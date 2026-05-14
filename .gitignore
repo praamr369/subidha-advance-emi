@@ -120,3 +120,10 @@ temp/
 # Project-specific
 # ------------------------------
 docs/_build/
+
+# Private backup/export artifacts
+backend/private_backups/
+*.backup
+*.dump
+*.sql
+local_setup_snapshot.json

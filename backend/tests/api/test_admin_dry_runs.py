@@ -5,6 +5,7 @@ from unittest.mock import patch
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from inventory.models import PurchaseNeed, PurchaseNeedStatus, Warehouse
 from subscriptions.models import DryRunValidationJob, Payment
 from subscriptions.services import dry_run_control_service as drs
 from tests.helpers import (
@@ -158,3 +159,28 @@ class AdminDryRunsApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Payment.objects.count(), before)
+
+    def test_stock_need_workflow_readiness_blocked_without_active_warehouse(self):
+        Warehouse.objects.all().delete()
+        rows = drs._check_stock_need_workflow_readiness()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["check"], "STOCK_NEED_WORKFLOW_READINESS")
+        self.assertEqual(rows[0]["status"], "BLOCKED")
+        self.assertEqual(rows[0]["action_href"], "/admin/inventory/locations")
+
+    def test_stock_need_workflow_readiness_pass_with_active_warehouse(self):
+        warehouse = Warehouse.objects.create(code="WH-READY", name="Readiness Warehouse", is_active=True)
+        PurchaseNeed.objects.create(
+            product=create_product(name="Readiness Product", product_code="RDY-P1"),
+            warehouse=warehouse,
+            required_quantity="2.000",
+            available_quantity="2.000",
+            shortage_quantity="0.000",
+            status=PurchaseNeedStatus.CLOSED,
+            source_module="GENERAL",
+            source_object_id="readiness-check",
+        )
+        rows = drs._check_stock_need_workflow_readiness()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["check"], "STOCK_NEED_WORKFLOW_READINESS")
+        self.assertEqual(rows[0]["status"], "PASS")

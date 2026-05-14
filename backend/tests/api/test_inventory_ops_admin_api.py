@@ -50,6 +50,20 @@ class AdminInventoryOpsApiTests(APITestCase):
         self.assertEqual(patch.status_code, status.HTTP_200_OK)
         self.assertEqual(patch.data["status"], "IN_REVIEW")
 
+    def test_non_admin_cannot_create_stock_location(self):
+        self.client.force_authenticate(user=self.partner)
+        response = self.client.post(
+            "/api/v1/inventory/locations/",
+            {
+                "code": "WH-NONADMIN",
+                "name": "Non Admin Warehouse",
+                "location_type": "WAREHOUSE",
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
 
 class AdminSalesDirectSaleOpsApiTests(APITestCase):
     def setUp(self):
