@@ -92,3 +92,23 @@ class PermissionBoundaryTests(APITestCase):
                 format="json",
             )
             self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_non_admin_roles_cannot_access_internal_user_management(self):
+        payload = {
+            "username": "blocked_internal_create",
+            "password": "BlockedPass123!",
+            "phone": "9007778889",
+            "role": "CASHIER",
+            "is_active": True,
+        }
+        for actor in (self.cashier, self.customer, self.partner, self.vendor):
+            self.client.force_authenticate(user=actor)
+            response = self.client.post("/api/v1/admin/internal-users/create/", payload, format="json")
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+
+    def test_non_admin_roles_cannot_modify_role_capability_matrix(self):
+        payload = {"capabilities": {"billing.collect": True}}
+        for actor in (self.cashier, self.customer, self.partner, self.vendor):
+            self.client.force_authenticate(user=actor)
+            response = self.client.patch("/api/v1/admin/settings/roles-permissions/roles/ADMIN/", payload, format="json")
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)

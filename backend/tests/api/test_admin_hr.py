@@ -90,3 +90,25 @@ class AdminHrApiTests(APITestCase):
         response = self.client.get("/api/v1/admin/hr/summary/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_customer_and_vendor_blocked_from_hr_apis(self):
+        customer = create_user(
+            username="hr_customer",
+            role="CUSTOMER",
+            phone="919300000099",
+            password="CustomerPass123!",
+        )
+        vendor = create_user(
+            username="hr_vendor",
+            role="VENDOR",
+            phone="919300000098",
+            password="VendorPass123!",
+        )
+
+        for actor in (customer, vendor):
+            self.client.force_authenticate(actor)
+            summary = self.client.get("/api/v1/admin/hr/summary/")
+            payroll = self.client.get("/api/v1/admin/hr/payroll/")
+            staff = self.client.get("/api/v1/admin/hr/staff/")
+            self.assertEqual(summary.status_code, status.HTTP_403_FORBIDDEN, summary.data)
+            self.assertEqual(payroll.status_code, status.HTTP_403_FORBIDDEN, payroll.data)
+            self.assertEqual(staff.status_code, status.HTTP_403_FORBIDDEN, staff.data)
