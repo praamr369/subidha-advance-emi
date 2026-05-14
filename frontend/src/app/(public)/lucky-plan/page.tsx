@@ -10,6 +10,7 @@ import { ADVANCE_EMI_POLICY, LUCKY_PLAN_FAQ, PUBLIC_LEGAL_DISCLAIMER_POINTS, REA
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { buildPublicMetadata } from "@/lib/public-seo";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -21,10 +22,18 @@ export const metadata: Metadata = buildPublicMetadata({
 export default async function LuckyPlanPage() {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
+  const banner = getPublicBannerWithFallback("luckyPlan");
   return (
     <PublicPageShell
       title={dictionary.common.luckyPlan}
       subtitle="Join a batch, receive a Lucky ID, pay monthly EMI, and follow transparent winner publication. Draws are run under published rules; participation does not guarantee a prize, and any waiver applies only to future EMI obligations as described in branch documents."
+      hero={{
+        eyebrow: "Advance EMI and Lucky Draw",
+        imageSrc: banner.src,
+        imageAlt: "Lucky Plan public banner",
+        imageExists: banner.exists,
+        badges: ["Future EMI waiver only", "No retroactive edits", "Auditable flow"],
+      }}
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.luckyPlan },

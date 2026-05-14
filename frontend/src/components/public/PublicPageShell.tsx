@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 
+import PublicHeroBanner from "@/components/public/PublicHeroBanner";
 import { cn } from "@/lib/utils";
 
 type Breadcrumb = { label: string; href?: string };
@@ -15,6 +16,17 @@ type PublicPageShellProps = {
   children: ReactNode;
   maxWidth?: number;
   className?: string;
+  hero?: {
+    eyebrow?: string;
+    imageSrc?: string;
+    imageAlt?: string;
+    imageExists?: boolean;
+    imagePosition?: "left" | "right" | "center";
+    badges?: readonly string[];
+    compact?: boolean;
+    legalVariant?: boolean;
+    imagePriority?: boolean;
+  };
 };
 
 export default function PublicPageShell({
@@ -25,7 +37,11 @@ export default function PublicPageShell({
   children,
   maxWidth = 1280,
   className,
+  hero,
 }: PublicPageShellProps) {
+  const primaryAction = actions.find((action) => action.variant === "primary");
+  const secondaryAction = actions.find((action) => action.variant !== "primary");
+
   return (
     <main
       className={cn(
@@ -62,43 +78,21 @@ export default function PublicPageShell({
         </nav>
       ) : null}
 
-      <header className="public-hero p-7 sm:p-10">
-        <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-slate-200/90 to-transparent" />
-        <div className="pointer-events-none absolute -right-20 top-0 h-48 w-48 rounded-full bg-slate-200/40 blur-3xl" />
-        <div className="pointer-events-none absolute left-0 top-24 h-40 w-40 rounded-full bg-amber-200/25 blur-3xl" />
-
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              {title}
-            </h1>
-            {subtitle ? (
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                {subtitle}
-              </p>
-            ) : null}
-          </div>
-
-          {actions.length > 0 ? (
-            <div className="flex flex-wrap gap-3">
-              {actions.map((action) => (
-                <Link
-                  key={action.href}
-                  href={action.href}
-                  className={cn(
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-                    action.variant === "primary"
-                      ? "public-action-primary focus-visible:ring-[var(--ring)]"
-                      : "public-action-secondary focus-visible:ring-[var(--ring)]/60"
-                  )}
-                >
-                  {action.label}
-                </Link>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </header>
+      <PublicHeroBanner
+        title={title}
+        subtitle={subtitle}
+        eyebrow={hero?.eyebrow}
+        imageSrc={hero?.imageSrc}
+        imageAlt={hero?.imageAlt}
+        imageExists={hero?.imageExists}
+        imagePosition={hero?.imagePosition}
+        badges={hero?.badges}
+        compact={hero?.compact}
+        legalVariant={hero?.legalVariant}
+        imagePriority={hero?.imagePriority}
+        secondaryAction={secondaryAction}
+        primaryAction={primaryAction}
+      />
 
       {children}
     </main>

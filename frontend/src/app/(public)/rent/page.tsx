@@ -6,6 +6,7 @@ import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicPolicySection from "@/components/public/PublicPolicySection";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import { READ_BEFORE_APPLY, RENT_POLICY, PUBLIC_LEGAL_DISCLAIMER_POINTS } from "@/lib/public-content";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
@@ -16,10 +17,18 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default function RentPolicyPage() {
+  const banner = getPublicBannerWithFallback("rentLease");
   return (
     <PublicPageShell
       title="Rent policy"
       subtitle="Short-term and flexible furniture usage rules explained clearly for customers."
+      hero={{
+        eyebrow: "Rent workflow",
+        imageSrc: banner.src,
+        imageAlt: "Rent and lease banner image",
+        imageExists: banner.exists,
+        badges: ["Refundable deposit subject to terms", "Inspection on return"],
+      }}
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Rent policy" },

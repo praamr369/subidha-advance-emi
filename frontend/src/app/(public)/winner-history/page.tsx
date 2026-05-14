@@ -8,6 +8,7 @@ import WinnerHistoryProductCarousel from "@/components/public/WinnerHistoryProdu
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { buildPublicMetadata } from "@/lib/public-seo";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { ROUTES } from "@/lib/routes";
 import { getPublicWinnerHistory, type PublicWinner } from "@/lib/public-api";
 import WinnerHistoryTableClient from "./WinnerHistoryTableClient";
@@ -21,6 +22,7 @@ export const metadata: Metadata = buildPublicMetadata({
 export default async function WinnerHistoryPage() {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
+  const banner = getPublicBannerWithFallback("winners");
   let winners: PublicWinner[] = [];
   let error: string | null = null;
 
@@ -35,6 +37,13 @@ export default async function WinnerHistoryPage() {
     <PublicPageShell
       title={dictionary.common.winnerHistory}
       subtitle="Archive from live draw records."
+      hero={{
+        eyebrow: "Public archive",
+        imageSrc: banner.src,
+        imageAlt: "Winner history banner",
+        imageExists: banner.exists,
+        badges: ["Historical transparency", "No fabricated winners"],
+      }}
       breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.winnerHistory }]}
       actions={[
         { label: dictionary.common.winners, href: ROUTES.public.winners, variant: "secondary" },

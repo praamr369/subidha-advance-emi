@@ -6,6 +6,7 @@ import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicPolicySection from "@/components/public/PublicPolicySection";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import { LEASE_POLICY, PUBLIC_LEGAL_DISCLAIMER_POINTS, READ_BEFORE_APPLY } from "@/lib/public-content";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
@@ -16,10 +17,18 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default function LeasePolicyPage() {
+  const banner = getPublicBannerWithFallback("rentLease");
   return (
     <PublicPageShell
       title="Lease policy"
       subtitle="Longer-term furniture access with contract-backed controls and approval checkpoints."
+      hero={{
+        eyebrow: "Lease workflow",
+        imageSrc: banner.src,
+        imageAlt: "Lease policy banner image",
+        imageExists: banner.exists,
+        badges: ["Contract-backed terms", "Return and condition checks"],
+      }}
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Lease policy" },

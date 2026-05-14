@@ -6,6 +6,7 @@ import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import PolicyMarkdown from "@/components/public/PolicyMarkdown";
 import { getPublicPolicyBySlug } from "@/lib/public-api";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { ROUTES } from "@/lib/routes";
 
 type PolicyPublicPageProps = {
@@ -22,11 +23,26 @@ export default async function PolicyPublicPage({
   heroSubtitle,
 }: PolicyPublicPageProps) {
   const policy = await getPublicPolicyBySlug(slug);
+  const policyBanner = getPublicBannerWithFallback("policies");
 
   return (
     <PublicPageShell
       title={heroTitle}
       subtitle={heroSubtitle}
+      hero={{
+        eyebrow: "Legal and policy",
+        imageSrc: policyBanner.src,
+        imageAlt: "Subidha Furniture legal and policy banner",
+        imageExists: policyBanner.exists,
+        compact: true,
+        legalVariant: true,
+        badges: policy
+          ? [
+              `Status: published v${policy.version}`,
+              policy.effective_date ? `Effective: ${policy.effective_date}` : "Effective date pending",
+            ]
+          : ["Status: under review"],
+      }}
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Business policies", href: ROUTES.public.policies },

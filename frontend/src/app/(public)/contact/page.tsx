@@ -9,6 +9,7 @@ import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
 import { buildPublicMetadata } from "@/lib/public-seo";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { ROUTES } from "@/lib/routes";
 import ContactLeadForm from "./ContactLeadForm";
 
@@ -22,11 +23,19 @@ export default async function ContactPage() {
   const profile = await getResolvedPublicBusinessProfile();
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
+  const banner = getPublicBannerWithFallback("contact");
 
   return (
     <PublicPageShell
       title={dictionary.common.contact}
       subtitle="Call, visit, or send an enquiry. Our team will guide you in simple steps."
+      hero={{
+        eyebrow: "Contact and support",
+        imageSrc: banner.src,
+        imageAlt: "Subidha contact banner image",
+        imageExists: banner.exists,
+        badges: ["Phone support", "Branch help", "Enquiry follow-up"],
+      }}
       breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.contact }]}
       actions={[
         { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },

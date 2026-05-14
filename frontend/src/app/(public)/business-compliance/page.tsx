@@ -6,6 +6,7 @@ import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import PolicyMarkdown from "@/components/public/PolicyMarkdown";
 import { getPublicBusinessComplianceSummary, getPublicPolicyBySlug } from "@/lib/public-api";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
@@ -16,6 +17,7 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default async function BusinessCompliancePolicyPage() {
+  const banner = getPublicBannerWithFallback("policies");
   const [summary, policy] = await Promise.all([
     getPublicBusinessComplianceSummary().catch(() => null),
     getPublicPolicyBySlug("business-compliance").catch(() => null),
@@ -25,6 +27,15 @@ export default async function BusinessCompliancePolicyPage() {
     <PublicPageShell
       title="Business Registration and Compliance"
       subtitle="Public-safe compliance disclosure with no private-document exposure and no fake registration claims."
+      hero={{
+        eyebrow: "Business compliance",
+        imageSrc: banner.src,
+        imageAlt: "Business compliance policy banner",
+        imageExists: banner.exists,
+        compact: true,
+        legalVariant: true,
+        badges: ["No fake GST/Udyam claims", policy ? "Status: published" : "Status: under review"],
+      }}
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Business policies", href: ROUTES.public.policies },

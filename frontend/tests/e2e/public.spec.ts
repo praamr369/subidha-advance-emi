@@ -16,11 +16,7 @@ test("public home loads with apply nav, live stats, and latest winner widget", a
     page.getByRole("img", { name: "Subidha Furniture logo" }).first()
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Apply" }).first()).toBeVisible();
-  await expect(
-    page.getByRole("heading", {
-      name: /Furniture and appliances with clear monthly plans/i,
-    })
-  ).toBeVisible();
+  await expect(page.locator(".public-hero-banner").first()).toBeVisible();
   await expect(page.getByText("Published batches").first()).toBeVisible();
   await expect(page.getByText("Latest winner").first()).toBeVisible();
 });
@@ -59,7 +55,7 @@ test("public product enquiry routes into apply and the apply form submits", asyn
     page.getByRole("main").getByText("Base price", { exact: true }).first()
   ).toBeVisible();
   await expect(page.getByText("Product code").first()).toBeVisible();
-  await page.getByRole("link", { name: "Enquire Now" }).click();
+  await page.getByRole("link", { name: /^Enquire$/ }).first().click();
   await expect(page).toHaveURL(/\/apply\?/);
   await expect(page.getByText("Selected Product Context")).toBeVisible();
 
@@ -82,8 +78,8 @@ test("public product detail keeps enquiry workflow and catalogue facts visible",
   await page.goto(`/products/${manifest.entities.public.product_id}`);
   await expect(page.getByText("Product code").first()).toBeVisible();
   await expect(page.getByText("Media state").first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Enquire Now" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Contact branch" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Enquire$/ }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Contact$/ }).first()).toBeVisible();
 });
 
 test("public winner history page loads with live data", async ({ page }) => {

@@ -669,6 +669,57 @@ body {
     0 18px 42px -34px rgba(15, 23, 42, 0.46);
 }
 
+.public-hero-banner {
+  will-change: transform, opacity;
+}
+
+.public-hero-image-motion {
+  transform: scale(1.02);
+  transition: transform 900ms ease, opacity 600ms ease;
+}
+
+.public-hero-banner:hover .public-hero-image-motion {
+  transform: scale(1.06);
+}
+
+.public-card-animated {
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.public-card-animated:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 28px 64px -44px rgba(15, 23, 42, 0.68);
+}
+
+.public-reveal {
+  animation: public-fade-up 560ms ease both;
+}
+
+.public-trust-badge {
+  animation: trust-breathe 4s ease-in-out infinite;
+}
+
+@keyframes public-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes trust-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
 input::placeholder,
 textarea::placeholder {
   color: color-mix(in oklab, var(--muted-foreground) 88%, var(--foreground) 12%);
@@ -855,6 +906,14 @@ a, button, input, select, textarea {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  .public-reveal,
+  .public-trust-badge,
+  .public-hero-image-motion {
+    animation: none !important;
+    transform: none !important;
+    transition: none !important;
   }
 }
 

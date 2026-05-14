@@ -10,6 +10,7 @@ import { buildPublicMetadata, getPublicDictionary } from "@/lib/public-i18n";
 import { PUBLIC_LEGAL_DISCLAIMER_POINTS, PUBLIC_PURPOSE_BADGES } from "@/lib/public-content";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { ROUTES } from "@/lib/routes";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getPublicLocale();
@@ -24,11 +25,19 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AboutPage() {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
+  const banner = getPublicBannerWithFallback("about");
 
   return (
     <PublicPageShell
       title={dictionary.nav.links[6]}
       subtitle="We are a local retail business helping families own furniture, electronics, and appliances through practical monthly plans."
+      hero={{
+        eyebrow: "About Subidha Furniture",
+        imageSrc: banner.src,
+        imageAlt: "About Subidha Furniture banner image",
+        imageExists: banner.exists,
+        badges: ["Asansol local brand", "Operational transparency", "Service-first promise"],
+      }}
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.nav.links[6] },

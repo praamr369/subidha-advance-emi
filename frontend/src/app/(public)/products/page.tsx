@@ -8,6 +8,7 @@ import { getPublicLocale } from "@/lib/public-i18n.server";
 import { ROUTES } from "@/lib/routes";
 import { listPublicProducts, type PublicProduct } from "@/lib/public-api";
 import { buildPublicMetadata } from "@/lib/public-seo";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import ProductGrid from "./ProductGrid";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -19,6 +20,7 @@ export const metadata: Metadata = buildPublicMetadata({
 export default async function ProductsPage() {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
+  const banner = getPublicBannerWithFallback("products");
 
   let products: PublicProduct[] = [];
   let count = 0;
@@ -38,6 +40,13 @@ export default async function ProductsPage() {
     <PublicPageShell
       title={dictionary.common.products}
       subtitle="Browse the live catalogue and enquire with your preferred product in one flow."
+      hero={{
+        eyebrow: "Live catalogue",
+        imageSrc: banner.src,
+        imageAlt: "Subidha Furniture products banner",
+        imageExists: banner.exists,
+        badges: ["Real endpoint data", "No mock prices", "No fake stock"],
+      }}
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.products },

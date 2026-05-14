@@ -5,6 +5,7 @@ import CtaBanner from "@/components/public/CtaBanner";
 import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import { listPublicPolicies } from "@/lib/public-api";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
@@ -34,11 +35,21 @@ const routeMap: Record<string, string> = {
 
 export default async function PublicPoliciesPage() {
   const payload = await listPublicPolicies().catch(() => ({ count: 0, results: [] }));
+  const banner = getPublicBannerWithFallback("policies");
 
   return (
     <PublicPageShell
       title="Business policies"
       subtitle="Only published policies are shown here. Draft or archived legal text is not publicly visible."
+      hero={{
+        eyebrow: "Legal governance",
+        imageSrc: banner.src,
+        imageAlt: "Subidha legal policy banner",
+        imageExists: banner.exists,
+        compact: true,
+        legalVariant: true,
+        badges: ["Published policies only", "Review-gated content"],
+      }}
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Business policies" },

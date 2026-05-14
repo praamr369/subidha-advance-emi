@@ -7,6 +7,7 @@ import WinnerSpotlight from "@/components/public/WinnerSpotlight";
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { buildPublicMetadata } from "@/lib/public-seo";
+import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { ROUTES } from "@/lib/routes";
 import { getPublicLatestWinner, getPublicWinners, type PublicWinner } from "@/lib/public-api";
 
@@ -38,6 +39,7 @@ function WinnerCard({ winner }: { winner: PublicWinner }) {
 export default async function WinnersPage() {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
+  const banner = getPublicBannerWithFallback("winners");
   let error: string | null = null;
   let latestWinner: PublicWinner | null = null;
   let winners: PublicWinner[] = [];
@@ -54,6 +56,13 @@ export default async function WinnersPage() {
     <PublicPageShell
       title={dictionary.common.winners}
       subtitle="Only rows returned by the public draw API are shown. Names appear in a privacy-safe masked form; internal customer identifiers are never listed here."
+      hero={{
+        eyebrow: "Winner publication",
+        imageSrc: banner.src,
+        imageAlt: "Subidha winners banner",
+        imageExists: banner.exists,
+        badges: ["Masked identity", "Live draw records", "Future EMI waiver only"],
+      }}
       breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.winners }]}
       actions={[
         { label: dictionary.common.winnerHistory, href: ROUTES.public.winnerHistory, variant: "secondary" },
