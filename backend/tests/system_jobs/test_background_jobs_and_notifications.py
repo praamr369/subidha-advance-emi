@@ -13,7 +13,7 @@ from reminders.services.emi_reminder_jobs import generate_emi_due_reminders_for_
 from system_jobs.models import Notification, SystemJobLog, SystemJobStatus
 from system_jobs.services.job_runner import run_idempotent_job
 from system_jobs.services.notifications import emit_notification
-from system_jobs.tasks import daily_emi_due_reminders
+from system_jobs.tasks import daily_emi_due_reminders, daily_inventory_reorder_check
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -149,6 +149,37 @@ class IdempotentJobAndNotificationTests(APITestCase):
                 title="EMI due reminder job failed",
             ).exists()
         )
+
+    @patch("inventory.services.demand_service.get_purchase_suggestions")
+    def test_inventory_reorder_task_creates_per_source_stock_low_alert_once(self, mock_suggestions):
+        mock_suggestions.return_value = [
+            {
+                "product_id": 101,
+                "product_code": "INV-101",
+                "product_name": "Low Item 101",
+                "trigger": "LOW_STOCK",
+                "physical_stock": "1.000",
+                "available_stock": "1.000",
+                "low_stock_threshold": "5.000",
+                "suggested_order_quantity": "4.000",
+            },
+            {
+                "product_id": 102,
+                "product_code": "INV-102",
+                "product_name": "Low Item 102",
+                "trigger": "SHORTAGE",
+                "physical_stock": "2.000",
+                "available_stock": "0.000",
+                "low_stock_threshold": "2.000",
+                "suggested_order_quantity": "3.000",
+            },
+        ]
+        daily_inventory_reorder_check()
+        daily_inventory_reorder_check()
+        stock_low = Notification.objects.filter(module="inventory", title="Stock low alert")
+        self.assertEqual(stock_low.count(), 2)
+        self.assertTrue(stock_low.filter(payload__product_id=101).exists())
+        self.assertTrue(stock_low.filter(payload__product_id=102).exists())
 
 
 class NotificationApiTests(APITestCase):

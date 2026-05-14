@@ -13,6 +13,7 @@ from subscriptions.models import Payment
 from subscriptions.services.phase5_filter_service import parse_admin_report_filters, SUPPORTED_FILTERS
 from subscriptions.services.reports_center_service import REPORT_KEYS, run_report
 from tests.helpers import create_admin_user
+from tests.helpers import create_cashier_user
 
 
 class ReportsCenterApiTests(APITestCase):
@@ -84,3 +85,9 @@ class ReportsCenterApiTests(APITestCase):
         self.client.get("/api/v1/admin/reports-center/reports/payment-method/", {"date_from": "2026-01-01"})
         after = Payment.objects.count()
         self.assertEqual(before, after)
+
+    def test_non_admin_cannot_access_reports_center(self):
+        cashier = create_cashier_user(username="rc_cashier", phone="9306000002")
+        self.client.force_authenticate(user=cashier)
+        response = self.client.get("/api/v1/admin/reports-center/catalog/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

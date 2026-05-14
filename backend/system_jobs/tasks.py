@@ -1,6 +1,29 @@
 from __future__ import annotations
 
-from celery import shared_task
+try:
+    from celery import shared_task
+except ModuleNotFoundError:  # pragma: no cover - local/test environments without Celery
+    class _FallbackTaskRequest:
+        id = ""
+
+    class _FallbackTaskSelf:
+        request = _FallbackTaskRequest()
+
+    def shared_task(*_args, **_kwargs):
+        bind = bool(_kwargs.get("bind"))
+
+        def decorator(func):
+            if not bind:
+                return func
+
+            def _wrapped(*args, **kwargs):
+                if args:
+                    return func(*args, **kwargs)
+                return func(_FallbackTaskSelf(), **kwargs)
+
+            return _wrapped
+
+        return decorator
 from django.utils import timezone
 
 from reminders.services.emi_reminder_jobs import (
@@ -11,7 +34,7 @@ from reminders.services.rent_reminder_generation import generate_rent_due_remind
 from system_jobs.models import SystemJobStatus
 from system_jobs.services.broadcast import notify_all_active_admins
 from system_jobs.services.job_runner import run_idempotent_job
-from system_jobs.services.notifications import notify_admins_of_job
+from system_jobs.services.notifications import emit_notification, notify_admins_of_job
 
 
 @shared_task(name="system_jobs.tasks.daily_emi_due_reminders", bind=True)
@@ -160,16 +183,41 @@ def daily_inventory_reorder_check(self):
         from inventory.services.demand_service import get_purchase_suggestions
 
         suggestions = get_purchase_suggestions(product_ids=None)
+        per_source_created = 0
+        for item in suggestions[:200]:
+            product_id = item.get("product_id")
+            if not product_id:
+                continue
+            dedupe_key = f"{key}:product:{product_id}"
+            _notification, created = emit_notification(
+                module="inventory",
+                title="Stock low alert",
+                body=f"{item.get('product_name') or 'Product'} requires review ({item.get('trigger') or 'LOW_STOCK'}).",
+                payload={
+                    "product_id": product_id,
+                    "product_code": item.get("product_code"),
+                    "product_name": item.get("product_name"),
+                    "trigger": item.get("trigger"),
+                    "physical_stock": str(item.get("physical_stock") or ""),
+                    "available_stock": str(item.get("available_stock") or ""),
+                    "low_stock_threshold": str(item.get("low_stock_threshold") or ""),
+                    "suggested_order_quantity": str(item.get("suggested_order_quantity") or ""),
+                },
+                dedupe_key=dedupe_key,
+                source_job=log,
+            )
+            if created:
+                per_source_created += 1
         if suggestions:
             notify_all_active_admins(
                 module="inventory",
                 title="Inventory reorder suggestions",
                 body=f"{len(suggestions)} product(s) need review based on stock and demand.",
                 dedupe_prefix=f"{key}:notify",
-                payload={"count": len(suggestions)},
+                payload={"count": len(suggestions), "per_source_alerts_created": per_source_created},
                 source_job=log,
             )
-        return {"count": len(suggestions)}
+        return {"count": len(suggestions), "per_source_alerts_created": per_source_created}
 
     log, meta = run_idempotent_job(
         idempotency_key=key,
