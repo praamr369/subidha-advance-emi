@@ -20,6 +20,7 @@ const links = [
   { href: ROUTES.admin.brandData, label: "Brand Data Center" },
   { href: "/admin/settings/business-setup/checklist", label: "Checklist" },
   { href: ROUTES.admin.settingsBusinessSetupDryRuns, label: "Dry runs" },
+  { href: ROUTES.admin.settingsBusinessSetupReset, label: "Reset / Backup / Restore" },
 ];
 
 export default function BusinessSetupLinks() {

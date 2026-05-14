@@ -1,0 +1,20 @@
+export type SetupReadiness = {
+  business_profile_configured: boolean;
+  active_tax_profile_exists: boolean;
+  active_tax_profile_is_gst_unregistered: boolean;
+  coa_exists: boolean;
+  finance_accounts_exist: boolean;
+  payment_collection_account_exists: boolean;
+  operational_mappings_complete: boolean;
+  branch_exists: boolean;
+  counter_exists: boolean;
+  warehouse_exists: boolean;
+  product_category_exists: boolean;
+  posting_profiles_exist: boolean;
+  ready_for_direct_sale: boolean;
+  ready_for_advance_emi: boolean;
+  ready_for_rent_lease: boolean;
+  ready_for_purchase: boolean;
+  blocking_issues: string[];
+  warnings: string[];
+};

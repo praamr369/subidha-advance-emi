@@ -779,3 +779,73 @@ class ChartAccount(BusinessSetupTimeStampedModel):
 
     def __str__(self):
         return f"{self.code} - {self.name}"
+
+
+class BusinessDataBackupJob(BusinessSetupTimeStampedModel):
+    class JobType(models.TextChoices):
+        FULL_DATABASE_LOGICAL = "FULL_DATABASE_LOGICAL", "Full database logical"
+        SELECTED_SCOPES_EXPORT = "SELECTED_SCOPES_EXPORT", "Selected scopes export"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        RUNNING = "RUNNING", "Running"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+        EXPIRED = "EXPIRED", "Expired"
+
+    job_type = models.CharField(max_length=40, choices=JobType.choices, db_index=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING, db_index=True)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="requested_business_backup_jobs",
+    )
+    scopes = models.JSONField(default=list)
+    file_path = models.CharField(max_length=500, blank=True, default="")
+    checksum = models.CharField(max_length=128, blank=True, default="")
+    row_counts = models.JSONField(default=dict)
+    metadata = models.JSONField(default=dict)
+    error_message = models.TextField(blank=True, default="")
+    completed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "business_data_backup_jobs"
+        ordering = ["-created_at", "-id"]
+
+
+class BusinessDataRestoreJob(BusinessSetupTimeStampedModel):
+    class Status(models.TextChoices):
+        PREVIEWED = "PREVIEWED", "Previewed"
+        RUNNING = "RUNNING", "Running"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PREVIEWED, db_index=True)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="requested_business_restore_jobs",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="approved_business_restore_jobs",
+        null=True,
+        blank=True,
+    )
+    backup_job = models.ForeignKey(
+        "subscriptions.BusinessDataBackupJob",
+        on_delete=models.PROTECT,
+        related_name="restore_jobs",
+    )
+    package_type = models.CharField(max_length=64, blank=True, default="")
+    package_checksum = models.CharField(max_length=128, blank=True, default="")
+    selected_scopes = models.JSONField(default=list)
+    preview = models.JSONField(default=dict)
+    error_message = models.TextField(blank=True, default="")
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "business_data_restore_jobs"
+        ordering = ["-created_at", "-id"]

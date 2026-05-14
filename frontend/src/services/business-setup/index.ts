@@ -125,3 +125,79 @@ export async function executeBusinessReset(payload: BusinessResetExecuteRequest)
     body: payload,
   });
 }
+
+export type ResetScope = {
+  code: string;
+  label: string;
+  danger_level: string;
+  requires_backup: boolean;
+  model_labels: string[];
+};
+
+export async function getResetScopes(): Promise<{ scopes: ResetScope[] }> {
+  return apiFetch<{ scopes: ResetScope[] }>("/admin/business-setup/reset-scopes/");
+}
+
+export async function getModularResetPreview(payload: {
+  scopes: string[];
+  preserve_username: string;
+  preserve_user_ids?: number[];
+}): Promise<Record<string, unknown>> {
+  return apiFetch<Record<string, unknown>>("/admin/business-setup/reset-preview-v2/", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function executeModularReset(payload: {
+  scopes: string[];
+  preserve_username: string;
+  confirmation_phrase: string;
+  backup_job_id?: number;
+}): Promise<Record<string, unknown>> {
+  return apiFetch<Record<string, unknown>>("/admin/business-setup/reset-v2/", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function createBackupJob(payload: {
+  job_type: "FULL_DATABASE_LOGICAL" | "SELECTED_SCOPES_EXPORT";
+  scopes: string[];
+}): Promise<{ id: number; status: string; checksum: string }> {
+  return apiFetch("/admin/business-setup/backups/", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function listBackupJobs(): Promise<{ jobs: Array<Record<string, unknown>> }> {
+  return apiFetch("/admin/business-setup/backups/");
+}
+
+export async function getRestorePreview(payload: {
+  restore_type?: "FULL_BACKUP_RESTORE_PREVIEW" | "SELECTED_SCOPE_RESTORE_PREVIEW" | "SETUP_SNAPSHOT_RESTORE_PREVIEW" | "LOCAL_SANDBOX_RESTORE_PREVIEW";
+  backup_job_id?: number;
+  scopes?: string[];
+  snapshot_payload?: Record<string, unknown>;
+  preserve_admin_username?: string;
+}): Promise<Record<string, unknown>> {
+  return apiFetch("/admin/business-setup/restore/preview/", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function executeRestore(payload: {
+  restore_job_id: number;
+  confirmation_phrase: string;
+}): Promise<Record<string, unknown>> {
+  return apiFetch("/admin/business-setup/restore/", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function listRestoreJobs(): Promise<{ jobs: Array<Record<string, unknown>> }> {
+  return apiFetch("/admin/business-setup/restore-jobs/");
+}

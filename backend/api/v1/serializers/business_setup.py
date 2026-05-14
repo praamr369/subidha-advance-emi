@@ -115,3 +115,62 @@ class BusinessResetResponseSerializer(serializers.Serializer):
     deleted_counts = serializers.DictField(required=False)
     post_reset_checklist = serializers.DictField(required=False)
     next_setup_steps = serializers.ListField(child=serializers.CharField(), required=False)
+
+
+class ResetScopePreviewRequestSerializer(serializers.Serializer):
+    scopes = serializers.ListField(child=serializers.CharField(max_length=80), min_length=1)
+    preserve_username = serializers.CharField()
+    preserve_user_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False, default=list)
+
+
+class ModularResetExecuteRequestSerializer(serializers.Serializer):
+    scopes = serializers.ListField(child=serializers.CharField(max_length=80), min_length=1)
+    preserve_username = serializers.CharField()
+    confirmation_phrase = serializers.CharField()
+    backup_job_id = serializers.IntegerField(required=False)
+
+
+class BackupJobCreateSerializer(serializers.Serializer):
+    job_type = serializers.ChoiceField(choices=["FULL_DATABASE_LOGICAL", "SELECTED_SCOPES_EXPORT"])
+    scopes = serializers.ListField(child=serializers.CharField(max_length=80), min_length=1)
+
+
+class RestorePreviewRequestSerializer(serializers.Serializer):
+    restore_type = serializers.ChoiceField(
+        choices=[
+            "FULL_BACKUP_RESTORE_PREVIEW",
+            "SELECTED_SCOPE_RESTORE_PREVIEW",
+            "SETUP_SNAPSHOT_RESTORE_PREVIEW",
+            "LOCAL_SANDBOX_RESTORE_PREVIEW",
+        ],
+        required=False,
+        default="FULL_BACKUP_RESTORE_PREVIEW",
+    )
+    backup_job_id = serializers.IntegerField(min_value=1, required=False)
+    scopes = serializers.ListField(child=serializers.CharField(max_length=80), required=False, default=list)
+    snapshot_payload = serializers.JSONField(required=False)
+    preserve_admin_username = serializers.CharField(required=False, allow_blank=True)
+
+
+class RestoreExecuteRequestSerializer(serializers.Serializer):
+    restore_job_id = serializers.IntegerField(min_value=1)
+    confirmation_phrase = serializers.CharField()
+
+
+class SetupSnapshotImportSerializer(serializers.Serializer):
+    payload = serializers.JSONField()
+    dry_run = serializers.BooleanField(default=True)
+    confirm = serializers.BooleanField(default=False)
+
+
+class LocalSandboxSeedSerializer(serializers.Serializer):
+    confirm = serializers.BooleanField(default=False)
+
+
+class LocalSandboxResetSerializer(serializers.Serializer):
+    scopes = serializers.ListField(child=serializers.CharField(max_length=64), min_length=1)
+    preserve_admin_username = serializers.CharField()
+    preserve_setup = serializers.BooleanField(default=True)
+    confirm_phrase = serializers.CharField()
+    dry_run = serializers.BooleanField(default=True)
+    sandbox_only = serializers.BooleanField(default=True)

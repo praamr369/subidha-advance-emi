@@ -251,6 +251,8 @@ export const ROUTES = {
     settingsPolicies: "/admin/settings/policies",
     settingsBusinessCompliance: "/admin/settings/business-compliance",
     settingsBusinessSetupDryRuns: "/admin/settings/business-setup/dry-runs",
+    settingsBusinessSetupReset: "/admin/settings/business-setup/reset",
+    settingsLocalSandbox: "/admin/settings/local-sandbox",
     complianceTaxProfile: "/admin/compliance/tax-profile",
     complianceTaxReadiness: "/admin/compliance/tax-readiness",
     complianceProductTaxProfiles: "/admin/compliance/product-tax-profiles",

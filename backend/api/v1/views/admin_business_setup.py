@@ -5,13 +5,22 @@ from rest_framework.views import APIView
 from accounts.capabilities import require_capability
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.business_setup import (
+    BackupJobCreateSerializer,
     BusinessProfileSerializer,
     BusinessResetRequestSerializer,
     BusinessResetResponseSerializer,
     DocumentNumberingStateSerializer,
     DocumentNumberingUpdateSerializer,
+    ModularResetExecuteRequestSerializer,
+    ResetScopePreviewRequestSerializer,
+    RestoreExecuteRequestSerializer,
+    SetupSnapshotImportSerializer,
+    LocalSandboxSeedSerializer,
+    LocalSandboxResetSerializer,
+    RestorePreviewRequestSerializer,
     SetupChecklistSerializer,
 )
+from subscriptions.models_business_setup import BusinessDataBackupJob, BusinessDataRestoreJob
 from subscriptions.services.business_setup_service import (
     get_active_business_profile,
     get_reset_preview,
@@ -28,7 +37,22 @@ from subscriptions.services.document_numbering_service import (
     get_document_numbering_state,
     upsert_document_numbering,
 )
+from subscriptions.services.business_reset_governance_service import (
+    build_reset_preview,
+    create_backup_job,
+    create_restore_preview,
+    create_setup_snapshot_restore_preview,
+    execute_modular_reset,
+    execute_restore,
+    list_backup_jobs,
+    list_reset_scopes,
+)
+from subscriptions.services.setup_readiness_service import get_setup_readiness
+from subscriptions.services.setup_snapshot_service import export_setup_snapshot, import_setup_snapshot
+from subscriptions.services.local_sandbox_seed_service import seed_local_sandbox
+from subscriptions.services.selective_reset_service import execute_selective_reset
 from subscriptions.services.setup_checklist_service import compute_setup_checklist
+from django.conf import settings
 
 
 class AdminBusinessProfileView(APIView):
@@ -178,3 +202,305 @@ class BusinessSetupResetExecuteView(APIView):
         ]
         response_serializer = BusinessResetResponseSerializer(instance=payload)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+class BusinessSetupResetScopesView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        return Response({"scopes": list_reset_scopes()}, status=status.HTTP_200_OK)
+
+
+class BusinessSetupModularResetPreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        serializer = ResetScopePreviewRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        payload = build_reset_preview(
+            scopes=list(data["scopes"]),
+            preserve_username=data["preserve_username"],
+            preserve_user_ids=list(data.get("preserve_user_ids") or []),
+        )
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class BusinessSetupModularResetExecuteView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    @require_capability("business_setup.reset")
+    def post(self, request):
+        serializer = ModularResetExecuteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            payload = execute_modular_reset(
+                scopes=list(data["scopes"]),
+                preserve_username=data["preserve_username"],
+                confirmation_phrase=data["confirmation_phrase"],
+                backup_job_id=data.get("backup_job_id"),
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class BusinessSetupBackupJobsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        jobs = list_backup_jobs(limit=100)
+        return Response(
+            {
+                "jobs": [
+                    {
+                        "id": job.id,
+                        "job_type": job.job_type,
+                        "status": job.status,
+                        "scopes": job.scopes,
+                        "checksum": job.checksum,
+                        "row_counts": job.row_counts,
+                        "created_at": job.created_at,
+                        "completed_at": job.completed_at,
+                        "expires_at": job.expires_at,
+                        "requested_by": getattr(job.requested_by, "username", None),
+                    }
+                    for job in jobs
+                ]
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request):
+        serializer = BackupJobCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = create_backup_job(
+            requested_by=request.user,
+            scopes=list(serializer.validated_data["scopes"]),
+            job_type=serializer.validated_data["job_type"],
+        )
+        return Response({"id": job.id, "status": job.status, "checksum": job.checksum}, status=status.HTTP_201_CREATED)
+
+
+class BusinessSetupBackupJobDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        job = BusinessDataBackupJob.objects.select_related("requested_by").filter(pk=pk).first()
+        if not job:
+            return Response({"detail": "Backup job not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {
+                "id": job.id,
+                "job_type": job.job_type,
+                "status": job.status,
+                "scopes": job.scopes,
+                "checksum": job.checksum,
+                "file_path": job.file_path,
+                "row_counts": job.row_counts,
+                "metadata": job.metadata,
+                "error_message": job.error_message,
+                "requested_by": getattr(job.requested_by, "username", None),
+                "created_at": job.created_at,
+                "completed_at": job.completed_at,
+                "expires_at": job.expires_at,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class BusinessSetupBackupJobDownloadView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        from pathlib import Path
+        from django.http import FileResponse
+
+        job = BusinessDataBackupJob.objects.filter(pk=pk).first()
+        if not job:
+            return Response({"detail": "Backup job not found."}, status=status.HTTP_404_NOT_FOUND)
+        file_path = Path(job.file_path)
+        if not file_path.exists():
+            return Response({"detail": "Backup file not found on server."}, status=status.HTTP_404_NOT_FOUND)
+        return FileResponse(open(file_path, "rb"), as_attachment=True, filename=file_path.name)
+
+
+class BusinessSetupRestorePreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        serializer = RestorePreviewRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        restore_type = data.get("restore_type") or "FULL_BACKUP_RESTORE_PREVIEW"
+        try:
+            if restore_type == "SETUP_SNAPSHOT_RESTORE_PREVIEW":
+                payload = data.get("snapshot_payload")
+                if not isinstance(payload, dict):
+                    return Response({"detail": "snapshot_payload JSON object is required for setup snapshot preview."}, status=status.HTTP_400_BAD_REQUEST)
+                preserve_admin = (data.get("preserve_admin_username") or request.user.username or "").strip()
+                job = create_setup_snapshot_restore_preview(
+                    requested_by=request.user,
+                    snapshot_payload=payload,
+                    preserve_admin_username=preserve_admin,
+                )
+            else:
+                backup_job_id = data.get("backup_job_id")
+                if not backup_job_id:
+                    return Response({"detail": "backup_job_id is required for this restore preview type."}, status=status.HTTP_400_BAD_REQUEST)
+                backup_job = BusinessDataBackupJob.objects.filter(pk=backup_job_id).first()
+                if not backup_job:
+                    return Response({"detail": "Backup job not found."}, status=status.HTTP_404_NOT_FOUND)
+                job = create_restore_preview(
+                    requested_by=request.user,
+                    backup_job=backup_job,
+                    scopes=list(data.get("scopes") or []),
+                )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"restore_job_id": job.id, "status": job.status, "preview": job.preview}, status=status.HTTP_200_OK)
+
+
+class BusinessSetupRestoreExecuteView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        serializer = RestoreExecuteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = BusinessDataRestoreJob.objects.select_related("backup_job").filter(pk=serializer.validated_data["restore_job_id"]).first()
+        if not job:
+            return Response({"detail": "Restore job not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            updated = execute_restore(
+                restore_job=job,
+                confirmation_phrase=serializer.validated_data["confirmation_phrase"],
+                requested_by=request.user,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"id": updated.id, "status": updated.status, "completed_at": updated.completed_at}, status=status.HTTP_200_OK)
+
+
+class BusinessSetupRestoreJobsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        jobs = BusinessDataRestoreJob.objects.select_related("requested_by", "backup_job").order_by("-created_at")[:100]
+        return Response(
+            {
+                "jobs": [
+                    {
+                        "id": job.id,
+                        "status": job.status,
+                        "backup_job_id": job.backup_job_id,
+                        "selected_scopes": job.selected_scopes,
+                        "preview": job.preview,
+                        "error_message": job.error_message,
+                        "created_at": job.created_at,
+                        "completed_at": job.completed_at,
+                        "requested_by": getattr(job.requested_by, "username", None),
+                    }
+                    for job in jobs
+                ]
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class BusinessSetupRestoreJobDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        job = BusinessDataRestoreJob.objects.select_related("requested_by", "backup_job", "approved_by").filter(pk=pk).first()
+        if not job:
+            return Response({"detail": "Restore job not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {
+                "id": job.id,
+                "status": job.status,
+                "backup_job_id": job.backup_job_id,
+                "selected_scopes": job.selected_scopes,
+                "package_type": job.package_type,
+                "package_checksum": job.package_checksum,
+                "preview": job.preview,
+                "error_message": job.error_message,
+                "requested_by": getattr(job.requested_by, "username", None),
+                "approved_by": getattr(job.approved_by, "username", None),
+                "created_at": job.created_at,
+                "completed_at": job.completed_at,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+def _sandbox_enabled() -> bool:
+    env = (getattr(settings, "ENVIRONMENT_NAME", "") or "").lower()
+    return bool(settings.DEBUG or env in {"development", "test", "local"})
+
+
+class AdminSetupReadinessView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        if not _sandbox_enabled():
+            return Response({"detail": "Local sandbox tools are disabled in this environment."}, status=status.HTTP_403_FORBIDDEN)
+        return Response(get_setup_readiness(), status=status.HTTP_200_OK)
+
+
+class AdminSetupSnapshotExportView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        if not _sandbox_enabled():
+            return Response({"detail": "Local sandbox tools are disabled in this environment."}, status=status.HTTP_403_FORBIDDEN)
+        payload = export_setup_snapshot().payload
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class AdminSetupSnapshotImportView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        if not _sandbox_enabled():
+            return Response({"detail": "Local sandbox tools are disabled in this environment."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = SetupSnapshotImportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        if not data.get("dry_run") and not data.get("confirm"):
+            return Response({"detail": "Set confirm=true to apply import."}, status=status.HTTP_400_BAD_REQUEST)
+        result = import_setup_snapshot(payload=data["payload"], dry_run=bool(data.get("dry_run", True)))
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class AdminLocalSandboxSeedView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        if not _sandbox_enabled():
+            return Response({"detail": "Local sandbox tools are disabled in this environment."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = LocalSandboxSeedSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data.get("confirm"):
+            return Response({"detail": "confirm=true is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            result = seed_local_sandbox(performed_by=request.user)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class AdminLocalSandboxResetView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        if not _sandbox_enabled():
+            return Response({"detail": "Local sandbox tools are disabled in this environment."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = LocalSandboxResetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = execute_selective_reset(**serializer.validated_data)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=status.HTTP_200_OK)
