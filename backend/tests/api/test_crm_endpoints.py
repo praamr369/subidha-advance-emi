@@ -4,6 +4,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from service_desk.models import ServiceDeskCase, ServiceDeskCaseType
 from subscriptions.services.payment_service import record_emi_payment
 from subscriptions.services.public_lead_service import (
     complete_public_lead_conversion,
@@ -176,6 +177,33 @@ class CrmApiTests(APITestCase):
         self.assertTrue(any(item.get("event_type") == "PAYMENT" for item in timeline))
         self.assertTrue(any(item.get("event_type") == "DELIVERY" for item in timeline))
         self.assertGreaterEqual(detail.data["summary"].get("payment_count", 0), 1)
+
+    def test_crm_party_detail_handles_service_cases_with_payment_exception_approval_state(self):
+        ServiceDeskCase.objects.create(
+            case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+            status="OPEN",
+            subscription=self.subscription,
+            issue_summary="Delivery hold due to partial payment",
+            payment_exception_approved=False,
+        )
+        ServiceDeskCase.objects.create(
+            case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+            status="OPEN",
+            subscription=self.subscription,
+            issue_summary="Delivery approved via payment exception",
+            payment_exception_approved=True,
+            payment_exception_approved_at=timezone.now(),
+            payment_exception_approved_by=self.admin,
+        )
+
+        parties = self.client.get("/api/v1/crm/parties/?role_type=CUSTOMER")
+        self.assertEqual(parties.status_code, status.HTTP_200_OK, parties.data)
+        party_id = parties.data["results"][0]["id"]
+
+        detail = self.client.get(f"/api/v1/crm/parties/{party_id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
+        self.assertGreaterEqual(detail.data["summary"].get("service_case_count", 0), 2)
+        self.assertTrue(any(item.get("event_type") == "DIRECT_SALE_DELIVERY" for item in detail.data["timeline"]))
 
     def test_non_admin_roles_cannot_access_admin_crm_surfaces(self):
         customer_user = create_customer_user(username="crm_non_admin_customer", phone="7388000122")
