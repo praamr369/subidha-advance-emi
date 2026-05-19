@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import ActionButton from "@/components/ui/ActionButton";
 import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
@@ -75,7 +75,7 @@ export default function AdminOperationsWorkspacePage() {
   }, [rows]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Operations"
       title="Operations Working Screen"
       subtitle="Action-first queues for payment collection, delivery, stock, KYC, and HR approvals."
@@ -157,6 +157,6 @@ export default function AdminOperationsWorkspacePage() {
           </div>
         </section>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

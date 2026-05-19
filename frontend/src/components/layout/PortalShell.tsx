@@ -11,7 +11,13 @@ type PortalShellProps = {
 
 export default function PortalShell({ sidebar, header, children, className }: PortalShellProps) {
   return (
-    <div className={cn("dashboard-app h-screen overflow-hidden text-foreground", className)}>
+    <div
+      className={cn(
+        "dashboard-app min-h-screen overflow-hidden text-foreground",
+        "h-[100dvh] supports-[height:100dvh]:h-[100dvh]",
+        className
+      )}
+    >
       <div className="flex h-full min-h-0">
         {sidebar ? <div className="hidden md:block">{sidebar}</div> : null}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">

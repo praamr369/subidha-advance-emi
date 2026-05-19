@@ -48,7 +48,8 @@ export default function RoleSidebar({
   return (
     <aside
       className={cn(
-        "dashboard-shell-chrome flex h-screen min-h-0 flex-col border-r border-[var(--sidebar-rail-border)]/80 text-[var(--sidebar-foreground)] transition-[width] duration-200",
+        "dashboard-shell-chrome flex min-h-0 flex-col border-r border-[var(--sidebar-rail-border)]/80 text-[var(--sidebar-foreground)] transition-[width] duration-200",
+        "h-[100dvh] supports-[height:100dvh]:h-[100dvh]",
         "bg-[radial-gradient(circle_at_top_left,rgba(217,119,6,0.055),transparent_30%),linear-gradient(180deg,var(--sidebar-surface),color-mix(in_oklab,var(--sidebar-surface-alt)_76%,black_24%))]",
         "shadow-[24px_0_60px_-52px_rgba(28,25,23,0.45)]",
         collapsed ? "w-16" : "w-64 xl:w-[17rem]",
