@@ -218,6 +218,49 @@ Findings to verify before implementation work:
    - Sidebar spacing/typography/hover/focus states.
    - Topbar action area density and alignment.
    - Mobile sidebar open/close affordances and overlay behavior.
+
+---
+
+## Phase B primitives result
+
+Date: 2026-05-20  
+Scope: `frontend/` only (UI primitives used by existing pages; no backend/auth/API changes).
+
+### Components created (immediately used)
+
+- `frontend/src/components/erp/ERPEmptyState.tsx` (thin wrapper over `frontend/src/components/feedback/EmptyState.tsx`)
+- `frontend/src/components/erp/ERPErrorState.tsx` (thin wrapper over `frontend/src/components/feedback/ErrorState.tsx`)
+- `frontend/src/components/erp/ERPLoadingState.tsx` (thin wrapper over `frontend/src/components/feedback/LoadingBlock.tsx`)
+
+Rationale: keep primitives additive and type-safe, reusing the existing shadcn-aligned feedback patterns and preserving dark-mode behavior.
+
+### Pages updated
+
+- `frontend/src/app/(dashboard)/admin/operations/page.tsx`
+  - Replaced repeated loading/error/empty rendering with ERP wrappers only (no changes to data fetching, routing, or action logic).
+
+### Why this page was low-risk
+
+- Operational summary surface only; no payment posting, reversals, cancellations, or ledger mutations.
+- Existing API/service usage preserved (`getAdminOperationsQueueSummary`, `getHrSummary`) and the same UI semantics remain.
+
+### Intentionally not touched
+
+- Backend code, API contracts, serializers, endpoints.
+- Auth/session/RoleGuard/middleware/token handling/redirect behavior.
+- Cashier collection submit flow, payment posting pages, cancellation/void/return action logic.
+- Lucky draw execution, waiver/commission/payout/ledger/reconciliation logic, accounting posting logic.
+- Any route removals or renames.
+
+### Duplicate partner commissions routes
+
+- Confirmed unchanged: both remain present and untouched:
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### Next recommended pilot pages
+
+Pick 1 low-risk admin list/catalog page at a time (no high-consequence money flows), prioritizing pages already using shared services and with clear loading/error/empty UI blocks suitable for wrapper replacement.
 3. **Introduce consistent operational page headers** by enhancing existing primitives:
    - Prefer extending `PortalPage` / `PageHeader` rather than creating a parallel system.
 

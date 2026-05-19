@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ActionButton from "@/components/ui/ActionButton";
 import StatusBadge from "@/components/ui/status-badge";
@@ -90,15 +90,12 @@ export default function AdminOperationsWorkspacePage() {
       statusBadge={{ label: "Action Mode", tone: "warning" }}
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading operations queues..." /> : null}
+        {loading ? <ERPLoadingState label="Loading operations queues..." /> : null}
         {!loading && error ? (
-          <ErrorState
-            title="Unable to load operations workspace"
-            description={error}
-          />
+          <ERPErrorState title="Unable to load operations workspace" description={error} />
         ) : null}
         {!loading && !error && focusRows.length === 0 ? (
-          <EmptyState
+          <ERPEmptyState
             title="No operational queues returned"
             description="No active overdue, delivery, stock, or KYC queue rows were returned by the current operations summary payload."
           />
