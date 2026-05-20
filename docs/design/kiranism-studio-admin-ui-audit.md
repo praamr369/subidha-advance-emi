@@ -36,6 +36,27 @@ Non-goals (explicit): **no backend changes**, **no auth provider changes**, **no
 
 ---
 
+## Route category audit result
+
+Date: 2026-05-20  
+Scope: **Audit + planning only** (no UI transformations in this pass).
+
+- **Inventory output**:
+  - Markdown: `docs/design/kiranism-route-category-map.md`
+  - JSON: `docs/design/kiranism-route-category-map.json`
+- **Total pages inspected** (App Router `page.*`): **393**
+- **Route families found**: admin (286), public (34), customer (27), partner (20), vendor (11), cashier (7), auth (5), unknown (2), compatibility (1)
+- **Migration class counts**:
+  - SAFE_AUTO: 267
+  - SAFE_LAYOUT_ONLY: 39
+  - MANUAL_REVIEW: 81
+  - DO_NOT_TOUCH: 6
+- **Duplicate partner commissions route status**: **unchanged and preserved** (both remain by policy)
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+---
+
 ## 2) Current layout components
 
 ### App-level shell
