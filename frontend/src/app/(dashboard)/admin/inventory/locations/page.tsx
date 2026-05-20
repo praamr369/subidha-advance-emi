@@ -6,8 +6,9 @@ import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import { listBranches, type BranchRecord } from "@/services/branch-control";
@@ -97,7 +98,7 @@ export default function InventoryLocationsPage() {
     {
       key: "is_active",
       header: "Status",
-      render: (row) => (row.is_active ? "Active" : "Inactive"),
+      render: (row) => <ERPStatusBadge status={row.is_active ? "ACTIVE" : "INACTIVE"} />,
     },
     { key: "notes", header: "Notes", render: (row) => row.notes?.trim() || "No notes" },
     {
@@ -159,7 +160,7 @@ export default function InventoryLocationsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Inventory Master Control"
       title="Stock Locations"
       subtitle="Govern store, warehouse, and showroom stock locations as explicit operational masters separate from product and contract truth."
@@ -199,7 +200,7 @@ export default function InventoryLocationsPage() {
         </div>
       ) : null}
 
-      <WorkspaceSection
+      <ERPSectionShell
         title={form.id ? "Edit Location" : "Create Location"}
         description="Location codes and names are stock-only masters. Use them for inventory issue, receipt, and daily location visibility."
       >
@@ -317,9 +318,9 @@ export default function InventoryLocationsPage() {
             </button>
           </div>
         </div>
-      </WorkspaceSection>
+      </ERPSectionShell>
 
-      <WorkspaceSection
+      <ERPSectionShell
         title="Location Register"
         description="Inventory locations are reusable stock masters that inventory items and stock movements can reference safely."
       >
@@ -331,7 +332,7 @@ export default function InventoryLocationsPage() {
           emptyTitle="No stock locations configured"
           emptyDescription="Create at least one active location before relying on stock issues and receipts in daily operations."
         />
-      </WorkspaceSection>
-    </PortalPage>
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

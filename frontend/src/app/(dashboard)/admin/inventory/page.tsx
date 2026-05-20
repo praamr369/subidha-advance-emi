@@ -13,11 +13,12 @@ import {
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import ErrorState from "@/components/feedback/ErrorState";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import StatCard from "@/components/ui/StatCard";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage } from "@/components/accounting/shared";
 import {
@@ -51,7 +52,12 @@ const summaryColumns: EnterpriseColumnDef<StockSummaryRow>[] = [
   {
     key: "is_below_reorder",
     header: "Alert",
-    render: (row) => (row.is_below_reorder ? "Reorder needed" : "Healthy"),
+    render: (row) =>
+      row.is_below_reorder ? (
+        <ERPStatusBadge status="PENDING" label="Reorder needed" />
+      ) : (
+        <ERPStatusBadge status="ACTIVE" label="Healthy" />
+      ),
   },
 ];
 
@@ -62,7 +68,7 @@ const locationColumns: EnterpriseColumnDef<StockLocation>[] = [
   {
     key: "is_active",
     header: "Status",
-    render: (row) => (row.is_active ? "Active" : "Inactive"),
+    render: (row) => <ERPStatusBadge status={row.is_active ? "ACTIVE" : "INACTIVE"} />,
   },
   { key: "notes", header: "Notes", render: (row) => row.notes?.trim() || "No notes" },
 ];
@@ -138,7 +144,7 @@ export default function AdminInventoryPage() {
   const latestBridge = bridgeRows[0];
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Inventory Operations"
       subtitle="Operate stock as a separate ledger-backed module while keeping product master canonical and leaving EMI, payment, draw, waiver, and reconciliation truth unchanged."
       helperNote="Stock movement, delivery bridge, and adjustment queues stay explicit so inventory remains auditable and finance-safe."
@@ -170,8 +176,8 @@ export default function AdminInventoryPage() {
         { label: "Draft Adjustments", value: String(draftAdjustments), tone: draftAdjustments > 0 ? "warning" : "default" },
       ]}
     >
-      {loading ? <LoadingBlock label="Loading inventory operations..." /> : null}
-      {!loading && error ? <ErrorState title="Inventory load failed" description={error} /> : null}
+      {loading ? <ERPLoadingState label="Loading inventory operations..." /> : null}
+      {!loading && error ? <ERPErrorState title="Inventory load failed" description={error} /> : null}
 
       {!loading && !error ? (
         <>
@@ -224,7 +230,7 @@ export default function AdminInventoryPage() {
             />
           </div>
 
-          <WorkspaceSection
+          <ERPSectionShell
             title="Stock Summary"
             description="Live stock is derived from the explicit stock ledger and opening balances, not from product pricing or subscription records."
           >
@@ -234,10 +240,10 @@ export default function AdminInventoryPage() {
               emptyTitle="No inventory items found"
               emptyDescription="Create inventory profiles for products that need stock tracking."
             />
-          </WorkspaceSection>
+          </ERPSectionShell>
 
           <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-            <WorkspaceSection
+            <ERPSectionShell
               title="Location Master"
               description="Warehouses and store locations stay operationally separate from product and contract truth."
             >
@@ -247,9 +253,9 @@ export default function AdminInventoryPage() {
                 emptyTitle="No stock locations found"
                 emptyDescription="Create at least one active stock location before daily stock operations expand."
               />
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection
+            <ERPSectionShell
               title="Adjustment Queue"
               description="Draft adjustments remain non-operational until approved and posted."
             >
@@ -272,10 +278,10 @@ export default function AdminInventoryPage() {
                   icon={<ScrollText className="h-5 w-5" />}
                 />
               </div>
-            </WorkspaceSection>
+            </ERPSectionShell>
           </div>
 
-          <WorkspaceSection
+          <ERPSectionShell
             title="Delivery-Linked Stock Bridge"
             description="These rows show the safe inventory bridge from delivered and returned subscription deliveries into the stock ledger."
           >
@@ -285,9 +291,9 @@ export default function AdminInventoryPage() {
               emptyTitle="No delivery-linked stock movements found"
               emptyDescription="Delivered and returned subscription deliveries for bridge-enabled stock items will appear here."
             />
-          </WorkspaceSection>
+          </ERPSectionShell>
         </>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -6,7 +6,9 @@ import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import type { StockSummaryRow } from "@/services/inventory";
@@ -40,29 +42,21 @@ const columns: EnterpriseColumnDef<StockSummaryRow>[] = [
       const reorder = parseFloat(row.reorder_level_qty || "0");
       if (onHand <= 0) {
         return (
-          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-800">
-            Out of Stock
-          </span>
+          <ERPStatusBadge status="FAILED" label="Out of Stock" />
         );
       }
       if (reorder > 0 && onHand <= reorder) {
         return (
-          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
-            Low Stock
-          </span>
+          <ERPStatusBadge status="PENDING" label="Low Stock" />
         );
       }
       if (available <= 0 && onHand > 0) {
         return (
-          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-orange-100 text-orange-800">
-            Fully Reserved
-          </span>
+          <ERPStatusBadge status="UNDER_REVIEW" label="Fully Reserved" />
         );
       }
       return (
-        <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">
-          In Stock
-        </span>
+        <ERPStatusBadge status="AVAILABLE" label="In Stock" />
       );
     },
   },
@@ -96,7 +90,7 @@ export default function InventoryStockOnHandPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Inventory Review"
       title="Stock On Hand"
       subtitle="Live stock availability by product master, SKU, and default location."
@@ -114,14 +108,16 @@ export default function InventoryStockOnHandPage() {
         groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
       />
 
-      <EnterpriseDataTable
-        data={rows}
-        columns={columns}
-        loading={loading}
-        error={error}
-        emptyTitle="No stock on hand rows found"
-        emptyDescription="Create inventory profiles or import opening stock to populate the on-hand register."
-      />
-    </PortalPage>
+      <ERPSectionShell title="Stock Register" description="Read-only stock register derived from the stock ledger.">
+        <EnterpriseDataTable
+          data={rows}
+          columns={columns}
+          loading={loading}
+          error={error}
+          emptyTitle="No stock on hand rows found"
+          emptyDescription="Create inventory profiles or import opening stock to populate the on-hand register."
+        />
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

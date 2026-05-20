@@ -756,3 +756,115 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 
 - Phase 5 — Inventory / stock control (SAFE_AUTO read-only surfaces first; strict mutation guardrails), or
 - Phase 6 — Customer / CRM intelligence (register/detail polish without touching money flows).
+
+---
+
+## Phase 5 inventory stock control transformation result (2026-05-20)
+
+Scope: **Frontend UI only** for Inventory / Stock Control SAFE pages (admin + vendor surfaces categorized as Inventory/Stock Control).  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no invented KPIs/charts/endpoints**, **no permission weakening**, **no stock sync / movement posting logic changes**.
+
+### 1) Inventory/stock routes touched
+
+- `/admin/inventory` (SAFE_AUTO)
+- `/admin/inventory/workspace` (SAFE_AUTO)
+- `/admin/inventory/ledger` (SAFE_AUTO)
+- `/admin/inventory/movements` (SAFE_AUTO)
+- `/admin/inventory/stock-on-hand` (SAFE_AUTO)
+- `/admin/inventory/valuation` (SAFE_AUTO)
+- `/admin/inventory/items` (SAFE_AUTO)
+- `/admin/inventory/adjustments` (SAFE_AUTO)
+- `/admin/inventory/readiness` (SAFE_AUTO)
+- `/admin/inventory/stock-needs` (SAFE_AUTO)
+- `/admin/inventory/demand-planning` (SAFE_AUTO)
+- `/admin/inventory/purchase-needs` (SAFE_AUTO)
+- `/admin/inventory/profiles` (SAFE_AUTO)
+- `/admin/inventory/profiles/[id]` (SAFE_AUTO)
+- `/admin/bi/inventory` (SAFE_AUTO)
+- `/admin/vendors/categories` (SAFE_AUTO; categorized inventory/stock control)
+- `/admin/vendors/ledger` (SAFE_AUTO; categorized inventory/stock control)
+- `/vendor/ledger` (SAFE_AUTO; categorized inventory/stock control)
+- `/admin/inventory/locations` (SAFE_LAYOUT_ONLY)
+- `/admin/inventory/opening-stock` (SAFE_LAYOUT_ONLY)
+
+### 2) Inventory/stock routes deferred
+
+- `/admin/reports/inventory` (SAFE_AUTO) — deferred in Phase 5 because it is a shared `Phase5ReportSurface` composition used by multiple report categories; changing the shared report surface in an Inventory-only phase risks cross-domain UI changes outside this scope.
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO:
+  - `/admin/inventory`
+  - `/admin/inventory/workspace`
+  - `/admin/inventory/ledger`
+  - `/admin/inventory/movements`
+  - `/admin/inventory/stock-on-hand`
+  - `/admin/inventory/valuation`
+  - `/admin/inventory/items`
+  - `/admin/inventory/adjustments`
+  - `/admin/inventory/readiness`
+  - `/admin/inventory/stock-needs`
+  - `/admin/inventory/demand-planning`
+  - `/admin/inventory/purchase-needs`
+  - `/admin/inventory/profiles`
+  - `/admin/inventory/profiles/[id]`
+  - `/admin/bi/inventory`
+  - `/admin/vendors/categories`
+  - `/admin/vendors/ledger`
+  - `/vendor/ledger`
+- SAFE_LAYOUT_ONLY:
+  - `/admin/inventory/locations`
+  - `/admin/inventory/opening-stock`
+
+### 4) Components reused
+
+- ERP framing: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPSectionShell.tsx`
+- Register toolbars: `frontend/src/components/erp/ERPDataToolbar.tsx`
+- Detail fields: `frontend/src/components/erp/ERPDetailGrid.tsx`
+- States: `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- Status chips: `frontend/src/components/erp/ERPStatusBadge.tsx`
+
+### 5) Components created
+
+- None (Phase 5 is composition-only over existing ERP primitives and existing page logic).
+
+### 6) Inventory services/API contracts preserved
+
+- No changes to:
+  - `frontend/src/services/inventory/*` (stock summary, ledger, movements, opening-stock, adjustments, items, locations)
+  - `frontend/src/services/inventory-ops.ts` (readiness, stock needs)
+  - `frontend/src/services/direct-sale-workspace.ts` (purchase needs list)
+  - `frontend/src/services/vendors.ts`, `frontend/src/services/vendor-ops.ts` (vendor category/ledger surfaces)
+- No endpoint path, request param, or response normalization changes.
+
+### 7) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No cross-role data exposure changes (admin inventory surfaces remain under admin portal; vendor ledger remains under vendor portal).
+
+### 8) Stock sync / inventory integrity impact
+
+- Stock quantities remain derived from existing backend-owned stock ledger/snapshot endpoints only.
+- No changes to stock sync behavior, stock movement posting logic, warehouse/branch stock rules, direct-sale stock deduction/return restoration, or delivery bridge semantics.
+
+### 9) Financial integrity impact
+
+- No changes to EMI logic, payment posting, waiver logic, commission logic, payout logic, ledger behavior, reconciliation behavior, accounting posting, or audit behavior.
+
+### 10) Auditability impact
+
+- No changes to immutable/append-only expectations for stock history; UI changes are framing/state consistency only.
+
+### 11) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 12) Remaining inventory UI gaps
+
+- `/admin/reports/inventory` remains on the shared Phase5 report surface; consider a dedicated “Reports surfaces” pass to refactor shared report framing safely without touching finance/accounting semantics.
+
+### 13) Next recommended phase
+
+- Phase 6 — Customer / CRM intelligence (register/detail polish), keeping money flows explicitly deferred.

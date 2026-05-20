@@ -12,8 +12,8 @@ import {
 
 import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ApiError } from "@/lib/api";
 import { invalidateAfterOpeningStockMutation } from "@/lib/operational-query-invalidation";
 import { ROUTES } from "@/lib/routes";
@@ -367,7 +367,7 @@ export default function InventoryOpeningStockPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Inventory Opening Control"
       title="Opening Stock"
       subtitle="Draft and post opening balances with explicit unit costs. Posted rows are immutable; corrections create stock adjustment drafts."
@@ -430,7 +430,7 @@ export default function InventoryOpeningStockPage() {
 
         {tab === "manual" ? (
           <>
-            <WorkspaceSection
+            <ERPSectionShell
               title="Manual draft"
               description="Search inventory items by SKU or product code. Save as draft, then post to create one immutable ledger movement per row."
             >
@@ -571,9 +571,9 @@ export default function InventoryOpeningStockPage() {
                   <p className="md:col-span-2 text-sm text-destructive">{manualFieldErrors.base}</p>
                 ) : null}
               </form>
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection title="Opening stock rows" description="Drafts are editable; posted rows are read-only.">
+            <ERPSectionShell title="Opening stock rows" description="Drafts are editable; posted rows are read-only.">
               {entriesLoading ? (
                 <p className="text-sm text-muted-foreground" data-testid="opening-stock-list-skeleton">
                   Loading rows…
@@ -655,13 +655,13 @@ export default function InventoryOpeningStockPage() {
                   </table>
                 </div>
               )}
-            </WorkspaceSection>
+            </ERPSectionShell>
           </>
         ) : null}
 
         {tab === "csv" ? (
           <>
-            <WorkspaceSection
+            <ERPSectionShell
               title="Bulk CSV (preview / apply)"
               description="Columns: sku, product_code, warehouse_code, quantity, unit_cost, effective_date, update_mode, note. Duplicate file content shares a stable batch key for idempotent re-apply."
             >
@@ -781,9 +781,9 @@ export default function InventoryOpeningStockPage() {
                   </table>
                 </div>
               ) : null}
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection
+            <ERPSectionShell
               title="Legacy opening ledger import"
               description="Older additive path posts OPENING_BALANCE_IN movements directly from CSV (still duplicate-safe at ledger reference level)."
             >
@@ -851,12 +851,12 @@ export default function InventoryOpeningStockPage() {
                   Ready {legacyPreview.ready_rows} · Errors {legacyPreview.error_rows}
                 </p>
               ) : null}
-            </WorkspaceSection>
+            </ERPSectionShell>
           </>
         ) : null}
 
         {tab === "history" ? (
-          <WorkspaceSection title="Import batch history" description="Last 50 CSV batch envelopes.">
+          <ERPSectionShell title="Import batch history" description="Last 50 CSV batch envelopes.">
             {batchesLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
             {!batchesLoading && batches?.results?.length ? (
               <ul className="space-y-2 text-sm">
@@ -873,7 +873,7 @@ export default function InventoryOpeningStockPage() {
             {!batchesLoading && !batches?.results?.length ? (
               <p className="text-sm text-muted-foreground">No import batches recorded yet.</p>
             ) : null}
-          </WorkspaceSection>
+          </ERPSectionShell>
         ) : null}
       </div>
 
@@ -938,6 +938,6 @@ export default function InventoryOpeningStockPage() {
           </div>
         </div>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

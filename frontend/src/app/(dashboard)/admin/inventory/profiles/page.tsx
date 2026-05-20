@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { listInventoryProfiles, type InventoryProfileRow } from "@/services/inventory";
 
@@ -13,21 +18,28 @@ export default function InventoryProfilesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    void (async () => {
       try {
         const payload = await listInventoryProfiles();
+        if (cancelled) return;
         setRows(payload.results || []);
         setError(null);
       } catch (err) {
+        if (cancelled) return;
+        setRows([]);
         setError(err instanceof Error ? err.message : "Failed to load inventory profiles.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Inventory Profiles"
       subtitle="Product catalog entries become stock-trackable only after profile preparation."
       breadcrumbs={[
@@ -36,28 +48,52 @@ export default function InventoryProfilesPage() {
         { label: "Profiles" },
       ]}
     >
-      <div className="space-y-3">
-        <p className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
-          Stock quantity is read-only here. Use Opening Stock, Goods Receipt, Stock Adjustment, Sale/Delivery, Return, or Manufacturing Receipt workflows to change real stock.
-        </p>
-        {loading ? <div className="text-sm text-muted-foreground">Loading inventory profiles...</div> : null}
-        {error ? <div className="text-sm text-destructive">{error}</div> : null}
+      <ERPSectionShell
+        title="Guidance"
+        description="Stock quantity is read-only here. Use Opening Stock, Goods Receipt, Stock Adjustment, Sale/Delivery, Return, or Manufacturing Receipt workflows to change real stock."
+      >
+        <div className="rounded-[1.3rem] border border-border/70 bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
+          Profiles control only stock-facing fields like default location, reorder controls, and delivery bridge participation. Catalog identity stays on Product.
+        </div>
+      </ERPSectionShell>
+
+      <ERPSectionShell title="Profile Register" description="Inventory profiles that enable stock tracking per product.">
+        {loading ? <ERPLoadingState label="Loading inventory profiles..." /> : null}
+        {!loading && error ? <ERPErrorState title="Unable to load profiles" description={error} /> : null}
         {!loading && !error && rows.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No inventory profiles yet. Prepare from Product Detail.</div>
+          <ERPEmptyState title="No inventory profiles yet" description="Prepare inventory profiles from Product Detail." />
         ) : null}
+
         {!loading && !error && rows.length > 0 ? (
           <div className="grid gap-3">
             {rows.map((row) => (
-              <Link key={row.id} href={`${ROUTES.admin.inventoryProfiles}/${row.id}`} className="rounded-xl border border-border px-4 py-3 hover:bg-muted/40">
-                <div className="text-sm font-medium">{row.product_name} ({row.product_code})</div>
-                <div className="text-xs text-muted-foreground">
-                  Inventory ID: {row.inventory_code || "—"} | SKU: {row.sku || "—"} | Status: {row.stock_tracking_status || "—"}
+              <Link
+                key={row.id}
+                href={`${ROUTES.admin.inventoryProfiles}/${row.id}`}
+                className="group rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-foreground">
+                      {row.product_name}{" "}
+                      <span className="text-muted-foreground">({row.product_code})</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Inventory ID: {row.inventory_code || "—"} · SKU: {row.sku || "—"}
+                    </div>
+                  </div>
+                  <div className="shrink-0">
+                    <ERPStatusBadge status={row.stock_tracking_status || undefined} label={row.stock_tracking_status || "—"} />
+                  </div>
+                </div>
+                <div className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition group-hover:text-foreground">
+                  Open profile
                 </div>
               </Link>
             ))}
           </div>
         ) : null}
-      </div>
-    </PortalPage>
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

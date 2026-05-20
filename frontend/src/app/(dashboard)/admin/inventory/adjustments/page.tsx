@@ -7,8 +7,9 @@ import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import type { InventoryItem, StockAdjustment, StockLocation } from "@/services/inventory";
@@ -105,7 +106,13 @@ export default function InventoryAdjustmentsPage() {
   const columns: EnterpriseColumnDef<StockAdjustment>[] = [
     { key: "adjustment_no", header: "Adjustment" },
     { key: "adjustment_date", header: "Date", render: (row) => accountingDate(row.adjustment_date) },
-    { key: "status", header: "Status" },
+    {
+      key: "status",
+      header: "Status",
+      render: (row) => (
+        <ERPStatusBadge status={row.status} label={row.status} />
+      ),
+    },
     { key: "stock_location_name", header: "Location", render: (row) => row.stock_location_name || "Default" },
     { key: "reason", header: "Reason" },
     {
@@ -217,7 +224,7 @@ export default function InventoryAdjustmentsPage() {
   const locationOptions = useMemo(() => locations, [locations]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Inventory Adjustment Control"
       title="Stock Adjustments"
       subtitle="Create counted stock corrections with explicit reasons, then approve and post them into the stock ledger without rewriting product or billing history."
@@ -256,7 +263,7 @@ export default function InventoryAdjustmentsPage() {
         </div>
       ) : null}
 
-      <WorkspaceSection
+      <ERPSectionShell
         title="Create Draft Adjustment"
         description="Use draft adjustments for counted shortages, surpluses, or stock corrections. Approval and posting stay explicit."
       >
@@ -422,9 +429,9 @@ export default function InventoryAdjustmentsPage() {
             </button>
           </div>
         </div>
-      </WorkspaceSection>
+      </ERPSectionShell>
 
-      <WorkspaceSection
+      <ERPSectionShell
         title="Adjustment Register"
         description="Approve and post counted adjustments only after review so stock mutations remain explicit and auditable."
       >
@@ -436,7 +443,7 @@ export default function InventoryAdjustmentsPage() {
           emptyTitle="No stock adjustments yet"
           emptyDescription="Create a counted stock adjustment to move stock in or out safely."
         />
-      </WorkspaceSection>
-    </PortalPage>
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

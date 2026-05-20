@@ -126,6 +126,31 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Prompt title**: “Phase 5 — Inventory UI polish (no behavior changes)”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
+- **Phase 5 status (implemented 2026-05-20)**:
+  - **Transformed**:
+    - `/admin/inventory` (SAFE_AUTO)
+    - `/admin/inventory/workspace` (SAFE_AUTO)
+    - `/admin/inventory/ledger` (SAFE_AUTO)
+    - `/admin/inventory/movements` (SAFE_AUTO)
+    - `/admin/inventory/stock-on-hand` (SAFE_AUTO)
+    - `/admin/inventory/valuation` (SAFE_AUTO)
+    - `/admin/inventory/items` (SAFE_AUTO)
+    - `/admin/inventory/adjustments` (SAFE_AUTO)
+    - `/admin/inventory/readiness` (SAFE_AUTO)
+    - `/admin/inventory/stock-needs` (SAFE_AUTO)
+    - `/admin/inventory/demand-planning` (SAFE_AUTO)
+    - `/admin/inventory/purchase-needs` (SAFE_AUTO)
+    - `/admin/inventory/profiles` (SAFE_AUTO)
+    - `/admin/inventory/profiles/[id]` (SAFE_AUTO)
+    - `/admin/inventory/locations` (SAFE_LAYOUT_ONLY)
+    - `/admin/inventory/opening-stock` (SAFE_LAYOUT_ONLY)
+    - `/admin/bi/inventory` (SAFE_AUTO; categorized inventory/stock control)
+    - `/admin/vendors/categories` (SAFE_AUTO; categorized inventory/stock control)
+    - `/admin/vendors/ledger` (SAFE_AUTO; categorized inventory/stock control)
+    - `/vendor/ledger` (SAFE_AUTO; categorized inventory/stock control)
+  - **Deferred**:
+    - `/admin/reports/inventory` (SAFE_AUTO) — shared Phase5 report surface; defer shared report refactor to a dedicated reports pass to avoid cross-domain UI changes in an inventory-only phase.
+
 ### Phase 6 — Customer / CRM intelligence
 
 - **Goal**: customer register, pipeline, enquiries, support list/detail polish.

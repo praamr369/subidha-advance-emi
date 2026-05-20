@@ -6,8 +6,10 @@ import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import PortalPage from "@/components/ui/PortalPage";
-import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
+import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import type { InventoryItem, StockLocation } from "@/services/inventory";
@@ -116,7 +118,12 @@ export default function InventoryItemsPage() {
     {
       key: "delivery_stock_bridge_enabled",
       header: "Delivery Bridge",
-      render: (row) => (row.delivery_stock_bridge_enabled ? "Enabled" : "Disabled"),
+      render: (row) => (
+        <ERPStatusBadge
+          status={row.delivery_stock_bridge_enabled ? "ACTIVE" : "INACTIVE"}
+          label={row.delivery_stock_bridge_enabled ? "Enabled" : "Disabled"}
+        />
+      ),
     },
     {
       key: "actions",
@@ -162,7 +169,7 @@ export default function InventoryItemsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Inventory Master Control"
       title="Inventory Items"
       subtitle="Govern stock-tracked product profiles from inventory without redefining the canonical product master."
@@ -201,7 +208,7 @@ export default function InventoryItemsPage() {
         </div>
       ) : null}
 
-      <WorkspaceSection
+      <ERPSectionShell
         title="Tracked Inventory Profiles"
         description="Use the inventory workspace to govern stock-only fields such as location, reorder controls, and delivery bridge participation."
       >
@@ -213,20 +220,23 @@ export default function InventoryItemsPage() {
           emptyTitle="No inventory items are configured"
           emptyDescription="Prepare inventory profiles from the product workspace for stock-tracked products."
         />
-      </WorkspaceSection>
+      </ERPSectionShell>
 
-      <WorkspaceSection
+      <ERPSectionShell
         title="Selected Item Governance"
         description="Catalog identity stays on Product. This form controls only stock-facing behavior for the selected inventory profile."
       >
         {selectedItem && form ? (
           <div className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <DetailItem label="Product" value={selectedItem.product_name || "—"} />
-              <DetailItem label="Product Code" value={selectedItem.product_code || "—"} />
-              <DetailItem label="SKU" value={selectedItem.sku || "—"} />
-              <DetailItem label="Unit" value={selectedItem.unit_of_measure || "PCS"} />
-            </div>
+            <ERPDetailGrid
+              columns={4}
+              items={[
+                { label: "Product", value: selectedItem.product_name || "—" },
+                { label: "Product Code", value: selectedItem.product_code || "—" },
+                { label: "SKU", value: selectedItem.sku || "—" },
+                { label: "Unit", value: selectedItem.unit_of_measure || "PCS" },
+              ]}
+            />
 
             <div className="grid gap-4 xl:grid-cols-2">
               <label className="grid gap-2 text-sm text-foreground">
@@ -380,7 +390,7 @@ export default function InventoryItemsPage() {
             Select an inventory item from the register to govern its stock-facing settings.
           </p>
         )}
-      </WorkspaceSection>
-    </PortalPage>
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

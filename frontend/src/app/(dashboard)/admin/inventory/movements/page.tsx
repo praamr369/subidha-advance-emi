@@ -7,8 +7,8 @@ import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -89,7 +89,7 @@ export default function InventoryMovementsPage() {
   }, [endDate, startDate]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Inventory Movement Control"
       title="Inventory Movements"
       subtitle="Read-only movement register from the additive stock ledger, covering purchase intake, sale outflow, returns, and approved adjustments."
@@ -113,26 +113,25 @@ export default function InventoryMovementsPage() {
         groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
       />
 
-      <WorkspaceSection
-        title="Filters"
-        description="Filter inventory movements by movement date."
-      >
+      <ERPSectionShell title="Filters" description="Filter inventory movements by movement date.">
         <AccountingPeriodFilters
           startDate={startDate}
           endDate={endDate}
           onStartDateChange={setStartDate}
           onEndDateChange={setEndDate}
         />
-      </WorkspaceSection>
+      </ERPSectionShell>
 
-      <EnterpriseDataTable
-        data={rows}
-        columns={columns}
-        loading={loading}
-        error={error}
-        emptyTitle="No inventory movements found"
-        emptyDescription="Post purchase bills, retail invoices, or stock adjustments to populate this register."
-      />
-    </PortalPage>
+      <ERPSectionShell title="Movement Register" description="Read-only movement register derived from ledger-backed stock events.">
+        <EnterpriseDataTable
+          data={rows}
+          columns={columns}
+          loading={loading}
+          error={error}
+          emptyTitle="No inventory movements found"
+          emptyDescription="Post purchase bills, retail invoices, or stock adjustments to populate this register."
+        />
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

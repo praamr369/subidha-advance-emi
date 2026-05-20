@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { listAdminInventoryRequirements } from "@/services/direct-sale-workspace";
 
@@ -39,7 +40,7 @@ export default function AdminInventoryPurchaseNeedsPage() {
   const alerts = useMemo(() => rows.length, [rows]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Inventory Purchase Needs"
       subtitle="Required products and inventory needs generated from direct sale and other demand sources."
       breadcrumbs={[
@@ -49,17 +50,25 @@ export default function AdminInventoryPurchaseNeedsPage() {
       ]}
       stats={[{ label: "Open Alerts", value: String(alerts), tone: alerts > 0 ? "warning" : "success" }]}
     >
-      <div className="mb-4">
-        <button
-          type="button"
-          onClick={() => void loadNeeds()}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white"
-          disabled={loading}
-        >
-          {loading ? "Refreshing..." : "Refresh Needs"}
-        </button>
-      </div>
-      <WorkspaceSection title="Required Products / Inventory Needs" description="Read-only operational feed. Purchase execution remains manual and auditable.">
+      <ERPDataToolbar
+        left={<div className="text-sm text-muted-foreground">Operational feed (read-only).</div>}
+        right={
+          <button
+            type="button"
+            onClick={() => void loadNeeds()}
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={loading}
+          >
+            {loading ? "Refreshing..." : "Refresh Needs"}
+          </button>
+        }
+        className="mb-4"
+      />
+
+      <ERPSectionShell
+        title="Required Products / Inventory Needs"
+        description="Read-only operational feed. Purchase execution remains manual and auditable."
+      >
         <EnterpriseDataTable
           data={rows}
           columns={[
@@ -76,7 +85,7 @@ export default function AdminInventoryPurchaseNeedsPage() {
           emptyTitle="No purchase needs"
           emptyDescription="No open inventory requirements at the moment."
         />
-      </WorkspaceSection>
-    </PortalPage>
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

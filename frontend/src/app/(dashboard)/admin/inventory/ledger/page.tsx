@@ -7,8 +7,8 @@ import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -96,7 +96,7 @@ export default function InventoryLedgerPage() {
   }, [startDate, endDate, sourceFilter, sourceId]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Inventory Ledger Review"
       title="Stock Ledger"
       subtitle="Actual stock movements from approved operational documents and adjustments."
@@ -114,10 +114,7 @@ export default function InventoryLedgerPage() {
         groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
       />
 
-      <WorkspaceSection
-        title="Filters"
-        description="Filter the stock ledger by posting date."
-      >
+      <ERPSectionShell title="Filters" description="Filter the stock ledger by posting date and optional source document.">
         <AccountingPeriodFilters
           startDate={startDate}
           endDate={endDate}
@@ -144,31 +141,31 @@ export default function InventoryLedgerPage() {
             placeholder="Source document ID"
           />
         </div>
-      </WorkspaceSection>
+      </ERPSectionShell>
 
-      <div className="mb-4 flex flex-wrap gap-3">
-        <Link
-          href={ROUTES.admin.billingRegister}
-          className="rounded-xl border border-border px-4 py-2 text-sm"
-        >
-          Billing Register
-        </Link>
-        <Link
-          href={ROUTES.admin.billingDirectSales}
-          className="rounded-xl border border-border px-4 py-2 text-sm"
-        >
-          Direct Sales
-        </Link>
-      </div>
-
-      <EnterpriseDataTable
-        data={rows}
-        columns={columns}
-        loading={loading}
-        error={error}
-        emptyTitle="No stock ledger rows found"
-        emptyDescription="Post stock adjustments, purchase bills, or retail notes to populate the ledger."
-      />
-    </PortalPage>
+      <ERPSectionShell
+        title="Ledger Register"
+        description="Read-only register. Posting and reversal actions remain in their respective controlled workflows."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link href={ROUTES.admin.billingRegister} className="workspace-pill px-3 py-1.5 text-xs font-semibold">
+              Billing Register
+            </Link>
+            <Link href={ROUTES.admin.billingDirectSales} className="workspace-pill px-3 py-1.5 text-xs font-semibold">
+              Direct Sales
+            </Link>
+          </div>
+        }
+      >
+        <EnterpriseDataTable
+          data={rows}
+          columns={columns}
+          loading={loading}
+          error={error}
+          emptyTitle="No stock ledger rows found"
+          emptyDescription="Post stock adjustments, purchase bills, or retail notes to populate the ledger."
+        />
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

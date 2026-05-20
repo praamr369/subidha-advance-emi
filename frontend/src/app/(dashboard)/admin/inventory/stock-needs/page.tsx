@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { StockNeedsOperationalWorkspace } from "@/components/workspace/StockNeedsOperationalWorkspace";
 import { ROUTES } from "@/lib/routes";
 import { listStockNeeds } from "@/services/inventory-ops";
@@ -38,7 +39,7 @@ export default function StockNeedsPage() {
   }, [loadRows]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Purchase need workspace"
       subtitle="Operational purchase/stock needs (PurchaseNeed). Mutations require admin privileges."
       breadcrumbs={[
@@ -53,24 +54,26 @@ export default function StockNeedsPage() {
       ]}
     >
       <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 text-sm">
-        <Link className="rounded-full border border-border px-3 py-1 hover:bg-muted" href={ROUTES.admin.inventoryReadiness}>
-          Readiness
-        </Link>
-        <Link className="rounded-full border border-border px-3 py-1 hover:bg-muted" href={ROUTES.admin.inventoryPurchaseNeeds}>
-          Purchase needs (legacy workspace)
-        </Link>
-      </div>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Link className="rounded-full border border-border px-3 py-1 hover:bg-muted" href={ROUTES.admin.inventoryReadiness}>
+            Readiness
+          </Link>
+          <Link className="rounded-full border border-border px-3 py-1 hover:bg-muted" href={ROUTES.admin.inventoryPurchaseNeeds}>
+            Purchase needs (legacy workspace)
+          </Link>
+        </div>
 
-      {loading ? <LoadingBlock label="Loading stock needs…" /> : null}
-      {!loading && error ? (
-        <ErrorState title="Unable to load stock needs" description={error} />
-      ) : null}
+        {loading ? <ERPLoadingState label="Loading stock needs…" /> : null}
+        {!loading && error ? (
+          <ERPErrorState title="Unable to load stock needs" description={error} />
+        ) : null}
 
-      {!loading && !error ? (
-        <StockNeedsOperationalWorkspace rows={rows} count={count} onRefresh={loadRows} />
-      ) : null}
+        {!loading && !error ? (
+          <ERPSectionShell title="Need Register" description="Read-only need signals. Purchase execution remains manual and auditable.">
+            <StockNeedsOperationalWorkspace rows={rows} count={count} onRefresh={loadRows} />
+          </ERPSectionShell>
+        ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

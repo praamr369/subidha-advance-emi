@@ -6,8 +6,8 @@ import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import {
   accountingDate,
@@ -62,7 +62,7 @@ export default function InventoryValuationPage() {
   }, [asOfDate]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Inventory Valuation Review"
       title="Inventory Valuation"
       subtitle="Current stock value is derived from tracked inventory items and purchase cost foundations without touching product selling-price or EMI contract semantics."
@@ -86,21 +86,20 @@ export default function InventoryValuationPage() {
         groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
       />
 
-      <WorkspaceSection
-        title="Valuation Date"
-        description="Use an as-of date to review the stock valuation snapshot from live ledger-backed stock."
-      >
+      <ERPSectionShell title="Valuation Date" description="Use an as-of date to review the stock valuation snapshot.">
         <AccountingPeriodFilters asOf={asOfDate} onAsOfChange={setAsOfDate} />
-      </WorkspaceSection>
+      </ERPSectionShell>
 
-      <EnterpriseDataTable
-        data={report?.rows ?? []}
-        columns={columns}
-        loading={loading}
-        error={error}
-        emptyTitle="No valuation rows found"
-        emptyDescription="Create inventory items and post stock movements to produce valuation rows."
-      />
-    </PortalPage>
+      <ERPSectionShell title="Valuation Register" description="Read-only valuation rows derived from ledger-backed stock.">
+        <EnterpriseDataTable
+          data={report?.rows ?? []}
+          columns={columns}
+          loading={loading}
+          error={error}
+          emptyTitle="No valuation rows found"
+          emptyDescription="Create inventory items and post stock movements to produce valuation rows."
+        />
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }
