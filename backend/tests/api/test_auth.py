@@ -17,10 +17,12 @@ class AuthApiTests(APITestCase):
         self.admin = create_admin_user(
             username="auth_admin",
             phone="9000000201",
+            email="auth_admin@example.com",
         )
         self.partner = create_partner_user(
             username="auth_partner",
             phone="9000000202",
+            email="Auth_Partner@Example.com",
         )
 
         # Known helper passwords:
@@ -83,6 +85,108 @@ class AuthApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn("detail", response.data)
+        self.assertEqual(
+            response.data["detail"],
+            "Unable to log in with provided credentials.",
+        )
+
+    def test_login_accepts_identifier_payload_with_username(self):
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            {
+                "identifier": "auth_partner",
+                "password": "PartnerPass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user"]["username"], "auth_partner")
+
+    def test_login_accepts_identifier_payload_with_email_case_insensitive(self):
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            {
+                "identifier": "auth_partner@example.com",
+                "password": "PartnerPass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user"]["username"], "auth_partner")
+
+    def test_login_accepts_identifier_payload_with_phone_normalized(self):
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            {
+                "identifier": "900-000-0202",
+                "password": "PartnerPass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user"]["username"], "auth_partner")
+
+    def test_login_rejects_unknown_identifier_with_generic_error(self):
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            {
+                "identifier": "does-not-exist@example.com",
+                "password": "PartnerPass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(
+            response.data["detail"],
+            "Unable to log in with provided credentials.",
+        )
+
+    def test_login_rejects_inactive_user(self):
+        self.partner.is_active = False
+        self.partner.save(update_fields=["is_active"])
+
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            {
+                "identifier": "auth_partner",
+                "password": "PartnerPass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(
+            response.data["detail"],
+            "Unable to log in with provided credentials.",
+        )
+
+    def test_login_rejects_ambiguous_email_identifier_safely(self):
+        User.objects.create_user(
+            username="auth_partner_dup",
+            password="PartnerPass123!",
+            phone="9000000299",
+            email="auth_partner@example.com",
+            role=UserRole.PARTNER,
+        )
+
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            {
+                "identifier": "auth_partner@example.com",
+                "password": "PartnerPass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(
+            response.data["detail"],
+            "Unable to log in with provided credentials.",
+        )
 
     # -------------------------------------------------
     # ME

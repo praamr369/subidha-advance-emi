@@ -54,7 +54,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const { login, isAuthenticated, role } = useAuth();
 
-  const [username, setUsername] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -85,7 +85,7 @@ export default function LoginPage() {
       setError(null);
 
       const response = await loginRequest({
-        username: username.trim(),
+        identifier: identifier.trim(),
         password,
       });
 
@@ -106,7 +106,7 @@ export default function LoginPage() {
         name:
           response.user?.name ??
           response.user?.username ??
-          username.trim(),
+          identifier.trim(),
         role: resolvedRole,
         accessToken,
         refreshToken,
@@ -136,19 +136,19 @@ export default function LoginPage() {
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
-          <label htmlFor="username" className="text-sm font-medium text-slate-800">
-            Username
+          <label htmlFor="identifier" className="text-sm font-medium text-slate-800">
+            Username, email, or phone
           </label>
           <div className="relative">
             <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
-              id="username"
-              name="username"
+              id="identifier"
+              name="identifier"
               type="text"
               autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="Enter your username, email, or phone"
               className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus-visible:border-slate-500 focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
               required
               disabled={submitting}

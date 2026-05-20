@@ -1,7 +1,7 @@
 import { API_BASE_URL } from "@/lib/constants";
 
 export type LoginRequest = {
-  username: string;
+  identifier: string;
   password: string;
 };
 
@@ -102,15 +102,63 @@ async function parseResponse<T>(response: Response): Promise<T> {
 export async function loginRequest(
   payload: LoginRequest
 ): Promise<LoginResponse> {
-  const response = await fetch(buildApiUrl("/auth/login/"), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  const identifier = payload.identifier.trim();
+  const password = payload.password;
 
-  return parseResponse<LoginResponse>(response);
+  async function attempt(body: Record<string, unknown>): Promise<Response> {
+    return fetch(buildApiUrl("/auth/login/"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  const primary = await attempt({ identifier, password });
+  if (primary.ok) {
+    return parseResponse<LoginResponse>(primary);
+  }
+
+  // Backward compatibility: older deployments may only accept { username, password }.
+  // Retry only on serializer/shape-type errors.
+  const contentType = primary.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+  const payloadBody = isJson ? await primary.json() : await primary.text();
+
+  const shouldRetry =
+    primary.status === 400 &&
+    payloadBody &&
+    typeof payloadBody === "object" &&
+    (typeof (payloadBody as Record<string, unknown>).username !== "undefined" ||
+      typeof (payloadBody as Record<string, unknown>).identifier !== "undefined");
+
+  if (shouldRetry) {
+    const legacy = await attempt({ username: identifier, password });
+    return parseResponse<LoginResponse>(legacy);
+  }
+
+  if (typeof payloadBody === "string") {
+    throw new Error(payloadBody || "Request failed.");
+  }
+
+  if (payloadBody && typeof payloadBody === "object") {
+    const record = payloadBody as Record<string, unknown>;
+
+    if (typeof record.detail === "string" && record.detail.trim()) {
+      throw new Error(record.detail);
+    }
+
+    const firstValue = Object.values(record)[0];
+    if (Array.isArray(firstValue) && typeof firstValue[0] === "string") {
+      throw new Error(firstValue[0]);
+    }
+    if (typeof firstValue === "string") {
+      throw new Error(firstValue);
+    }
+  }
+
+  throw new Error("Request failed.");
 }
 
 export async function refreshTokenRequest(
