@@ -14,13 +14,13 @@ import {
 import { Download, RefreshCw, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { RegistryPageShell } from "@/components/layout/page-shells";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import { DataTableShell, DetailPanel } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import TableToolbar from "@/components/ui/TableToolbar";
@@ -548,7 +548,7 @@ export default function AdminCustomersPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Customer Operations"
       title="Customer Register"
       subtitle="Search, review, and route customer records into KYC, subscription, and payment workflows with clear operational context."
@@ -711,10 +711,10 @@ export default function AdminCustomersPage() {
         }
         register={
           <>
-        {loading ? <LoadingBlock label="Loading customer register..." /> : null}
+        {loading ? <ERPLoadingState label="Loading customer register..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load customer register"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -728,7 +728,7 @@ export default function AdminCustomersPage() {
             description="Open the customer detail page for KYC decisions, subscription context, and recent payment visibility."
           >
             {rows.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No customers found"
                 description="No customer records matched the current search and filter set."
                 action={
@@ -1134,6 +1134,6 @@ export default function AdminCustomersPage() {
           </>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -258,6 +258,52 @@ Rationale: keep primitives additive and type-safe, reusing the existing shadcn-a
   - `frontend/src/app/(dashboard)/partner/commissions/`
   - `frontend/src/app/(dashboard)/partner/commisions/`
 
+---
+
+## Phase B second-page adoption result
+
+Date: 2026-05-20  
+Scope: `frontend/` only (UI primitive adoption on exactly one additional low-risk admin list/catalog page; no backend/auth/API changes).
+
+### Page selected
+
+- `frontend/src/app/(dashboard)/admin/customers/page.tsx` (Admin → Customers → Customer Register)
+
+### Why it was low-risk
+
+- List/catalog workflow surface with read-only register browsing + navigation into existing downstream routes.
+- Already had explicit local loading/error/empty state rendering suitable for wrapper-only replacement.
+- No changes to payment posting, reversals, cancellations, reconciliation, lucky draw execution, or accounting posting logic.
+
+### Components reused
+
+- `frontend/src/components/erp/ERPPageShell.tsx`
+- `frontend/src/components/erp/ERPLoadingState.tsx`
+- `frontend/src/components/erp/ERPErrorState.tsx`
+- `frontend/src/components/erp/ERPEmptyState.tsx`
+
+### Services/API contracts preserved
+
+- Existing data-fetch and action calls remain unchanged (no request param changes, no response-shape assumption changes).
+
+### Intentionally not touched
+
+- Backend code and API contracts.
+- Auth/session/RoleGuard/middleware/token handling/redirect behavior.
+- EMI logic, payment posting flows, cashier collection submit flow, cancellation/void/return actions.
+- Waiver/commission/payout/ledger/reconciliation/audit behavior.
+- Any route removals or renames.
+
+### Duplicate partner commissions routes
+
+- Confirmed unchanged in this pass:
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### Next recommended pilot page
+
+- Admin products catalog list: `frontend/src/app/(dashboard)/admin/products/page.tsx` (apply wrappers only where it already has explicit local loading/error/empty rendering).
+
 ### Next recommended pilot pages
 
 Pick 1 low-risk admin list/catalog page at a time (no high-consequence money flows), prioritizing pages already using shared services and with clear loading/error/empty UI blocks suitable for wrapper replacement.
