@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 
 import { PipelineBoard } from "@/components/admin/erp/PipelineBoard";
 import { WorkspaceShell } from "@/components/admin/erp/WorkspaceShell";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { getAdminTodayWork, type ErpCard } from "@/services/admin-erp";
 
 export default function AdminTodayWorkPage() {
@@ -37,15 +40,13 @@ export default function AdminTodayWorkPage() {
       title="Today's Work"
       subtitle="Daily admin action queues from the existing ERP summary service."
     >
-      {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
-          {error}
-        </div>
-      ) : null}
+      {error ? <ERPErrorState title="Unable to load today's work" description={error} /> : null}
       {loading ? (
-        <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">Loading today&apos;s work...</div>
+        <ERPLoadingState label="Loading today's work..." />
       ) : (
-        <PipelineBoard title="Action Queues" cards={cards} />
+        <ERPSectionShell title="Action Queues" description="Prioritized admin action queues from the existing ERP service.">
+          <PipelineBoard title="Action Queues" cards={cards} />
+        </ERPSectionShell>
       )}
     </WorkspaceShell>
   );

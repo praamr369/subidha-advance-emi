@@ -591,3 +591,79 @@ Scope: shell/layout polish + smallest used shared primitive (Phase B). Backend/a
 ### Follow-up migration recommendation (future, not executed here)
 
 - Add a **single canonical route** (`/partner/commissions`) and a **safe redirect**/alias path for `/partner/commisions` once route usage is confirmed via `ROUTES` mapping + navigation config + analytics/logs; then deprecate the typo route in a controlled release.
+
+---
+
+## Phase 3 admin cockpit operations transformation result (2026-05-20)
+
+Scope: **Frontend UI only** for Admin Cockpit / Operations SAFE pages.  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no invented KPIs/charts/endpoints**, **no permission weakening**.
+
+### 1) Admin routes touched
+
+- `/admin/operations` (SAFE_AUTO)
+- `/admin/operations/command-center` (SAFE_AUTO)
+- `/admin/operations/today-work` (SAFE_AUTO)
+- `/admin/erp` (SAFE_AUTO)
+- `/admin/global-search` (SAFE_LAYOUT_ONLY)
+
+### 2) Admin routes deferred
+
+- `/admin` (SAFE_AUTO) — deferred because it is a large mixed-domain executive surface; keep unchanged to avoid accidental domain scope creep in Phase 3.
+- `/admin/notifications` (SAFE_AUTO) — deferred because the current UI is driven by shared `NotificationCenterPanel` (used by other roles); transforming it would implicitly touch non-admin routes.
+- All other `Admin Cockpit / Operations` routes in the map that are operationally tied to inventory/CRM/deliveries/EMI/payment/purchases/partners/compliance/tax — explicitly out of Phase 3 scope per constraints (defer to later dedicated phases).
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO:
+  - `/admin/operations`
+  - `/admin/operations/command-center`
+  - `/admin/operations/today-work`
+  - `/admin/erp`
+- SAFE_LAYOUT_ONLY:
+  - `/admin/global-search`
+
+### 4) Components reused
+
+- ERP page framing: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPSectionShell.tsx`
+- Consistent states: `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- Tooling wrapper: `frontend/src/components/erp/ERPDataToolbar.tsx` (admin global search)
+- Existing business UI kept intact: `OperationsCommandCenterWorkspace`, `GlobalSearchOperationalWorkspace`, `PipelineBoard`, `WorkspaceShell`
+- shadcn/ui controls reused (no custom forks): `Button`, `Input`
+
+### 5) Components created
+
+- None (Phase 3 is composition-only over existing ERP primitives and existing page components).
+
+### 6) Services/API contracts preserved
+
+- No changes to `frontend/src/services/**`.
+- No endpoint additions or changes.
+- No request parameter changes.
+- No response normalization changes.
+
+### 7) Auth/role safety confirmation
+
+- No changes to JWT/session storage, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No cross-role data exposure changes (pages remain under admin portal routing).
+
+### 8) Financial/audit safety confirmation
+
+- No changes to EMI logic, payment posting, waivers, commissions, payouts, reconciliation, accounting posting, or audit logging.
+- Phase 3 changes are UI framing/state consistency only; no mutation handlers were altered.
+
+### 9) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 10) Remaining admin cockpit UI gaps
+
+- `/admin` executive dashboard remains a large mixed-domain surface; consider a dedicated “Admin Executive Dashboard” pass with stricter sub-scope (operations-only framing, keep finance/inventory links intact).
+- `/admin/notifications` needs an ERP-aligned header/toolbar treatment, but must be done in a way that does **not** change non-admin role experiences (likely via additive props or role-scoped wrapper component).
+
+### 11) Next recommended phase
+
+- Phase 4 — Products / catalog master (UI-only, SAFE_LAYOUT_ONLY surfaces first), or
+- Phase 6 — Customer / CRM intelligence (read-first register/detail polish), keeping money flows explicitly deferred.

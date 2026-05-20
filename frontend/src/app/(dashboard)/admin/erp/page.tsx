@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/admin/erp/WorkspaceShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { apiFetch } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import { listDirectSales } from "@/services/billing";
@@ -248,44 +249,49 @@ export default function AdminErpHomePage() {
       title="ERP Home"
       subtitle="Operational entry point across Sales, CRM, Billing, Inventory, Finance, Delivery, Reports, and Setup readiness."
     >
-      {hasErrors ? (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          One or more module statuses are unavailable. Open the affected module directly to continue operations.
-        </div>
-      ) : null}
+      <ERPSectionShell
+        title="Module workspaces"
+        description="Status chips are read-only signals from existing workspace summary endpoints. Open modules directly to continue work."
+      >
+        {hasErrors ? (
+          <div className="rounded-xl border border-amber-200/90 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100">
+            One or more module statuses are unavailable. Open the affected module directly to continue operations.
+          </div>
+        ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {MODULES.map((module) => {
-          const status = statuses[module.key] || {
-            loading: true,
-            error: null,
-            count: null,
-            detail: "Loading...",
-          };
-          return (
-            <article key={module.key} className="rounded-xl border border-border bg-card p-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-foreground">{module.label}</h2>
-                <span className="text-xs font-medium text-muted-foreground">
-                  {status.loading ? "Loading" : status.error ? "Error" : status.count === 0 ? "Empty" : "Ready"}
-                </span>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">{module.purpose}</p>
-              <p className={`mt-3 text-xs ${status.error ? "text-destructive" : "text-muted-foreground"}`}>
-                {moduleStatusLabel(status)}
-              </p>
-              <div className="mt-4">
-                <Link
-                  href={module.href}
-                  className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted"
-                >
-                  Open {module.label}
-                </Link>
-              </div>
-            </article>
-          );
-        })}
-      </section>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {MODULES.map((module) => {
+            const status = statuses[module.key] || {
+              loading: true,
+              error: null,
+              count: null,
+              detail: "Loading...",
+            };
+            return (
+              <article key={module.key} className="rounded-xl border border-border bg-card p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold text-foreground">{module.label}</h2>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {status.loading ? "Loading" : status.error ? "Error" : status.count === 0 ? "Empty" : "Ready"}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">{module.purpose}</p>
+                <p className={`mt-3 text-xs ${status.error ? "text-destructive" : "text-muted-foreground"}`}>
+                  {moduleStatusLabel(status)}
+                </p>
+                <div className="mt-4">
+                  <Link
+                    href={module.href}
+                    className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted"
+                  >
+                    Open {module.label}
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+      </ERPSectionShell>
     </WorkspaceShell>
   );
 }

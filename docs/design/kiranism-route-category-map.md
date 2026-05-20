@@ -76,6 +76,17 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Services/contracts to preserve**: `frontend/src/services/**` used by admin ops.
 - **Prompt title**: “Phase 3 — Admin cockpit polish (read-first)”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
+- **Phase 3 status (implemented)**:
+  - **Transformed** (SAFE_AUTO/SAFE_LAYOUT_ONLY, UI-only wrappers/states; no behavior changes):
+    - `/admin/operations`
+    - `/admin/operations/command-center`
+    - `/admin/operations/today-work`
+    - `/admin/erp`
+    - `/admin/global-search`
+  - **Deferred** (unchanged in Phase 3 to keep scope strictly “admin cockpit/operations” and avoid touching other domains):
+    - `/admin` (executive dashboard; large mixed-domain surface—kept unchanged for safety)
+    - `/admin/notifications` (uses shared `NotificationCenterPanel`; transforming it would impact non-admin routes)
+    - All other `Admin Cockpit / Operations` pages that are operationally tied to inventory/CRM/deliveries/EMIs/partners/purchases/tax/compliance (explicitly out of Phase 3 scope)
 
 ### Phase 4 — Products / catalog master
 
