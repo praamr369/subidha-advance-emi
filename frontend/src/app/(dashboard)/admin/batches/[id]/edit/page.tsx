@@ -9,12 +9,14 @@ import {
   useState,
 } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import {
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPStatusBadge,
+} from "@/components/erp";
 import FormActions from "@/components/ui/FormActions";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import { DetailPanel, FormSection } from "@/components/ui/operations";
 import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import {
@@ -374,7 +376,7 @@ export default function AdminBatchEditPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={
         batch?.batch_code
           ? `Edit ${batch.batch_code}`
@@ -438,10 +440,10 @@ export default function AdminBatchEditPage() {
           </button>
         </section>
 
-        {loading ? <LoadingBlock label="Loading batch edit workspace..." /> : null}
+        {loading ? <ERPLoadingState label="Loading batch edit workspace..." /> : null}
 
         {!loading && error && !batch ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load batch edit page"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -449,7 +451,7 @@ export default function AdminBatchEditPage() {
         ) : null}
 
         {!loading && !error && !batch ? (
-          <EmptyState
+          <ERPEmptyState
             title="Batch not available"
             description="The requested batch could not be loaded."
           />
@@ -464,7 +466,7 @@ export default function AdminBatchEditPage() {
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <DetailValue
                   label="Current Status"
-                  value={<StatusBadge status={String(batch.status)} />}
+                  value={<ERPStatusBadge status={String(batch.status)} />}
                 />
                 <DetailValue
                   label="Allowed Next Statuses"
@@ -494,7 +496,7 @@ export default function AdminBatchEditPage() {
                 <DetailValue label="Batch Code" value={batch.batch_code} />
                 <DetailValue
                   label="Status"
-                  value={<StatusBadge status={batch.status} />}
+                  value={<ERPStatusBadge status={batch.status} />}
                 />
                   <DetailValue label="Total Slots" value={String(summary.total_slots)} />
                   <DetailValue
@@ -633,7 +635,7 @@ export default function AdminBatchEditPage() {
               description="Use the guarded transition endpoint instead of direct free-form status patching."
             >
               {allowedStatuses.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No further transition"
                   description="This batch currently has no allowed next status."
                 />
@@ -686,7 +688,7 @@ export default function AdminBatchEditPage() {
             </FormSection>
 
             {error ? (
-              <ErrorState title="Unable to update batch" description={error} />
+              <ERPErrorState title="Unable to update batch" description={error} />
             ) : null}
 
             {successMessage ? (
@@ -743,6 +745,6 @@ export default function AdminBatchEditPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

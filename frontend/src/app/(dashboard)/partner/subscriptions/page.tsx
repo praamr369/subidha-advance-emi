@@ -4,14 +4,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { RefreshCw, Search } from "lucide-react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PaginationControls from "@/components/ui/PaginationControls";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -222,7 +222,7 @@ export default function PartnerSubscriptionsPage() {
           <div className="space-y-2">
             <div className="text-sm text-foreground">{row.product_name || "—"}</div>
             <div className="flex flex-wrap gap-2">
-              <StatusBadge
+              <ERPStatusBadge
                 status={row.batch_status || "OPEN"}
                 label={row.batch_code || "No batch"}
               />
@@ -236,11 +236,11 @@ export default function PartnerSubscriptionsPage() {
         sortable: true,
         render: (row) => (
           <div className="space-y-2">
-            <StatusBadge status={row.status || "PENDING"} />
+            <ERPStatusBadge status={row.status || "PENDING"} />
             {getOutstandingAmount(row) > 0 ? (
-              <StatusBadge status="PENDING" label={`Outstanding ${formatMoney(getOutstandingAmount(row))}`} />
+              <ERPStatusBadge status="PENDING" label={`Outstanding ${formatMoney(getOutstandingAmount(row))}`} />
             ) : (
-              <StatusBadge status="PAID" label="No Outstanding" />
+              <ERPStatusBadge status="PAID" label="No Outstanding" />
             )}
           </div>
         ),
@@ -285,7 +285,7 @@ export default function PartnerSubscriptionsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Partner Contracts"
       title="Partner Subscriptions"
       subtitle="Review only the subscriptions attributed to your partner scope, with clearer contract state, outstanding amount, and next action visibility."
@@ -345,10 +345,10 @@ export default function PartnerSubscriptionsPage() {
               q || initialStatus || customerFilter ? (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="font-semibold uppercase tracking-[0.14em]">Active filters</span>
-                  {q ? <StatusBadge status="OPEN" label={`Search: ${q}`} hideIcon /> : null}
-                  {initialStatus ? <StatusBadge status={initialStatus} hideIcon /> : null}
+                  {q ? <ERPStatusBadge status="OPEN" label={`Search: ${q}`} hideIcon /> : null}
+                  {initialStatus ? <ERPStatusBadge status={initialStatus} hideIcon /> : null}
                   {customerFilter ? (
-                    <StatusBadge status="ASSIGNED" label={`Customer scope: ${customerFilter}`} hideIcon />
+                    <ERPStatusBadge status="ASSIGNED" label={`Customer scope: ${customerFilter}`} hideIcon />
                   ) : null}
                 </div>
               ) : (
@@ -406,10 +406,10 @@ export default function PartnerSubscriptionsPage() {
           </TableToolbar>
         </WorkspaceSection>
 
-        {loading ? <LoadingBlock label="Loading subscriptions..." /> : null}
+        {loading ? <ERPLoadingState label="Loading subscriptions..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Failed to load subscriptions"
             description={error}
             onRetry={() => void loadSubscriptions("initial")}
@@ -422,12 +422,12 @@ export default function PartnerSubscriptionsPage() {
             description="Open the partner subscription detail page for EMI schedule and payment progress, or jump directly into collection workflow."
           >
             {count === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No subscriptions found"
                 description="No subscriptions matched the current partner scope and filter set."
               />
             ) : rows.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No rows on this page"
                 description="The current page has no results. Move to a previous page or change the filters."
               />
@@ -491,6 +491,6 @@ export default function PartnerSubscriptionsPage() {
           </WorkspaceSection>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

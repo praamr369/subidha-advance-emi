@@ -9,11 +9,13 @@ import {
   type ReactNode,
 } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import {
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPStatusBadge,
+} from "@/components/erp";
 import { DetailPanel } from "@/components/ui/operations";
 import { apiFetch } from "@/lib/api";
 
@@ -391,7 +393,7 @@ export default function AdminLuckyIdDetailPage() {
   }, [luckyId]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={
         luckyId
           ? `Lucky ID ${formatLuckyNumber(luckyId.lucky_number)}`
@@ -472,10 +474,10 @@ export default function AdminLuckyIdDetailPage() {
           </button>
         </section>
 
-        {loading ? <LoadingBlock label="Loading Lucky ID detail..." /> : null}
+        {loading ? <ERPLoadingState label="Loading Lucky ID detail..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load Lucky ID detail"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -483,7 +485,7 @@ export default function AdminLuckyIdDetailPage() {
         ) : null}
 
         {!loading && !error && !luckyId ? (
-          <EmptyState
+          <ERPEmptyState
             title="Lucky ID not available"
             description="The requested Lucky ID could not be loaded."
           />
@@ -516,7 +518,7 @@ export default function AdminLuckyIdDetailPage() {
                   <DetailValue label="Batch Code" value={luckyId.batch_code} />
                   <DetailValue
                     label="Status"
-                    value={<StatusBadge status={luckyId.status} />}
+                    value={<ERPStatusBadge status={luckyId.status} />}
                   />
                   <DetailValue
                     label="Customer"
@@ -578,7 +580,7 @@ export default function AdminLuckyIdDetailPage() {
                     <DetailValue label="Batch Code" value={batchPreview.batch_code} />
                     <DetailValue
                       label="Status"
-                      value={<StatusBadge status={batchPreview.status} />}
+                      value={<ERPStatusBadge status={batchPreview.status} />}
                     />
                     <DetailValue
                       label="Total Slots"
@@ -602,7 +604,7 @@ export default function AdminLuckyIdDetailPage() {
                     />
                   </div>
                 ) : (
-                  <EmptyState
+                  <ERPEmptyState
                     title="Batch preview unavailable"
                     description="Batch preview could not be loaded for this Lucky ID."
                   />
@@ -637,7 +639,7 @@ export default function AdminLuckyIdDetailPage() {
                     />
                     <DetailValue
                       label="Status"
-                      value={<StatusBadge status={subscriptionPreview.status} />}
+                      value={<ERPStatusBadge status={subscriptionPreview.status} />}
                     />
                     <DetailValue
                       label="Total Amount"
@@ -653,7 +655,7 @@ export default function AdminLuckyIdDetailPage() {
                     />
                   </div>
                 ) : (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No linked contract preview"
                     description={
                       isAssignedState
@@ -667,6 +669,6 @@ export default function AdminLuckyIdDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

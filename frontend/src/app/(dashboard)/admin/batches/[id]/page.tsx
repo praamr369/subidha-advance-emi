@@ -8,11 +8,13 @@ import {
   useState,
 } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import {
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPStatusBadge,
+} from "@/components/erp";
 import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import {
   type BatchStatus,
@@ -493,7 +495,7 @@ export default function AdminBatchDetailPage() {
   }, [loadPage]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={batch?.batch_code || `Batch #${batchId ?? "—"}`}
       subtitle="Operational batch detail workspace for slot readiness, Lucky IDs, subscriptions, and lifecycle visibility."
       breadcrumbs={[
@@ -560,10 +562,10 @@ export default function AdminBatchDetailPage() {
           </button>
         </section>
 
-        {loading ? <LoadingBlock label="Loading batch detail..." /> : null}
+        {loading ? <ERPLoadingState label="Loading batch detail..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load batch detail"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -571,7 +573,7 @@ export default function AdminBatchDetailPage() {
         ) : null}
 
         {!loading && !error && !batch ? (
-          <EmptyState
+          <ERPEmptyState
             title="Batch not found"
             description="The requested batch could not be loaded."
           />
@@ -602,7 +604,7 @@ export default function AdminBatchDetailPage() {
                   />
                   <DetailValue
                     label="Status"
-                    value={<StatusBadge status={batch.status} />}
+                    value={<ERPStatusBadge status={batch.status} />}
                   />
                   <DetailValue
                     label="Created At"
@@ -672,7 +674,7 @@ export default function AdminBatchDetailPage() {
               description="All Lucky IDs for this batch, including assignment state and linked contract context."
             >
               {luckyIds.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No Lucky IDs"
                   description="No Lucky IDs were returned for this batch."
                 />
@@ -742,7 +744,7 @@ export default function AdminBatchDetailPage() {
                             </td>
 
                             <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                              <StatusBadge status={row.status} hideIcon />
+                              <ERPStatusBadge status={row.status} hideIcon />
                             </td>
                           </tr>
                         );
@@ -759,7 +761,7 @@ export default function AdminBatchDetailPage() {
               description="Operationally active subscriptions only. Cancelled/archived records are shown separately in history."
             >
               {activeSubscriptions.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No active subscriptions are linked to this batch."
                   description="Cancelled subscriptions are preserved below for audit history."
                 />
@@ -819,7 +821,7 @@ export default function AdminBatchDetailPage() {
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <StatusBadge status={row.status} hideIcon />
+                            <ERPStatusBadge status={row.status} hideIcon />
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -844,7 +846,7 @@ export default function AdminBatchDetailPage() {
               description="History-only records retained for auditability. These do not contribute to active KPIs, draw eligibility, or collection queues."
             >
               {historicalSubscriptions.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No archived/cancelled subscription history."
                   description="No historical subscriptions were returned for this batch."
                 />
@@ -900,7 +902,7 @@ export default function AdminBatchDetailPage() {
                               </div>
                             </td>
                             <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                              <StatusBadge status={row.status} hideIcon />
+                              <ERPStatusBadge status={row.status} hideIcon />
                               <div className="mt-1 text-xs text-muted-foreground">
                                 History only
                               </div>
@@ -924,6 +926,6 @@ export default function AdminBatchDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -4,16 +4,16 @@ import { RefreshCw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import PublicProductMedia from "@/components/public/PublicProductMedia";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import PaginationControls from "@/components/ui/PaginationControls";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { SelfServicePageShell } from "@/components/layout/page-shells";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DataTableShell, DetailPanel, MobileSafeTable } from "@/components/ui/operations";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { MetricStrip } from "@/components/ui/operations";
@@ -237,7 +237,7 @@ export default function CustomerSubscriptionsPage() {
       {
         key: "status",
         title: "Status",
-        render: (row) => <StatusBadge status={row.status || "ACTIVE"} />,
+        render: (row) => <ERPStatusBadge status={row.status || "ACTIVE"} />,
       },
       {
         key: "winner_waiver",
@@ -316,7 +316,7 @@ export default function CustomerSubscriptionsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Customer Subscriptions"
       title="My Subscriptions"
       subtitle="Customer-scoped subscription truth with contract status, winner benefit visibility, and payment progress in one operational register."
@@ -381,7 +381,7 @@ export default function CustomerSubscriptionsPage() {
                   <span className="font-semibold uppercase tracking-[0.14em]">
                     Active filter
                   </span>
-                  <StatusBadge status={statusFilter} hideIcon />
+                  <ERPStatusBadge status={statusFilter} hideIcon />
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">
@@ -416,10 +416,10 @@ export default function CustomerSubscriptionsPage() {
           </TableToolbar>
         </DetailPanel>
 
-        {loading ? <LoadingBlock label="Loading subscriptions..." /> : null}
+        {loading ? <ERPLoadingState label="Loading subscriptions..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load subscriptions"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -432,7 +432,7 @@ export default function CustomerSubscriptionsPage() {
             description="Dedicated customer subscription rows with safe navigation into detail and payment history."
           >
             {count === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No subscriptions found"
                 description={
                   statusFilter
@@ -441,7 +441,7 @@ export default function CustomerSubscriptionsPage() {
                 }
               />
             ) : rows.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No rows on this page"
                 description="The current page has no results. Move to a previous page or change the filters."
               />
@@ -501,6 +501,6 @@ export default function CustomerSubscriptionsPage() {
         </>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

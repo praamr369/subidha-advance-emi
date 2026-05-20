@@ -4,13 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ActionButton from "@/components/ui/ActionButton";
 import PaginationControls from "@/components/ui/PaginationControls";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -122,7 +122,7 @@ export default function PartnerSubscriptionRequestsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Partner Intake"
       title="Partner Subscription Requests"
       subtitle="Submit and track partner-led EMI subscription intake without creating an active contract before admin approval."
@@ -174,7 +174,7 @@ export default function PartnerSubscriptionRequestsPage() {
                   <span className="font-semibold uppercase tracking-[0.14em]">
                     Active filter
                   </span>
-                  <StatusBadge status={statusFilter} hideIcon />
+                  <ERPStatusBadge status={statusFilter} hideIcon />
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">
@@ -212,10 +212,10 @@ export default function PartnerSubscriptionRequestsPage() {
           </TableToolbar>
         </WorkspaceSection>
 
-        {loading ? <LoadingBlock label="Loading partner subscription requests..." /> : null}
+        {loading ? <ERPLoadingState label="Loading partner subscription requests..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load partner subscription requests"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -223,7 +223,7 @@ export default function PartnerSubscriptionRequestsPage() {
         ) : null}
 
         {!loading && !error && rows.length === 0 ? (
-          <EmptyState
+          <ERPEmptyState
             title="No partner subscription requests yet"
             description="Create a request for a partner-visible customer or submit a new customer snapshot for admin approval."
             action={
@@ -271,6 +271,6 @@ export default function PartnerSubscriptionRequestsPage() {
           </WorkspaceSection>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import {
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPStatusBadge,
+} from "@/components/erp";
 import {
   DataTableShell,
   DetailPanel,
@@ -277,7 +279,7 @@ export default function AdminBatchControlCenterPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={state?.batch_code || `Batch #${batchId ?? "—"} Control Center`}
       subtitle="Lock, commit, and execute draw actions using real backend guardrails and reasons only."
       breadcrumbs={[
@@ -328,16 +330,16 @@ export default function AdminBatchControlCenterPage() {
           </button>
         </section>
 
-        {loading ? <LoadingBlock label="Loading batch control center..." /> : null}
+        {loading ? <ERPLoadingState label="Loading batch control center..." /> : null}
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load control center"
             description={error}
             onRetry={() => void load("initial")}
           />
         ) : null}
         {!loading && !error && !state ? (
-          <EmptyState
+          <ERPEmptyState
             title="Control center unavailable"
             description="The requested batch control state could not be loaded."
           />
@@ -368,13 +370,13 @@ export default function AdminBatchControlCenterPage() {
             ) : null}
 
             <QuickActionGrid>
-              <KpiCard label="Lock Status" value={<StatusBadge status={state.lock_status || "UNKNOWN"} />} />
-              <KpiCard label="Snapshot Status" value={<StatusBadge status={state.snapshot_status || "ABSENT"} />} />
-              <KpiCard label="Commit Status" value={<StatusBadge status={state.commit_status || "ABSENT"} />} />
-              <KpiCard label="Draw Status" value={<StatusBadge status={state.draw_status || "NONE"} />} />
+              <KpiCard label="Lock Status" value={<ERPStatusBadge status={state.lock_status || "UNKNOWN"} />} />
+              <KpiCard label="Snapshot Status" value={<ERPStatusBadge status={state.snapshot_status || "ABSENT"} />} />
+              <KpiCard label="Commit Status" value={<ERPStatusBadge status={state.commit_status || "ABSENT"} />} />
+              <KpiCard label="Draw Status" value={<ERPStatusBadge status={state.draw_status || "NONE"} />} />
               <KpiCard
                 label="Finance Waiver Posting"
-                value={<StatusBadge status={state.finance_waiver_posting_status || "UNKNOWN"} />}
+                value={<ERPStatusBadge status={state.finance_waiver_posting_status || "UNKNOWN"} />}
                 helper={state.finance_waiver_posting_reason || undefined}
               />
               <KpiCard
@@ -509,6 +511,6 @@ export default function AdminBatchControlCenterPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

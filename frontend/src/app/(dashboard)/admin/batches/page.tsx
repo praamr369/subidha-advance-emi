@@ -5,13 +5,16 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Download, RefreshCw, Search } from "lucide-react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import {
+  ERPDataToolbar,
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPSectionShell,
+  ERPStatusBadge,
+} from "@/components/erp";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
-import TableToolbar from "@/components/ui/TableToolbar";
 import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import {
   type BatchStatus,
@@ -364,8 +367,8 @@ export default function AdminBatchesPage() {
         sortable: true,
         render: (row) => (
           <div className="flex flex-wrap gap-2">
-            <StatusBadge status={row.status} />
-            <StatusBadge
+            <ERPStatusBadge status={row.status} />
+            <ERPStatusBadge
               status={row.available_slots === 0 ? "FULL" : "AVAILABLE"}
               label={
                 row.available_slots === 0
@@ -374,7 +377,7 @@ export default function AdminBatchesPage() {
               }
             />
             {row.winner_count > 0 ? (
-              <StatusBadge status="WON" label={`${row.winner_count} Winners`} />
+              <ERPStatusBadge status="WON" label={`${row.winner_count} Winners`} />
             ) : null}
           </div>
         ),
@@ -384,7 +387,7 @@ export default function AdminBatchesPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Batch Register"
       subtitle="Review Lucky Plan grouping, slot pressure, draw timing, and subscription attachment from one operational register without changing batch lifecycle logic."
       breadcrumbs={[
@@ -470,13 +473,17 @@ export default function AdminBatchesPage() {
               Export Current View
             </button>
           </div>
-          <TableToolbar
+          <ERPSectionShell
+            title="Filters"
+            description="Search and narrow the batch register by code and lifecycle status without changing any batch lifecycle rules."
             footer={
               query || statusFilter ? (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="font-semibold uppercase tracking-[0.14em]">Active filters</span>
-                  {query ? <StatusBadge status="OPEN" label={`Search: ${query}`} hideIcon /> : null}
-                  {statusFilter ? <StatusBadge status={statusFilter} hideIcon /> : null}
+                  {query ? (
+                    <ERPStatusBadge status="OPEN" label={`Search: ${query}`} hideIcon />
+                  ) : null}
+                  {statusFilter ? <ERPStatusBadge status={statusFilter} hideIcon /> : null}
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">
@@ -485,60 +492,64 @@ export default function AdminBatchesPage() {
               )
             }
           >
-            <form
-              onSubmit={handleApplyFilters}
-              className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]"
-            >
-              <label className="relative block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={queryInput}
-                  onChange={(event) => setQueryInput(event.target.value)}
-                  placeholder="Search by batch code"
-                  className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
-                />
-              </label>
-
-              <select
-                value={statusInput}
-                onChange={(event) =>
-                  setStatusInput(event.target.value as "" | CanonicalBatchStatus)
-                }
-                className="h-10 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-              >
-                <option value="">All states</option>
-                <option value="DRAFT">Draft</option>
-                <option value="OPEN">Open</option>
-                <option value="FULL">Full</option>
-                <option value="DRAW_IN_PROGRESS">Draw In Progress</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CLOSED">Closed</option>
-              </select>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="submit"
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+            <ERPDataToolbar
+              left={
+                <form
+                  onSubmit={handleApplyFilters}
+                  className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]"
                 >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-                >
-                  Reset
-                </button>
-              </div>
-            </form>
-          </TableToolbar>
+                  <label className="relative block">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={queryInput}
+                      onChange={(event) => setQueryInput(event.target.value)}
+                      placeholder="Search by batch code"
+                      className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
+                    />
+                  </label>
+
+                  <select
+                    value={statusInput}
+                    onChange={(event) =>
+                      setStatusInput(event.target.value as "" | CanonicalBatchStatus)
+                    }
+                    className="h-10 rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                  >
+                    <option value="">All states</option>
+                    <option value="DRAFT">Draft</option>
+                    <option value="OPEN">Open</option>
+                    <option value="FULL">Full</option>
+                    <option value="DRAW_IN_PROGRESS">Draw In Progress</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="CLOSED">Closed</option>
+                  </select>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+                    >
+                      Apply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </form>
+              }
+            />
+          </ERPSectionShell>
         </DetailPanel>
 
-        {loading ? <LoadingBlock label="Loading batch register..." /> : null}
+        {loading ? <ERPLoadingState label="Loading batch register..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load batch register"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -551,7 +562,7 @@ export default function AdminBatchesPage() {
             description="Open a batch to review Lucky IDs, draw readiness, and linked subscriptions without leaving the operational register."
           >
             {rows.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No batches found"
                 description="No batch records matched the current search and status filters."
                 action={
@@ -603,6 +614,6 @@ export default function AdminBatchesPage() {
           </DetailPanel>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

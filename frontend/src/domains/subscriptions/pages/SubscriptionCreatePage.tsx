@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import ActionButton from "@/components/ui/ActionButton";
 import { apiFetch, toArray } from "@/lib/api";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
@@ -363,7 +363,7 @@ function SearchPanel<T>({
 
       {!selected && !loading && query.trim().length > 0 && results.length === 0 ? (
         <div className="mt-4">
-          <EmptyState title={emptyTitle} description={emptyDescription} />
+          <ERPEmptyState title={emptyTitle} description={emptyDescription} />
         </div>
       ) : null}
     </div>
@@ -1208,7 +1208,7 @@ export default function SubscriptionCreatePage({
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={variant === "drawer" ? "Create subscription" : "Create Subscription"}
       subtitle="Search-first contract creation flow for customer, product, plan, batch, Lucky ID, and start date."
       helperNote="This flow preserves existing EMI, payment, waiver, draw, and audit semantics while adding safe contract onboarding controls."
@@ -1925,7 +1925,7 @@ export default function SubscriptionCreatePage({
           </div>
         </SectionCard>
 
-        {globalLoadingLabel ? <LoadingBlock label={globalLoadingLabel} /> : null}
+        {globalLoadingLabel ? <ERPLoadingState label={globalLoadingLabel} /> : null}
 
         {leadContext ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -1968,7 +1968,7 @@ export default function SubscriptionCreatePage({
         ) : null}
 
         {error ? (
-          <ErrorState
+          <ERPErrorState
             title={isEmiPlan ? "Unable to create subscription" : "Unable to create contract"}
             description={error}
             onRetry={canSubmit ? handleSubmit : undefined}
@@ -2188,6 +2188,6 @@ export default function SubscriptionCreatePage({
           </div>
         </SectionCard>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

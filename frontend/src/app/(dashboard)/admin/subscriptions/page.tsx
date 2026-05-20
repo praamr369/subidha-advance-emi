@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
 import PaginationControls from "@/components/ui/PaginationControls";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import { DataTableShell, DetailPanel, FormSection, WorkflowCard } from "@/components/ui/operations";
 import { RegistryPageShell } from "@/components/layout/page-shells";
@@ -211,7 +211,7 @@ function normalizeSubscriptionListPayload(payload: unknown): SubscriptionListPay
 
 function SubscriptionWorkflowLanding() {
   return (
-    <PortalPage
+    <ERPPageShell
       title="Subscriptions"
       subtitle="Canonical contract workflow entry point for Advance EMI, rent, lease, and partner Advance EMI operations."
       breadcrumbs={[
@@ -300,7 +300,7 @@ function SubscriptionWorkflowLanding() {
           />
         </div>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }
 
@@ -514,7 +514,7 @@ export default function AdminSubscriptionsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Subscription Register"
       subtitle="Operational contract register for customer subscriptions, EMI plan visibility, and downstream handoff into detail, payments, and customer workflows."
       breadcrumbs={[
@@ -745,10 +745,10 @@ export default function AdminSubscriptionsPage() {
         }
         register={
           <>
-        {loading ? <LoadingBlock label="Loading subscription register..." /> : null}
+        {loading ? <ERPLoadingState label="Loading subscription register..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load subscription register"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -762,12 +762,12 @@ export default function AdminSubscriptionsPage() {
               description="Review contract context and route into detail, customer, or payment operations."
             >
               {count === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No subscriptions"
                   description="No subscriptions match the current filter set."
                 />
               ) : rows.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No rows on this page"
                   description="The current page has no results. Move to a previous page or change the filters."
                 />
@@ -853,7 +853,7 @@ export default function AdminSubscriptionsPage() {
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <StatusBadge status={row.status} hideIcon />
+                            <ERPStatusBadge status={row.status} hideIcon />
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -934,6 +934,6 @@ export default function AdminSubscriptionsPage() {
           </>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

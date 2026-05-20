@@ -10,14 +10,14 @@ import {
   Trophy,
 } from "lucide-react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatCard from "@/components/ui/StatCard";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { MobileSafeTable } from "@/components/ui/operations";
 import {
   WorkspaceNotice,
@@ -314,7 +314,7 @@ export default function PartnerSubscriptionDetailPage() {
         title: "Contract recorded",
         description: "The partner-visible subscription entered the contract register.",
         timestamp: formatDateTime(subscription.created_at),
-        badge: <StatusBadge status={subscription.status || "ACTIVE"} hideIcon />,
+        badge: <ERPStatusBadge status={subscription.status || "ACTIVE"} hideIcon />,
       });
     }
 
@@ -333,7 +333,7 @@ export default function PartnerSubscriptionDetailPage() {
         title: "Winner history recorded",
         description: `Winner status: ${detailSemantics.winnerHeadline}`,
         timestamp: formatDateTime(winnerSummary.draw_revealed_at),
-        badge: <StatusBadge status="WON" hideIcon />,
+        badge: <ERPStatusBadge status="WON" hideIcon />,
       });
     }
 
@@ -343,7 +343,7 @@ export default function PartnerSubscriptionDetailPage() {
         title: "Latest payment reference point",
         description: "Most recent payment date visible from the partner subscription record.",
         timestamp: formatDate(subscription.last_payment_date),
-        badge: <StatusBadge status="PAID" hideIcon />,
+        badge: <ERPStatusBadge status="PAID" hideIcon />,
       });
     }
 
@@ -356,7 +356,7 @@ export default function PartnerSubscriptionDetailPage() {
           : "Upcoming due position visible for partner follow-up.",
         timestamp: formatDate(nextDueDate),
         badge: (
-          <StatusBadge
+          <ERPStatusBadge
             status={nextDueOverdue ? "OVERDUE" : "PENDING"}
             hideIcon
           />
@@ -393,7 +393,7 @@ export default function PartnerSubscriptionDetailPage() {
               {formatDate(row.due_date)}
             </div>
             {row.is_overdue ? (
-              <StatusBadge
+              <ERPStatusBadge
                 status="OVERDUE"
                 label={`${row.overdue_days} day${row.overdue_days === 1 ? "" : "s"} overdue`}
               />
@@ -431,7 +431,7 @@ export default function PartnerSubscriptionDetailPage() {
         key: "status",
         title: "Status",
         render: (row) => (
-          <StatusBadge status={row.status || "PENDING"} isOverdue={row.is_overdue} />
+          <ERPStatusBadge status={row.status || "PENDING"} isOverdue={row.is_overdue} />
         ),
       },
     ],
@@ -439,7 +439,7 @@ export default function PartnerSubscriptionDetailPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Partner Contracts"
       title={
         subscription
@@ -530,7 +530,7 @@ export default function PartnerSubscriptionDetailPage() {
               label="Contract Lifecycle"
               value={
                 <div className="space-y-2">
-                  <StatusBadge
+                  <ERPStatusBadge
                     status={subscription?.status || "PENDING"}
                     size="md"
                   />
@@ -544,7 +544,7 @@ export default function PartnerSubscriptionDetailPage() {
               label="Winner History"
               value={
                 <div className="space-y-2">
-                  <StatusBadge
+                  <ERPStatusBadge
                     status={
                       detailSemantics.winnerStatus === "WON" ? "WON" : "NOT_WON"
                     }
@@ -566,7 +566,7 @@ export default function PartnerSubscriptionDetailPage() {
               label="Waiver Posture"
               value={
                 <div className="space-y-2">
-                  <StatusBadge
+                  <ERPStatusBadge
                     status={detailSemantics.isSettled ? "COMPLETED" : "ACTIVE"}
                     label={
                       detailSemantics.isSettled ? "Fully settled" : "Still settling"
@@ -586,7 +586,7 @@ export default function PartnerSubscriptionDetailPage() {
                 nextDueDate ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <span>{formatDate(nextDueDate)}</span>
-                    <StatusBadge
+                    <ERPStatusBadge
                       status={nextDueOverdue ? "OVERDUE" : "PENDING"}
                       label={
                         nextDueOverdue
@@ -603,10 +603,10 @@ export default function PartnerSubscriptionDetailPage() {
           </div>
         </WorkspaceSection>
 
-        {loading ? <LoadingBlock label="Loading subscription detail..." /> : null}
+        {loading ? <ERPLoadingState label="Loading subscription detail..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load subscription"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -614,7 +614,7 @@ export default function PartnerSubscriptionDetailPage() {
         ) : null}
 
         {!loading && !error && !subscription ? (
-          <EmptyState
+          <ERPEmptyState
             title="Subscription not found"
             description="The requested subscription was not found for this partner account."
           />
@@ -811,7 +811,7 @@ export default function PartnerSubscriptionDetailPage() {
               description="Major contract, winner, and follow-up checkpoints currently visible from this partner-facing detail surface."
             >
               {timelineItems.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No timeline events recorded"
                   description="This subscription does not yet expose any partner-visible contract events."
                 />
@@ -830,7 +830,7 @@ export default function PartnerSubscriptionDetailPage() {
               }
             >
               {emiRows.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No Advance EMI schedule"
                   description="No advance EMI rows are available for this subscription yet."
                 />
@@ -843,6 +843,6 @@ export default function PartnerSubscriptionDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DataTableShell, DetailPanel, Timeline } from "@/components/ui/operations";
 import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import {
@@ -763,7 +763,7 @@ export default function AdminSubscriptionDetailPage() {
   }, [contractDocuments, subscription]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={
         subscription
           ? `Subscription #${subscription.id}`
@@ -889,10 +889,10 @@ export default function AdminSubscriptionDetailPage() {
       }}
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading subscription detail..." /> : null}
+        {loading ? <ERPLoadingState label="Loading subscription detail..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load subscription detail"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -900,7 +900,7 @@ export default function AdminSubscriptionDetailPage() {
         ) : null}
 
         {!loading && !error && !subscription ? (
-          <EmptyState
+          <ERPEmptyState
             title="Subscription not available"
             description="The requested subscription could not be loaded."
           />
@@ -974,7 +974,7 @@ export default function AdminSubscriptionDetailPage() {
                     title={detailSemantics.contractHeadline}
                     description={detailSemantics.contractDescription}
                     tone={detailSemantics.contractTone}
-                    badge={<StatusBadge status={subscription.status} size="md" />}
+                    badge={<ERPStatusBadge status={subscription.status} size="md" />}
                     meta={
                       <>
                         <DetailMetricTile
@@ -1009,7 +1009,7 @@ export default function AdminSubscriptionDetailPage() {
                     description={detailSemantics.winnerDescription}
                     tone={detailSemantics.winnerTone}
                     badge={
-                      <StatusBadge
+                      <ERPStatusBadge
                         status={winnerStatus === "WON" ? "WON" : "NOT_WON"}
                         label={winnerStatus === "WON" ? "Winner recorded" : "Not won"}
                         size="md"
@@ -1050,7 +1050,7 @@ export default function AdminSubscriptionDetailPage() {
                     description={detailSemantics.waiverDescription}
                     tone={detailSemantics.waiverTone}
                     badge={
-                      <StatusBadge
+                      <ERPStatusBadge
                         status={detailSemantics.isSettled ? "COMPLETED" : "ACTIVE"}
                         label={detailSemantics.isSettled ? "No remaining amount" : "Exposure remains"}
                         size="md"
@@ -1117,7 +1117,7 @@ export default function AdminSubscriptionDetailPage() {
                   <DetailValue label="Subscription ID" value={`#${subscription.id}`} />
                   <DetailValue
                     label="Status"
-                    value={<StatusBadge status={subscription.status} />}
+                    value={<ERPStatusBadge status={subscription.status} />}
                   />
                   <DetailValue label="Customer" value={subscription.customer_name} />
                   <DetailValue label="Phone" value={subscription.customer_phone} />
@@ -1133,7 +1133,7 @@ export default function AdminSubscriptionDetailPage() {
                     label="Batch Status"
                     value={
                       isEmiSubscription && subscription.batch_status ? (
-                        <StatusBadge status={subscription.batch_status} />
+                        <ERPStatusBadge status={subscription.batch_status} />
                       ) : (
                         isEmiSubscription
                           ? "—"
@@ -1171,7 +1171,12 @@ export default function AdminSubscriptionDetailPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <DetailValue
                       label="Winner Status"
-                      value={<StatusBadge status={winnerStatus === "WON" ? "WON" : "NOT_WON"} label={winnerStatus === "WON" ? "Won" : "Not won"} />}
+                      value={
+                        <ERPStatusBadge
+                          status={winnerStatus === "WON" ? "WON" : "NOT_WON"}
+                          label={winnerStatus === "WON" ? "Won" : "Not won"}
+                        />
+                      }
                     />
                     <DetailValue
                       label="Winner Month"
@@ -1238,7 +1243,7 @@ export default function AdminSubscriptionDetailPage() {
                         />
                         <DetailValue
                           label="Return Condition"
-                          value={<StatusBadge status={contractProfile.return_condition_status} />}
+                          value={<ERPStatusBadge status={contractProfile.return_condition_status} />}
                         />
                         <DetailValue
                           label="Deduction Amount"
@@ -1250,7 +1255,7 @@ export default function AdminSubscriptionDetailPage() {
                         />
                         <DetailValue
                           label="Refund Status"
-                          value={<StatusBadge status={contractProfile.refund_status} />}
+                          value={<ERPStatusBadge status={contractProfile.refund_status} />}
                         />
                         {subscription.plan_type === "LEASE" ? (
                           <>
@@ -1309,7 +1314,7 @@ export default function AdminSubscriptionDetailPage() {
                                   <div className="text-sm font-medium text-foreground">
                                     {doc.document_type}
                                   </div>
-                                  <StatusBadge status={doc.verification_status} size="sm" />
+                                  <ERPStatusBadge status={doc.verification_status} size="sm" />
                                 </div>
                                 <div className="text-xs text-muted-foreground">
                                   Uploaded {formatDateTime(doc.created_at)} · {doc.uploaded_by_username || "—"}
@@ -1431,7 +1436,7 @@ export default function AdminSubscriptionDetailPage() {
                             </Link>
                           </td>
                           <td className="border-b border-border px-4 py-3 text-sm">
-                            <StatusBadge status={row.status} />
+                            <ERPStatusBadge status={row.status} />
                           </td>
                           <td className="border-b border-border px-4 py-3 text-sm">
                             {formatDate(row.scheduled_date)}
@@ -1522,7 +1527,7 @@ export default function AdminSubscriptionDetailPage() {
                 className="rounded-[28px]"
               >
               {emis.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No Advance EMI schedule found"
                   description="This subscription does not currently expose EMI rows."
                 />
@@ -1586,7 +1591,7 @@ export default function AdminSubscriptionDetailPage() {
                             {money(emi.balance_amount)}
                           </td>
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <StatusBadge
+                            <ERPStatusBadge
                               status={emi.status}
                               isOverdue={emi.is_overdue}
                             />
@@ -1623,7 +1628,7 @@ export default function AdminSubscriptionDetailPage() {
                   className="rounded-[28px]"
                 >
                   {waivedEmis.length === 0 ? (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No waived EMI rows"
                       description="No waived EMI rows are currently visible for this subscription."
                     />
@@ -1668,7 +1673,7 @@ export default function AdminSubscriptionDetailPage() {
                 className="rounded-[28px]"
               >
                 {payments.length === 0 ? (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No payments recorded"
                     description="No payment rows are currently visible for this subscription."
                   />
@@ -1718,7 +1723,7 @@ export default function AdminSubscriptionDetailPage() {
               className="rounded-[28px]"
             >
               {timeline.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No audit events"
                   description="No audit trail entries are currently visible for this subscription."
                 />
@@ -1749,6 +1754,6 @@ export default function AdminSubscriptionDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

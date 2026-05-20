@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import FormActions from "@/components/ui/FormActions";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DetailPanel, FormSection, MobileSafeTable } from "@/components/ui/operations";
 import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
 import {
@@ -191,7 +191,7 @@ export default function AdminSubscriptionRequestDetailPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={request ? `Request #${request.id}` : "Subscription Request Review"}
       subtitle="Approve or reject customer and partner subscription intake without bypassing the canonical EMI subscription creation path."
       breadcrumbs={[
@@ -230,10 +230,10 @@ export default function AdminSubscriptionRequestDetailPage() {
       ]}
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading subscription request review..." /> : null}
+        {loading ? <ERPLoadingState label="Loading subscription request review..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load subscription request"
             description={error}
             onRetry={() => void loadRequest()}
@@ -242,9 +242,7 @@ export default function AdminSubscriptionRequestDetailPage() {
 
         {!loading && !error && request ? (
           <>
-            {actionError ? (
-              <ErrorState title="Action failed" description={actionError} />
-            ) : null}
+            {actionError ? <ERPErrorState title="Action failed" description={actionError} /> : null}
 
             {successMessage ? (
               <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-800 shadow-sm">
@@ -439,12 +437,12 @@ export default function AdminSubscriptionRequestDetailPage() {
                 title="Request resolution"
                 description="This request is finalized and remains visible for audit history."
               >
-                <StatusBadge status={request.status} />
+                <ERPStatusBadge status={request.status} />
               </DetailPanel>
             )}
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

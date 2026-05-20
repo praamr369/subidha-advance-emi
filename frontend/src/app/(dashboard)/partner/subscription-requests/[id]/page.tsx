@@ -4,11 +4,11 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import {
   WorkspaceNotice,
   WorkspaceTimeline,
@@ -116,7 +116,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
               )}.`
             : "The partner request entered the intake queue.",
         timestamp: formatDateTime(request.created_at),
-        badge: <StatusBadge status="SUBMITTED" />,
+        badge: <ERPStatusBadge status="SUBMITTED" />,
       },
     ];
 
@@ -131,7 +131,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
             : "Review metadata was recorded for this request."
         ),
         timestamp: formatDateTime(request.reviewed_at),
-        badge: <StatusBadge status={request.status} />,
+        badge: <ERPStatusBadge status={request.status} />,
       });
     }
 
@@ -143,7 +143,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
           request.approved_subscription_number
         )} is now available in the partner subscription workspace.`,
         timestamp: formatDateTime(request.updated_at || request.reviewed_at),
-        badge: <StatusBadge status="APPROVED" label="Linked subscription" />,
+        badge: <ERPStatusBadge status="APPROVED" label="Linked subscription" />,
       });
     } else if (request.status === "REJECTED") {
       items.push({
@@ -151,7 +151,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
         title: "Request rejected",
         description: text(request.review_note, "Review notes explain the rejection posture."),
         timestamp: formatDateTime(request.updated_at || request.reviewed_at),
-        badge: <StatusBadge status="REJECTED" />,
+        badge: <ERPStatusBadge status="REJECTED" />,
       });
     } else if (request.status === "CANCELLED") {
       items.push({
@@ -159,7 +159,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
         title: "Request cancelled",
         description: "The partner request remains part of the audit trail even after cancellation.",
         timestamp: formatDateTime(request.updated_at),
-        badge: <StatusBadge status="CANCELLED" />,
+        badge: <ERPStatusBadge status="CANCELLED" />,
       });
     }
 
@@ -181,7 +181,7 @@ export default function PartnerSubscriptionRequestDetailPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Partner Intake"
       title={request ? `Partner Request #${request.id}` : "Partner Subscription Request"}
       subtitle="Review the partner intake status, requested customer scope, and admin decision history for this submission."
@@ -216,10 +216,10 @@ export default function PartnerSubscriptionRequestDetailPage() {
       ]}
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading partner subscription request..." /> : null}
+        {loading ? <ERPLoadingState label="Loading partner subscription request..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load partner subscription request"
             description={error}
             onRetry={() => void loadPage()}
@@ -321,6 +321,6 @@ export default function PartnerSubscriptionRequestDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

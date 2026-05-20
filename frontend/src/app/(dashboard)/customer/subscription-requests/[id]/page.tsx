@@ -4,17 +4,17 @@ import { RefreshCw } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import EmptyState from "@/components/feedback/EmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import {
   WorkspaceNotice,
   WorkspaceTimeline,
   type WorkspaceTimelineItem,
 } from "@/components/ui/role-workspace";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
 import {
@@ -118,7 +118,7 @@ export default function CustomerSubscriptionRequestDetailPage() {
         description:
           "The customer intake request is stored separately from live subscription truth until admin review completes.",
         timestamp: formatDateTime(request.created_at),
-        badge: <StatusBadge status="SUBMITTED" label="Submitted" />,
+        badge: <ERPStatusBadge status="SUBMITTED" label="Submitted" />,
       },
     ];
 
@@ -136,7 +136,7 @@ export default function CustomerSubscriptionRequestDetailPage() {
           "Review action was recorded without a detailed note."
         ),
         timestamp: formatDateTime(request.reviewed_at),
-        badge: <StatusBadge status={request.status} />,
+        badge: <ERPStatusBadge status={request.status} />,
         meta: request.reviewed_by_username
           ? `Reviewed by ${request.reviewed_by_username}`
           : undefined,
@@ -150,7 +150,7 @@ export default function CustomerSubscriptionRequestDetailPage() {
         description:
           "The customer cancelled the intake request before approval created a live subscription.",
         timestamp: formatDateTime(request.updated_at),
-        badge: <StatusBadge status="CANCELLED" />,
+        badge: <ERPStatusBadge status="CANCELLED" />,
       });
     }
 
@@ -163,7 +163,7 @@ export default function CustomerSubscriptionRequestDetailPage() {
           `SUB-${request.approved_subscription_id}`
         )} is now available in the customer subscription workspace.`,
         timestamp: formatDateTime(request.reviewed_at || request.updated_at),
-        badge: <StatusBadge status="APPROVED" label="Subscription created" />,
+        badge: <ERPStatusBadge status="APPROVED" label="Subscription created" />,
       });
     }
 
@@ -171,7 +171,7 @@ export default function CustomerSubscriptionRequestDetailPage() {
   }, [request]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Customer Intake"
       title={request ? `Request #${request.id}` : "Subscription Request"}
       subtitle="Review request posture, admin decision history, and any approved subscription linkage from the customer workspace."
@@ -256,10 +256,10 @@ export default function CustomerSubscriptionRequestDetailPage() {
           </div>
         </WorkspaceSection>
 
-        {loading ? <LoadingBlock label="Loading subscription request..." /> : null}
+        {loading ? <ERPLoadingState label="Loading subscription request..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load subscription request"
             description={error}
             onRetry={() => void loadPage()}
@@ -267,7 +267,7 @@ export default function CustomerSubscriptionRequestDetailPage() {
         ) : null}
 
         {!loading && !error && !request ? (
-          <EmptyState
+          <ERPEmptyState
             title="Request not found"
             description="The requested customer intake record could not be loaded."
           />
@@ -331,6 +331,6 @@ export default function CustomerSubscriptionRequestDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

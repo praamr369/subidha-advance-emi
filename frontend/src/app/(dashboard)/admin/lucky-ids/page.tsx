@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import {
+  ERPDataToolbar,
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPSectionShell,
+  ERPStatusBadge,
+} from "@/components/erp";
 import {
   DataTableShell,
   DetailPanel,
@@ -15,7 +19,6 @@ import {
   MobileSafeTable,
   QuickActionGrid,
 } from "@/components/ui/operations";
-import TableToolbar from "@/components/ui/TableToolbar";
 import { apiFetch, toArray } from "@/lib/api";
 
 type LuckyIdStatus =
@@ -404,7 +407,7 @@ export default function AdminLuckyIdsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Lucky ID Register"
       subtitle="Operational register for Lucky ID visibility, batch allocation, assignment integrity, and contract linkage."
       breadcrumbs={[
@@ -476,117 +479,122 @@ export default function AdminLuckyIdsPage() {
           </QuickActionGrid>
         </DetailPanel>
 
-        <TableToolbar
-          title="Filter register"
+        <ERPSectionShell
+          title="Filters"
           description="Narrow by batch, status, lucky number, customer, or subscription for daily administration and reconciliation."
         >
-          <form onSubmit={handleApplyFilters} className="grid gap-4 lg:grid-cols-6">
-            <div className="lg:col-span-3">
-              <label
-                htmlFor="lucky-id-search"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Search
-              </label>
-              <input
-                id="lucky-id-search"
-                type="text"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Lucky number, customer, contract, batch"
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-              />
-            </div>
+          <ERPDataToolbar
+            left={
+              <form onSubmit={handleApplyFilters} className="grid gap-4 lg:grid-cols-6">
+                <div className="lg:col-span-3">
+                  <label
+                    htmlFor="lucky-id-search"
+                    className="mb-2 block text-sm font-medium text-foreground"
+                  >
+                    Search
+                  </label>
+                  <input
+                    id="lucky-id-search"
+                    type="text"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Lucky number, customer, contract, batch"
+                    className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                  />
+                </div>
 
-            <div>
-              <label
-                htmlFor="lucky-id-batch"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Batch
-              </label>
-              <select
-                id="lucky-id-batch"
-                value={batchInput}
-                onChange={(event) => setBatchInput(event.target.value)}
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-              >
-                <option value="">All</option>
-                {batchOptions.map((option) => (
-                  <option key={option.id} value={String(option.id)}>
-                    {option.batch_code}
-                  </option>
-                ))}
-              </select>
-            </div>
+                <div>
+                  <label
+                    htmlFor="lucky-id-batch"
+                    className="mb-2 block text-sm font-medium text-foreground"
+                  >
+                    Batch
+                  </label>
+                  <select
+                    id="lucky-id-batch"
+                    value={batchInput}
+                    onChange={(event) => setBatchInput(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                  >
+                    <option value="">All</option>
+                    {batchOptions.map((option) => (
+                      <option key={option.id} value={String(option.id)}>
+                        {option.batch_code}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div>
-              <label
-                htmlFor="lucky-id-status"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Status
-              </label>
-              <select
-                id="lucky-id-status"
-                value={statusInput}
-                onChange={(event) =>
-                  setStatusInput(event.target.value as "" | LuckyIdStatus)
-                }
-                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
-              >
-                <option value="">All</option>
-                <option value="AVAILABLE">AVAILABLE</option>
-                <option value="ASSIGNED">ASSIGNED</option>
-                <option value="WON">WON</option>
-                <option value="BLOCKED">BLOCKED</option>
-                <option value="CANCELLED">CANCELLED</option>
-              </select>
-            </div>
+                <div>
+                  <label
+                    htmlFor="lucky-id-status"
+                    className="mb-2 block text-sm font-medium text-foreground"
+                  >
+                    Status
+                  </label>
+                  <select
+                    id="lucky-id-status"
+                    value={statusInput}
+                    onChange={(event) =>
+                      setStatusInput(event.target.value as "" | LuckyIdStatus)
+                    }
+                    className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                  >
+                    <option value="">All</option>
+                    <option value="AVAILABLE">AVAILABLE</option>
+                    <option value="ASSIGNED">ASSIGNED</option>
+                    <option value="WON">WON</option>
+                    <option value="BLOCKED">BLOCKED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
+                </div>
 
-            <div className="flex flex-wrap items-end gap-2">
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-              >
-                Apply
-              </button>
+                <div className="flex flex-wrap items-end gap-2">
+                  <button
+                    type="submit"
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+                  >
+                    Apply
+                  </button>
 
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-              >
-                Reset
-              </button>
-            </div>
-          </form>
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </form>
+            }
+            right={
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void loadPage("refresh")}
+                  disabled={refreshing || loading}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </button>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void loadPage("refresh")}
-              disabled={refreshing || loading}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
+                <button
+                  type="button"
+                  disabled={exportRows.length === 0 || loading}
+                  onClick={() => downloadCsv("lucky-id-register-current-view.csv", exportRows)}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Export Current View
+                </button>
+              </div>
+            }
+          />
+        </ERPSectionShell>
 
-            <button
-              type="button"
-              disabled={exportRows.length === 0 || loading}
-              onClick={() => downloadCsv("lucky-id-register-current-view.csv", exportRows)}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Export Current View
-            </button>
-          </div>
-        </TableToolbar>
-
-        {loading ? <LoadingBlock label="Loading Lucky ID register..." /> : null}
+        {loading ? <ERPLoadingState label="Loading Lucky ID register..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load Lucky ID register"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -599,7 +607,7 @@ export default function AdminLuckyIdsPage() {
             description="Use this register to verify batch ownership, contract linkage, and assignment integrity."
           >
             {rows.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No Lucky IDs found"
                 description="No Lucky IDs match the current filter set."
               />
@@ -672,7 +680,7 @@ export default function AdminLuckyIdsPage() {
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <StatusBadge status={status} hideIcon />
+                            <ERPStatusBadge status={status} hideIcon />
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -714,6 +722,6 @@ export default function AdminLuckyIdsPage() {
           </DetailPanel>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

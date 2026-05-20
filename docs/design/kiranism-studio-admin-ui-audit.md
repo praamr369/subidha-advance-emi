@@ -960,3 +960,210 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 ### 12) Next recommended phase
 
 - Phase 7 — Subscriptions / contract desk (SAFE_LAYOUT_ONLY first; keep payment/waiver/collection actions under manual review where applicable).
+
+---
+
+## Phase 7 subscriptions contract desk transformation result (2026-05-20)
+
+Scope: **Frontend UI only** for Subscriptions / Contract Desk SAFE pages.  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no invented contracts/EMIs/KPIs**, **no permission weakening**, **no handler/validation/submit changes**.
+
+### 1) Subscription/contract routes touched
+
+- `/admin/subscriptions` (SAFE_LAYOUT_ONLY)
+- `/admin/subscriptions/[id]` (SAFE_AUTO)
+- `/admin/subscriptions/[id]/lifecycle` (SAFE_AUTO)
+- `/admin/subscription-requests` (SAFE_LAYOUT_ONLY)
+- `/admin/subscription-requests/[id]` (SAFE_AUTO)
+- `/admin/subscriptions/advance-emi/create` (SAFE_AUTO; via `SubscriptionCreatePage`)
+- `/admin/subscriptions/rent/create` (SAFE_AUTO; via `SubscriptionCreatePage`)
+- `/admin/subscriptions/lease/create` (SAFE_AUTO; via `SubscriptionCreatePage`)
+- `/admin/billing/contracts` (SAFE_AUTO; contract/billing workspace view only)
+- `/customer/subscriptions` (SAFE_AUTO)
+- `/customer/subscriptions/[id]` (SAFE_AUTO)
+- `/customer/contracts` (SAFE_AUTO)
+- `/customer/subscription-requests` (SAFE_AUTO)
+- `/customer/subscription-requests/[id]` (SAFE_AUTO)
+- `/customer/subscription-requests/create` (SAFE_AUTO; via `CustomerSubscriptionRequestCreatePage`)
+- `/partner/subscriptions` (SAFE_LAYOUT_ONLY)
+- `/partner/subscriptions/[id]` (SAFE_AUTO)
+- `/partner/subscription-requests` (SAFE_AUTO)
+- `/partner/subscription-requests/[id]` (SAFE_AUTO)
+- `/partner/subscription-requests/create` (SAFE_LAYOUT_ONLY)
+
+### 2) Subscription/contract routes deferred
+
+- `/admin/reports/contracts` (SAFE_AUTO) — remains on the shared `Phase5ReportSurface`; defer report framing changes to a dedicated reports pass to avoid cross-domain UI ripple.
+- `/admin/subscriptions/create` (SAFE_AUTO) — compatibility redirect route; no UI surface to transform.
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO:
+  - `/admin/billing/contracts`
+  - `/admin/subscription-requests/[id]`
+  - `/admin/subscriptions/[id]`
+  - `/admin/subscriptions/[id]/lifecycle`
+  - `/admin/subscriptions/advance-emi/create` (via `SubscriptionCreatePage`)
+  - `/admin/subscriptions/rent/create` (via `SubscriptionCreatePage`)
+  - `/admin/subscriptions/lease/create` (via `SubscriptionCreatePage`)
+  - `/customer/contracts`
+  - `/customer/subscription-requests`
+  - `/customer/subscription-requests/[id]`
+  - `/customer/subscription-requests/create` (via `CustomerSubscriptionRequestCreatePage`)
+  - `/customer/subscriptions`
+  - `/customer/subscriptions/[id]`
+  - `/partner/subscription-requests`
+  - `/partner/subscription-requests/[id]`
+  - `/partner/subscriptions/[id]`
+- SAFE_LAYOUT_ONLY:
+  - `/admin/subscription-requests`
+  - `/admin/subscriptions`
+  - `/partner/subscription-requests/create`
+  - `/partner/subscriptions`
+
+### 4) Components reused
+
+- ERP shell/states: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP status chips: `frontend/src/components/erp/ERPStatusBadge.tsx`
+
+### 5) Components created
+
+- None (Phase 7 is composition-only: swap to ERP wrappers + spacing/section hierarchy polish where already present).
+
+### 6) Subscription services/API contracts preserved
+
+- No endpoint path changes, request param changes, or response normalization changes.
+- No changes to subscription/contract services; UI wrappers only (examples):
+  - `frontend/src/services/subscriptions.ts`, `frontend/src/services/subscriptions/*`
+  - `frontend/src/services/subscription-requests.ts`
+  - `frontend/src/services/customer/*` subscription register/detail services
+  - `frontend/src/services/partner/*` subscription register/detail services
+
+### 7) EMI/lucky ID/batch/waiver safety confirmation
+
+- No changes to EMI calculation logic, EMI preview behavior, schedule derivation, or due-date logic.
+- No changes to lucky ID selection/assignment rules.
+- No changes to batch lifecycle interpretation.
+- No changes to winner/waiver meaning (future EMI waiver only) or how waiver states are displayed.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No changes that expand customer/partner visibility into admin-only contract data.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to payment posting, reversal behavior, commission logic, payout logic, ledger behavior, reconciliation behavior, accounting posting, or audit behavior.
+- Contract desk surfaces remain read-first; mutation semantics and handlers remain unchanged where they exist.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining subscription UI gaps
+
+- `/admin/reports/contracts` is still on the shared report surface; consider a dedicated “Reports surfaces” pass to align reporting header/filters to ERP without touching report query semantics.
+- Consider a dedicated “contract detail section hierarchy pass” for any remaining large contract detail surfaces that still rely on legacy panels (keep handlers unchanged).
+
+### 12) Next recommended phase
+
+- Phase 8 — Batches / Lucky IDs / lucky draw (read-only first; keep draw execution/mutations manual-review).
+
+---
+
+## Phase 8 batches lucky draw transformation result (2026-05-20)
+
+Scope: **Frontend UI only** for Batches / Lucky IDs / Lucky Draw SAFE pages.  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no invented batches/lucky IDs/winners/draw results**, **no permission weakening**, **no handler/validation/submit changes**.
+
+### 1) Batch/lucky draw routes touched
+
+- `/admin/batches` (SAFE_LAYOUT_ONLY)
+- `/admin/batches/create` (SAFE_AUTO)
+- `/admin/batches/[id]` (SAFE_AUTO)
+- `/admin/batches/[id]/edit` (SAFE_AUTO)
+- `/admin/batches/[id]/control-center` (SAFE_LAYOUT_ONLY; wrapper-only)
+- `/admin/lucky-ids` (SAFE_LAYOUT_ONLY)
+- `/admin/lucky-ids/[id]` (SAFE_AUTO)
+- `/admin/lucky-ids/[id]/edit` (SAFE_AUTO)
+- `/admin/bi/batches` (SAFE_AUTO; read-only analytics)
+
+### 2) Batch/lucky draw routes deferred
+
+Deferred by policy because these are draw execution/mutation and verification-critical surfaces (MANUAL_REVIEW):
+
+- `/admin/lucky-draw` (MANUAL_REVIEW)
+- `/admin/lucky-draw/history` (MANUAL_REVIEW)
+- `/admin/lucky-draws` (MANUAL_REVIEW)
+- `/admin/lucky-draws/create` (MANUAL_REVIEW)
+- `/admin/lucky-draws/[id]` (MANUAL_REVIEW)
+- `/admin/lucky-draws/[id]/reveal` (MANUAL_REVIEW)
+
+Also intentionally left unchanged:
+
+- `/admin/batches/[id]/generate-lucky-ids` (SAFE_AUTO) — redirect-only route; no UI surface to transform.
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO:
+  - `/admin/batches/create`
+  - `/admin/batches/[id]`
+  - `/admin/batches/[id]/edit`
+  - `/admin/lucky-ids/[id]`
+  - `/admin/lucky-ids/[id]/edit`
+  - `/admin/bi/batches`
+- SAFE_LAYOUT_ONLY:
+  - `/admin/batches`
+  - `/admin/batches/[id]/control-center` (wrapper-only, handlers preserved)
+  - `/admin/lucky-ids`
+
+### 4) Components reused
+
+- ERP shell/states: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP status chips: `frontend/src/components/erp/ERPStatusBadge.tsx`
+- ERP toolbars/sections: `frontend/src/components/erp/ERPDataToolbar.tsx`, `frontend/src/components/erp/ERPSectionShell.tsx`
+
+### 5) Components created
+
+- None (Phase 8 is composition-only: adopt shared ERP wrappers + toolbar/section framing).
+
+### 6) Batch/lucky draw services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, or response-shape assumptions added.
+- No new service calls added; existing `apiFetch` usage and existing service modules remain unchanged (examples):
+  - `frontend/src/services/batches/*`
+  - `frontend/src/services/draws/*`
+
+### 7) Lucky ID/draw/winner/waiver safety confirmation
+
+- No changes to Lucky ID allocation rules, assignment behavior, or status meaning.
+- No changes to draw commit/reveal/verification display logic or seed/hash behavior.
+- No changes to winner selection behavior or winner waiver meaning (future EMI waiver only).
+- `/admin/batches/[id]/control-center` remains behavior-identical; only wrapper/state primitives were swapped.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No changes that expand any role’s visibility into other-role batch/draw data.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to EMI logic, payment posting, commission, payout, ledger, reconciliation, accounting posting, or audit behavior.
+- No new derived financial numbers were introduced; all numbers shown remain sourced from existing backend payloads.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining batch/lucky draw UI gaps
+
+- Lucky draw execution surfaces remain deferred (MANUAL_REVIEW) and still use legacy framing; do not auto-migrate.
+- If/when migrating draw pages, do it as a dedicated manual-review pass with strict “no handler” constraints.
+
+### 12) Next recommended phase
+
+- Phase 9 — Cashier POS / counter workspace (visual-only; keep submit/mutation behavior strict).

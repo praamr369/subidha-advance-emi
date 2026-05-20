@@ -10,11 +10,13 @@ import {
   type ReactNode,
 } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import {
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPStatusBadge,
+} from "@/components/erp";
 import { DetailPanel, FormSection } from "@/components/ui/operations";
 import { apiFetch } from "@/lib/api";
 
@@ -507,7 +509,7 @@ export default function AdminLuckyIdEditPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={
         luckyId
           ? `Edit Lucky ID ${formatLuckyNumber(luckyId.lucky_number)}`
@@ -579,10 +581,10 @@ export default function AdminLuckyIdEditPage() {
           </button>
         </section>
 
-        {loading ? <LoadingBlock label="Loading Lucky ID edit workspace..." /> : null}
+        {loading ? <ERPLoadingState label="Loading Lucky ID edit workspace..." /> : null}
 
         {!loading && error && !luckyId ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load Lucky ID edit page"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -590,7 +592,7 @@ export default function AdminLuckyIdEditPage() {
         ) : null}
 
         {!loading && !error && !luckyId ? (
-          <EmptyState
+          <ERPEmptyState
             title="Lucky ID not available"
             description="The requested Lucky ID could not be loaded."
           />
@@ -603,7 +605,7 @@ export default function AdminLuckyIdEditPage() {
               description="Lucky ID linkage is derived from the subscription workflow, not edited directly here. This page should be used only for controlled administrative status correction."
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DetailValue label="Current Status" value={<StatusBadge status={luckyId.status} />} />
+                <DetailValue label="Current Status" value={<ERPStatusBadge status={luckyId.status} />} />
                 <DetailValue
                   label="Allowed Corrections"
                   value={allowedStatuses.length > 0 ? allowedStatuses.join(", ") : "No direct correction allowed"}
@@ -655,7 +657,7 @@ export default function AdminLuckyIdEditPage() {
                   <DetailValue label="Batch Code" value={luckyId.batch_code} />
                   <DetailValue
                     label="Status"
-                    value={<StatusBadge status={luckyId.status} />}
+                    value={<ERPStatusBadge status={luckyId.status} />}
                   />
                   <DetailValue
                     label="Customer"
@@ -746,7 +748,7 @@ export default function AdminLuckyIdEditPage() {
                     </div>
                   </div>
                 ) : (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No direct status correction available"
                     description="This Lucky ID should be reviewed through its linked subscription or winner workflow rather than corrected directly here."
                   />
@@ -764,7 +766,7 @@ export default function AdminLuckyIdEditPage() {
                     <DetailValue label="Batch Code" value={batchPreview.batch_code} />
                     <DetailValue
                       label="Status"
-                      value={<StatusBadge status={batchPreview.status} />}
+                      value={<ERPStatusBadge status={batchPreview.status} />}
                     />
                     <DetailValue
                       label="Total Slots"
@@ -788,7 +790,7 @@ export default function AdminLuckyIdEditPage() {
                     />
                   </div>
                 ) : (
-                  <EmptyState
+                  <ERPEmptyState
                     title="Batch preview unavailable"
                     description="Batch preview could not be loaded for this Lucky ID."
                   />
@@ -823,7 +825,7 @@ export default function AdminLuckyIdEditPage() {
                     />
                     <DetailValue
                       label="Status"
-                      value={<StatusBadge status={subscriptionPreview.status} />}
+                      value={<ERPStatusBadge status={subscriptionPreview.status} />}
                     />
                     <DetailValue
                       label="Total Amount"
@@ -839,7 +841,7 @@ export default function AdminLuckyIdEditPage() {
                     />
                   </div>
                 ) : (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No linked contract preview"
                     description="This Lucky ID does not currently resolve to a visible subscription preview."
                   />
@@ -848,7 +850,7 @@ export default function AdminLuckyIdEditPage() {
             </section>
 
             {error ? (
-              <ErrorState
+              <ERPErrorState
                 title="Unable to update Lucky ID"
                 description={error}
               />
@@ -913,6 +915,6 @@ export default function AdminLuckyIdEditPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

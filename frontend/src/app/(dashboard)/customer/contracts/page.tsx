@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { listCustomerSubscriptionsRegister } from "@/services/customer/paginated-subscriptions";
 import type { CustomerSubscription } from "@/services/customer";
@@ -228,7 +228,7 @@ export default function CustomerContractsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="My Contracts"
       subtitle="Overview of all Advance EMI, Rent, and Lease contracts linked to your account."
       breadcrumbs={[
@@ -248,10 +248,10 @@ export default function CustomerContractsPage() {
       statusBadge={{ label: "My Contracts", tone: "info" }}
     >
       <div className="space-y-8">
-        {loading && <LoadingBlock label="Loading your contracts..." />}
+        {loading && <ERPLoadingState label="Loading your contracts..." />}
 
         {!loading && error && (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load contracts"
             description={error}
             onRetry={() => void load()}
@@ -259,7 +259,7 @@ export default function CustomerContractsPage() {
         )}
 
         {!loading && !error && subscriptions.length === 0 && (
-          <EmptyState
+          <ERPEmptyState
             title="No contracts found"
             description="You don't have any Advance EMI, Rent, or Lease contracts yet. Contact the store to set one up."
           />
@@ -317,6 +317,6 @@ export default function CustomerContractsPage() {
           </WorkspaceSection>
         )}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

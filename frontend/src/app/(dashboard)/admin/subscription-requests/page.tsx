@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import PaginationControls from "@/components/ui/PaginationControls";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { ROUTES } from "@/lib/routes";
 import SubscriptionRequestCard from "@/domains/subscription-requests/components/SubscriptionRequestCard";
@@ -137,7 +137,7 @@ export default function AdminSubscriptionRequestsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Subscription Requests"
       subtitle="Admin review queue for customer and partner EMI subscription intake, with approval creating the real subscription through the canonical service path."
       breadcrumbs={[
@@ -230,10 +230,10 @@ export default function AdminSubscriptionRequestsPage() {
           </form>
         </TableToolbar>
 
-        {loading ? <LoadingBlock label="Loading admin request register..." /> : null}
+        {loading ? <ERPLoadingState label="Loading admin request register..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load admin request register"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -241,7 +241,7 @@ export default function AdminSubscriptionRequestsPage() {
         ) : null}
 
         {!loading && !error && rows.length === 0 ? (
-          <EmptyState
+          <ERPEmptyState
             title="No subscription requests found"
             description="Customer and partner request intake will appear here for approval or rejection."
           />
@@ -272,6 +272,6 @@ export default function AdminSubscriptionRequestsPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

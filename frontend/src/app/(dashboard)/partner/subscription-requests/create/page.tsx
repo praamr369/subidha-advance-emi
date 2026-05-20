@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import PublicProductMedia from "@/components/public/PublicProductMedia";
 import ActionButton from "@/components/ui/ActionButton";
 import FormActions from "@/components/ui/FormActions";
 import FormSection from "@/components/ui/FormSection";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -230,7 +230,7 @@ export default function PartnerSubscriptionRequestCreatePage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Partner Intake"
       title="Create Partner Subscription Request"
       subtitle="Submit a partner-led intake request for an existing partner-visible customer or a new customer snapshot. Admin approval is still required before any live subscription exists."
@@ -262,7 +262,7 @@ export default function PartnerSubscriptionRequestCreatePage() {
       ]}
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading partner request form..." /> : null}
+        {loading ? <ERPLoadingState label="Loading partner request form..." /> : null}
 
         {!loading && error ? (
           <WorkspaceSection
@@ -686,6 +686,6 @@ export default function PartnerSubscriptionRequestCreatePage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -3,11 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { ERPEmptyState, ERPErrorState, ERPLoadingState, ERPPageShell } from "@/components/erp";
 import FormActions from "@/components/ui/FormActions";
-import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 
@@ -230,7 +227,7 @@ export default function AdminBatchCreatePage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Create Batch"
       subtitle="Create a Lucky Plan batch with controlled slots, tenure, draw scheduling, and safe initial lifecycle state."
       breadcrumbs={[
@@ -484,7 +481,7 @@ export default function AdminBatchCreatePage() {
               </div>
 
               {!canSave ? (
-                <EmptyState
+                <ERPEmptyState
                   title="Batch not ready"
                   description="Complete batch code, slots, duration, draw day, and start date before creating the batch."
                 />
@@ -493,10 +490,10 @@ export default function AdminBatchCreatePage() {
           </SectionCard>
         </section>
 
-        {loadingLabel ? <LoadingBlock label={loadingLabel} /> : null}
+        {loadingLabel ? <ERPLoadingState label={loadingLabel} /> : null}
 
         {error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to create batch"
             description={error}
             onRetry={canSave ? handleSave : undefined}
@@ -582,6 +579,6 @@ export default function AdminBatchCreatePage() {
           />
         </SectionCard>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

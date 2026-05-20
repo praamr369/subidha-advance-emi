@@ -6,10 +6,10 @@ import { useSearchParams } from "next/navigation";
 
 import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
 import SubscriptionContractDocument from "@/components/print/SubscriptionContractDocument";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -120,7 +120,7 @@ export default function BillingContractsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       eyebrow="Billing Contract Mirrors"
       title="Billing Contracts"
@@ -159,9 +159,13 @@ export default function BillingContractsPage() {
           </div>
         ) : null}
 
-        {loading ? <LoadingBlock label="Loading billing contracts..." /> : null}
+        {loading ? <ERPLoadingState label="Loading billing contracts..." /> : null}
         {!loading && error ? (
-          <ErrorState title="Unable to load billing contracts" description={error} onRetry={() => void loadPage()} />
+          <ERPErrorState
+            title="Unable to load billing contracts"
+            description={error}
+            onRetry={() => void loadPage()}
+          />
         ) : null}
 
         {!loading && !error ? (
@@ -377,6 +381,6 @@ export default function BillingContractsPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

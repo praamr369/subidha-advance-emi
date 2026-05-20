@@ -3,13 +3,13 @@
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import PublicProductMedia from "@/components/public/PublicProductMedia";
 import ActionButton from "@/components/ui/ActionButton";
 import FormActions from "@/components/ui/FormActions";
 import FormSection from "@/components/ui/FormSection";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -187,7 +187,7 @@ export default function CustomerSubscriptionRequestCreatePage({
   const showAside = variant === "page";
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Customer Intake"
       title={variant === "drawer" ? "Create request" : "Create Subscription Request"}
       subtitle="Submit a self-service intake request that stays pending until admin approval creates the real subscription."
@@ -256,10 +256,10 @@ export default function CustomerSubscriptionRequestCreatePage({
       maxWidth={variant === "drawer" ? "100%" : undefined}
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading request form..." /> : null}
+        {loading ? <ERPLoadingState label="Loading request form..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load request form"
             description={error}
             onRetry={() => void loadOptions(batchId || undefined)}
@@ -462,6 +462,6 @@ export default function CustomerSubscriptionRequestCreatePage({
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

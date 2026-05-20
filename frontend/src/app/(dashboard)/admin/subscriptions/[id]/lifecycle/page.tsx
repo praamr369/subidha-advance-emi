@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DetailPanel, FormSection } from "@/components/ui/operations";
 import { getSubscription, type SubscriptionRecord } from "@/services/subscriptions";
 import {
@@ -370,10 +370,10 @@ export default function ContractLifecyclePage() {
     }, "Inspection approved. Stock routed. Deposit refund approved.");
   }
 
-  if (loading) return <LoadingBlock label="Loading contract lifecycle..." />;
+  if (loading) return <ERPLoadingState label="Loading contract lifecycle..." />;
   if (error)
     return (
-      <ErrorState
+      <ERPErrorState
         title="Unable to load contract"
         description={error}
         onRetry={() => void loadAll()}
@@ -397,7 +397,7 @@ export default function ContractLifecyclePage() {
         : null;
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={`Contract Lifecycle — #${subscriptionId}`}
       subtitle="Manage contract approval, activation, amendments, possession, and return inspection."
       breadcrumbs={[
@@ -465,7 +465,7 @@ export default function ContractLifecyclePage() {
             <FieldRow label="ID" value={`#${subscriptionId}`} />
             <FieldRow label="Contract No." value={contractNo ?? <span className="text-muted-foreground">Not assigned yet</span>} />
             <FieldRow label="Plan Type" value={sub?.plan_type} />
-            <FieldRow label="Status" value={<StatusBadge status={status} />} />
+            <FieldRow label="Status" value={<ERPStatusBadge status={status} />} />
             <FieldRow label="Terms Locked" value={termsLocked ? "Yes — financial terms are immutable" : "No — terms can still be edited"} />
             <FieldRow label="Total Amount" value={money(sub?.total_amount)} />
             <FieldRow label="Monthly Amount" value={money(sub?.monthly_amount)} />
@@ -636,7 +636,7 @@ export default function ContractLifecyclePage() {
                         <span className="font-medium text-foreground">
                           {amend.amendment_type.replaceAll("_", " ")}
                         </span>
-                        <StatusBadge status={amend.status} />
+                        <ERPStatusBadge status={amend.status} />
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {amend.reason}
@@ -732,7 +732,7 @@ export default function ContractLifecyclePage() {
             {possession ? (
               <div className="space-y-4">
                 <div className="grid gap-0 divide-y divide-border rounded-xl border border-border bg-background">
-                  <FieldRow label="Status" value={<StatusBadge status={possession.status} />} />
+                  <FieldRow label="Status" value={<ERPStatusBadge status={possession.status} />} />
                   <FieldRow label="Serial No." value={possession.serial_number || "—"} />
                   <FieldRow label="Handover Date" value={formatDate(possession.handover_date)} />
                   <FieldRow label="Expected Return" value={formatDate(possession.expected_return_date)} />
@@ -889,7 +889,7 @@ export default function ContractLifecyclePage() {
             ) : (
               <div className="space-y-4">
                 <div className="grid gap-0 divide-y divide-border rounded-xl border border-border bg-background">
-                  <FieldRow label="Status" value={<StatusBadge status={inspection.status} />} />
+                  <FieldRow label="Status" value={<ERPStatusBadge status={inspection.status} />} />
                   <FieldRow label="Outcome" value={inspection.outcome ?? <span className="text-muted-foreground">Not yet assessed</span>} />
                   <FieldRow label="Condition" value={inspection.condition_recorded} />
                   <FieldRow label="Inspection Date" value={formatDate(inspection.inspection_date)} />
@@ -1015,6 +1015,6 @@ export default function ContractLifecyclePage() {
           </Link>
         </div>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

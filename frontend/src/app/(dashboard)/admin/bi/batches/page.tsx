@@ -1,12 +1,12 @@
 "use client";
 
 import BiInsightsDashboard from "@/components/admin/bi/BiInsightsDashboard";
-import PortalPage from "@/components/ui/PortalPage";
+import { ERPPageShell } from "@/components/erp";
 import { ROUTES } from "@/lib/routes";
 
 export default function BiBatchPerformancePage() {
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="BI Control Center"
       title="Batch Performance"
       subtitle="Read-only fill rate, payment discipline, default rate, and draw completion."
@@ -18,6 +18,6 @@ export default function BiBatchPerformancePage() {
       statusBadge={{ label: "Read Only", tone: "info" }}
     >
       <BiInsightsDashboard mode="batches" />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import DataTable from "@/components/ui/DataTable";
 import { DataTableShell } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
 import {
   buildSubscriptionDetailSemantics,
@@ -365,7 +365,7 @@ export default function CustomerSubscriptionDetailPage() {
         title: "Status",
         render: (row: EmiRow) => {
           const badge = resolveEmiBadge(row);
-          return <StatusBadge status={badge.status} label={badge.label} />;
+          return <ERPStatusBadge status={badge.status} label={badge.label} />;
         },
       },
     ],
@@ -373,7 +373,7 @@ export default function CustomerSubscriptionDetailPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Customer Subscription"
       title="Subscription Details"
       subtitle="Track contract lifecycle, winner benefit history, waiver impact, and advance EMI settlement from your live subscription record."
@@ -443,10 +443,10 @@ export default function CustomerSubscriptionDetailPage() {
         </button>
       </div>
 
-      {loading ? <LoadingBlock label="Loading subscription details..." /> : null}
+      {loading ? <ERPLoadingState label="Loading subscription details..." /> : null}
 
       {!loading && error ? (
-        <ErrorState
+        <ERPErrorState
           title="Unable to load subscription"
           description={error}
           onRetry={() => void loadPage("initial")}
@@ -454,7 +454,7 @@ export default function CustomerSubscriptionDetailPage() {
       ) : null}
 
       {!loading && !error && !subscription ? (
-        <EmptyState
+        <ERPEmptyState
           title="Subscription not found"
           description="No customer subscription record was returned."
         />
@@ -481,7 +481,7 @@ export default function CustomerSubscriptionDetailPage() {
                 title={detailSemantics.contractHeadline}
                 description={detailSemantics.contractDescription}
                 tone={detailSemantics.contractTone}
-                badge={<StatusBadge status={subscription.status} size="md" />}
+                badge={<ERPStatusBadge status={subscription.status} size="md" />}
                 meta={
                   <>
                     <DetailMetricTile
@@ -513,7 +513,7 @@ export default function CustomerSubscriptionDetailPage() {
                 description={detailSemantics.winnerDescription}
                 tone={detailSemantics.winnerTone}
                 badge={
-                  <StatusBadge
+                  <ERPStatusBadge
                     status={detailSemantics.winnerStatus === "WON" ? "WON" : "NOT_WON"}
                     label={
                       detailSemantics.winnerStatus === "WON"
@@ -558,7 +558,7 @@ export default function CustomerSubscriptionDetailPage() {
                 description={detailSemantics.waiverDescription}
                 tone={detailSemantics.waiverTone}
                 badge={
-                  <StatusBadge
+                  <ERPStatusBadge
                     status={detailSemantics.isSettled ? "COMPLETED" : "ACTIVE"}
                     label={detailSemantics.isSettled ? "Fully settled" : "Still settling"}
                     size="md"
@@ -705,7 +705,7 @@ export default function CustomerSubscriptionDetailPage() {
                       Delivery updates come from internal operations only and remain linked to this subscription for audit clarity.
                     </p>
                   </div>
-                  <StatusBadge status={subscription.delivery_summary.status} size="md" />
+                  <ERPStatusBadge status={subscription.delivery_summary.status} size="md" />
                 </div>
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -761,7 +761,7 @@ export default function CustomerSubscriptionDetailPage() {
                               {row.delivery_reference}
                             </td>
                             <td className="border-b border-slate-200 px-4 py-3 text-sm">
-                              <StatusBadge status={row.status} />
+                              <ERPStatusBadge status={row.status} />
                             </td>
                             <td className="border-b border-slate-200 px-4 py-3 text-sm text-slate-700">
                               {formatDate(row.scheduled_date)}
@@ -788,7 +788,7 @@ export default function CustomerSubscriptionDetailPage() {
             description="Customer-visible advance EMI rows with paid, waived, and outstanding amounts shown separately."
           >
             {emiRows.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No Advance EMI schedule found"
                 description="No advance EMI rows were returned for this subscription."
               />
@@ -800,6 +800,6 @@ export default function CustomerSubscriptionDetailPage() {
           </DetailSectionShell>
         </div>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

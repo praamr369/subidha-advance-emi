@@ -196,6 +196,32 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Prompt title**: “Phase 7 — Subscription desk UI (guardrails)”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
+- **Phase 7 status (implemented 2026-05-20)**:
+  - **Transformed**:
+    - `/admin/subscriptions` (SAFE_LAYOUT_ONLY)
+    - `/admin/subscriptions/[id]` (SAFE_AUTO)
+    - `/admin/subscriptions/[id]/lifecycle` (SAFE_AUTO)
+    - `/admin/subscription-requests` (SAFE_LAYOUT_ONLY)
+    - `/admin/subscription-requests/[id]` (SAFE_AUTO)
+    - `/admin/subscriptions/advance-emi/create` (SAFE_AUTO; via `SubscriptionCreatePage`)
+    - `/admin/subscriptions/rent/create` (SAFE_AUTO; via `SubscriptionCreatePage`)
+    - `/admin/subscriptions/lease/create` (SAFE_AUTO; via `SubscriptionCreatePage`)
+    - `/admin/billing/contracts` (SAFE_AUTO)
+    - `/customer/subscriptions` (SAFE_AUTO)
+    - `/customer/subscriptions/[id]` (SAFE_AUTO)
+    - `/customer/contracts` (SAFE_AUTO)
+    - `/customer/subscription-requests` (SAFE_AUTO)
+    - `/customer/subscription-requests/[id]` (SAFE_AUTO)
+    - `/customer/subscription-requests/create` (SAFE_AUTO; via `CustomerSubscriptionRequestCreatePage`)
+    - `/partner/subscriptions` (SAFE_LAYOUT_ONLY)
+    - `/partner/subscriptions/[id]` (SAFE_AUTO)
+    - `/partner/subscription-requests` (SAFE_AUTO)
+    - `/partner/subscription-requests/[id]` (SAFE_AUTO)
+    - `/partner/subscription-requests/create` (SAFE_LAYOUT_ONLY)
+  - **Deferred**:
+    - `/admin/reports/contracts` (SAFE_AUTO) — shared report surface; defer report framing changes to a dedicated reports pass.
+    - `/admin/subscriptions/create` (SAFE_AUTO) — compatibility redirect route; no UI surface to transform.
+
 ### Phase 8 — Batches / Lucky IDs / lucky draw read-only/admin surfaces
 
 - **Goal**: batch register + lucky id generation UI polish; keep draw execution manual-review.
@@ -208,6 +234,25 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Services/contracts**: batches/lucky services.
 - **Prompt title**: “Phase 8 — Batches & Lucky IDs (read-only first)”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
+- **Phase 8 status (implemented 2026-05-20)**:
+  - **Transformed**:
+    - `/admin/batches` (SAFE_LAYOUT_ONLY)
+    - `/admin/batches/create` (SAFE_AUTO)
+    - `/admin/batches/[id]` (SAFE_AUTO)
+    - `/admin/batches/[id]/edit` (SAFE_AUTO)
+    - `/admin/batches/[id]/control-center` (SAFE_LAYOUT_ONLY; wrapper-only, handlers preserved)
+    - `/admin/lucky-ids` (SAFE_LAYOUT_ONLY)
+    - `/admin/lucky-ids/[id]` (SAFE_AUTO)
+    - `/admin/lucky-ids/[id]/edit` (SAFE_AUTO)
+    - `/admin/bi/batches` (SAFE_AUTO; categorized batches/lucky draw ops)
+  - **Deferred**:
+    - `/admin/lucky-draw` (MANUAL_REVIEW) — contains draw commit/execute semantics; defer to a dedicated manual-review lucky draw pass.
+    - `/admin/lucky-draw/history` (MANUAL_REVIEW) — draw history interpretation should be reviewed together with draw lifecycle semantics.
+    - `/admin/lucky-draws` (MANUAL_REVIEW) — draw lifecycle/mutation surface; defer.
+    - `/admin/lucky-draws/create` (MANUAL_REVIEW) — draw creation is mutation-heavy; defer.
+    - `/admin/lucky-draws/[id]` (MANUAL_REVIEW) — draw detail includes integrity-critical verification context; defer.
+    - `/admin/lucky-draws/[id]/reveal` (MANUAL_REVIEW) — reveal/seed verification display and copy must remain manual-review.
+    - `/admin/batches/[id]/generate-lucky-ids` (SAFE_AUTO) — redirect-only route (no UI surface); left unchanged.
 
 ### Phase 9 — Cashier POS / counter workspace
 
