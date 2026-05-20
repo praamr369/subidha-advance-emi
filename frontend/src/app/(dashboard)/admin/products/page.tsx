@@ -5,11 +5,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Download, RefreshCw, Search } from "lucide-react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
@@ -485,7 +485,7 @@ export default function AdminProductsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Product Register"
       subtitle="Keep contract pricing, product cataloging, and subscription-ready inventory readable for daily staff without changing the underlying Lucky Plan pricing rule."
       breadcrumbs={[
@@ -699,10 +699,10 @@ export default function AdminProductsPage() {
           </DetailPanel>
         ) : null}
 
-        {loading ? <LoadingBlock label="Loading product register..." /> : null}
+        {loading ? <ERPLoadingState label="Loading product register..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load product register"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -715,7 +715,7 @@ export default function AdminProductsPage() {
             description="Open the product detail page to review catalog information and downstream usage without breaking existing pricing or subscription dependencies."
           >
             {rows.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No products found"
                 description="No product records matched the current filter set."
                 action={
@@ -761,6 +761,6 @@ export default function AdminProductsPage() {
           </DetailPanel>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

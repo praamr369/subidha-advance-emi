@@ -310,6 +310,60 @@ Pick 1 low-risk admin list/catalog page at a time (no high-consequence money flo
 3. **Introduce consistent operational page headers** by enhancing existing primitives:
    - Prefer extending `PortalPage` / `PageHeader` rather than creating a parallel system.
 
+---
+
+## Phase B products adoption result
+
+Date: 2026-05-20  
+Scope: `frontend/` only (UI primitive adoption on exactly one additional low-risk admin catalog/register page; no backend/auth/API changes).
+
+### Page selected
+
+- `frontend/src/app/(dashboard)/admin/products/page.tsx` (Admin → Products → Product Register)
+
+### Why it was low-risk
+
+- Catalog/register surface only (read + filter + export + navigation); no cashier collection, payment posting, cancellations, reversals, reconciliation, accounting posting, lucky draw execution, or payout execution.
+- Page already had explicit local loading/error/empty state rendering blocks suitable for wrapper-only replacement.
+
+### Components reused
+
+- `frontend/src/components/erp/ERPPageShell.tsx`
+- `frontend/src/components/erp/ERPLoadingState.tsx`
+- `frontend/src/components/erp/ERPErrorState.tsx`
+- `frontend/src/components/erp/ERPEmptyState.tsx`
+
+### Services/API contracts preserved
+
+- Existing data fetching remains unchanged:
+  - continues using `apiFetch()` against `/admin/products/` (including `q`, `category`, `subcategory` query params).
+  - preserves existing pagination handling via `results/next` when present (no request param changes).
+- No changes to table rows, links, row actions, or router navigation behavior.
+
+### Product pricing / inventory safety confirmation
+
+- Pricing display remains read-only and unchanged: the page still renders `base_price` as the contract total (no pricing mutation and no EMI math changes).
+- Inventory readiness display remains read-only and unchanged (no stock sync, no inventory mutations).
+
+### Intentionally not touched
+
+- Backend code, API contracts, serializers, endpoints.
+- Auth/session/RoleGuard/middleware/token handling/redirect behavior.
+- Product create/edit/delete behavior or any pricing logic.
+- Inventory stock sync logic.
+- EMI logic, payment posting, waiver, commissions, payouts, ledger, reconciliation, audit behavior.
+- Route removals or renames; no fake KPIs/charts/counters/records.
+
+### Duplicate partner commissions route status
+
+- Confirmed unchanged in this pass:
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### Next recommended pilot page
+
+- Admin product masters workspace: `frontend/src/app/(dashboard)/admin/products/masters/page.tsx` (only if it already has explicit local loading/error/empty blocks; otherwise defer and document).
+
 ### Phase B — Shared ERP UI primitives (only if used immediately)
 
 Implement a minimal set of new wrappers (or extend existing ones) and **apply to pilot pages**:
