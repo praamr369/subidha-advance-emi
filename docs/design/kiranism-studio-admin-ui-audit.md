@@ -57,6 +57,70 @@ Scope: **Audit + planning only** (no UI transformations in this pass).
 
 ---
 
+## Phase 1 shared ERP UI foundation result
+
+Date: 2026-05-20  
+Scope: **Frontend UI foundation only** (shared primitives + shell refinement).  
+Non-goals: **no backend changes**, **no auth/session/RoleGuard changes**, **no route changes**, **no API contract changes**, **no fake KPIs/data**.
+
+### 1) Shared primitives created (additive)
+
+Located in `frontend/src/components/erp/`:
+
+- `ERPPageHeader.tsx`
+- `ERPSectionShell.tsx`
+- `ERPDataToolbar.tsx`
+- `ERPRegisterShell.tsx`
+- `ERPActionPanel.tsx`
+- `ERPStatusBadge.tsx`
+- `ERPAuditNote.tsx`
+- `ERPDetailGrid.tsx`
+- `ERPMobileCardList.tsx`
+- `ERPMetricStrip.tsx`
+- Optional barrel exports: `index.ts` (does not change existing import paths)
+
+### 2) Shared primitives reused (existing)
+
+- `ERPPageShell.tsx` (thin wrapper over `PortalPage`)
+- `ERPEmptyState.tsx`, `ERPErrorState.tsx`, `ERPLoadingState.tsx` (thin wrappers over feedback primitives)
+- `frontend/src/components/ui/portal-primitives.tsx` (`PageSection`, `SectionHeader`, `DataToolbar`, `MetricCard`)
+- `frontend/src/components/ui/status-badge.tsx`
+
+### 3) Shell/layout files changed
+
+- None in this pass (foundation components only; shell behavior intentionally untouched).
+
+### 4) Route families this foundation supports
+
+- Admin, Cashier, Customer, Partner, Vendor, Public (shared primitives are role-agnostic; pages provide their own actions/links/data).
+
+### 5) What was intentionally not touched
+
+- Backend (Django/DRF/PostgreSQL) and all API request/response contracts
+- Auth/JWT/session storage, refresh flow, logout, redirects
+- `RoleGuard` and role visibility/permissions
+- EMI logic, payment posting, lucky draw, waiver, commission, payout, ledger, reconciliation, accounting posting, audit behavior
+- Route structure (no move/rename/delete)
+
+### 6) Duplicate partner commissions route status
+
+- Preserved unchanged:
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 7) Fast frontend checks
+
+- `npm run lint`: ✅ pass
+- `npm run typecheck`: ✅ pass
+- `npm run build`: ✅ pass
+- `npm run check:routes`: ✅ pass (no collisions; checked 393 routes, 11 compatibility redirects)
+
+### 8) Next recommended phase
+
+- Phase 2 — Public website / brand site
+
+---
+
 ## 2) Current layout components
 
 ### App-level shell

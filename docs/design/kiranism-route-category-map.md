@@ -35,6 +35,18 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Existing services/API contracts to preserve**: all `frontend/src/services/**`; routing constants in `frontend/src/lib/routes.ts`.
 - **Suggested prompt title**: “Phase 1 — Dashboard shell foundation (no behavior changes)”.
 - **Fast tests**: `cd frontend && npm run lint && npm run typecheck && npm run build`.
+- **Foundation components now available** (for later phase migrations; no page logic moved):
+  - `frontend/src/components/erp/ERPPageHeader.tsx`
+  - `frontend/src/components/erp/ERPSectionShell.tsx`
+  - `frontend/src/components/erp/ERPDataToolbar.tsx`
+  - `frontend/src/components/erp/ERPRegisterShell.tsx`
+  - `frontend/src/components/erp/ERPActionPanel.tsx`
+  - `frontend/src/components/erp/ERPStatusBadge.tsx`
+  - `frontend/src/components/erp/ERPAuditNote.tsx`
+  - `frontend/src/components/erp/ERPDetailGrid.tsx`
+  - `frontend/src/components/erp/ERPMobileCardList.tsx`
+  - `frontend/src/components/erp/ERPMetricStrip.tsx`
+  - Optional barrel exports: `frontend/src/components/erp/index.ts`
 
 ### Phase 2 — Public website / brand site
 
