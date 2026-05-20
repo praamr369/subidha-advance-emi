@@ -49,10 +49,8 @@ export default function PublicHeroBanner({
   return (
     <section
       className={cn(
-        "public-hero-banner group relative overflow-hidden rounded-[2rem] border border-white/75 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.62)] sm:p-8",
-        legalVariant
-          ? "bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(245,245,244,0.94))]"
-          : "bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))]",
+        "public-hero-banner public-hero group relative overflow-hidden p-6 sm:p-8",
+        legalVariant ? "ring-1 ring-border/60" : "ring-1 ring-border/50",
         compact ? "min-h-[14rem]" : "min-h-[20rem]"
       )}
     >
@@ -70,7 +68,7 @@ export default function PublicHeroBanner({
                 positionMap[imagePosition]
               )}
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/45" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[var(--surface-card-elevated)] via-[color-mix(in_oklab,var(--surface-card-elevated)_92%,transparent)] to-transparent" />
           </div>
         ) : (
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(180,147,106,0.24),transparent_45%),radial-gradient(circle_at_12%_90%,rgba(15,23,42,0.08),transparent_40%)]" />
@@ -96,7 +94,10 @@ export default function PublicHeroBanner({
           {badges.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-2">
               {badges.map((badge) => (
-                <span key={badge} className="inline-flex items-center rounded-full border border-white/80 bg-white/80 px-3 py-1 text-xs font-medium text-foreground">
+                <span
+                  key={badge}
+                  className="inline-flex items-center rounded-full border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_86%,transparent)] px-3 py-1 text-xs font-semibold text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                >
                   {badge}
                 </span>
               ))}

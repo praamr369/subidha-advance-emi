@@ -60,6 +60,9 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Services/contracts to preserve**: existing public product fetch/search patterns (if any).
 - **Prompt title**: “Phase 2 — Public site polish”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
+- **Phase 2 status (implemented)**:
+  - **Transformed** (premium surface consistency + dark-mode safe panels): `/products`, `/products/[id]`, `/winners`, `/winner-history`, `/about`, `/contact`
+  - **Deferred** (unchanged in Phase 2 to keep the diff safe and reviewable): `/apply`, `/blog`, `/blog/[slug]`, `/how-it-works`, `/lucky-plan`, `/lucky-plan/*`, `/policies`, `/policies/[slug]`, and other legal/policy pages
 
 ### Phase 3 — Admin cockpit / operations
 

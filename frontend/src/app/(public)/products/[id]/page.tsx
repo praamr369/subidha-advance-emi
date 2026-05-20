@@ -104,8 +104,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         Back to catalogue
       </Link>
 
-      <section className="relative overflow-hidden rounded-[2.5rem] border border-white/75 bg-[radial-gradient(circle_at_top_right,rgba(148,163,184,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(251,191,36,0.16),transparent_26%),linear-gradient(145deg,rgba(255,255,255,0.99),rgba(250,250,249,0.94))] p-6 shadow-[0_34px_90px_-58px_rgba(15,23,42,0.78)] sm:p-8 lg:p-10">
-        <div className="pointer-events-none absolute inset-x-14 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+      <section className="public-surface relative overflow-hidden p-6 sm:p-8 lg:p-10">
+        <div className="pointer-events-none absolute inset-x-14 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
         <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
           <div className="space-y-4">
             <PublicProductDetailMedia
@@ -118,9 +118,9 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               {factRows.map((fact) => (
                 <div
                   key={fact.label}
-                  className="rounded-[1.4rem] border border-white/80 bg-white/80 p-4 shadow-[0_18px_38px_-28px_rgba(15,23,42,0.74)]"
+                  className="public-card p-4 shadow-[0_18px_38px_-28px_rgba(15,23,42,0.24)] dark:shadow-none"
                 >
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     {fact.label}
                   </div>
                   <div className="mt-2 text-sm font-medium text-foreground">
@@ -132,8 +132,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-[2rem] border border-white/80 bg-white/82 p-6 shadow-[0_26px_62px_-40px_rgba(15,23,42,0.74)]">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <div className="public-card p-6 shadow-[0_26px_62px_-40px_rgba(15,23,42,0.22)] dark:shadow-none">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Base price
               </div>
               <div className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
@@ -150,7 +150,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 </Link>
                 <Link
                   href={ROUTES.public.contact}
-                  className="public-action-secondary h-12 justify-center gap-2 !min-h-0 px-6 shadow-[0_20px_42px_-30px_rgba(15,23,42,0.72)]"
+                  className="public-action-secondary h-12 justify-center gap-2 !min-h-0 px-6"
                 >
                   Contact branch
                   <ArrowUpRight className="h-4 w-4" />

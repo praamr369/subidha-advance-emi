@@ -67,7 +67,7 @@ export default function PublicPageShell({
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className="inline-flex items-center rounded-full border border-slate-950/10 bg-slate-950 px-3 py-1 text-xs font-semibold text-white shadow-[0_12px_28px_-20px_rgba(15,23,42,0.72)]">
+                  <span className="inline-flex items-center rounded-full border border-primary/30 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--primary)_92%,white_8%),color-mix(in_oklab,var(--primary)_86%,black_14%))] px-3 py-1 text-xs font-semibold text-primary-foreground shadow-[0_14px_30px_-24px_color-mix(in_oklab,var(--primary)_48%,transparent)]">
                     {crumb.label}
                   </span>
                 )}

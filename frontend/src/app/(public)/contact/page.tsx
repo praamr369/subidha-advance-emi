@@ -66,14 +66,18 @@ export default async function ContactPage() {
 
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <section className="space-y-6">
-          <div className="rounded-[2rem] border border-white/75 bg-white/82 p-6">
+          <div className="public-surface p-6">
             <SectionHeader eyebrow="Branch" title="Visit our store" description="Asansol, West Bengal" />
             {profile.address_text ? <p className="mt-4 text-sm leading-6 text-muted-foreground">{profile.address_text}</p> : null}
             <div className="mt-5 grid gap-2 text-sm text-muted-foreground">
-              {profile.support_phone ? <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">Phone: {profile.support_phone}</div> : null}
-              {profile.support_email ? <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">Email: {profile.support_email}</div> : null}
-              {profile.business_hours ? <div className="rounded-xl border border-white/75 bg-white/70 px-4 py-3">Hours: {profile.business_hours}</div> : null}
-              {profile.map_url ? <Link href={profile.map_url} className="rounded-xl border border-white/75 bg-white/70 px-4 py-3 transition hover:bg-white">Open map</Link> : null}
+              {profile.support_phone ? <div className="public-card-sm px-4 py-3">Phone: {profile.support_phone}</div> : null}
+              {profile.support_email ? <div className="public-card-sm px-4 py-3">Email: {profile.support_email}</div> : null}
+              {profile.business_hours ? <div className="public-card-sm px-4 py-3">Hours: {profile.business_hours}</div> : null}
+              {profile.map_url ? (
+                <Link href={profile.map_url} className="public-card-sm px-4 py-3 transition hover:bg-[var(--surface-card-elevated)]">
+                  Open map
+                </Link>
+              ) : null}
             </div>
           </div>
         </section>

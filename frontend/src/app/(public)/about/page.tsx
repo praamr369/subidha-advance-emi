@@ -71,7 +71,7 @@ export default async function AboutPage() {
         ]}
       />
 
-      <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6">
+      <section className="public-surface p-6">
         <SectionHeader
           eyebrow="Brand story"
           title="Built for daily retail reality"

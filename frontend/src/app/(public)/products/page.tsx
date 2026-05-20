@@ -78,26 +78,34 @@ export default async function ProductsPage() {
         ]}
       />
 
-      <section className="rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
+      <section className="public-surface p-6">
         <p className="mb-4 text-sm leading-6 text-muted-foreground">
           Browse the live catalogue sourced from production product records.
         </p>
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-[1.5rem] border border-white/80 bg-white/82 p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Published products</div>
+          <div className="public-card p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Published products</div>
             <div className="mt-2 text-3xl font-semibold text-foreground">{count}</div>
           </div>
-          <div className="rounded-[1.5rem] border border-white/80 bg-white/82 p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Media-ready cards</div>
+          <div className="public-card p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Media-ready cards</div>
             <div className="mt-2 text-3xl font-semibold text-foreground">{mediaReadyCount}</div>
           </div>
-          <div className="rounded-[1.5rem] border border-white/80 bg-white/82 p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Workflow</div>
+          <div className="public-card p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Workflow</div>
             <div className="mt-2 text-lg font-semibold text-foreground">Browse → Inspect → Enquire</div>
           </div>
         </div>
 
-        {error ? <div className="mt-6 rounded-[1.6rem] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div> : <div className="mt-6"><ProductGrid products={products} locale={locale} /></div>}
+        {error ? (
+          <div className="mt-6 rounded-[1.6rem] border border-red-200/90 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.9))] px-5 py-4 text-sm text-red-700 shadow-[0_16px_36px_-28px_rgba(127,29,29,0.42)]">
+            {error}
+          </div>
+        ) : (
+          <div className="mt-6">
+            <ProductGrid products={products} locale={locale} />
+          </div>
+        )}
       </section>
 
       <section className="public-surface p-6">

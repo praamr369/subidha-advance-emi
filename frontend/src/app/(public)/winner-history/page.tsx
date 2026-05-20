@@ -63,7 +63,7 @@ export default async function WinnerHistoryPage() {
         ]}
       />
 
-      <section className="space-y-4 rounded-[2rem] border border-white/75 bg-white/70 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
+      <section className="public-surface space-y-4 p-6">
         <SectionHeader
           eyebrow="Archive"
           title="Published records"
@@ -78,11 +78,11 @@ export default async function WinnerHistoryPage() {
           />
         ) : null}
         {error ? (
-          <div className="rounded-[1.6rem] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+          <div className="rounded-[1.6rem] border border-red-200/90 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.9))] px-5 py-4 text-sm text-red-700 shadow-[0_16px_36px_-28px_rgba(127,29,29,0.42)]">
             {error}
           </div>
         ) : winners.length === 0 ? (
-          <div className="rounded-[1.6rem] border border-white/75 bg-white/80 px-5 py-4 text-sm leading-6 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+          <div className="public-card-sm px-5 py-4 text-sm leading-6 text-muted-foreground">
             No winner history is published yet. When revealed draw records exist, they will appear here.
           </div>
         ) : (

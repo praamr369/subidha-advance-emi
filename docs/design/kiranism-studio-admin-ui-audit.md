@@ -121,6 +121,71 @@ Located in `frontend/src/components/erp/`:
 
 ---
 
+## Phase 2 public website transformation result
+
+Date: 2026-05-20  
+Scope: **Public website / brand site only** (`frontend/src/app/(public)/**`).  
+Non-goals: no backend changes, no auth/session changes, no route changes, no invented endpoints, no fake winners/products/stats.
+
+### 1) Public routes touched (visual-only)
+
+- `/` (home): unchanged in this phase (already premium; relies on live public APIs).
+- `/products`, `/products/[id]`: improved surface consistency and dark-mode safety by replacing hard-coded white panels with shared `public-*` surfaces.
+- `/winners`, `/winner-history`: upgraded section framing and honest empty/error surface styling; preserved masked identity + live API sourcing.
+- `/about`, `/contact`: improved readability panels and consistent premium surfaces.
+
+### 2) Public routes intentionally not touched
+
+All other public routes remain unchanged to keep this pass safe and reviewable:
+- `/apply`, `/blog`, `/blog/[slug]`
+- `/how-it-works`, `/lucky-plan`, `/lucky-plan/*`
+- `/policies`, `/policies/[slug]` and other legal/policy routes (`/terms`, `/privacy`, `/warranty`, etc.)
+- `/direct-sale`, `/rent`, `/lease`, `/vision-trust` and other marketing/legal surfaces
+
+### 3) Components reused
+
+- `frontend/src/components/public/PublicPageShell.tsx`
+- `frontend/src/components/public/PublicHeroBanner.tsx`
+- Existing public atoms: marketing banners, trust strips, product/winner widgets (no changes)
+- Shared public CSS tokens: `public-surface`, `public-card`, `public-card-sm`, public action buttons
+
+### 4) Public components created
+
+- None (reused and refined existing public shell components).
+
+### 5) Services/API contracts preserved
+
+- Preserved all public API usage and response handling:
+  - `@/lib/public-api` (re-exporting `@/services/public`)
+  - No request param changes and no response-shape assumptions added
+
+### 6) SEO/i18n/copy safety confirmation
+
+- No route path changes
+- No changes to `metadata` / `generateMetadata` exports
+- No changes to `public-i18n` dictionary structure or cookie handling
+
+### 7) Fake data avoided confirmation
+
+- No fake winners, fake products, fake stats, or invented endpoints were added.
+
+### 8) Duplicate partner commissions route status
+
+- Preserved unchanged:
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 9) Remaining public UI gaps
+
+- Standardize remaining public pages that still use hard-coded `bg-white/*` panels for better dark-mode behavior (do this incrementally).
+- Align legal/policy page typography and content density to match updated premium surfaces (without changing content).
+
+### 10) Next recommended phase
+
+- Phase 3 — Admin cockpit / operations (SAFE_AUTO surfaces first; keep MANUAL_REVIEW pages untouched).
+
+---
+
 ## 2) Current layout components
 
 ### App-level shell
