@@ -11,13 +11,14 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import FormActions from "@/components/ui/FormActions";
-import PortalPage from "@/components/ui/PortalPage";
-import { DetailPanel, FormSection } from "@/components/ui/operations";
-import { DetailItem as DetailValue } from "@/components/ui/workspace";
+import { FormSection } from "@/components/ui/operations";
 import { apiFetch } from "@/lib/api";
 import { invalidateAfterProductInventoryMutation } from "@/lib/operational-query-invalidation";
 import { resolveApiMediaUrl } from "@/lib/media";
@@ -749,7 +750,7 @@ export default function AdminProductEditPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={
         product?.name
           ? `Edit ${product.name}`
@@ -816,17 +817,20 @@ export default function AdminProductEditPage() {
       }}
     >
       <div className="space-y-6">
-        <DetailPanel
+        <ERPSectionShell
           title="Editing rule"
           description="Product base price is the total contract price used by subscription creation. Update carefully to avoid future contract inconsistencies."
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <DetailValue label="Base Price Meaning" value="Total contract price" />
-            <DetailValue label="EMI Dependency" value="base price / tenure months" />
-            <DetailValue label="Image Workflow" value="Attach, replace, or remove from this page" />
-            <DetailValue label="Mutation Scope" value="Product master only" />
-          </div>
-        </DetailPanel>
+          <ERPDetailGrid
+            columns={4}
+            items={[
+              { label: "Base Price Meaning", value: "Total contract price" },
+              { label: "EMI Dependency", value: "base price / tenure months" },
+              { label: "Image Workflow", value: "Attach, replace, or remove from this page" },
+              { label: "Mutation Scope", value: "Product master only" },
+            ]}
+          />
+        </ERPSectionShell>
 
         <section className="flex justify-end">
           <button
@@ -839,10 +843,10 @@ export default function AdminProductEditPage() {
           </button>
         </section>
 
-        {loading ? <LoadingBlock label="Loading product edit form..." /> : null}
+        {loading ? <ERPLoadingState label="Loading product edit form..." /> : null}
 
         {!loading && error && !product ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load product"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -850,7 +854,7 @@ export default function AdminProductEditPage() {
         ) : null}
 
         {!loading && !error && !product ? (
-          <EmptyState
+          <ERPEmptyState
             title="Product not available"
             description="The requested product could not be loaded."
           />
@@ -1179,7 +1183,7 @@ export default function AdminProductEditPage() {
                       />
                     </div>
                   ) : (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No product image"
                       description="This product currently has no attached image."
                     />
@@ -1251,26 +1255,23 @@ export default function AdminProductEditPage() {
                   ) : null}
 
                   <div className="rounded-xl border border-border bg-muted/40 p-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <DetailValue
-                        label="Current Image State"
-                        value={
-                          removeExistingImage
+                    <ERPDetailGrid
+                      columns={2}
+                      items={[
+                        {
+                          label: "Current Image State",
+                          value: removeExistingImage
                             ? "Marked for removal"
                             : product.image
                               ? "Image attached"
-                              : "No image attached"
-                        }
-                      />
-                      <DetailValue
-                        label="New Upload State"
-                        value={
-                          selectedImageFile
-                            ? "Ready to replace"
-                            : "No new file selected"
-                        }
-                      />
-                    </div>
+                              : "No image attached",
+                        },
+                        {
+                          label: "New Upload State",
+                          value: selectedImageFile ? "Ready to replace" : "No new file selected",
+                        },
+                      ]}
+                    />
                   </div>
                 </div>
               </FormSection>
@@ -1392,14 +1393,14 @@ export default function AdminProductEditPage() {
             </FormSection>
 
             {error ? (
-              <ErrorState
+              <ERPErrorState
                 title="Unable to update product"
                 description={error}
               />
             ) : null}
 
             {saveSuccess ? (
-              <DetailPanel
+              <ERPSectionShell
                 title="Update successful"
                 description="The product master has been updated successfully."
               >
@@ -1422,7 +1423,7 @@ export default function AdminProductEditPage() {
                     Back to Register
                   </Link>
                 </div>
-              </DetailPanel>
+              </ERPSectionShell>
             ) : null}
 
             <FormSection
@@ -1455,6 +1456,6 @@ export default function AdminProductEditPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

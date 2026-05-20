@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
-import { DataTableShell, DetailPanel } from "@/components/ui/operations";
-import { DetailItem as DetailValue } from "@/components/ui/workspace";
+import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
+import { DataTableShell } from "@/components/ui/operations";
 import { apiFetch, toArray } from "@/lib/api";
 import { resolveApiMediaUrl } from "@/lib/media";
 import { prepareProductInventoryProfile } from "@/services/products";
@@ -406,7 +407,7 @@ export default function AdminProductDetailPage() {
   }, [productId]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={product?.name || `Product #${productId ?? "—"}`}
       subtitle="Inspect full product master data, pricing basis, catalog structure, image state, and downstream subscription usage."
       breadcrumbs={[
@@ -457,10 +458,10 @@ export default function AdminProductDetailPage() {
           </button>
         </section>
 
-        {loading ? <LoadingBlock label="Loading product detail..." /> : null}
+        {loading ? <ERPLoadingState label="Loading product detail..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load product detail"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -468,7 +469,7 @@ export default function AdminProductDetailPage() {
         ) : null}
 
         {!loading && !error && !product ? (
-          <EmptyState
+          <ERPEmptyState
             title="Product not available"
             description="The requested product could not be loaded."
           />
@@ -477,7 +478,7 @@ export default function AdminProductDetailPage() {
         {!loading && !error && product ? (
           <>
             {warnings.length > 0 ? (
-              <DetailPanel
+              <ERPSectionShell
                 title="Data source note"
                 description="The detail page loaded with fallback sources for some child data."
               >
@@ -491,91 +492,57 @@ export default function AdminProductDetailPage() {
                     </div>
                   ))}
                 </div>
-              </DetailPanel>
+              </ERPSectionShell>
             ) : null}
 
             <section className="grid gap-6 xl:grid-cols-2">
-              <DetailPanel
+              <ERPSectionShell
                 title="Product overview"
                 description="Primary product master fields used in contract pricing and subscription creation."
               >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <DetailValue label="Product ID" value={`#${product.id}`} />
-                  <DetailValue label="Name" value={product.name} />
-                  <DetailValue
-                    label="Product Code"
-                    value={product.product_code || "—"}
-                  />
-                  <DetailValue
-                    label="Base Price"
-                    value={money(product.base_price)}
-                  />
-                  <DetailValue
-                    label="Category"
-                    value={product.category || "—"}
-                  />
-                  <DetailValue
-                    label="Subcategory"
-                    value={product.subcategory || "—"}
-                  />
-                  <DetailValue
-                    label="SKU"
-                    value={product.sku || "—"}
-                  />
-                  <DetailValue
-                    label="Unit"
-                    value={product.unit_of_measure || "PCS"}
-                  />
-                  <DetailValue
-                    label="Inventory Profile"
-                    value={
-                      product.inventory_profile_id
-                        ? `#${product.inventory_profile_id}`
-                        : "Not prepared"
-                    }
-                  />
-                  <DetailValue
-                    label="Created At"
-                    value={formatDateTime(product.created_at)}
-                  />
-                  <DetailValue
-                    label="Latest Linked Subscription"
-                    value={
-                      latestSubscription
-                        ? latestSubscription.subscription_number
-                        : "No usage yet"
-                    }
-                  />
-                </div>
-              </DetailPanel>
+                <ERPDetailGrid
+                  columns={2}
+                  items={[
+                    { label: "Product ID", value: `#${product.id}` },
+                    { label: "Name", value: product.name },
+                    { label: "Product Code", value: product.product_code || "—" },
+                    { label: "Base Price", value: money(product.base_price) },
+                    { label: "Category", value: product.category || "—" },
+                    { label: "Subcategory", value: product.subcategory || "—" },
+                    { label: "SKU", value: product.sku || "—" },
+                    { label: "Unit", value: product.unit_of_measure || "PCS" },
+                    {
+                      label: "Inventory Profile",
+                      value: product.inventory_profile_id ? `#${product.inventory_profile_id}` : "Not prepared",
+                    },
+                    { label: "Created At", value: formatDateTime(product.created_at) },
+                    {
+                      label: "Latest Linked Subscription",
+                      value: latestSubscription ? latestSubscription.subscription_number : "No usage yet",
+                    },
+                  ]}
+                />
+              </ERPSectionShell>
 
-              <DetailPanel
+              <ERPSectionShell
                 title="Inventory readiness"
                 description="Prepare a stock profile only when this product should participate in inventory workflows. This keeps product master truth shared while leaving delivery, EMI, and payment behavior unchanged."
               >
                 <div className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <DetailValue
-                      label="Status"
-                      value={
-                        product.inventory_ready
-                          ? "Inventory profile ready"
-                          : "Needs product-to-stock preparation"
-                      }
-                    />
-                    <DetailValue
-                      label="Stock Tracking"
-                      value={
-                        product.inventory_ready
-                          ? "Enabled in inventory module"
-                          : "Not yet activated"
-                      }
-                    />
-                    <DetailValue
-                      label="Stock Quantity Control"
-                      value="Use opening stock and stock movements only"
-                    />
-                  </div>
+                  <ERPDetailGrid
+                    columns={2}
+                    items={[
+                      {
+                        label: "Status",
+                        value: product.inventory_ready ? "Inventory profile ready" : "Needs product-to-stock preparation",
+                      },
+                      {
+                        label: "Stock Tracking",
+                        value: product.inventory_ready ? "Enabled in inventory module" : "Not yet activated",
+                      },
+                      { label: "Stock Quantity Control", value: "Use opening stock and stock movements only" },
+                    ]}
+                  />
 
                   {inventoryMessage ? (
                     <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
@@ -617,23 +584,20 @@ export default function AdminProductDetailPage() {
                     </div>
                   ) : null}
                 </div>
-              </DetailPanel>
+              </ERPSectionShell>
 
-              <DetailPanel
+              <ERPSectionShell
                 title="Image & operational state"
                 description="Single-image product master with capability visibility for EMI now and rent/lease expansion later."
               >
                 <div className="grid gap-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <DetailValue
-                      label="Image State"
-                      value={product.image ? "Image attached" : "No image attached"}
-                    />
-                    <DetailValue
-                      label="Product State"
-                      value={product.is_active ? "Active" : "Inactive"}
-                    />
-                  </div>
+                  <ERPDetailGrid
+                    columns={2}
+                    items={[
+                      { label: "Image State", value: product.image ? "Image attached" : "No image attached" },
+                      { label: "Product State", value: product.is_active ? "Active" : "Inactive" },
+                    ]}
+                  />
 
                   {product.image ? (
                     <div className="overflow-hidden rounded-2xl border border-border bg-background">
@@ -645,7 +609,7 @@ export default function AdminProductDetailPage() {
                       />
                     </div>
                   ) : (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No product image"
                       description="This product currently has no attached image. Use Edit Product to add or remove the single image for this item."
                     />
@@ -747,19 +711,19 @@ export default function AdminProductDetailPage() {
                     Changes affect future onboarding and billing only. Existing contracts keep their saved pricing and plan snapshots.
                   </p>
                 </div>
-              </DetailPanel>
+              </ERPSectionShell>
             </section>
 
-            <DetailPanel
+            <ERPSectionShell
               title="Description"
               description="Full product description used for internal clarity and future catalog enrichment."
             >
               <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-foreground">
                 {product.description?.trim() || "No description available."}
               </div>
-            </DetailPanel>
+            </ERPSectionShell>
 
-            <DetailPanel
+            <ERPSectionShell
               title="Pricing rule"
               description="Base price is the total contract price. EMI is derived later from base price and tenure months."
             >
@@ -800,14 +764,14 @@ export default function AdminProductDetailPage() {
                   </div>
                 </div>
               </div>
-            </DetailPanel>
+            </ERPSectionShell>
 
-            <DetailPanel
+            <ERPSectionShell
               title="Subscription usage"
               description="Linked subscriptions show how this product is currently used in active and historical contracts."
             >
               {subscriptions.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No linked subscriptions"
                   description="No subscription rows were returned for this product."
                 />
@@ -870,7 +834,7 @@ export default function AdminProductDetailPage() {
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                            <StatusBadge status={row.status} hideIcon />
+                            <ERPStatusBadge status={row.status} hideIcon />
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -897,10 +861,10 @@ export default function AdminProductDetailPage() {
                   </div>
                 </DataTableShell>
               )}
-            </DetailPanel>
+            </ERPSectionShell>
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -9,8 +9,10 @@ import {
   type DragEvent,
 } from "react";
 
-import PortalPage from "@/components/ui/PortalPage";
-import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
+import ERPMetricStrip from "@/components/erp/ERPMetricStrip";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import { DataTableShell } from "@/components/ui/operations";
 import { normalizeApiError } from "@/services/api/errors";
 import {
   postProductImport,
@@ -184,7 +186,7 @@ export default function AdminProductImportPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Import Products"
       subtitle="Bulk import product master data with category, sub-category, SKU, unit, description, and pricing while keeping product master as the shared catalog truth for subscriptions and future inventory."
       breadcrumbs={[
@@ -404,28 +406,36 @@ export default function AdminProductImportPage() {
               </h3>
 
               <div className="mt-4">
-                <QuickActionGrid className="sm:grid-cols-2 xl:grid-cols-2">
-                  <KpiCard
-                    label="Preview Valid"
-                    value={preview?.valid_count ?? 0}
-                    helper={(preview?.valid_count ?? 0) > 0 ? "Ready to import when no invalid rows remain." : "Run preview after selecting a CSV."}
-                  />
-                  <KpiCard
-                    label="Created"
-                    value={result?.created ?? 0}
-                    helper="Products created on last successful import."
-                  />
-                  <KpiCard
-                    label="Updated"
-                    value={result?.updated ?? 0}
-                    helper="Products updated on last successful import."
-                  />
-                  <KpiCard
-                    label="Preview Invalid"
-                    value={preview?.invalid_count ?? result?.skipped ?? 0}
-                    helper="Rows blocked until corrected or skipped per backend rules."
-                  />
-                </QuickActionGrid>
+                <ERPMetricStrip
+                  className="md:grid-cols-2 xl:grid-cols-2"
+                  metrics={[
+                    {
+                      label: "Preview Valid",
+                      value: preview?.valid_count ?? 0,
+                      detail:
+                        (preview?.valid_count ?? 0) > 0
+                          ? "Ready to import when no invalid rows remain."
+                          : "Run preview after selecting a CSV.",
+                    },
+                    {
+                      label: "Created",
+                      value: result?.created ?? 0,
+                      detail: "Products created on last successful import.",
+                    },
+                    {
+                      label: "Updated",
+                      value: result?.updated ?? 0,
+                      detail: "Products updated on last successful import.",
+                    },
+                    {
+                      label: "Preview Invalid",
+                      value: preview?.invalid_count ?? result?.skipped ?? 0,
+                      detail: "Rows blocked until corrected or skipped per backend rules.",
+                      className:
+                        (preview?.invalid_count ?? result?.skipped ?? 0) > 0 ? "ring-1 ring-amber-200" : undefined,
+                    },
+                  ]}
+                />
               </div>
 
               {preview ? (
@@ -472,7 +482,7 @@ export default function AdminProductImportPage() {
         </div>
       </section>
 
-      <DetailPanel
+      <ERPSectionShell
         title="Sample CSV format"
         description="Reference row shape for operator CSV authoring. Uses the same columns as the governed import path."
       >
@@ -534,7 +544,7 @@ export default function AdminProductImportPage() {
           </Link>
           .
         </div>
-      </DetailPanel>
-    </PortalPage>
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

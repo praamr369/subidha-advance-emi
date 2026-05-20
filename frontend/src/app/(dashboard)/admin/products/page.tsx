@@ -5,14 +5,16 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Download, RefreshCw, Search } from "lucide-react";
 
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPMetricStrip from "@/components/erp/ERPMetricStrip";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import StatusBadge from "@/components/ui/status-badge";
-import TableToolbar from "@/components/ui/TableToolbar";
-import { DataTableShell, DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
+import { DataTableShell } from "@/components/ui/operations";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 
@@ -407,7 +409,7 @@ export default function AdminProductsPage() {
             <div className="text-sm text-foreground">
               {normalizeLabel(row.category, "Uncategorized")}
             </div>
-            <StatusBadge
+            <ERPStatusBadge
               status={row.subcategory ? "ASSIGNED" : "NOT_PROVIDED"}
               label={normalizeLabel(row.subcategory, "No subcategory")}
               hideIcon={!row.subcategory}
@@ -465,15 +467,15 @@ export default function AdminProductsPage() {
                 {row.lifecycle_status}
               </span>
             )}
-            <StatusBadge
+            <ERPStatusBadge
               status={row.image ? "AVAILABLE" : "NOT_PROVIDED"}
               label={row.image ? "Image Ready" : "No Image"}
             />
-            <StatusBadge
+            <ERPStatusBadge
               status={row.category ? "ASSIGNED" : "PENDING"}
               label={row.category ? "Cataloged" : "Needs Catalog"}
             />
-            <StatusBadge
+            <ERPStatusBadge
               status={row.inventory_ready ? "AVAILABLE" : "PENDING"}
               label={row.inventory_ready ? "Inventory Ready" : "Stock Profile Pending"}
             />
@@ -511,91 +513,35 @@ export default function AdminProductsPage() {
       statusBadge={{ label: "Product Operations", tone: "info" }}
     >
       <div className="space-y-6">
-        <QuickActionGrid>
-          <KpiCard label="Visible Products" value={rows.length} />
-          <KpiCard
-            label="Visible Contract Value"
-            value={money(visibleBaseValue)}
-            helper="Sum of base price for products in the current filter view."
-          />
-          <KpiCard
-            label="Catalog Coverage"
-            value={rows.length - uncategorizedCount}
-            helper={`${uncategorizedCount} need catalog cleanup`}
-          />
-          <KpiCard
-            label="Image Coverage"
-            value={`${imageCoverage}%`}
-            helper={`${imageCount}/${rows.length || 0} products with images`}
-          />
-        </QuickActionGrid>
+        <ERPMetricStrip
+          metrics={[
+            { label: "Visible Products", value: rows.length },
+            {
+              label: "Visible Contract Value",
+              value: money(visibleBaseValue),
+              detail: "Sum of base price for products in the current filter view.",
+            },
+            {
+              label: "Catalog Coverage",
+              value: rows.length - uncategorizedCount,
+              detail: `${uncategorizedCount} need catalog cleanup`,
+              className: uncategorizedCount > 0 ? "ring-1 ring-amber-200" : undefined,
+            },
+            {
+              label: "Image Coverage",
+              value: `${imageCoverage}%`,
+              detail: `${imageCount}/${rows.length || 0} products with images`,
+              className: imageCoverage < 60 ? "ring-1 ring-amber-200" : "ring-1 ring-emerald-200",
+            },
+          ]}
+        />
 
-        <DetailPanel
+        <ERPSectionShell
           title="Catalog workflow"
           description="Use server-backed search and catalog filters to keep product lookup fast, export the current view for offline review, manage category/subcategory/unit masters from one workspace, and route directly into product or subscription work."
         >
-          <div className="mb-4 flex flex-wrap gap-2">
-            <Link
-              href="/admin/products/masters"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              Manage Masters
-            </Link>
-            <button
-              type="button"
-              onClick={() => void loadPage("refresh")}
-              disabled={refreshing || loading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCw className="h-4 w-4" />
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
-            <button
-              type="button"
-              disabled={exportRows.length === 0 || loading}
-              onClick={() =>
-                downloadCsv(
-                  "product-register-current-view.csv",
-                  [
-                    { key: "id", header: "id" },
-                    { key: "name", header: "name" },
-                    { key: "product_code", header: "product_code" },
-                    { key: "sku", header: "sku" },
-                    { key: "unit_of_measure", header: "unit_of_measure" },
-                    { key: "category", header: "category" },
-                    { key: "subcategory", header: "subcategory" },
-                    { key: "description", header: "description" },
-                    { key: "base_price", header: "base_price" },
-                    { key: "image_status", header: "image_status" },
-                    { key: "created_at", header: "created_at" },
-                  ],
-                  exportRows
-                )
-              }
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Download className="h-4 w-4" />
-              Export Current View
-            </button>
-          </div>
-          <TableToolbar
-            footer={
-              query || categoryFilter || subcategoryFilter ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-semibold uppercase tracking-[0.14em]">Active filters</span>
-                  {query ? <StatusBadge status="OPEN" label={`Search: ${query}`} hideIcon /> : null}
-                  {categoryFilter ? <StatusBadge status="ASSIGNED" label={`Category: ${categoryFilter}`} hideIcon /> : null}
-                  {subcategoryFilter ? (
-                    <StatusBadge status="ASSIGNED" label={`Subcategory: ${subcategoryFilter}`} hideIcon />
-                  ) : null}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Product base price remains the total contract price. These filters only improve register usability and do not alter EMI math or downstream subscription rules.
-                </div>
-              )
-            }
-          >
+          <ERPDataToolbar
+            left={
             <form
               onSubmit={handleApplyFilters}
               className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_180px_auto]"
@@ -643,11 +589,73 @@ export default function AdminProductsPage() {
                 </button>
               </div>
             </form>
-          </TableToolbar>
-        </DetailPanel>
+            }
+            right={
+              <>
+                <Link
+                  href="/admin/products/masters"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                >
+                  Manage Masters
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void loadPage("refresh")}
+                  disabled={refreshing || loading}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </button>
+                <button
+                  type="button"
+                  disabled={exportRows.length === 0 || loading}
+                  onClick={() =>
+                    downloadCsv(
+                      "product-register-current-view.csv",
+                      [
+                        { key: "id", header: "id" },
+                        { key: "name", header: "name" },
+                        { key: "product_code", header: "product_code" },
+                        { key: "sku", header: "sku" },
+                        { key: "unit_of_measure", header: "unit_of_measure" },
+                        { key: "category", header: "category" },
+                        { key: "subcategory", header: "subcategory" },
+                        { key: "description", header: "description" },
+                        { key: "base_price", header: "base_price" },
+                        { key: "image_status", header: "image_status" },
+                        { key: "created_at", header: "created_at" },
+                      ],
+                      exportRows
+                    )
+                  }
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Download className="h-4 w-4" />
+                  Export Current View
+                </button>
+              </>
+            }
+          />
+
+          {query || categoryFilter || subcategoryFilter ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="font-semibold uppercase tracking-[0.14em]">Active filters</span>
+              {query ? <ERPStatusBadge status="OPEN" label={`Search: ${query}`} hideIcon /> : null}
+              {categoryFilter ? <ERPStatusBadge status="ASSIGNED" label={`Category: ${categoryFilter}`} hideIcon /> : null}
+              {subcategoryFilter ? (
+                <ERPStatusBadge status="ASSIGNED" label={`Subcategory: ${subcategoryFilter}`} hideIcon />
+              ) : null}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              Product base price remains the total contract price. These filters only improve register usability and do not alter EMI math or downstream subscription rules.
+            </div>
+          )}
+        </ERPSectionShell>
 
         {!loading && !error && categoryHighlights.length > 0 ? (
-          <DetailPanel
+          <ERPSectionShell
             title="Catalog shortcuts"
             description="Use the heaviest categories in the current view to narrow the register with fewer clicks."
           >
@@ -696,7 +704,7 @@ export default function AdminProductsPage() {
                 )}
               </div>
             </div>
-          </DetailPanel>
+          </ERPSectionShell>
         ) : null}
 
         {loading ? <ERPLoadingState label="Loading product register..." /> : null}
@@ -710,7 +718,7 @@ export default function AdminProductsPage() {
         ) : null}
 
         {!loading && !error ? (
-          <DetailPanel
+          <ERPSectionShell
             title="Product rows"
             description="Open the product detail page to review catalog information and downstream usage without breaking existing pricing or subscription dependencies."
           >
@@ -758,7 +766,7 @@ export default function AdminProductsPage() {
                 />
               </DataTableShell>
             )}
-          </DetailPanel>
+          </ERPSectionShell>
         ) : null}
       </div>
     </ERPPageShell>

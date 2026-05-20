@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
+import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import {
   createProductCategoryMaster,
   createProductSubcategoryMaster,
@@ -153,7 +155,7 @@ export default function AdminProductMastersPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Product Masters"
       subtitle="Govern shared catalog masters for category, subcategory, and unit of measure from the product workspace. SKU and product code remain product-level identifiers."
       breadcrumbs={[
@@ -174,21 +176,23 @@ export default function AdminProductMastersPage() {
       statusBadge={{ label: "Catalog Governance", tone: "info" }}
     >
       <div className="space-y-6">
-        <section className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh")}
-            disabled={refreshing || loading || saving !== null}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </section>
+        <ERPDataToolbar
+          right={
+            <button
+              type="button"
+              onClick={() => void loadPage("refresh")}
+              disabled={refreshing || loading || saving !== null}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          }
+        />
 
-        {loading ? <LoadingBlock label="Loading product masters..." /> : null}
+        {loading ? <ERPLoadingState label="Loading product masters..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load product masters"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -203,20 +207,23 @@ export default function AdminProductMastersPage() {
               </div>
             ) : null}
 
-            <SectionCard
+            <ERPSectionShell
               title="Master-data rule"
               description="Categories, subcategories, and units are shared catalog masters. Product code and SKU stay at the individual product level so catalog identity does not split into conflicting truths."
             >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DetailValue label="Category Owner" value="Shared product master" />
-                <DetailValue label="Subcategory Owner" value="Shared product master" />
-                <DetailValue label="Unit Owner" value="Shared product master" />
-                <DetailValue label="SKU / Code" value="Managed per product record" />
-              </div>
-            </SectionCard>
+              <ERPDetailGrid
+                columns={4}
+                items={[
+                  { label: "Category Owner", value: "Shared product master" },
+                  { label: "Subcategory Owner", value: "Shared product master" },
+                  { label: "Unit Owner", value: "Shared product master" },
+                  { label: "SKU / Code", value: "Managed per product record" },
+                ]}
+              />
+            </ERPSectionShell>
 
             <div className="grid gap-6 xl:grid-cols-3">
-              <SectionCard
+              <ERPSectionShell
                 title="Categories"
                 description="Create reusable top-level catalog groups before adding products."
               >
@@ -254,9 +261,9 @@ export default function AdminProductMastersPage() {
                     ))}
                   </div>
                 </div>
-              </SectionCard>
+              </ERPSectionShell>
 
-              <SectionCard
+              <ERPSectionShell
                 title="Subcategories"
                 description="Subcategories stay attached to one category so operators do not create ambiguous catalog branches."
               >
@@ -307,9 +314,9 @@ export default function AdminProductMastersPage() {
                     ))}
                   </div>
                 </div>
-              </SectionCard>
+              </ERPSectionShell>
 
-              <SectionCard
+              <ERPSectionShell
                 title="Units of measure"
                 description="Manage approved UOM codes once, then reuse them across products and future stock records."
               >
@@ -354,19 +361,22 @@ export default function AdminProductMastersPage() {
                     ))}
                   </div>
                 </div>
-              </SectionCard>
+              </ERPSectionShell>
             </div>
 
-            <SectionCard
+            <ERPSectionShell
               title="Operator workflow"
               description="Keep catalog maintenance fast and duplication-safe for daily shop use."
             >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DetailValue label="1. Add masters" value="Category, subcategory, UOM" />
-                <DetailValue label="2. Create product" value="Assign code, SKU, price, modes" />
-                <DetailValue label="3. Prepare inventory" value="Only for stock-tracked items" />
-                <DetailValue label="4. Import safely" value="CSV extends masters, never rewrites EMI truth" />
-              </div>
+              <ERPDetailGrid
+                columns={4}
+                items={[
+                  { label: "1. Add masters", value: "Category, subcategory, UOM" },
+                  { label: "2. Create product", value: "Assign code, SKU, price, modes" },
+                  { label: "3. Prepare inventory", value: "Only for stock-tracked items" },
+                  { label: "4. Import safely", value: "CSV extends masters, never rewrites EMI truth" },
+                ]}
+              />
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link
                   href="/admin/products/create"
@@ -381,10 +391,10 @@ export default function AdminProductMastersPage() {
                   Import Products
                 </Link>
               </div>
-            </SectionCard>
+            </ERPSectionShell>
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -13,13 +13,14 @@ import {
   X,
 } from "lucide-react";
 
-
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPMetricStrip from "@/components/erp/ERPMetricStrip";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import FormActions from "@/components/ui/FormActions";
-import PortalPage from "@/components/ui/PortalPage";
-import { DetailPanel, FormSection, KpiCard, QuickActionGrid } from "@/components/ui/operations";
-import { DetailItem as DetailValue } from "@/components/ui/workspace";
+import { FormSection } from "@/components/ui/operations";
 import { apiFetch } from "@/lib/api";
 import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
 
@@ -532,7 +533,7 @@ export default function AdminProductCreatePage() {
   ];
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Create Product"
       subtitle="Create product master data for contract pricing, product lookup, and downstream subscription creation."
       breadcrumbs={[
@@ -564,39 +565,45 @@ export default function AdminProductCreatePage() {
       }}
     >
       <div className="space-y-6">
-        <QuickActionGrid>
-          <KpiCard label="Base Price" value={money(basePrice || 0)} helper="Total contract price for this product." />
-          <KpiCard
-            label="EMI Mode"
-            value={isEmiEnabled ? "Enabled" : "Disabled"}
-            helper="Locked on for current backend default plan behavior."
-          />
-          <KpiCard
-            label="Rent Mode"
-            value={isRentEnabled ? "Enabled" : "Disabled"}
-            helper="Rent-capable flag for supported workflows."
-          />
-          <KpiCard
-            label="Lease Mode"
-            value={isLeaseEnabled ? "Enabled" : "Disabled"}
-            helper="Lease-capable flag for supported workflows."
-          />
-        </QuickActionGrid>
+        <ERPMetricStrip
+          metrics={[
+            {
+              label: "Base Price",
+              value: money(basePrice || 0),
+              detail: "Total contract price for this product.",
+            },
+            {
+              label: "EMI Mode",
+              value: isEmiEnabled ? "Enabled" : "Disabled",
+              detail: "Locked on for current backend default plan behavior.",
+            },
+            {
+              label: "Rent Mode",
+              value: isRentEnabled ? "Enabled" : "Disabled",
+              detail: "Rent-capable flag for supported workflows.",
+            },
+            {
+              label: "Lease Mode",
+              value: isLeaseEnabled ? "Enabled" : "Disabled",
+              detail: "Lease-capable flag for supported workflows.",
+            },
+          ]}
+        />
 
-        <DetailPanel
+        <ERPSectionShell
           title="Product rule"
           description="Product base price is the total contract price. Default EMI is derived later from base price and tenure months."
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <DetailValue label="Pricing Meaning" value="Base price = total contract price" />
-            <DetailValue label="Image Rule" value="One image per product" />
-            <DetailValue label="Contract Usage" value="Used in subscription creation" />
-            <DetailValue
-              label="Current Backend Constraint"
-              value="EMI remains enabled at create time"
-            />
-          </div>
-        </DetailPanel>
+          <ERPDetailGrid
+            columns={4}
+            items={[
+              { label: "Pricing Meaning", value: "Base price = total contract price" },
+              { label: "Image Rule", value: "One image per product" },
+              { label: "Contract Usage", value: "Used in subscription creation" },
+              { label: "Current Backend Constraint", value: "EMI remains enabled at create time" },
+            ]}
+          />
+        </ERPSectionShell>
 
         <div className="grid gap-6 xl:grid-cols-2">
           <FormSection
@@ -932,10 +939,10 @@ export default function AdminProductCreatePage() {
           </FormSection>
         </div>
 
-        {loadingLabel ? <LoadingBlock label={loadingLabel} /> : null}
+        {loadingLabel ? <ERPLoadingState label={loadingLabel} /> : null}
 
         {error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to create product"
             description={error}
             onRetry={canSave ? handleSave : undefined}
@@ -943,33 +950,21 @@ export default function AdminProductCreatePage() {
         ) : null}
 
         {created ? (
-          <DetailPanel
+          <ERPSectionShell
             title="Product created"
             description="The product master was created successfully and is ready for register, detail, and subscription workflows."
           >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-              <DetailValue label="Product ID" value={`#${created.id}`} />
-              <DetailValue
-                label="Product Code"
-                value={created.product_code || trimmedProductCode}
-              />
-              <DetailValue
-                label="Name"
-                value={created.name || trimmedName}
-              />
-              <DetailValue
-                label="Base Price"
-                value={money(created.base_price || trimmedBasePrice)}
-              />
-              <DetailValue
-                label="SKU"
-                value={created.sku || trimmedSku || "—"}
-              />
-              <DetailValue
-                label="Unit"
-                value={created.unit_of_measure || trimmedUnitOfMeasure}
-              />
-            </div>
+            <ERPDetailGrid
+              columns={3}
+              items={[
+                { label: "Product ID", value: `#${created.id}` },
+                { label: "Product Code", value: created.product_code || trimmedProductCode },
+                { label: "Name", value: created.name || trimmedName },
+                { label: "Base Price", value: money(created.base_price || trimmedBasePrice) },
+                { label: "SKU", value: created.sku || trimmedSku || "—" },
+                { label: "Unit", value: created.unit_of_measure || trimmedUnitOfMeasure },
+              ]}
+            />
 
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
@@ -1001,7 +996,7 @@ export default function AdminProductCreatePage() {
                 Create Another
               </button>
             </div>
-          </DetailPanel>
+          </ERPSectionShell>
         ) : null}
 
         <FormSection
@@ -1029,6 +1024,6 @@ export default function AdminProductCreatePage() {
           />
         </FormSection>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

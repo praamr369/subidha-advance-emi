@@ -100,6 +100,18 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Services/contracts to preserve**: product services (`@/services/...`).
 - **Prompt title**: “Phase 4 — Products catalog UI pass”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
+- **Phase 4 status (implemented)**:
+  - **Transformed** (SAFE_AUTO/SAFE_LAYOUT_ONLY; UI-only wrappers/states; no behavior changes):
+    - `/admin/products` (SAFE_LAYOUT_ONLY)
+    - `/admin/products/create` (SAFE_AUTO)
+    - `/admin/products/import` (SAFE_AUTO)
+    - `/admin/products/masters` (SAFE_AUTO)
+    - `/admin/products/[id]` (SAFE_AUTO)
+    - `/admin/products/[id]/edit` (SAFE_AUTO)
+    - `/admin/vendors/products` (SAFE_AUTO)
+    - `/vendor/products` (SAFE_LAYOUT_ONLY)
+  - **Deferred**:
+    - `/admin/products/workspace` (SAFE_AUTO) — already uses the shared admin workspace shell; left unchanged in Phase 4 to keep this pass strictly catalog/register/detail/forms.
 
 ### Phase 5 — Inventory / stock control
 

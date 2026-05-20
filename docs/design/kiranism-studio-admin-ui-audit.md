@@ -667,3 +667,92 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 
 - Phase 4 — Products / catalog master (UI-only, SAFE_LAYOUT_ONLY surfaces first), or
 - Phase 6 — Customer / CRM intelligence (read-first register/detail polish), keeping money flows explicitly deferred.
+
+---
+
+## Phase 4 products catalog transformation result (2026-05-20)
+
+Scope: **Frontend UI only** for Products / Catalog Master SAFE pages (admin + vendor register surfaces).  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no invented KPIs/charts/endpoints**, **no permission weakening**, **no pricing/inventory logic changes**.
+
+### 1) Product/catalog routes touched
+
+- `/admin/products` (SAFE_LAYOUT_ONLY)
+- `/admin/products/create` (SAFE_AUTO)
+- `/admin/products/import` (SAFE_AUTO)
+- `/admin/products/masters` (SAFE_AUTO)
+- `/admin/products/[id]` (SAFE_AUTO)
+- `/admin/products/[id]/edit` (SAFE_AUTO)
+- `/admin/vendors/products` (SAFE_AUTO)
+- `/vendor/products` (SAFE_LAYOUT_ONLY)
+
+### 2) Product/catalog routes deferred
+
+- `/admin/products/workspace` (SAFE_AUTO) — already uses the shared admin workspace shell; left unchanged in Phase 4 to keep this pass strictly “catalog/register/detail/forms” and avoid scope creep into inventory-style workspace boards.
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO:
+  - `/admin/products/create`
+  - `/admin/products/import`
+  - `/admin/products/masters`
+  - `/admin/products/[id]`
+  - `/admin/products/[id]/edit`
+  - `/admin/vendors/products`
+- SAFE_LAYOUT_ONLY:
+  - `/admin/products`
+  - `/vendor/products`
+
+### 4) Components reused
+
+- ERP framing: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPSectionShell.tsx`
+- Register toolbars/metrics: `frontend/src/components/erp/ERPDataToolbar.tsx`, `frontend/src/components/erp/ERPMetricStrip.tsx`
+- Detail fields: `frontend/src/components/erp/ERPDetailGrid.tsx`
+- States: `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- Status chips: `frontend/src/components/erp/ERPStatusBadge.tsx`
+
+### 5) Components created
+
+- None (Phase 4 is composition-only over existing ERP primitives and existing page logic).
+
+### 6) Product services/API contracts preserved
+
+- No changes to:
+  - `frontend/src/services/products/index.ts` (product list, catalog options, masters CRUD, inventory profile prepare)
+  - `frontend/src/services/vendor-ops.ts` (vendor product list/create)
+  - `frontend/src/services/import-hub.ts` (product import preview/post)
+- No endpoint path, request param, or response normalization changes.
+
+### 7) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No cross-role data exposure changes (admin pages remain under admin portal; vendor catalog remains under vendor portal).
+
+### 8) Product pricing/inventory integrity impact
+
+- Product base price display meaning preserved: **base price = total contract price** (no pricing math changes).
+- Inventory/profile/stock posture remains read-only in this pass (no changes to stock sync logic; only UI framing of existing readiness states/buttons where already present).
+
+### 9) Financial integrity impact
+
+- No changes to EMI logic, payment posting, waiver logic, commission logic, payout logic, ledger behavior, reconciliation behavior, accounting posting, or opening balance locking.
+
+### 10) Auditability impact
+
+- No changes to audit log structures or mutation semantics; Phase 4 is UI framing/state consistency only.
+
+### 11) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 12) Remaining products/catalog UI gaps
+
+- Standardize remaining non-product master catalog surfaces (if any) under later phases using the same ERP register framing (do not mix with inventory/stock control pages unless explicitly scoped).
+- Consider consolidating product master field normalization patterns into a shared view-model helper (UI-only) once Phase 4 diffs stabilize (avoid spreading new assumptions across pages).
+
+### 13) Next recommended phase
+
+- Phase 5 — Inventory / stock control (SAFE_AUTO read-only surfaces first; strict mutation guardrails), or
+- Phase 6 — Customer / CRM intelligence (register/detail polish without touching money flows).
