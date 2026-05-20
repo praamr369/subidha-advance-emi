@@ -868,3 +868,95 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 ### 13) Next recommended phase
 
 - Phase 6 — Customer / CRM intelligence (register/detail polish), keeping money flows explicitly deferred.
+
+---
+
+## Phase 6 customer CRM intelligence transformation result (2026-05-20)
+
+Scope: **Frontend UI only** for Customer / CRM Intelligence SAFE pages.  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no invented KPIs/charts/endpoints**, **no permission weakening**, **no customer workflow changes** (onboarding, approval, password reset, edit handlers).
+
+### 1) Customer/CRM routes touched
+
+- `/admin/bi/customers` (SAFE_AUTO)
+- `/admin/crm` (SAFE_AUTO)
+- `/admin/crm/follow-ups` (SAFE_AUTO)
+- `/admin/crm/pipeline` (SAFE_AUTO)
+- `/admin/customers/[id]/profile` (SAFE_AUTO)
+- `/admin/customers/[id]/edit` (SAFE_LAYOUT_ONLY)
+- `/admin/online-enquiries` (SAFE_AUTO)
+- `/admin/online-enquiries/[id]` (SAFE_AUTO)
+
+### 2) Customer/CRM routes deferred
+
+- `/admin/customers` (SAFE_LAYOUT_ONLY) — already using `ERPPageShell` + ERP state wrappers; left unchanged to keep Phase 6 diffs focused on the CRM desk and enquiry/detail surfaces.
+- `/admin/customers/[id]` (SAFE_LAYOUT_ONLY) — very large operational profile surface; defer a dedicated “customer detail workspace” refinement pass to avoid accidental handler/visibility churn.
+- `/admin/customers/create` (SAFE_AUTO) — route delegates to `@/domains/customers/pages/AdminCustomerCreatePage`; defer to a domains-level design pass to keep Phase 6 route diffs small and reviewable.
+- `/admin/crm/leads` (SAFE_AUTO) — already uses `PortalPage` + operational lanes/register framing; defer until the lead inbox + CRM lead register can be aligned together without duplicating toolbars.
+- `/admin/crm/parties` (SAFE_AUTO) — already uses `PortalPage` + operational lanes/register framing; defer to a dedicated Party 360 detail/register pass.
+- `/admin/crm/parties/[id]` (SAFE_AUTO) — contains mutation actions (party updates + interaction logging); defer to keep Phase 6 focused on read-first customer intelligence layouts.
+- `/admin/reports/crm` (SAFE_AUTO) — shared `Phase5ReportSurface` composition; defer shared report framing changes to a dedicated reports pass to avoid cross-domain UI ripple.
+- `/partner/customers` (SAFE_LAYOUT_ONLY) and `/partner/customers/[id]` (SAFE_AUTO) — partner-scoped customer intelligence surfaces deferred to a partner-only CRM pass to avoid any accidental role boundary regressions in an admin-focused phase.
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO:
+  - `/admin/bi/customers`
+  - `/admin/crm`
+  - `/admin/crm/follow-ups`
+  - `/admin/crm/pipeline`
+  - `/admin/customers/[id]/profile`
+  - `/admin/online-enquiries`
+  - `/admin/online-enquiries/[id]`
+- SAFE_LAYOUT_ONLY:
+  - `/admin/customers/[id]/edit`
+
+### 4) Components reused
+
+- ERP framing: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPSectionShell.tsx`
+- ERP states: `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP details: `frontend/src/components/erp/ERPDetailGrid.tsx`
+- ERP audit framing: `frontend/src/components/erp/ERPAuditNote.tsx`
+- ERP status chips: `frontend/src/components/erp/ERPStatusBadge.tsx`
+
+### 5) Components created
+
+- None (Phase 6 is composition-only over existing ERP primitives and existing page logic).
+
+### 6) Customer/CRM services/API contracts preserved
+
+- No changes to endpoint paths, request params, or response normalization.
+- No changes to:
+  - `frontend/src/services/crm-module` (internal CRM follow-ups/pipeline/profile)
+  - `frontend/src/services/admin-erp`, `frontend/src/services/crm`, `frontend/src/services/customers` (CRM workspace overview inputs)
+  - `frontend/src/services/online-enquiries` (enquiry register + actions)
+
+### 7) Customer privacy/role safety confirmation
+
+- No changes to route locations or role layouts.
+- No changes that expand partner/customer visibility into admin-only data.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to EMI logic, payment posting, waiver logic, commission logic, payout logic, ledger behavior, reconciliation behavior, accounting posting, or audit behavior.
+- Online enquiry actions remain explicit and unchanged (suggest, request quotes, select quote, draft PO).
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining customer/CRM UI gaps
+
+- Align `/admin/customers/[id]` (large customer intelligence surface) to ERP section hierarchy without touching action wiring.
+- Decide whether CRM follow-ups/pipeline should stay as lightweight internal boards or be migrated into the same register/table primitives used by `/admin/crm/leads` and `/admin/crm/parties`.
+- Run a dedicated “Party 360 mutation-safe UI pass” for `/admin/crm/parties/[id]` (SAFE_AUTO but includes mutation actions).
+
+### 12) Next recommended phase
+
+- Phase 7 — Subscriptions / contract desk (SAFE_LAYOUT_ONLY first; keep payment/waiver/collection actions under manual review where applicable).

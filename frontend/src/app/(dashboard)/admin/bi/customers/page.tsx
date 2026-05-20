@@ -1,12 +1,13 @@
 "use client";
 
 import BiInsightsDashboard from "@/components/admin/bi/BiInsightsDashboard";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 
 export default function BiCustomerInsightsPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="BI Control Center"
       title="Customer Insights"
       subtitle="Read-only customer activity, overdue, repeat, and churn-risk posture."
@@ -17,7 +18,12 @@ export default function BiCustomerInsightsPage() {
       ]}
       statusBadge={{ label: "Read Only", tone: "info" }}
     >
-      <BiInsightsDashboard mode="customers" />
-    </PortalPage>
+      <ERPSectionShell
+        title="Intelligence workspace"
+        description="Use BI insights for review and routing; customer financial mutations remain in their owned operational workflows."
+      >
+        <BiInsightsDashboard mode="customers" />
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

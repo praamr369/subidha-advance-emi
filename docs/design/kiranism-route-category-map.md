@@ -163,6 +163,25 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Services/contracts to preserve**: CRM/customer services.
 - **Prompt title**: “Phase 6 — CRM surfaces polish”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
+- **Phase 6 status (implemented 2026-05-20)**:
+  - **Transformed**:
+    - `/admin/bi/customers` (SAFE_AUTO)
+    - `/admin/crm` (SAFE_AUTO)
+    - `/admin/crm/follow-ups` (SAFE_AUTO)
+    - `/admin/crm/pipeline` (SAFE_AUTO)
+    - `/admin/customers/[id]/profile` (SAFE_AUTO)
+    - `/admin/customers/[id]/edit` (SAFE_LAYOUT_ONLY)
+    - `/admin/online-enquiries` (SAFE_AUTO)
+    - `/admin/online-enquiries/[id]` (SAFE_AUTO)
+  - **Deferred**:
+    - `/admin/customers` (SAFE_LAYOUT_ONLY) — already on ERP primitives; kept unchanged to keep Phase 6 diffs focused.
+    - `/admin/customers/[id]` (SAFE_LAYOUT_ONLY) — very large customer intelligence surface; defer to a dedicated customer detail workspace pass.
+    - `/admin/customers/create` (SAFE_AUTO) — delegates to a domain-owned page component; defer to a domains-level UI pass.
+    - `/admin/crm/leads` (SAFE_AUTO) — already framed; defer until lead inbox + CRM lead register alignment is planned together.
+    - `/admin/crm/parties` (SAFE_AUTO) — already framed; defer to a dedicated Party Directory alignment pass.
+    - `/admin/crm/parties/[id]` (SAFE_AUTO) — contains mutation actions; defer to a mutation-safe CRM pass.
+    - `/admin/reports/crm` (SAFE_AUTO) — shared Phase5 report surface; defer shared report refactor to a dedicated reports pass.
+    - `/partner/customers` (SAFE_LAYOUT_ONLY) and `/partner/customers/[id]` (SAFE_AUTO) — defer to a partner-only CRM intelligence pass to avoid role boundary risk in an admin-focused phase.
 
 ### Phase 7 — Subscriptions / contract desk
 

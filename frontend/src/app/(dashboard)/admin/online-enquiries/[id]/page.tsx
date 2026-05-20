@@ -5,7 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import {
   createDraftPurchaseOrderForOnlineEnquiry,
@@ -172,14 +175,14 @@ export default function AdminOnlineEnquiryDetailPage() {
 
   if (!Number.isFinite(id) || id < 1) {
     return (
-      <PortalPage title="Invalid enquiry" breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }]}>
+      <ERPPageShell title="Invalid enquiry" breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }]}>
         <div className="text-sm text-destructive">Missing enquiry id.</div>
-      </PortalPage>
+      </ERPPageShell>
     );
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={String(row?.enquiry_no ?? `Enquiry #${id}`)}
       subtitle="Connect enquiry geography + SKU cues to supplier RFQs — procurement stays admin-controlled."
       breadcrumbs={[
@@ -193,14 +196,16 @@ export default function AdminOnlineEnquiryDetailPage() {
       ]}
     >
       {banner ? <div className="mb-3 rounded border border-emerald-600/40 bg-emerald-600/10 p-3 text-sm">{banner}</div> : null}
-      {error ? <div className="mb-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
+      {error ? <ERPErrorState title="Action failed" description={error} /> : null}
 
-      {loading ? <div className="text-sm text-muted-foreground">Loading…</div> : null}
+      {loading ? <ERPLoadingState label="Loading enquiry..." /> : null}
 
       {!loading && row ? (
         <div className="space-y-6 text-sm">
-          <section className="rounded border p-4">
-            <h2 className="mb-2 text-base font-medium">Customer & fulfilment cues</h2>
+          <ERPSectionShell
+            title="Customer & fulfilment cues"
+            description="Use this context to route into sourcing and vendor RFQs. Procurement posting remains explicitly admin-controlled."
+          >
             <div className="grid gap-2 md:grid-cols-2">
               <div>
                 <span className="text-xs uppercase text-muted-foreground">Customer</span>
@@ -234,13 +239,12 @@ export default function AdminOnlineEnquiryDetailPage() {
                 Open sourcing (prefilled)
               </Link>
             </div>
-          </section>
+          </ERPSectionShell>
 
-          <section className="rounded border p-4">
-            <h2 className="mb-2 text-base font-medium">Inline supplier ranking</h2>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Runs the same Phase 4 scoring engine against this enquiry’s geography + SKU filters (updates status to SOURCING when new).
-            </p>
+          <ERPSectionShell
+            title="Inline supplier ranking"
+            description="Runs the same Phase 4 scoring engine against this enquiry’s geography + SKU filters (updates status to SOURCING when new)."
+          >
             <button
               type="button"
               className="h-10 rounded border bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50"
@@ -260,10 +264,9 @@ export default function AdminOnlineEnquiryDetailPage() {
             ) : (
               <div className="mt-3 text-xs text-muted-foreground">No cached ranking yet — run suggest vendors.</div>
             )}
-          </section>
+          </ERPSectionShell>
 
-          <section className="rounded border p-4">
-            <h2 className="mb-2 text-base font-medium">Request vendor quotes</h2>
+          <ERPSectionShell title="Request vendor quotes">
             <div className="flex flex-wrap gap-2">
               <input
                 className="h-10 min-w-[240px] flex-1 rounded border px-2"
@@ -280,10 +283,9 @@ export default function AdminOnlineEnquiryDetailPage() {
                 {rqBusy ? "Saving…" : "Request quotes"}
               </button>
             </div>
-          </section>
+          </ERPSectionShell>
 
-          <section className="rounded border p-4">
-            <h2 className="mb-2 text-base font-medium">Quote requests & vendor responses</h2>
+          <ERPSectionShell title="Quote requests & vendor responses">
             {quoteRequests.length === 0 ? (
               <div className="text-xs text-muted-foreground">No RFQs linked yet.</div>
             ) : (
@@ -304,11 +306,12 @@ export default function AdminOnlineEnquiryDetailPage() {
                 ))}
               </div>
             )}
-          </section>
+          </ERPSectionShell>
 
-          <section className="rounded border p-4">
-            <h2 className="mb-2 text-base font-medium">Select vendor quote</h2>
-            <p className="mb-2 text-xs text-muted-foreground">Requires a QUOTED vendor row belonging to this enquiry’s RFQ.</p>
+          <ERPSectionShell
+            title="Select vendor quote"
+            description="Requires a QUOTED vendor row belonging to this enquiry’s RFQ."
+          >
             <div className="flex flex-wrap gap-2">
               <input
                 className="h-10 w-40 rounded border px-2"
@@ -320,13 +323,12 @@ export default function AdminOnlineEnquiryDetailPage() {
                 {sqBusy ? "Saving…" : "Accept quote"}
               </button>
             </div>
-          </section>
+          </ERPSectionShell>
 
-          <section className="rounded border p-4">
-            <h2 className="mb-2 text-base font-medium">Draft purchase order (explicit confirm)</h2>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Creates inventory PurchaseOrder in DRAFT only — no GRN, payable voucher, or payment automation.
-            </p>
+          <ERPSectionShell
+            title="Draft purchase order (explicit confirm)"
+            description="Creates inventory PurchaseOrder in DRAFT only — no GRN, payable voucher, or payment automation."
+          >
             <div className="grid gap-2 md:grid-cols-3">
               <input className="h-10 rounded border px-2" placeholder="Inventory item ID" value={invItemId} onChange={(e) => setInvItemId(e.target.value)} />
               <input className="h-10 rounded border px-2" placeholder="Quantity" value={poQty} onChange={(e) => setPoQty(e.target.value)} />
@@ -338,9 +340,9 @@ export default function AdminOnlineEnquiryDetailPage() {
             <button type="button" className="mt-3 h-10 rounded border px-4 disabled:opacity-50" disabled={poBusy} onClick={() => void runDraftPo()}>
               {poBusy ? "Creating…" : "Create draft PO"}
             </button>
-          </section>
+          </ERPSectionShell>
         </div>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

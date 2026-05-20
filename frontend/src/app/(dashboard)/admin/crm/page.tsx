@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/admin/erp/WorkspaceShell";
+import ERPAuditNote from "@/components/erp/ERPAuditNote";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import {
   CrmOperationalWorkspace,
   type CrmWorkspaceSectionCard,
@@ -149,24 +151,30 @@ export default function AdminCrmOverviewPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : null}
 
-      <section className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-        <p>
-          Direct-sale existing-customer search uses the registered customer source (`/api/v1/admin/customers/search/`).
-          CRM parties remain a separate model and are not submitted as `customer` IDs in direct-sale payloads.
-        </p>
-        <p className="mt-2">
-          CRM Pipeline visibility is handled through the Leads / Enquiries and Follow-ups sections in this workspace.
-        </p>
-        <p className="mt-2">
-          Create-customer-from-party action path: unavailable (backend endpoint not present). Use{" "}
-          <Link href={`${ROUTES.admin.customers}/create`} className="font-medium text-primary underline-offset-4 hover:underline">
-            customer create
-          </Link>{" "}
-          for now.
-        </p>
-      </section>
+      <ERPSectionShell title="CRM desk" description="Customer intelligence routing without mixing financial mutations into the CRM layer.">
+        <ERPAuditNote title="Operational separation" tone="info">
+          <p>
+            Direct-sale existing-customer search uses the registered customer source (
+            <code>/api/v1/admin/customers/search/</code>). CRM parties remain a separate model and are not submitted as{" "}
+            <code>customer</code> IDs in direct-sale payloads.
+          </p>
+          <p className="mt-2">
+            CRM Pipeline visibility is handled through the Leads / Enquiries and Follow-ups sections in this workspace.
+          </p>
+          <p className="mt-2">
+            Create-customer-from-party action path: unavailable (backend endpoint not present). Use{" "}
+            <Link
+              href={`${ROUTES.admin.customers}/create`}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              customer create
+            </Link>{" "}
+            for now.
+          </p>
+        </ERPAuditNote>
 
-      <CrmOperationalWorkspace cards={cards} />
+        <CrmOperationalWorkspace cards={cards} />
+      </ERPSectionShell>
     </WorkspaceShell>
   );
 }

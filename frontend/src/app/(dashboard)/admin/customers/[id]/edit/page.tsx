@@ -4,15 +4,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import {
   DetailPanel,
   FormSection,
   Timeline,
 } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import { apiFetch } from "@/lib/api";
 
 type KycStatus = "NOT_PROVIDED" | "PENDING" | "VERIFIED" | "REJECTED";
@@ -265,12 +265,12 @@ export default function AdminCustomerEditPage() {
   }
 
   if (loading) {
-    return <LoadingBlock label="Loading customer account..." />;
+    return <ERPLoadingState label="Loading customer account..." />;
   }
 
   if (error && !customer) {
     return (
-      <ErrorState
+      <ERPErrorState
         title="Unable to load customer account"
         description={error}
         onRetry={loadPage}
@@ -280,7 +280,7 @@ export default function AdminCustomerEditPage() {
 
   if (!customer) {
     return (
-      <ErrorState
+      <ERPErrorState
         title="Customer not found"
         description="The requested customer could not be loaded."
       />
@@ -288,7 +288,7 @@ export default function AdminCustomerEditPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={`Edit Customer: ${customer.name}`}
       subtitle="Update customer profile, access details, and account state from the admin workflow."
       breadcrumbs={[
@@ -308,7 +308,7 @@ export default function AdminCustomerEditPage() {
                   Email is required for customer access and public password reset.
                 </p>
               </div>
-              <StatusBadge
+              <ERPStatusBadge
                 status={customer.user_is_active ? "ACTIVE" : "INACTIVE"}
               />
             </div>
@@ -540,6 +540,6 @@ export default function AdminCustomerEditPage() {
           </div>
         </section>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }
