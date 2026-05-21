@@ -2394,3 +2394,120 @@ This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-fir
 ### 12) Next recommended phase
 
 - Phase 17 — Reports / analytics / BI (SAFE_AUTO first), preserving “no fake KPIs” and “no invented endpoints” policy.
+
+---
+
+## Phase 17 reports analytics BI transformation result
+
+Date: 2026-05-21  
+Scope: SAFE_AUTO pages where `businessCategory = Reports / Analytics / BI` (per route-category map).  
+Non-goals: no backend changes; no auth/session changes; no new service calls; no report calc/filter/export changes.
+
+### 1) Report/BI routes touched
+
+- `/admin/reports`
+- `/admin/reports/revenue`
+- `/admin/reports/overdue`
+- `/admin/reports/batch-performance`
+- `/admin/reports/customer-analytics` (placeholder surface only; no new data)
+- `/admin/reports/advance-emi`
+- `/admin/reports/delivery`
+- `/admin/reports/rent-lease`
+- `/admin/reports/partners`
+- `/admin/reports-center/[reportKey]`
+- `/admin/analytics/churn-analysis`
+- `/admin/analytics/risk-monitor`
+
+### 2) Report/BI routes deferred (by policy)
+
+- MANUAL_REVIEW:
+  - `/admin/reports/waiver-loss` (explicitly not touched)
+- Not in `businessCategory = Reports / Analytics / BI` (left unchanged in Phase 17 even if SAFE_*):
+  - `/admin/reports/contracts` (Subscriptions / Contract Desk)
+  - `/admin/reports/collections` (Payments / Receipts / Collections)
+  - `/admin/reports/direct-sales` (Direct Sale / Billing / Receivables)
+  - `/admin/reports/inventory` (Inventory / Stock Control)
+  - `/admin/reports/crm` (Customer / CRM Intelligence)
+  - `/partner/reports` (Partner Portal / Commission / Payout)
+- Redirect-only pages (no UI surface to transform):
+  - `/admin/analytics` (redirects to `/admin/reports?live=1`)
+  - `/admin/reports-center` (redirects to `/admin/reports?catalog=1`)
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO transformed:
+  - `/admin/reports`
+  - `/admin/reports/revenue`
+  - `/admin/reports/overdue`
+  - `/admin/reports/batch-performance`
+  - `/admin/reports/customer-analytics`
+  - `/admin/reports/advance-emi`
+  - `/admin/reports/delivery`
+  - `/admin/reports/rent-lease`
+  - `/admin/reports/partners`
+  - `/admin/reports-center/[reportKey]`
+  - `/admin/analytics/churn-analysis`
+  - `/admin/analytics/risk-monitor`
+- SAFE_LAYOUT_ONLY transformed: none.
+- MANUAL_REVIEW transformed: none.
+- DO_NOT_TOUCH transformed: none.
+
+### 4) Components reused
+
+- ERP shell/states:
+  - `frontend/src/components/ui/PortalPage.tsx` via `headerMode="erp"` (ERPPageHeader styling)
+  - `frontend/src/components/erp/ERPLoadingState.tsx`
+  - `frontend/src/components/erp/ERPErrorState.tsx`
+  - `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP framing:
+  - `frontend/src/components/erp/ERPDataToolbar.tsx` (reports-center detail toolbar)
+  - `frontend/src/components/erp/ERPAuditNote.tsx` (mobile-safe note for placeholder “Saved views” label)
+- Existing report components preserved:
+  - `frontend/src/components/admin/Phase5ReportSurface.tsx` (enabled `uiVariant="erp"` with behavior preserved)
+
+### 5) Components created, if any
+
+- None.
+
+### 6) Report/BI services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, response normalization changes, or new service calls were introduced.
+- Existing usage preserved:
+  - `@/services/reports` (revenue/overdue/batch-performance + admin analytics summary)
+  - `@/services/reports-center` (report-center detail fetch + export paths)
+  - `@/services/phase5-control` (Phase5 report surfaces + export endpoint usage)
+  - `@/services/subscriptions` (churn analysis sample)
+  - `@/services/emis` (risk monitor watchlist)
+
+### 7) Report filters/export safety confirmation
+
+- Export/download behavior preserved:
+  - Phase5 report export href composition unchanged (query params and `type=` preserved).
+  - Reports-center CSV/PDF export uses the same `reportCenterExportPath(...)` + `downloadAuthenticatedFile(...)` flow.
+  - CSV downloads on revenue/overdue/batch-performance continue to use `downloadCsv(...)` with unchanged row/column mapping.
+- No filter semantics changed (no added/removed/renamed query parameters).
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No permission changes; report/BI pages remain admin-only as defined by existing guards.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to KPI calculations, chart mapping, report aggregations, reconciliation logic, accounting logic, payments, EMIs, commissions, payouts, or audit behavior.
+- Phase 17 is UI-only: header framing, toolbar framing, and state surfaces.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved (explicit policy; unchanged in Phase 17):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining report/BI UI gaps
+
+- `/admin/reports/waiver-loss` remains MANUAL_REVIEW; only wrapper-level changes should be attempted after manual verification of its data-sensitive filters and export semantics.
+- Consider a follow-up “reports consistency sweep” to standardize toolbars/notes across the SAFE_AUTO reports without touching calculations.
+
+### 12) Next recommended phase
+
+- Phase 18 — Vendor / manufacturing / marketplace (if present), SAFE_AUTO first.

@@ -11,7 +11,7 @@ export default function AdminReportPartnersPage() {
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Partners" }]}
       fetcher={(query) => getAdminReportPartnerPerformance(query)}
       exportType="partners"
+      uiVariant="erp"
     />
   );
 }
-

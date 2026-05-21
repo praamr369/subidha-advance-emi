@@ -11,7 +11,7 @@ export default function AdminReportDeliveryPage() {
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Delivery" }]}
       fetcher={(query) => getAdminReportDeliveryPerformance(query)}
       exportType="delivery"
+      uiVariant="erp"
     />
   );
 }
-

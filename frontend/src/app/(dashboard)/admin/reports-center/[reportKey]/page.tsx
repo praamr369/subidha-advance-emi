@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 
 import type { EnterpriseColumnDef, GenericRecord } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import ERPAuditNote from "@/components/erp/ERPAuditNote";
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
 import DrawerShell from "@/components/ui/DrawerShell";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -101,6 +103,7 @@ export default function AdminReportCenterDetailPage() {
     <PortalPage
       title={payload?.title || reportKey || "Report"}
       subtitle="Read-only dataset. Exports require the reports.export capability."
+      headerMode="erp"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Reports & analysis", href: `${ROUTES.admin.reports}?catalog=1` },
@@ -114,32 +117,36 @@ export default function AdminReportCenterDetailPage() {
         },
       ]}
     >
-      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-4">
-        <ActionButton type="button" variant="secondary" onClick={() => setFiltersOpen(true)}>
-          <Filter className="mr-2 h-4 w-4" />
-          Filters
-        </ActionButton>
-        <ActionButton
-          type="button"
-          variant="secondary"
-          disabled={!!exporting}
-          onClick={() => void onExport("csv")}
-        >
-          <FileDown className="mr-2 h-4 w-4" />
-          {exporting === "csv" ? "Exporting…" : "Export CSV"}
-        </ActionButton>
-        <ActionButton
-          type="button"
-          variant="secondary"
-          disabled={!!exporting}
-          onClick={() => void onExport("pdf")}
-        >
-          <FileText className="mr-2 h-4 w-4" />
-          {exporting === "pdf" ? "Exporting…" : "Export PDF summary"}
-        </ActionButton>
-        <span className="text-xs text-muted-foreground">
-          Saved views: <em>placeholder</em> — presets will attach here in a future release.
-        </span>
+      <ERPDataToolbar
+        left={
+          <div className="flex flex-wrap items-center gap-2">
+            <ActionButton type="button" variant="secondary" onClick={() => setFiltersOpen(true)}>
+              <Filter className="mr-2 h-4 w-4" />
+              Filters
+            </ActionButton>
+            <ActionButton type="button" variant="secondary" disabled={!!exporting} onClick={() => void onExport("csv")}>
+              <FileDown className="mr-2 h-4 w-4" />
+              {exporting === "csv" ? "Exporting…" : "Export CSV"}
+            </ActionButton>
+            <ActionButton type="button" variant="secondary" disabled={!!exporting} onClick={() => void onExport("pdf")}>
+              <FileText className="mr-2 h-4 w-4" />
+              {exporting === "pdf" ? "Exporting…" : "Export PDF summary"}
+            </ActionButton>
+          </div>
+        }
+        right={
+          <div className="hidden min-h-10 items-center sm:flex">
+            <span className="text-xs text-muted-foreground">
+              Saved views: <em>placeholder</em> — presets will attach here in a future release.
+            </span>
+          </div>
+        }
+      />
+
+      <div className="sm:hidden">
+        <ERPAuditNote title="Saved views" tone="info">
+          Presets will attach here in a future release. (Currently a placeholder label.)
+        </ERPAuditNote>
       </div>
 
       {payload?.branch_placeholder ? (

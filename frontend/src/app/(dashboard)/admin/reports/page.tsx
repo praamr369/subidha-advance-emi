@@ -412,6 +412,7 @@ export default function AdminReportsPage() {
       subtitle="Single hub: windowed analytics summary, live admin dashboard posture, SME read-only report catalog (CSV/PDF), and shortcuts into canonical report routes."
       helperNote="Legacy /admin/analytics and /admin/reports-center forward here (?live=1 and ?catalog=1). Charts stay backend-prepared; reporting remains separate from collections posting and cashier execution."
       helperTone="info"
+      headerMode="erp"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Reports & analysis" },

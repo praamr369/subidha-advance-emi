@@ -89,7 +89,7 @@ export default function Phase5ReportSurface({
 
   if (uiVariant === "erp") {
     return (
-      <ERPPageShell title={title} subtitle={subtitle} breadcrumbs={breadcrumbs}>
+      <ERPPageShell title={title} subtitle={subtitle} breadcrumbs={breadcrumbs} headerMode="erp">
         <ERPSectionShell
           title="Live BI Surface"
           description="Real-data API response with stable chart payload contract."

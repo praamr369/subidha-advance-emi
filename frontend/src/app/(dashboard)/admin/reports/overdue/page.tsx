@@ -85,6 +85,7 @@ export default function OverdueReportPage() {
     <PortalPage
       title="Overdue EMI Report"
       subtitle="Pending and overdue EMI exposure using backend KPIs with row-level drill-down for operator follow-up."
+      headerMode="erp"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Reports", href: "/admin/reports" },

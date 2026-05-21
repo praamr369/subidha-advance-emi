@@ -89,6 +89,7 @@ export default function RevenueReportPage() {
     <PortalPage
       title="Revenue Report"
       subtitle="Operational revenue view sourced from the admin payment register so collection totals and reversal visibility stay aligned."
+      headerMode="erp"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Reports", href: "/admin/reports" },

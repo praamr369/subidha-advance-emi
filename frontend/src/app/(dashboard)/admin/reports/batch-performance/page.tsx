@@ -116,6 +116,7 @@ export default function BatchPerformanceReportPage() {
     <PortalPage
       title="Batch Performance"
       subtitle="Operational draw, enrollment, and Lucky ID progression by batch using live per-batch summary endpoints."
+      headerMode="erp"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Reports", href: "/admin/reports" },

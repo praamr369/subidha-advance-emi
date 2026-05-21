@@ -582,6 +582,25 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Prompt title**: “Phase 17 — Reports UI (data-preserving)”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
+- **Transformed (2026-05-21)** (SAFE_AUTO; UI-only):
+  - `/admin/reports`
+  - `/admin/reports/revenue`
+  - `/admin/reports/overdue`
+  - `/admin/reports/batch-performance`
+  - `/admin/reports/customer-analytics`
+  - `/admin/reports/advance-emi`
+  - `/admin/reports/delivery`
+  - `/admin/reports/rent-lease`
+  - `/admin/reports/partners`
+  - `/admin/reports-center/[reportKey]`
+  - `/admin/analytics/churn-analysis`
+  - `/admin/analytics/risk-monitor`
+- **Deferred (safety policy / out of scope)**:
+  - `/admin/reports/waiver-loss` (MANUAL_REVIEW)
+  - `/admin/reports/finance` and `/admin/reports/reconciliation` (MANUAL_REVIEW; finance/reconciliation reporting)
+  - `/partner/reports` (categorized Partner Portal / Commission / Payout; not moved in Phase 17)
+  - Redirect-only pages: `/admin/analytics`, `/admin/reports-center` (no UI surface)
+
 ### Phase 18 — Vendor / manufacturing / marketplace (if present)
 
 - **Goal**: vendor portal UI polish.
