@@ -338,6 +338,18 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
     - `/cashier/billing` — delegates into cashier collect/billing workflows; keep unchanged to avoid mutation-flow drift.
     - `/cashier/billing/direct-sale` — already transformed in Phase 9; intentionally not revisited.
 
+- **Phase 10D status (implemented 2026-05-21)**:
+  - **Transformed** (MANUAL_REVIEW; wrapper/layout/state-only changes only):
+    - `/customer/payments`
+    - `/customer/payments/[id]`
+    - `/partner/payments`
+    - `/partner/payments/[id]`
+  - **Deferred** (explicitly out-of-scope for Phase 10D to preserve behavior and privacy boundaries):
+    - `/admin/payments/create` — posting/mutation; manual-review only.
+    - `/admin/payments/reconciliation` and accounting/reconciliation routes — reconciliation semantics; manual-review only.
+    - `/cashier/collect`, `/cashier/billing` — collection submit + receipt generation workflow entry; behavior-critical mutation surfaces.
+    - `/partner/collections/create` — partner-side mutation route; keep unchanged to avoid submit behavior drift.
+
 ### Phase 11 — Direct sale / billing / receivables
 
 - **Goal**: direct sale billing flows UI polish; cancellations/returns manual-review.

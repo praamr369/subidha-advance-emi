@@ -1,20 +1,23 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { ActionStrip, DetailMetaGrid, DetailSection, StatusChip } from "@/components/detail";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
-import PortalPage from "@/components/ui/PortalPage";
-import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
-  getCustomerPaymentDetail,
-  type CustomerPayment,
-} from "@/services/customer";
+  ERPActionPanel,
+  ERPDataToolbar,
+  ERPDetailGrid,
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPSectionShell,
+  ERPStatusBadge,
+} from "@/components/erp";
+import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
+import ActionButton from "@/components/ui/ActionButton";
+import { formatPlanTypeLabel } from "@/lib/plan-labels";
+import { getCustomerPaymentDetail, type CustomerPayment } from "@/services/customer";
 
 function money(value: string | number | null | undefined): string {
   const parsed = Number(value);
@@ -108,21 +111,20 @@ export default function CustomerPaymentReceiptPage() {
   }, [payment]);
 
   const statusLabel = payment?.is_reversed ? "REVERSED" : "RECORDED";
-  const statusTone = payment?.is_reversed
+  const statusToneClassName = payment?.is_reversed
     ? "border-red-200 bg-red-50 text-red-700"
     : "border-emerald-200 bg-emerald-50 text-emerald-700";
+
   const subscriptionLabel = payment?.subscription_number
     ? payment.subscription_number
     : payment?.subscription
       ? `SUB-${payment.subscription}`
       : "—";
-  const emiContext = payment?.emi_id
-    ? `#${payment.emi_id} · Month ${payment.emi_month_no ?? "—"}`
-    : "Not linked to a single advance EMI row";
+
+  const emiContext = payment?.emi_id ? `#${payment.emi_id} · Month ${payment.emi_month_no ?? "—"}` : "Not linked to a single advance EMI row";
+
   const supportHref = payment
-    ? `/customer/support?payment=${payment.id}&subscription=${
-        payment.subscription_id ?? payment.subscription
-      }&category=PAYMENT_ISSUE`
+    ? `/customer/support?payment=${payment.id}&subscription=${payment.subscription_id ?? payment.subscription}&category=PAYMENT_ISSUE`
     : "/customer/support";
 
   function handlePrint() {
@@ -130,9 +132,9 @@ export default function CustomerPaymentReceiptPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
-      eyebrow="Customer Payments"
+      eyebrow="Customer Portal"
       title={
         payment
           ? `Payment Receipt #${payment.id}`
@@ -156,9 +158,7 @@ export default function CustomerPaymentReceiptPage() {
         },
         payment
           ? {
-              href: `/customer/payments?subscription=${
-                payment.subscription_id ?? payment.subscription
-              }`,
+              href: `/customer/payments?subscription=${payment.subscription_id ?? payment.subscription}`,
               label: "Subscription Payments",
               variant: "secondary",
             }
@@ -174,65 +174,57 @@ export default function CustomerPaymentReceiptPage() {
         },
       ]}
       stats={[
-        {
-          label: "Payment ID",
-          value: payment ? `#${payment.id}` : hasValidPaymentId ? `#${paymentId}` : "—",
-        },
+        { label: "Payment ID", value: payment ? `#${payment.id}` : hasValidPaymentId ? `#${paymentId}` : "—" },
         { label: "Amount", value: money(payment?.amount), tone: "success" },
         { label: "Method", value: payment?.method || "—" },
-        {
-          label: "Status",
-          value: statusLabel,
-          tone: payment?.is_reversed ? "danger" : "success",
-        },
+        { label: "Status", value: statusLabel, tone: payment?.is_reversed ? "danger" : "success" },
       ]}
       statusBadge={{
-        label: "Customer Payment Proof",
+        label: "Customer payment proof",
         tone: payment?.is_reversed ? "warning" : "info",
       }}
     >
       <div className="space-y-6">
-        <section className="receipt-print-hide flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-600">
-            Use Print / Save PDF for a paper copy or browser PDF export of this receipt.
-          </p>
+        <ERPSectionShell
+          className="receipt-print-hide"
+          title="Receipt actions"
+          description="Print or save this receipt as PDF for your records."
+        >
+          <ERPDataToolbar
+            left={
+              <p className="text-sm text-muted-foreground">
+                Use browser print to keep a paper copy or export as PDF.
+              </p>
+            }
+            right={
+              <div className="flex flex-wrap gap-2">
+                <ActionButton
+                  variant="outline"
+                  onClick={() => void loadPage("refresh")}
+                  disabled={loading || refreshing}
+                >
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </ActionButton>
+                <ActionButton
+                  variant="primary"
+                  onClick={handlePrint}
+                  disabled={loading || Boolean(error) || !payment}
+                >
+                  Print / Save PDF
+                </ActionButton>
+              </div>
+            }
+          />
+        </ERPSectionShell>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void loadPage("refresh")}
-              disabled={loading || refreshing}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 disabled:opacity-70"
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
-
-            <button
-              type="button"
-              onClick={handlePrint}
-              disabled={loading || Boolean(error) || !payment}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-950 bg-slate-950 px-4 text-sm font-medium text-white shadow-[0_18px_38px_-24px_rgba(15,23,42,0.82)] transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300 disabled:text-slate-100 disabled:opacity-70"
-            >
-              Print / Save PDF
-            </button>
-          </div>
-        </section>
-
-        {loading ? <LoadingBlock label="Loading payment receipt..." /> : null}
+        {loading ? <ERPLoadingState label="Loading payment receipt..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
-            title="Unable to load payment receipt"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
+          <ERPErrorState title="Unable to load payment receipt" description={error} onRetry={() => void loadPage("initial")} />
         ) : null}
 
         {!loading && !error && !payment ? (
-          <EmptyState
-            title="Receipt not available"
-            description="The requested customer payment could not be loaded."
-          />
+          <ERPEmptyState title="Receipt not available" description="The requested customer payment could not be loaded." />
         ) : null}
 
         {!loading && !error && payment ? (
@@ -243,7 +235,7 @@ export default function CustomerPaymentReceiptPage() {
               receiptReference={receiptReference}
               paymentId={payment.id}
               statusLabel={statusLabel}
-              statusToneClassName={statusTone}
+              statusToneClassName={statusToneClassName}
               statusNote={
                 payment.is_reversed ? (
                   <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -264,20 +256,9 @@ export default function CustomerPaymentReceiptPage() {
                 { label: "Advance EMI Context", value: emiContext },
               ]}
               summaryFields={[
-                {
-                  label: "Recorded At",
-                  value: formatDateTime(payment.created_at || payment.payment_date),
-                  emphasize: true,
-                },
-                {
-                  label: "Amount",
-                  value: money(payment.amount),
-                  emphasize: true,
-                },
-                {
-                  label: "Collected By",
-                  value: payment.collected_by_username || "—",
-                },
+                { label: "Recorded At", value: formatDateTime(payment.created_at || payment.payment_date), emphasize: true },
+                { label: "Amount", value: money(payment.amount), emphasize: true },
+                { label: "Collected By", value: payment.collected_by_username || "—" },
               ]}
               detailFields={[
                 { label: "Receipt Status", value: statusLabel },
@@ -289,98 +270,63 @@ export default function CustomerPaymentReceiptPage() {
                 { label: "Batch", value: payment.batch_code || "—" },
                 {
                   label: "Lucky Number",
-                  value:
-                    typeof payment.lucky_number === "number"
-                      ? `#${payment.lucky_number}`
-                      : "—",
+                  value: typeof payment.lucky_number === "number" ? `#${payment.lucky_number}` : "—",
                 },
                 { label: "Reference Number", value: payment.reference_no || "—" },
               ]}
               footerNote="Use browser print to keep a paper copy or save this receipt as PDF. This view is sourced from your customer-scoped payment record only."
             />
 
-            <DetailSection
+            <ERPSectionShell
               className="receipt-print-hide"
               title="Payment snapshot"
               description="Customer-safe payment context from the same recorded receipt."
             >
-              <DetailMetaGrid
+              <ERPDetailGrid
+                columns={4}
                 items={[
-                  { label: "Receipt Reference", value: receiptReference },
+                  { label: "Receipt reference", value: receiptReference },
                   {
-                    label: "Payment Status",
-                    value: (
-                      <StatusChip
-                        label={statusLabel}
-                        tone={payment.is_reversed ? "danger" : "success"}
-                      />
-                    ),
+                    label: "Payment status",
+                    value: <ERPStatusBadge status={statusLabel} label={statusLabel} />,
                   },
-                  {
-                    label: "Recorded At",
-                    value: formatDateTime(payment.created_at || payment.payment_date),
-                  },
-                  { label: "Collected By", value: payment.collected_by_username || "—" },
+                  { label: "Recorded at", value: formatDateTime(payment.created_at || payment.payment_date) },
+                  { label: "Collected by", value: payment.collected_by_username || "—" },
                   { label: "Subscription", value: subscriptionLabel },
-                  { label: "Advance EMI Context", value: emiContext },
+                  { label: "Advance EMI context", value: emiContext },
+                  { label: "Advance EMI amount", value: money(payment.emi_amount) },
                   {
-                    label: "Advance EMI Amount",
-                    value: money(payment.emi_amount),
-                    tone: "success",
-                  },
-                  {
-                    label: "Batch / Lucky",
-                    value: `${payment.batch_code || "—"} / ${
-                      typeof payment.lucky_number === "number"
-                        ? `#${payment.lucky_number}`
-                        : "—"
-                    }`,
+                    label: "Batch / lucky",
+                    value: `${payment.batch_code || "—"} / ${typeof payment.lucky_number === "number" ? `#${payment.lucky_number}` : "—"}`,
                   },
                 ]}
               />
-            </DetailSection>
+            </ERPSectionShell>
 
-            <DetailSection
-              className="receipt-print-hide"
-              title="Next step"
-              description="Use the next route that matches what you need to check."
-            >
-              <ActionStrip>
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className="inline-flex items-center rounded-md border border-slate-950 bg-slate-950 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
-                >
-                  Print / Save PDF
-                </button>
-
-                <Link
-                  href="/customer/payments"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                >
-                  Back to Payment History
-                </Link>
-
-                <Link
-                  href={`/customer/subscriptions/${
-                    payment.subscription_id ?? payment.subscription
-                  }`}
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                >
-                  Open Subscription
-                </Link>
-
-                <Link
-                  href={supportHref}
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
-                >
-                  Report an Issue
-                </Link>
-              </ActionStrip>
-            </DetailSection>
+            <ERPSectionShell className="receipt-print-hide" title="Next step" description="Use the action that matches what you need to check.">
+              <ERPActionPanel>
+                <div className="flex flex-wrap gap-2">
+                  <ActionButton variant="primary" onClick={handlePrint}>
+                    Print / Save PDF
+                  </ActionButton>
+                  <ActionButton href="/customer/payments" variant="outline">
+                    Back to payment history
+                  </ActionButton>
+                  <ActionButton
+                    href={`/customer/subscriptions/${payment.subscription_id ?? payment.subscription}`}
+                    variant="outline"
+                  >
+                    Open subscription
+                  </ActionButton>
+                  <ActionButton href={supportHref} variant="outline">
+                    Report an issue
+                  </ActionButton>
+                </div>
+              </ERPActionPanel>
+            </ERPSectionShell>
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

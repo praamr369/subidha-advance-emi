@@ -1491,3 +1491,75 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 ### 11) Next recommended phase
 
 - Phase 10D — Manual-review `/customer/payments*` and `/partner/payments*` (register/detail) with the same “wrapper/layout/state-only” constraints, after confirming each role’s action suppression semantics on non-collectible statuses.
+
+---
+
+## Phase 10D customer partner payments manual-review transformation result (2026-05-21)
+
+Scope: **Frontend UI only**. Wrapper/layout/state improvements for customer and partner payment register/detail pages with strict behavior and visibility preservation.  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no permission changes**, **no new service calls**, **no payment posting/collection submit/receipt generation/reversal behavior changes**, **no invented payment/receipt data**.
+
+### 1) Customer/partner payment routes touched
+
+- `/customer/payments` (MANUAL_REVIEW; wrapper/layout/state-only)
+- `/customer/payments/[id]` (MANUAL_REVIEW; wrapper/layout/state-only)
+- `/partner/payments` (MANUAL_REVIEW; wrapper/layout/state-only)
+- `/partner/payments/[id]` (MANUAL_REVIEW; wrapper/layout/state-only)
+
+### 2) Customer/partner payment routes deferred
+
+- None (all Phase 10D target routes were transformed).
+
+### 3) Components reused
+
+- ERP shell/states: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP framing: `frontend/src/components/erp/ERPSectionShell.tsx`, `frontend/src/components/erp/ERPDataToolbar.tsx`, `frontend/src/components/erp/ERPDetailGrid.tsx`
+- ERP controls: `frontend/src/components/erp/ERPActionPanel.tsx`, `frontend/src/components/erp/ERPStatusBadge.tsx`, `frontend/src/components/erp/ERPAuditNote.tsx`
+- Existing payment/receipt primitives preserved: `frontend/src/components/ui/DataTable.tsx`, `frontend/src/components/ui/operations/*`, `frontend/src/components/receipts/PaymentReceiptDocument.tsx`
+
+### 4) Components created, if any
+
+- None.
+
+### 5) Existing payment services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, or response normalization changes.
+- No new service calls introduced; pages continue to rely on existing service modules:
+  - Customer: `@/services/customer` (`listCustomerPayments`, `getCustomerPaymentDetail`)
+  - Customer receipts list: `@/services/phase4-finance` (`listCustomerReceipts`)
+  - Partner: `@/services/partner` (`listPartnerPayments`, `getPartnerPaymentDetail`, `getPartnerDashboard` fallback)
+
+### 6) Customer/partner privacy safety confirmation
+
+- No cross-role data exposure added (customer pages remain customer-scoped; partner pages remain partner-scoped).
+- No new cross-scope links introduced beyond existing partner/customer route families.
+
+### 7) Payment/collection/receipt safety confirmation
+
+- No changes to submit handlers, validation, payment mode handling, collectability rules, or action visibility logic.
+- No changes to receipt creation/download/print/share behavior; receipt rendering remains owned by `PaymentReceiptDocument`.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No changes to customer payment visibility rules or partner payment visibility rules.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to EMI logic, waiver, commission, payout, ledger, reconciliation, accounting posting, or audit trails.
+- UI changes are composition-only; financial integrity remains enforced by backend and existing contracts.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining payment UI gaps
+
+- Customer payment history still mixes “payment rows” and “receipt rows” on the same page; a future pass could optionally separate into tabs **only** if it remains contract-safe and does not introduce new queries.
+- Receipt print layout remains anchored to `PaymentReceiptDocument`; a dedicated receipt-document visual pass should be planned separately to avoid behavior drift.
+
+### 12) Next recommended phase
+
+- Phase 11 — Billing/direct-sale/receivables manual-review surfaces (visual-only) once payment routes for all roles are aligned, or proceed to Phase 12 accounting/reconciliation **only** with explicit manual-review constraints.
