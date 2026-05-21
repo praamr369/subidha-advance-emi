@@ -1659,3 +1659,68 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 ### 13) Next recommended phase
 
 - Phase 12 — Accounting / finance / reconciliation (MANUAL_REVIEW pages only; per-route prompts), or a dedicated reports pass for `/admin/reports/*` visual alignment.
+
+## Phase 12 accounting finance control room transformation result
+
+### 1) Accounting/finance routes touched
+
+- None — route-category map (`docs/design/kiranism-route-category-map.json`, generated 2026-05-20) currently classifies **all** Accounting / Finance Control Room pages as `MANUAL_REVIEW`, so no routes were eligible under the “SAFE_AUTO / SAFE_LAYOUT_ONLY only” Phase 12 safety policy.
+
+### 2) Accounting/finance routes deferred
+
+- Deferred (all `MANUAL_REVIEW`; requires per-route manual-review prompts with explicit verification that action visibility + handlers remain identical):
+  - `/admin/accounting/**`
+  - `/admin/finance/**`
+  - `/admin/reconciliation`
+  - `/admin/audit/events`, `/admin/audit-logs`
+  - `/admin/reports/finance`, `/admin/reports/reconciliation`
+  - `/customer/finance`, `/partner/finance`
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO transformed: none.
+- SAFE_LAYOUT_ONLY transformed: none.
+- MANUAL_REVIEW transformed: none (explicitly deferred by policy).
+- DO_NOT_TOUCH transformed: none.
+
+### 4) Components reused
+
+- None (no eligible routes).
+
+### 5) Components created, if any
+
+- None.
+
+### 6) Accounting/finance services/API contracts preserved
+
+- Preserved by non-change: no service calls, endpoint paths, request parameters, or response normalization were modified.
+
+### 7) COA/posting/ledger/reconciliation/opening-balance safety confirmation
+
+- No changes were made to any accounting posting, journal creation, ledger mutation, reconciliation actions, GST/non-GST posting, or opening-balance lock/unlock UI flows.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No role permission changes.
+
+### 9) Financial/audit safety confirmation
+
+- No UI or behavioral changes to ledger/journal/audit semantics; backend remains authoritative.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (policy retained):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining accounting/finance UI gaps
+
+- All Accounting / Finance Control Room pages remain pending a dedicated MANUAL_REVIEW pass (route-by-route), with explicit verification of:
+  - mutation action visibility rules
+  - submit handlers and validation wiring
+  - irreversible/controlled financial control warnings
+
+### 12) Next recommended phase
+
+- Run Phase 12 as a per-route MANUAL_REVIEW prompt series (start with read-first dashboards/registers and explicitly defer any mutation-heavy pages), or re-audit the route map to split truly read-only finance-control pages into `SAFE_LAYOUT_ONLY` if policy allows.

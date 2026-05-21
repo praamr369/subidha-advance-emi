@@ -402,6 +402,16 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Prompt title**: “Phase 12 — Accounting UI (manual-review only)”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
+- **Phase 12 status (2026-05-21)**:
+  - **Transformed**: _none_ — route-category JSON currently classifies **all** Accounting / Finance Control Room pages as `MANUAL_REVIEW`; Phase 12 “SAFE_AUTO / SAFE_LAYOUT_ONLY only” policy yields zero eligible routes.
+  - **Deferred** (all `MANUAL_REVIEW`; requires per-route manual-review prompts with handler/visibility verification):
+    - `/admin/accounting/**` (incl. chart of accounts, journals, books, GST, setup, reports, staff-ledger)
+    - `/admin/finance/**` (incl. reconciliation, reversal control, payout batches)
+    - `/admin/reconciliation`
+    - `/admin/audit/events`, `/admin/audit-logs`
+    - `/admin/reports/finance`, `/admin/reports/reconciliation`
+    - `/customer/finance`, `/partner/finance`
+
 ### Phase 13 — Partner portal / commission / payout
 
 - **Goal**: partner portal UI polish; payout execution manual-review.
