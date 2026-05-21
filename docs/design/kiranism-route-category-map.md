@@ -473,6 +473,19 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Prompt title**: “Phase 13 — Partner portal polish (compat-safe)”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
+- **Phase 13 status (implemented 2026-05-21)** (partner portal commission/payout: safe pages only; visual wrapper/layout/state-only):
+  - **Transformed**:
+    - `/partner` (SAFE_LAYOUT_ONLY)
+    - `/partner/commissions` (SAFE_AUTO)
+    - `/partner/reports` (SAFE_AUTO)
+    - `/partner/notifications` (SAFE_AUTO)
+  - **Preserved for compatibility**:
+    - `/partner/commisions` (SAFE_AUTO; redirect compatibility route preserved, no consolidation in Phase 13)
+  - **Deferred**:
+    - `/partner/payouts` (MANUAL_REVIEW) — payout execution/visibility controls require explicit per-action verification; out-of-scope for SAFE-only Phase 13.
+    - `/partner/finance` (MANUAL_REVIEW) — finance control-room semantics; requires MANUAL_REVIEW prompt.
+    - `/admin/finance/commissions` (MANUAL_REVIEW) — settlement/reversal/export controls; requires MANUAL_REVIEW prompt.
+
 ### Phase 14 — Customer portal / self-service
 
 - **Goal**: customer dashboard, documents, subscriptions, payments view polish.

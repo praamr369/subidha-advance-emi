@@ -16,12 +16,12 @@ import {
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
 import DashboardWidgetBoard from "@/components/dashboard/DashboardWidgetBoard";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
-import PortalPage from "@/components/ui/PortalPage";
 import { PartnerVendorWorkspaceShell } from "@/components/layout/page-shells";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { MetricStrip } from "@/components/ui/operations";
@@ -256,7 +256,7 @@ export default function PartnerDashboardPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Partner Operations"
       title="Partner Dashboard"
       subtitle="Partner-scoped collection truth aligned to the canonical subscription rollup, with separate operational visibility for request workflow and commission status."
@@ -404,10 +404,10 @@ export default function PartnerDashboardPage() {
           />
         </WorkspaceSection>
 
-        {loading ? <LoadingBlock label="Loading partner dashboard..." /> : null}
+        {loading ? <ERPLoadingState label="Loading partner dashboard..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load partner dashboard"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -683,7 +683,7 @@ export default function PartnerDashboardPage() {
                   ))}
                 </div>
               ) : (
-                <EmptyState
+                <ERPEmptyState
                   title="No required actions"
                   description="No follow-up queue items are currently visible for your partner scope."
                 />
@@ -752,7 +752,7 @@ export default function PartnerDashboardPage() {
                   })}
                 </div>
               ) : (
-                <EmptyState
+                <ERPEmptyState
                   title="No due subscriptions"
                   description="There are no current next-due rows inside this partner scope."
                 />
@@ -838,7 +838,7 @@ export default function PartnerDashboardPage() {
                     ))}
                   </div>
                 ) : (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No recent requests"
                     description="No recent partner collection requests are currently visible."
                   />
@@ -899,7 +899,7 @@ export default function PartnerDashboardPage() {
                     ))}
                   </div>
                 ) : (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No verified payments"
                     description="No verified partner-visible payment rows are currently visible."
                   />
@@ -954,6 +954,6 @@ export default function PartnerDashboardPage() {
         </>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

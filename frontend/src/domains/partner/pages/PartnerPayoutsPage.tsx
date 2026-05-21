@@ -3,12 +3,14 @@
 import { RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPMetricStrip from "@/components/erp/ERPMetricStrip";
+import ERPRegisterShell from "@/components/erp/ERPRegisterShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { TableSkeleton } from "@/components/feedback/Skeleton";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
 import StatusBadge from "@/components/ui/status-badge";
 import {
   DataTableShell,
@@ -268,48 +270,38 @@ export default function PartnerPayoutsPage({
         : "No commission or payout visibility rows are currently available in this partner scope.";
 
   return (
-    <PortalPage
+    <ERPRegisterShell
       eyebrow="Partner Earnings"
       title={title}
-      subtitle={subtitle}
-      helperNote="This page is visibility-only for partners. Payout finalization, finance-account posting, and reconciliation remain controlled admin workflows."
-      helperTone="info"
-      breadcrumbs={[
-        { label: "Partner", href: "/partner" },
-        { label: mode === "commissions" ? "Commissions" : "Payouts" },
-      ]}
-      actions={[
-        {
-          href: "/partner/payments",
-          label: "Payments",
-          variant: "secondary",
-        },
-        {
-          href: "/partner/collections",
-          label: "Collections",
-          variant: "secondary",
-        },
-      ]}
-      stats={[
-        { label: "Entries", value: loading ? "…" : String(rows.length) },
-        {
-          label: "Pending amount",
-          value: loading ? "…" : money(pendingDisplay),
-          tone: pendingDisplay > 0 ? "warning" : "default",
-        },
-        {
-          label: "Settled amount",
-          value: loading ? "…" : money(settledDisplay),
-          tone: settledDisplay > 0 ? "success" : "default",
-        },
-        {
-          label: "Latest entry",
-          value: loading ? "…" : formatDateTime(latestCreatedAt),
-        },
-      ]}
-      statusBadge={{ label: "Partner visibility", tone: "info" }}
+      description={subtitle}
+      status={<ERPStatusBadge status="Partner visibility" hideIcon />}
+      actions={
+        <>
+          <ActionButton href="/partner/payments" variant="secondary">
+            Payments
+          </ActionButton>
+          <ActionButton href="/partner/collections" variant="secondary">
+            Collections
+          </ActionButton>
+        </>
+      }
     >
       <div className="space-y-6">
+        <ERPMetricStrip
+          metrics={[
+            { label: "Entries", value: loading ? "…" : String(rows.length) },
+            {
+              label: "Pending amount",
+              value: loading ? "…" : money(pendingDisplay),
+            },
+            {
+              label: "Settled amount",
+              value: loading ? "…" : money(settledDisplay),
+            },
+            { label: "Latest entry", value: loading ? "…" : formatDateTime(latestCreatedAt) },
+          ]}
+          className="xl:grid-cols-4"
+        />
         <DetailPanel
           title="Payout boundary"
           description="Commission is payment-based and visibility here does not authorize payout posting."
@@ -440,7 +432,7 @@ export default function PartnerPayoutsPage({
         ) : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load payout visibility"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -453,7 +445,10 @@ export default function PartnerPayoutsPage({
             description="Live partner-visible entries; winner status appears only when linked subscription data is available."
           >
             {rows.length === 0 ? (
-              <EmptyState title="No commission entries found" description={emptyFilterExplanation} />
+              <ERPEmptyState
+                title="No commission entries found"
+                description={emptyFilterExplanation}
+              />
             ) : (
               <DataTableShell>
                 <MobileSafeTable className="border-none bg-transparent">
@@ -478,6 +473,6 @@ export default function PartnerPayoutsPage({
           </DetailPanel>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPRegisterShell>
   );
 }

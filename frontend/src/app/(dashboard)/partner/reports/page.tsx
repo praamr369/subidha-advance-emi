@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import { MobileSafeTable } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -201,7 +201,7 @@ export default function PartnerReportsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Partner Reports"
       title="Partner Reports"
       subtitle="Partner-scoped collection and commission report truth sourced from the live earnings and dashboard endpoints."
@@ -261,10 +261,10 @@ export default function PartnerReportsPage() {
           </ActionButton>
         </div>
 
-        {loading ? <LoadingBlock label="Loading partner reports..." /> : null}
+        {loading ? <ERPLoadingState label="Loading partner reports..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load partner reports"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -272,7 +272,7 @@ export default function PartnerReportsPage() {
         ) : null}
 
         {!loading && !error && (!dashboard || !earnings) ? (
-          <EmptyState
+          <ERPEmptyState
             title="No partner report data"
             description="Partner report sources are currently empty for this scope."
           />
@@ -424,7 +424,7 @@ export default function PartnerReportsPage() {
               }
             >
               {trendRows.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No report rows yet"
                   description="No partner-scoped collection or commission history is currently available."
                 />
@@ -442,6 +442,6 @@ export default function PartnerReportsPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

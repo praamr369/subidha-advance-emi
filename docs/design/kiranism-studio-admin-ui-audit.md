@@ -2025,3 +2025,82 @@ This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-fir
 ### 12) Next recommended phase
 
 - Phase 12E: select up to 1–3 additional read-first accounting/finance report/register pages, or start a one-route-per-prompt series for mutation-heavy finance/accounting pages with explicit handler/visibility verification.
+
+## Phase 13 partner portal commission payout transformation result
+
+### 1) Partner/commission/payout routes touched
+
+- Partner portal (SAFE_LAYOUT_ONLY wrapper/state alignment):
+  - `/partner`
+- Partner commission/payout visibility (SAFE_AUTO; register framing only):
+  - `/partner/commissions` (delegates to `PartnerPayoutsPage` in commissions mode)
+  - `/partner/commisions` (compat redirect preserved; unchanged behavior)
+- Partner reporting and alerts (SAFE_AUTO):
+  - `/partner/reports`
+  - `/partner/notifications`
+
+### 2) Partner/commission/payout routes deferred
+
+- Deferred (MANUAL_REVIEW / critical safety posture; do not touch without explicit per-action verification):
+  - `/partner/payouts`
+  - `/partner/finance`
+  - `/admin/finance/commissions`
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO transformed: `/partner/reports`, `/partner/notifications`, `/partner/commissions`.
+- SAFE_LAYOUT_ONLY transformed: `/partner`.
+- MANUAL_REVIEW transformed: none (explicitly deferred).
+- DO_NOT_TOUCH transformed: none.
+
+### 4) Components reused
+
+- ERP shell/states: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP register framing: `frontend/src/components/erp/ERPRegisterShell.tsx`, `frontend/src/components/erp/ERPMetricStrip.tsx`, `frontend/src/components/erp/ERPStatusBadge.tsx`
+
+### 5) Components created, if any
+
+- None.
+
+### 6) Partner/commission/payout services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, response normalization changes, or new service calls.
+- Partner portal continues using existing partner endpoints and dashboard surfaces:
+  - `@/services/partner` (dashboard, earnings, commissions list, subscriptions list)
+  - `@/services/notifications` (partner notifications list + mark-read)
+  - `@/services/dashboards` (canonical dashboard summary + register surfaces as previously used on `/partner`)
+
+### 7) Partner privacy safety confirmation
+
+- No broadening of partner-visible fields; pages continue to render only data returned by partner-scoped endpoints.
+- No new cross-role links were introduced (partner routes only link within existing partner-safe navigation).
+
+### 8) Commission/payout safety confirmation
+
+- No changes to commission calculation, status semantics, settlement/reversal behavior, payout execution, payout approval, or payout visibility rules.
+- `/partner/payouts` remains MANUAL_REVIEW and is explicitly deferred.
+
+### 9) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No permission weakening; partner route access remains role-scoped exactly as before.
+
+### 10) Financial/audit safety confirmation
+
+- UI changes are wrapper/layout/state substitutions only; no mutation handler changes.
+- Backend remains authoritative for commission and payout state; rendered values remain auditable and sourced from persisted records.
+
+### 11) Duplicate partner commissions route status
+
+- Preserved (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/` (canonical UI)
+  - `frontend/src/app/(dashboard)/partner/commisions/` (redirect compatibility route)
+
+### 12) Remaining partner UI gaps
+
+- Partner payout execution, payout approval/reversal visibility, and any partner finance control surfaces still require dedicated MANUAL_REVIEW prompts.
+- Partner notifications panel header remains component-owned; a shared ERP header-only refactor should be a separate, cross-role notifications phase to avoid role UX drift.
+
+### 13) Next recommended phase
+
+- Phase 14 — Customer portal / self-service (SAFE_AUTO/SAFE_LAYOUT_ONLY only), or a dedicated notifications center alignment pass across roles (admin/cashier/customer/partner/vendor) with strictly layout-only changes.
