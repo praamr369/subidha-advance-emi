@@ -69,6 +69,10 @@ Deliverable:
 - consistent “Download PDF” actions across payment/receipt/invoice/subscription pages
 - unified document panel listing stored docs + on-demand PDFs
 
+Phase C (implemented 2026-05-21):
+- Added backend + frontend foundation only (no broad wiring yet).
+- Deferred a new `GeneratedDocument` table in favor of a unifying service-layer contract.
+
 ### C) Reconciliation Control Tower
 
 Reference docs:

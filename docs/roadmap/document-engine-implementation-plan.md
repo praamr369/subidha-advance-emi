@@ -1,7 +1,22 @@
 # Document / PDF Engine — Implementation Plan (Additive, Production)
 
-Status: **PLAN ONLY (no implementation in this pass)**  
+Status: **PHASE C FOUNDATION IMPLEMENTED (backend + frontend primitives)**  
 Primary objective: Ship an admin/cashier/customer-safe document experience without changing financial logic or existing write APIs.
+
+## Phase C (Implemented): Foundation only (no broad wiring)
+
+Delivered:
+- Backend service-layer contract: `backend/subscriptions/services/document_engine_service.py`
+- Frontend reusable primitives:
+  - `frontend/src/components/documents/DocumentPanel.tsx`
+  - `frontend/src/components/documents/DocumentActionBar.tsx`
+  - `frontend/src/components/documents/DocumentStatusBadge.tsx`
+  - `frontend/src/components/documents/DownloadPdfButton.tsx`
+
+Explicitly not done in Phase C:
+- No new listing endpoints
+- No new `GeneratedDocument` table
+- No broad attachment across payment pages (Phase D work)
 
 ## Phase 0 (Now): Audit findings (confirmed in repo)
 
@@ -111,4 +126,3 @@ Suggested additions, in safe order:
 - Ensure backend PDF dependencies (`reportlab`) are present in production requirements.
 - Validate content-disposition filenames for safe attachment downloads.
 - Add monitoring for PDF generation failures (HTTP 400/500 rates on pdf endpoints).
-

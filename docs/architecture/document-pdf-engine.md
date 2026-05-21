@@ -148,3 +148,53 @@ If operational needs require cross-module indexing and lifecycle tracking beyond
   - invoice PDFs (`BillingInvoice` → pdf endpoint)
 - If a future `GeneratedDocument` table is introduced, migration must be additive and must not rewrite historical docs.
 
+---
+
+## Phase C (Implemented): Document Engine Foundation (Backend + Frontend primitives)
+
+Implementation date: **2026-05-21**
+
+### Decision: `GeneratedDocument` table **deferred**
+
+Rationale:
+- Existing persisted models already cover the two current document families safely:
+  - **file-backed + versioned**: `SubscriptionDocument`
+  - **financial record-backed + deterministic render**: `ReceiptDocument` (PDF rendered on-demand)
+- Adding a new table in Phase C would duplicate indexing without improving auditability for the first target doc type (money receipt PDF).
+
+### Backend foundation added
+
+New internal service contract (no API changes in Phase C):
+- `backend/subscriptions/services/document_engine_service.py`
+  - stable `DocumentMeta` contract for stored docs and on-demand PDFs
+  - checksum helpers (`sha256`) for file-backed docs
+  - source link resolver for known-safe models (Phase C scope)
+  - permission helpers (admin + customer ownership only; no new cashier/partner exposure)
+
+### Frontend foundation added
+
+Reusable document UI primitives (not yet wired broadly):
+- `frontend/src/components/documents/DocumentPanel.tsx`
+- `frontend/src/components/documents/DocumentActionBar.tsx`
+- `frontend/src/components/documents/DocumentStatusBadge.tsx`
+- `frontend/src/components/documents/DownloadPdfButton.tsx`
+
+### Document metadata contract (Phase C)
+
+Canonical fields (service-layer; used for future listing/normalization):
+- `document_type`
+- `document_number` (adapter: receipt_no / contract_reference / subscription_number)
+- `source_model` + `source_object_id`
+- `customer_id` (nullable)
+- `branch_id` (nullable)
+- `status` (doc-family specific; e.g. receipt status vs verification status)
+- `generated_by_user_id` (nullable; best-effort for receipts)
+- `generated_at` (source record timestamp; receipts are on-demand render)
+- `checksum_sha256` (nullable; computed for file-backed docs)
+- `metadata` (JSON)
+
+### PDF library decision
+
+Phase C remains unified on existing **reportlab** renderers:
+- `backend/subscriptions/services/document_pdf_service.py`
+
