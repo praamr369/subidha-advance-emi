@@ -2696,3 +2696,24 @@ Primary output: `docs/design/kiranism-compatibility-route-cleanup-plan.md`.
 ### 6) Next recommended phase
 
 - Phase 20 — UI consistency sweep (visual-only), followed by a dedicated “compatibility removal” phase **only after** usage logging/analytics verification and compatibility test coverage is in place.
+
+---
+
+## Phase 20 final UI consistency sweep result
+
+Date: 2026-05-21  
+Scope: `frontend/` UI-only consistency sweep after route-family ERP migration.  
+Non-goals: no backend/auth/API/service changes; no route move/rename/delete; no mutation semantics changes.
+
+### Summary
+
+- Normalized a small set of remaining legacy “paper white” panels in migrated admin BI and subscription helper components to use ERP/enterprise surface tokens (dark-mode safe).
+- Replaced local empty-state usage in admin BI tables with `ERPEmptyState` (behavior-neutral wrapper).
+- Added an overflow-safe wrapper for a legacy subscription table component to prevent mobile horizontal clipping.
+
+### Safety confirmations
+
+- No changes to routes, navigation items, redirects, or compatibility aliases.
+- No changes to auth/JWT/session, `RoleGuard`, role boundaries, or action visibility logic.
+- No changes to service calls, API params, response normalization, submit handlers, or business logic.
+- No impact to payment/EMI/waiver/commission/payout/ledger/reconciliation/accounting behavior (UI-only class/token changes).

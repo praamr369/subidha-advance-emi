@@ -679,6 +679,9 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Services/contracts**: all.
 - **Prompt title**: “Phase 20 — UI consistency sweep”.
 - **Fast tests**: `cd frontend && npm run build`.
+- **Phase 20 status (implemented 2026-05-21)**:
+  - Targeted consistency fixes only (surface tokens + empty-state wrapper + mobile overflow safety) in a small set of previously migrated admin BI + subscription helper components.
+  - No route/navigation/auth/API/service/behavior changes.
 
 | Route URL | File path | Role/family | Business category | Current purpose | Main services/endpoints used if visible | Current UI pattern | Loading/error/empty state presence | Mutation/action risk | Migration classification | Recommended UI target | Recommended phase |
 |---|---|---|---|---|---|---|---|---|---|---|---|

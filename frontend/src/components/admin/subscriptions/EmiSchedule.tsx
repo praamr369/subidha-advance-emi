@@ -11,11 +11,14 @@ type EmiScheduleProps = {
 
 export default function EmiSchedule({ schedule }: EmiScheduleProps) {
   return (
-    <section className="rounded border bg-white p-4">
-      <h3 className="mb-3 text-lg font-semibold">EMI Schedule</h3>
+    <section className="rounded-xl border border-border bg-card p-4 text-card-foreground">
+      <h3 className="mb-3 text-base font-semibold">EMI Schedule</h3>
       <ul className="space-y-2">
         {schedule.map((installment) => (
-          <li key={installment.installmentNumber} className="rounded border p-2">
+          <li
+            key={installment.installmentNumber}
+            className="rounded-lg border border-border bg-[var(--surface-muted)] p-3"
+          >
             <p>Installment #{installment.installmentNumber}</p>
             <p>Due Date: {installment.dueDate}</p>
             <p>Amount: ₹ {installment.amount}</p>

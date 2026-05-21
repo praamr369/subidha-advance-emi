@@ -11,23 +11,31 @@ type SubscriptionTableProps = {
 
 export default function SubscriptionTable({ rows }: SubscriptionTableProps) {
   return (
-    <table className="min-w-full border-collapse rounded border bg-white">
+    <div className="overflow-x-auto rounded-xl border border-border bg-card text-card-foreground">
+      <table className="min-w-full border-collapse">
       <thead>
-        <tr>
-          <th className="border p-2 text-left">Customer</th>
-          <th className="border p-2 text-left">Product</th>
-          <th className="border p-2 text-left">Status</th>
+        <tr className="bg-[var(--surface-muted)]">
+          <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
+            Customer
+          </th>
+          <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
+            Product
+          </th>
+          <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
+            Status
+          </th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.id}>
-            <td className="border p-2">{row.customerName}</td>
-            <td className="border p-2">{row.product}</td>
-            <td className="border p-2">{row.status}</td>
+          <tr key={row.id} className="border-b border-border last:border-0">
+            <td className="px-3 py-2 text-sm text-foreground">{row.customerName}</td>
+            <td className="px-3 py-2 text-sm text-foreground">{row.product}</td>
+            <td className="px-3 py-2 text-sm text-foreground">{row.status}</td>
           </tr>
         ))}
       </tbody>
-    </table>
+      </table>
+    </div>
   );
 }
