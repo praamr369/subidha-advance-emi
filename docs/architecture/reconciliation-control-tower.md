@@ -95,6 +95,30 @@ Guarantees (Phase H):
 - No mutation of BillingInvoice, DirectSale, DirectSaleReturn, CustomerRefund, BillingCreditNote, ReceiptDocument, JournalEntry, AccountingBridgePosting, StockLedger, customer, or other source rows
 - Admin-only permission gate (`IsAdmin`) remains unchanged
 
+## Phase I (Implemented 2026-05-21)
+
+Phase I extends the Control Tower check catalog to cover **inventory / stock / manufacturing** using **strict allowlisted** `StockLedger.reference_model/reference_id` patterns only.
+
+Implemented Phase I checks (read-only detection; no mutation of source records; allowlist-only):
+- Allowlisted StockLedger rows with invalid `reference_id` format (HIGH).
+- Posted DirectSaleReturn with `stock_effect=True` missing allowlisted stock restoration `SALE_RETURN_IN` evidence (HIGH).
+- Posted DirectSaleReturn allowlisted restoration quantity mismatch (HIGH).
+- Posted BillingInvoice missing allowlisted stock deduction `SALE_OUT` evidence per BillingInvoiceLine (HIGH).
+- Completed ProductionJob missing allowlisted finished-good receipt stock evidence per posted ProductionReceiptLine (HIGH).
+- Completed ProductionJob missing allowlisted raw-material issue/return stock evidence per posted ProductionMaterialIssueLine (HIGH).
+- Negative stock detection when `InventoryItem.current_stock_quantity() < 0` (CRITICAL).
+
+StockLedger allowlist (Phase I):
+- `BillingInvoiceLine` (`reference_id`: `{invoice_id}:{line_id}`)
+- `DirectSaleReturnLine` (`reference_id`: `{return_id}:{line_id}`)
+- `ProductionMaterialIssueLine` (`reference_id`: `{line_id}`)
+- `ProductionReceiptLine` (`reference_id`: `{line_id}`)
+
+Explicitly deferred in Phase I:
+- Any inventory reconciliation requiring guessed joins or non-allowlisted `reference_model/reference_id` interpretation
+- Purchase/GRN/vendor inventory checks unless explicit FK/source links are confirmed
+- Delivery reservation/dispatched checks until lifecycle + bridge contracts are explicitly confirmed
+
 ## 0) Phase E prerequisite (source-link determinism)
 
 Phase E deliverable (docs-only):

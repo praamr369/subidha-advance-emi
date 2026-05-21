@@ -14,6 +14,7 @@ from reconciliation.models import (
 from reconciliation.services.accounting_bridge_reconciliation import run_accounting_bridge_checks
 from reconciliation.services.direct_sale_reconciliation import run_direct_sale_billing_checks
 from reconciliation.services.emi_reconciliation import run_emi_checks
+from reconciliation.services.inventory_stock_reconciliation import run_inventory_stock_checks
 from reconciliation.services.return_cancellation_reconciliation import run_return_cancellation_checks
 
 
@@ -40,7 +41,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         started_by=started_by,
         started_at=timezone.now(),
         metadata={
-            "phase": "H",
+            "phase": "I",
             "checks": [
                 "PAYMENT_MISSING_RECEIPT_DOCUMENT",
                 "RECEIPT_DOCUMENT_PAYMENT_LINK_INVALID",
@@ -70,6 +71,15 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
                 "CUSTOMER_REFUND_PAID_JOURNAL_MISSING",
                 "CUSTOMER_REFUND_JOURNAL_SOURCE_LINK_INVALID",
                 "CUSTOMER_REFUND_DUPLICATE_JOURNAL_SOURCE_REFERENCE",
+                "STOCK_LEDGER_REFERENCE_FORMAT_INVALID",
+                "DIRECT_SALE_RETURN_STOCK_RESTORATION_MISSING",
+                "DIRECT_SALE_RETURN_STOCK_QUANTITY_MISMATCH",
+                "BILLING_INVOICE_STOCK_DEDUCTION_MISSING",
+                "PRODUCTION_JOB_FINISHED_GOOD_RECEIPT_STOCK_MISSING",
+                "PRODUCTION_JOB_FINISHED_GOOD_RECEIPT_STOCK_QUANTITY_MISMATCH",
+                "PRODUCTION_JOB_RAW_MATERIAL_STOCK_MOVEMENT_MISSING",
+                "PRODUCTION_JOB_RAW_MATERIAL_STOCK_QUANTITY_MISMATCH",
+                "INVENTORY_NEGATIVE_STOCK",
             ],
         },
     )
@@ -85,6 +95,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         totals = run_accounting_bridge_checks(run=run, totals=totals)
         totals = run_direct_sale_billing_checks(run=run, totals=totals)
         totals = run_return_cancellation_checks(run=run, totals=totals)
+        totals = run_inventory_stock_checks(run=run, totals=totals)
 
         run.total_checked = totals["checked"]
         run.total_matched = totals["matched"]

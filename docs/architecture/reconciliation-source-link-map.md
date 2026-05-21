@@ -1,6 +1,6 @@
 # Reconciliation Source-Link Map (Deterministic Audit — Phase E)
 
-Status: **AUDIT COMPLETE + PHASE F+G IMPLEMENTED (2026-05-21)**  
+Status: **AUDIT COMPLETE + PHASE F+G+H+I IMPLEMENTED (2026-05-21)**  
 Scope: **Source-link evidence map only** — no schema/API/service/frontend changes in this phase.
 
 This document records **confirmed** (code-backed) source-link patterns across modules so Phase F can implement only **deterministic, low-noise** reconciliation checks.
@@ -71,6 +71,35 @@ Explicitly deferred in Phase H:
 - Stock restoration checks using only `StockLedger.reference_model/reference_id` without a strict allowlist
 - Exchange lifecycle checks without a confirmed explicit FK + status contract
 - BillingInvoice reversal journal validation without an explicit reversal link/status/source-reference contract
+
+## Phase I Implementation Result (2026-05-21)
+
+Phase I extends Control Tower detection to **inventory / stock / manufacturing** using a **strict allowlist** for `StockLedger.reference_model/reference_id` patterns.
+
+Implemented checks (deterministic; allowlist-only; no auto-correction; no source-record mutation):
+- Allowlisted `StockLedger.reference_model` with invalid `reference_id` format.
+- Direct sale return stock restoration (DirectSaleReturn → StockLedger) using `reference_model="DirectSaleReturnLine"` and `reference_id="{return_id}:{line_id}"`.
+- Direct sale/billing invoice stock deduction (BillingInvoice → StockLedger) using `reference_model="BillingInvoiceLine"` and `reference_id="{invoice_id}:{line_id}"`.
+- Manufacturing stock receipts/issues (ProductionJob → StockLedger via posted lines):
+  - `ProductionReceiptLine` → `reference_model="ProductionReceiptLine"`, `reference_id="{receipt_line_id}"`.
+  - `ProductionMaterialIssueLine` → `reference_model="ProductionMaterialIssueLine"`, `reference_id="{line_id}"`.
+- Negative stock (InventoryItem) when `InventoryItem.current_stock_quantity() < 0` (computed deterministically from persisted StockLedger + opening_stock_qty).
+
+### StockLedger strict allowlist (Phase I)
+
+Only these `StockLedger.reference_model` values are treated as deterministic for Phase I inventory checks:
+- `BillingInvoiceLine` (`reference_id` regex: `^\\d+:\\d+$`)
+- `DirectSaleReturnLine` (`reference_id` regex: `^\\d+:\\d+$`)
+- `ProductionMaterialIssueLine` (`reference_id` regex: `^\\d+$`)
+- `ProductionReceiptLine` (`reference_id` regex: `^\\d+$`)
+
+Anything else is intentionally **deferred** (ignored by Phase I inventory checks), including legacy/ambiguous patterns such as `DirectSaleLine`.
+
+Explicitly deferred in Phase I:
+- Any inventory reconciliation that requires guessed joins or non-allowlisted `reference_model/reference_id` mapping
+- Purchase/GRN/vendor inventory reconciliation unless explicit FK/source links are confirmed
+- Delivery reservation/dispatched inventory checks (requires explicit lifecycle + accounting bridge contract confirmation)
+- Exchange lifecycle inventory checks unless explicit FK + stable status contract exists
 
 ## 1) Executive summary
 

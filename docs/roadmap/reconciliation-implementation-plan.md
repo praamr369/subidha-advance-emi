@@ -1,6 +1,6 @@
 # Reconciliation Control Tower — Implementation Plan (Additive)
 
-Status: **PHASE F IMPLEMENTED (2026-05-21)**  
+Status: **PHASE I IMPLEMENTED (2026-05-21)**  
 Phase 1 constraint: **read-only detection + manual resolution notes/status only**. No auto-correct.
 
 Phase E prerequisite (docs-only, completed):
@@ -87,6 +87,35 @@ Explicitly deferred in Phase H:
 
 Tests (backend, targeted):
 - `backend/tests/reconciliation/test_phase_h_returns_refunds_control_tower.py`
+
+## Phase I Implementation (2026-05-21)
+
+Goal:
+- Add deterministic inventory / stock / manufacturing reconciliation checks using a strict allowlist for `StockLedger.reference_model/reference_id` patterns.
+- Detection only (no auto-correction); do not mutate inventory/manufacturing/source records.
+
+Backend (additive):
+- New service module:
+  - `backend/reconciliation/services/inventory_stock_reconciliation.py`
+- Runner registration:
+  - `backend/reconciliation/services/reconciliation_runner.py` runs Phase F + Phase G + Phase H + Phase I checks in the same run (still read-only detection).
+
+Implemented checks (Phase I; allowlist-only):
+- Allowlisted StockLedger invalid reference format (`STOCK_LEDGER_REFERENCE_FORMAT_INVALID`)
+- Posted DirectSaleReturn missing allowlisted stock restoration (`DIRECT_SALE_RETURN_STOCK_RESTORATION_MISSING`)
+- Posted DirectSaleReturn restoration quantity mismatch (`DIRECT_SALE_RETURN_STOCK_QUANTITY_MISMATCH`)
+- Posted BillingInvoice missing allowlisted stock deduction (`BILLING_INVOICE_STOCK_DEDUCTION_MISSING`)
+- Completed ProductionJob missing finished-good receipt stock entry (`PRODUCTION_JOB_FINISHED_GOOD_RECEIPT_STOCK_MISSING`)
+- Completed ProductionJob missing raw-material issue/return stock entry (`PRODUCTION_JOB_RAW_MATERIAL_STOCK_MOVEMENT_MISSING`)
+- Negative on-hand stock (`INVENTORY_NEGATIVE_STOCK`)
+
+Explicitly deferred in Phase I:
+- Any inventory reconciliation requiring non-allowlisted `reference_model/reference_id` interpretation
+- Purchase/GRN/vendor inventory checks unless explicit FK/source links are confirmed
+- Delivery reservation/dispatched inventory checks until lifecycle + bridge contracts are explicitly confirmed
+
+Tests (backend, targeted):
+- `backend/tests/reconciliation/test_phase_i_inventory_stock_control_tower.py`
 
 ## 0) Starting Point (Confirmed in repo)
 
