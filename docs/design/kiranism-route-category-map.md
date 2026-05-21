@@ -403,7 +403,7 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
 - **Phase 12 status (2026-05-21)**:
-  - **Transformed**: _none_ — route-category JSON currently classifies **all** Accounting / Finance Control Room pages as `MANUAL_REVIEW`; Phase 12 “SAFE_AUTO / SAFE_LAYOUT_ONLY only” policy yields zero eligible routes.
+  - **Transformed**: _none_ under the “SAFE_AUTO / SAFE_LAYOUT_ONLY only” Phase 12 safety policy — route-category JSON currently classifies **all** Accounting / Finance Control Room pages as `MANUAL_REVIEW`.
   - **Deferred** (all `MANUAL_REVIEW`; requires per-route manual-review prompts with handler/visibility verification):
     - `/admin/accounting/**` (incl. chart of accounts, journals, books, GST, setup, reports, staff-ledger)
     - `/admin/finance/**` (incl. reconciliation, reversal control, payout batches)
@@ -411,6 +411,17 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
     - `/admin/audit/events`, `/admin/audit-logs`
     - `/admin/reports/finance`, `/admin/reports/reconciliation`
     - `/customer/finance`, `/partner/finance`
+
+- **Phase 12A status (2026-05-21)** (manual-review, read-first, wrapper/layout/state-only):
+  - **Transformed**:
+    - `/admin/accounting`
+    - `/admin/accounting/control-center`
+    - `/admin/finance/workspace`
+  - **Deferred**:
+    - `/admin/accounting/chart-of-accounts` — master-data mutation surface; requires per-action verification.
+    - `/admin/accounting/books` — money-movement create/post flows; mutation surface.
+    - `/admin/finance` — mixed surface; defer until per-action verification/splitting is planned.
+    - Reconciliation/reversal/payout pages — explicitly out-of-scope for Phase 12A.
 
 ### Phase 13 — Partner portal / commission / payout
 

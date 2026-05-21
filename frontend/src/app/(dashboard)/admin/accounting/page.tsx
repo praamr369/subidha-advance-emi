@@ -16,11 +16,12 @@ import {
 } from "lucide-react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import StatCard from "@/components/ui/StatCard";
-import PortalPage from "@/components/ui/PortalPage";
 import { MetricStrip, QueueList } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -144,7 +145,7 @@ export default function AdminAccountingPage() {
   const kpiUnmappedWarnings = controlKpis?.unmapped_account_warnings ?? "0";
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Accounting Control"
       title="Accounting Control Center"
       subtitle="Phase-1 accounting workspace with separate double-entry books, admin-only posting controls, and no overlap with the EMI payment ledger."
@@ -200,10 +201,10 @@ export default function AdminAccountingPage() {
           </button>
         </div>
 
-        {loading ? <LoadingBlock label="Loading accounting control center..." /> : null}
+        {loading ? <ERPLoadingState label="Loading accounting control center..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load accounting control center"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -267,10 +268,7 @@ export default function AdminAccountingPage() {
                 },
               ]}
             />
-            <WorkspaceSection
-              title="Readiness posture"
-              description="Operational indicators loaded from the admin accounting control center endpoint. This surface does not recalculate books in the UI."
-            >
+            <ERPSectionShell title="Readiness posture" description="Operational indicators loaded from the admin accounting control center endpoint. This surface does not recalculate books in the UI.">
               <MetricStrip
                 items={[
                   { label: "Today Collection", value: money(kpiTodayCollection) },
@@ -287,7 +285,7 @@ export default function AdminAccountingPage() {
                   { label: "Draft Journals", value: String(draftJournalCount) },
                 ]}
               />
-            </WorkspaceSection>
+            </ERPSectionShell>
 
             <div className="grid gap-4 xl:grid-cols-2">
               <WorkspaceSection
@@ -482,7 +480,7 @@ export default function AdminAccountingPage() {
                   ]}
                 />
               ) : (
-                <EmptyState
+                <ERPEmptyState
                   title="No accounting rows are waiting for admin posting"
                   description="Draft journals and approved vouchers/salary sheets will surface here once the accounting registers start receiving transactions."
                 />
@@ -491,6 +489,6 @@ export default function AdminAccountingPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

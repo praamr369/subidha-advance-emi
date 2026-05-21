@@ -1724,3 +1724,72 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 ### 12) Next recommended phase
 
 - Run Phase 12 as a per-route MANUAL_REVIEW prompt series (start with read-first dashboards/registers and explicitly defer any mutation-heavy pages), or re-audit the route map to split truly read-only finance-control pages into `SAFE_LAYOUT_ONLY` if policy allows.
+
+## Phase 12A accounting read-first manual-review transformation result
+
+This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-first** Accounting/Finance surfaces, limited to **wrapper/layout/state-only** changes (no handler, visibility, or service/contract changes).
+
+### 1) Accounting/finance routes touched
+
+- `/admin/accounting`
+- `/admin/accounting/control-center`
+- `/admin/finance/workspace`
+
+### 2) Accounting/finance routes inspected but deferred
+
+- `/admin/accounting/chart-of-accounts` — mutation-heavy master-data controls; defer until per-action visibility/handler verification is done.
+- `/admin/accounting/books` — contains money-movement create/post flows; mutation surface (explicitly out-of-scope for Phase 12A).
+- `/admin/finance` — broad surface mixing operational KPIs + mutation entrypoints; defer until split-by-section or per-action verification.
+- `/admin/finance/reconciliation`, `/admin/accounting/reconciliation`, `/admin/reconciliation` — reconciliation semantics; explicitly out-of-scope.
+- `/admin/finance/reversal-control`, `/admin/finance/reversal-reconciliation` — reversal/refund controls; explicitly out-of-scope.
+- `/admin/finance/payout-batches` — payout batch execution controls; explicitly out-of-scope.
+
+### 3) Why selected pages were safe for wrapper/layout/state-only change
+
+- All three pages are **read-first** surfaces in this phase: no submit handlers were changed and no new actions were introduced.
+- The pass is limited to replacing page shells and standardizing loading/error/empty rendering using existing ERP primitives; all existing links, visibility rules, and service calls remain unchanged.
+
+### 4) Components reused
+
+- `frontend/src/components/erp/ERPPageShell.tsx`
+- `frontend/src/components/erp/ERPLoadingState.tsx`
+- `frontend/src/components/erp/ERPErrorState.tsx`
+- `frontend/src/components/erp/ERPEmptyState.tsx`
+- `frontend/src/components/erp/ERPSectionShell.tsx`
+
+### 5) Components created, if any
+
+- None.
+
+### 6) Accounting/finance services/API contracts preserved
+
+- Preserved: no endpoint paths, request parameters, response normalization, or service functions were modified.
+
+### 7) COA/account/posting-profile safety confirmation
+
+- No changes to Chart of Accounts behaviors, finance-account behaviors, posting-profile behaviors, or any posting/journal/accounting mutation flows.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No permission weakening; route access remains role-scoped exactly as before.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to ledger/journal semantics, reconciliation semantics, opening-balance lock/unlock behavior, GST/non-GST posting behavior, or audit logging semantics.
+- UI changes are wrapper/layout/state-only; backend remains authoritative for financial records.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining accounting/finance UI gaps
+
+- Register pages with mutation controls still need per-route MANUAL_REVIEW work with explicit handler/visibility verification before any structural UI refactor.
+- Reconciliation and reversal surfaces remain intentionally untouched for safety.
+
+### 12) Next recommended phase
+
+- Continue Phase 12A-style MANUAL_REVIEW, read-first-only passes: expand into the safest “register home” pages first, and keep mutation-heavy accounting/finance pages in dedicated prompts (one route per prompt) with explicit per-action verification.

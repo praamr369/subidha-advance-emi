@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 import ActionButton from "@/components/ui/ActionButton";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { AccountingControlShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
 import { FormSection } from "@/components/ui/operations";
 import Phase5FilterBar from "@/components/admin/Phase5FilterBar";
 import Phase5ChartBlock from "@/components/admin/Phase5ChartBlock";
@@ -86,7 +87,7 @@ export default function AdminAccountingControlCenterPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Accounting Control Center"
       subtitle="Admin-only accounting command surface for reconciliation blockers, mappings, journals, and period posture (no posting changes here)."
       breadcrumbs={[
@@ -102,9 +103,9 @@ export default function AdminAccountingControlCenterPage() {
               title="Blockers (authoritative)"
               description="This page only renders what the control-center endpoint returns. No client-side fabricated KPIs."
             >
-              {loading ? <LoadingBlock label="Loading control center..." /> : null}
+              {loading ? <ERPLoadingState label="Loading control center..." /> : null}
               {!loading && error ? (
-                <ErrorState title="Unable to load control center" description={error} onRetry={() => void load()} />
+                <ERPErrorState title="Unable to load control center" description={error} onRetry={() => void load()} />
               ) : null}
               {!loading && !error && payload ? (
                 <MetricStrip
@@ -121,22 +122,19 @@ export default function AdminAccountingControlCenterPage() {
         primaryRegister={
           !loading && !error ? (
             !payload ? (
-              <EmptyState title="No data available" description="No authoritative records returned by this report endpoint." />
+              <ERPEmptyState title="No data available" description="No authoritative records returned by this report endpoint." />
             ) : (
               <div className="space-y-4">
                 {kpiCards.length > 0 ? (
-                  <WorkspaceSection
-                    title="Exception and blocker register"
-                    description="Use these signals to decide what to fix next. Follow detail links for the underlying register or control surface."
-                  >
+                  <ERPSectionShell title="Exception and blocker register" description="Use these signals to decide what to fix next. Follow detail links for the underlying register or control surface.">
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                       {kpiCards.map((card) => (
                         <Phase5KpiCard key={`${card.label}-${card.source}`} card={card} />
                       ))}
                     </div>
-                  </WorkspaceSection>
+                  </ERPSectionShell>
                 ) : (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No KPI signals returned"
                     description="The control-center endpoint did not return KPI cards for the current filter set."
                   />
@@ -187,6 +185,6 @@ export default function AdminAccountingControlCenterPage() {
           </div>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }
