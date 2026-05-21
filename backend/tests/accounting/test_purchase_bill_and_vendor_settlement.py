@@ -17,6 +17,7 @@ from inventory.models import (
     InventoryItem,
     InventoryItemType,
     PurchaseBill,
+    PurchaseBillLine,
     PurchaseBillStatus,
     StockLedger,
     StockMovementType,
@@ -94,6 +95,16 @@ class PurchaseBillAndVendorSettlementTests(TestCase):
               movement_type=StockMovementType.PURCHASE_IN,
               reference_model="PurchaseBillLine",
           ).exists()
+        )
+        pb_line = PurchaseBillLine.objects.filter(purchase_bill=purchase_bill).order_by("id").first()
+        self.assertIsNotNone(pb_line)
+        self.assertTrue(
+            StockLedger.objects.filter(
+                inventory_item=self.item,
+                movement_type=StockMovementType.PURCHASE_IN,
+                reference_model="PurchaseBillLine",
+                reference_id=f"{purchase_bill.id}:{pb_line.id}",
+            ).exists()
         )
 
         settlement = VendorSettlement.objects.create(

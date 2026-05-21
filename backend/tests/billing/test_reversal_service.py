@@ -182,6 +182,13 @@ class ReversalServiceTests(TestCase):
         ret, _ = post_direct_sale_return(return_id=ret.id, posted_by=self.admin)
         self.assertTrue(StockLedger.objects.filter(movement_type=StockMovementType.SALE_RETURN_IN, reference_model="DirectSaleReturnLine").exists())
         self.assertTrue(StockLedger.objects.filter(movement_type=StockMovementType.SALE_OUT, reference_model="DirectSaleExchangeReplacement").exists())
+        self.assertTrue(
+            StockLedger.objects.filter(
+                movement_type=StockMovementType.SALE_OUT,
+                reference_model="DirectSaleExchangeReplacement",
+                reference_id=f"{ret.id}:1",
+            ).exists()
+        )
         self.assertFalse(CustomerCreditLedger.objects.filter(direct_sale_return=ret).exists())
 
     def test_exchange_lower_value_creates_customer_credit_on_post(self):

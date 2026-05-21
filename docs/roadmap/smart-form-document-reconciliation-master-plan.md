@@ -112,6 +112,16 @@ Phase H (implemented 2026-05-21):
 - Added journal source-link integrity checks for BillingCreditNote and CustomerRefund and duplicate-posting detection for each (CRITICAL).
 - No auto-correction; no mutation of return/refund/credit-note/journal source records.
 
+Phase I (implemented 2026-05-21):
+- Added deterministic inventory / stock / manufacturing Control Tower checks using a strict `StockLedger.reference_model/reference_id` allowlist.
+- No auto-correction; no mutation of `StockLedger` or inventory/manufacturing source records.
+
+Inventory Source-Link Hardening (preparation, implemented 2026-05-21):
+- Standardized and documented deterministic `StockLedger` source-link contracts for remaining stock workflows (purchase/GRN, delivery, exchange, opening stock, adjustments).
+- Added helper constants/functions and unit tests proving existing `reference_model/reference_id` outputs.
+- Expanded the Phase I StockLedger reference allowlist **only** where reference formats are proven by code/tests.
+- No new reconciliation checks added in this phase (preparation only).
+
 ## Deployment Plan (when implemented)
 
 ### Order of rollout (recommended)

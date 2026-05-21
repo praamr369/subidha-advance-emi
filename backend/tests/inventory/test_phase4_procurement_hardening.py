@@ -186,7 +186,15 @@ class Phase4ProcurementHardeningTests(TestCase):
         post_purchase_return(purchase_return_id=pr.id, posted_by=self.admin)
         self.item.refresh_from_db()
         self.assertEqual(self.item.current_stock_quantity(), before - Decimal("1.000"))
-        self.assertTrue(StockLedger.objects.filter(reference_model="PurchaseReturnLine", movement_type=StockMovementType.PURCHASE_RETURN_OUT).exists())
+        pr_line = pr.lines.order_by("id").first()
+        self.assertIsNotNone(pr_line)
+        self.assertTrue(
+            StockLedger.objects.filter(
+                reference_model="PurchaseReturnLine",
+                reference_id=f"{pr.id}:{pr_line.id}",
+                movement_type=StockMovementType.PURCHASE_RETURN_OUT,
+            ).exists()
+        )
         self.assertTrue(VendorLedgerEntry.objects.filter(vendor=self.vendor, entry_type="PURCHASE_RETURN", source_id=pr.id).exists())
 
     def test_receipt_posting_transition_keeps_po_status(self):

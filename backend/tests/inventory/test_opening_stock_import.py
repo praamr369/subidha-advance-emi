@@ -1,3 +1,4 @@
+import hashlib
 from datetime import date
 from decimal import Decimal
 
@@ -68,6 +69,9 @@ class OpeningStockImportServiceTests(TestCase):
         self.assertEqual(second_post["created_count"], 0)
         self.assertEqual(second_post["existing_count"], 1)
         self.assertEqual(ledger_entries.count(), 1)
+        entry = ledger_entries.first()
+        self.assertEqual(entry.reference_model, "OpeningStockImport")
+        digest = hashlib.sha256(csv_text.encode("utf-8")).hexdigest()[:16]
+        self.assertEqual(entry.reference_id, f"{digest}:2:MAIN")
         self.assertEqual(self.item.default_stock_location_id, location.id)
         self.assertEqual(self.item.current_stock_quantity(), Decimal("4.500"))
-

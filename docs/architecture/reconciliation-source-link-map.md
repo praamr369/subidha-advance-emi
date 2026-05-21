@@ -348,13 +348,14 @@ Current “waiver” evidence is distributed (no single `EmiWaiver` model):
   - `StockLedger.reference_id` (string)
 - Relationship type: **string reference**
 - Deterministic? **Yes** only for known `reference_model` enumerations and stable formatting used in services.
-- Confidence: **Medium**
+- Confidence: **High** for the documented contracts; **Low** for legacy/unregistered strings.
 - First safe check:
   - “StockLedger rows with empty/unknown reference_model/reference_id” (integrity/quality check; low-noise).
 - Deferred checks:
   - Attempting to resolve arbitrary `reference_model` strings to actual rows without a canonical registry.
 - Risk notes:
   - Do not implement generic cross-app dereferencing until Phase F+ has a controlled allowlist and normalization layer.
+  - Canonical contract registry (docs + tests): `docs/architecture/inventory-stock-source-link-contracts.md`.
 
 ### 3.11 Manufacturing job/BOM → inventory movement link
 

@@ -117,6 +117,35 @@ Explicitly deferred in Phase I:
 Tests (backend, targeted):
 - `backend/tests/reconciliation/test_phase_i_inventory_stock_control_tower.py`
 
+## Inventory Source-Link Hardening (Preparation Phase, additive) (2026-05-21)
+
+Goal:
+- Standardize and document deterministic `StockLedger(reference_model, reference_id)` contracts for remaining stock workflows **before** adding new inventory reconciliation checks.
+
+Constraints:
+- No changes to stock movement business behavior
+- No mutation/backfill of historical `StockLedger` rows in this phase
+- No new reconciliation checks (only docs + helper constants + tests that prove existing behavior)
+
+Deliverables:
+- Canonical contract registry doc:
+  - `docs/architecture/inventory-stock-source-link-contracts.md`
+- Update source-link map to reference the canonical contract doc:
+  - `docs/architecture/reconciliation-source-link-map.md` (section 3.10)
+- Add (optional) centralized helper constants/functions for reference construction (no output changes):
+  - `backend/inventory/stock_ledger_reference_contracts.py`
+- Expand Phase I `StockLedger` allowlist **only** for workflows whose reference formats are proven by code/tests:
+  - Goods receipt / GRN (`GoodsReceiptLine`)
+  - Purchase bills (`PurchaseBillLine`)
+  - Purchase returns (`PurchaseReturnLine`)
+  - Stock adjustments (`StockAdjustmentLine`)
+  - Opening stock (`OpeningStockEntry`, `OpeningStockImport`)
+  - Delivery bridge (`SubscriptionDelivery`)
+  - Exchange replacement (`DirectSaleExchangeReplacement`)
+
+Tests (backend, targeted):
+- Extend existing tests to assert `reference_model/reference_id` formats for the above workflows (no behavioral changes).
+
 ## 0) Starting Point (Confirmed in repo)
 
 Existing reconciliation surfaces:

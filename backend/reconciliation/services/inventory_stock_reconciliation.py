@@ -110,6 +110,84 @@ STOCK_LEDGER_REFERENCE_ALLOWLIST: dict[str, StockLedgerReferenceSpec] = {
         expected_direction="IN",
         evidence_label="manufacturing.services.production_service.post_production_output",
     ),
+    # Evidence: inventory.services.procurement_service.post_goods_receipt(...)
+    "GoodsReceiptLine": StockLedgerReferenceSpec(
+        reference_model="GoodsReceiptLine",
+        allowed_source_model="GoodsReceiptLine",
+        reference_id_regex=r"^\d+:\d+$",
+        allowed_movement_types=frozenset([StockMovementType.PURCHASE_IN]),
+        expected_direction="IN",
+        evidence_label="inventory.services.procurement_service.post_goods_receipt",
+    ),
+    # Evidence: inventory.services.stock_service.post_purchase_bill(...)
+    "PurchaseBillLine": StockLedgerReferenceSpec(
+        reference_model="PurchaseBillLine",
+        allowed_source_model="PurchaseBillLine",
+        reference_id_regex=r"^\d+:\d+$",
+        allowed_movement_types=frozenset([StockMovementType.PURCHASE_IN]),
+        expected_direction="IN",
+        evidence_label="inventory.services.stock_service.post_purchase_bill",
+    ),
+    # Evidence: billing.services.reversal_service.post_purchase_return(...)
+    "PurchaseReturnLine": StockLedgerReferenceSpec(
+        reference_model="PurchaseReturnLine",
+        allowed_source_model="PurchaseReturnLine",
+        reference_id_regex=r"^\d+:\d+$",
+        allowed_movement_types=frozenset([StockMovementType.PURCHASE_RETURN_OUT]),
+        expected_direction="OUT",
+        evidence_label="billing.services.reversal_service.post_purchase_return",
+    ),
+    # Evidence: inventory.services.stock_service.post_stock_adjustment(...)
+    "StockAdjustmentLine": StockLedgerReferenceSpec(
+        reference_model="StockAdjustmentLine",
+        allowed_source_model="StockAdjustmentLine",
+        reference_id_regex=r"^\d+:\d+$",
+        allowed_movement_types=frozenset([StockMovementType.ADJUSTMENT_IN, StockMovementType.ADJUSTMENT_OUT]),
+        expected_direction="MIXED",
+        evidence_label="inventory.services.stock_service.post_stock_adjustment",
+    ),
+    # Evidence: inventory.services.opening_stock_entry_service.post_opening_stock_entry(...)
+    "OpeningStockEntry": StockLedgerReferenceSpec(
+        reference_model="OpeningStockEntry",
+        allowed_source_model="OpeningStockEntry",
+        reference_id_regex=r"^\d+$",
+        allowed_movement_types=frozenset([StockMovementType.OPENING_BALANCE_IN]),
+        expected_direction="IN",
+        evidence_label="inventory.services.opening_stock_entry_service.post_opening_stock_entry",
+    ),
+    # Evidence: inventory.services.opening_stock_import_service.post_opening_stock_import(...)
+    "OpeningStockImport": StockLedgerReferenceSpec(
+        reference_model="OpeningStockImport",
+        allowed_source_model="OpeningStockImport",
+        reference_id_regex=r"^[0-9a-f]{16}:\d+:[A-Z0-9\\-]{1,30}$",
+        allowed_movement_types=frozenset([StockMovementType.OPENING_BALANCE_IN]),
+        expected_direction="IN",
+        evidence_label="inventory.services.opening_stock_import_service.post_opening_stock_import",
+    ),
+    # Evidence: inventory.services.delivery_bridge_service.sync_delivery_inventory_bridge(...)
+    "SubscriptionDelivery": StockLedgerReferenceSpec(
+        reference_model="SubscriptionDelivery",
+        allowed_source_model="SubscriptionDelivery",
+        reference_id_regex=r"^\d+$",
+        allowed_movement_types=frozenset(
+            [
+                StockMovementType.EMI_DELIVERY_OUT,
+                StockMovementType.EMI_RETURN_IN,
+                StockMovementType.DELIVERY_OUT,
+            ]
+        ),
+        expected_direction="MIXED",
+        evidence_label="inventory.services.delivery_bridge_service.sync_delivery_inventory_bridge",
+    ),
+    # Evidence: billing.services.reversal_service.post_exchange_replacement_stock_movement(...)
+    "DirectSaleExchangeReplacement": StockLedgerReferenceSpec(
+        reference_model="DirectSaleExchangeReplacement",
+        allowed_source_model="DirectSaleExchangeReplacement",
+        reference_id_regex=r"^\d+:\d+$",
+        allowed_movement_types=frozenset([StockMovementType.SALE_OUT]),
+        expected_direction="OUT",
+        evidence_label="billing.services.reversal_service.post_exchange_replacement_stock_movement",
+    ),
 }
 
 

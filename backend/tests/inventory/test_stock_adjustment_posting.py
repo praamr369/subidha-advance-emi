@@ -3,7 +3,14 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from inventory.models import InventoryItem, StockAdjustment, StockAdjustmentLine, StockAdjustmentStatus, StockLedger
+from inventory.models import (
+    InventoryItem,
+    StockAdjustment,
+    StockAdjustmentLine,
+    StockAdjustmentStatus,
+    StockLedger,
+    StockMovementType,
+)
 from inventory.services.stock_service import (
     UNIT_COST_REQUIRED_BEFORE_POSTING_MSG,
     approve_stock_adjustment,
@@ -64,6 +71,13 @@ class StockAdjustmentPostingTests(TestCase):
             1,
         )
         line = StockAdjustmentLine.objects.get(stock_adjustment=posted_adjustment)
+        self.assertTrue(
+            StockLedger.objects.filter(
+                reference_model="StockAdjustmentLine",
+                reference_id=f"{posted_adjustment.id}:{line.id}",
+                movement_type=StockMovementType.ADJUSTMENT_OUT,
+            ).exists()
+        )
         self.assertEqual(line.unit_cost_snapshot, Decimal("50.00"))
         self.assertEqual(line.valuation_amount_snapshot, Decimal("100.00"))
 
