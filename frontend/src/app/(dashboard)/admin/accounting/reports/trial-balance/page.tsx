@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { ACCOUNTING_REPORT_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import {
@@ -14,9 +11,13 @@ import {
   AccountingRefreshButton,
   accountingMoney,
 } from "@/components/accounting/shared";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ReportPageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { getTrialBalance, type TrialBalanceReport } from "@/services/accounting";
 
@@ -63,7 +64,7 @@ export default function AccountingTrialBalancePage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Accounting Statements"
       title="Trial Balance"
       subtitle="Read-only trial balance over posted accounting journals. This report stays inside the separate accounting subsystem and does not reinterpret EMI ledger history."
@@ -99,19 +100,23 @@ export default function AccountingTrialBalancePage() {
               groups={ACCOUNTING_REPORT_DIRECTORY_GROUPS}
             />
 
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-              <AccountingPeriodFilters
-                startDate={startDate}
-                endDate={endDate}
-                onStartDateChange={setStartDate}
-                onEndDateChange={setEndDate}
-              />
-              <AccountingRefreshButton
-                loading={loading}
-                refreshing={refreshing}
-                onClick={() => void loadReport("refresh")}
-              />
-            </div>
+            <ERPDataToolbar
+              left={
+                <AccountingPeriodFilters
+                  startDate={startDate}
+                  endDate={endDate}
+                  onStartDateChange={setStartDate}
+                  onEndDateChange={setEndDate}
+                />
+              }
+              right={
+                <AccountingRefreshButton
+                  loading={loading}
+                  refreshing={refreshing}
+                  onClick={() => void loadReport("refresh")}
+                />
+              }
+            />
           </div>
         }
         summary={
@@ -123,10 +128,10 @@ export default function AccountingTrialBalancePage() {
               />
             ) : null}
 
-            {loading ? <LoadingBlock label="Loading trial balance..." /> : null}
+            {loading ? <ERPLoadingState label="Loading trial balance..." /> : null}
 
             {!loading && error ? (
-              <ErrorState
+              <ERPErrorState
                 title="Unable to load trial balance"
                 description={error}
                 onRetry={() => void loadReport("initial")}
@@ -136,12 +141,12 @@ export default function AccountingTrialBalancePage() {
         }
         chartTable={
           !loading && !error ? (
-            <WorkspaceSection
+            <ERPSectionShell
               title="Posted account balances"
               description="Debits and credits are rolled up directly from posted journal entry lines."
             >
               {!report || report.rows.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No posted balances"
                   description="Post accounting journals for the selected period to populate the trial balance."
                 />
@@ -149,7 +154,7 @@ export default function AccountingTrialBalancePage() {
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 text-left text-muted-foreground">
+                      <tr className="border-b border-border/70 text-left text-muted-foreground">
                         <th className="px-3 py-2 font-medium">Account</th>
                         <th className="px-3 py-2 font-medium">Type</th>
                         <th className="px-3 py-2 font-medium">Debit</th>
@@ -159,7 +164,7 @@ export default function AccountingTrialBalancePage() {
                     </thead>
                     <tbody>
                       {report.rows.map((row) => (
-                        <tr key={row.account_id} className="border-b border-slate-100">
+                        <tr key={row.account_id} className="border-b border-border/40">
                           <td className="px-3 py-3">
                             <div className="font-medium text-foreground">{row.account_code}</div>
                             <div className="text-xs text-muted-foreground">{row.account_name}</div>
@@ -176,10 +181,10 @@ export default function AccountingTrialBalancePage() {
                   </table>
                 </div>
               )}
-            </WorkspaceSection>
+            </ERPSectionShell>
           ) : null
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

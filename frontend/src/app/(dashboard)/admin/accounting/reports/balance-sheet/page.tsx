@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { ACCOUNTING_REPORT_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import {
@@ -13,9 +10,13 @@ import {
   AccountingRefreshButton,
   accountingMoney,
 } from "@/components/accounting/shared";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ReportPageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { getBalanceSheet, type BalanceSheetReport } from "@/services/accounting";
 
@@ -51,7 +52,7 @@ export default function AccountingBalanceSheetPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Accounting Statements"
       title="Balance Sheet"
       subtitle="Point-in-time balance sheet over posted accounting journals, including current-period net income folded into equity."
@@ -87,22 +88,24 @@ export default function AccountingBalanceSheetPage() {
               groups={ACCOUNTING_REPORT_DIRECTORY_GROUPS}
             />
 
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-              <AccountingPeriodFilters asOf={asOf} onAsOfChange={setAsOf} />
-              <AccountingRefreshButton
-                loading={loading}
-                refreshing={refreshing}
-                onClick={() => void loadReport("refresh")}
-              />
-            </div>
+            <ERPDataToolbar
+              left={<AccountingPeriodFilters asOf={asOf} onAsOfChange={setAsOf} />}
+              right={
+                <AccountingRefreshButton
+                  loading={loading}
+                  refreshing={refreshing}
+                  onClick={() => void loadReport("refresh")}
+                />
+              }
+            />
           </div>
         }
         summary={
           <div className="space-y-4">
-            {loading ? <LoadingBlock label="Loading balance sheet..." /> : null}
+            {loading ? <ERPLoadingState label="Loading balance sheet..." /> : null}
 
             {!loading && error ? (
-              <ErrorState
+              <ERPErrorState
                 title="Unable to load balance sheet"
                 description={error}
                 onRetry={() => void loadReport("initial")}
@@ -118,13 +121,13 @@ export default function AccountingBalanceSheetPage() {
                 { title: "Liabilities", rows: report?.liabilities ?? [] },
                 { title: "Equity", rows: report?.equity ?? [] },
               ].map((section) => (
-                <WorkspaceSection
+                <ERPSectionShell
                   key={section.title}
                   title={section.title}
                   description={`Posted ${section.title.toLowerCase()} as of ${asOf}.`}
                 >
                   {section.rows.length === 0 ? (
-                    <EmptyState
+                    <ERPEmptyState
                       title={`No ${section.title.toLowerCase()} rows`}
                       description={`Posted ${section.title.toLowerCase()} will appear here once journals exist.`}
                     />
@@ -133,7 +136,7 @@ export default function AccountingBalanceSheetPage() {
                       {section.rows.map((row) => (
                         <div
                           key={`${section.title}-${row.account_code}-${row.account_name}`}
-                          className="rounded-2xl border border-white/75 bg-white/75 px-4 py-4"
+                          className="rounded-2xl border border-border/70 bg-background px-4 py-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div>
@@ -146,12 +149,12 @@ export default function AccountingBalanceSheetPage() {
                       ))}
                     </div>
                   )}
-                </WorkspaceSection>
+                </ERPSectionShell>
               ))}
             </div>
           ) : null
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

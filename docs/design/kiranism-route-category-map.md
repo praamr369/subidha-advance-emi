@@ -423,6 +423,19 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
     - `/admin/finance` — mixed surface; defer until per-action verification/splitting is planned.
     - Reconciliation/reversal/payout pages — explicitly out-of-scope for Phase 12A.
 
+- **Phase 12B status (2026-05-21)** (manual-review, read-first, wrapper/layout/state-only):
+  - **Transformed** (read-only accounting statement registers; no handler/API changes):
+    - `/admin/accounting/reports/trial-balance`
+    - `/admin/accounting/reports/profit-loss`
+    - `/admin/accounting/reports/balance-sheet`
+  - **Deferred**:
+    - `/admin/accounting/exports`, `/admin/accounting/exports/itr-pack` — export pack generation/download (mutation + file download); out-of-scope for read-only register batch.
+    - `/admin/finance/deposits` — deposit deduction/refund/mapping mutation controls; out-of-scope.
+    - `/admin/accounting/chart-of-accounts` — master-data mutation surface; requires per-action verification.
+    - `/admin/accounting/books` — money-movement create/post flows; mutation surface.
+    - `/admin/finance` — mixed surface; defer until per-action verification/splitting is planned.
+    - Reconciliation/reversal/payout/audit pages — explicitly out-of-scope for Phase 12B.
+
 ### Phase 13 — Partner portal / commission / payout
 
 - **Goal**: partner portal UI polish; payout execution manual-review.

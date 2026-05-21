@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { ACCOUNTING_REPORT_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import {
@@ -13,9 +10,13 @@ import {
   AccountingRefreshButton,
   accountingMoney,
 } from "@/components/accounting/shared";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ReportPageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { getProfitLoss, type ProfitLossReport } from "@/services/accounting";
 
@@ -55,7 +56,7 @@ export default function AccountingProfitLossPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Accounting Statements"
       title="Profit & Loss"
       subtitle="Revenue and expense rollup sourced from posted accounting entries only. This additive report does not alter EMI, payout, or reconciliation behavior."
@@ -90,27 +91,31 @@ export default function AccountingProfitLossPage() {
               groups={ACCOUNTING_REPORT_DIRECTORY_GROUPS}
             />
 
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-              <AccountingPeriodFilters
-                startDate={startDate}
-                endDate={endDate}
-                onStartDateChange={setStartDate}
-                onEndDateChange={setEndDate}
-              />
-              <AccountingRefreshButton
-                loading={loading}
-                refreshing={refreshing}
-                onClick={() => void loadReport("refresh")}
-              />
-            </div>
+            <ERPDataToolbar
+              left={
+                <AccountingPeriodFilters
+                  startDate={startDate}
+                  endDate={endDate}
+                  onStartDateChange={setStartDate}
+                  onEndDateChange={setEndDate}
+                />
+              }
+              right={
+                <AccountingRefreshButton
+                  loading={loading}
+                  refreshing={refreshing}
+                  onClick={() => void loadReport("refresh")}
+                />
+              }
+            />
           </div>
         }
         summary={
           <div className="space-y-4">
-            {loading ? <LoadingBlock label="Loading profit and loss..." /> : null}
+            {loading ? <ERPLoadingState label="Loading profit and loss..." /> : null}
 
             {!loading && error ? (
-              <ErrorState
+              <ERPErrorState
                 title="Unable to load profit and loss"
                 description={error}
                 onRetry={() => void loadReport("initial")}
@@ -121,16 +126,19 @@ export default function AccountingProfitLossPage() {
         chartTable={
           !loading && !error ? (
             <div className="grid gap-4 xl:grid-cols-2">
-              <WorkspaceSection title="Income" description="Posted income accounts for the selected period.">
+              <ERPSectionShell title="Income" description="Posted income accounts for the selected period.">
                 {!report || report.income.length === 0 ? (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No income rows"
                     description="Income accounts will appear once posted accounting revenue exists in the selected period."
                   />
                 ) : (
                   <div className="space-y-3">
                     {report.income.map((row) => (
-                      <div key={row.account_id} className="rounded-2xl border border-white/75 bg-white/75 px-4 py-4">
+                      <div
+                        key={row.account_id}
+                        className="rounded-2xl border border-border/70 bg-background px-4 py-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                      >
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="font-medium text-foreground">{row.account_code}</div>
@@ -142,18 +150,21 @@ export default function AccountingProfitLossPage() {
                     ))}
                   </div>
                 )}
-              </WorkspaceSection>
+              </ERPSectionShell>
 
-              <WorkspaceSection title="Expenses" description="Posted expense accounts for the selected period.">
+              <ERPSectionShell title="Expenses" description="Posted expense accounts for the selected period.">
                 {!report || report.expenses.length === 0 ? (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No expense rows"
                     description="Expense accounts will appear once posted accounting spend exists in the selected period."
                   />
                 ) : (
                   <div className="space-y-3">
                     {report.expenses.map((row) => (
-                      <div key={row.account_id} className="rounded-2xl border border-white/75 bg-white/75 px-4 py-4">
+                      <div
+                        key={row.account_id}
+                        className="rounded-2xl border border-border/70 bg-background px-4 py-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                      >
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="font-medium text-foreground">{row.account_code}</div>
@@ -165,11 +176,11 @@ export default function AccountingProfitLossPage() {
                     ))}
                   </div>
                 )}
-              </WorkspaceSection>
+              </ERPSectionShell>
             </div>
           ) : null
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

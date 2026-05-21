@@ -1793,3 +1793,81 @@ This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-fir
 ### 12) Next recommended phase
 
 - Continue Phase 12A-style MANUAL_REVIEW, read-first-only passes: expand into the safest “register home” pages first, and keep mutation-heavy accounting/finance pages in dedicated prompts (one route per prompt) with explicit per-action verification.
+
+## Phase 12B accounting finance read-only register transformation result
+
+This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-first** Accounting statement register pages, limited to **wrapper/layout/state-only** changes (no handler, visibility, or service/contract changes).
+
+### 1) Accounting/finance routes touched
+
+- `/admin/accounting/reports/trial-balance`
+- `/admin/accounting/reports/profit-loss`
+- `/admin/accounting/reports/balance-sheet`
+
+### 2) Accounting/finance routes inspected but deferred
+
+- `/admin/accounting/exports`, `/admin/accounting/exports/itr-pack` — contains export pack generation/download actions (mutation + file download); out-of-scope for this read-only register batch.
+- `/admin/finance/deposits` — contains deduction/refund/mapping mutation actions; out-of-scope.
+- `/admin/accounting/books` — money-movement create/post flows; out-of-scope.
+- `/admin/accounting/chart-of-accounts` — master-data mutation surface; out-of-scope.
+- `/admin/finance` — mixed surface with mutation entrypoints; defer until split/per-action verification is planned.
+- Reconciliation/reversal/payout/audit routes — explicitly out-of-scope for Phase 12B.
+
+### 3) Why selected pages were safe for wrapper/layout/state-only change
+
+- Each selected page only calls read-only report services from `@/services/accounting`:
+  - `getTrialBalance`, `getProfitLoss`, `getBalanceSheet`
+- No POST/PUT/PATCH/DELETE calls exist in these pages; no submit handlers were added or changed.
+- Existing navigation actions remain link-only between statement pages; no action visibility or handler logic changed.
+
+### 4) Components reused
+
+- `frontend/src/components/erp/ERPPageShell.tsx`
+- `frontend/src/components/erp/ERPSectionShell.tsx`
+- `frontend/src/components/erp/ERPDataToolbar.tsx`
+- `frontend/src/components/erp/ERPLoadingState.tsx`
+- `frontend/src/components/erp/ERPErrorState.tsx`
+- `frontend/src/components/erp/ERPEmptyState.tsx`
+- Preserved report layout shell: `frontend/src/components/layout/page-shells.tsx` (`ReportPageShell`)
+
+### 5) Components created, if any
+
+- None.
+
+### 6) Accounting/finance services/API contracts preserved
+
+- Preserved: no endpoint paths, request parameters, response normalization, or service functions were modified.
+- All existing report fetches remain exactly:
+  - `getTrialBalance({ start_date, end_date })`
+  - `getProfitLoss({ start_date, end_date })`
+  - `getBalanceSheet({ as_of })`
+
+### 7) COA/account/posting/reconciliation/opening-balance safety confirmation
+
+- No changes to Chart of Accounts behavior, finance-account behavior, posting profile behavior, journals/ledger behavior, opening-balance lock/unlock behavior, GST/non-GST posting behavior, reconciliation behavior, reversal behavior, payout behavior, or audit logging surfaces.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No permission weakening; route access remains role-scoped exactly as before.
+
+### 9) Financial/audit safety confirmation
+
+- UI changes are wrapper/layout/state-only and do not affect any persisted financial history or auditability.
+- Backend remains authoritative; report rows are rendered as returned.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining accounting/finance UI gaps
+
+- Accounting and finance mutation-heavy registers (COA, books, deposits, reconciliation, reversal control, payout batches) remain pending a dedicated MANUAL_REVIEW prompt series with explicit per-action verification.
+
+### 12) Next recommended phase
+
+- Continue Phase 12 as small MANUAL_REVIEW batches:
+  - keep read-only statement/register pages grouped
+  - handle mutation-heavy finance/accounting pages one route at a time with explicit handler/visibility verification
