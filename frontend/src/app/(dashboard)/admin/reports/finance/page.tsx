@@ -11,7 +11,7 @@ export default function AdminReportFinancePage() {
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Finance" }]}
       fetcher={(query) => getAdminReportFinancePerformance(query)}
       exportType="finance"
+      uiVariant="erp"
     />
   );
 }
-

@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import ActionButton from "@/components/ui/ActionButton";
 
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -41,12 +47,14 @@ export default function Phase5ReportSurface({
   breadcrumbs,
   fetcher,
   exportType,
+  uiVariant = "default",
 }: {
   title: string;
   subtitle: string;
   breadcrumbs: Array<{ label: string; href?: string }>;
   fetcher: Fetcher;
   exportType?: string;
+  uiVariant?: "default" | "erp";
 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +83,67 @@ export default function Phase5ReportSurface({
     void load();
   }, [load]);
 
+  const exportHref = exportType
+    ? `/api/v1/admin/reports/export/?type=${encodeURIComponent(exportType)}&${new URLSearchParams(filters).toString()}`
+    : null;
+
+  if (uiVariant === "erp") {
+    return (
+      <ERPPageShell title={title} subtitle={subtitle} breadcrumbs={breadcrumbs}>
+        <ERPSectionShell
+          title="Live BI Surface"
+          description="Real-data API response with stable chart payload contract."
+        >
+          <ERPDataToolbar
+            left={<Phase5FilterBar value={filters} onChange={setFilters} />}
+            right={
+              <>
+                <ActionButton variant="outline" onClick={() => void load()}>
+                  Apply filters
+                </ActionButton>
+                {exportHref ? (
+                  <a
+                    href={exportHref}
+                    className="inline-flex items-center rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground transition hover:bg-muted"
+                  >
+                    Export CSV
+                  </a>
+                ) : null}
+              </>
+            }
+          />
+
+          {loading ? (
+            <ERPLoadingState label="Loading..." />
+          ) : error ? (
+            <ERPErrorState title="Unable to load report" description={error} onRetry={() => void load()} />
+          ) : !payload ? (
+            <ERPEmptyState
+              title="No data available"
+              description="No authoritative records returned by this report endpoint."
+            />
+          ) : (
+            <div className="space-y-4">
+              {Array.isArray((payload as PayloadWithKpis)?.kpi_cards) ? (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {((payload as PayloadWithKpis).kpi_cards ?? []).map((card) => (
+                    <Phase5KpiCard key={`${card.label}-${card.source}`} card={card} />
+                  ))}
+                </div>
+              ) : null}
+              <Phase5ChartBlock payload={payload as Record<string, unknown>} />
+              <details className="rounded-lg border border-border bg-background p-3 text-xs">
+                <summary className="cursor-pointer font-semibold">Raw response</summary>
+                <pre className="mt-3 overflow-x-auto">{JSON.stringify(payload, null, 2)}</pre>
+              </details>
+              <Phase5SourceMapPanel rows={sourceMap} />
+            </div>
+          )}
+        </ERPSectionShell>
+      </ERPPageShell>
+    );
+  }
+
   return (
     <PortalPage title={title} subtitle={subtitle} breadcrumbs={breadcrumbs}>
       <FormSection title="Live BI Surface" description="Real-data API response with stable chart payload contract.">
@@ -83,9 +152,9 @@ export default function Phase5ReportSurface({
           <ActionButton variant="outline" onClick={() => void load()}>
             Apply filters
           </ActionButton>
-          {exportType ? (
+          {exportHref ? (
             <a
-              href={`/api/v1/admin/reports/export/?type=${encodeURIComponent(exportType)}&${new URLSearchParams(filters).toString()}`}
+              href={exportHref}
               className="inline-flex items-center rounded-lg border px-3 py-2 text-sm"
             >
               Export CSV
@@ -119,4 +188,3 @@ export default function Phase5ReportSurface({
     </PortalPage>
   );
 }
-

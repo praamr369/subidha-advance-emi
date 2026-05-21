@@ -11,7 +11,7 @@ export default function AdminReportReconciliationPage() {
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Reports", href: "/admin/reports" }, { label: "Reconciliation" }]}
       fetcher={(query) => getAdminReportReconciliationAnalysis(query)}
       exportType="reconciliation"
+      uiVariant="erp"
     />
   );
 }
-

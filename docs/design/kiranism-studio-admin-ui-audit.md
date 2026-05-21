@@ -1947,3 +1947,81 @@ This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-fir
 - Continue Phase 12 with another small read-first batch:
   - consider `/admin/reports/finance` and `/admin/reports/reconciliation` if they are read-only (verify before touching)
   - keep mutation-heavy pages one route per prompt with explicit handler/visibility verification
+
+## Phase 12D accounting finance read-first book register transformation result
+
+This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-first** Accounting/Finance report pages, limited to **wrapper/layout/state-only** changes (no handler, visibility, or service/contract changes).
+
+### 1) Accounting/finance routes touched
+
+- `/admin/reports/finance`
+- `/admin/reports/reconciliation`
+
+### 2) Accounting/finance routes inspected but deferred
+
+- `/admin/accounting/books/(cash|bank|upi|sales|purchase)` — already uses `BookRegisterPage`; defer to a dedicated BookRegisterPage alignment pass to avoid touching shared book surfaces in this report-only batch.
+- `/admin/accounting/reconciliation` — contains reconciliation action controls; explicitly out-of-scope.
+- `/admin/finance/reconciliation` — delegates to `/admin/reconciliation` (action controls); out-of-scope.
+- `/admin/accounting/books` — contains money-movement create/post controls; out-of-scope.
+- `/admin/finance/deposits` — contains deduction/refund/mapping mutation controls; out-of-scope.
+- `/admin/finance` — mixed surface; defer until per-action verification is planned.
+
+### 3) Why selected pages were safe for wrapper/layout/state-only change
+
+- Both selected pages are read-first BI/report surfaces:
+  - `getAdminReportFinancePerformance(query)` and `getAdminReportReconciliationAnalysis(query)`
+  - `getAdminReportSourceMap()` for report provenance display
+- No new service calls were added; no request parameters, endpoint paths, or response normalization were changed.
+- Export behavior is preserved exactly: the existing `Export CSV` anchor remains an `<a href="/api/v1/admin/reports/export/?type=...">` link with the same query-string semantics.
+
+### 4) Components reused
+
+- `frontend/src/components/erp/ERPPageShell.tsx`
+- `frontend/src/components/erp/ERPSectionShell.tsx`
+- `frontend/src/components/erp/ERPDataToolbar.tsx`
+- `frontend/src/components/erp/ERPLoadingState.tsx`
+- `frontend/src/components/erp/ERPErrorState.tsx`
+- `frontend/src/components/erp/ERPEmptyState.tsx`
+
+### 5) Components created, if any
+
+- None.
+
+### 6) Accounting/finance services/API contracts preserved
+
+- Preserved: no endpoint paths, request parameters, response normalization, or service functions were modified.
+- Report fetchers remain:
+  - `getAdminReportFinancePerformance(query)`
+  - `getAdminReportReconciliationAnalysis(query)`
+  - `getAdminReportSourceMap()`
+- Export/download link preserved:
+  - `/api/v1/admin/reports/export/?type=<exportType>&<filters>`
+
+### 7) COA/account/posting/reconciliation/opening-balance safety confirmation
+
+- No changes to Chart of Accounts behavior, finance-account behavior, posting profile behavior, journals/ledger behavior, opening-balance lock/unlock behavior, GST/non-GST posting behavior, reconciliation action logic, reversal behavior, payout behavior, or audit logging surfaces.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No permission weakening; route access remains role-scoped exactly as before.
+
+### 9) Financial/audit safety confirmation
+
+- UI changes are wrapper/layout/state-only and do not affect any persisted financial history or auditability.
+- Backend remains authoritative; report payloads render as returned.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining accounting/finance UI gaps
+
+- Mutation-heavy accounting/finance surfaces still require dedicated per-route MANUAL_REVIEW prompts with explicit per-action verification (books money movements, deposits, reconciliation controls, reversal control, payout batches, GST posting registers).
+- Remaining admin reports still using the default report chrome can be upgraded incrementally per-domain (do not batch-transform across unrelated report families without an explicit prompt).
+
+### 12) Next recommended phase
+
+- Phase 12E: select up to 1–3 additional read-first accounting/finance report/register pages, or start a one-route-per-prompt series for mutation-heavy finance/accounting pages with explicit handler/visibility verification.

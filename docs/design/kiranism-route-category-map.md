@@ -448,6 +448,18 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
     - `/admin/accounting/books/(bank|cash|upi|sales|purchase)` — already uses `BookRegisterPage`; defer shared-shell alignment to a dedicated pass to keep the Phase 12C batch ≤3 routes.
     - `/admin/accounting/gst` — GST hub links into posting lifecycle registers; defer to a dedicated GST manual-review prompt series.
 
+- **Phase 12D status (2026-05-21)** (manual-review, read-first, wrapper/layout/state-only):
+  - **Transformed** (read-first BI report pages; export/download preserved):
+    - `/admin/reports/finance`
+    - `/admin/reports/reconciliation`
+  - **Deferred**:
+    - `/admin/accounting/books/(cash|bank|upi|sales|purchase)` — already uses `BookRegisterPage`; defer to a dedicated BookRegisterPage alignment pass to avoid touching shared book surfaces in a report-only batch.
+    - `/admin/accounting/reconciliation` — reconciliation action controls; explicitly out-of-scope.
+    - `/admin/finance/reconciliation` — delegates to `/admin/reconciliation` (action controls); out-of-scope.
+    - `/admin/accounting/books` — money-movement create/post controls; out-of-scope.
+    - `/admin/finance/deposits` — deposit deduction/refund/mapping mutation controls; out-of-scope.
+    - `/admin/finance` — mixed surface; defer until per-action verification/splitting is planned.
+
 ### Phase 13 — Partner portal / commission / payout
 
 - **Goal**: partner portal UI polish; payout execution manual-review.
