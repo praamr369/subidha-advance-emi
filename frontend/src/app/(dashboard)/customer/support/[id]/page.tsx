@@ -3,13 +3,14 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
-import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
+import { DetailItem } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   commentCustomerSupportTicket,
@@ -82,24 +83,32 @@ export default function CustomerSupportTicketDetailPage() {
 
   if (loading) {
     return (
-      <PortalPage title="Support ticket" breadcrumbs={[{ label: "Support", href: ROUTES.customer.support }]}>
-        <LoadingBlock label="Loading ticket…" />
-      </PortalPage>
+      <ERPPageShell
+        title="Support ticket"
+        breadcrumbs={[{ label: "Support", href: ROUTES.customer.support }]}
+        headerMode="erp"
+      >
+        <ERPLoadingState label="Loading ticket…" />
+      </ERPPageShell>
     );
   }
 
   if (error || !ticket) {
     return (
-      <PortalPage title="Support ticket" breadcrumbs={[{ label: "Support", href: ROUTES.customer.support }]}>
-        <ErrorState title="Ticket unavailable" description={error || "Not found."} onRetry={() => void load()} />
-      </PortalPage>
+      <ERPPageShell
+        title="Support ticket"
+        breadcrumbs={[{ label: "Support", href: ROUTES.customer.support }]}
+        headerMode="erp"
+      >
+        <ERPErrorState title="Ticket unavailable" description={error || "Not found."} onRetry={() => void load()} />
+      </ERPPageShell>
     );
   }
 
   const canReopen = ["RESOLVED", "CLOSED", "REJECTED"].includes(ticket.status);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Support ticket"
       title={ticket.ticket_no}
       subtitle={ticket.subject}
@@ -110,10 +119,11 @@ export default function CustomerSupportTicketDetailPage() {
       ]}
       actions={[{ href: ROUTES.customer.support, label: "All tickets", variant: "secondary" }]}
       statusBadge={{ label: ticket.status.replaceAll("_", " "), tone: "info" }}
+      headerMode="erp"
     >
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0 space-y-6">
-          <WorkspaceSection title="Details">
+          <ERPSectionShell title="Details">
             <p className="whitespace-pre-wrap text-sm text-foreground">{ticket.description}</p>
             {ticket.resolution_summary ? (
               <div className="mt-4 rounded-lg border border-border bg-[var(--surface-muted)]/40 p-3 text-sm">
@@ -121,10 +131,10 @@ export default function CustomerSupportTicketDetailPage() {
                 <p className="mt-1 whitespace-pre-wrap">{ticket.resolution_summary}</p>
               </div>
             ) : null}
-          </WorkspaceSection>
-          <WorkspaceSection title="Conversation">
+          </ERPSectionShell>
+          <ERPSectionShell title="Conversation">
             {ticket.comments.length === 0 ? (
-              <EmptyState title="No replies yet" description="The team will respond here." />
+              <ERPEmptyState title="No replies yet" description="The team will respond here." />
             ) : (
               <ul className="space-y-3">
                 {ticket.comments.map((c) => (
@@ -152,10 +162,10 @@ export default function CustomerSupportTicketDetailPage() {
                 Send reply
               </ActionButton>
             </form>
-          </WorkspaceSection>
-          <WorkspaceSection title="Timeline (summary)">
+          </ERPSectionShell>
+          <ERPSectionShell title="Timeline (summary)">
             {ticket.timeline.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No timeline entries yet"
                 description="Updates from the shop will appear here when the ticket moves forward."
               />
@@ -168,15 +178,15 @@ export default function CustomerSupportTicketDetailPage() {
                 ))}
               </ul>
             )}
-          </WorkspaceSection>
+          </ERPSectionShell>
         </div>
         <div className="min-w-0 space-y-4">
           <div className="rounded-xl border border-border bg-[var(--surface-card)] p-4 text-sm">
-            <DetailItem label="Status" value={<StatusBadge status={ticket.status} />} />
+            <DetailItem label="Status" value={<ERPStatusBadge status={ticket.status} />} />
             <DetailItem
               label="Priority"
               value={
-                <StatusBadge
+                <ERPStatusBadge
                   status={ticket.priority}
                   label={ticket.priority.replaceAll("_", " ")}
                   hideIcon
@@ -198,6 +208,6 @@ export default function CustomerSupportTicketDetailPage() {
           ) : null}
         </div>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

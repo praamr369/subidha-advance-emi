@@ -17,6 +17,11 @@ type Props = {
   breadcrumbs: { label: string; href?: string }[];
   list: (params?: { module?: string; limit?: number }) => Promise<NotificationListResponse>;
   markRead: (id: number) => Promise<SystemNotification>;
+  /**
+   * When false, renders only the notification toolbar + list (no title/breadcrumb header),
+   * allowing role pages to provide ERPPageHeader without duplicating titles.
+   */
+  showHeader?: boolean;
 };
 
 const MODULE_PRESETS = ["", "billing", "accounting", "inventory", "rent", "reports", "system"];
@@ -26,7 +31,15 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load notifications.";
 }
 
-export default function NotificationCenterPanel({ role, title, subtitle, breadcrumbs, list, markRead }: Props) {
+export default function NotificationCenterPanel({
+  role,
+  title,
+  subtitle,
+  breadcrumbs,
+  list,
+  markRead,
+  showHeader = true,
+}: Props) {
   const [module, setModule] = useState("");
   const [data, setData] = useState<NotificationListResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,53 +86,85 @@ export default function NotificationCenterPanel({ role, title, subtitle, breadcr
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {breadcrumbs.map((b, i) => (
-            <span key={`${b.label}-${i}`}>
-              {i > 0 ? " · " : ""}
-              {b.href ? (
-                <a href={b.href} className="text-primary hover:underline">
-                  {b.label}
-                </a>
-              ) : (
-                <span>{b.label}</span>
-              )}
-            </span>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>
+      {showHeader ? (
+        <header className="space-y-1">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {breadcrumbs.map((b, i) => (
+              <span key={`${b.label}-${i}`}>
+                {i > 0 ? " · " : ""}
+                {b.href ? (
+                  <a href={b.href} className="text-primary hover:underline">
+                    {b.label}
+                  </a>
+                ) : (
+                  <span>{b.label}</span>
+                )}
+              </span>
+            ))}
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-              Module
-              <select
-                className="h-10 min-w-[160px] rounded-lg border border-border bg-background px-3 text-sm text-foreground"
-                value={module}
-                onChange={(e) => setModule(e.target.value)}
-              >
-                {moduleOptions.map((m) => (
-                  <option key={m || "all"} value={m}>
-                    {m === "" ? "All modules" : m}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <ActionButton type="button" variant="secondary" onClick={() => void load()}>
-              Refresh
-            </ActionButton>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Module
+                <select
+                  className="h-10 min-w-[160px] rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+                  value={module}
+                  onChange={(e) => setModule(e.target.value)}
+                >
+                  {moduleOptions.map((m) => (
+                    <option key={m || "all"} value={m}>
+                      {m === "" ? "All modules" : m}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ActionButton type="button" variant="secondary" onClick={() => void load()}>
+                Refresh
+              </ActionButton>
+            </div>
+          </div>
+          {data !== null && (
+            <p className="text-sm text-muted-foreground">
+              {data.unread_count} unread · {data.count} shown
+              {role === "cashier" ? " (assigned to you only)" : ""}
+            </p>
+          )}
+        </header>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Module
+                <select
+                  className="h-10 min-w-[160px] rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+                  value={module}
+                  onChange={(e) => setModule(e.target.value)}
+                >
+                  {moduleOptions.map((m) => (
+                    <option key={m || "all"} value={m}>
+                      {m === "" ? "All modules" : m}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ActionButton type="button" variant="secondary" onClick={() => void load()}>
+                Refresh
+              </ActionButton>
+            </div>
+            {data !== null ? (
+              <div className="text-xs font-medium text-muted-foreground">
+                {data.unread_count} unread · {data.count} shown
+                {role === "cashier" ? " (assigned to you only)" : ""}
+              </div>
+            ) : null}
           </div>
         </div>
-        {data !== null && (
-          <p className="text-sm text-muted-foreground">
-            {data.unread_count} unread · {data.count} shown
-            {role === "cashier" ? " (assigned to you only)" : ""}
-          </p>
-        )}
-      </header>
+      )}
 
       {loading && <LoadingBlock label="Loading notifications…" />}
       {error && <ErrorState title="Could not load" message={error} onRetry={() => void load()} />}

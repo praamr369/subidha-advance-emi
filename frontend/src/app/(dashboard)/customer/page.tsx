@@ -13,11 +13,12 @@ import {
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
 import DashboardWidgetBoard from "@/components/dashboard/DashboardWidgetBoard";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageHeader from "@/components/erp/ERPPageHeader";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ActionButton from "@/components/ui/ActionButton";
-import PageHeader from "@/components/ui/PageHeader";
 import { MetricStrip } from "@/components/ui/operations";
 import { SelfServicePageShell } from "@/components/layout/page-shells";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -403,7 +404,7 @@ export default function CustomerDashboardPage() {
     <SelfServicePageShell
       glance={
         <>
-          <PageHeader
+          <ERPPageHeader
             eyebrow="Your account"
             title="Customer Workspace"
             description="See what is due, what you paid last, and where deliveries or support stand—using the same live records the shop uses for your contracts."
@@ -444,7 +445,7 @@ export default function CustomerDashboardPage() {
         </>
       }
       actions={
-        <WorkspaceSection
+        <ERPSectionShell
           title="Workspace quick lanes"
           description="Open common customer workflows quickly while keeping contract, payment, and support routes separate."
         >
@@ -509,14 +510,14 @@ export default function CustomerDashboardPage() {
               },
             ]}
           />
-        </WorkspaceSection>
+        </ERPSectionShell>
       }
       records={
         <>
-      {loading ? <LoadingBlock label="Loading customer workspace..." /> : null}
+      {loading ? <ERPLoadingState label="Loading customer workspace..." /> : null}
 
       {!loading && error ? (
-        <ErrorState
+        <ERPErrorState
           title="Unable to load customer workspace"
           description={error}
           onRetry={() => void loadPage("initial")}
@@ -621,7 +622,7 @@ export default function CustomerDashboardPage() {
             }
           >
             {latestDirectSales.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No direct-sale invoices"
                 description="When a direct sale is linked to your account, it will appear here with balance context."
               />
@@ -819,7 +820,7 @@ export default function CustomerDashboardPage() {
                   ))}
                 </div>
               ) : (
-                <EmptyState
+                <ERPEmptyState
                   title="No due contracts in this window"
                   description="The selected drilldown window is not currently returning any next-due or overdue rows."
                 />
@@ -880,7 +881,7 @@ export default function CustomerDashboardPage() {
                   ))}
                 </div>
               ) : (
-                <EmptyState
+                <ERPEmptyState
                   title="No recent payments in this window"
                   description="No recorded payment rows are visible for the selected drilldown window."
                 />
@@ -911,7 +912,7 @@ export default function CustomerDashboardPage() {
                 ))}
               </div>
             ) : (
-              <EmptyState
+              <ERPEmptyState
                 title="No subscriptions yet"
                 description="Once your contracts are active, they will appear here with product and settlement context."
               />
@@ -936,7 +937,7 @@ export default function CustomerDashboardPage() {
       ) : null}
 
       {!loading && !error && !legacy ? (
-        <EmptyState
+        <ERPEmptyState
           title="No customer workspace data"
           description="Customer dashboard data is not currently available."
         />

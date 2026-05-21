@@ -4,17 +4,17 @@ import { RefreshCw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import { MobileSafeTable } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import {
   listCustomerDeliveries,
   type DeliveryRecord,
@@ -205,7 +205,7 @@ export default function CustomerDeliveriesPage() {
         title: "Shipment status",
         render: (row) => (
           <div className="space-y-2">
-            <StatusBadge status={row.status} />
+            <ERPStatusBadge status={row.status} />
             <div className="text-xs text-muted-foreground">
               {row.fulfillment_status || "Delivery workflow record"}
             </div>
@@ -254,7 +254,7 @@ export default function CustomerDeliveriesPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Customer Deliveries"
       title="Delivery Tracking"
       subtitle="Track delivery history and current shipment posture for your own subscriptions without mixing delivery status into payment or contract-state screens."
@@ -287,12 +287,13 @@ export default function CustomerDeliveriesPage() {
         },
       ]}
       statusBadge={{ label: "Read-only delivery scope", tone: "info" }}
+      headerMode="erp"
     >
       <div className="space-y-6">
-        <WorkspaceSection
+        <ERPSectionShell
           title="Delivery register controls"
           description="Filter shipment records by status or subscription, then open a detail view for timeline and receiver context."
-          action={
+          actions={
             <ActionButton
               variant="outline"
               onClick={() => void loadPage("refresh")}
@@ -310,9 +311,9 @@ export default function CustomerDeliveriesPage() {
                   <span className="font-semibold uppercase tracking-[0.14em]">
                     Active filters
                   </span>
-                  {statusFilter ? <StatusBadge status={statusFilter} hideIcon /> : null}
+                  {statusFilter ? <ERPStatusBadge status={statusFilter} hideIcon /> : null}
                   {subscriptionFilter ? (
-                    <StatusBadge
+                    <ERPStatusBadge
                       status="ACTIVE"
                       label={`Subscription ${subscriptionFilter}`}
                       hideIcon
@@ -363,12 +364,12 @@ export default function CustomerDeliveriesPage() {
               </div>
             </div>
           </TableToolbar>
-        </WorkspaceSection>
+        </ERPSectionShell>
 
-        {loading ? <LoadingBlock label="Loading deliveries..." /> : null}
+        {loading ? <ERPLoadingState label="Loading deliveries..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load deliveries"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -376,12 +377,12 @@ export default function CustomerDeliveriesPage() {
         ) : null}
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <ERPSectionShell
             title="Delivery history"
             description="Shipment rows sourced from the customer delivery API, with direct drill-in to the delivery detail surface."
           >
             {rows.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No delivery records"
                 description={
                   statusFilter || subscriptionFilter
@@ -432,9 +433,9 @@ export default function CustomerDeliveriesPage() {
                   : "No delivery activity has been recorded yet."}
               </WorkspaceNotice>
             </div>
-          </WorkspaceSection>
+          </ERPSectionShell>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
 import { MobileSafeTable } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   listCustomerSupportTickets,
@@ -62,7 +62,7 @@ export default function CustomerSupportHubPage() {
   }, [load, tab]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Customer Support"
       title="Support & requests"
       subtitle="Raise structured requests (TKT numbers) for EMI, rent, lease, delivery, payments, and general help. Operational records are never changed from this desk."
@@ -74,6 +74,7 @@ export default function CustomerSupportHubPage() {
         { href: ROUTES.customer.supportNew, label: "Create New Request", variant: "primary" },
         { href: ROUTES.customer.payments, label: "Payments", variant: "secondary" },
       ]}
+      headerMode="erp"
     >
       <div className="space-y-6">
         <div className="flex flex-wrap gap-2">
@@ -99,19 +100,19 @@ export default function CustomerSupportHubPage() {
           ))}
         </div>
 
-        {loading ? <LoadingBlock label="Loading tickets…" /> : null}
+        {loading ? <ERPLoadingState label="Loading tickets…" /> : null}
         {!loading && error ? (
-          <ErrorState title="Could not load tickets" description={error} onRetry={() => void load(tab)} />
+          <ERPErrorState title="Could not load tickets" description={error} onRetry={() => void load(tab)} />
         ) : null}
         {!loading && !error && rows.length === 0 ? (
-          <EmptyState
+          <ERPEmptyState
             title="No tickets in this view"
             description="Create a request to start a tracked conversation with the shop team."
             action={<ActionButton href={ROUTES.customer.supportNew}>Create request</ActionButton>}
           />
         ) : null}
         {!loading && !error && rows.length > 0 ? (
-          <WorkspaceSection
+          <ERPSectionShell
             title="Your tickets"
             description={`${count} total in this filter · ticket numbers look like TKT-FY-#####`}
           >
@@ -135,10 +136,10 @@ export default function CustomerSupportHubPage() {
                       <td className="px-3 py-3">{r.subject}</td>
                       <td className="px-3 py-3 text-muted-foreground">{r.category.replaceAll("_", " ")}</td>
                       <td className="px-3 py-3">
-                        <StatusBadge status={r.priority} label={r.priority.replaceAll("_", " ")} hideIcon />
+                        <ERPStatusBadge status={r.priority} label={r.priority.replaceAll("_", " ")} hideIcon />
                       </td>
                       <td className="px-3 py-3">
-                        <StatusBadge status={r.status} />
+                        <ERPStatusBadge status={r.status} />
                       </td>
                       <td className="px-3 py-3 text-muted-foreground">{formatDt(r.updated_at)}</td>
                       <td className="px-3 py-3 text-right">
@@ -154,9 +155,9 @@ export default function CustomerSupportHubPage() {
                 </tbody>
               </table>
             </MobileSafeTable>
-          </WorkspaceSection>
+          </ERPSectionShell>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

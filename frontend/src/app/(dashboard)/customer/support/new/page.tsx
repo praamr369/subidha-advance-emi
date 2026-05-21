@@ -3,11 +3,11 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import FormActions from "@/components/ui/FormActions";
 import FormSection from "@/components/ui/FormSection";
-import PortalPage from "@/components/ui/PortalPage";
 import { ROUTES } from "@/lib/routes";
 import { listCustomerSubscriptions } from "@/services/customer";
 import {
@@ -100,7 +100,7 @@ export default function CustomerSupportNewPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Customer Support"
       title="New support request"
       subtitle="You will receive a ticket number (TKT-…). This form does not change EMI, payments, or contracts."
@@ -110,11 +110,12 @@ export default function CustomerSupportNewPage() {
         { label: "New" },
       ]}
       actions={[{ href: ROUTES.customer.support, label: "Back to list", variant: "secondary" }]}
+      headerMode="erp"
     >
-      {subsLoading ? <LoadingBlock label="Loading your subscriptions…" /> : null}
+      {subsLoading ? <ERPLoadingState label="Loading your subscriptions…" /> : null}
       {!subsLoading ? (
         <form onSubmit={onSubmit} className="mx-auto max-w-2xl space-y-6">
-          {error ? <ErrorState title="Unable to submit" description={error} /> : null}
+          {error ? <ERPErrorState title="Unable to submit" description={error} /> : null}
           <FormSection title="Request" description="Choose a category and describe the issue clearly.">
             <label className="block space-y-1 text-sm">
               <span className="text-muted-foreground">Category</span>
@@ -184,6 +185,6 @@ export default function CustomerSupportNewPage() {
           />
         </form>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

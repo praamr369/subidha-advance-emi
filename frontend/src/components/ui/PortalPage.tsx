@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ChevronRight, Info, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
+import ERPPageHeader from "@/components/erp/ERPPageHeader";
 import { cn } from "@/lib/utils";
 
 type PortalAction = {
@@ -43,6 +44,12 @@ type PortalPageProps = {
   maxWidth?: number | string;
   className?: string;
   presentation?: "page" | "popup";
+  /**
+   * Header rendering mode.
+   * - "portal" (default): existing PortalPage header layout
+   * - "erp": ERPPageHeader styling (behavior-neutral; links/stats preserved)
+   */
+  headerMode?: "portal" | "erp";
 };
 
 function getActionClassName(variant: PortalAction["variant"] = "secondary") {
@@ -113,6 +120,7 @@ export default function PortalPage({
   maxWidth = "none",
   className,
   presentation = "page",
+  headerMode = "portal",
 }: PortalPageProps) {
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
   const widthStyle =
@@ -240,95 +248,176 @@ export default function PortalPage({
         <section className="portal-page-header workspace-header-panel">
           <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
           <div className="relative flex min-w-0 flex-col gap-5 p-4 sm:p-6">
-            <div className="flex min-w-0 flex-col gap-4">
-              <div className="w-full min-w-0">
-                {eyebrow ? <div className="enterprise-eyebrow">{eyebrow}</div> : null}
-                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-                  <h1 className="enterprise-title block w-full max-w-full break-words">{title}</h1>
+            {headerMode === "erp" ? (
+              <>
+                <ERPPageHeader
+                  eyebrow={eyebrow}
+                  title={title}
+                  description={subtitle}
+                  helperNote={helperNote}
+                  helperTone={helperTone}
+                  status={
+                    statusBadge ? (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold",
+                          getToneClassName(statusBadge.tone)
+                        )}
+                      >
+                        {(() => {
+                          const Icon = getToneIcon(statusBadge.tone);
+                          return <Icon className="h-3.5 w-3.5" />;
+                        })()}
+                        {statusBadge.label}
+                      </span>
+                    ) : null
+                  }
+                  actions={
+                    actions.length > 0 ? (
+                      <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
+                        {actions.map((action) => (
+                          <Link
+                            key={`${action.href}-${action.label}`}
+                            href={action.href}
+                            className={cn(
+                              "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
+                              getActionClassName(action.variant)
+                            )}
+                          >
+                            {action.label}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : null
+                  }
+                  className="border-transparent bg-transparent p-0 shadow-none"
+                />
 
-                  {statusBadge ? (
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold",
-                        getToneClassName(statusBadge.tone)
-                      )}
-                    >
-                      {(() => {
-                        const Icon = getToneIcon(statusBadge.tone);
-                        return <Icon className="h-3.5 w-3.5" />;
-                      })()}
-                      {statusBadge.label}
-                    </span>
+                {stats.length > 0 ? (
+                  <div className="portal-page-stats workspace-kpi-band grid grid-cols-1 gap-3 p-3 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
+                    {stats.map((stat, index) => (
+                      <div
+                        key={`${stat.label}-${index}`}
+                        className="portal-stat-tile rounded-[1.1rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine),0_12px_35px_-28px_rgba(15,23,42,0.22)]"
+                      >
+                        <div className="enterprise-eyebrow">{stat.label}</div>
+
+                        <div
+                          className={cn(
+                            "enterprise-metric mt-2",
+                            stat.tone === "success"
+                              ? "text-[var(--semantic-success-fg)]"
+                              : stat.tone === "warning"
+                                ? "text-[var(--semantic-warning-fg)]"
+                                : stat.tone === "danger"
+                                  ? "text-[var(--semantic-danger-fg)]"
+                                  : stat.tone === "info"
+                                    ? "text-[var(--semantic-info-fg)]"
+                                    : "text-foreground"
+                          )}
+                        >
+                          {normalizeStatValue(stat.value)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <div className="flex min-w-0 flex-col gap-4">
+                  <div className="w-full min-w-0">
+                    {eyebrow ? <div className="enterprise-eyebrow">{eyebrow}</div> : null}
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+                      <h1 className="enterprise-title block w-full max-w-full break-words">{title}</h1>
+
+                      {statusBadge ? (
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold",
+                            getToneClassName(statusBadge.tone)
+                          )}
+                        >
+                          {(() => {
+                            const Icon = getToneIcon(statusBadge.tone);
+                            return <Icon className="h-3.5 w-3.5" />;
+                          })()}
+                          {statusBadge.label}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {subtitle ? (
+                      <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base">
+                        {subtitle}
+                      </p>
+                    ) : null}
+
+                    {helperNote ? (
+                      <div
+                        className={cn(
+                          "mt-3 inline-flex max-w-4xl items-start rounded-xl border px-3 py-2 text-xs font-medium leading-6",
+                          helperTone === "warning"
+                            ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
+                            : helperTone === "info"
+                              ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
+                              : "border-border bg-[var(--surface-muted)] text-foreground"
+                        )}
+                      >
+                        {helperNote}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {actions.length > 0 ? (
+                    <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
+                      {actions.map((action) => (
+                        <Link
+                          key={`${action.href}-${action.label}`}
+                          href={action.href}
+                          className={cn(
+                            "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
+                            getActionClassName(action.variant)
+                          )}
+                        >
+                          {action.label}
+                        </Link>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
 
-                {subtitle ? (
-                  <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base">{subtitle}</p>
-                ) : null}
+                {stats.length > 0 ? (
+                  <div className="portal-page-stats workspace-kpi-band grid grid-cols-1 gap-3 p-3 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
+                    {stats.map((stat, index) => (
+                      <div
+                        key={`${stat.label}-${index}`}
+                        className="portal-stat-tile rounded-[1.1rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine),0_12px_35px_-28px_rgba(15,23,42,0.22)]"
+                      >
+                        <div className="enterprise-eyebrow">{stat.label}</div>
 
-                {helperNote ? (
-                  <div
-                    className={cn(
-                      "mt-3 inline-flex max-w-4xl items-start rounded-xl border px-3 py-2 text-xs font-medium leading-6",
-                      helperTone === "warning"
-                        ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
-                        : helperTone === "info"
-                          ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
-                          : "border-border bg-[var(--surface-muted)] text-foreground"
-                    )}
-                  >
-                    {helperNote}
+                        <div
+                          className={cn(
+                            "enterprise-metric mt-2",
+                            stat.tone === "success"
+                              ? "text-[var(--semantic-success-fg)]"
+                              : stat.tone === "warning"
+                                ? "text-[var(--semantic-warning-fg)]"
+                                : stat.tone === "danger"
+                                  ? "text-[var(--semantic-danger-fg)]"
+                                  : stat.tone === "info"
+                                    ? "text-[var(--semantic-info-fg)]"
+                                    : "text-foreground"
+                          )}
+                        >
+                          {normalizeStatValue(stat.value)}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : null}
-              </div>
-
-              {actions.length > 0 ? (
-                <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
-                  {actions.map((action) => (
-                    <Link
-                      key={`${action.href}-${action.label}`}
-                      href={action.href}
-                      className={cn(
-                        "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
-                        getActionClassName(action.variant)
-                      )}
-                    >
-                      {action.label}
-                    </Link>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
-            {stats.length > 0 ? (
-              <div className="portal-page-stats workspace-kpi-band grid grid-cols-1 gap-3 p-3 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
-                {stats.map((stat, index) => (
-                  <div
-                    key={`${stat.label}-${index}`}
-                    className="portal-stat-tile rounded-[1.1rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine),0_12px_35px_-28px_rgba(15,23,42,0.22)]"
-                  >
-                    <div className="enterprise-eyebrow">{stat.label}</div>
-
-                    <div
-                      className={cn(
-                        "enterprise-metric mt-2",
-                        stat.tone === "success"
-                          ? "text-[var(--semantic-success-fg)]"
-                          : stat.tone === "warning"
-                            ? "text-[var(--semantic-warning-fg)]"
-                            : stat.tone === "danger"
-                              ? "text-[var(--semantic-danger-fg)]"
-                              : stat.tone === "info"
-                                ? "text-[var(--semantic-info-fg)]"
-                                : "text-foreground"
-                      )}
-                    >
-                      {normalizeStatValue(stat.value)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
+              </>
+            )}
           </div>
         </section>
       )}

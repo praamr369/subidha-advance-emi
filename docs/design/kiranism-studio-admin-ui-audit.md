@@ -2104,3 +2104,93 @@ This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-fir
 ### 13) Next recommended phase
 
 - Phase 14 — Customer portal / self-service (SAFE_AUTO/SAFE_LAYOUT_ONLY only), or a dedicated notifications center alignment pass across roles (admin/cashier/customer/partner/vendor) with strictly layout-only changes.
+
+## Phase 14 customer portal self-service transformation result
+
+### 1) Customer portal routes touched
+
+- Customer workspace and self-service navigation (SAFE_AUTO):
+  - `/customer` (workspace dashboard)
+  - `/customer/dashboard` (alias export; unchanged behavior)
+- Customer self-service utilities (SAFE_AUTO):
+  - `/customer/notifications`
+  - `/customer/documents`
+  - `/customer/account-statement`
+  - `/customer/payment-schedule`
+- Customer delivery tracking (SAFE_AUTO):
+  - `/customer/deliveries`
+  - `/customer/deliveries/[id]`
+  - `/customer/delivery` (alias export; unchanged behavior)
+- Customer support desk (SAFE_AUTO + SAFE_LAYOUT_ONLY):
+  - `/customer/support` (SAFE_AUTO)
+  - `/customer/support/new` (SAFE_LAYOUT_ONLY)
+  - `/customer/support/[id]` (SAFE_LAYOUT_ONLY)
+- Customer identity workspace (SAFE_LAYOUT_ONLY wrapper alignment only):
+  - `/customer/profile`
+
+### 2) Customer portal routes deferred
+
+- None (no Customer Portal / Self-Service routes are categorized MANUAL_REVIEW / DO_NOT_TOUCH in the route map).
+- `/customer/emis` remains redirect-only; no customer-visible UI surface to transform safely in this pass.
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO transformed: `/customer`, `/customer/notifications`, `/customer/documents`, `/customer/account-statement`, `/customer/payment-schedule`, `/customer/deliveries`, `/customer/deliveries/[id]`, `/customer/support`.
+- SAFE_LAYOUT_ONLY transformed: `/customer/profile`, `/customer/support/new`, `/customer/support/[id]`.
+- MANUAL_REVIEW transformed: none.
+- DO_NOT_TOUCH transformed: none.
+
+### 4) Components reused
+
+- ERP shell/states: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP framing: `frontend/src/components/erp/ERPSectionShell.tsx`, `frontend/src/components/erp/ERPPageHeader.tsx`, `frontend/src/components/erp/ERPStatusBadge.tsx`
+- Existing customer-safe shells retained where already used: `frontend/src/components/layout/page-shells.tsx` (`SelfServicePageShell`)
+
+### 5) Components created, if any
+
+- None (additive prop extensions only).
+
+### 6) Customer services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, response normalization changes, or new service calls were introduced.
+- Customer portal continues using existing customer-scoped services only:
+  - `@/services/customer` (dashboard/profile/direct-sale summaries already used by the customer workspace)
+  - `@/services/phase4-finance` (customer documents, account statement, payment schedule)
+  - `@/services/deliveries` (customer deliveries register + detail)
+  - `@/services/support` (customer support tickets list/detail/create/comment/reopen)
+  - `@/services/notifications` (customer notifications list + mark-read)
+
+### 7) Customer privacy safety confirmation
+
+- No cross-customer data exposure was introduced; pages continue to render only results returned by customer-scoped endpoints.
+- No new list/detail routes were added; route URLs and role scoping remain unchanged.
+
+### 8) Customer payment/subscription/support safety confirmation
+
+- No changes to payment behavior, receipt download behavior, subscription visibility, EMI logic, or support request mutation semantics.
+- UI-only changes: shell/header styling alignment and loading/error/empty state framing.
+
+### 9) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No permission weakening; customer route access remains role-scoped exactly as before.
+
+### 10) Financial/audit safety confirmation
+
+- Backend remains authoritative for payment status, subscription posture, delivery status, document availability, and support ticket state.
+- No client-side fabrication of financial totals or status; rendered values remain auditable and sourced from persisted records.
+
+### 11) Duplicate partner commissions route status
+
+- Preserved (explicit policy; unchanged in Phase 14):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 12) Remaining customer portal UI gaps
+
+- Customer notifications center is now page-framed, but the list/tooling remains component-owned; consider a dedicated cross-role notifications alignment pass to unify toolbar/empty/error states without changing semantics.
+- Customer profile workspace is a large surface; only SAFE_LAYOUT_ONLY header alignment was performed here to avoid accidental behavior changes.
+
+### 13) Next recommended phase
+
+- Phase 15 — HR / branch / staff operations (SAFE_AUTO first), or Phase 16 — service desk/support alignment across roles (layout-only) once customer support surfaces are stable.

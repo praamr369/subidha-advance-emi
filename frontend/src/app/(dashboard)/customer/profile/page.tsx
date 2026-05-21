@@ -458,6 +458,7 @@ export default function CustomerProfilePage() {
         label: data?.kyc_status || "Customer profile",
         tone: noticeToneForKyc(data?.kyc_status),
       }}
+      headerMode="erp"
     >
       {loading ? (
         <div aria-busy="true" aria-label="Loading profile workspace">

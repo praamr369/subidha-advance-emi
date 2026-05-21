@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { listCustomerDocuments, type FinanceDocumentRow } from "@/services/phase4-finance";
 
 export default function CustomerDocumentsPage() {
@@ -33,23 +33,28 @@ export default function CustomerDocumentsPage() {
   }, [load]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="My Documents"
       subtitle="Contract and finance PDFs generated for your subscriptions."
       breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Documents" }]}
       actions={[{ href: "/customer/account-statement", label: "Account Statement", variant: "secondary" }]}
+      headerMode="erp"
     >
-      <WorkspaceSection title="Document Center" description="Versioned PDF records with secure scoped access.">
-        {loading ? (
-          <LoadingBlock label="Loading documents..." />
-        ) : error ? (
-          <ErrorState title="Unable to load documents" message={error} onRetry={() => void load()} />
-        ) : rows.length === 0 ? (
-          <EmptyState title="No documents yet" description="Generated PDFs will appear here." />
-        ) : (
+      <ERPSectionShell title="Document Center" description="Versioned PDF records with secure scoped access.">
+        {loading ? <ERPLoadingState label="Loading documents..." /> : null}
+        {!loading && error ? (
+          <ERPErrorState title="Unable to load documents" message={error} onRetry={() => void load()} />
+        ) : null}
+        {!loading && !error && rows.length === 0 ? (
+          <ERPEmptyState title="No documents yet" description="Generated PDFs will appear here." />
+        ) : null}
+        {!loading && !error && rows.length > 0 ? (
           <div className="space-y-2">
             {rows.map((row) => (
-              <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
+              <div
+                key={row.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3"
+              >
                 <div>
                   <div className="text-sm font-medium">{row.document_type}</div>
                   <div className="text-xs text-muted-foreground">
@@ -60,7 +65,7 @@ export default function CustomerDocumentsPage() {
                   <Link
                     href={row.file_url}
                     target="_blank"
-                    className="inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium"
+                    className="inline-flex h-10 items-center rounded-lg border px-3 text-sm font-medium"
                   >
                     Download PDF
                   </Link>
@@ -70,8 +75,8 @@ export default function CustomerDocumentsPage() {
               </div>
             ))}
           </div>
-        )}
-      </WorkspaceSection>
-    </PortalPage>
+        ) : null}
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

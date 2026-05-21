@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { getCustomerPaymentSchedule } from "@/services/phase4-finance";
 
 function money(value: unknown): string {
@@ -50,20 +50,25 @@ export default function CustomerPaymentSchedulePage() {
   }, [load]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Payment Schedule"
       subtitle="Upcoming, paid, waived, and overdue schedule rows across your subscriptions."
       breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Payment Schedule" }]}
       actions={[{ href: "/customer/payments", label: "Payments", variant: "secondary" }]}
+      headerMode="erp"
     >
-      <WorkspaceSection title="Schedule" description="Authoritative EMI/payment-demand schedule from backend records.">
-        {loading ? (
-          <LoadingBlock label="Loading schedule..." />
-        ) : error ? (
-          <ErrorState title="Unable to load schedule" message={error} onRetry={() => void load()} />
-        ) : rows.length === 0 ? (
-          <EmptyState title="No schedule rows" description="No payment schedule rows are available for this account." />
-        ) : (
+      <ERPSectionShell title="Schedule" description="Authoritative EMI/payment-demand schedule from backend records.">
+        {loading ? <ERPLoadingState label="Loading schedule..." /> : null}
+        {!loading && error ? (
+          <ERPErrorState title="Unable to load schedule" message={error} onRetry={() => void load()} />
+        ) : null}
+        {!loading && !error && rows.length === 0 ? (
+          <ERPEmptyState
+            title="No schedule rows"
+            description="No payment schedule rows are available for this account."
+          />
+        ) : null}
+        {!loading && !error && rows.length > 0 ? (
           <div className="overflow-x-auto rounded-2xl border">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40 text-left">
@@ -93,8 +98,8 @@ export default function CustomerPaymentSchedulePage() {
               </tbody>
             </table>
           </div>
-        )}
-      </WorkspaceSection>
-    </PortalPage>
+        ) : null}
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

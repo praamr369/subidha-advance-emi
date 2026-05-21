@@ -4,18 +4,19 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import {
   WorkspaceNotice,
   WorkspaceTimeline,
   type WorkspaceTimelineItem,
 } from "@/components/ui/role-workspace";
-import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
+import { DetailItem } from "@/components/ui/workspace";
 import { getCustomerDelivery, type DeliveryRecord } from "@/services/deliveries";
 
 function formatDate(value?: string | null): string {
@@ -107,7 +108,7 @@ function buildTimeline(delivery: DeliveryRecord): WorkspaceTimelineItem[] {
       title,
       description,
       timestamp: formatDateTime(value),
-      badge: badgeStatus ? <StatusBadge status={badgeStatus} hideIcon /> : undefined,
+      badge: badgeStatus ? <ERPStatusBadge status={badgeStatus} hideIcon /> : undefined,
     });
   };
 
@@ -238,7 +239,7 @@ export default function CustomerDeliveryDetailPage() {
   }, [delivery]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Customer Deliveries"
       title={delivery ? delivery.delivery_reference : "Delivery Detail"}
       subtitle="Read-only shipment detail for your own subscription delivery, with fulfillment context, receiver information, and event history framed separately from payment and contract views."
@@ -281,12 +282,13 @@ export default function CustomerDeliveryDetailPage() {
         label: delivery?.status || "Delivery tracking",
         tone: deliveryTone(delivery?.status),
       }}
+      headerMode="erp"
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading delivery detail..." /> : null}
+        {loading ? <ERPLoadingState label="Loading delivery detail..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load delivery detail"
             description={error}
             onRetry={() => void loadPage()}
@@ -294,7 +296,7 @@ export default function CustomerDeliveryDetailPage() {
         ) : null}
 
         {!loading && !error && !delivery ? (
-          <EmptyState
+          <ERPEmptyState
             title="Delivery not found"
             description="The requested delivery record is not available for your account."
           />
@@ -302,10 +304,10 @@ export default function CustomerDeliveryDetailPage() {
 
         {!loading && !error && delivery ? (
           <>
-            <WorkspaceSection
+            <ERPSectionShell
               title="Delivery posture"
               description="Current shipment state and the operational boundary for this delivery record."
-              action={
+              actions={
                 <ActionButton
                   variant="outline"
                   onClick={() => void loadPage("refresh")}
@@ -322,9 +324,9 @@ export default function CustomerDeliveryDetailPage() {
               >
                 {deliverySummary(delivery.status)}
               </WorkspaceNotice>
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection
+            <ERPSectionShell
               title="Shipment summary"
               description="Core delivery identifiers and subscription linkage kept separate from payment or EMI detail."
             >
@@ -365,9 +367,9 @@ export default function CustomerDeliveryDetailPage() {
                   value={delivery.delivery_reference || "—"}
                 />
               </div>
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection
+            <ERPSectionShell
               title="Receiver and destination"
               description="Receiver information and address snapshot captured against this delivery record."
             >
@@ -399,23 +401,23 @@ export default function CustomerDeliveryDetailPage() {
                   }
                 />
               </div>
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection
+            <ERPSectionShell
               title="Delivery event timeline"
               description="Fulfillment events recorded for this delivery history."
             >
               {timelineItems.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No delivery events recorded"
                   description="This delivery does not yet have a visible shipment timeline."
                 />
               ) : (
                 <WorkspaceTimeline items={timelineItems} />
               )}
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection
+            <ERPSectionShell
               title="Operational record"
               description="Created/updated metadata and audit-adjacent context visible to the customer role."
             >
@@ -437,10 +439,10 @@ export default function CustomerDeliveryDetailPage() {
                   value={formatDateTime(delivery.updated_at)}
                 />
               </div>
-            </WorkspaceSection>
+            </ERPSectionShell>
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

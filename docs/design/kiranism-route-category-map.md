@@ -498,6 +498,24 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Services/contracts**: customer portal services.
 - **Prompt title**: “Phase 14 — Customer portal polish”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
+- **Phase 14 status (implemented 2026-05-21)**:
+  - **Transformed** (Customer Portal / Self-Service, SAFE_AUTO + SAFE_LAYOUT_ONLY only):
+    - `/customer` (workspace dashboard)
+    - `/customer/dashboard` (alias export; unchanged behavior)
+    - `/customer/profile` (SAFE_LAYOUT_ONLY header alignment only)
+    - `/customer/notifications`
+    - `/customer/documents`
+    - `/customer/account-statement`
+    - `/customer/payment-schedule`
+    - `/customer/deliveries`
+    - `/customer/deliveries/[id]`
+    - `/customer/delivery` (alias export; unchanged behavior)
+    - `/customer/support`
+    - `/customer/support/new` (SAFE_LAYOUT_ONLY)
+    - `/customer/support/[id]` (SAFE_LAYOUT_ONLY)
+  - **Intentionally unchanged**:
+    - `/customer/emis` (redirect-only page; no customer-visible UI to transform)
+  - **Deferred**: none (no Customer Portal / Self-Service routes are categorized MANUAL_REVIEW / DO_NOT_TOUCH).
 
 ### Phase 15 — HR / branch / staff operations
 

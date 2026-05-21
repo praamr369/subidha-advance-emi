@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { getCustomerAccountStatement } from "@/services/phase4-finance";
 
 function money(value: unknown): string {
@@ -41,20 +41,25 @@ export default function CustomerAccountStatementPage() {
   }, [load]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Account Statement"
       subtitle="Chronological finance statement across invoices, receipts, and payments."
       breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Account Statement" }]}
       actions={[{ href: "/customer/documents", label: "Documents", variant: "secondary" }]}
+      headerMode="erp"
     >
-      <WorkspaceSection title="Statement Summary" description="Computed from authoritative billing and payment records.">
-        {loading ? (
-          <LoadingBlock label="Loading statement..." />
-        ) : error ? (
-          <ErrorState title="Unable to load statement" message={error} onRetry={() => void load()} />
-        ) : !data ? (
-          <EmptyState title="No statement available" description="No account statement data is available right now." />
-        ) : (
+      <ERPSectionShell title="Statement Summary" description="Computed from authoritative billing and payment records.">
+        {loading ? <ERPLoadingState label="Loading statement..." /> : null}
+        {!loading && error ? (
+          <ERPErrorState title="Unable to load statement" message={error} onRetry={() => void load()} />
+        ) : null}
+        {!loading && !error && !data ? (
+          <ERPEmptyState
+            title="No statement available"
+            description="No account statement data is available right now."
+          />
+        ) : null}
+        {!loading && !error && data ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-xl border p-4">
               <div className="text-xs text-muted-foreground">Invoice Total</div>
@@ -73,8 +78,8 @@ export default function CustomerAccountStatementPage() {
               <div className="text-xl font-semibold">{money(data.summary.receipts_total)}</div>
             </div>
           </div>
-        )}
-      </WorkspaceSection>
-    </PortalPage>
+        ) : null}
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }
