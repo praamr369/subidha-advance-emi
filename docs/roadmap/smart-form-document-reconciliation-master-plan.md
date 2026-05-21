@@ -1,6 +1,6 @@
 # Master Plan: Smart Form Lookups + Document Engine + Reconciliation Control Tower
 
-Status: **PHASE F RECONCILIATION IMPLEMENTED (2026-05-21)**  
+Status: **PHASE H RECONCILIATION IMPLEMENTED (2026-05-21)**  
 Principles: financial correctness, auditability, backward compatibility, and operational usability.
 
 ## Executive Summary
@@ -106,6 +106,11 @@ Phase F (implemented 2026-05-21):
 Phase G (implemented 2026-05-21):
 - Extended Control Tower checks to deterministic direct-sale / billing / receipt reconciliation using explicit source links only.
 - No auto-correction; no mutation of billing/receipt/journal source records.
+
+Phase H (implemented 2026-05-21):
+- Extended Control Tower checks to deterministic direct-sale return/refund reconciliation using explicit source links only.
+- Added journal source-link integrity checks for BillingCreditNote and CustomerRefund and duplicate-posting detection for each (CRITICAL).
+- No auto-correction; no mutation of return/refund/credit-note/journal source records.
 
 ## Deployment Plan (when implemented)
 

@@ -56,6 +56,38 @@ Implemented checks (Phase G):
 Tests (backend, targeted):
 - `backend/tests/reconciliation/test_phase_g_direct_sale_billing_control_tower.py`
 
+## Phase H Implementation (2026-05-21)
+
+Goal:
+- Add deterministic cancellation / void / return / refund reconciliation checks for billing + direct-sale flows using explicit source links only.
+
+Backend (additive):
+- New service module:
+  - `backend/reconciliation/services/return_cancellation_reconciliation.py`
+- Runner registration:
+  - `backend/reconciliation/services/reconciliation_runner.py` runs Phase F + Phase G + Phase H checks in the same run (still read-only detection).
+
+Implemented checks (Phase H):
+- DirectSaleReturn internal amount fields mismatch (`grand_total != subtotal + tax_total`)
+- DirectSaleReturn `original_invoice` invalid relative to `direct_sale` (explicit FK mismatch)
+- DirectSaleReturn customer mismatch vs original_invoice customer (explicit FK mismatch)
+- Posted DirectSaleReturn missing expected credit note when `metadata.financial_mode != NO_ACTIVE_CUSTOMER_VALUE`
+- Posted/void BillingCreditNote missing expected `posted_journal_entry_id`
+- BillingCreditNote posted journal source link mismatch (`JournalEntry.source_model/source_id`)
+- Duplicate posted journal source reference for BillingCreditNote (CRITICAL)
+- CustomerRefund paid missing expected `posted_journal_entry_id`
+- CustomerRefund posted journal source link mismatch (`JournalEntry.source_model/source_id`)
+- Duplicate posted journal source reference for CustomerRefund (CRITICAL)
+
+Explicitly deferred in Phase H:
+- BillingInvoice reversal/void journal pairing checks (no explicit reversal link contract available in current models)
+- Broad inventory/stock restoration reconciliation (string reference-only; needs strict allowlist)
+- Exchange lifecycle reconciliation (requires explicit FK + status contract confirmation)
+- Refund allocation to receipts/payments unless the relationship is explicit
+
+Tests (backend, targeted):
+- `backend/tests/reconciliation/test_phase_h_returns_refunds_control_tower.py`
+
 ## 0) Starting Point (Confirmed in repo)
 
 Existing reconciliation surfaces:

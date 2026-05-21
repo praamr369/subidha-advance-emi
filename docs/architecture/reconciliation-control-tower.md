@@ -62,6 +62,39 @@ Guarantees (Phase G):
 - No mutation of BillingInvoice, ReceiptDocument, JournalEntry, AccountingBridgePosting, Payment, StockLedger, or other source rows
 - Admin-only permission gate (`IsAdmin`) remains unchanged
 
+## Phase H (Implemented 2026-05-21)
+
+Phase H extends the Control Tower check catalog to cover **cancellation / returns / refunds** for direct-sale flows using **explicit deterministic links only**.
+
+Implemented Phase H checks (read-only detection; no mutation of source records; explicit FK/OneToOne/source fields only):
+- DirectSaleReturn internal totals mismatch (`grand_total != subtotal + tax_total`) (HIGH)
+- DirectSaleReturn `original_invoice` link invalid (invoice belongs to a different direct_sale) (HIGH)
+- DirectSaleReturn customer mismatch vs `original_invoice.customer` (HIGH, review)
+- DirectSaleReturn is POSTED and requires a credit note (based on `metadata.financial_mode`) but `credit_note_id` is missing (HIGH)
+- Return credit note is POSTED/VOID but `posted_journal_entry_id` is missing (HIGH)
+- Return credit note posted journal exists but `JournalEntry.source_model/source_id` mismatch (HIGH)
+- Return credit note `original_invoice_id` mismatch vs DirectSaleReturn.original_invoice_id (HIGH)
+- BillingCreditNote internal totals mismatch (`total_adjustment != taxable_adjustment + tax_adjustment`) (HIGH)
+- Duplicate posted journal source reference for a BillingCreditNote (CRITICAL)
+- CustomerRefund customer mismatch vs linked DirectSaleReturn.customer (HIGH)
+- CustomerRefund is PAID but `posted_journal_entry_id` is missing (HIGH)
+- CustomerRefund posted journal exists but `JournalEntry.source_model/source_id` mismatch (HIGH)
+- Duplicate posted journal source reference for a CustomerRefund (CRITICAL)
+
+Explicitly deferred in Phase H (non-goals; not deterministic without additional explicit links):
+- BillingInvoice “posted journal without reversal” checks (no explicit reversal-link contract available in current models)
+- “Cancelled/void invoice still collectible” checks beyond `balance_total > 0` (no stable explicit collectible-field contract on BillingInvoice; operational visibility excludes CANCELLED/VOID via status alone)
+- Stock restoration checks for returns if only `StockLedger.reference_model/reference_id` string references exist without a strict allowlist
+- Exchange lifecycle checks (unless explicit FK + status contract is confirmed)
+- Delivery reversal checks
+- Payment refund allocation checks unless relationships are explicit
+- End-to-end invoice → return → stock → accounting checks requiring inferred joins
+
+Guarantees (Phase H):
+- No auto-correction
+- No mutation of BillingInvoice, DirectSale, DirectSaleReturn, CustomerRefund, BillingCreditNote, ReceiptDocument, JournalEntry, AccountingBridgePosting, StockLedger, customer, or other source rows
+- Admin-only permission gate (`IsAdmin`) remains unchanged
+
 ## 0) Phase E prerequisite (source-link determinism)
 
 Phase E deliverable (docs-only):

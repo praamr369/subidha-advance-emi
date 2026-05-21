@@ -14,6 +14,7 @@ from reconciliation.models import (
 from reconciliation.services.accounting_bridge_reconciliation import run_accounting_bridge_checks
 from reconciliation.services.direct_sale_reconciliation import run_direct_sale_billing_checks
 from reconciliation.services.emi_reconciliation import run_emi_checks
+from reconciliation.services.return_cancellation_reconciliation import run_return_cancellation_checks
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         started_by=started_by,
         started_at=timezone.now(),
         metadata={
-            "phase": "G",
+            "phase": "H",
             "checks": [
                 "PAYMENT_MISSING_RECEIPT_DOCUMENT",
                 "RECEIPT_DOCUMENT_PAYMENT_LINK_INVALID",
@@ -56,6 +57,19 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
                 "BILLING_INVOICE_AMOUNT_FIELDS_MISMATCH",
                 "BILLING_INVOICE_CANCELLED_OUTSTANDING",
                 "RECEIPT_DOCUMENT_INVOICE_LINK_INVALID",
+                "DIRECT_SALE_RETURN_AMOUNT_FIELDS_MISMATCH",
+                "DIRECT_SALE_RETURN_ORIGINAL_INVOICE_LINK_INVALID",
+                "DIRECT_SALE_RETURN_CUSTOMER_LINK_MISMATCH",
+                "DIRECT_SALE_RETURN_CREDIT_NOTE_MISSING",
+                "DIRECT_SALE_RETURN_CREDIT_NOTE_JOURNAL_MISSING",
+                "DIRECT_SALE_RETURN_CREDIT_NOTE_SOURCE_LINK_INVALID",
+                "DIRECT_SALE_RETURN_CREDIT_NOTE_JOURNAL_SOURCE_LINK_INVALID",
+                "CREDIT_NOTE_AMOUNT_FIELDS_MISMATCH",
+                "CREDIT_NOTE_DUPLICATE_JOURNAL_SOURCE_REFERENCE",
+                "CUSTOMER_REFUND_DIRECT_SALE_RETURN_LINK_INVALID",
+                "CUSTOMER_REFUND_PAID_JOURNAL_MISSING",
+                "CUSTOMER_REFUND_JOURNAL_SOURCE_LINK_INVALID",
+                "CUSTOMER_REFUND_DUPLICATE_JOURNAL_SOURCE_REFERENCE",
             ],
         },
     )
@@ -70,6 +84,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         totals = run_emi_checks(run=run, totals=totals)
         totals = run_accounting_bridge_checks(run=run, totals=totals)
         totals = run_direct_sale_billing_checks(run=run, totals=totals)
+        totals = run_return_cancellation_checks(run=run, totals=totals)
 
         run.total_checked = totals["checked"]
         run.total_matched = totals["matched"]

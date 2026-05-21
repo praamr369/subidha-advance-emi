@@ -44,6 +44,34 @@ Explicitly deferred in Phase G:
 - Partial payment allocation checks (receipt-to-invoice allocation) unless explicit allocation links exist
 - End-to-end direct-sale → stock → delivery → accounting checks that require inferred joins
 
+## Phase H Implementation Result (2026-05-21)
+
+Phase H implements deterministic cancellation / return / refund reconciliation checks for direct-sale flows using **explicit source links only**.
+
+Implemented checks (deterministic; explicit FK/OneToOne/source fields only):
+- DirectSaleReturn → BillingInvoice linkage integrity:
+  - `DirectSaleReturn.original_invoice` must reference an invoice for the same `direct_sale` (where invoice has `direct_sale_id`)
+  - return customer should match `original_invoice.customer` when both are present
+- DirectSaleReturn internal totals integrity:
+  - `DirectSaleReturn.grand_total == subtotal + tax_total`
+- DirectSaleReturn → BillingCreditNote evidence:
+  - when return is POSTED and `metadata.financial_mode != NO_ACTIVE_CUSTOMER_VALUE`, a `credit_note_id` is expected
+  - when `credit_note.status in {POSTED, VOID}`, a `posted_journal_entry_id` is expected
+  - when `credit_note.posted_journal_entry` exists, `JournalEntry.source_model/source_id` must equal `BillingCreditNote/<id>`
+  - `credit_note.original_invoice_id` should match `DirectSaleReturn.original_invoice_id`
+  - BillingCreditNote internal totals integrity (`total_adjustment == taxable_adjustment + tax_adjustment`)
+  - Duplicate posted `JournalEntry(source_model=BillingCreditNote, source_id=<note.id>, status=POSTED)` detection
+- CustomerRefund → accounting evidence:
+  - when `CustomerRefund.status == PAID`, `posted_journal_entry_id` is expected
+  - when `CustomerRefund.posted_journal_entry` exists, `JournalEntry.source_model/source_id` must equal `CustomerRefund/<id>`
+  - Duplicate posted `JournalEntry(source_model=CustomerRefund, source_id=<refund.id>, status=POSTED)` detection
+
+Explicitly deferred in Phase H:
+- Any return/refund/void reconciliation that requires guessed joins (no inference from free-text references)
+- Stock restoration checks using only `StockLedger.reference_model/reference_id` without a strict allowlist
+- Exchange lifecycle checks without a confirmed explicit FK + status contract
+- BillingInvoice reversal journal validation without an explicit reversal link/status/source-reference contract
+
 ## 1) Executive summary
 
 ### What is already deterministic (high confidence)
