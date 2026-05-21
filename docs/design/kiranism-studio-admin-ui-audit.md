@@ -2647,3 +2647,52 @@ Non-goals: no backend changes; no auth/session changes; no new service calls; no
 ### 12) Next recommended phase
 
 - Phase 19 — Compatibility/legacy route cleanup plan only (no deletions), then Phase 20 consistency sweep.
+
+---
+
+## Phase 19 compatibility legacy route cleanup plan result
+
+Date: 2026-05-21  
+Scope: documentation + audit only (no deletions/renames/moves; no behavior change).  
+Primary output: `docs/design/kiranism-compatibility-route-cleanup-plan.md`.
+
+### 1) Compatibility routes audited
+
+- Enforced compatibility set (must exist): as defined in `frontend/scripts/check-routes.mjs` (11 routes).
+- Additional legacy/alias routes discovered: redirect-only and thin alias pages outside the enforced set (documented in the Phase 19 cleanup plan).
+
+### 2) Duplicate/legacy routes found (high-level)
+
+- Partner commissions duplication preserved:
+  - `/partner/commissions` (canonical UI surface)
+  - `/partner/commisions` (legacy typo redirect)
+- Admin commissions legacy aliases preserved:
+  - plural/singular variants (`/admin/partners/*`, `/admin/partner/*`) redirecting to `/admin/finance/commissions`
+  - typo variant `/admin/finance/commisions`
+- Additional redirect-only legacy entrypoints:
+  - `/admin/analytics` → `/admin/reports?live=1`
+  - `/admin/reports-center` → `/admin/reports?catalog=1`
+  - `/admin/emi/overdue` → `/admin/emis/overdue`
+  - `/customer/emis` → `/customer/subscriptions`
+
+### 3) Recommended classifications (Phase 19 output)
+
+- **MIGRATE THEN DELETE** (required): `/partner/commisions`
+- **KEEP**: `/profile`, `/settings` (cross-role entrypoints)
+- **KEEP TEMPORARILY**: legacy typo/alias redirects referenced by bookmarks/tests (see cleanup plan tables)
+- **REDIRECT THEN DELETE LATER**: redirect-only legacy entrypoints like `/admin/analytics`, `/admin/reports-center` (remove only after usage verification)
+- **DO NOT DELETE**: canonical admin routes like `/admin/finance/reconciliation`
+
+### 4) Routes explicitly not deleted
+
+- No routes were deleted, renamed, moved, or consolidated in Phase 19 (docs-only by constraint).
+
+### 5) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit compatibility policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 6) Next recommended phase
+
+- Phase 20 — UI consistency sweep (visual-only), followed by a dedicated “compatibility removal” phase **only after** usage logging/analytics verification and compatibility test coverage is in place.

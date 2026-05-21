@@ -646,15 +646,25 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 
 ### Phase 19 — Compatibility/legacy route cleanup plan only
 
-- **Goal**: plan route cleanups/aliases/deprecations; **do not delete routes**.
-- **Route families included**: compatibility + known duplicates/typos.
-- **Page paths included**: `frontend/src/app/settings/page.tsx`, `frontend/src/app/(dashboard)/partner/commisions/**` and other duplicates.
-- **Pages excluded**: none (planning only).
-- **Risk level**: critical.
-- **Allowed UI changes**: none (planning only).
-- **Forbidden changes**: deleting or renaming routes; changing redirects/guards.
-- **Services/contracts**: all.
-- **Prompt title**: “Phase 19 — Compatibility route plan (no deletions)”.
+- **Goal**: document current compatibility/legacy routes + provide a safe, auditable cleanup plan; **no deletions/renames/moves**.
+- **Route families included**: compatibility + redirect-only aliases + legacy typos + duplicate routes that intentionally map to a canonical surface.
+- **Files audited**:
+  - Docs + route inventory: `docs/design/kiranism-route-category-map.(md|json)`, `docs/design/kiranism-studio-admin-ui-audit.md`
+  - Route sources: `frontend/src/app/**`
+  - Navigation/registry: `frontend/src/config/navigation.ts`, `frontend/src/config/admin-route-registry.ts`
+  - Route constants/helpers: `frontend/src/lib/routes.ts`, `frontend/src/lib/route-redirect.ts`, `frontend/src/lib/route-builders.ts`
+  - Route checks: `frontend/scripts/check-routes.mjs`
+  - Legacy path usage in tests: `frontend/tests/e2e/**`
+- **Compatibility routes audited**: documented in `docs/design/kiranism-compatibility-route-cleanup-plan.md` (Phase 19 output).
+- **Known required classification**:
+  - `/partner/commisions` (typo) is explicitly classified as **MIGRATE THEN DELETE** (keep working now).
+- **Routes to keep (examples)**:
+  - Cross-role entrypoints: `/profile`, `/settings` (role-based redirects).
+- **Routes to keep temporarily (examples)**:
+  - Legacy typo/alias redirects used by bookmarks/tests: `/admin/emi/overdue`, `/customer/emis`, `/admin/finance/commisions`, `/admin/partners/commisions`, `/admin/payments/reconciliation`.
+- **Routes requiring compatibility redirects (examples)**:
+  - `/admin/analytics` → `/admin/reports?live=1`, `/admin/reports-center` → `/admin/reports?catalog=1`.
+- **No code deletion performed**: confirmed (Phase 19 is docs-only).
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
 ### Phase 20 — Final UI consistency pass
