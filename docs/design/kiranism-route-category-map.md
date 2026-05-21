@@ -363,6 +363,32 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Prompt title**: “Phase 11 — Billing UI (manual-risk controls)”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
+- **Phase 11 status (implemented 2026-05-21)**:
+  - **Transformed** (SAFE_AUTO; wrapper/layout/state-only changes; no handler/visibility/API changes):
+    - `/admin/billing`
+    - `/admin/billing/invoices`
+    - `/admin/billing/register`
+    - `/admin/billing/documents/[id]`
+    - `/admin/billing/credit-notes`
+    - `/admin/billing/debit-notes`
+    - `/admin/billing/reversals` (mutation-heavy; ERP wrapper/state components only)
+    - `/admin/billing/direct-sale` (mutation-heavy; ERP wrapper only)
+    - `/admin/deliveries/direct-sale-cases/[caseId]` (mutation-heavy; ERP wrapper/state components only)
+    - `/customer/invoices`
+    - `/customer/direct-sales`
+    - `/customer/direct-sales/[id]`
+  - **Deferred**:
+    - `/admin/accounting/books/sales` (MANUAL_REVIEW) — accounting book semantics; dedicated Phase 12 prompt required.
+    - `/admin/accounting/gst/credit-notes` (MANUAL_REVIEW) — GST accounting controls; dedicated Phase 12 prompt required.
+    - `/admin/accounting/gst/debit-notes` (MANUAL_REVIEW) — GST accounting controls; dedicated Phase 12 prompt required.
+    - `/admin/billing/cashbook` (SAFE_AUTO) — already uses `BookRegisterPage`; no Phase 11 change needed.
+    - `/admin/billing/dailybook` (SAFE_AUTO) — already uses `BookRegisterPage`; no Phase 11 change needed.
+    - `/admin/billing/direct-sale/create` (SAFE_AUTO) — redirect-only route; no Phase 11 change needed.
+    - `/admin/billing/direct-sales` (SAFE_AUTO) — route alias delegating to direct-sale workspace; no Phase 11 change needed.
+    - `/admin/sales` (SAFE_AUTO) — sales workspace already uses `WorkspaceShell`; defer to a dedicated workspace alignment pass.
+    - `/admin/sales/direct-sale/create` (SAFE_AUTO) — orchestrated create workflow entry; treat as manual-risk; defer to a direct-sale mutation-only prompt if needed.
+    - `/admin/reports/direct-sales` (SAFE_AUTO) — report surface uses `Phase5ReportSurface`; defer shared report styling to a reports-only pass.
+
 ### Phase 12 — Accounting / finance control room
 
 - **Goal**: accounting + reconciliation surfaces; always manual-review for postings.

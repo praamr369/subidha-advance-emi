@@ -8,12 +8,12 @@ import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ShareActions from "@/components/communications/ShareActions";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import DirectSaleCollectDrawer from "@/features/direct-sale/components/DirectSaleCollectDrawer";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
@@ -182,7 +182,7 @@ export default function BillingDocumentDetailPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       eyebrow="Billing Document Detail"
       title={invoice?.document_no || (documentId ? `Billing Document ${documentId}` : "Billing Document")}
@@ -242,8 +242,8 @@ export default function BillingDocumentDetailPage() {
         groups={BILLING_CONTROL_DIRECTORY_GROUPS}
       />
 
-      {loading ? <LoadingBlock label="Loading billing document detail..." /> : null}
-      {!loading && error ? <ErrorState title="Billing detail load failed" description={error} /> : null}
+      {loading ? <ERPLoadingState label="Loading billing document detail..." /> : null}
+      {!loading && error ? <ERPErrorState title="Billing detail load failed" description={error} /> : null}
 
       {!loading && !error && invoice ? (
         <>
@@ -446,6 +446,6 @@ export default function BillingDocumentDetailPage() {
           />
         </>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

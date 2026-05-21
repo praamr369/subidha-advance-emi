@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { DataTableShell } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { listCustomerDirectSales, type CustomerDirectSaleListItem } from "@/services/customer";
 
 function money(value: string | undefined): string {
@@ -50,7 +50,7 @@ export default function CustomerDirectSalesPage() {
   }, [load]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Direct Sales"
       subtitle="Customer-scoped direct-sale invoices, dues, and receipts."
       breadcrumbs={[{ label: "Customer", href: "/customer" }, { label: "Direct Sales" }]}
@@ -63,12 +63,12 @@ export default function CustomerDirectSalesPage() {
         title="Direct-sale invoice register"
         description="Only direct-sale records linked to your registered customer profile appear here."
       >
-        {loading ? <LoadingBlock label="Loading direct sales..." /> : null}
+        {loading ? <ERPLoadingState label="Loading direct sales..." /> : null}
         {!loading && error ? (
-          <ErrorState title="Unable to load direct sales" description={error} onRetry={() => void load()} />
+          <ERPErrorState title="Unable to load direct sales" description={error} onRetry={() => void load()} />
         ) : null}
         {!loading && !error && rows.length === 0 ? (
-          <EmptyState title="No direct sales found" description="No direct-sale invoices are currently linked to your account." />
+          <ERPEmptyState title="No direct sales found" description="No direct-sale invoices are currently linked to your account." />
         ) : null}
         {!loading && !error && rows.length > 0 ? (
           <DataTableShell>
@@ -93,7 +93,7 @@ export default function CustomerDirectSalesPage() {
                       </td>
                       <td className="px-3 py-2">{formatDate(row.sale_date)}</td>
                       <td className="px-3 py-2">
-                        <StatusBadge status={row.status || "DRAFT"} />
+                        <ERPStatusBadge status={row.status || "DRAFT"} />
                       </td>
                       <td className="px-3 py-2 text-right">{money(row.grand_total)}</td>
                       <td className="px-3 py-2 text-right">{money(row.paid_amount)}</td>
@@ -126,6 +126,6 @@ export default function CustomerDirectSalesPage() {
           </DataTableShell>
         ) : null}
       </WorkspaceSection>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

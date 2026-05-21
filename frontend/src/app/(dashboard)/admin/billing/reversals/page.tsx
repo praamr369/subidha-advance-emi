@@ -4,10 +4,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { directSalesKeys, inventoryKeys } from "@/lib/query-keys";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -195,7 +195,7 @@ export default function AdminBillingReversalsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Returns, Voids & Reversal Center"
       subtitle="Admin-only control center for direct sale cancellation, returns, receipt voids, customer refunds, and purchase returns."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.root }, { label: "Billing", href: ROUTES.admin.billing }, { label: "Reversals" }]}
@@ -532,9 +532,14 @@ export default function AdminBillingReversalsPage() {
           </div>
         </div>
 
-        {loading ? <LoadingBlock label="Loading reversal center..." /> : null}
-        {!loading && error ? <ErrorState title="Unable to load reversal center" description={error} /> : null}
-        {!loading && !error && rows.length === 0 ? <EmptyState title="No reversal records" description="Create cancellation, return, void, refund, or purchase return records to populate this center." /> : null}
+        {loading ? <ERPLoadingState label="Loading reversal center..." /> : null}
+        {!loading && error ? <ERPErrorState title="Unable to load reversal center" description={error} /> : null}
+        {!loading && !error && rows.length === 0 ? (
+          <ERPEmptyState
+            title="No reversal records"
+            description="Create cancellation, return, void, refund, or purchase return records to populate this center."
+          />
+        ) : null}
 
         {!loading && !error && rows.length > 0 ? (
           <div className="overflow-hidden rounded border">
@@ -573,6 +578,6 @@ export default function AdminBillingReversalsPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

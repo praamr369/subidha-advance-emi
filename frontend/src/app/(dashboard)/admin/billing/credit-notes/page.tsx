@@ -7,7 +7,7 @@ import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { ROUTES } from "@/lib/routes";
@@ -85,7 +85,7 @@ export default function BillingCreditNotesPage() {
   const latestPosted = rows.find((row) => row.status === "POSTED");
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       eyebrow="Billing Adjustment Control"
       title="Billing Credit Notes"
@@ -174,6 +174,6 @@ export default function BillingCreditNotesPage() {
           note: line.inventory_item_sku || undefined,
         }))}
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

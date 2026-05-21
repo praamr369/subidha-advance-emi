@@ -10,7 +10,7 @@ import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceD
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import ActionButton from "@/components/ui/ActionButton";
 import AdminCancellationDialog from "@/components/ui/AdminCancellationDialog";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { ROUTES } from "@/lib/routes";
@@ -149,7 +149,7 @@ export default function BillingInvoicesPage() {
   const latestPosted = rows.find((row) => row.status === "POSTED");
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       eyebrow="Billing Document Control"
       title="Billing Invoices"
@@ -290,6 +290,6 @@ export default function BillingInvoicesPage() {
           }
         }}
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

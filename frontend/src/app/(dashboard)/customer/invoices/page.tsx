@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { listCustomerInvoices, type FinanceInvoiceRow } from "@/services/phase4-finance";
 
@@ -36,7 +36,7 @@ export default function CustomerInvoicesPage() {
   }, [load]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="My Invoices"
       subtitle="Customer-scoped invoice register across contract and direct-sale flows."
       breadcrumbs={[{ label: "Dashboard", href: "/customer" }, { label: "Invoices" }]}
@@ -44,11 +44,11 @@ export default function CustomerInvoicesPage() {
     >
       <WorkspaceSection title="Invoice Register" description="Immutable invoice numbers and current balances.">
         {loading ? (
-          <LoadingBlock label="Loading invoices..." />
+          <ERPLoadingState label="Loading invoices..." />
         ) : error ? (
-          <ErrorState title="Unable to load invoices" message={error} onRetry={() => void load()} />
+          <ERPErrorState title="Unable to load invoices" message={error} onRetry={() => void load()} />
         ) : rows.length === 0 ? (
-          <EmptyState title="No invoices yet" description="Invoices will appear after demands are generated." />
+          <ERPEmptyState title="No invoices yet" description="Invoices will appear after demands are generated." />
         ) : (
           <div className="overflow-x-auto rounded-2xl border">
             <table className="min-w-full text-sm">
@@ -78,6 +78,6 @@ export default function CustomerInvoicesPage() {
           </div>
         )}
       </WorkspaceSection>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

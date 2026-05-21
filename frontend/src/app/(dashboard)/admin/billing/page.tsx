@@ -5,9 +5,9 @@ import { FileBadge2, FileText, Receipt, RotateCcw } from "lucide-react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -76,7 +76,7 @@ export default function BillingOverviewPage() {
   const showMetrics = !loading && !error;
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       eyebrow="Billing Control"
       title="Billing Operations"
@@ -108,8 +108,8 @@ export default function BillingOverviewPage() {
         { label: "Receipts", value: showMetrics ? String(receiptCount) : "—", tone: showMetrics ? "success" : "default" },
       ]}
     >
-      {loading ? <LoadingBlock label="Loading billing operations..." /> : null}
-      {!loading && error ? <ErrorState title="Billing load failed" description={error} /> : null}
+      {loading ? <ERPLoadingState label="Loading billing operations..." /> : null}
+      {!loading && error ? <ERPErrorState title="Billing load failed" description={error} /> : null}
 
       {!loading && !error ? (
         <>
@@ -374,6 +374,6 @@ export default function BillingOverviewPage() {
           </WorkspaceSection>
         </>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

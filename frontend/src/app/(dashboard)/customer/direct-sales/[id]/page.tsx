@@ -3,12 +3,12 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import StatusBadge from "@/components/ui/status-badge";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { getCustomerDirectSale, type CustomerDirectSaleDetail } from "@/services/customer";
 
 function money(value: string | undefined): string {
@@ -56,7 +56,7 @@ export default function CustomerDirectSaleDetailPage() {
   }, [load]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Direct Sale Detail"
       subtitle="Invoice, line items, totals, and customer-scoped receipt history."
       breadcrumbs={[
@@ -66,12 +66,12 @@ export default function CustomerDirectSaleDetailPage() {
       ]}
       actions={[{ href: "/customer/direct-sales", label: "Back to Direct Sales", variant: "secondary" }]}
     >
-      {loading ? <LoadingBlock label="Loading direct-sale detail..." /> : null}
+      {loading ? <ERPLoadingState label="Loading direct-sale detail..." /> : null}
       {!loading && error ? (
-        <ErrorState title="Unable to load direct sale" description={error} onRetry={() => void load()} />
+        <ERPErrorState title="Unable to load direct sale" description={error} onRetry={() => void load()} />
       ) : null}
       {!loading && !error && !row ? (
-        <EmptyState title="Direct sale not found" description="The requested direct-sale record is not available." />
+        <ERPEmptyState title="Direct sale not found" description="The requested direct-sale record is not available." />
       ) : null}
       {!loading && !error && row ? (
         <div className="space-y-6">
@@ -82,7 +82,7 @@ export default function CustomerDirectSaleDetailPage() {
             <div className="grid gap-3 md:grid-cols-3">
               <div>
                 <div className="text-xs text-muted-foreground">Status</div>
-                <div className="mt-1"><StatusBadge status={row.status || "DRAFT"} /></div>
+                <div className="mt-1"><ERPStatusBadge status={row.status || "DRAFT"} /></div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Grand total</div>
@@ -197,7 +197,7 @@ export default function CustomerDirectSaleDetailPage() {
                 </table>
               </div>
             ) : (
-              <EmptyState title="No line items" description="This direct sale has no visible line rows." />
+              <ERPEmptyState title="No line items" description="This direct sale has no visible line rows." />
             )}
           </WorkspaceSection>
 
@@ -224,7 +224,7 @@ export default function CustomerDirectSaleDetailPage() {
                 ))}
               </div>
             ) : (
-              <EmptyState title="No receipts yet" description="No direct-sale receipt is linked yet." />
+              <ERPEmptyState title="No receipts yet" description="No direct-sale receipt is linked yet." />
             )}
           </WorkspaceSection>
 
@@ -241,6 +241,6 @@ export default function CustomerDirectSaleDetailPage() {
           ) : null}
         </div>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

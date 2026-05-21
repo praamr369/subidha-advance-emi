@@ -1563,3 +1563,99 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 ### 12) Next recommended phase
 
 - Phase 11 — Billing/direct-sale/receivables manual-review surfaces (visual-only) once payment routes for all roles are aligned, or proceed to Phase 12 accounting/reconciliation **only** with explicit manual-review constraints.
+
+---
+
+## Phase 11 direct sale billing receivables transformation result (2026-05-21)
+
+Scope: **Frontend UI only**. ERP shell/state primitives adopted for SAFE Direct Sale / Billing / Receivables surfaces with strict behavior preservation.  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no permission changes**, **no new service calls**, **no changes to invoice creation/submission**, **no changes to collection/cancellation/return/exchange/void/reversal/refund/receipt behavior**, **no stock mutation changes**, **no accounting posting changes**, **no invented invoices/receivables/receipts/records**.
+
+### 1) Direct-sale/billing/receivable routes touched
+
+- `/admin/billing`
+- `/admin/billing/invoices`
+- `/admin/billing/register`
+- `/admin/billing/documents/[id]`
+- `/admin/billing/credit-notes`
+- `/admin/billing/debit-notes`
+- `/admin/billing/reversals` (mutation-heavy; wrapper/state-only changes)
+- `/admin/billing/direct-sale` (mutation-heavy; wrapper-only changes)
+- `/admin/deliveries/direct-sale-cases/[caseId]` (mutation-heavy; wrapper/state-only changes)
+- `/customer/invoices`
+- `/customer/direct-sales`
+- `/customer/direct-sales/[id]`
+
+### 2) Direct-sale/billing/receivable routes deferred
+
+- `/admin/accounting/books/sales` (MANUAL_REVIEW) — accounting book semantics; defer to Phase 12 manual-review prompt.
+- `/admin/accounting/gst/credit-notes` (MANUAL_REVIEW) — GST accounting control; defer to Phase 12 manual-review prompt.
+- `/admin/accounting/gst/debit-notes` (MANUAL_REVIEW) — GST accounting control; defer to Phase 12 manual-review prompt.
+- `/admin/billing/cashbook` (SAFE_AUTO) — already uses `BookRegisterPage`; no Phase 11 changes needed.
+- `/admin/billing/dailybook` (SAFE_AUTO) — already uses `BookRegisterPage`; no Phase 11 changes needed.
+- `/admin/billing/direct-sale/create` (SAFE_AUTO) — redirect-only; no Phase 11 changes needed.
+- `/admin/billing/direct-sales` (SAFE_AUTO) — route alias delegating to direct-sale workspace; no Phase 11 changes needed.
+- `/admin/sales` (SAFE_AUTO) — sales workspace already uses `WorkspaceShell`; defer shared workspace alignment to a dedicated pass.
+- `/admin/sales/direct-sale/create` (SAFE_AUTO) — orchestrated create workflow entry; treat as manual-risk; defer to a direct-sale mutation-only prompt.
+- `/admin/reports/direct-sales` (SAFE_AUTO) — report surface uses `Phase5ReportSurface`; defer report styling to a reports-only phase.
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO transformed: all routes listed under “routes touched”.
+- MANUAL_REVIEW transformed: none (explicitly deferred).
+- DO_NOT_TOUCH transformed: none.
+
+### 4) Components reused
+
+- ERP shell/states: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP status: `frontend/src/components/erp/ERPStatusBadge.tsx`
+- Existing billing/print components preserved: `frontend/src/components/print/BillingPrintDocument.tsx`, `frontend/src/components/print/PrintActionBanner.tsx`
+
+### 5) Components created, if any
+
+- None.
+
+### 6) Services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, or response normalization changes.
+- No new service calls introduced; pages continue to use existing modules:
+  - Billing: `@/services/billing`
+  - Reversals: `@/services/reversals`
+  - Deliveries: `@/services/deliveries`
+  - Customer: `@/services/customer`, `@/services/phase4-finance`
+
+### 7) Invoice/receivable/collection safety confirmation
+
+- No submit handler changes and no action visibility logic changes were made.
+- Direct-sale invoice create/submit, collect drawer submit, cancellation/return/exchange/void/reversal/refund entry surfaces remain behavior-identical (ERP wrapper/state component substitutions only).
+- No receivable calculation behavior was introduced or altered in this phase (no `/receivables*` routes exist in the current route map).
+
+### 8) Stock/accounting safety confirmation
+
+- No changes to stock deduction/restoration, delivery/fulfillment state transitions, or accounting posting behavior.
+- Billing documents remain backend-authoritative for totals, balances, and eligibility.
+
+### 9) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No permission weakening; route access remains role-scoped exactly as before.
+
+### 10) Financial/audit safety confirmation
+
+- No changes to EMI logic, lucky draw/waiver, commission/payout, ledger, reconciliation, or audit logging semantics.
+- UI changes are composition-only; historical records remain unchanged and auditable.
+
+### 11) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 12) Remaining direct-sale/billing UI gaps
+
+- `/admin/billing/reversals` and delivery-case detail remain mutation-heavy pages; deeper visual redesign should be done only under a dedicated MANUAL_REVIEW prompt with per-action visibility verification.
+- `/admin/sales/direct-sale/create` (orchestrated create) and other direct-sale mutation entrypoints need a separate mutation-only UI pass if UX improvements are required (keep behavior strictly identical).
+
+### 13) Next recommended phase
+
+- Phase 12 — Accounting / finance / reconciliation (MANUAL_REVIEW pages only; per-route prompts), or a dedicated reports pass for `/admin/reports/*` visual alignment.

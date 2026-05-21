@@ -13,7 +13,7 @@ import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/
 import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import AdminCancellationDialog from "@/components/ui/AdminCancellationDialog";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import OperationalNextStepsPanel from "@/components/workflows/OperationalNextStepsPanel";
@@ -1201,7 +1201,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
 
   if (createMode) {
     return (
-      <PortalPage
+      <ERPPageShell
         eyebrow="Admin Billing"
         title="Create Direct Sale Invoice"
         subtitle="Full-page direct-sale invoice workspace with customer snapshot controls, GST/non-GST handling, product search, requirement flags, and safe payment summary."
@@ -1971,12 +1971,12 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
             </section>
           </aside>
         </div>
-      </PortalPage>
+      </ERPPageShell>
     );
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Admin Billing"
       title="Direct Sale Workspace"
       subtitle="Create retail bills from the full product catalog while keeping product base price, EMI contracts, billing discounts, and inventory requirements separate."
@@ -2264,6 +2264,6 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           }
         }}
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { DetailPageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { apiFetch } from "@/lib/api";
 import {
   addDirectSaleDeliveryCaseNote,
@@ -317,7 +317,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
   const showCancel = !isHistoryOnly && delivery?.status !== "DELIVERED" && delivery?.status !== "CANCELLED";
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={delivery?.sale_number || delivery?.sale_no || "Direct-Sale Delivery"}
       subtitle="Operational delivery workspace for direct-sale service cases."
       breadcrumbs={[
@@ -391,17 +391,17 @@ export default function AdminDirectSaleDeliveryDetailPage() {
         }
         sections={<div className="space-y-6">
 
-        {loading ? <LoadingBlock label="Loading direct-sale delivery detail..." /> : null}
-        {!loading && error ? (
-          <ErrorState
-            title="Unable to load direct-sale delivery detail"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
-        ) : null}
-        {!loading && !error && !delivery ? (
-          <EmptyState title="Direct-sale delivery not found" description="No case detail was returned for this route." />
-        ) : null}
+	        {loading ? <ERPLoadingState label="Loading direct-sale delivery detail..." /> : null}
+	        {!loading && error ? (
+	          <ERPErrorState
+	            title="Unable to load direct-sale delivery detail"
+	            description={error}
+	            onRetry={() => void loadPage("initial")}
+	          />
+	        ) : null}
+	        {!loading && !error && !delivery ? (
+	          <ERPEmptyState title="Direct-sale delivery not found" description="No case detail was returned for this route." />
+	        ) : null}
 
         {!loading && !error && delivery ? (
           <>
@@ -762,7 +762,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
 
             <SectionCard title="Recent Audit Activity" description="Timeline entries from audit logs for this direct-sale delivery case.">
               {timeline.length === 0 ? (
-                <EmptyState title="No audit entries yet" description="No direct-sale delivery audit events are recorded for this case yet." />
+                <ERPEmptyState title="No audit entries yet" description="No direct-sale delivery audit events are recorded for this case yet." />
               ) : (
                 <div className="space-y-3">
                   {timeline.map((entry) => (
@@ -780,6 +780,6 @@ export default function AdminDirectSaleDeliveryDetailPage() {
         ) : null}
       </div>}
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }
