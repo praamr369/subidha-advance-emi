@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 
 import DataTable from "@/components/ui/DataTable";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ApprovalQueuePageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import { FormSection } from "@/components/ui/operations";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { buildAdminServiceDeskCaseRoute } from "@/lib/route-builders";
@@ -165,29 +165,29 @@ export default function AdminServiceDeskTicketsPage() {
       {
         key: "status",
         title: "Case Status",
-        render: (row: ServiceDeskCase) => <StatusBadge status={row.status} hideIcon />,
+        render: (row: ServiceDeskCase) => <ERPStatusBadge status={row.status} hideIcon />,
       },
       {
         key: "warranty_status",
         title: "Warranty",
-        render: (row: ServiceDeskCase) => <StatusBadge status={row.warranty_status} hideIcon />,
+        render: (row: ServiceDeskCase) => <ERPStatusBadge status={row.warranty_status} hideIcon />,
       },
       {
         key: "finance_status",
         title: "Finance",
-        render: (row: ServiceDeskCase) => <StatusBadge status={row.finance_status} hideIcon />,
+        render: (row: ServiceDeskCase) => <ERPStatusBadge status={row.finance_status} hideIcon />,
       },
       {
         key: "stock_status",
         title: "Stock",
-        render: (row: ServiceDeskCase) => <StatusBadge status={row.stock_status} hideIcon />,
+        render: (row: ServiceDeskCase) => <ERPStatusBadge status={row.stock_status} hideIcon />,
       },
     ],
     []
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Service Tickets"
       subtitle="After-sales service stays inside explicit tickets. Warranty posture, optional charge notes, and optional stock issues are visible on the case without turning billing or accounting into the operational owner of the workflow."
       breadcrumbs={[
@@ -211,6 +211,7 @@ export default function AdminServiceDeskTicketsPage() {
         { label: "Warranty", value: String(rows.filter((item) => item.warranty_status === "IN_WARRANTY").length) },
       ]}
       statusBadge={{ label: "After-Sales Service", tone: "info" }}
+      headerMode="erp"
     >
       <ApprovalQueuePageShell
         queueSummary={
@@ -222,9 +223,9 @@ export default function AdminServiceDeskTicketsPage() {
         }
         queueList={
           <>
-            {loading ? <LoadingBlock label="Loading service tickets..." /> : null}
+            {loading ? <ERPLoadingState label="Loading service tickets..." /> : null}
             {!loading && error ? (
-              <ErrorState title="Service ticket register unavailable" description={error} onRetry={() => void loadPage()} />
+              <ERPErrorState title="Service ticket register unavailable" description={error} onRetry={() => void loadPage()} />
             ) : null}
             {!loading && !error ? (
               <DataTable
@@ -419,9 +420,9 @@ export default function AdminServiceDeskTicketsPage() {
             </button>
           </div>
           </div>
-        </FormSection>
+          </FormSection>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

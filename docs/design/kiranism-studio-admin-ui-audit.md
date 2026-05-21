@@ -2291,3 +2291,106 @@ This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-fir
 ### 12) Next recommended phase
 
 - Phase 16 — Service desk / support alignment across roles (SAFE_AUTO + SAFE_LAYOUT_ONLY), keeping all workflow transitions and mutation semantics unchanged.
+
+## Phase 16 service desk reminders support transformation result
+
+### 1) Service/support/reminder routes touched
+
+- Service desk overview + registers (SAFE_AUTO):
+  - `/admin/service-desk`
+  - `/admin/service-desk/complaints`
+  - `/admin/service-desk/tickets`
+- Service desk case/ticket detail (SAFE_AUTO + SAFE_LAYOUT_ONLY):
+  - `/admin/service-desk/cases/[id]`
+  - `/admin/service-desk/[id]` (SAFE_LAYOUT_ONLY; wrapper/layout/state framing only)
+- Reminder queue (SAFE_AUTO):
+  - `/admin/reminders`
+  - `/admin/reminders/payment-reminders` (inherits `/admin/reminders`; wrapper-only)
+- Support intake (SAFE_AUTO):
+  - `/admin/support-requests`
+  - `/admin/support-requests/[id]`
+
+### 2) Service/support/reminder routes deferred
+
+- Explicitly deferred (MANUAL_REVIEW; critical):
+  - `/admin/service-desk/returns` (contains return/exchange execution actions; left unchanged in Phase 16 per safety policy)
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO transformed:
+  - `/admin/service-desk`
+  - `/admin/service-desk/cases/[id]`
+  - `/admin/service-desk/complaints`
+  - `/admin/service-desk/tickets`
+  - `/admin/reminders`
+  - `/admin/support-requests`
+  - `/admin/support-requests/[id]`
+- SAFE_LAYOUT_ONLY transformed:
+  - `/admin/service-desk/[id]`
+- MANUAL_REVIEW transformed: none.
+- DO_NOT_TOUCH transformed: none.
+
+### 4) Components reused
+
+- ERP shell/states:
+  - `frontend/src/components/erp/ERPPageShell.tsx` (via `headerMode="erp"` for Studio Admin header styling)
+  - `frontend/src/components/erp/ERPLoadingState.tsx`
+  - `frontend/src/components/erp/ERPErrorState.tsx`
+  - `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP framing:
+  - `frontend/src/components/erp/ERPSectionShell.tsx`
+  - `frontend/src/components/erp/ERPDataToolbar.tsx`
+  - `frontend/src/components/erp/ERPActionPanel.tsx`
+  - `frontend/src/components/erp/ERPStatusBadge.tsx`
+
+### 5) Components created, if any
+
+- None.
+
+### 6) Service/support/reminder services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, response normalization changes, or new service calls were introduced.
+- Pages continue to use existing services only:
+  - `@/services/service-desk`
+  - `@/services/support`
+  - `@/services/reminders`
+  - `@/services/admin-support-requests`
+  - `@/services/internal-users` (assignee selector in support request detail)
+  - `@/services/notifications` (not modified in Phase 16)
+
+### 7) Ticket/reminder/support safety confirmation
+
+- No changes to:
+  - service ticket creation, update, assignment, status transition, closure, escalation, or linking behavior
+  - reminder scheduling/sending/cancellation behavior
+  - support request submission semantics (customer intake) or admin triage mutation semantics
+- High-consequence actions preserve:
+  - existing handlers
+  - existing visibility conditions
+  - existing request payload shapes
+- UI-only changes: page framing (`headerMode="erp"`), section hierarchy, status chip rendering, and loading/error/empty state wrappers.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No permission weakening; all touched routes remain admin-only as defined by existing dashboard layout guards.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to EMI, payments/receipts, direct-sale, accounting, reconciliation, commissions, payouts, stock, lucky draw, or audit behavior.
+- Service desk/reminders/support pages remain operational workspaces only; financial posting stays in the dedicated finance/payment modules.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved (explicit policy; unchanged in Phase 16):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining service/support UI gaps
+
+- `/admin/service-desk/returns` remains MANUAL_REVIEW; a future pass should be wrapper-only unless the workflow actions and confirmation surfaces are explicitly reviewed.
+- `/admin/service` uses a shared workspace card surface (`WorkspaceCardsPage`) and was not modified in Phase 16; it can be aligned later only if it stays behavior-neutral and service-driven.
+
+### 12) Next recommended phase
+
+- Phase 17 — Reports / analytics / BI (SAFE_AUTO first), preserving “no fake KPIs” and “no invented endpoints” policy.

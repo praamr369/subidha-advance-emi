@@ -5,9 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import DataTable from "@/components/ui/DataTable";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { buildAdminServiceDeskCaseRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -120,7 +120,7 @@ export default function AdminServiceDeskComplaintsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Complaint Register"
       subtitle="Customer complaint intake stays anchored in support requests while linked service-desk cases capture the operational return, exchange, or after-sales work that follows."
       breadcrumbs={[
@@ -140,12 +140,13 @@ export default function AdminServiceDeskComplaintsPage() {
         { label: "Linked Cases", value: String(payload?.summary.linked_case_count ?? 0) },
       ]}
       statusBadge={{ label: "Complaint Intake", tone: "info" }}
+      headerMode="erp"
     >
-      {loading ? <LoadingBlock label="Loading complaints..." /> : null}
+      {loading ? <ERPLoadingState label="Loading complaints..." /> : null}
       {!loading && error ? (
-        <ErrorState title="Complaint register unavailable" description={error} />
+        <ERPErrorState title="Complaint register unavailable" description={error} />
       ) : null}
       {!loading && !error ? <DataTable columns={columns} rows={rows} emptyText="No complaints found." /> : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

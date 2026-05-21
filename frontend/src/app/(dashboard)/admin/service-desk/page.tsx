@@ -6,12 +6,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import StatCard from "@/components/ui/StatCard";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminServiceDeskCaseRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { getServiceDeskOverview, type ServiceDeskOverview } from "@/services/service-desk";
@@ -97,7 +98,7 @@ export default function AdminServiceDeskOverviewPage() {
   }, [issueLane, loadIssues]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Service Operations"
       title="Service Desk"
       subtitle="Run complaint escalation, furniture returns, exchanges, and after-sales service through explicit operational cases that link back to CRM, delivery, billing, inventory, and accounting without mutating those records directly."
@@ -123,24 +124,25 @@ export default function AdminServiceDeskOverviewPage() {
         { label: "Service", value: String(payload?.summary.service_count ?? 0) },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
+      headerMode="erp"
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading service desk overview..." /> : null}
+        {loading ? <ERPLoadingState label="Loading service desk overview..." /> : null}
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load the service desk overview"
             description={error}
             onRetry={() => void loadPage()}
           />
         ) : null}
 
-        <WorkspaceSection
+        <ERPSectionShell
           title="Customer issue tickets (TKT)"
           description="Unified support desk for EMI, rent, lease, delivery, and billing questions. Links are read-only references; no payment or EMI posting happens here."
         >
-          {issueLoading ? <LoadingBlock label="Loading issue tickets…" /> : null}
+          {issueLoading ? <ERPLoadingState label="Loading issue tickets…" /> : null}
           {!issueLoading && issueError ? (
-            <ErrorState title="Issue queue error" description={issueError} onRetry={() => void loadIssues()} />
+            <ERPErrorState title="Issue queue error" description={issueError} onRetry={() => void loadIssues()} />
           ) : null}
           {!issueLoading && !issueError ? (
             <div className="space-y-4">
@@ -207,12 +209,12 @@ export default function AdminServiceDeskOverviewPage() {
                 </div>
               </div>
               {issueTickets.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No tickets"
                   description="Customer submissions will appear here with TKT-FY-##### numbers."
                 />
               ) : filteredIssueTickets.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No matches"
                   description="Try a different search on the loaded page of tickets."
                 />
@@ -241,9 +243,7 @@ export default function AdminServiceDeskOverviewPage() {
                             <td className="px-3 py-2 font-mono text-xs">{row.ticket_no}</td>
                             <td className="px-3 py-2">{row.subject}</td>
                             <td className="px-3 py-2">
-                              <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs">
-                                {row.status}
-                              </span>
+                              <ERPStatusBadge status={row.status} hideIcon />
                             </td>
                             <td className="px-3 py-2 text-xs">{row.priority}</td>
                             <td className="px-3 py-2 text-muted-foreground">
@@ -266,7 +266,7 @@ export default function AdminServiceDeskOverviewPage() {
               )}
             </div>
           ) : null}
-        </WorkspaceSection>
+        </ERPSectionShell>
 
         {!loading && !error && payload ? (
           <>
@@ -385,15 +385,21 @@ export default function AdminServiceDeskOverviewPage() {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Recent Service Cases"
                 description="Returns, exchanges, and after-sales service tickets stay as explicit cases with drill-downs into the linked operational records."
-                actionHref={ROUTES.admin.serviceDeskReturns}
-                actionLabel="Open Return Register"
+                actions={
+                  <Link
+                    href={ROUTES.admin.serviceDeskReturns}
+                    className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
+                  >
+                    Open Return Register
+                  </Link>
+                }
               >
                 <div className="space-y-3">
                   {payload.recent_cases.length === 0 ? (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No service cases yet"
                       description="Once the team starts logging returns, exchanges, or service tickets, they will appear here."
                     />
@@ -424,17 +430,23 @@ export default function AdminServiceDeskOverviewPage() {
                     ))
                   )}
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
 
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Recent Complaint Intake"
                 description="Complaints remain anchored in the support-request flow, but linked service-desk cases now keep escalation, return, and service work auditable."
-                actionHref={ROUTES.admin.serviceDeskComplaints}
-                actionLabel="Open Complaint Register"
+                actions={
+                  <Link
+                    href={ROUTES.admin.serviceDeskComplaints}
+                    className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
+                  >
+                    Open Complaint Register
+                  </Link>
+                }
               >
                 <div className="space-y-3">
                   {payload.recent_complaints.length === 0 ? (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No complaint intake"
                       description="Customer complaints or support requests will appear here once they are submitted."
                     />
@@ -470,11 +482,11 @@ export default function AdminServiceDeskOverviewPage() {
                     ))
                   )}
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
             </div>
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

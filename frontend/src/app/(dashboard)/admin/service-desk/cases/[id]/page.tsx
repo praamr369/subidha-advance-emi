@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { DetailPageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
   buildAdminBillingDocumentRoute,
@@ -191,7 +192,7 @@ export default function AdminServiceDeskCaseDetailPage() {
       : null;
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={serviceCase?.case_no || "Service Desk Case"}
       subtitle="This case detail is the explicit operational control surface for returns, exchanges, complaints, and after-sales service. Inventory, billing, delivery, and accounting remain linked but separate truths."
       breadcrumbs={[
@@ -261,6 +262,7 @@ export default function AdminServiceDeskCaseDetailPage() {
         { label: "Total", value: money(serviceCase?.total_amount) },
       ]}
       statusBadge={{ label: serviceCase?.case_type || "Case", tone: "info" }}
+      headerMode="erp"
     >
       <DetailPageShell
         statusActions={
@@ -279,18 +281,18 @@ export default function AdminServiceDeskCaseDetailPage() {
         }
         sections={
           <div className="space-y-6">
-            {loading ? <LoadingBlock label="Loading service desk case..." /> : null}
+            {loading ? <ERPLoadingState label="Loading service desk case..." /> : null}
             {!loading && error && !serviceCase ? (
-              <ErrorState title="Unable to load the case" description={error} onRetry={() => void loadPage()} />
+              <ERPErrorState title="Unable to load the case" description={error} onRetry={() => void loadPage()} />
             ) : null}
             {!loading && !error && !serviceCase ? (
-              <EmptyState title="Case not found" description="The requested service desk case could not be loaded." />
+              <ERPEmptyState title="Case not found" description="The requested service desk case could not be loaded." />
             ) : null}
 
             {serviceCase ? (
               <div className="space-y-6">
               <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Case Summary"
                 description="The case carries operational context, while the linked modules remain authoritative for their own documents and movements."
               >
@@ -317,9 +319,9 @@ export default function AdminServiceDeskCaseDetailPage() {
                 <div className="mt-4 rounded-2xl border border-border bg-background p-4 text-sm text-foreground">
                   {serviceCase.issue_details || "No extended issue details recorded."}
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
 
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Cross-Module Trace"
                 description="Use these links to review the original delivery, sale, invoice, or complaint without turning this case into the source of truth for those records."
               >
@@ -414,7 +416,7 @@ export default function AdminServiceDeskCaseDetailPage() {
                   <DetailItem label="Credit Note" value={serviceCase.credit_note_no || "—"} />
                   <DetailItem label="Debit Note" value={serviceCase.debit_note_no || "—"} />
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
             </div>
 
             <WorkspaceSection
@@ -423,7 +425,7 @@ export default function AdminServiceDeskCaseDetailPage() {
             >
               <div className="space-y-3">
                 {serviceCase.lines.length === 0 ? (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No lines recorded"
                     description="Add lines from the create flow or update the case through the API before posting a finance document."
                   />
@@ -592,6 +594,6 @@ export default function AdminServiceDeskCaseDetailPage() {
           </div>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

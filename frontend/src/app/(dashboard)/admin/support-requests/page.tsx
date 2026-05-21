@@ -3,14 +3,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import StatCard from "@/components/ui/StatCard";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -192,9 +192,7 @@ export default function AdminSupportRequestsPage() {
       {
         key: "status",
         title: "Status",
-        render: (row: AdminSupportRequest) => (
-          <StatusBadge status={row.status} hideIcon />
-        ),
+        render: (row: AdminSupportRequest) => <ERPStatusBadge status={row.status} hideIcon />,
       },
       {
         key: "assigned_to_full_name",
@@ -234,7 +232,7 @@ export default function AdminSupportRequestsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Support Triage"
       title="Support Requests"
       subtitle="Customer-submitted support and dispute intake with receipt and subscription context."
@@ -270,6 +268,7 @@ export default function AdminSupportRequestsPage() {
         { label: "Assigned", value: String(summary.assigned) },
       ]}
       statusBadge={{ label: "Customer Support Intake", tone: "info" }}
+      headerMode="erp"
     >
       <div className="space-y-6">
         <ControlLaneGrid
@@ -413,10 +412,10 @@ export default function AdminSupportRequestsPage() {
           </TableToolbar>
 
           <div className="mt-5">
-            {loading ? <LoadingBlock label="Loading support requests..." /> : null}
+            {loading ? <ERPLoadingState label="Loading support requests..." /> : null}
 
             {!loading && error ? (
-              <ErrorState
+              <ERPErrorState
                 title="Unable to load support requests"
                 description={error}
                 onRetry={() => void loadPage("initial")}
@@ -424,7 +423,7 @@ export default function AdminSupportRequestsPage() {
             ) : null}
 
             {!loading && !error && rows.length === 0 ? (
-              <EmptyState
+              <ERPEmptyState
                 title="No support requests"
                 description="No customer-submitted support issues matched the current filters."
               />
@@ -477,6 +476,6 @@ export default function AdminSupportRequestsPage() {
           </div>
         </WorkspaceSection>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

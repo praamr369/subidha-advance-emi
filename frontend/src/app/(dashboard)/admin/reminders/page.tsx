@@ -5,9 +5,12 @@ import { useEffect, useState } from "react";
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { AccountingNotice, accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
+import ERPActionPanel from "@/components/erp/ERPActionPanel";
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
 import { ROUTES } from "@/lib/routes";
 import type { PaymentReminder } from "@/services/reminders";
 import {
@@ -113,7 +116,7 @@ export default function AdminRemindersPage() {
   ];
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Reminder Queue"
       subtitle="Manual and scheduled reminders for retail dues and Lucky Plan EMI collections, with explicit status tracking and audit events."
       breadcrumbs={[
@@ -130,23 +133,52 @@ export default function AdminRemindersPage() {
       actions={[
         { href: ROUTES.admin.remindersPaymentReminders, label: "Payment Reminders", variant: "secondary" },
       ]}
+      headerMode="erp"
     >
-      {notice ? <AccountingNotice message={notice} /> : null}
+      <div className="space-y-4">
+        {notice ? <AccountingNotice message={notice} /> : null}
 
-      <div className="mb-4 flex justify-end">
-        <ActionButton variant="primary" disabled={loading} onClick={() => void handleRunGeneration()}>
-          Run Reminder Generation
-        </ActionButton>
+        <ERPDataToolbar
+          left={
+            <div className="text-sm font-medium text-muted-foreground">
+              Reminders can be scheduled, sent, or cancelled with explicit audit events.
+            </div>
+          }
+          right={
+            <ActionButton variant="primary" disabled={loading} onClick={() => void handleRunGeneration()}>
+              Run Reminder Generation
+            </ActionButton>
+          }
+        />
+
+        <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+          <ERPSectionShell
+            title="Queue register"
+            description="Track reminder statuses across scheduled dispatch, manual send, and cancellations."
+            className="xl:order-1"
+          >
+            <EnterpriseDataTable
+              data={rows}
+              columns={columns}
+              loading={loading}
+              error={error}
+              emptyTitle="No reminders in queue"
+              emptyDescription="Create reminders from operational follow-up workflows or future scheduled reminder generation."
+            />
+          </ERPSectionShell>
+
+          <ERPActionPanel
+            title="Safety & audit posture"
+            description="Reminders are operational follow-ups; they must not mutate EMI, payment, or accounting records."
+            className="xl:order-2"
+          >
+            <p className="text-sm leading-6 text-muted-foreground">
+              Use this workspace for controlled dispatch. Financial posting stays inside Payments, Receipts, and Accounting
+              workspaces.
+            </p>
+          </ERPActionPanel>
+        </div>
       </div>
-
-      <EnterpriseDataTable
-        data={rows}
-        columns={columns}
-        loading={loading}
-        error={error}
-        emptyTitle="No reminders in queue"
-        emptyDescription="Create reminders from operational follow-up workflows or future scheduled reminder generation."
-      />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

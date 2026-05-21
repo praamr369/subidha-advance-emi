@@ -557,6 +557,17 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Services/contracts**: support services.
 - **Prompt title**: “Phase 16 — Service desk UI”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
+- **Transformed (2026-05-21)**:
+  - `/admin/service-desk`
+  - `/admin/service-desk/complaints`
+  - `/admin/service-desk/tickets`
+  - `/admin/service-desk/cases/[id]`
+  - `/admin/service-desk/[id]` (SAFE_LAYOUT_ONLY)
+  - `/admin/reminders` (and `/admin/reminders/payment-reminders` via wrapper)
+  - `/admin/support-requests`
+  - `/admin/support-requests/[id]`
+- **Deferred (safety policy)**:
+  - `/admin/service-desk/returns` (MANUAL_REVIEW; return/exchange execution actions)
 
 ### Phase 17 — Reports / analytics / BI
 

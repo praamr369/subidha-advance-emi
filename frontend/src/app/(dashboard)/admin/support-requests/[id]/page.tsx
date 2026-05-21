@@ -3,10 +3,10 @@
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { apiFetch } from "@/lib/api";
 import {
   getAdminSupportRequest,
@@ -309,7 +309,7 @@ export default function AdminSupportRequestDetailPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={supportRequest ? `Support Request #${supportRequest.id}` : "Support Request Detail"}
       subtitle="Review the customer-submitted issue, update triage ownership and status, and follow the linked records without leaving the support workflow."
       breadcrumbs={[
@@ -375,12 +375,13 @@ export default function AdminSupportRequestDetailPage() {
         },
       ]}
       statusBadge={{ label: "Support Triage", tone: "info" }}
+      headerMode="erp"
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading support request detail..." /> : null}
+        {loading ? <ERPLoadingState label="Loading support request detail..." /> : null}
 
         {!loading && error && !supportRequest ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load support request detail"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -388,7 +389,7 @@ export default function AdminSupportRequestDetailPage() {
         ) : null}
 
         {!loading && !error && !supportRequest ? (
-          <EmptyState
+          <ERPEmptyState
             title="Support request not found"
             description="The requested support request could not be loaded."
           />
@@ -687,7 +688,7 @@ export default function AdminSupportRequestDetailPage() {
 
                 <div className="mt-4 space-y-3">
                   {timeline.length === 0 ? (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No audit entries yet"
                       description="Support request activity will appear here as triage actions are taken."
                     />
@@ -720,6 +721,6 @@ export default function AdminSupportRequestDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

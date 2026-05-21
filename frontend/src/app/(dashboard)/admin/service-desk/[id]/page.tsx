@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DetailPageShell } from "@/components/layout/page-shells";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   assignAdminSupportTicket,
@@ -83,24 +83,32 @@ export default function AdminServiceDeskTicketDetailPage() {
 
   if (loading) {
     return (
-      <PortalPage title="Issue ticket" breadcrumbs={[{ label: "Service Desk", href: ROUTES.admin.serviceDesk }]}>
-        <LoadingBlock label="Loading…" />
-      </PortalPage>
+      <ERPPageShell
+        title="Issue ticket"
+        breadcrumbs={[{ label: "Service Desk", href: ROUTES.admin.serviceDesk }]}
+        headerMode="erp"
+      >
+        <ERPLoadingState label="Loading…" />
+      </ERPPageShell>
     );
   }
 
   if (error && !ticket) {
     return (
-      <PortalPage title="Issue ticket" breadcrumbs={[{ label: "Service Desk", href: ROUTES.admin.serviceDesk }]}>
-        <ErrorState title="Error" description={error} onRetry={() => void load()} />
-      </PortalPage>
+      <ERPPageShell
+        title="Issue ticket"
+        breadcrumbs={[{ label: "Service Desk", href: ROUTES.admin.serviceDesk }]}
+        headerMode="erp"
+      >
+        <ERPErrorState title="Error" description={error} onRetry={() => void load()} />
+      </ERPPageShell>
     );
   }
 
   if (!ticket) return null;
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Issue management"
       title={ticket.ticket_no}
       subtitle={ticket.subject}
@@ -111,6 +119,7 @@ export default function AdminServiceDeskTicketDetailPage() {
       ]}
       actions={[{ href: ROUTES.admin.serviceDesk, label: "Desk home", variant: "secondary" }]}
       statusBadge={{ label: ticket.status, tone: "warning" }}
+      headerMode="erp"
     >
       {error ? (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -120,10 +129,10 @@ export default function AdminServiceDeskTicketDetailPage() {
       <DetailPageShell
         sections={
           <div className="space-y-6">
-            <WorkspaceSection title="Description">
+            <ERPSectionShell title="Description">
               <p className="whitespace-pre-wrap text-sm">{ticket.description}</p>
-            </WorkspaceSection>
-            <WorkspaceSection title="Public comments">
+            </ERPSectionShell>
+            <ERPSectionShell title="Public comments">
               <ul className="space-y-2 text-sm">
                 {ticket.comments
                   .filter((c) => !c.is_internal)
@@ -152,8 +161,8 @@ export default function AdminServiceDeskTicketDetailPage() {
                   Post
                 </ActionButton>
               </form>
-            </WorkspaceSection>
-            <WorkspaceSection title="Internal notes">
+            </ERPSectionShell>
+            <ERPSectionShell title="Internal notes">
               <ul className="space-y-2 text-sm">
                 {ticket.comments
                   .filter((c) => c.is_internal)
@@ -182,15 +191,15 @@ export default function AdminServiceDeskTicketDetailPage() {
                   Save internal note
                 </ActionButton>
               </form>
-            </WorkspaceSection>
+            </ERPSectionShell>
           </div>
         }
         timelineAside={
           <div className="space-y-4 text-sm">
             <div className="rounded-xl border border-border bg-card p-4">
               <div className="flex flex-wrap gap-2">
-                <StatusBadge status={ticket.status} />
-                <StatusBadge status={ticket.priority} />
+                <ERPStatusBadge status={ticket.status} />
+                <ERPStatusBadge status={ticket.priority} />
               </div>
               {ticket.customer_detail ? (
                 <div className="mt-3">
@@ -202,7 +211,7 @@ export default function AdminServiceDeskTicketDetailPage() {
               ) : null}
             </div>
 
-            <WorkspaceSection title="Workflow">
+            <ERPSectionShell title="Workflow">
               <form
                 className="space-y-2"
                 onSubmit={(e) => {
@@ -223,17 +232,17 @@ export default function AdminServiceDeskTicketDetailPage() {
                   Update status
                 </ActionButton>
               </form>
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection title="Timeline">
+            <ERPSectionShell title="Timeline">
               <ul className="max-h-64 space-y-1 overflow-auto text-xs text-muted-foreground">
                 {ticket.timeline.map((row, i) => (
                   <li key={i}>{JSON.stringify(row)}</li>
                 ))}
               </ul>
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection title="Assign">
+            <ERPSectionShell title="Assign">
             <div className="flex gap-2">
               <input
                 className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
@@ -258,9 +267,9 @@ export default function AdminServiceDeskTicketDetailPage() {
               </ActionButton>
             </div>
             <p className="text-xs text-muted-foreground">Send null assignee_id to unassign (clear field).</p>
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection title="Link object">
+            <ERPSectionShell title="Link object">
             <div className="space-y-2">
               <select
                 className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
@@ -295,9 +304,9 @@ export default function AdminServiceDeskTicketDetailPage() {
                 Add link
               </ActionButton>
             </div>
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection title="Resolve / reject / close">
+            <ERPSectionShell title="Resolve / reject / close">
             <textarea
               className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
               placeholder="Resolution summary"
@@ -350,16 +359,16 @@ export default function AdminServiceDeskTicketDetailPage() {
             >
               Reopen
             </ActionButton>
-          </WorkspaceSection>
+          </ERPSectionShell>
 
-          <WorkspaceSection title="Operational context (read-only)">
+          <ERPSectionShell title="Operational context (read-only)">
             <pre className="max-h-64 overflow-auto rounded bg-muted p-2 text-xs">
               {JSON.stringify(ticket.operational_context, null, 2)}
             </pre>
-          </WorkspaceSection>
+          </ERPSectionShell>
         </div>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }
