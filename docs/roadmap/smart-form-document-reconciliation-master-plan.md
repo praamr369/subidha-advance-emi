@@ -1,6 +1,6 @@
 # Master Plan: Smart Form Lookups + Document Engine + Reconciliation Control Tower
 
-Status: **AUDIT + PLAN ONLY (no code changes in this pass)**  
+Status: **PHASE F RECONCILIATION IMPLEMENTED (2026-05-21)**  
 Principles: financial correctness, auditability, backward compatibility, and operational usability.
 
 ## Executive Summary
@@ -97,6 +97,11 @@ Deliverable (Phase 1):
 
 Phase E (implemented 2026-05-21):
 - Completed the deterministic source-link audit required to prevent noisy reconciliation exceptions.
+
+Phase F (implemented 2026-05-21):
+- Added stored Control Tower runs/items/evidence/resolutions (admin-only).
+- Implemented only deterministic `READY_FOR_PHASE_F` checks (no auto-correction).
+- Added admin UI for runs, module matrix, exception queue, and item drilldown + resolution notes.
 
 ## Deployment Plan (when implemented)
 

@@ -166,6 +166,15 @@ from api.v1.views.finance_operations import (
     AdminFinanceTransferView,
     AdminReconciliationOverviewView,
 )
+from api.v1.views.admin_reconciliation_control_tower import (
+    AdminReconciliationItemDetailView,
+    AdminReconciliationItemListView,
+    AdminReconciliationItemReopenView,
+    AdminReconciliationItemResolveView,
+    AdminReconciliationModulesView,
+    AdminReconciliationRunDetailView,
+    AdminReconciliationRunListCreateView,
+)
 from api.v1.views.phase4_finance import (
     AdminFinanceAccountMappingView,
     AdminCustomerStatementView,
@@ -661,6 +670,13 @@ urlpatterns = [
     path("payments/allocate-advance/", AdminAdvanceAllocationView.as_view()),
     path("finance-transfers/", AdminFinanceTransferView.as_view()),
     path("reconciliation/overview/", AdminReconciliationOverviewView.as_view()),
+    path("reconciliation/modules/", AdminReconciliationModulesView.as_view()),
+    path("reconciliation/runs/", AdminReconciliationRunListCreateView.as_view()),
+    path("reconciliation/runs/<int:pk>/", AdminReconciliationRunDetailView.as_view()),
+    path("reconciliation/items/", AdminReconciliationItemListView.as_view()),
+    path("reconciliation/items/<int:pk>/", AdminReconciliationItemDetailView.as_view()),
+    path("reconciliation/items/<int:pk>/resolve/", AdminReconciliationItemResolveView.as_view()),
+    path("reconciliation/items/<int:pk>/reopen/", AdminReconciliationItemReopenView.as_view()),
     path("finance-accounts/operational-summary/", AdminFinanceAccountOperationalSummaryView.as_view()),
     # Phase 4: finance dashboard + registers + document center
     path("finance/dashboard/", AdminFinanceDashboardView.as_view()),

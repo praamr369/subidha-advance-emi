@@ -520,6 +520,13 @@ export default function AdminReconciliationPage() {
                     helper="Payment reconciliation queue (collection-side)."
                   />
                 </Link>
+                <Link href="/admin/reconciliation/runs" className="block">
+                  <KpiCard
+                    label="Control Tower runs"
+                    value="Phase F"
+                    helper="Deterministic reconciliation runs + exception queue (read-only)."
+                  />
+                </Link>
                 <Link href={subscriptionsViewHref} className="block">
                   <KpiCard
                     className={kpiToneClass(flaggedCount > 0 ? "warning" : "success")}

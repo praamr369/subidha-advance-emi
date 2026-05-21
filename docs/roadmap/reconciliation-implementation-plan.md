@@ -1,10 +1,37 @@
 # Reconciliation Control Tower — Implementation Plan (Additive)
 
-Status: **PLAN ONLY (no implementation in this pass)**  
+Status: **PHASE F IMPLEMENTED (2026-05-21)**  
 Phase 1 constraint: **read-only detection + manual resolution notes/status only**. No auto-correct.
 
 Phase E prerequisite (docs-only, completed):
 - `docs/architecture/reconciliation-source-link-map.md` (deterministic evidence map + Phase F readiness classification)
+
+## Phase F Implementation (2026-05-21)
+
+Backend (additive):
+- New app: `backend/reconciliation/`
+- Stored run + items + evidence + resolution models:
+  - `ReconciliationRun`, `ReconciliationItem`, `ReconciliationEvidence`, `ReconciliationResolution`
+- Runner: `backend/reconciliation/services/reconciliation_runner.py` (synchronous execution; read-only against source records)
+- Checks implemented are limited to `READY_FOR_PHASE_F` deterministic links (see `docs/architecture/reconciliation-control-tower.md`)
+
+Admin APIs (additive; admin-only):
+- `GET /api/v1/admin/reconciliation/modules/`
+- `GET/POST /api/v1/admin/reconciliation/runs/`
+- `GET /api/v1/admin/reconciliation/runs/{id}/`
+- `GET /api/v1/admin/reconciliation/items/` (+ filters)
+- `GET /api/v1/admin/reconciliation/items/{id}/`
+- `POST /api/v1/admin/reconciliation/items/{id}/resolve/`
+- `POST /api/v1/admin/reconciliation/items/{id}/reopen/`
+
+Frontend (additive):
+- New Control Tower routes:
+  - `frontend/src/app/(dashboard)/admin/reconciliation/runs/page.tsx`
+  - `frontend/src/app/(dashboard)/admin/reconciliation/runs/[id]/page.tsx`
+  - `frontend/src/app/(dashboard)/admin/reconciliation/items/[id]/page.tsx`
+
+Tests (backend, targeted):
+- `backend/tests/reconciliation/test_phase_f_control_tower.py`
 
 ## 0) Starting Point (Confirmed in repo)
 

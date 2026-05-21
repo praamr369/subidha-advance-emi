@@ -1,9 +1,29 @@
 # Reconciliation Source-Link Map (Deterministic Audit — Phase E)
 
-Status: **AUDIT COMPLETE (docs-only)**  
+Status: **AUDIT COMPLETE + PHASE F IMPLEMENTED (2026-05-21)**  
 Scope: **Source-link evidence map only** — no schema/API/service/frontend changes in this phase.
 
 This document records **confirmed** (code-backed) source-link patterns across modules so Phase F can implement only **deterministic, low-noise** reconciliation checks.
+
+## Phase F Implementation Result (2026-05-21)
+
+Phase F implemented a stored Control Tower run model and deterministic checks only.
+
+Implemented checks (READY_FOR_PHASE_F only):
+- Payment exists but no ReceiptDocument (`billing.ReceiptDocument.payment`)
+- ReceiptDocument exists but payment link / receipt type constraint looks invalid
+- Payment exists but linked EMI remains `PENDING` (scoped to `Payment.emi_id`)
+- EMI marked `PAID` but no `FinancialLedger(entry_type=EMI_PAYMENT)` evidence
+- Payment exists but missing `AccountingBridgePosting(source_model=Payment, purpose=PAYMENT_COLLECTION)`
+- Bridge journal missing/mismatching `JournalEntry.source_model/source_id`
+- `JournalEntryGroup.is_balanced == False`
+- Duplicate payment-collection journal source reference: multiple posted `JournalEntry(source_model=Payment, source_id, voucher_type=PAYMENT_COLLECTION, status=POSTED)`
+
+Explicitly deferred in Phase F (non-goals):
+- direct-sale, inventory/stock, purchase, returns, cash/bank settlement reconciliation
+- rent/lease accounting reconciliation (posting is deferred-by-design)
+- commission/payout reconciliation
+- any check requiring schema link additions, derived-only inference, or business-rule confirmation
 
 ## 1) Executive summary
 

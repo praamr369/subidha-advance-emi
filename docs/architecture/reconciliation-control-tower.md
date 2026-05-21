@@ -3,6 +3,41 @@
 Status: **AUDIT COMPLETE (docs-only)**  
 Constraint: **Read-only detection + manual resolution notes/status only (Phase 1)**. No auto-correction of financial records.
 
+## Phase F (Implemented 2026-05-21)
+
+Phase F implements the first production Control Tower slice using only `READY_FOR_PHASE_F` deterministic links.
+
+Additive backend app (new):
+- `backend/reconciliation/` (models + services)
+- Models: `ReconciliationRun`, `ReconciliationItem`, `ReconciliationEvidence`, `ReconciliationResolution`
+- Migration: `backend/reconciliation/migrations/0001_initial.py`
+
+Admin-only APIs (additive):
+- Existing (unchanged): `GET /api/v1/admin/reconciliation/overview/` (finance settlement overview)
+- New (Phase F Control Tower):
+  - `GET /api/v1/admin/reconciliation/modules/`
+  - `GET/POST /api/v1/admin/reconciliation/runs/`
+  - `GET /api/v1/admin/reconciliation/runs/{id}/`
+  - `GET /api/v1/admin/reconciliation/items/` (filters: `run,module,status,severity,exception_code,search`)
+  - `GET /api/v1/admin/reconciliation/items/{id}/`
+  - `POST /api/v1/admin/reconciliation/items/{id}/resolve/` (note required)
+  - `POST /api/v1/admin/reconciliation/items/{id}/reopen/` (note required)
+
+Implemented Phase F checks (read-only detection; no mutation of source financial records):
+- Payment exists but no `ReceiptDocument` (`billing.ReceiptDocument.payment`)
+- ReceiptDocument exists but payment link / receipt type constraints look invalid (deterministic)
+- Payment exists but linked `Emi.status` remains `PENDING` (scoped to `Payment.emi_id`)
+- `Emi.status=PAID` but no `FinancialLedger(entry_type=EMI_PAYMENT)` evidence (deterministic)
+- Payment exists but missing `AccountingBridgePosting(source_model=Payment, purpose=PAYMENT_COLLECTION)`
+- Bridge-created `JournalEntry` missing/mismatching `source_model/source_id` vs bridge row
+- `JournalEntryGroup.is_balanced == False`
+- Duplicate posted `JournalEntry` references for payment collection (`source_model=Payment`, `voucher_type=PAYMENT_COLLECTION`, `status=POSTED`)
+
+Guarantees (Phase F):
+- No auto-correction
+- Manual actions update only `ReconciliationItem` status and append `ReconciliationResolution`
+- Admin-only permission gate (`IsAdmin`) on all Control Tower endpoints
+
 ## 0) Phase E prerequisite (source-link determinism)
 
 Phase E deliverable (docs-only):

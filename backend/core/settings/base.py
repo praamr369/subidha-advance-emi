@@ -428,6 +428,7 @@ INSTALLED_APPS = [
     "reminders",
     "system_jobs",
     "subscriptions",
+    "reconciliation",
     "django_extensions",
 ]
 
