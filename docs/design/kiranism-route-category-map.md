@@ -329,6 +329,15 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
     - `/customer/payments` and `/customer/payments/[id]` — deferred by Phase 10B scope.
     - `/partner/payments` and `/partner/payments/[id]` — deferred by Phase 10B scope.
 
+- **Phase 10C status (implemented 2026-05-21)**:
+  - **Transformed** (MANUAL_REVIEW; wrapper/layout/state-only changes only):
+    - `/cashier/payments`
+    - `/cashier/payments/[id]`
+  - **Deferred** (manual-review only; out-of-scope for Phase 10C):
+    - `/cashier/collect` — collection submit/receipt-generation workflow; behavior-critical mutation surface.
+    - `/cashier/billing` — delegates into cashier collect/billing workflows; keep unchanged to avoid mutation-flow drift.
+    - `/cashier/billing/direct-sale` — already transformed in Phase 9; intentionally not revisited.
+
 ### Phase 11 — Direct sale / billing / receivables
 
 - **Goal**: direct sale billing flows UI polish; cancellations/returns manual-review.

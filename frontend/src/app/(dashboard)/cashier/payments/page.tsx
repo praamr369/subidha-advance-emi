@@ -4,23 +4,23 @@ import { RefreshCw, Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import {
+  ERPAuditNote,
+  ERPDataToolbar,
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPSectionShell,
+  ERPStatusBadge,
+} from "@/components/erp";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import {
   DataTableShell,
-  DetailPanel,
-  FormSection,
-  KpiCard,
   MobileSafeTable,
-  QuickActionGrid,
 } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
-import TableToolbar from "@/components/ui/TableToolbar";
 import {
   getCashierPaymentHistory,
   type CashierTransaction,
@@ -136,7 +136,7 @@ export default function CashierPaymentsPage() {
               Ref {row.reference_no || `AUTO-${row.id}`}
             </div>
             {row.is_reversed ? (
-              <StatusBadge status="REVERSED" hideIcon />
+              <ERPStatusBadge status="REVERSED" hideIcon />
             ) : null}
           </div>
         ),
@@ -176,7 +176,7 @@ export default function CashierPaymentsPage() {
         key: "method",
         title: "Method",
         render: (row) =>
-          row.method ? <StatusBadge status={row.method} hideIcon /> : <span className="text-muted-foreground">—</span>,
+          row.method ? <ERPStatusBadge status={row.method} hideIcon /> : <span className="text-muted-foreground">—</span>,
       },
       {
         key: "recorded_at",
@@ -193,7 +193,7 @@ export default function CashierPaymentsPage() {
         key: "status",
         title: "Status",
         render: (row) => (
-          <StatusBadge
+          <ERPStatusBadge
             status={row.is_reversed ? "REVERSED" : row.status_label || "RECORDED"}
             label={row.status_label || (row.is_reversed ? "REVERSED" : "RECORDED")}
           />
@@ -204,7 +204,7 @@ export default function CashierPaymentsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Cashier Desk"
       title="Payment History"
       subtitle="Counter-safe payment lookup for receipt proof, dispute follow-up, and recent posted transaction review."
@@ -256,138 +256,115 @@ export default function CashierPaymentsPage() {
       }}
     >
       <div className="space-y-6">
-        <FormSection
+        <ERPSectionShell
           title="Counter lookup"
           description="Search by payment ID, reference, customer phone, customer name, subscription number, EMI ID, or lucky number."
         >
-          <div className="mb-4 flex justify-end">
-            <ActionButton
-              variant="outline"
-              onClick={() =>
-                void loadPage("refresh", (searchParams.get("q") || "").trim())
-              }
-              disabled={loading || refreshing}
-              leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </ActionButton>
-          </div>
-          <TableToolbar
-            footer={
-              query ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-semibold uppercase tracking-[0.14em]">
-                    Active search
-                  </span>
-                  <StatusBadge status="OPEN" label={query} hideIcon />
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Use this register for cashier-visible history only. Counter collection, counter assignment, and finance-account routing remain on the cashier collection surface.
-                </div>
-              )
-            }
-          >
-            <form
-              onSubmit={handleApplySearch}
-              className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]"
-            >
-              <label className="relative block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  id="cashier-payment-search"
-                  type="text"
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Payment ID, reference, phone, SUB-123, EMI id"
-                  className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-4 text-sm outline-none transition focus:border-ring"
-                  disabled={loading || refreshing}
-                />
-              </label>
-
-              <div className="flex flex-wrap gap-2">
-                <ActionButton type="submit" disabled={loading || refreshing}>
-                  Search
-                </ActionButton>
-                <ActionButton
-                  type="button"
-                  variant="outline"
-                  onClick={handleResetSearch}
-                  disabled={loading || refreshing}
-                >
-                  Reset
-                </ActionButton>
-              </div>
-            </form>
-          </TableToolbar>
-        </FormSection>
-
-        <QuickActionGrid>
-          <KpiCard label="Visible payments" value={String(rows.length)} helper="Current cashier search result set" />
-          <KpiCard label="Visible amount" value={money(visibleAmount)} helper="Total for listed rows" />
-          <KpiCard
-            label="Reversed"
-            value={String(reversedCount)}
-            helper="Rows marked reversed in cashier view"
-          />
-          <KpiCard
-            label="Latest visible"
-            value={
-              latestVisiblePayment
-                ? formatDateTime(latestVisiblePayment.created_at || latestVisiblePayment.payment_date)
-                : "—"
-            }
-            helper="Most recent record in this list"
-          />
-        </QuickActionGrid>
-
-        {loading ? <LoadingBlock label="Loading cashier payment history..." /> : null}
-
-        {!loading && error ? (
-          <ErrorState
-            title="Unable to load payment history"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
-        ) : null}
-
-        {!loading && !error ? (
-          <DetailPanel
-            title="Posted cashier-visible payments"
-            description={
-              query
-                ? `Showing cashier-visible results for "${query}".`
-                : "Showing the most recent posted payments visible in cashier scope."
-            }
-          >
-            {rows.length === 0 ? (
-              <EmptyState
-                title="No matching payments"
-                description="No cashier-visible payments matched the current search."
-                action={
-                  <ActionButton href="/cashier/collect" variant="outline">
-                    Open collect flow
-                  </ActionButton>
-                }
-              />
-            ) : (
-              <DataTableShell>
-                <MobileSafeTable className="border-none bg-transparent shadow-none">
-                  <DataTable<CashierTransaction>
-                    rows={rows}
-                    columns={columns}
-                    rowActions={(row) => (
-                      <ActionButton href={`/cashier/payments/${row.id}`} variant="outline">
-                        Receipt
-                      </ActionButton>
-                    )}
+          <ERPDataToolbar
+            left={
+              <form onSubmit={handleApplySearch} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                <label className="relative block">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    id="cashier-payment-search"
+                    type="text"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Payment ID, reference, phone, SUB-123, EMI id"
+                    className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-4 text-sm outline-none transition focus:border-ring"
+                    disabled={loading || refreshing}
                   />
-                </MobileSafeTable>
-              </DataTableShell>
-            )}
-          </DetailPanel>
-        ) : null}
+                </label>
+
+                <div className="flex flex-wrap gap-2">
+                  <ActionButton type="submit" disabled={loading || refreshing}>
+                    Search
+                  </ActionButton>
+                  <ActionButton
+                    type="button"
+                    variant="outline"
+                    onClick={handleResetSearch}
+                    disabled={loading || refreshing}
+                  >
+                    Reset
+                  </ActionButton>
+                </div>
+              </form>
+            }
+            right={
+              <ActionButton
+                variant="outline"
+                onClick={() => void loadPage("refresh", (searchParams.get("q") || "").trim())}
+                disabled={loading || refreshing}
+                leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </ActionButton>
+            }
+          />
+
+          {query ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="font-semibold uppercase tracking-[0.14em]">Active search</span>
+              <ERPStatusBadge status="OPEN" label={query} hideIcon />
+            </div>
+          ) : (
+            <ERPAuditNote tone="info" title="Cashier-safe lookup">
+              Use this register for cashier-visible history only. Counter collection, counter assignment, and finance-account
+              routing remain on the cashier collection surface.
+            </ERPAuditNote>
+          )}
+        </ERPSectionShell>
+
+        <ERPSectionShell
+          title="Posted cashier-visible payments"
+          description={
+            query
+              ? `Showing cashier-visible results for "${query}".`
+              : "Showing the most recent posted payments visible in cashier scope."
+          }
+        >
+          {loading ? <ERPLoadingState label="Loading cashier payment history..." /> : null}
+
+          {!loading && error ? (
+            <ERPErrorState
+              title="Unable to load payment history"
+              description={error}
+              onRetry={() => void loadPage("initial")}
+            />
+          ) : null}
+
+          {!loading && !error ? (
+            <>
+              {rows.length === 0 ? (
+                <ERPEmptyState
+                  title="No matching payments"
+                  description="No cashier-visible payments matched the current search."
+                  action={
+                    <ActionButton href="/cashier/collect" variant="outline">
+                      Open collect flow
+                    </ActionButton>
+                  }
+                />
+              ) : (
+                <DataTableShell>
+                  <MobileSafeTable className="border-none bg-transparent shadow-none">
+                    <DataTable<CashierTransaction>
+                      rows={rows}
+                      columns={columns}
+                      rowActions={(row) => (
+                        <ActionButton href={`/cashier/payments/${row.id}`} variant="outline">
+                          Receipt
+                        </ActionButton>
+                      )}
+                    />
+                  </MobileSafeTable>
+                </DataTableShell>
+              )}
+            </>
+          ) : null}
+        </ERPSectionShell>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -1426,3 +1426,68 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 ### 12) Next recommended phase
 
 - Phase 10C — Manual-review `/cashier/payments*` (register/detail) with the same “wrapper/layout/state-only” constraints, then evaluate `/customer/payments*` and `/partner/payments*` once action semantics are confirmed.
+
+---
+
+## Phase 10C cashier payments manual-review transformation result (2026-05-21)
+
+Scope: **Frontend UI only**. Wrapper/layout/state improvements for cashier payment register/detail pages with strict behavior preservation.  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no payment/collection/receipt behavior changes**, **no invented endpoints or data**.
+
+### 1) Cashier payment routes touched
+
+- `/cashier/payments` (MANUAL_REVIEW; wrapper/layout/state-only)
+- `/cashier/payments/[id]` (MANUAL_REVIEW; wrapper/layout/state-only)
+
+### 2) Cashier payment routes deferred
+
+- `/cashier/collect` — collection submit + receipt generation workflow entry; manual-review only (out of scope).
+- `/cashier/billing` — delegates into collect/billing flows; kept unchanged to avoid mutation-flow drift (out of scope).
+- `/cashier/billing/direct-sale` — already transformed in Phase 9; intentionally not revisited in Phase 10C.
+
+### 3) Components reused
+
+- ERP shell/states: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP framing: `frontend/src/components/erp/ERPSectionShell.tsx`, `frontend/src/components/erp/ERPDataToolbar.tsx`, `frontend/src/components/erp/ERPDetailGrid.tsx`, `frontend/src/components/erp/ERPStatusBadge.tsx`, `frontend/src/components/erp/ERPAuditNote.tsx`
+- Existing cashier table/detail primitives preserved: `frontend/src/components/ui/DataTable.tsx`, `frontend/src/components/ui/operations/*`, `frontend/src/components/receipts/PaymentReceiptDocument.tsx`
+
+### 4) Components created, if any
+
+- None.
+
+### 5) Cashier payment services/API contracts preserved
+
+- Preserved existing cashier service calls and endpoint usage:
+  - `/cashier/payments` continues to use `@/services/cashier` (`getCashierPaymentHistory`) with the same query params (`q`, `limit`).
+  - `/cashier/payments/[id]` continues to use `@/services/cashier` (`getCashierPaymentDetail`) with the same path parameter.
+- No new service calls, no request parameter changes, and no response normalization changes.
+
+### 6) Payment/collection/receipt safety confirmation
+
+- No changes to payment posting behavior, collection submit wiring, receipt generation/rendering behavior, print/save behavior, download/share behavior, payment validation, payment mode handling, or collectability rules.
+- Action visibility and handlers remain owned by the existing page logic; this pass only reframed layout/states.
+
+### 7) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No cross-role data exposure added; pages remain cashier-scoped and service-scoped as before.
+
+### 8) Financial/audit safety confirmation
+
+- No changes to EMI logic, lucky draw behavior, waiver, commission, payout, ledger, reconciliation, accounting posting, or audit trails.
+- UI changes are composition-only; financial integrity remains enforced by backend and existing contracts.
+
+### 9) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 10) Remaining cashier payment UI gaps
+
+- Cashier payment history remains “latest N” (limit-based) without pagination controls; add pagination only with an explicit contract-safe plan.
+- Receipt detail page still depends on the existing receipt document component layout; consider a dedicated receipt-document visual pass only after all role routes are aligned.
+
+### 11) Next recommended phase
+
+- Phase 10D — Manual-review `/customer/payments*` and `/partner/payments*` (register/detail) with the same “wrapper/layout/state-only” constraints, after confirming each role’s action suppression semantics on non-collectible statuses.

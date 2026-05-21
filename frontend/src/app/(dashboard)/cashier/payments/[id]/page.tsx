@@ -4,14 +4,19 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { ActionStrip, DetailMetaGrid, DetailSection, StatusChip } from "@/components/detail";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import {
+  ERPDataToolbar,
+  ERPDetailGrid,
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPSectionShell,
+  ERPStatusBadge,
+} from "@/components/erp";
+import { ActionStrip } from "@/components/detail";
 import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
-import { DetailPanel, FormSection, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
+import { QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import {
   getCashierPaymentDetail,
@@ -116,7 +121,7 @@ export default function CashierPaymentReceiptPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       eyebrow="Cashier Desk"
       title={payment ? `Receipt #${payment.id}` : "Payment Receipt"}
@@ -165,36 +170,39 @@ export default function CashierPaymentReceiptPage() {
       }}
     >
       <div className="space-y-6">
-        <section className="receipt-print-hide flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            Use Print / Save PDF for a paper-safe counter copy without dashboard chrome.
-          </p>
+        <ERPDataToolbar
+          className="receipt-print-hide"
+          left={
+            <p className="text-sm text-muted-foreground">
+              Use Print / Save PDF for a paper-safe counter copy without dashboard chrome.
+            </p>
+          }
+          right={
+            <>
+              <button
+                type="button"
+                onClick={() => void loadPage("refresh")}
+                disabled={loading || refreshing}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={loading || Boolean(error) || !payment}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background shadow-[0_18px_38px_-24px_rgba(15,23,42,0.82)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Print / Save PDF
+              </button>
+            </>
+          }
+        />
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void loadPage("refresh")}
-              disabled={loading || refreshing}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
-
-            <button
-              type="button"
-              onClick={handlePrint}
-              disabled={loading || Boolean(error) || !payment}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background shadow-[0_18px_38px_-24px_rgba(15,23,42,0.82)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              Print / Save PDF
-            </button>
-          </div>
-        </section>
-
-        {loading ? <LoadingBlock label="Loading cashier receipt..." /> : null}
+        {loading ? <ERPLoadingState label="Loading cashier receipt..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load payment receipt"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -202,7 +210,7 @@ export default function CashierPaymentReceiptPage() {
         ) : null}
 
         {!loading && !error && !payment ? (
-          <EmptyState
+          <ERPEmptyState
             title="Receipt not available"
             description="The requested cashier-visible payment could not be loaded."
           />
@@ -271,49 +279,39 @@ export default function CashierPaymentReceiptPage() {
               footerNote="Use browser print to keep a paper counter copy or save this receipt as PDF. This view is sourced from the cashier-scoped payment record."
             />
 
-            <DetailSection
+            <ERPSectionShell
               className="receipt-print-hide"
               title="Collection snapshot"
               description="Operational summary for this cashier-visible collection record."
             >
-              <DetailPanel
-                title="Collection snapshot"
-                description="Operational summary for this cashier-visible collection record."
-              >
-                <DetailMetaGrid
-                  items={[
-                    { label: "Receipt Reference", value: receiptReference },
-                    {
-                      label: "Collection Status",
-                      value: (
-                        <StatusChip
-                          label={statusLabel}
-                          tone={statusLabel === "REVERSED" ? "danger" : "success"}
-                        />
-                      ),
-                    },
-                    {
-                      label: "Recorded At",
-                      value: formatDateTime(payment.created_at || payment.payment_date),
-                    },
-                    { label: "Operator", value: payment.collected_by_username || "—" },
-                    { label: "Customer", value: payment.customer_name || "—" },
-                    { label: "Subscription", value: subscriptionLabel },
-                    {
-                      label: "Method",
-                      value: payment.method ? (
-                        <StatusBadge status={payment.method} hideIcon />
-                      ) : (
-                        "—"
-                      ),
-                    },
-                    { label: "Amount", value: money(payment.amount), tone: "success" },
-                  ]}
-                />
-              </DetailPanel>
-            </DetailSection>
+              <ERPDetailGrid
+                columns={3}
+                items={[
+                  { label: "Receipt Reference", value: receiptReference },
+                  {
+                    label: "Collection Status",
+                    value: <ERPStatusBadge status={statusLabel} />,
+                  },
+                  {
+                    label: "Recorded At",
+                    value: formatDateTime(payment.created_at || payment.payment_date),
+                  },
+                  { label: "Operator", value: payment.collected_by_username || "—" },
+                  { label: "Customer", value: payment.customer_name || "—" },
+                  { label: "Subscription", value: subscriptionLabel },
+                  {
+                    label: "Method",
+                    value: payment.method ? <ERPStatusBadge status={payment.method} hideIcon /> : "—",
+                  },
+                  {
+                    label: "Amount",
+                    value: <span className="text-[var(--semantic-success-fg)]">{money(payment.amount)}</span>,
+                  },
+                ]}
+              />
+            </ERPSectionShell>
 
-            <FormSection
+            <ERPSectionShell
               className="receipt-print-hide"
               title="Next step"
               description="Use the next action that matches the customer conversation at the counter."
@@ -359,10 +357,10 @@ export default function CashierPaymentReceiptPage() {
                   }
                 />
               </QuickActionGrid>
-            </FormSection>
+            </ERPSectionShell>
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }
