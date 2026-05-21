@@ -144,6 +144,33 @@ This would be a **display/session-sync mismatch**, not a permission bypass.
 
 ## Implementation Plan (Additive, Non-breaking)
 
+### Phase B (Implemented on 2026-05-21)
+
+Production-grade smart form foundation (frontend-only) + applied to the highest-friction manufacturing create forms.
+
+**Reusable components added**
+- `frontend/src/components/erp/forms/*` (shell, lookup combobox, field help, impact panel, related preview, validation summary, operator hints)
+
+**Forms improved (raw-ID replaced where safe)**
+- `frontend/src/app/(dashboard)/admin/manufacturing/boms/page.tsx`
+  - Finished Good Inventory Item ID → inventory item lookup selector
+  - Raw/Accessory Inventory Item ID (BOM lines) → inventory item lookup selector
+- `frontend/src/app/(dashboard)/admin/manufacturing/jobs/page.tsx`
+  - Finished Good Inventory Item ID → inventory item lookup selector
+  - BOM ID → BOM lookup selector (existing list endpoint + `?search=...`)
+  - Stock Location ID → stock location lookup selector (existing list endpoint + `?search=...`)
+
+**Endpoints reused (no write contract changes)**
+- Inventory item search (admin-only): `GET /api/v1/admin/inventory/items/search/?q=...`
+- Manufacturing BOM list search: `GET /api/v1/manufacturing/boms/?search=...`
+- Inventory stock locations list search: `GET /api/v1/inventory/locations/?search=...`
+
+**Deferred**
+- Service desk ticket create lookups are deferred because the form references multiple cross-module IDs (invoice, direct sale, subscription, delivery, support request) that need consistent “lite” lookup wiring to stay safe and operational.
+
+**Role-scope label fix**
+- `/admin/*` workspace label now prefers the AuthProvider role (fallback to stored session) so admin pages no longer show a stale “Customer Workspace” label when localStorage is outdated.
+
 ### Phase 1 (P0): Replace the worst raw-ID fields
 
 - Manufacturing BOM + Production Job create flows: move from raw ID inputs to `SearchSelect`.
@@ -179,7 +206,6 @@ This would be a **display/session-sync mismatch**, not a permission bypass.
 
 ## Next Phase Deliverables (implementation phase, not in this docs pass)
 
-- Replace raw-ID inputs in the identified pages with `SearchSelect`.
+- Replace raw-ID inputs in service desk ticket/return attachments with safe “lite” lookups (after confirming endpoints + permissions).
 - Add missing read-only “lite lookup” endpoints only where needed (after verifying list/search endpoints are insufficient).
-- Fix session role-label mismatch (if confirmed) by aligning `DashboardShell` role source with `AuthProvider` or ensuring session write path always updates localStorage role on login/refresh.
-
+- Expand smart form patterns to job detail workflows (`jobs/[id]`) and remaining high-risk raw-ID forms.

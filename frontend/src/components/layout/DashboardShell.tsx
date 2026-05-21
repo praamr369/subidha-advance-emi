@@ -82,6 +82,7 @@ import {
   type NavIconKey,
   type NavigationRole,
 } from "@/config/navigation";
+import { useAuth } from "@/providers/AuthProvider";
 import { pushRecent, readFavorites, readRecents, toggleFavorite } from "@/lib/workspace-prefs";
 import { cn } from "@/lib/utils";
 import { getAdminNavigationBadges } from "@/services/navigation-badges";
@@ -1392,7 +1393,12 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const sessionSnapshot = useSyncExternalStore(subscribeDashboardShell, readSessionSnapshot, () => "null");
   const session = useMemo(() => parseSessionSnapshot(sessionSnapshot), [sessionSnapshot]);
   const { logout, isLoggingOut } = useLogout();
-  const role = normalizeRole(session?.role);
+  const { role: authRole } = useAuth();
+  const role = useMemo(() => {
+    const candidate = (authRole || "").trim();
+    if (candidate) return normalizeRole(candidate);
+    return normalizeRole(session?.role);
+  }, [authRole, session]);
   const sessionId = session?.id ?? null;
   const collapsedStorageKey = sidebarCollapsedKey(sessionId, role);
   const sidebarCollapsedSnapshot = useSyncExternalStore(

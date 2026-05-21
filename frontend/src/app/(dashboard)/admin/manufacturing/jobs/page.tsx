@@ -7,13 +7,25 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import DataTable from "@/components/ui/DataTable";
+import {
+  EntityLookupCombobox,
+  FormImpactPanel,
+  OperatorHint,
+  RelatedRecordPreview,
+  SmartFormShell,
+  ValidationSummary,
+  type EntityLookupOption,
+} from "@/components/erp/forms";
+import { ApiError } from "@/lib/api";
 import { buildAdminManufacturingJobRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
   createProductionJob,
   listProductionJobs,
+  listManufacturingBoms,
   type ProductionJob,
 } from "@/services/manufacturing";
+import { listStockLocations, searchAdminInventoryItems, type AdminInventoryItemSearchRow, type StockLocation } from "@/services/inventory";
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -26,11 +38,19 @@ export default function AdminManufacturingJobsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [validation, setValidation] = useState<{
+    frontend: string[];
+    backendMessage: string | null;
+    backendFieldErrors: Record<string, string[]>;
+  }>({ frontend: [], backendMessage: null, backendFieldErrors: {} });
   const [form, setForm] = useState({
     job_date: new Date().toISOString().slice(0, 10),
     finished_good_inventory_item: "",
+    finished_good_inventory_item_option: null as EntityLookupOption | null,
     bom: "",
+    bom_option: null as EntityLookupOption | null,
     stock_location: "",
+    stock_location_option: null as EntityLookupOption | null,
     planned_output_qty: "1.000",
     notes: "",
   });
@@ -53,11 +73,61 @@ export default function AdminManufacturingJobsPage() {
     void loadPage();
   }, []);
 
+  async function searchInventoryOptions(query: string): Promise<EntityLookupOption[]> {
+    const payload = await searchAdminInventoryItems({ q: query });
+    return payload.results.map((row: AdminInventoryItemSearchRow) => ({
+      id: row.id,
+      label: row.product_name,
+      subtitle: row.sku ? `SKU: ${row.sku}` : undefined,
+      metadata: row as unknown as Record<string, unknown>,
+    }));
+  }
+
+  async function searchBomOptions(query: string): Promise<EntityLookupOption[]> {
+    const payload = await listManufacturingBoms({ search: query, status: "ACTIVE" });
+    return payload.results.map((row) => ({
+      id: row.id,
+      label: row.bom_no,
+      subtitle: row.finished_good_product_name || row.finished_good_sku || "Finished good",
+      status: row.status,
+      metadata: row as unknown as Record<string, unknown>,
+    }));
+  }
+
+  async function searchStockLocationOptions(query: string): Promise<EntityLookupOption[]> {
+    const payload = await listStockLocations({ search: query, is_active: true });
+    return payload.results.map((row: StockLocation) => ({
+      id: row.id,
+      label: row.name,
+      code: row.code,
+      subtitle: row.location_type,
+      status: row.is_active ? "ACTIVE" : "INACTIVE",
+      metadata: row as unknown as Record<string, unknown>,
+    }));
+  }
+
+  function validateForm(): string[] {
+    const errors: string[] = [];
+    if (!form.finished_good_inventory_item.trim()) {
+      errors.push("Finished good inventory item is required.");
+    }
+    if (!form.job_date.trim()) {
+      errors.push("Job date is required.");
+    }
+    if (!form.planned_output_qty.trim() || Number(form.planned_output_qty) <= 0) {
+      errors.push("Planned output quantity must be greater than zero.");
+    }
+    return errors;
+  }
+
   async function handleCreateJob() {
-    if (!form.finished_good_inventory_item.trim()) return;
+    const frontendErrors = validateForm();
+    setValidation({ frontend: frontendErrors, backendMessage: null, backendFieldErrors: {} });
+    if (frontendErrors.length > 0) return;
     try {
       setSaving(true);
       setNotice(null);
+      setError(null);
       await createProductionJob({
         job_date: form.job_date,
         finished_good_inventory_item: Number(form.finished_good_inventory_item),
@@ -70,13 +140,24 @@ export default function AdminManufacturingJobsPage() {
       setForm({
         job_date: new Date().toISOString().slice(0, 10),
         finished_good_inventory_item: "",
+        finished_good_inventory_item_option: null,
         bom: "",
+        bom_option: null,
         stock_location: "",
+        stock_location_option: null,
         planned_output_qty: "1.000",
         notes: "",
       });
       await loadPage();
     } catch (err) {
+      if (err instanceof ApiError) {
+        setValidation({
+          frontend: [],
+          backendMessage: err.readableMessage || "Unable to save the production job.",
+          backendFieldErrors: err.fieldErrors || {},
+        });
+        return;
+      }
       setError(toErrorMessage(err));
     } finally {
       setSaving(false);
@@ -148,72 +229,128 @@ export default function AdminManufacturingJobsPage() {
           title="Create Production Job"
           description="Use a BOM-backed job when available so material planning can seed from the active revision. Procurement remains the source of raw inward; production only consumes and converts stock."
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <label className="grid gap-2 text-sm">
-              <span>Job Date</span>
-              <input
-                type="date"
-                value={form.job_date}
-                onChange={(event) => setForm((current) => ({ ...current, job_date: event.target.value }))}
-                className="rounded-xl border border-border bg-background px-3 py-2"
-              />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Finished Good Inventory Item ID</span>
-              <input
-                value={form.finished_good_inventory_item}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, finished_good_inventory_item: event.target.value }))
+          <SmartFormShell
+            sidePanel={
+              <>
+                <OperatorHint>
+                  Creating a job does not consume stock unless the backend posts a material issue. Stock, costing, and
+                  accounting effects remain backend-controlled and auditable.
+                </OperatorHint>
+                <FormImpactPanel
+                  items={[
+                    "A job starts as a draft record until you release/operate it in the job detail screen.",
+                    "BOM selection is optional; use it when the active revision is ready for production control.",
+                    "Material availability must come from real stock APIs only (no manual assumptions).",
+                  ]}
+                />
+                <RelatedRecordPreview
+                  title="Selected references"
+                  rows={[
+                    {
+                      label: "Finished good",
+                      value: form.finished_good_inventory_item_option?.label || "—",
+                    },
+                    {
+                      label: "BOM",
+                      value: form.bom_option?.label || "—",
+                    },
+                    {
+                      label: "Stock location",
+                      value: form.stock_location_option
+                        ? `${form.stock_location_option.label}${form.stock_location_option.code ? ` (${form.stock_location_option.code})` : ""}`
+                        : "—",
+                    },
+                  ].filter((row) => row.value !== "—")}
+                />
+                <ValidationSummary
+                  frontendErrors={validation.frontend}
+                  backendMessage={validation.backendMessage}
+                  backendFieldErrors={validation.backendFieldErrors}
+                />
+              </>
+            }
+          >
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <label className="grid gap-2 text-sm">
+                <span>Job Date</span>
+                <input
+                  type="date"
+                  value={form.job_date}
+                  onChange={(event) => setForm((current) => ({ ...current, job_date: event.target.value }))}
+                  className="rounded-xl border border-border bg-background px-3 py-2"
+                />
+              </label>
+              <EntityLookupCombobox
+                label="Finished Good Inventory Item"
+                value={form.finished_good_inventory_item || null}
+                onChange={(value, option) =>
+                  setForm((current) => ({
+                    ...current,
+                    finished_good_inventory_item: value || "",
+                    finished_good_inventory_item_option: option ?? null,
+                  }))
                 }
-                className="rounded-xl border border-border bg-background px-3 py-2"
+                search={searchInventoryOptions}
+                required
+                placeholder="Search finished goods by name or SKU..."
               />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>BOM ID</span>
-              <input
-                value={form.bom}
-                onChange={(event) => setForm((current) => ({ ...current, bom: event.target.value }))}
-                className="rounded-xl border border-border bg-background px-3 py-2"
-              />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Stock Location ID</span>
-              <input
-                value={form.stock_location}
-                onChange={(event) => setForm((current) => ({ ...current, stock_location: event.target.value }))}
-                className="rounded-xl border border-border bg-background px-3 py-2"
-              />
-            </label>
-            <label className="grid gap-2 text-sm">
-              <span>Planned Output Qty</span>
-              <input
-                value={form.planned_output_qty}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, planned_output_qty: event.target.value }))
+              <EntityLookupCombobox
+                label="BOM (optional)"
+                value={form.bom || null}
+                onChange={(value, option) =>
+                  setForm((current) => ({
+                    ...current,
+                    bom: value || "",
+                    bom_option: option ?? null,
+                  }))
                 }
-                className="rounded-xl border border-border bg-background px-3 py-2"
+                search={searchBomOptions}
+                placeholder="Search BOM by number or finished-good name..."
               />
-            </label>
-            <label className="grid gap-2 text-sm md:col-span-2 xl:col-span-5">
-              <span>Notes</span>
-              <textarea
-                rows={3}
-                value={form.notes}
-                onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                className="rounded-xl border border-border bg-background px-3 py-2"
+              <EntityLookupCombobox
+                label="Stock Location (optional)"
+                value={form.stock_location || null}
+                onChange={(value, option) =>
+                  setForm((current) => ({
+                    ...current,
+                    stock_location: value || "",
+                    stock_location_option: option ?? null,
+                  }))
+                }
+                search={searchStockLocationOptions}
+                placeholder="Search stock location by code or name..."
               />
-            </label>
-          </div>
-          <div className="mt-4 flex gap-3">
-            <button
-              type="button"
-              onClick={() => void handleCreateJob()}
-              disabled={saving}
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
-            >
-              {saving ? "Saving..." : "Create Production Job"}
-            </button>
-          </div>
+              <label className="grid gap-2 text-sm">
+                <span>Planned Output Qty</span>
+                <input
+                  value={form.planned_output_qty}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, planned_output_qty: event.target.value }))
+                  }
+                  className="rounded-xl border border-border bg-background px-3 py-2"
+                />
+              </label>
+              <label className="grid gap-2 text-sm md:col-span-2 xl:col-span-5">
+                <span>Notes</span>
+                <textarea
+                  rows={3}
+                  value={form.notes}
+                  onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+                  className="rounded-xl border border-border bg-background px-3 py-2"
+                />
+              </label>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => void handleCreateJob()}
+                disabled={saving}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Create Production Job"}
+              </button>
+            </div>
+          </SmartFormShell>
         </ERPSectionShell>
 
         {!loading && !error ? (

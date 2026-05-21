@@ -44,6 +44,13 @@ Existing building blocks:
 - UI: `frontend/src/components/ui/SearchSelect.tsx`
 - Backend inventory lookup: `/api/v1/admin/inventory/items/search/?q=...`
 
+Phase B (implemented on 2026-05-21):
+- Added reusable smart-form primitives: `frontend/src/components/erp/forms/*`
+- Replaced raw-ID inputs in manufacturing create flows:
+  - `frontend/src/app/(dashboard)/admin/manufacturing/boms/page.tsx`
+  - `frontend/src/app/(dashboard)/admin/manufacturing/jobs/page.tsx`
+- Reused existing read-only lookup/search endpoints; no backend write contract changes
+
 Deliverable:
 - no raw IDs for high-consequence references; show “lite” entity labels + deep links.
 
@@ -104,4 +111,3 @@ Deliverable (Phase 1):
   - Manufacturing forms
   - Service desk ticket/return references
   - Admin payment detail “Download Receipt PDF”
-

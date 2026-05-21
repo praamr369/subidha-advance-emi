@@ -40,6 +40,23 @@ export type InventoryItem = {
   current_stock_qty?: string;
 };
 
+export type AdminInventoryItemSearchLocationRow = {
+  stock_location_id: number;
+  stock_location_name: string;
+  stock_location_code: string;
+  available_quantity: string;
+};
+
+export type AdminInventoryItemSearchRow = {
+  id: number;
+  inventory_item_id: number;
+  product_id: number;
+  product_name: string;
+  sku: string;
+  default_stock_location_id?: number | null;
+  available_by_location: AdminInventoryItemSearchLocationRow[];
+};
+
 export type StockLedgerRow = {
   id: number;
   inventory_item_id: number;
@@ -476,6 +493,12 @@ export type CreateStockAdjustmentPayload = {
 
 export function listInventoryItems(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<InventoryItem>>(`/inventory/items/${buildQuery(params)}`);
+}
+
+export function searchAdminInventoryItems(params: { q: string }) {
+  return apiFetch<{ count: number; results: AdminInventoryItemSearchRow[] }>(
+    `/admin/inventory/items/search/${buildQuery({ q: params.q })}`
+  );
 }
 
 export function updateInventoryItem(
