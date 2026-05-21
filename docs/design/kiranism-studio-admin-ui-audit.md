@@ -1275,10 +1275,10 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 
 ### 2) Payment/receipt/collection routes deferred
 
-- `/admin/payments` (MANUAL_REVIEW) — register + reversal/interpretation surfaces; keep manual-review.
-- `/admin/payments/[id]` (MANUAL_REVIEW) — payment detail/audit + actions; keep manual-review.
+- `/admin/payments` (MANUAL_REVIEW) — register + reversal/interpretation surfaces; **completed in Phase 10B** (wrapper/layout/state-only; handlers preserved).
+- `/admin/payments/[id]` (MANUAL_REVIEW) — payment detail/audit + actions; **completed in Phase 10B** (wrapper/layout/state-only; handlers preserved).
 - `/admin/payments/create` (MANUAL_REVIEW) — payment posting; keep manual-review.
-- `/admin/payments/history` (MANUAL_REVIEW) — history/register interpretations; keep manual-review.
+- `/admin/payments/history` (MANUAL_REVIEW) — compatibility redirect to `/admin/payments`; no UI surface to transform in Phase 10B.
 - `/admin/payments/reconciliation` (MANUAL_REVIEW) — reconciliation surfaces; keep manual-review.
 - `/admin/finance/collect` (MANUAL_REVIEW) — collection/receipt workflow entry; keep manual-review.
 - `/admin/partners/collection-requests` (MANUAL_REVIEW) — verification + actions; keep manual-review.
@@ -1350,3 +1350,79 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 ### 12) Next recommended phase
 
 - Continue Phase 10 with a dedicated **manual-review** prompt for `/admin/payments*` (register + detail + history) before moving to Phase 11 billing/report consolidation.
+
+---
+
+## Phase 10B admin payments manual-review transformation result (2026-05-21)
+
+Scope: **Frontend UI only**. Wrapper/layout/state improvements for admin payment register/detail/history pages with strict behavior preservation.  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no action visibility changes**, **no payment/reversal/receipt/reconciliation behavior changes**, **no invented endpoints or data**.
+
+### 1) Admin payment routes touched
+
+- `/admin/payments` (MANUAL_REVIEW; wrapper/layout/state-only)
+- `/admin/payments/[id]` (MANUAL_REVIEW; wrapper/layout/state-only)
+
+### 2) Admin payment routes deferred
+
+- `/admin/payments/create` — redirect/compat route to finance collection workspace (no UI surface changed).
+- `/admin/payments/reconciliation` — redirect-only handoff to reconciliation workspace (no UI surface changed).
+- `/customer/payments*` — deferred by explicit scope (customer role).
+- `/partner/payments*` — deferred by explicit scope (partner role).
+
+### 3) Pages transformed by migrationClass
+
+- MANUAL_REVIEW:
+  - `/admin/payments` (layout/state framing only)
+  - `/admin/payments/[id]` (layout/state framing only)
+- Redirect-only (no UI surface):
+  - `/admin/payments/history`
+  - `/admin/payments/create`
+  - `/admin/payments/reconciliation`
+
+### 4) Components reused
+
+- ERP shell/states: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP framing: `frontend/src/components/erp/ERPSectionShell.tsx`, `frontend/src/components/erp/ERPDataToolbar.tsx`, `frontend/src/components/erp/ERPStatusBadge.tsx`
+- Existing register/detail layout primitives preserved: `frontend/src/components/layout/page-shells.tsx` and existing `operations` panels/forms (no handler changes)
+
+### 5) Components created
+
+- None.
+
+### 6) Payment services/API contracts preserved
+
+- Preserved existing calls and payload handling:
+  - `/admin/payments` continues to use `@/services/payments` (`getAdminPaymentRegister`).
+  - `/admin/payments/[id]` continues to use `@/lib/api` (`apiFetch`) with the same endpoints and params.
+- No new service calls, no request parameter changes, and no response normalization changes.
+
+### 7) Payment/reversal/reconciliation/receipt safety confirmation
+
+- No changes to payment posting, create behavior, validation, payment modes, collectability rules, receipt rendering/print/share behavior, reversal submission wiring, or reconciliation redirects.
+- Action visibility and disabled states remain owned by existing page logic.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No changes to role boundaries or cross-role navigation access.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to EMI logic, waiver, commission, payout, ledger, reconciliation, accounting posting, or audit trails.
+- UI changes are composition-only; financial integrity remains enforced by backend/service contracts.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining payment UI gaps
+
+- `/admin/payments/reconciliation` remains redirect-only; a dedicated reconciliation UI pass must be done in the reconciliation workspace route itself.
+- Customer/partner payment pages remain legacy framed by policy until their manual-review prompts are scheduled.
+
+### 12) Next recommended phase
+
+- Phase 10C — Manual-review `/cashier/payments*` (register/detail) with the same “wrapper/layout/state-only” constraints, then evaluate `/customer/payments*` and `/partner/payments*` once action semantics are confirmed.

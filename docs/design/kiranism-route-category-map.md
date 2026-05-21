@@ -306,10 +306,10 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
     - `/partner/collections`
     - `/partner/collections/[id]`
   - **Deferred**:
-    - `/admin/payments` (MANUAL_REVIEW) — payment register + actions; manual-review only.
-    - `/admin/payments/[id]` (MANUAL_REVIEW) — payment detail/audit/actions; manual-review only.
+    - `/admin/payments` (MANUAL_REVIEW) — payment register + actions; **completed in Phase 10B** (wrapper/layout/state-only).
+    - `/admin/payments/[id]` (MANUAL_REVIEW) — payment detail/audit/actions; **completed in Phase 10B** (wrapper/layout/state-only).
     - `/admin/payments/create` (MANUAL_REVIEW) — posting/mutation; manual-review only.
-    - `/admin/payments/history` (MANUAL_REVIEW) — register/history; manual-review only.
+    - `/admin/payments/history` (MANUAL_REVIEW) — compatibility redirect to `/admin/payments`; no UI surface to transform in Phase 10B.
     - `/admin/payments/reconciliation` (MANUAL_REVIEW) — reconciliation; manual-review only.
     - `/admin/finance/collect` (MANUAL_REVIEW) — collection/receipt workflow entry; manual-review only.
     - `/admin/partners/collection-requests` (MANUAL_REVIEW) — verification actions; manual-review only.
@@ -318,6 +318,16 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
     - `/partner/payments` (MANUAL_REVIEW) and `/partner/payments/[id]` (MANUAL_REVIEW) — payment visibility/detail; manual-review only.
     - `/admin/reports/collections` (SAFE_AUTO) — delegates to shared report page; defer to a dedicated reports pass.
     - `/partner/collections/create` (SAFE_AUTO) — delegates to domain-owned mutation page; defer to avoid behavior drift.
+
+- **Phase 10B status (implemented 2026-05-21)**:
+  - **Transformed** (MANUAL_REVIEW; wrapper/layout/state-only changes only):
+    - `/admin/payments`
+    - `/admin/payments/[id]`
+  - **Deferred** (explicit scope or redirect-only routes):
+    - `/admin/payments/create` — redirect/compat route; no UI surface.
+    - `/admin/payments/reconciliation` — redirect-only handoff; no UI surface.
+    - `/customer/payments` and `/customer/payments/[id]` — deferred by Phase 10B scope.
+    - `/partner/payments` and `/partner/payments/[id]` — deferred by Phase 10B scope.
 
 ### Phase 11 — Direct sale / billing / receivables
 

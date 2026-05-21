@@ -13,13 +13,17 @@ import {
   Calendar,
 } from "lucide-react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import { DataTableShell, DetailPanel, FormSection } from "@/components/ui/operations";
+import {
+  ERPDataToolbar,
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPSectionShell,
+  ERPStatusBadge,
+} from "@/components/erp";
+import { DataTableShell } from "@/components/ui/operations";
 import { RegistryPageShell } from "@/components/layout/page-shells";
-import StatusBadge from "@/components/ui/status-badge";
 import { downloadCsv } from "@/lib/export/csv";
 import {
   buildAdminPaymentRoute,
@@ -118,7 +122,7 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
 
   if (rows.length === 0) {
     return (
-      <EmptyState
+      <ERPEmptyState
         title="No payment rows"
         description="No payment records match the current register filters."
       />
@@ -258,7 +262,7 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
                 </td>
 
                 <td className="border-b border-border px-4 py-3 text-sm text-foreground">
-                  <StatusBadge
+                  <ERPStatusBadge
                     status={row.is_reversed ? "REVERSED" : "ACTIVE"}
                     label={row.is_reversed ? "Reversed" : "Active"}
                   />
@@ -511,7 +515,7 @@ export default function AdminPaymentsPage() {
   }, [emiFilter, subscriptionFilter]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Payments Register"
       subtitle="Operational payment register for admin review, verification, reversal visibility, and reconciliation handoff."
       breadcrumbs={[
@@ -544,44 +548,42 @@ export default function AdminPaymentsPage() {
       <RegistryPageShell
         summary={
           !loading && !error ? (
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
-              <span className="font-semibold text-foreground">Current filter view</span>
-              {": "}
-              {summary.visible_payments} payments · Net collected{" "}
-              <span className="tabular-nums text-foreground">{money(summary.net_collected_amount)}</span>
-              {" · "}
-              {summary.active_payments} active · {summary.reversed_payments} reversed
-            </div>
+            <ERPDataToolbar
+              left={
+                <div className="text-xs text-muted-foreground sm:text-sm">
+                  <span className="font-semibold text-foreground">Current filter view</span>
+                  {": "}
+                  {summary.visible_payments} payments · Net collected{" "}
+                  <span className="tabular-nums text-foreground">{money(summary.net_collected_amount)}</span>
+                  {" · "}
+                  {summary.active_payments} active · {summary.reversed_payments} reversed
+                </div>
+              }
+            />
           ) : null
         }
         filters={
-        <FormSection
-          title="Filter Register"
-          description="Search by customer, phone, reference, payment id, subscription id, or batch context. Narrow by method, reversal state, and posting date."
-        >
-          <form
-            onSubmit={handleApplyFilters}
-            className="grid gap-4 lg:grid-cols-6"
+          <ERPSectionShell
+            title="Filter Register"
+            description="Search by customer, phone, reference, payment id, subscription id, or batch context. Narrow by method, reversal state, and posting date."
           >
-            <div className="lg:col-span-2">
-              <label
-                htmlFor="payments-q"
-                className="mb-2 block text-sm font-medium text-foreground"
-              >
-                Search
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  id="payments-q"
-                  type="text"
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Customer, phone, reference, payment id"
-                  className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
-                />
+            <form onSubmit={handleApplyFilters} className="grid gap-4 lg:grid-cols-6">
+              <div className="lg:col-span-2">
+                <label htmlFor="payments-q" className="mb-2 block text-sm font-medium text-foreground">
+                  Search
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    id="payments-q"
+                    type="text"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Customer, phone, reference, payment id"
+                    className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
+                  />
+                </div>
               </div>
-            </div>
 
             <div>
               <label
@@ -719,11 +721,12 @@ export default function AdminPaymentsPage() {
                 Export Filtered Register CSV
               </button>
             </div>
-          </form>
+            </form>
 
-          <p className="mt-3 text-xs text-muted-foreground">
-            This CSV exports the payment rows returned by the main register filters above. The quick search inside the payment table is for on-screen review only and does not change the download.
-          </p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              This CSV exports the payment rows returned by the main register filters above. The quick search inside the
+              payment table is for on-screen review only and does not change the download.
+            </p>
 
           {subscriptionFilter || customerFilter || batchFilter || partnerFilter || emiFilter ? (
             <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -757,14 +760,14 @@ export default function AdminPaymentsPage() {
               ) : null}
             </div>
           ) : null}
-        </FormSection>
+        </ERPSectionShell>
         }
         register={
           <>
-        {loading ? <LoadingBlock label="Loading payment register..." /> : null}
+        {loading ? <ERPLoadingState label="Loading payment register..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load payment register"
             description={error}
             onRetry={() => void loadPayments("initial")}
@@ -772,16 +775,16 @@ export default function AdminPaymentsPage() {
         ) : null}
 
         {!loading && !error && (
-          <DetailPanel
+          <ERPSectionShell
             title="Payment Rows"
             description="Review payments, confirm reversal visibility, and hand off to payment detail, subscription detail, or payment-level reconciliation."
           >
             <PaymentsTable rows={rows} />
-          </DetailPanel>
+          </ERPSectionShell>
         )}
           </>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

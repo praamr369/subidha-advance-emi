@@ -12,17 +12,20 @@ import {
 
 import ShareActions from "@/components/communications/ShareActions";
 import { ActionStrip, DetailSection } from "@/components/detail";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import {
+  ERPDataToolbar,
+  ERPEmptyState,
+  ERPErrorState,
+  ERPLoadingState,
+  ERPPageShell,
+  ERPStatusBadge,
+} from "@/components/erp";
 import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
 import {
   DetailPanel,
   FormSection,
   Timeline,
 } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import {
   DetailItem as DetailValue,
 } from "@/components/ui/workspace";
@@ -509,7 +512,7 @@ export default function AdminPaymentDetailRoutePage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       title={`Payment #${paymentId ?? "—"}`}
       subtitle="Inspect payment facts, linked contract context, reversal state, and the full ledger/audit timeline."
@@ -550,45 +553,50 @@ export default function AdminPaymentDetailRoutePage() {
       }}
     >
       <div className="space-y-6">
-        <section className="receipt-print-hide flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            Use Print / Save PDF for a clean payment proof copy. Reversal, ledger, and timeline sections stay screen-only.
-          </p>
+        <ERPDataToolbar
+          className="receipt-print-hide"
+          left={
+            <p className="text-sm text-muted-foreground">
+              Use Print / Save PDF for a clean payment proof copy. Reversal, ledger, and timeline sections stay
+              screen-only.
+            </p>
+          }
+          right={
+            <>
+              <button
+                type="button"
+                onClick={() => void loadPage("refresh")}
+                disabled={refreshing || loading}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void loadPage("refresh")}
-              disabled={refreshing || loading}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={loading || Boolean(error) || !resolvedPayment}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Print / Save PDF
+              </button>
 
-            <button
-              type="button"
-              onClick={handlePrint}
-              disabled={loading || Boolean(error) || !resolvedPayment}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Print / Save PDF
-            </button>
+              {resolvedPayment ? (
+                <ShareActions
+                  title="EMI Collection Receipt"
+                  message={`Receipt Ref: ${receiptReference}\nAmount: ${money(resolvedPayment.amount)}`}
+                  whatsappPhone={resolvedPayment.customer_phone || null}
+                  label="Share"
+                />
+              ) : null}
+            </>
+          }
+        />
 
-            {resolvedPayment ? (
-              <ShareActions
-                title="EMI Collection Receipt"
-                message={`Receipt Ref: ${receiptReference}\nAmount: ${money(resolvedPayment.amount)}`}
-                whatsappPhone={resolvedPayment.customer_phone || null}
-                label="Share"
-              />
-            ) : null}
-          </div>
-        </section>
-
-        {loading ? <LoadingBlock label="Loading payment detail..." /> : null}
+        {loading ? <ERPLoadingState label="Loading payment detail..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load payment detail"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -596,7 +604,7 @@ export default function AdminPaymentDetailRoutePage() {
         ) : null}
 
         {!loading && !error && !resolvedPayment ? (
-          <EmptyState
+          <ERPEmptyState
             title="Payment not available"
             description="The requested payment record could not be loaded."
           />
@@ -693,7 +701,7 @@ export default function AdminPaymentDetailRoutePage() {
                   <DetailValue
                     label="Status"
                     value={
-                      <StatusBadge
+                      <ERPStatusBadge
                         status={isReversed ? "REVERSED" : "ACTIVE"}
                         label={isReversed ? "Reversed" : "Active"}
                       />
@@ -756,7 +764,7 @@ export default function AdminPaymentDetailRoutePage() {
                     label="Subscription Status"
                     value={
                       resolvedPayment.subscription_status ? (
-                        <StatusBadge status={resolvedPayment.subscription_status} />
+                        <ERPStatusBadge status={resolvedPayment.subscription_status} />
                       ) : (
                         "—"
                       )
@@ -898,7 +906,7 @@ export default function AdminPaymentDetailRoutePage() {
                 description="Direct ledger entries linked to this payment."
               >
                 {(timelineData?.ledger_entries?.length ?? 0) === 0 ? (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No direct ledger entries"
                     description="No direct payment-linked ledger rows were returned."
                   />
@@ -934,7 +942,7 @@ export default function AdminPaymentDetailRoutePage() {
                 description="Ledger rows created as part of reversal processing."
               >
                 {(timelineData?.reversal_ledger_entries?.length ?? 0) === 0 ? (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No reversal ledger entries"
                     description="No reversal ledger rows are present for this payment."
                   />
@@ -973,7 +981,7 @@ export default function AdminPaymentDetailRoutePage() {
             >
               {(timelineData?.timeline?.length ?? 0) === 0 &&
               (timelineData?.audit_logs?.length ?? 0) === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No timeline events"
                   description="No audit or timeline events were returned for this payment."
                 />
@@ -1071,6 +1079,6 @@ export default function AdminPaymentDetailRoutePage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }
