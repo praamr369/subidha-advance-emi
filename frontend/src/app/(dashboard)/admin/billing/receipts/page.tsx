@@ -3,13 +3,14 @@
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { BILLING_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
 import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
@@ -96,7 +97,7 @@ export default function BillingReceiptsPage() {
     : undefined;
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       eyebrow="Billing Document Control"
       title="Receipt Register"
@@ -113,14 +114,23 @@ export default function BillingReceiptsPage() {
         { href: ROUTES.admin.billingInvoices, label: "Invoices", variant: "secondary" },
       ]}
     >
-      <WorkspaceDirectory
-        className="receipt-print-hide"
-        title="Billing route map"
+      <ERPSectionShell
+        title="Billing control directory"
         description="Use the shared billing directory to move from receipts into invoices, documents, notes, contracts, and billing books."
-        groups={BILLING_CONTROL_DIRECTORY_GROUPS}
-      />
+      >
+        <WorkspaceDirectory
+          className="receipt-print-hide"
+          title="Billing route map"
+          description="Use the shared billing directory to move from receipts into invoices, documents, notes, contracts, and billing books."
+          groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+        />
+      </ERPSectionShell>
 
-      <div className="receipt-print-hide">
+      <ERPSectionShell
+        title="Receipt ledger"
+        description="Receipts are immutable documents with posting provenance; voiding creates a reversal journal and preserves history."
+        className="receipt-print-hide"
+      >
         <EnterpriseDataTable
           data={rows}
           columns={columns}
@@ -129,7 +139,7 @@ export default function BillingReceiptsPage() {
           emptyTitle="No receipts found"
           emptyDescription="Generate retail or EMI receipts after the underlying operational event exists."
         />
-      </div>
+      </ERPSectionShell>
 
       <PrintActionBanner
         className="mb-4"
@@ -193,6 +203,6 @@ export default function BillingReceiptsPage() {
           { label: "Notes", value: latestReceipt?.notes || "—" },
         ]}
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -13,19 +13,19 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import {
   DataTableShell,
   DetailPanel,
-  FormSection,
   KpiCard,
   QuickActionGrid,
   WorkflowCard,
 } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
@@ -214,7 +214,7 @@ function DueTodayTable({ rows }: { rows: EmiRow[] }) {
 
   if (rows.length === 0) {
     return (
-      <EmptyState
+      <ERPEmptyState
         title="No due-today EMI rows"
         description="No pending EMI rows are due today."
       />
@@ -407,7 +407,7 @@ function RecentPaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
 
   if (rows.length === 0) {
     return (
-      <EmptyState
+      <ERPEmptyState
         title="No collections posted today"
         description="No posted payments were returned for today. After a cashier or admin collection is recorded, refresh this page."
       />
@@ -560,7 +560,7 @@ function RecentPaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
 function OverduePreview({ rows }: { rows: EmiRow[] }) {
   if (rows.length === 0) {
     return (
-      <EmptyState
+      <ERPEmptyState
         title="No overdue preview rows"
         description="No overdue pending EMI rows are currently available."
       />
@@ -827,7 +827,7 @@ export default function AdminCollectionsPage() {
     : "0";
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Collections Control"
       title="Collections Workspace"
       subtitle="Operational collections control center for subscription EMI follow-up, direct-sale receivables, and posted payment verification."
@@ -880,7 +880,7 @@ export default function AdminCollectionsPage() {
           onAdvanceEmiSelect={handleUnifiedAdvanceEmiSelect}
         />
 
-        <FormSection
+        <ERPSectionShell
           title="Daily operations controls"
           description="Refresh, export, and handoff actions for same-day collections."
         >
@@ -944,12 +944,12 @@ export default function AdminCollectionsPage() {
             </div>
           </div>
         </div>
-        </FormSection>
+        </ERPSectionShell>
 
-        {loading ? <LoadingBlock label="Loading collections workspace..." /> : null}
+        {loading ? <ERPLoadingState label="Loading collections workspace..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load collections workspace"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -1056,7 +1056,7 @@ export default function AdminCollectionsPage() {
               description="Outstanding invoiced direct sales stay separate from the EMI queue but remain collectible from the same operational control layer."
             >
               {directSalePreview.length === 0 ? (
-                <EmptyState
+                <ERPEmptyState
                   title="No outstanding direct sales"
                   description="No invoiced direct-sale receivables are currently awaiting collection."
                 />
@@ -1161,6 +1161,6 @@ export default function AdminCollectionsPage() {
           </>
         )}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

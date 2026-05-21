@@ -291,6 +291,34 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Prompt title**: “Phase 10 — Payments & receipts UI (strict)”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
+- **Phase 10 status (implemented 2026-05-21)**:
+  - **Transformed** (SAFE_AUTO only):
+    - `/admin/collections`
+    - `/admin/billing/receipts`
+    - `/admin/purchases/receipts`
+    - `/admin/receipts/sample`
+    - `/admin/receipts/sample/invoice`
+    - `/admin/receipts/sample/payment`
+    - `/admin/receipts/sample/subscription`
+    - `/admin/receipts/sample/acknowledgement`
+    - `/customer/receipts`
+    - `/partner/collection-requests`
+    - `/partner/collections`
+    - `/partner/collections/[id]`
+  - **Deferred**:
+    - `/admin/payments` (MANUAL_REVIEW) — payment register + actions; manual-review only.
+    - `/admin/payments/[id]` (MANUAL_REVIEW) — payment detail/audit/actions; manual-review only.
+    - `/admin/payments/create` (MANUAL_REVIEW) — posting/mutation; manual-review only.
+    - `/admin/payments/history` (MANUAL_REVIEW) — register/history; manual-review only.
+    - `/admin/payments/reconciliation` (MANUAL_REVIEW) — reconciliation; manual-review only.
+    - `/admin/finance/collect` (MANUAL_REVIEW) — collection/receipt workflow entry; manual-review only.
+    - `/admin/partners/collection-requests` (MANUAL_REVIEW) — verification actions; manual-review only.
+    - `/admin/receipts/sample/waiver` (MANUAL_REVIEW) — waiver semantics; manual-review only.
+    - `/customer/payments` (MANUAL_REVIEW) and `/customer/payments/[id]` (MANUAL_REVIEW) — payment register/detail; manual-review only.
+    - `/partner/payments` (MANUAL_REVIEW) and `/partner/payments/[id]` (MANUAL_REVIEW) — payment visibility/detail; manual-review only.
+    - `/admin/reports/collections` (SAFE_AUTO) — delegates to shared report page; defer to a dedicated reports pass.
+    - `/partner/collections/create` (SAFE_AUTO) — delegates to domain-owned mutation page; defer to avoid behavior drift.
+
 ### Phase 11 — Direct sale / billing / receivables
 
 - **Goal**: direct sale billing flows UI polish; cancellations/returns manual-review.

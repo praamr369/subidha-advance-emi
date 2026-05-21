@@ -4,18 +4,20 @@ import { RefreshCw } from "lucide-react";
 import { useParams, usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
 import {
   WorkspaceNotice,
   WorkspaceTimeline,
   type WorkspaceTimelineItem,
 } from "@/components/ui/role-workspace";
 import StatusBadge from "@/components/ui/status-badge";
-import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
   getPartnerCollectionRequestDetail,
   type PartnerCollectionRequestDetail,
@@ -176,7 +178,7 @@ export default function PartnerCollectionDetailPage() {
   }, [request]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Partner Collections"
       title={
         request
@@ -242,10 +244,10 @@ export default function PartnerCollectionDetailPage() {
       }}
     >
       <div className="space-y-6">
-        <WorkspaceSection
+        <ERPSectionShell
           title="Request posture"
           description="Current request scope and latest verification outcome inside partner-visible boundaries."
-          action={
+          actions={
             <ActionButton
               variant="outline"
               onClick={() => void loadPage("refresh")}
@@ -256,21 +258,21 @@ export default function PartnerCollectionDetailPage() {
             </ActionButton>
           }
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <DetailItem label="Customer" value={request?.customer_name || "—"} />
-            <DetailItem label="Phone" value={request?.customer_phone || "—"} />
-            <DetailItem label="Payment date" value={formatDate(request?.payment_date)} />
-            <DetailItem
-              label="Status"
-              value={request ? <StatusBadge status={request.status} size="md" /> : "—"}
-            />
-          </div>
-        </WorkspaceSection>
+          <ERPDetailGrid
+            columns={4}
+            items={[
+              { label: "Customer", value: request?.customer_name || "—" },
+              { label: "Phone", value: request?.customer_phone || "—" },
+              { label: "Payment date", value: formatDate(request?.payment_date) },
+              { label: "Status", value: request ? <ERPStatusBadge status={request.status} size="md" /> : "—" },
+            ]}
+          />
+        </ERPSectionShell>
 
-        {loading ? <LoadingBlock label="Loading collection request..." /> : null}
+        {loading ? <ERPLoadingState label="Loading collection request..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load collection request"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -278,7 +280,7 @@ export default function PartnerCollectionDetailPage() {
         ) : null}
 
         {!loading && !error && !request ? (
-          <EmptyState
+          <ERPEmptyState
             title="Collection request not found"
             description="The requested partner collection record is not visible in the current partner scope."
           />
@@ -286,23 +288,23 @@ export default function PartnerCollectionDetailPage() {
 
         {!loading && !error && request ? (
           <>
-            <WorkspaceSection
+            <ERPSectionShell
               title="Submission detail"
               description="Collection request details as submitted by the partner, before approval converts them into verified payment truth."
             >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DetailItem label="Subscription" value={request.subscription_number || "—"} />
-                <DetailItem label="Amount" value={money(request.amount)} />
-                <DetailItem label="Method" value={request.method || "—"} />
-                <DetailItem label="Reference" value={request.reference_no || "—"} />
-                <DetailItem
-                  label="Submitted"
-                  value={formatDateTime(request.submitted_at || request.created_at)}
-                />
-                <DetailItem label="Partner user" value={request.partner_username || "—"} />
-                <DetailItem label="Reviewed by" value={request.reviewed_by_username || "—"} />
-                <DetailItem label="Reviewed at" value={formatDateTime(request.reviewed_at)} />
-              </div>
+              <ERPDetailGrid
+                columns={4}
+                items={[
+                  { label: "Subscription", value: request.subscription_number || "—" },
+                  { label: "Amount", value: money(request.amount) },
+                  { label: "Method", value: request.method || "—" },
+                  { label: "Reference", value: request.reference_no || "—" },
+                  { label: "Submitted", value: formatDateTime(request.submitted_at || request.created_at) },
+                  { label: "Partner user", value: request.partner_username || "—" },
+                  { label: "Reviewed by", value: request.reviewed_by_username || "—" },
+                  { label: "Reviewed at", value: formatDateTime(request.reviewed_at) },
+                ]}
+              />
 
               {request.notes ? (
                 <div className="mt-5">
@@ -328,35 +330,32 @@ export default function PartnerCollectionDetailPage() {
                   </WorkspaceNotice>
                 </div>
               ) : null}
-            </WorkspaceSection>
+            </ERPSectionShell>
 
-            <WorkspaceSection
+            <ERPSectionShell
               title="Verification outcome"
               description="Approved links are shown only when the backend has recorded the resulting payment or EMI relationship."
             >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DetailItem label="Reviewed by" value={request.reviewed_by_username || "—"} />
-                <DetailItem label="Reviewed at" value={formatDateTime(request.reviewed_at)} />
-                <DetailItem
-                  label="Approved payment"
-                  value={request.approved_payment_id ? `#${request.approved_payment_id}` : "—"}
-                />
-                <DetailItem
-                  label="Approved EMI"
-                  value={request.approved_emi_id ? `#${request.approved_emi_id}` : "—"}
-                />
-              </div>
-            </WorkspaceSection>
+              <ERPDetailGrid
+                columns={4}
+                items={[
+                  { label: "Reviewed by", value: request.reviewed_by_username || "—" },
+                  { label: "Reviewed at", value: formatDateTime(request.reviewed_at) },
+                  { label: "Approved payment", value: request.approved_payment_id ? `#${request.approved_payment_id}` : "—" },
+                  { label: "Approved EMI", value: request.approved_emi_id ? `#${request.approved_emi_id}` : "—" },
+                ]}
+              />
+            </ERPSectionShell>
 
-            <WorkspaceSection
+            <ERPSectionShell
               title="Request timeline"
               description="Case progression derived from the request record itself, not from a client-side list snapshot."
             >
               <WorkspaceTimeline items={timelineItems} />
-            </WorkspaceSection>
+            </ERPSectionShell>
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

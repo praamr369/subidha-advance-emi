@@ -2,12 +2,12 @@
 
 import PaymentAcknowledgementDocument from "@/components/receipts/PaymentAcknowledgementDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { toSafeMoney } from "@/lib/print/formatters";
 
 export default function SampleAcknowledgementPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       title="Sample Payment Acknowledgement Slip"
       subtitle="Compact acknowledgement format for quick customer handover."
@@ -40,7 +40,6 @@ export default function SampleAcknowledgementPage() {
           { label: "Amount Received", value: toSafeMoney(4200), emphasize: true },
         ]}
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }
-

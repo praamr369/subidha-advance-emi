@@ -3,12 +3,12 @@
 import SubscriptionContractDocument from "@/components/print/SubscriptionContractDocument";
 import SubscriptionBookingReceiptDocument from "@/components/receipts/SubscriptionBookingReceiptDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { toSafeMoney } from "@/lib/print/formatters";
 
 export default function SampleSubscriptionDocumentsPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       title="Sample Subscription Booking + Plan Summary"
       subtitle="Customer-facing enrollment receipt and contract-style plan summary preview."
@@ -89,7 +89,6 @@ export default function SampleSubscriptionDocumentsPage() {
           "Past paid installments are not altered by winner waiver events.",
         ]}
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }
-

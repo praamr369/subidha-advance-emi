@@ -2,7 +2,7 @@
 
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { toAmountInWordsINR, toSafeMoney } from "@/lib/print/formatters";
 
 const sampleLineItems = [
@@ -28,7 +28,7 @@ const balance = total - received;
 
 export default function SampleInvoicePage() {
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       title="Sample Invoice / Bill"
       subtitle="Branded customer-safe invoice preview for print and PDF output."
@@ -97,6 +97,6 @@ export default function SampleInvoicePage() {
           lineTotal: item.lineTotal,
         }))}
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 
 const SAMPLE_LINKS = [
   {
@@ -33,7 +33,7 @@ const SAMPLE_LINKS = [
 
 export default function AdminReceiptSampleIndexPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       title="Document Sample Previews"
       subtitle="Review the branded receipt/document family before or alongside route-level backend wiring."
@@ -55,7 +55,6 @@ export default function AdminReceiptSampleIndexPage() {
           </div>
         ))}
       </section>
-    </PortalPage>
+    </ERPPageShell>
   );
 }
-

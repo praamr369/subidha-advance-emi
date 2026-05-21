@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from "react";
 
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import { listGoodsReceipts, type GoodsReceipt } from "@/services/inventory";
@@ -41,7 +44,7 @@ export default function AdminPurchaseReceiptsPage() {
     { key: "status", header: "Status" },
   ];
   return (
-    <PortalPage
+    <ERPPageShell
       title="Goods Receipts"
       subtitle="Receiving goods creates stock ledger IN entries and updates availability."
       breadcrumbs={[
@@ -50,9 +53,18 @@ export default function AdminPurchaseReceiptsPage() {
         { label: "Receipts" },
       ]}
     >
-      <WorkspaceSection title="Receipts" description="Post receipts only after physical verification.">
-        <EnterpriseDataTable data={rows} columns={columns} loading={loading} error={error} />
-      </WorkspaceSection>
-    </PortalPage>
+      <ERPSectionShell title="Receipts" description="Post receipts only after physical verification.">
+        {loading ? <ERPLoadingState label="Loading goods receipts..." /> : null}
+        {!loading && error ? (
+          <ERPErrorState title="Unable to load receipts" description={error} />
+        ) : null}
+        {!loading && !error && rows.length === 0 ? (
+          <ERPEmptyState title="No goods receipts" description="No goods receipts are available yet." />
+        ) : null}
+        {!loading && !error && rows.length > 0 ? (
+          <EnterpriseDataTable data={rows} columns={columns} loading={false} error={null} />
+        ) : null}
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

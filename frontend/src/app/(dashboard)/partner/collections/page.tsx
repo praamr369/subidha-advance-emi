@@ -3,13 +3,14 @@
 import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import { DataTableShell, DetailPanel, KpiCard, MobileSafeTable, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import { getPartnerDashboard } from "@/services/partner";
 
@@ -248,7 +249,7 @@ export default function PartnerCollectionsPage() {
       {
         key: "status",
         title: "Status",
-        render: (row) => <StatusBadge status={row.status} />,
+        render: (row) => <ERPStatusBadge status={row.status} />,
       },
       {
         key: "reference_no",
@@ -301,7 +302,7 @@ export default function PartnerCollectionsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Partner Collections"
       title="Collection Workspace"
       subtitle="Track submitted field collections, review progress, and the verified payment rows that become partner-visible only after controlled approval."
@@ -341,14 +342,10 @@ export default function PartnerCollectionsPage() {
       statusBadge={{ label: "Partner collection scope", tone: "info" }}
     >
       <div className="space-y-6">
-        <DetailPanel
+        <ERPSectionShell
           title="Collection boundary"
           description="Use this workspace to understand where a partner-submitted collection is in the pipeline without crossing into admin finance or reconciliation controls."
-        >
-          <WorkflowCard
-            title="Refresh collections"
-            description="Reload request and verified-payment surfaces."
-            action={
+          actions={
             <ActionButton
               variant="outline"
               onClick={() => void loadPage("refresh")}
@@ -357,9 +354,13 @@ export default function PartnerCollectionsPage() {
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </ActionButton>
-            }
+          }
+        >
+          <WorkflowCard
+            title="Refresh collections"
+            description="Reload request, follow-up, and verified-payment panels."
           />
-        </DetailPanel>
+        </ERPSectionShell>
 
         <QuickActionGrid>
           <KpiCard label="Submitted" value={submittedCount} />
@@ -368,10 +369,10 @@ export default function PartnerCollectionsPage() {
           <KpiCard label="Rejected" value={rejectedCount} />
         </QuickActionGrid>
 
-        {loading ? <LoadingBlock label="Loading partner collections..." /> : null}
+        {loading ? <ERPLoadingState label="Loading partner collections..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load partner collections"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -385,7 +386,7 @@ export default function PartnerCollectionsPage() {
                 title="Collection activity"
                 description="No submitted requests, verified payments, or follow-up items are currently available in this partner scope."
               >
-                <EmptyState
+                <ERPEmptyState
                   title="No collection workflow activity"
                   description="Create a new collection request to begin the partner collection flow."
                   action={
@@ -402,7 +403,7 @@ export default function PartnerCollectionsPage() {
                   description="Partner-created requests waiting for review or final decision."
                 >
                   {requests.length === 0 ? (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No submitted collection requests"
                       description="No partner collection requests matched the current workspace."
                     />
@@ -443,7 +444,7 @@ export default function PartnerCollectionsPage() {
                   description="These rows represent finalized payment visibility after approval and verification."
                 >
                   {verifiedPayments.length === 0 ? (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No verified payments visible"
                       description="No verified partner-visible payment rows are currently available."
                     />
@@ -477,7 +478,7 @@ export default function PartnerCollectionsPage() {
                   description="Requests needing re-submission, trace clarification, or partner action."
                 >
                   {followUpQueue.length === 0 ? (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No follow-up queue items"
                       description="No partner follow-up items currently require action."
                     />
@@ -491,7 +492,7 @@ export default function PartnerCollectionsPage() {
                             {
                               key: "status",
                               title: "Status",
-                              render: (row) => <StatusBadge status={row.status} />,
+                              render: (row) => <ERPStatusBadge status={row.status} />,
                             },
                             {
                               key: "review_note",
@@ -531,6 +532,6 @@ export default function PartnerCollectionsPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

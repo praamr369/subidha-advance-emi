@@ -1250,3 +1250,103 @@ Non-goals (enforced): **no backend changes**, **no API contract changes**, **no 
 ### 13) Next recommended phase
 
 - Phase 10 — Payments / receipts / collections (strict manual-review for posting/mutations; SAFE views first).
+
+---
+
+## Phase 10 payments receipts collections transformation result (2026-05-21)
+
+Scope: **Frontend UI only** for Payments / Receipts / Collections SAFE pages.  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no permission changes**, **no payment posting/collection submit/receipt generation/reversal behavior changes**, **no invented payment/receipt/collection data**.
+
+### 1) Payment/receipt/collection routes touched
+
+- `/admin/collections` (SAFE_AUTO)
+- `/admin/billing/receipts` (SAFE_AUTO)
+- `/admin/purchases/receipts` (SAFE_AUTO)
+- `/admin/receipts/sample` (SAFE_AUTO)
+- `/admin/receipts/sample/invoice` (SAFE_AUTO)
+- `/admin/receipts/sample/payment` (SAFE_AUTO)
+- `/admin/receipts/sample/subscription` (SAFE_AUTO)
+- `/admin/receipts/sample/acknowledgement` (SAFE_AUTO)
+- `/customer/receipts` (SAFE_AUTO)
+- `/partner/collection-requests` (SAFE_AUTO)
+- `/partner/collections` (SAFE_AUTO)
+- `/partner/collections/[id]` (SAFE_AUTO)
+
+### 2) Payment/receipt/collection routes deferred
+
+- `/admin/payments` (MANUAL_REVIEW) — register + reversal/interpretation surfaces; keep manual-review.
+- `/admin/payments/[id]` (MANUAL_REVIEW) — payment detail/audit + actions; keep manual-review.
+- `/admin/payments/create` (MANUAL_REVIEW) — payment posting; keep manual-review.
+- `/admin/payments/history` (MANUAL_REVIEW) — history/register interpretations; keep manual-review.
+- `/admin/payments/reconciliation` (MANUAL_REVIEW) — reconciliation surfaces; keep manual-review.
+- `/admin/finance/collect` (MANUAL_REVIEW) — collection/receipt workflow entry; keep manual-review.
+- `/admin/partners/collection-requests` (MANUAL_REVIEW) — verification + actions; keep manual-review.
+- `/admin/receipts/sample/waiver` (MANUAL_REVIEW) — benefit/waiver semantics; keep manual-review.
+- `/customer/payments` (MANUAL_REVIEW) — customer payment register; keep manual-review.
+- `/customer/payments/[id]` (MANUAL_REVIEW) — payment detail; keep manual-review.
+- `/partner/payments` (MANUAL_REVIEW) — partner payment visibility; keep manual-review.
+- `/partner/payments/[id]` (MANUAL_REVIEW) — payment detail; keep manual-review.
+- `/admin/reports/collections` (SAFE_AUTO) — delegates to a shared report surface; deferred to avoid cross-domain report restyling inside a payments-only phase.
+- `/partner/collections/create` (SAFE_AUTO) — delegates to a domain-owned page component; deferred to avoid accidental mutation-flow UI drift.
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO:
+  - `/admin/collections`
+  - `/admin/billing/receipts`
+  - `/admin/purchases/receipts`
+  - `/admin/receipts/sample*` (index + read-only samples excluding waiver)
+  - `/customer/receipts`
+  - `/partner/collection-requests`
+  - `/partner/collections`
+  - `/partner/collections/[id]`
+
+### 4) Components reused
+
+- ERP shell/states: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP framing: `frontend/src/components/erp/ERPSectionShell.tsx`, `frontend/src/components/erp/ERPDetailGrid.tsx`
+- ERP chips/tooling: `frontend/src/components/erp/ERPDataToolbar.tsx`, `frontend/src/components/erp/ERPStatusBadge.tsx`
+
+### 5) Components created
+
+- None (Phase 10 is composition-only: adopt shared ERP wrappers and register/section/detail framing).
+
+### 6) Payment services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, or response-shape assumptions added.
+- No new service calls introduced; all pages continue to rely on existing service modules:
+  - `frontend/src/services/payments.ts`
+  - `frontend/src/services/billing.ts`
+  - `frontend/src/services/partner/index.ts`
+  - `frontend/src/services/phase4-finance.ts`
+
+### 7) Payment/collection/receipt safety confirmation
+
+- No changes to submit handlers, validation, payment mode handling, collectability rules, or action visibility logic.
+- No changes to receipt creation/download behavior, reversal/refund/void behavior, or settlement/reconciliation behavior.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No changes that expand cross-role visibility outside existing role-permitted contracts.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to EMI logic, waiver/winner behavior, commission, payout, ledger, reconciliation, accounting posting, opening balance locking, or audit behavior.
+- UI changes are wrapper/layout/state-only on SAFE pages; mutation surfaces remain deferred for manual review.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining payment UI gaps
+
+- Admin payment register/detail/create/reconciliation pages remain legacy framed (MANUAL_REVIEW); migrate only with explicit “no handler/visibility/validation changes” constraints.
+- Customer/partner payment registers remain MANUAL_REVIEW; migrate only after confirming collectability/status semantics and action suppression on non-collectible states.
+
+### 12) Next recommended phase
+
+- Continue Phase 10 with a dedicated **manual-review** prompt for `/admin/payments*` (register + detail + history) before moving to Phase 11 billing/report consolidation.

@@ -2,12 +2,12 @@
 
 import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { toSafeMoney } from "@/lib/print/formatters";
 
 export default function SamplePaymentReceiptPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       title="Sample EMI Payment Receipt"
       subtitle="Customer-ready EMI receipt preview with clean payment and subscription context."
@@ -58,7 +58,6 @@ export default function SamplePaymentReceiptPage() {
         ]}
         footerNote="Thank you for your payment. Keep this receipt for subscription and payment reference."
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }
-
