@@ -103,6 +103,10 @@ Phase F (implemented 2026-05-21):
 - Implemented only deterministic `READY_FOR_PHASE_F` checks (no auto-correction).
 - Added admin UI for runs, module matrix, exception queue, and item drilldown + resolution notes.
 
+Phase G (implemented 2026-05-21):
+- Extended Control Tower checks to deterministic direct-sale / billing / receipt reconciliation using explicit source links only.
+- No auto-correction; no mutation of billing/receipt/journal source records.
+
 ## Deployment Plan (when implemented)
 
 ### Order of rollout (recommended)

@@ -1,6 +1,6 @@
 # Reconciliation Source-Link Map (Deterministic Audit — Phase E)
 
-Status: **AUDIT COMPLETE + PHASE F IMPLEMENTED (2026-05-21)**  
+Status: **AUDIT COMPLETE + PHASE F+G IMPLEMENTED (2026-05-21)**  
 Scope: **Source-link evidence map only** — no schema/API/service/frontend changes in this phase.
 
 This document records **confirmed** (code-backed) source-link patterns across modules so Phase F can implement only **deterministic, low-noise** reconciliation checks.
@@ -24,6 +24,25 @@ Explicitly deferred in Phase F (non-goals):
 - rent/lease accounting reconciliation (posting is deferred-by-design)
 - commission/payout reconciliation
 - any check requiring schema link additions, derived-only inference, or business-rule confirmation
+
+## Phase G Implementation Result (2026-05-21)
+
+Phase G extends Control Tower detection to **direct-sale / billing / receipt** checks using explicit links only:
+
+Implemented checks (deterministic; explicit FK/OneToOne/source fields only):
+- BillingInvoice is `POSTED/VOID` but `posted_journal_entry_id` is NULL (safe audit check; already enforced by model clean)
+- BillingInvoice `posted_journal_entry` exists but `JournalEntry.source_model/source_id` mismatch
+- Duplicate posted JournalEntry source reference for the same BillingInvoice
+- BillingInvoice has `received_total > 0` but no POSTED ReceiptDocument linked via `ReceiptDocument.billing_invoice`
+- BillingInvoice amount snapshot fields inconsistent (`grand_total/received_total/balance_total`)
+- BillingInvoice is `CANCELLED/VOID` but still has outstanding `balance_total > 0`
+- ReceiptDocument has `billing_invoice_id` but linked customer/direct_sale fields are inconsistent with the invoice
+
+Explicitly deferred in Phase G:
+- Stock movement reconciliation using only string-based `StockLedger.reference_model/reference_id` without a strict allowlist for this phase
+- Return/exchange/refund lifecycle reconciliation (even when partially linked) until workflow-specific rules are confirmed
+- Partial payment allocation checks (receipt-to-invoice allocation) unless explicit allocation links exist
+- End-to-end direct-sale → stock → delivery → accounting checks that require inferred joins
 
 ## 1) Executive summary
 

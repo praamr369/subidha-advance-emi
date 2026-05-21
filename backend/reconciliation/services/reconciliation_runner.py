@@ -12,6 +12,7 @@ from reconciliation.models import (
     ReconciliationRunStatus,
 )
 from reconciliation.services.accounting_bridge_reconciliation import run_accounting_bridge_checks
+from reconciliation.services.direct_sale_reconciliation import run_direct_sale_billing_checks
 from reconciliation.services.emi_reconciliation import run_emi_checks
 
 
@@ -38,7 +39,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         started_by=started_by,
         started_at=timezone.now(),
         metadata={
-            "phase": "F",
+            "phase": "G",
             "checks": [
                 "PAYMENT_MISSING_RECEIPT_DOCUMENT",
                 "RECEIPT_DOCUMENT_PAYMENT_LINK_INVALID",
@@ -48,6 +49,13 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
                 "BRIDGE_JOURNAL_MISSING_SOURCE_REFERENCE",
                 "JOURNAL_GROUP_UNBALANCED",
                 "DUPLICATE_JOURNAL_SOURCE_REFERENCE",
+                "BILLING_INVOICE_POSTED_JOURNAL_MISSING",
+                "BILLING_INVOICE_JOURNAL_SOURCE_LINK_INVALID",
+                "BILLING_INVOICE_DUPLICATE_JOURNAL_SOURCE_REFERENCE",
+                "BILLING_INVOICE_RECEIPT_LINK_MISSING",
+                "BILLING_INVOICE_AMOUNT_FIELDS_MISMATCH",
+                "BILLING_INVOICE_CANCELLED_OUTSTANDING",
+                "RECEIPT_DOCUMENT_INVOICE_LINK_INVALID",
             ],
         },
     )
@@ -61,6 +69,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         }
         totals = run_emi_checks(run=run, totals=totals)
         totals = run_accounting_bridge_checks(run=run, totals=totals)
+        totals = run_direct_sale_billing_checks(run=run, totals=totals)
 
         run.total_checked = totals["checked"]
         run.total_matched = totals["matched"]
@@ -89,4 +98,3 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         raise
 
     return run
-

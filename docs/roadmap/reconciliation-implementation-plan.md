@@ -33,6 +33,29 @@ Frontend (additive):
 Tests (backend, targeted):
 - `backend/tests/reconciliation/test_phase_f_control_tower.py`
 
+## Phase G Implementation (2026-05-21)
+
+Goal:
+- Extend Control Tower with deterministic direct-sale / billing / receipt checks using explicit source links only.
+
+Backend (additive):
+- New service module:
+  - `backend/reconciliation/services/direct_sale_reconciliation.py`
+- Runner registration:
+  - `backend/reconciliation/services/reconciliation_runner.py` runs Phase F checks + Phase G checks in the same run (still read-only detection).
+
+Implemented checks (Phase G):
+- BillingInvoice POSTED/VOID missing `posted_journal_entry_id`
+- BillingInvoice journal source link mismatch
+- Duplicate posted journal source reference for BillingInvoice
+- BillingInvoice `received_total > 0` but no POSTED ReceiptDocument linked via `billing_invoice` FK
+- BillingInvoice internal amount fields mismatch (balance vs computed)
+- CANCELLED/VOID BillingInvoice still outstanding (balance_total > 0)
+- ReceiptDocument → BillingInvoice link invalid (customer/direct_sale mismatch)
+
+Tests (backend, targeted):
+- `backend/tests/reconciliation/test_phase_g_direct_sale_billing_control_tower.py`
+
 ## 0) Starting Point (Confirmed in repo)
 
 Existing reconciliation surfaces:

@@ -38,6 +38,30 @@ Guarantees (Phase F):
 - Manual actions update only `ReconciliationItem` status and append `ReconciliationResolution`
 - Admin-only permission gate (`IsAdmin`) on all Control Tower endpoints
 
+## Phase G (Implemented 2026-05-21)
+
+Phase G extends the Control Tower check catalog to cover **direct-sale / billing / receipt** reconciliation using **explicit, deterministic source links only**.
+
+Implemented Phase G checks (read-only detection; no mutation of source records; explicit links only):
+- BillingInvoice is `POSTED/VOID` but `posted_journal_entry_id` is missing (HIGH)
+- BillingInvoice `posted_journal_entry` exists but `JournalEntry.source_model/source_id` does not match the invoice (HIGH)
+- Duplicate posted JournalEntry source reference for the same BillingInvoice (CRITICAL)
+- BillingInvoice has `received_total > 0` but no POSTED ReceiptDocument linked via `ReceiptDocument.billing_invoice` (MEDIUM/HIGH)
+- BillingInvoice amount fields inconsistent (`grand_total/received_total/balance_total` mismatch) (HIGH)
+- BillingInvoice is `CANCELLED/VOID` but still has outstanding `balance_total > 0` (HIGH)
+- ReceiptDocument has `billing_invoice_id` but linked customer/direct_sale fields are inconsistent with the invoice (HIGH)
+
+Deferred in Phase G (explicitly not implemented here):
+- Any stock/inventory-wide reconciliation relying only on `StockLedger.reference_model/reference_id` without a strict allowlist for this phase
+- Return/exchange/refund lifecycle reconciliation (even when partially linkable) until rules + scope are confirmed per workflow
+- Partial-payment allocation / receipt-to-invoice allocation checks unless the relationship is explicit and policy-stable
+- End-to-end direct sale → stock → delivery → accounting checks that require inferred joins
+
+Guarantees (Phase G):
+- No auto-correction
+- No mutation of BillingInvoice, ReceiptDocument, JournalEntry, AccountingBridgePosting, Payment, StockLedger, or other source rows
+- Admin-only permission gate (`IsAdmin`) remains unchanged
+
 ## 0) Phase E prerequisite (source-link determinism)
 
 Phase E deliverable (docs-only):
