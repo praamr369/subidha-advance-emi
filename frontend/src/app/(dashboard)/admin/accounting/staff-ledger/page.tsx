@@ -9,11 +9,12 @@ import {
   AccountingRefreshButton,
   accountingDate,
   accountingErrorMessage,
-  accountingFieldClassName,
   accountingMoney,
 } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import {
   getStaffLedger,
@@ -93,7 +94,7 @@ export default function AccountingStaffLedgerPage() {
   ];
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Staff Ledger"
       subtitle="The staff ledger gives a single payable-receivable view across salary accruals, salary payments, reimbursement accruals, and reimbursement payments while leaving payroll and accounting source records intact."
       breadcrumbs={[
@@ -120,54 +121,59 @@ export default function AccountingStaffLedgerPage() {
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-3">
-          <label className="max-w-sm flex-1 text-sm text-muted-foreground">
-            Staff filter
-            <select
-              className={accountingFieldClassName()}
-              value={selectedEmployeeId}
-              onChange={(event) => setSelectedEmployeeId(event.target.value)}
-            >
-              <option value="">All staff</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.employee_code} · {employee.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <AccountingRefreshButton
-            loading={loading}
-            refreshing={refreshing}
-            onClick={() => void loadPage("refresh")}
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => void loadPage("refresh", selectedEmployeeId)}
-            className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-          >
-            Apply Filter
-          </button>
-          {selectedEmployeeId ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedEmployeeId("");
-                void loadPage("refresh", "");
-              }}
-              className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              Clear Filter
-            </button>
-          ) : null}
-        </div>
+        <ERPDataToolbar
+          left={
+            <label className="max-w-sm text-sm text-muted-foreground">
+              Staff filter
+              <select
+                className="mt-1 w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-sm text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                value={selectedEmployeeId}
+                onChange={(event) => setSelectedEmployeeId(event.target.value)}
+              >
+                <option value="">All staff</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.employee_code} · {employee.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          }
+          right={
+            <>
+              <button
+                type="button"
+                onClick={() => void loadPage("refresh", selectedEmployeeId)}
+                className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+                disabled={loading || refreshing}
+              >
+                Apply Filter
+              </button>
+              {selectedEmployeeId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedEmployeeId("");
+                    void loadPage("refresh", "");
+                  }}
+                  className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+                  disabled={loading || refreshing}
+                >
+                  Clear Filter
+                </button>
+              ) : null}
+              <AccountingRefreshButton
+                loading={loading}
+                refreshing={refreshing}
+                onClick={() => void loadPage("refresh")}
+              />
+            </>
+          }
+        />
 
         {error ? <AccountingNotice tone="danger" message={error} /> : null}
 
-        <WorkspaceSection
+        <ERPSectionShell
           title="Closing Balances"
           description="Positive balances are staff payables from the business. Negative balances surface receivable posture from the staff side."
         >
@@ -176,7 +182,7 @@ export default function AccountingStaffLedgerPage() {
               {report.employees.map((employee) => (
                 <div
                   key={employee.employee_id}
-                  className="rounded-[1.2rem] border border-white/80 bg-white/75 p-4"
+                  className="surface-panel-elevated rounded-[1.35rem] border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_92%,white_8%)] p-4 shadow-[0_18px_40px_-46px_rgba(15,23,42,0.38)]"
                 >
                   <div className="text-sm font-semibold text-foreground">
                     {employee.employee_code} · {employee.employee_name}
@@ -191,14 +197,14 @@ export default function AccountingStaffLedgerPage() {
               ))}
             </div>
           ) : (
-            <AccountingNotice
-              tone="danger"
-              message="No salary or reimbursement ledger rows are available for the selected scope yet."
+            <ERPEmptyState
+              title="No closing balances yet"
+              description="No salary or reimbursement ledger rows are available for the selected scope yet."
             />
           )}
-        </WorkspaceSection>
+        </ERPSectionShell>
 
-        <WorkspaceSection
+        <ERPSectionShell
           title="Ledger Entries"
           description="The ledger is derived from posted salary and reimbursement source events. It is not a manual journal substitute."
         >
@@ -211,8 +217,8 @@ export default function AccountingStaffLedgerPage() {
             emptyTitle="No staff ledger rows"
             emptyDescription="Posted salary or reimbursement activity will appear here."
           />
-        </WorkspaceSection>
+        </ERPSectionShell>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

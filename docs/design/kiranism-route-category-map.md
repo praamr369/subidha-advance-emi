@@ -436,6 +436,18 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
     - `/admin/finance` — mixed surface; defer until per-action verification/splitting is planned.
     - Reconciliation/reversal/payout/audit pages — explicitly out-of-scope for Phase 12B.
 
+- **Phase 12C status (2026-05-21)** (manual-review, read-first, wrapper/layout/state-only):
+  - **Transformed** (read-first ledger register; no handler/API changes):
+    - `/admin/accounting/staff-ledger`
+  - **Deferred**:
+    - `/admin/accounting/staff` — create/update staff profile + attendance record mutations; out-of-scope.
+    - `/admin/accounting/salary`, `/admin/accounting/salary/[id]` — approve/post + payment mutations; out-of-scope.
+    - `/admin/accounting/books` — money-movement create/post controls; out-of-scope.
+    - `/admin/accounting/bridges` — bridge-run mutation controls; out-of-scope.
+    - `/admin/finance/commissions` — export/download + settlement/reversal controls; out-of-scope for this read-first-only batch.
+    - `/admin/accounting/books/(bank|cash|upi|sales|purchase)` — already uses `BookRegisterPage`; defer shared-shell alignment to a dedicated pass to keep the Phase 12C batch ≤3 routes.
+    - `/admin/accounting/gst` — GST hub links into posting lifecycle registers; defer to a dedicated GST manual-review prompt series.
+
 ### Phase 13 — Partner portal / commission / payout
 
 - **Goal**: partner portal UI polish; payout execution manual-review.

@@ -1871,3 +1871,79 @@ This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-fir
 - Continue Phase 12 as small MANUAL_REVIEW batches:
   - keep read-only statement/register pages grouped
   - handle mutation-heavy finance/accounting pages one route at a time with explicit handler/visibility verification
+
+## Phase 12C accounting finance read-first register transformation result
+
+This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-first** Accounting/Finance register pages, limited to **wrapper/layout/state-only** changes (no handler, visibility, or service/contract changes).
+
+### 1) Accounting/finance routes touched
+
+- `/admin/accounting/staff-ledger`
+
+### 2) Accounting/finance routes inspected but deferred
+
+- `/admin/accounting/staff` — contains create/update staff profile and attendance record mutations; out-of-scope for Phase 12C.
+- `/admin/accounting/salary` and `/admin/accounting/salary/[id]` — contains approve/post salary sheet mutations and salary payment mutations; out-of-scope.
+- `/admin/accounting/books` — contains money-movement create/post controls; out-of-scope.
+- `/admin/accounting/bridges` — contains bridge-run mutation controls; out-of-scope.
+- `/admin/finance/commissions` — contains export/download actions and settlement/reversal controls; out-of-scope for a read-first-only register batch.
+- `/admin/accounting/books/(bank|cash|upi|sales|purchase)` — already uses `BookRegisterPage`; defer any shared-shell changes to a dedicated BookRegisterPage alignment pass to avoid transforming >3 routes in this batch.
+- `/admin/accounting/gst` — GST hub links into posting lifecycle registers; defer to a dedicated GST manual-review prompt series.
+
+### 3) Why selected pages were safe for wrapper/layout/state-only change
+
+- The selected page only calls read-only services from `@/services/accounting`:
+  - `listEmployees()`
+  - `getStaffLedger({ employee })`
+- No POST/PUT/PATCH/DELETE calls exist in the page; no submit handlers were added or changed.
+- Existing action visibility and event handlers (filter/apply/clear/refresh) remain unchanged in logic; only wrapper/layout framing changed.
+
+### 4) Components reused
+
+- `frontend/src/components/erp/ERPPageShell.tsx`
+- `frontend/src/components/erp/ERPSectionShell.tsx`
+- `frontend/src/components/erp/ERPDataToolbar.tsx`
+- `frontend/src/components/erp/ERPEmptyState.tsx`
+- Preserved data table and accounting formatters:
+  - `frontend/src/components/enterprise/EnterpriseDataTable.tsx`
+  - `frontend/src/components/accounting/shared.tsx`
+
+### 5) Components created, if any
+
+- None.
+
+### 6) Accounting/finance services/API contracts preserved
+
+- Preserved: no endpoint paths, request parameters, response normalization, or service functions were modified.
+- Staff ledger fetch remains:
+  - `getStaffLedger(employeeId ? { employee: employeeId } : {})`
+
+### 7) COA/account/posting/reconciliation/opening-balance safety confirmation
+
+- No changes to Chart of Accounts behavior, finance-account behavior, posting profile behavior, journals/ledger behavior, opening-balance lock/unlock behavior, GST/non-GST posting behavior, reconciliation behavior, reversal behavior, payout behavior, or audit logging surfaces.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No permission weakening; route access remains role-scoped exactly as before.
+
+### 9) Financial/audit safety confirmation
+
+- UI changes are wrapper/layout/state-only and do not affect any persisted financial history or auditability.
+- Backend remains authoritative; ledger rows and balances render as returned.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining accounting/finance UI gaps
+
+- Accounting/finance mutation-heavy pages still require dedicated per-route MANUAL_REVIEW prompts with explicit per-action verification (books money movements, staff register, salary register, deposits, reconciliation, reversal control, payout batches, GST posting registers).
+
+### 12) Next recommended phase
+
+- Continue Phase 12 with another small read-first batch:
+  - consider `/admin/reports/finance` and `/admin/reports/reconciliation` if they are read-only (verify before touching)
+  - keep mutation-heavy pages one route per prompt with explicit handler/visibility verification
