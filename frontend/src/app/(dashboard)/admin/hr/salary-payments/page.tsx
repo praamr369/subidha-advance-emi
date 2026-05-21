@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { listHrSalaryPayments } from "@/services/admin-hr";
 
@@ -33,7 +34,7 @@ export default function AdminHrSalaryPaymentsPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Staff HR"
       title="Salary Payments"
       subtitle="Salary payment register. This uses existing salary payment models and does not mutate unrelated finance records."
@@ -48,18 +49,18 @@ export default function AdminHrSalaryPaymentsPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      {loading ? <LoadingBlock label="Loading salary payments..." /> : null}
-      {!loading && error ? <ErrorState title="Unable to load salary payments" description={error} onRetry={() => void load()} /> : null}
-      {!loading && !error && rows.length === 0 ? <EmptyState title="No salary payments yet" description="Salary payments will appear here when recorded." /> : null}
+      {loading ? <ERPLoadingState label="Loading salary payments..." /> : null}
+      {!loading && error ? <ERPErrorState title="Unable to load salary payments" description={error} onRetry={() => void load()} /> : null}
+      {!loading && !error && rows.length === 0 ? (
+        <ERPEmptyState title="No salary payments yet" description="Salary payments will appear here when recorded." />
+      ) : null}
       {!loading && !error && rows.length > 0 ? (
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="text-sm font-semibold text-foreground">Recent salary payments</div>
-          <div className="mt-3 overflow-auto">
+        <ERPSectionShell title="Recent salary payments" description="Read-only preview of the first 20 items returned by the API.">
+          <div className="overflow-auto">
             <pre className="text-xs text-muted-foreground">{JSON.stringify(rows.slice(0, 20), null, 2)}</pre>
           </div>
-        </section>
+        </ERPSectionShell>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }
-

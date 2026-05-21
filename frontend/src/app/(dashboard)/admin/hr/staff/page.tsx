@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import {
   DataTableShell,
   FormSection,
@@ -14,8 +17,6 @@ import {
   WorkflowCard,
 } from "@/components/ui/operations";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
 import { listBranches, type BranchRecord } from "@/services/branch-control";
 import {
@@ -340,7 +341,7 @@ export default function AdminHrStaffRegisterPage() {
   const editorOpen = createOpen || Boolean(editStaff);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Staff HR"
       title="Staff Register"
       subtitle="Search, filter, and manage staff profiles with real HR controls."
@@ -357,25 +358,27 @@ export default function AdminHrStaffRegisterPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <QuickActionGrid>
-        <KpiCard label="Total staff" value={rows.length} helper="Current register scope" />
-        <KpiCard label="Active staff" value={activeCount} helper="Ready for scheduling/payroll" />
-        <KpiCard label="KYC verified" value={verifiedKycCount} helper="Compliant profiles" />
-        <WorkflowCard
-          title="Daily HR actions"
-          description="Use attendance, payroll, and documents to complete daily operator workflows."
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Link href={ROUTES.admin.hrAttendance} className="text-xs font-semibold text-primary hover:underline">
-                Mark attendance
-              </Link>
-              <Link href={ROUTES.admin.hrPayroll} className="text-xs font-semibold text-primary hover:underline">
-                Run payroll
-              </Link>
-            </div>
-          }
-        />
-      </QuickActionGrid>
+      <ERPSectionShell title="Workspace overview" description="Staff directory view and controlled HR actions using existing APIs (no fake records).">
+        <QuickActionGrid>
+          <KpiCard label="Total staff" value={rows.length} helper="Current register scope" />
+          <KpiCard label="Active staff" value={activeCount} helper="Ready for scheduling/payroll" />
+          <KpiCard label="KYC verified" value={verifiedKycCount} helper="Compliant profiles" />
+          <WorkflowCard
+            title="Daily HR actions"
+            description="Use attendance, payroll, and documents to complete daily operator workflows."
+            action={
+              <div className="flex flex-wrap gap-2">
+                <Link href={ROUTES.admin.hrAttendance} className="text-xs font-semibold text-primary hover:underline">
+                  Mark attendance
+                </Link>
+                <Link href={ROUTES.admin.hrPayroll} className="text-xs font-semibold text-primary hover:underline">
+                  Run payroll
+                </Link>
+              </div>
+            }
+          />
+        </QuickActionGrid>
+      </ERPSectionShell>
 
       <FormSection
         title="Staff search and filters"
@@ -416,8 +419,8 @@ export default function AdminHrStaffRegisterPage() {
       </FormSection>
 
       {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
-      {loading ? <LoadingBlock label="Loading staff..." /> : null}
-      {!loading && error ? <ErrorState title="Unable to load staff" description={error} onRetry={() => void load()} /> : null}
+      {loading ? <ERPLoadingState label="Loading staff..." /> : null}
+      {!loading && error ? <ERPErrorState title="Unable to load staff" description={error} onRetry={() => void load()} /> : null}
 
       {editorOpen ? (
         <FormSection
@@ -440,10 +443,11 @@ export default function AdminHrStaffRegisterPage() {
         </FormSection>
       ) : null}
 
-      {!loading && !error && rows.length === 0 ? <EmptyState title="No staff found" description="Adjust filters or create a staff profile." /> : null}
+      {!loading && !error && rows.length === 0 ? <ERPEmptyState title="No staff found" description="Adjust filters or create a staff profile." /> : null}
 
       {!loading && !error && rows.length > 0 ? (
-        <DataTableShell>
+        <ERPSectionShell title={`Staff register (${rows.length})`} description="Open staff profiles to review attendance, documents, payroll, and salary context.">
+          <DataTableShell>
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-foreground">Staff ({rows.length})</div>
             <div className="text-xs text-muted-foreground">Profile pages are opened from staff names and View Profile actions.</div>
@@ -480,8 +484,8 @@ export default function AdminHrStaffRegisterPage() {
                       <div>{row.branch_name || "No branch"}</div>
                       <div className="text-xs text-muted-foreground">Counter assignment not exposed on staff profile API.</div>
                     </td>
-                    <td className="py-3 pr-4"><StatusBadge status={row.kyc_verified ? "ACTIVE" : "PENDING"} label={row.kyc_verified ? "Verified" : "Pending"} /></td>
-                    <td className="py-3 pr-4"><StatusBadge status={row.is_active ? "ACTIVE" : "INACTIVE"} label={row.is_active ? "Active" : "Inactive"} /></td>
+                    <td className="py-3 pr-4"><ERPStatusBadge status={row.kyc_verified ? "ACTIVE" : "PENDING"} label={row.kyc_verified ? "Verified" : "Pending"} /></td>
+                    <td className="py-3 pr-4"><ERPStatusBadge status={row.is_active ? "ACTIVE" : "INACTIVE"} label={row.is_active ? "Active" : "Inactive"} /></td>
                     <td className="py-3 pr-4">
                       <div className="flex min-w-56 flex-wrap gap-2">
                         <Link href={`${ROUTES.admin.hrStaff}/${row.id}`} className="rounded-md border border-border px-2 py-1 text-xs font-semibold hover:bg-muted">View profile</Link>
@@ -499,8 +503,9 @@ export default function AdminHrStaffRegisterPage() {
               </tbody>
             </table>
           </div>
-        </DataTableShell>
+          </DataTableShell>
+        </ERPSectionShell>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

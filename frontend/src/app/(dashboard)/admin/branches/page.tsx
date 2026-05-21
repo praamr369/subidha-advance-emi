@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -119,7 +119,7 @@ export default function AdminBranchesPage() {
             setNotice(null);
             setError(null);
           }}
-          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+          className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-muted"
         >
           Edit
         </button>
@@ -174,7 +174,7 @@ export default function AdminBranchesPage() {
   const primaryBranch = rows.find((row) => row.is_primary) ?? null;
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Branch Master"
       subtitle="Govern branch ownership centrally so subscriptions, collections, billing, inventory, accounting, and workforce records can carry explicit branch context without collapsing those modules into one table."
       breadcrumbs={[
@@ -194,9 +194,9 @@ export default function AdminBranchesPage() {
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading branches..." /> : null}
+        {loading ? <ERPLoadingState label="Loading branches..." /> : null}
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load branches"
             description={error}
             onRetry={() => void loadPage("initial")}
@@ -226,7 +226,7 @@ export default function AdminBranchesPage() {
                 description="Branch codes and primary-branch designation drive safe defaults for existing records and new branch-aware operations."
               >
                 {rows.length === 0 ? (
-                  <EmptyState
+                  <ERPEmptyState
                     title="No branches yet"
                     description="Create the primary branch first so existing operational records have a safe default governance home."
                   />
@@ -247,27 +247,27 @@ export default function AdminBranchesPage() {
               >
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <label className="text-sm text-slate-700">
+                    <label className="text-sm text-foreground">
                       <span className="mb-2 block font-medium">Code</span>
                       <input
                         value={form.code}
                         onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-ring"
                         placeholder="BR-MAIN"
                         required
                       />
                     </label>
-                    <label className="text-sm text-slate-700">
+                    <label className="text-sm text-foreground">
                       <span className="mb-2 block font-medium">Name</span>
                       <input
                         value={form.name}
                         onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-ring"
                         placeholder="Main Showroom"
                         required
                       />
                     </label>
-                    <label className="text-sm text-slate-700">
+                    <label className="text-sm text-foreground">
                       <span className="mb-2 block font-medium">Status</span>
                       <select
                         value={form.status}
@@ -277,59 +277,59 @@ export default function AdminBranchesPage() {
                             status: event.target.value as BranchForm["status"],
                           }))
                         }
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-ring"
                       >
                         <option value="ACTIVE">Active</option>
                         <option value="INACTIVE">Inactive</option>
                       </select>
                     </label>
-                    <label className="text-sm text-slate-700">
+                    <label className="text-sm text-foreground">
                       <span className="mb-2 block font-medium">Phone</span>
                       <input
                         value={form.phone}
                         onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-ring"
                         placeholder="Branch contact phone"
                       />
                     </label>
-                    <label className="text-sm text-slate-700 md:col-span-2">
+                    <label className="text-sm text-foreground md:col-span-2">
                       <span className="mb-2 block font-medium">Email</span>
                       <input
                         type="email"
                         value={form.email}
                         onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-ring"
                         placeholder="branch@example.com"
                       />
                     </label>
-                    <label className="text-sm text-slate-700 md:col-span-2">
+                    <label className="text-sm text-foreground md:col-span-2">
                       <span className="mb-2 block font-medium">Address</span>
                       <textarea
                         rows={3}
                         value={form.address}
                         onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-ring"
                         placeholder="Physical branch address"
                       />
                     </label>
-                    <label className="text-sm text-slate-700 md:col-span-2">
+                    <label className="text-sm text-foreground md:col-span-2">
                       <span className="mb-2 block font-medium">Notes</span>
                       <textarea
                         rows={3}
                         value={form.notes}
                         onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-ring"
                         placeholder="Operational notes, opening remarks, or branch-control posture."
                       />
                     </label>
                   </div>
 
-                  <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  <label className="flex items-center gap-3 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-foreground">
                     <input
                       type="checkbox"
                       checked={form.is_primary}
                       onChange={(event) => setForm((current) => ({ ...current, is_primary: event.target.checked }))}
-                      className="h-4 w-4 rounded border-slate-300"
+                      className="h-4 w-4 rounded border-border"
                     />
                     Mark this as the primary branch default for legacy and fallback branch assignment.
                   </label>
@@ -350,14 +350,14 @@ export default function AdminBranchesPage() {
                     <button
                       type="submit"
                       disabled={saving}
-                      className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+                      className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition disabled:opacity-60"
                     >
                       {saving ? "Saving..." : selectedBranch ? "Update Branch" : "Create Branch"}
                     </button>
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted"
                     >
                       Reset
                     </button>
@@ -365,7 +365,7 @@ export default function AdminBranchesPage() {
                       type="button"
                       onClick={() => void loadPage("refresh")}
                       disabled={refreshing}
-                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                      className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60"
                     >
                       {refreshing ? "Refreshing..." : "Refresh"}
                     </button>
@@ -376,6 +376,6 @@ export default function AdminBranchesPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -529,6 +529,21 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Services/contracts**: HR services.
 - **Prompt title**: “Phase 15 — HR UI pass”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
+- **Phase 15 status (implemented 2026-05-21)**:
+  - **Transformed**:
+    - `/admin/hr` (SAFE_AUTO)
+    - `/admin/hr/staff` (SAFE_AUTO)
+    - `/admin/hr/staff/[id]` (SAFE_AUTO)
+    - `/admin/hr/attendance` (SAFE_AUTO)
+    - `/admin/hr/leave` (SAFE_AUTO)
+    - `/admin/hr/expenses` (SAFE_AUTO)
+    - `/admin/hr/payroll` (SAFE_AUTO)
+    - `/admin/hr/salary-payments` (SAFE_AUTO)
+    - `/admin/hr/staff-documents` (SAFE_AUTO)
+    - `/admin/branches` (SAFE_LAYOUT_ONLY)
+    - `/admin/branch-reporting` (SAFE_AUTO)
+    - `/admin/bi/hr` (SAFE_AUTO)
+  - **Deferred**: none (no HR / Branch / Staff Operations routes are categorized MANUAL_REVIEW / DO_NOT_TOUCH in the route map).
 
 ### Phase 16 — Service desk / reminders / support
 

@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
 import {
   DataTableShell,
@@ -15,8 +18,6 @@ import {
   QuickActionGrid,
   WorkflowCard,
 } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
 import {
   createHrStaffDocument,
@@ -107,7 +108,7 @@ export default function AdminHrStaffDocumentsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Staff HR"
       title="Staff Documents"
       subtitle="Filter, upload, and maintain staff KYC and agreement documents."
@@ -122,23 +123,25 @@ export default function AdminHrStaffDocumentsPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <QuickActionGrid>
-        <KpiCard label="Documents loaded" value={rows.length} helper="Current filtered records" />
-        <KpiCard
-          label="Active documents"
-          value={rows.filter((row) => row.status === "ACTIVE").length}
-          helper="Operationally valid"
-        />
-        <KpiCard
-          label="Inactive documents"
-          value={rows.filter((row) => row.status === "INACTIVE").length}
-          helper="Kept for audit trail"
-        />
-        <WorkflowCard
-          title="Document workflow"
-          description="Upload from HR and toggle active/inactive without deleting historical records."
-        />
-      </QuickActionGrid>
+      <ERPSectionShell title="Workspace overview" description="Documents stay audit-safe through ACTIVE/INACTIVE status toggles (no delete).">
+        <QuickActionGrid>
+          <KpiCard label="Documents loaded" value={rows.length} helper="Current filtered records" />
+          <KpiCard
+            label="Active documents"
+            value={rows.filter((row) => row.status === "ACTIVE").length}
+            helper="Operationally valid"
+          />
+          <KpiCard
+            label="Inactive documents"
+            value={rows.filter((row) => row.status === "INACTIVE").length}
+            helper="Kept for audit trail"
+          />
+          <WorkflowCard
+            title="Document workflow"
+            description="Upload from HR and toggle active/inactive without deleting historical records."
+          />
+        </QuickActionGrid>
+      </ERPSectionShell>
 
       <FormSection
         title="Document filters"
@@ -201,12 +204,13 @@ export default function AdminHrStaffDocumentsPage() {
       ) : null}
 
       {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
-      {loading ? <LoadingBlock label="Loading staff documents..." /> : null}
-      {!loading && error ? <ErrorState title="Staff documents unavailable" description={error} onRetry={() => void load()} /> : null}
-      {!loading && !error && rows.length === 0 ? <EmptyState title="No staff documents" description="Upload KYC, appointment, and salary agreement documents from this page or the staff profile." /> : null}
+      {loading ? <ERPLoadingState label="Loading staff documents..." /> : null}
+      {!loading && error ? <ERPErrorState title="Staff documents unavailable" description={error} onRetry={() => void load()} /> : null}
+      {!loading && !error && rows.length === 0 ? <ERPEmptyState title="No staff documents" description="Upload KYC, appointment, and salary agreement documents from this page or the staff profile." /> : null}
 
       {!loading && !error && rows.length > 0 ? (
-        <DataTableShell>
+        <ERPSectionShell title={`Documents (${rows.length})`} description="Register view returned by the existing staff document API.">
+          <DataTableShell>
           <div className="text-sm font-semibold text-foreground">Documents ({rows.length})</div>
           <div className="mt-3 overflow-auto">
             <table className="min-w-full text-sm">
@@ -232,7 +236,7 @@ export default function AdminHrStaffDocumentsPage() {
                     <td className="py-3 pr-4">{row.document_type}</td>
                     <td className="py-3 pr-4">{row.title}</td>
                     <td className="py-3 pr-4">{row.document_no || "Unavailable"}</td>
-                    <td className="py-3 pr-4"><StatusBadge status={row.status} /></td>
+                    <td className="py-3 pr-4"><ERPStatusBadge status={row.status} /></td>
                     <td className="py-3 pr-4">{row.created_at?.slice(0, 10) || "Unavailable"}</td>
                     <td className="py-3 pr-4">{row.uploaded_by_username || "Unavailable"}</td>
                     <td className="py-3 pr-4">
@@ -251,8 +255,9 @@ export default function AdminHrStaffDocumentsPage() {
               </tbody>
             </table>
           </div>
-        </DataTableShell>
+          </DataTableShell>
+        </ERPSectionShell>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

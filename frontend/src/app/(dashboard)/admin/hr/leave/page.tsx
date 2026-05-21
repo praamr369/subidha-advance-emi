@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { listHrLeaveRequests, patchHrLeaveRequest, type HrLeaveRequest } from "@/services/admin-hr";
 
@@ -42,7 +43,7 @@ export default function AdminHrLeaveRequestsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Staff HR"
       title="Leave Requests"
       subtitle="Approve or reject leave requests (existing leave workflow)."
@@ -53,14 +54,15 @@ export default function AdminHrLeaveRequestsPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      {loading ? <LoadingBlock label="Loading leave requests..." /> : null}
-      {!loading && error ? <ErrorState title="Leave requests unavailable" description={error} onRetry={() => void load()} /> : null}
-      {!loading && !error && rows.length === 0 ? <EmptyState title="No leave requests" description="Leave requests will appear once staff submits them through the leave module." /> : null}
+      {loading ? <ERPLoadingState label="Loading leave requests..." /> : null}
+      {!loading && error ? <ERPErrorState title="Leave requests unavailable" description={error} onRetry={() => void load()} /> : null}
+      {!loading && !error && rows.length === 0 ? (
+        <ERPEmptyState title="No leave requests" description="Leave requests will appear once staff submits them through the leave module." />
+      ) : null}
 
       {!loading && !error && rows.length > 0 ? (
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="text-sm font-semibold text-foreground">Leave requests</div>
-          <div className="mt-3 overflow-auto">
+        <ERPSectionShell title="Leave requests" description="Approve/reject actions call the existing leave workflow.">
+          <div className="overflow-auto">
             <table className="min-w-full text-sm">
               <thead className="text-left text-xs text-muted-foreground">
                 <tr>
@@ -103,9 +105,8 @@ export default function AdminHrLeaveRequestsPage() {
               </tbody>
             </table>
           </div>
-        </section>
+        </ERPSectionShell>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }
-

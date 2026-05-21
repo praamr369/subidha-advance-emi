@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { listHrAttendance, listHrStaff, markHrAttendance, type HrStaff } from "@/services/admin-hr";
 
@@ -55,7 +56,7 @@ export default function AdminHrAttendancePage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Staff HR"
       title="Attendance"
       subtitle="Mark and review attendance using existing payroll-safe attendance records."
@@ -70,9 +71,8 @@ export default function AdminHrAttendancePage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="text-sm font-semibold text-foreground">Mark attendance</div>
-        <div className="mt-3 grid gap-3 md:grid-cols-4">
+      <ERPSectionShell title="Mark attendance" description="Writes only through the existing attendance mutation endpoint; no local state becomes authoritative.">
+        <div className="grid gap-3 md:grid-cols-4">
           <select
             value={staffId ?? ""}
             onChange={(e) => setStaffId(e.target.value ? Number(e.target.value) : null)}
@@ -110,16 +110,17 @@ export default function AdminHrAttendancePage() {
             Save
           </button>
         </div>
-      </section>
+      </ERPSectionShell>
 
-      {loading ? <LoadingBlock label="Loading attendance..." /> : null}
-      {!loading && error ? <ErrorState title="Attendance unavailable" description={error} onRetry={() => void load()} /> : null}
-      {!loading && !error && rows.length === 0 ? <EmptyState title="No attendance records" description="Mark attendance to build a daily record." /> : null}
+      {loading ? <ERPLoadingState label="Loading attendance..." /> : null}
+      {!loading && error ? <ERPErrorState title="Attendance unavailable" description={error} onRetry={() => void load()} /> : null}
+      {!loading && !error && rows.length === 0 ? (
+        <ERPEmptyState title="No attendance records" description="Mark attendance to build a daily record." />
+      ) : null}
 
       {!loading && !error && rows.length > 0 ? (
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="text-sm font-semibold text-foreground">Recent attendance</div>
-          <div className="mt-3 overflow-auto">
+        <ERPSectionShell title="Recent attendance" description="Read-only view of the most recent attendance rows returned by the current API.">
+          <div className="overflow-auto">
             <table className="min-w-full text-sm">
               <thead className="text-left text-xs text-muted-foreground">
                 <tr>
@@ -141,9 +142,8 @@ export default function AdminHrAttendancePage() {
               </tbody>
             </table>
           </div>
-        </section>
+        </ERPSectionShell>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }
-

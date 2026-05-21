@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import StatCard from "@/components/ui/StatCard";
 import { ROUTES } from "@/lib/routes";
 import { getHrSummary, type HrSummary } from "@/services/admin-hr";
@@ -12,6 +16,17 @@ export default function AdminHrWorkspacePage() {
   const [payload, setPayload] = useState<HrSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const loading = !payload && !error;
+
+  async function refresh() {
+    try {
+      const data = await getHrSummary();
+      setPayload(data);
+      setError(null);
+    } catch (err: unknown) {
+      setPayload(null);
+      setError(err instanceof Error ? err.message : "Unable to load HR summary.");
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -23,6 +38,7 @@ export default function AdminHrWorkspacePage() {
       })
       .catch((err: unknown) => {
         if (!active) return;
+        setPayload(null);
         setError(err instanceof Error ? err.message : "Unable to load HR summary.");
       });
     return () => {
@@ -31,7 +47,7 @@ export default function AdminHrWorkspacePage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Staff HR"
       title="Staff Workspace"
       subtitle="Daily HR command center over existing employee, attendance, leave, expense, and payroll records."
@@ -54,24 +70,27 @@ export default function AdminHrWorkspacePage() {
         { label: "Leave pending", value: payload ? payload.pending_leave_requests : "—", tone: payload ? "warning" : "default" },
       ]}
     >
-      {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
-          {error}
-        </div>
+      {loading ? <ERPLoadingState label="Loading HR workspace..." /> : null}
+      {!loading && error ? (
+        <ERPErrorState title="HR workspace unavailable" description={error} onRetry={() => void refresh()} />
+      ) : null}
+      {!loading && !error && !payload ? (
+        <ERPEmptyState title="HR summary unavailable" description="Try refreshing the page. If the issue persists, verify HR summary service availability." />
       ) : null}
 
       {payload ? (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Expense claims pending" value={payload.pending_expense_claims} tone={payload.pending_expense_claims > 0 ? "warning" : "success"} />
-            <StatCard label="Payroll pending" value={payload.payroll_pending} tone={payload.payroll_pending > 0 ? "info" : "success"} />
-            <StatCard label="Salary payments pending" value={payload.salary_payment_pending} tone={payload.salary_payment_pending > 0 ? "warning" : "success"} />
-            <StatCard label="As of" value={new Date(payload.as_of).toLocaleString("en-IN")} tone="default" />
-          </div>
+          <ERPSectionShell title="Work queue" description="Snapshot summary from existing HR registers and payroll-safe models.">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard label="Expense claims pending" value={payload.pending_expense_claims} tone={payload.pending_expense_claims > 0 ? "warning" : "success"} />
+              <StatCard label="Payroll pending" value={payload.payroll_pending} tone={payload.payroll_pending > 0 ? "info" : "success"} />
+              <StatCard label="Salary payments pending" value={payload.salary_payment_pending} tone={payload.salary_payment_pending > 0 ? "warning" : "success"} />
+              <StatCard label="As of" value={new Date(payload.as_of).toLocaleString("en-IN")} tone="default" />
+            </div>
+          </ERPSectionShell>
 
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-foreground">Quick routes</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ERPSectionShell title="Quick routes" description="Open existing HR workspaces without changing staff, attendance, payroll, or salary behavior.">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {[
                 ["Staff Register", ROUTES.admin.hrStaff],
                 ["Attendance", ROUTES.admin.hrAttendance],
@@ -90,13 +109,9 @@ export default function AdminHrWorkspacePage() {
                 </Link>
               ))}
             </div>
-          </section>
+          </ERPSectionShell>
         </>
-      ) : (
-        <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-          {loading ? "Loading HR workspace..." : "HR summary unavailable."}
-        </div>
-      )}
-    </PortalPage>
+      ) : null}
+    </ERPPageShell>
   );
 }

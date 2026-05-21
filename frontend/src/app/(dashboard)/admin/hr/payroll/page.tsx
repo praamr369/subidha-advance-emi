@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { getHrPayroll, listHrStaff, patchHrStaff, type HrStaff } from "@/services/admin-hr";
 
@@ -43,7 +44,7 @@ export default function AdminHrPayrollPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Staff HR"
       title="Salary / Payroll"
       subtitle="Payroll periods and salary sheets from existing accounting workforce models."
@@ -59,13 +60,12 @@ export default function AdminHrPayrollPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      {loading ? <LoadingBlock label="Loading payroll..." /> : null}
-      {!loading && error ? <ErrorState title="Payroll unavailable" description={error} onRetry={() => void load()} /> : null}
+      {loading ? <ERPLoadingState label="Loading payroll..." /> : null}
+      {!loading && error ? <ERPErrorState title="Payroll unavailable" description={error} onRetry={() => void load()} /> : null}
       {!loading && !error && payload ? (
         <>
-          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="text-sm font-semibold text-foreground">Payroll Setup (Staff Master)</div>
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <ERPSectionShell title="Payroll setup (Staff master)" description="Updates staff payroll fields only through the existing staff patch API.">
+            <div className="grid gap-3 md:grid-cols-3">
               <select
                 value={staffId}
                 onChange={(e) => setStaffId(e.target.value)}
@@ -116,28 +116,25 @@ export default function AdminHrPayrollPage() {
             >
               Save payroll setup
             </button>
-          </section>
+          </ERPSectionShell>
 
-          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="text-sm font-semibold text-foreground">Current payroll period</div>
-            <div className="mt-2 text-sm text-muted-foreground">
+          <ERPSectionShell title="Current payroll period">
+            <div className="text-sm text-muted-foreground">
               {payload.current_period ? `${payload.current_period.code} · ${payload.current_period.status}` : "No payroll period found."}
             </div>
-          </section>
+          </ERPSectionShell>
 
           {payload.salary_sheets.length === 0 ? (
-            <EmptyState title="No salary sheets yet" description="Salary sheets will appear here when generated in the salary module." />
+            <ERPEmptyState title="No salary sheets yet" description="Salary sheets will appear here when generated in the salary module." />
           ) : (
-            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="text-sm font-semibold text-foreground">Recent salary sheets</div>
-              <div className="mt-3 overflow-auto">
+            <ERPSectionShell title="Recent salary sheets" description="Read-only peek at the first 20 rows for operator troubleshooting.">
+              <div className="overflow-auto">
                 <pre className="text-xs text-muted-foreground">{JSON.stringify(payload.salary_sheets.slice(0, 20), null, 2)}</pre>
               </div>
-            </section>
+            </ERPSectionShell>
           )}
         </>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }
-

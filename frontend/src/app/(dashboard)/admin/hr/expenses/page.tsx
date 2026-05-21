@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { listHrExpenseClaims, patchHrExpenseClaim, type HrExpenseClaim } from "@/services/admin-hr";
 
@@ -42,7 +43,7 @@ export default function AdminHrExpenseClaimsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Staff HR"
       title="Expense Claims"
       subtitle="Approve or reject employee expense claims (existing expense claim workflow)."
@@ -53,14 +54,15 @@ export default function AdminHrExpenseClaimsPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
-      {loading ? <LoadingBlock label="Loading expense claims..." /> : null}
-      {!loading && error ? <ErrorState title="Expense claims unavailable" description={error} onRetry={() => void load()} /> : null}
-      {!loading && !error && rows.length === 0 ? <EmptyState title="No expense claims" description="Expense claims will appear when staff submits them." /> : null}
+      {loading ? <ERPLoadingState label="Loading expense claims..." /> : null}
+      {!loading && error ? <ERPErrorState title="Expense claims unavailable" description={error} onRetry={() => void load()} /> : null}
+      {!loading && !error && rows.length === 0 ? (
+        <ERPEmptyState title="No expense claims" description="Expense claims will appear when staff submits them." />
+      ) : null}
 
       {!loading && !error && rows.length > 0 ? (
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="text-sm font-semibold text-foreground">Expense claims</div>
-          <div className="mt-3 overflow-auto">
+        <ERPSectionShell title="Expense claims" description="Approve/reject actions call the existing expense claim workflow.">
+          <div className="overflow-auto">
             <table className="min-w-full text-sm">
               <thead className="text-left text-xs text-muted-foreground">
                 <tr>
@@ -103,9 +105,8 @@ export default function AdminHrExpenseClaimsPage() {
               </tbody>
             </table>
           </div>
-        </section>
+        </ERPSectionShell>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }
-

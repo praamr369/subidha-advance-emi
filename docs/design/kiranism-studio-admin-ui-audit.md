@@ -2194,3 +2194,100 @@ This phase is a **narrow, per-route, MANUAL_REVIEW** UI-only pass for **read-fir
 ### 13) Next recommended phase
 
 - Phase 15 — HR / branch / staff operations (SAFE_AUTO first), or Phase 16 — service desk/support alignment across roles (layout-only) once customer support surfaces are stable.
+
+## Phase 15 HR branch staff operations transformation result
+
+### 1) HR/branch/staff routes touched
+
+- HR workspace (SAFE_AUTO):
+  - `/admin/hr`
+- HR operations (SAFE_AUTO):
+  - `/admin/hr/staff`
+  - `/admin/hr/staff/[id]`
+  - `/admin/hr/attendance`
+  - `/admin/hr/leave`
+  - `/admin/hr/expenses`
+  - `/admin/hr/payroll`
+  - `/admin/hr/salary-payments`
+  - `/admin/hr/staff-documents`
+- Branch register/control surfaces (SAFE_AUTO + SAFE_LAYOUT_ONLY):
+  - `/admin/branches` (SAFE_LAYOUT_ONLY)
+  - `/admin/branch-reporting` (SAFE_AUTO)
+- BI (HR) read-first surface (SAFE_AUTO):
+  - `/admin/bi/hr`
+
+### 2) HR/branch/staff routes deferred
+
+- None (all routes in `HR / Branch / Staff Operations` are categorized SAFE_AUTO or SAFE_LAYOUT_ONLY in the route map; no MANUAL_REVIEW / DO_NOT_TOUCH surfaces exist for this category as of 2026-05-20).
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO transformed:
+  - `/admin/hr`
+  - `/admin/hr/staff`
+  - `/admin/hr/staff/[id]`
+  - `/admin/hr/attendance`
+  - `/admin/hr/leave`
+  - `/admin/hr/expenses`
+  - `/admin/hr/payroll`
+  - `/admin/hr/salary-payments`
+  - `/admin/hr/staff-documents`
+  - `/admin/branch-reporting`
+  - `/admin/bi/hr`
+- SAFE_LAYOUT_ONLY transformed:
+  - `/admin/branches`
+- MANUAL_REVIEW transformed: none.
+- DO_NOT_TOUCH transformed: none.
+
+### 4) Components reused
+
+- ERP shell/states:
+  - `frontend/src/components/erp/ERPPageShell.tsx`
+  - `frontend/src/components/erp/ERPLoadingState.tsx`
+  - `frontend/src/components/erp/ERPErrorState.tsx`
+  - `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP framing:
+  - `frontend/src/components/erp/ERPSectionShell.tsx`
+  - `frontend/src/components/erp/ERPDataToolbar.tsx` (branch reporting scope filter framing)
+  - `frontend/src/components/erp/ERPStatusBadge.tsx`
+
+### 5) Components created, if any
+
+- None.
+
+### 6) HR/branch/staff services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, response normalization changes, or new service calls were introduced.
+- HR + branch pages continue to use existing services only:
+  - `@/services/admin-hr` (staff register/profile, attendance, leave, expenses, payroll, salary payments, staff documents)
+  - `@/services/branch-control` (branches register + branch reporting overview)
+
+### 7) Staff/role/branch safety confirmation
+
+- No changes to staff creation/update, role assignment, status semantics, attendance mutation behavior, leave/expense approve/reject semantics, payroll/salary behavior, or branch assignment rules.
+- All high-consequence actions (create/update/deactivate/reactivate/approve/reject/upload) preserve existing handlers and visibility logic; changes are wrapper/layout/state framing only.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No permission weakening; all routes remain admin-only as previously defined by existing layout guards.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to salary posting, payroll payment, staff ledger, accounting posting, reconciliation, commission, payout, EMI, payments, or audit behavior.
+- Backend remains authoritative for staff status, attendance state, leave/expense workflow state, payroll/salary registers, and all displayed values.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved (explicit policy; unchanged in Phase 15):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining HR/branch UI gaps
+
+- Several HR pages still rely on domain-owned `operations` primitives (`FormSection`, `DataTableShell`, `DetailPanel`) for complex mutation-safe forms; deeper visual alignment (e.g., full `ERPRegisterShell` conversion) should be staged carefully to avoid handler/visibility drift.
+- Branch master edit form remains intentionally explicit (no “smart” derived behavior); consider a dedicated staff/branch “audit notes” pass only if the backend exposes additional audit context.
+
+### 12) Next recommended phase
+
+- Phase 16 — Service desk / support alignment across roles (SAFE_AUTO + SAFE_LAYOUT_ONLY), keeping all workflow transitions and mutation semantics unchanged.

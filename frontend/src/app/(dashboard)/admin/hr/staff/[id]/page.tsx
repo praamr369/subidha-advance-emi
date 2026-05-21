@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
 import {
   DataTableShell,
@@ -17,8 +19,6 @@ import {
   Timeline,
   WorkflowCard,
 } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
 import { listBranches, type BranchRecord } from "@/services/branch-control";
 import {
@@ -123,7 +123,7 @@ function TinyTable({
   columns: string[];
   rows: Array<Array<ReactNode>>;
 }) {
-  if (!rows.length) return <EmptyState title={empty} />;
+  if (!rows.length) return <ERPEmptyState title={empty} />;
   return (
     <DataTableShell className="p-3">
       <div className="overflow-auto">
@@ -346,12 +346,12 @@ export default function AdminHrStaffProfilePage() {
     await load();
   }
 
-  if (loading) return <PortalPage title="Staff Profile"><LoadingBlock label="Loading staff profile..." /></PortalPage>;
-  if (error) return <PortalPage title="Staff Profile"><ErrorState title="Staff profile unavailable" description={error} onRetry={() => void load()} /></PortalPage>;
-  if (!staff) return <PortalPage title="Staff Profile"><EmptyState title="Staff profile not found" /></PortalPage>;
+  if (loading) return <ERPPageShell title="Staff Profile"><ERPLoadingState label="Loading staff profile..." /></ERPPageShell>;
+  if (error) return <ERPPageShell title="Staff Profile"><ERPErrorState title="Staff profile unavailable" description={error} onRetry={() => void load()} /></ERPPageShell>;
+  if (!staff) return <ERPPageShell title="Staff Profile"><ERPEmptyState title="Staff profile not found" /></ERPPageShell>;
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Staff 360"
       title={staff.name}
       subtitle={`${staff.employee_code || `Staff #${staff.id}`} · ${staff.department || "No department"} · ${staff.employment_type || "No staff type"}`}
@@ -369,7 +369,7 @@ export default function AdminHrStaffProfilePage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold text-foreground">{staff.name}</h1>
-              <StatusBadge status={staff.is_active ? "ACTIVE" : "INACTIVE"} label={staff.is_active ? "Active" : "Inactive"} size="md" />
+              <ERPStatusBadge status={staff.is_active ? "ACTIVE" : "INACTIVE"} label={staff.is_active ? "Active" : "Inactive"} size="md" />
             </div>
             <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
               <span>ID: {staff.employee_code || staff.id}</span>
@@ -409,7 +409,7 @@ export default function AdminHrStaffProfilePage() {
           <Detail label="Emergency contact" value={`${staff.emergency_contact_name || "Unavailable"} ${staff.emergency_contact_phone || ""}`.trim()} />
           <Detail label="Joining date" value={staff.joining_date} />
           <Detail label="Leaving date" value="Not available on current staff API" />
-          <Detail label="KYC status" value={<StatusBadge status={staff.kyc_verified ? "ACTIVE" : "PENDING"} label={staff.kyc_verified ? "Verified" : "Pending"} />} />
+          <Detail label="KYC status" value={<ERPStatusBadge status={staff.kyc_verified ? "ACTIVE" : "PENDING"} label={staff.kyc_verified ? "Verified" : "Pending"} />} />
           <Detail label="KYC reference" value={`${staff.kyc_id_type || "KYC"} ${mask(staff.kyc_id_number)}`} />
         </div>
       </DetailPanel>
@@ -452,7 +452,7 @@ export default function AdminHrStaffProfilePage() {
             doc.document_type,
             doc.title,
             doc.document_no || "Unavailable",
-            <StatusBadge key="status" status={doc.status} />,
+            <ERPStatusBadge key="status" status={doc.status} />,
             doc.created_at?.slice(0, 10),
             doc.uploaded_by_username || "Unavailable",
             <div key="actions" className="flex flex-wrap gap-2">
@@ -497,8 +497,8 @@ export default function AdminHrStaffProfilePage() {
       </DetailPanel>
 
       <Timeline title="Audit / Activity Timeline">
-        <EmptyState title="Timeline deferred" description="Profile updates, document status changes, deactivate/reactivate events, and salary setup changes should be shown here once a dedicated audit endpoint is exposed." />
+        <ERPEmptyState title="Timeline deferred" description="Profile updates, document status changes, deactivate/reactivate events, and salary setup changes should be shown here once a dedicated audit endpoint is exposed." />
       </Timeline>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

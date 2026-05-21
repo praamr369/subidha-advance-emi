@@ -5,11 +5,12 @@ import { useEffect, useState } from "react";
 
 import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
-import TableToolbar from "@/components/ui/TableToolbar";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -70,7 +71,7 @@ export default function AdminBranchReportingPage() {
     : "All branches";
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Branch Reporting"
       title="Branch Reporting"
       subtitle="Review branch-wise collections, direct sales, contract posture, overdue EMI, stock visibility, and people-cost signals from the existing operational and accounting truths."
@@ -94,69 +95,87 @@ export default function AdminBranchReportingPage() {
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <div className="space-y-6">
-        <TableToolbar
+        <ERPSectionShell
           title="Branch scope filters"
           description="Switch the reporting lens by branch and date range before drilling into collections, stock, and people-cost posture."
-          actions={
-            <ActionButton
-              variant="outline"
-              onClick={() =>
-                void loadPage({
-                  branch_id: branchId,
-                  start_date: startDate,
-                  end_date: endDate,
-                })
-              }
-            >
-              Refresh scope
-            </ActionButton>
-          }
           footer={
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">{selectedBranchLabel}</span>
               <span>·</span>
-              <span>{startDate || "Start not set"} to {endDate || "today"}</span>
+              <span>
+                {startDate || "Start not set"} to {endDate || "today"}
+              </span>
             </div>
           }
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <label className="text-sm text-slate-700">
-              <span className="mb-2 block font-medium">Branch</span>
-              <select
-                value={branchId}
-                onChange={(event) => setBranchId(event.target.value)}
-                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
-              >
-                <option value="">All branches</option>
-                {payload?.branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.code} · {branch.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm text-slate-700">
-              <span className="mb-2 block font-medium">From date</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
-              />
-            </label>
-            <label className="text-sm text-slate-700">
-              <span className="mb-2 block font-medium">To date</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
-                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
-              />
-            </label>
-            <div className="flex flex-wrap items-end gap-2">
+          <ERPDataToolbar
+            left={
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <label className="text-sm text-foreground">
+                  <span className="mb-2 block font-medium">Branch</span>
+                  <select
+                    value={branchId}
+                    onChange={(event) => setBranchId(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
+                  >
+                    <option value="">All branches</option>
+                    {payload?.branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.code} · {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm text-foreground">
+                  <span className="mb-2 block font-medium">From date</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(event) => setStartDate(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
+                  />
+                </label>
+                <label className="text-sm text-foreground">
+                  <span className="mb-2 block font-medium">To date</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(event) => setEndDate(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
+                  />
+                </label>
+                <div className="flex flex-wrap items-end gap-2">
+                  <ActionButton
+                    type="button"
+                    variant="primary"
+                    onClick={() =>
+                      void loadPage({
+                        branch_id: branchId,
+                        start_date: startDate,
+                        end_date: endDate,
+                      })
+                    }
+                  >
+                    Apply Filters
+                  </ActionButton>
+                  <ActionButton
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setBranchId("");
+                      setStartDate("");
+                      setEndDate("");
+                      void loadPage();
+                    }}
+                  >
+                    Reset
+                  </ActionButton>
+                </div>
+              </div>
+            }
+            right={
               <ActionButton
-                type="button"
-                variant="primary"
+                variant="outline"
                 onClick={() =>
                   void loadPage({
                     branch_id: branchId,
@@ -165,27 +184,15 @@ export default function AdminBranchReportingPage() {
                   })
                 }
               >
-                Apply Filters
+                Refresh scope
               </ActionButton>
-              <ActionButton
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setBranchId("");
-                  setStartDate("");
-                  setEndDate("");
-                  void loadPage();
-                }}
-              >
-                Reset
-              </ActionButton>
-            </div>
-          </div>
-        </TableToolbar>
+            }
+          />
+        </ERPSectionShell>
 
-        {loading ? <LoadingBlock label="Loading branch reporting..." /> : null}
+        {loading ? <ERPLoadingState label="Loading branch reporting..." /> : null}
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load branch reporting"
             description={error}
             onRetry={() =>
@@ -396,6 +403,6 @@ export default function AdminBranchReportingPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }
