@@ -267,6 +267,17 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Prompt title**: “Phase 9 — Cashier UI polish (visual-only)”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
+- **Phase 9 status (implemented 2026-05-21)**:
+  - **Transformed**:
+    - `/cashier` (SAFE_LAYOUT_ONLY)
+    - `/cashier/notifications` (SAFE_AUTO)
+    - `/cashier/billing/direct-sale` (SAFE_AUTO)
+  - **Deferred**:
+    - `/cashier/collect` (MANUAL_REVIEW) — collection submit/receipt generation/paying flows; do not auto-migrate.
+    - `/cashier/payments` (MANUAL_REVIEW) — register surface contains payment interpretation/actions; keep manual-review.
+    - `/cashier/payments/[id]` (MANUAL_REVIEW) — payment detail/audit context; keep manual-review.
+    - `/cashier/billing` (SAFE_AUTO) — route delegates to `/cashier/collect` page component; defer until collect page is manually reviewed.
+
 ### Phase 10 — Payments / receipts / collections
 
 - **Goal**: payment and receipt views modernization; posting/mutations manual-review.

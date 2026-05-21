@@ -1,6 +1,7 @@
 "use client";
 
 import NotificationCenterPanel from "@/components/notifications/NotificationCenterPanel";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import {
   listCashierNotifications,
@@ -9,7 +10,8 @@ import {
 
 export default function CashierNotificationsPage() {
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
+      <ERPSectionShell className="p-0">
       <NotificationCenterPanel
         role="cashier"
         title="Notifications"
@@ -21,6 +23,7 @@ export default function CashierNotificationsPage() {
         list={listCashierNotifications}
         markRead={markCashierNotificationRead}
       />
+      </ERPSectionShell>
     </div>
   );
 }

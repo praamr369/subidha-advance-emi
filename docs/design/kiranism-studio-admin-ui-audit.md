@@ -1167,3 +1167,86 @@ Also intentionally left unchanged:
 ### 12) Next recommended phase
 
 - Phase 9 — Cashier POS / counter workspace (visual-only; keep submit/mutation behavior strict).
+
+---
+
+## Phase 9 cashier POS counter transformation result (2026-05-21)
+
+Scope: **Frontend UI only** for Cashier POS / Counter Workspace SAFE pages.  
+Non-goals (enforced): **no backend changes**, **no API contract changes**, **no auth/session/RoleGuard changes**, **no route moves/renames/deletes**, **no permission changes**, **no submit/validation/handler changes**, **no invented payments/receipts/counters**.
+
+### 1) Cashier routes touched
+
+- `/cashier` (SAFE_LAYOUT_ONLY)
+- `/cashier/notifications` (SAFE_AUTO)
+- `/cashier/billing/direct-sale` (SAFE_AUTO)
+
+### 2) Cashier routes deferred
+
+- `/cashier/collect` (MANUAL_REVIEW) — collection submit + receipt generation surface; keep manual-review.
+- `/cashier/payments` (MANUAL_REVIEW) — cashier payment register/history; keep manual-review.
+- `/cashier/payments/[id]` (MANUAL_REVIEW) — payment detail/audit timeline; keep manual-review.
+- `/cashier/billing` (SAFE_AUTO) — delegates to `/cashier/collect` page component; deferred to avoid touching collection submit UI.
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO:
+  - `/cashier/notifications`
+  - `/cashier/billing/direct-sale`
+- SAFE_LAYOUT_ONLY:
+  - `/cashier`
+
+### 4) Components reused
+
+- ERP shell/states: `frontend/src/components/erp/ERPPageShell.tsx`, `frontend/src/components/erp/ERPLoadingState.tsx`, `frontend/src/components/erp/ERPErrorState.tsx`, `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP framing: `frontend/src/components/erp/ERPRegisterShell.tsx`, `frontend/src/components/erp/ERPSectionShell.tsx`, `frontend/src/components/erp/ERPDataToolbar.tsx`
+- ERP chips/notes: `frontend/src/components/erp/ERPStatusBadge.tsx`, `frontend/src/components/erp/ERPAuditNote.tsx`
+
+### 5) Components created
+
+- None (Phase 9 is composition-only: adopt shared ERP wrappers and register/section framing).
+
+### 6) Cashier services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, or response-shape assumptions added.
+- No new service calls introduced; existing service modules remain the source of truth:
+  - `frontend/src/services/cashier/index.ts` (cashier dashboard/collect/search/payment history endpoints)
+  - `frontend/src/services/notifications.ts` (cashier notifications)
+  - `frontend/src/services/direct-sale-workspace.ts` (cashier direct-sale billing search/preview endpoints)
+
+### 7) Payment/collection/receipt safety confirmation
+
+- No changes to collection submit handlers, payment posting behavior, receipt generation behavior, validation behavior, EMI search behavior, or direct-sale collection behavior.
+- MANUAL_REVIEW cashier payment and collection routes remain untouched.
+
+### 8) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No changes that expand cashier visibility outside existing cashier-permitted contracts.
+
+### 9) Financial/audit safety confirmation
+
+- No changes to EMI logic, waiver/winner behavior, commission, payout, ledger, reconciliation, accounting posting, or audit behavior.
+- UI changes remain wrapper/layout/state-only on SAFE pages.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining cashier UI gaps
+
+- Cashier collection and payment-history/detail surfaces remain on legacy framing (MANUAL_REVIEW); migrate only with explicit “no handler/submit changes” constraints.
+- Consider adding consistent register framing and audit notes to `/cashier/payments*` only after manual review of action visibility and reversal/void semantics.
+
+### 12) Fast frontend checks
+
+- `cd frontend && npm run lint`: ✅ pass
+- `cd frontend && npm run typecheck`: ✅ pass
+- `cd frontend && npm run build`: ✅ pass
+- `cd frontend && npm run check:routes`: ✅ pass (393 routes, 11 compatibility redirects)
+
+### 13) Next recommended phase
+
+- Phase 10 — Payments / receipts / collections (strict manual-review for posting/mutations; SAFE views first).

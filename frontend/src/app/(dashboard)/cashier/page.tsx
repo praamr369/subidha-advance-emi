@@ -16,13 +16,13 @@ import {
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
 import DashboardWidgetBoard from "@/components/dashboard/DashboardWidgetBoard";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
-import PortalPage from "@/components/ui/PortalPage";
-import StatusBadge from "@/components/ui/status-badge";
 import { FormSection, MetricStrip, MobileSafeTable } from "@/components/ui/operations";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -107,7 +107,7 @@ function CashierDashboardPaymentTable({
                 </Link>
                 <div className="mt-1 flex flex-wrap items-center gap-1">
                   {payment.method ? (
-                    <StatusBadge status={payment.method} hideIcon />
+                    <ERPStatusBadge status={payment.method} hideIcon />
                   ) : (
                     <span className="text-xs text-slate-600">—</span>
                   )}
@@ -115,7 +115,7 @@ function CashierDashboardPaymentTable({
                 </div>
                 {payment.is_reversed ? (
                   <div className="mt-1">
-                    <StatusBadge status="REVERSED" hideIcon />
+                    <ERPStatusBadge status="REVERSED" hideIcon />
                   </div>
                 ) : null}
               </td>
@@ -263,7 +263,7 @@ export default function CashierDashboardPage() {
       : "₹0.00";
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Counter Operations"
       title="Cashier Dashboard"
       subtitle="Daily counter workspace with canonical financial scope visibility on top, while keeping collection posting and receipt lookup fast for shop operations."
@@ -484,10 +484,10 @@ export default function CashierDashboardPage() {
           />
         </WorkspaceSection>
 
-        {loading ? <LoadingBlock label="Loading cashier dashboard..." /> : null}
+        {loading ? <ERPLoadingState label="Loading cashier dashboard..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load cashier dashboard"
             description={error}
             onRetry={() => void loadDashboard("initial")}
@@ -775,7 +775,7 @@ export default function CashierDashboardPage() {
                   })}
                 </div>
               ) : (
-                <EmptyState
+                <ERPEmptyState
                   title="No due contracts"
                   description="There are no current next-due rows in the cashier scope."
                 />
@@ -794,7 +794,7 @@ export default function CashierDashboardPage() {
               {todayTransactionRows.length > 0 ? (
                 <CashierDashboardPaymentTable rows={todayTransactionRows} />
               ) : (
-                <EmptyState
+                <ERPEmptyState
                   title="No same-day postings in this payload"
                   description="After you collect, refresh the dashboard. The time-window list below may still show earlier receipts."
                 />
@@ -862,7 +862,7 @@ export default function CashierDashboardPage() {
                             </Link>
                             <div className="mt-1 flex flex-wrap items-center gap-1">
                               {payment.method ? (
-                                <StatusBadge status={payment.method} hideIcon />
+                                <ERPStatusBadge status={payment.method} hideIcon />
                               ) : (
                                 <span className="text-xs text-slate-600">—</span>
                               )}
@@ -872,7 +872,7 @@ export default function CashierDashboardPage() {
                             </div>
                             {payment.is_reversed ? (
                               <div className="mt-1">
-                                <StatusBadge status="REVERSED" hideIcon />
+                                <ERPStatusBadge status="REVERSED" hideIcon />
                               </div>
                             ) : null}
                           </td>
@@ -913,7 +913,7 @@ export default function CashierDashboardPage() {
                   </table>
                 </MobileSafeTable>
               ) : (
-                <EmptyState
+                <ERPEmptyState
                   title="No transactions in this window"
                   description="Adjust the dashboard time filter or refresh after posting. Use payment history for deeper search."
                 />
@@ -922,6 +922,6 @@ export default function CashierDashboardPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }
