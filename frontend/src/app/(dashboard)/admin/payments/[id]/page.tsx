@@ -20,6 +20,11 @@ import {
   ERPPageShell,
   ERPStatusBadge,
 } from "@/components/erp";
+import {
+  DocumentPanel,
+  type DocumentPanelItem,
+  DownloadPdfButton,
+} from "@/components/documents";
 import PaymentReceiptDocument from "@/components/receipts/PaymentReceiptDocument";
 import {
   DetailPanel,
@@ -35,6 +40,7 @@ import {
   buildAdminReconciliationRoute,
   buildAdminSubscriptionRoute,
 } from "@/lib/route-builders";
+import { listReceiptDocuments, type ReceiptDocument } from "@/services/billing";
 
 type PaymentDetailRecord = {
   id: number;
@@ -336,6 +342,7 @@ function timelinePayloadRows(
 export default function AdminPaymentDetailRoutePage() {
   const params = useParams<{ id: string }>();
   const paymentId = params?.id;
+  const paymentIdNumber = Number(paymentId ?? 0);
 
   const [payment, setPayment] = useState<PaymentDetailRecord | null>(null);
   const [timelineData, setTimelineData] = useState<PaymentTimelineResponse | null>(
@@ -349,6 +356,10 @@ export default function AdminPaymentDetailRoutePage() {
   const [reversing, setReversing] = useState(false);
   const [reverseError, setReverseError] = useState<string | null>(null);
   const [reverseSuccess, setReverseSuccess] = useState<string | null>(null);
+
+  const [receiptDocuments, setReceiptDocuments] = useState<ReceiptDocument[]>([]);
+  const [receiptDocumentsLoading, setReceiptDocumentsLoading] = useState(false);
+  const [receiptDocumentsError, setReceiptDocumentsError] = useState<string | null>(null);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -366,11 +377,29 @@ export default function AdminPaymentDetailRoutePage() {
         setPayment(normalizePaymentDetail(paymentPayload));
         setTimelineData(normalizeTimelinePayload(timelinePayload));
         setError(null);
+
+        setReceiptDocumentsLoading(true);
+        try {
+          const receiptPayload = await listReceiptDocuments({ payment: paymentId });
+          setReceiptDocuments(receiptPayload.results);
+          setReceiptDocumentsError(null);
+        } catch (err) {
+          setReceiptDocuments([]);
+          setReceiptDocumentsError(
+            err instanceof Error && err.message.trim()
+              ? err.message
+              : "Unable to load receipt documents."
+          );
+        } finally {
+          setReceiptDocumentsLoading(false);
+        }
       } catch (err) {
         setError(toErrorMessage(err));
         if (mode === "initial") {
           setPayment(null);
           setTimelineData(null);
+          setReceiptDocuments([]);
+          setReceiptDocumentsError(null);
         }
       } finally {
         if (mode === "initial") setLoading(false);
@@ -406,6 +435,38 @@ export default function AdminPaymentDetailRoutePage() {
             : ""
         }`
       : "Not linked to a single EMI row";
+
+  const receiptDocument = useMemo(() => {
+    if (!Number.isFinite(paymentIdNumber) || paymentIdNumber <= 0) return null;
+    return receiptDocuments.find((row) => row.payment === paymentIdNumber) ?? receiptDocuments[0] ?? null;
+  }, [paymentIdNumber, receiptDocuments]);
+
+  const receiptDocumentPanelItems = useMemo((): DocumentPanelItem[] => {
+    if (!receiptDocument) return [];
+    const receiptNo = receiptDocument.receipt_no || null;
+    const filenameToken = receiptNo || String(receiptDocument.id);
+    return [
+      {
+        id: receiptDocument.id,
+        title: "Money Receipt (PDF)",
+        documentType: "Money Receipt",
+        documentNumber: receiptNo || `RCT-${receiptDocument.id}`,
+        status: receiptDocument.status,
+        statusLabel: receiptDocument.status,
+        generatedAtLabel: receiptDocument.receipt_date ? formatDate(receiptDocument.receipt_date) : null,
+        subtitle: resolvedPayment?.subscription
+          ? `Source: Payment #${paymentId} · Subscription SUB-${resolvedPayment.subscription}`
+          : `Source: Payment #${paymentId}`,
+        actions: (
+          <DownloadPdfButton
+            path={`/admin/receipts/${receiptDocument.id}/pdf/`}
+            filename={`receipt-${filenameToken}.pdf`}
+            label="Download PDF"
+          />
+        ),
+      },
+    ];
+  }, [paymentId, receiptDocument, resolvedPayment?.subscription]);
 
   const actionLinks = useMemo(() => {
     const links: Array<{
@@ -686,6 +747,27 @@ export default function AdminPaymentDetailRoutePage() {
               ]}
               footerNote="Use browser print to keep a paper copy or save this receipt as PDF. This view is sourced from the admin payment detail record."
             />
+
+            <div className="receipt-print-hide">
+              <DocumentPanel
+                title="Documents"
+                description="Payment-linked documents derived from immutable receipt records. Download does not change payment state."
+                loading={receiptDocumentsLoading}
+                error={receiptDocumentsError}
+                emptyLabel="Money receipt PDF is not available for this payment yet."
+                items={receiptDocumentPanelItems}
+                headerActions={
+                  receiptDocument ? (
+                    <Link
+                      href={`/admin/billing/receipts?payment=${paymentId}`}
+                      className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
+                    >
+                      Open Receipt Register
+                    </Link>
+                  ) : null
+                }
+              />
+            </div>
 
             <section className="receipt-print-hide grid gap-6 xl:grid-cols-2">
               <DetailPanel

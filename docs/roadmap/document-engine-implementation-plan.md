@@ -1,6 +1,6 @@
 # Document / PDF Engine — Implementation Plan (Additive, Production)
 
-Status: **PHASE C FOUNDATION IMPLEMENTED (backend + frontend primitives)**  
+Status: **PHASE D IN PROGRESS (admin wiring first; other roles deferred)**  
 Primary objective: Ship an admin/cashier/customer-safe document experience without changing financial logic or existing write APIs.
 
 ## Phase C (Implemented): Foundation only (no broad wiring)
@@ -17,6 +17,20 @@ Explicitly not done in Phase C:
 - No new listing endpoints
 - No new `GeneratedDocument` table
 - No broad attachment across payment pages (Phase D work)
+
+## Phase D (Implemented): Admin Money Receipt Panel Wiring (P0)
+
+Implementation date: **2026-05-21**
+
+Delivered:
+- Admin payment detail now shows a `DocumentPanel` section for Money Receipt PDF when a payment-linked `ReceiptDocument` exists.
+- Uses existing endpoints only:
+  - receipt metadata: `/api/v1/billing/receipts/?payment=<payment_id>` (admin-scoped billing register)
+  - receipt PDF download: `/api/v1/admin/receipts/<receipt_id>/pdf/`
+
+Not delivered (intentionally deferred in Phase D):
+- No cashier/customer/partner wiring unless each role’s receipt PDF endpoints and record scoping are verified per surface.
+- No “Generate receipt” UI actions (even if endpoints exist) because that would create source records and is out of Phase D scope.
 
 ## Phase 0 (Now): Audit findings (confirmed in repo)
 

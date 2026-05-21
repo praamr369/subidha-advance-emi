@@ -198,3 +198,29 @@ Canonical fields (service-layer; used for future listing/normalization):
 Phase C remains unified on existing **reportlab** renderers:
 - `backend/subscriptions/services/document_pdf_service.py`
 
+---
+
+## Phase D (Implemented): Money Receipt PDF UI Wiring (Admin-safe only)
+
+Implementation date: **2026-05-21**
+
+Scope delivered:
+- Wired the existing Money Receipt PDF capability into a permission-safe admin surface using the shared `DocumentPanel` components.
+- No changes to payment posting, accounting posting, receipt source records, EMI logic, or reconciliation behavior.
+- No new “GeneratedDocument” table and no new document-generation endpoints.
+
+Confirmed wiring:
+- Page: `frontend/src/app/(dashboard)/admin/payments/[id]/page.tsx`
+  - Lists the payment-linked `ReceiptDocument` (if present) via the existing admin billing receipt register API (`/api/v1/billing/receipts/?payment=<payment_id>`).
+  - Downloads the PDF via the existing admin receipt PDF endpoint (`/api/v1/admin/receipts/<receipt_id>/pdf/`).
+
+Permission posture:
+- Admin-only access preserved (page is admin route; backend endpoints are already admin-scoped).
+- No cross-role expansion in Phase D (cashier/customer/partner wiring intentionally deferred unless role-safe endpoints are explicitly verified per surface).
+
+Reconciliation compatibility:
+- DocumentPanel preserves source identity by displaying:
+  - payment id (route context)
+  - receipt id + receipt number (from `ReceiptDocument`)
+  - receipt status + receipt date
+  - endpoint is deterministic render from persisted `ReceiptDocument` rows

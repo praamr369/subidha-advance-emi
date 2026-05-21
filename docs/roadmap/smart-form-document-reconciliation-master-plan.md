@@ -73,6 +73,12 @@ Phase C (implemented 2026-05-21):
 - Added backend + frontend foundation only (no broad wiring yet).
 - Deferred a new `GeneratedDocument` table in favor of a unifying service-layer contract.
 
+Phase D (implemented 2026-05-21):
+- Wired Money Receipt PDF into the safest existing admin surface using `DocumentPanel`:
+  - `frontend/src/app/(dashboard)/admin/payments/[id]/page.tsx`
+- Reused existing read-only receipt register lookup + existing admin receipt PDF endpoint.
+- Did not expand cashier/customer/partner document wiring in this pass; role-safe endpoints must be confirmed per surface before enabling.
+
 ### C) Reconciliation Control Tower
 
 Reference docs:
