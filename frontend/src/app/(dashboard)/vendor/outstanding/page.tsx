@@ -1,17 +1,65 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import { accountingErrorMessage } from "@/components/accounting/shared";
+import { ROUTES } from "@/lib/routes";
 import { getVendorOutstanding } from "@/services/vendor-ops";
+
+function formatMoney(value: unknown): string {
+  const amount = Number(value ?? 0);
+  return `₹${Number.isFinite(amount) ? amount.toFixed(2) : "0.00"}`;
+}
 
 export default function VendorOutstandingPage() {
   const [value, setValue] = useState("0.00");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    void getVendorOutstanding().then((payload) => setValue(String(payload.outstanding || "0.00")));
+    let active = true;
+    void getVendorOutstanding()
+      .then((payload) => {
+        if (!active) return;
+        setValue(String(payload.outstanding || "0.00"));
+        setError(null);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(accountingErrorMessage(err, "Unable to load outstanding balance."));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
   return (
-    <PortalPage title="Outstanding" subtitle="Vendor payable outstanding snapshot.">
-      <div className="rounded border p-4 text-lg font-semibold">{value}</div>
-    </PortalPage>
+    <ERPPageShell
+      title="Outstanding"
+      subtitle="Vendor payable outstanding snapshot."
+      breadcrumbs={[{ label: "Vendor", href: ROUTES.vendor.dashboard }, { label: "Outstanding" }]}
+    >
+      <ERPSectionShell
+        title="Payable snapshot"
+        description="This is the current outstanding payable computed from your vendor ledger records. Settlement posting remains controlled by accounting."
+      >
+        {loading ? <ERPLoadingState label="Loading outstanding..." /> : null}
+        {!loading && error ? <ERPErrorState title="Unable to load outstanding" description={error} /> : null}
+        {!loading && !error ? (
+          <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-6 shadow-[inset_0_1px_0_var(--hairline-shine)]">
+            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Outstanding payable
+            </div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-foreground tabular-nums">
+              {formatMoney(value)}
+            </div>
+          </div>
+        ) : null}
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

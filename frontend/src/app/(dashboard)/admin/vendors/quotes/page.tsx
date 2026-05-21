@@ -5,7 +5,13 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { createAdminQuoteRequest, listAdminQuoteRequests } from "@/services/vendor-ops";
 import { listVendors } from "@/services/vendors";
@@ -119,7 +125,7 @@ export default function AdminVendorQuotesPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Vendor quote requests"
       subtitle="Request quotes without posting procurement, payable, or billing documents."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor quotes", href: ROUTES.admin.vendorsQuotes }]}
@@ -128,15 +134,19 @@ export default function AdminVendorQuotesPage() {
         { href: ROUTES.admin.purchaseOrders, label: "Purchase orders", variant: "primary" },
       ]}
     >
-      {submitBanner ? <div className="mb-3 rounded border border-green-600/40 bg-green-600/10 p-3 text-sm">{submitBanner}</div> : null}
-      {listError ? <div className="mb-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{listError}</div> : null}
-      {submitError ? (
-        <div className="mb-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{submitError}</div>
+      {submitBanner ? (
+        <div className="rounded-2xl border border-emerald-600/35 bg-emerald-600/10 p-4 text-sm text-foreground">
+          {submitBanner}
+        </div>
       ) : null}
+      {listError ? <ERPErrorState title="Unable to load quote requests" description={listError} /> : null}
+      {submitError ? <ERPErrorState title="Unable to save quote request" description={submitError} /> : null}
 
-      <section className="mb-8 rounded border p-4 text-sm">
-        <h2 className="mb-2 text-base font-medium">Create request</h2>
-        <form className="space-y-3" onSubmit={(e) => void submitRequest(e)}>
+      <ERPSectionShell
+        title="Create request"
+        description="Draft an RFQ and invite vendors without posting purchase/stock/accounting documents."
+      >
+        <form className="space-y-3 text-sm" onSubmit={(e) => void submitRequest(e)}>
           <div className="flex flex-wrap gap-2">
             <label className="flex flex-col text-xs uppercase text-muted-foreground">
               Source
@@ -193,31 +203,45 @@ export default function AdminVendorQuotesPage() {
             {submitting ? "Saving…" : "Create request"}
           </button>
         </form>
-      </section>
+      </ERPSectionShell>
 
-      <section className="rounded border p-4 text-sm">
-        <h2 className="mb-2 text-base font-medium">Open RFQs</h2>
-        {listLoading ? <div>Loading…</div> : null}
+      <ERPSectionShell
+        title="Open RFQs"
+        description="Monitor open quote requests. Accept/reject decisions are recorded explicitly and do not auto-post procurement documents."
+      >
+        <ERPDataToolbar
+          left={<div className="text-sm text-muted-foreground">Showing {rows.length} RFQs</div>}
+          right={
+            <Link className="text-sm font-medium text-primary underline" href={ROUTES.admin.vendorsSourcing}>
+              Open sourcing workspace
+            </Link>
+          }
+        />
+        {listLoading ? <ERPLoadingState label="Loading RFQs..." /> : null}
         {!listLoading && rows.length === 0 ? (
-          <div className="text-muted-foreground">No quote requests yet.</div>
-        ) : (
-          <div className="space-y-1">
+          <ERPEmptyState title="No quote requests yet" description="Create a quote request to start inviting vendors." />
+        ) : null}
+        {!listLoading && rows.length > 0 ? (
+          <div className="space-y-2 text-sm">
             {rows.map((row) => (
-              <div key={String(row.id)} className="flex flex-wrap justify-between gap-2 border-b border-border py-2 last:border-0">
+              <div
+                key={String(row.id)}
+                className="flex flex-wrap items-start justify-between gap-3 rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
+              >
                 <div>
-                  <Link className="font-medium text-primary underline" href={`${ROUTES.admin.vendorsQuotes}/${row.id}`}>
+                  <Link className="font-semibold text-primary underline" href={`${ROUTES.admin.vendorsQuotes}/${row.id}`}>
                     {String(row.request_no || row.id)}
                   </Link>
-                  <div className="text-muted-foreground text-xs">
-                    Status {String(row.status)} · {(row.quotes as unknown[] | undefined)?.length ?? 0} invites
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {(row.quotes as unknown[] | undefined)?.length ?? 0} invites · Product {String(row.product_name || "—")}
                   </div>
                 </div>
-                <div className="text-xs">{String(row.product_name || "—")}</div>
+                <ERPStatusBadge status={String(row.status ?? "—")} />
               </div>
             ))}
           </div>
-        )}
-      </section>
-    </PortalPage>
+        ) : null}
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

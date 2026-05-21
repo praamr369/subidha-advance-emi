@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import StatCard from "@/components/ui/StatCard";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminManufacturingJobRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { getManufacturingOverview, type ManufacturingOverview } from "@/services/manufacturing";
@@ -42,7 +42,7 @@ export default function AdminManufacturingOverviewPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Manufacturing"
       subtitle="Run BOM governance, raw-material issue, WIP tracking, finished-goods receipt, and scrap capture through explicit production jobs that link back to inventory and accounting without becoming a second stock or finance truth."
       breadcrumbs={[
@@ -70,9 +70,9 @@ export default function AdminManufacturingOverviewPage() {
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading manufacturing overview..." /> : null}
+        {loading ? <ERPLoadingState label="Loading manufacturing overview..." /> : null}
         {!loading && error ? (
-          <ErrorState
+          <ERPErrorState
             title="Unable to load manufacturing"
             description={error}
             onRetry={() => void loadPage()}
@@ -109,29 +109,32 @@ export default function AdminManufacturingOverviewPage() {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Recent Production Jobs"
                 description="Raw issue, WIP, finished-goods receipt, and scrap all remain traceable at the job level."
-                actionHref={ROUTES.admin.manufacturingJobs}
-                actionLabel="Open Job Register"
+                actions={
+                  <Link className="text-sm font-medium text-primary underline" href={ROUTES.admin.manufacturingJobs}>
+                    Open job register
+                  </Link>
+                }
               >
                 <div className="space-y-3">
                   {payload.recent_jobs.length === 0 ? (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No production jobs yet"
                       description="Released furniture jobs will appear here once manufacturing operations start."
                     />
                   ) : (
                     payload.recent_jobs.map((job) => (
-                      <Link
-                        key={job.id}
-                        href={buildAdminManufacturingJobRoute(job.id)}
-                        className="block rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 transition hover:-translate-y-0.5 hover:bg-white"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="font-medium text-foreground">
-                              {job.job_no} · {job.finished_good_product_name || job.finished_good_sku || "Finished good"}
+                        <Link
+                          key={job.id}
+                          href={buildAdminManufacturingJobRoute(job.id)}
+                          className="block rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div className="font-medium text-foreground">
+                                {job.job_no} · {job.finished_good_product_name || job.finished_good_sku || "Finished good"}
                             </div>
                             <div className="text-sm text-muted-foreground">
                               {job.status} · Planned {job.planned_output_qty} · Output {job.completed_output_qty}
@@ -146,17 +149,20 @@ export default function AdminManufacturingOverviewPage() {
                     ))
                   )}
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
 
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Recent BOMs"
                 description="BOM revisions stay anchored to the shared finished-good and raw-material inventory profiles."
-                actionHref={ROUTES.admin.manufacturingBoms}
-                actionLabel="Open BOM Register"
+                actions={
+                  <Link className="text-sm font-medium text-primary underline" href={ROUTES.admin.manufacturingBoms}>
+                    Open BOM register
+                  </Link>
+                }
               >
                 <div className="space-y-3">
                   {payload.recent_boms.length === 0 ? (
-                    <EmptyState
+                    <ERPEmptyState
                       title="No BOMs yet"
                       description="Once BOMs are prepared for furniture production, they will appear here."
                     />
@@ -164,7 +170,7 @@ export default function AdminManufacturingOverviewPage() {
                     payload.recent_boms.map((bom) => (
                       <div
                         key={bom.id}
-                        className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3"
+                        className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_var(--hairline-shine)]"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>
@@ -183,11 +189,11 @@ export default function AdminManufacturingOverviewPage() {
                     ))
                   )}
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
             </div>
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

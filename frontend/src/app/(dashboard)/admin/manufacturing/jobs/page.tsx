@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import DataTable from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminManufacturingJobRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -113,7 +113,7 @@ export default function AdminManufacturingJobsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Production Jobs"
       subtitle="Release furniture jobs only when BOM and material planning are ready. Raw issue, output receipt, scrap capture, and job completion stay explicit and auditable."
       breadcrumbs={[
@@ -135,16 +135,16 @@ export default function AdminManufacturingJobsPage() {
     >
       <div className="space-y-6">
         {notice ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="rounded-2xl border border-emerald-600/35 bg-emerald-600/10 px-4 py-3 text-sm text-foreground">
             {notice}
           </div>
         ) : null}
-        {loading ? <LoadingBlock label="Loading production jobs..." /> : null}
+        {loading ? <ERPLoadingState label="Loading production jobs..." /> : null}
         {!loading && error ? (
-          <ErrorState title="Production jobs unavailable" description={error} onRetry={() => void loadPage()} />
+          <ERPErrorState title="Production jobs unavailable" description={error} onRetry={() => void loadPage()} />
         ) : null}
 
-        <WorkspaceSection
+        <ERPSectionShell
           title="Create Production Job"
           description="Use a BOM-backed job when available so material planning can seed from the active revision. Procurement remains the source of raw inward; production only consumes and converts stock."
         >
@@ -214,10 +214,10 @@ export default function AdminManufacturingJobsPage() {
               {saving ? "Saving..." : "Create Production Job"}
             </button>
           </div>
-        </WorkspaceSection>
+        </ERPSectionShell>
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <ERPSectionShell
             title="Production Job Register"
             description="Open the job detail to release the work order, post material issue, receive finished goods, record scrap, and complete the job."
           >
@@ -229,9 +229,9 @@ export default function AdminManufacturingJobsPage() {
                 window.location.href = buildAdminManufacturingJobRoute(row.id);
               }}
             />
-          </WorkspaceSection>
+          </ERPSectionShell>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

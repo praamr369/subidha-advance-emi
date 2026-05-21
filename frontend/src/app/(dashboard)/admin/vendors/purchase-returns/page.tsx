@@ -1,12 +1,21 @@
 "use client";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 
 export default function AdminVendorPurchaseReturnsPage() {
   return (
-    <PortalPage title="Vendor Purchase Returns" subtitle="Vendor-side purchase return visibility." breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor Purchase Returns" }]}>
-      <div className="rounded border p-3 text-sm">Purchase returns stay controlled by existing reversal posting services and remain audit-safe.</div>
-    </PortalPage>
+    <ERPPageShell
+      title="Vendor purchase returns"
+      subtitle="Vendor-side purchase return visibility."
+      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor purchase returns" }]}
+    >
+      <ERPSectionShell title="Audit-safe note" description="Purchase return posting remains controlled by existing reversal services.">
+        <div className="rounded-2xl border border-border/70 bg-[var(--surface-card-elevated)] p-4 text-sm shadow-[inset_0_1px_0_var(--hairline-shine)]">
+          Purchase returns stay controlled by existing reversal posting services and remain audit-safe.
+        </div>
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

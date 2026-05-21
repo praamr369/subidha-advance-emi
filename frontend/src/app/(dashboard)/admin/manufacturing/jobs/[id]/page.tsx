@@ -3,11 +3,13 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
-import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
+import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import {
   cancelProductionJob,
@@ -243,7 +245,7 @@ export default function AdminManufacturingJobDetailPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={job?.job_no || "Production Job"}
       subtitle="This job detail keeps BOM reference, raw issue, WIP, finished-goods receipt, scrap, and costing posture in one operational view while inventory and accounting remain separate posted truths."
       breadcrumbs={[
@@ -266,63 +268,73 @@ export default function AdminManufacturingJobDetailPage() {
       statusBadge={{ label: job?.costing_status || "Job", tone: "info" }}
     >
       <div className="space-y-6">
-        {loading ? <LoadingBlock label="Loading production job..." /> : null}
+        {loading ? <ERPLoadingState label="Loading production job..." /> : null}
         {!loading && error && !job ? (
-          <ErrorState title="Unable to load the production job" description={error} onRetry={() => void loadPage()} />
+          <ERPErrorState title="Unable to load the production job" description={error} onRetry={() => void loadPage()} />
         ) : null}
         {!loading && !error && !job ? (
-          <EmptyState title="Job not found" description="The requested production job could not be loaded." />
+          <ERPEmptyState title="Job not found" description="The requested production job could not be loaded." />
         ) : null}
 
         {job ? (
           <>
             {error ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-2xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {error}
               </div>
             ) : null}
             {notice ? (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              <div className="rounded-2xl border border-emerald-600/35 bg-emerald-600/10 px-4 py-3 text-sm text-foreground">
                 {notice}
               </div>
             ) : null}
 
             <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Job Summary"
                 description="The production job tracks WIP and operational progress while stock ledger and accounting bridge entries remain the posted system of record."
+                actions={<ERPStatusBadge status={job.status} />}
               >
-                <div className="grid gap-4 md:grid-cols-2">
-                  <DetailItem label="Finished Good" value={job.finished_good_product_name || job.finished_good_sku || "—"} />
-                  <DetailItem label="BOM" value={job.bom_no || "Manual"} />
-                  <DetailItem label="Location" value={job.stock_location_name || job.stock_location_code || "—"} />
-                  <DetailItem label="Created By" value={job.created_by_username || "—"} />
-                  <DetailItem label="Released At" value={formatDateTime(job.released_at)} />
-                  <DetailItem label="Started At" value={formatDateTime(job.started_at)} />
-                  <DetailItem label="Completed At" value={formatDateTime(job.completed_at)} />
-                  <DetailItem label="Posting Notes" value={job.posting_notes || "—"} />
+                <ERPDetailGrid
+                  columns={2}
+                  items={[
+                    { label: "Finished good", value: job.finished_good_product_name || job.finished_good_sku || "—" },
+                    { label: "BOM", value: job.bom_no || "Manual" },
+                    { label: "Location", value: job.stock_location_name || job.stock_location_code || "—" },
+                    { label: "Created by", value: job.created_by_username || "—" },
+                    { label: "Released at", value: formatDateTime(job.released_at) },
+                    { label: "Started at", value: formatDateTime(job.started_at) },
+                    { label: "Completed at", value: formatDateTime(job.completed_at) },
+                    { label: "Posting notes", value: job.posting_notes || "—" },
+                  ]}
+                />
+                <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 text-sm text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]">
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Job notes
+                  </div>
+                  <div className="mt-2 whitespace-pre-wrap">{job.notes || "No job notes recorded."}</div>
                 </div>
-                <div className="mt-4 rounded-2xl border border-border bg-background p-4 text-sm text-foreground">
-                  {job.notes || "No job notes recorded."}
-                </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
 
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Cost and WIP"
                 description="Issued raw cost, received finished-good cost, and scrap cost stay visible here so operators can close jobs only when WIP is settled."
               >
-                <div className="grid gap-4 md:grid-cols-2">
-                  <DetailItem label="Issued Cost" value={money(job.total_issued_cost)} />
-                  <DetailItem label="Received Cost" value={money(job.total_received_cost)} />
-                  <DetailItem label="Scrap Cost" value={money(job.total_scrap_cost)} />
-                  <DetailItem label="Current WIP" value={money(job.wip_cost)} />
-                  <DetailItem label="Costing Status" value={job.costing_status} />
-                  <DetailItem label="Accounting Status" value={job.accounting_status} />
-                </div>
-              </WorkspaceSection>
+                <ERPDetailGrid
+                  columns={2}
+                  items={[
+                    { label: "Issued cost", value: money(job.total_issued_cost) },
+                    { label: "Received cost", value: money(job.total_received_cost) },
+                    { label: "Scrap cost", value: money(job.total_scrap_cost) },
+                    { label: "Current WIP", value: money(job.wip_cost) },
+                    { label: "Costing status", value: job.costing_status },
+                    { label: "Accounting status", value: job.accounting_status },
+                  ]}
+                />
+              </ERPSectionShell>
             </div>
 
-            <WorkspaceSection
+            <ERPSectionShell
               title="Job Actions"
               description="Release, issue, receive, complete, or cancel the job through explicit production actions only."
             >
@@ -367,10 +379,10 @@ export default function AdminManufacturingJobDetailPage() {
                   </button>
                 </div>
               ) : null}
-            </WorkspaceSection>
+            </ERPSectionShell>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Material Movement"
                 description="Post the seeded BOM lines as a batch, or post an explicit issue/return correction line when the production floor needs an adjustment."
               >
@@ -458,9 +470,9 @@ export default function AdminManufacturingJobDetailPage() {
                     Post Material Batch
                   </button>
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
 
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Output and Scrap"
                 description="Receive finished goods and record scrap explicitly. The job can only complete after WIP clears."
               >
@@ -557,17 +569,17 @@ export default function AdminManufacturingJobDetailPage() {
                     Post Output Batch
                   </button>
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-3">
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Material Lines"
                 description="Issue and return-correction lines keep raw-material consumption explicit."
               >
                 <div className="space-y-3">
                   {job.material_issue_lines.length === 0 ? (
-                    <EmptyState title="No material lines" description="Release the job or post a material batch to create material movement lines." />
+                    <ERPEmptyState title="No material lines" description="Release the job or post a material batch to create material movement lines." />
                   ) : (
                     job.material_issue_lines.map((line) => (
                       <div key={line.id} className="rounded-2xl border border-border bg-background/70 p-3 text-sm">
@@ -581,15 +593,15 @@ export default function AdminManufacturingJobDetailPage() {
                     ))
                   )}
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
 
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Receipt Lines"
                 description="Finished-goods receipt lines increase stock only when posted through the job output action."
               >
                 <div className="space-y-3">
                   {job.receipt_lines.length === 0 ? (
-                    <EmptyState title="No receipt lines" description="Post an output batch to receive finished goods." />
+                    <ERPEmptyState title="No receipt lines" description="Post an output batch to receive finished goods." />
                   ) : (
                     job.receipt_lines.map((line) => (
                       <div key={line.id} className="rounded-2xl border border-border bg-background/70 p-3 text-sm">
@@ -603,15 +615,15 @@ export default function AdminManufacturingJobDetailPage() {
                     ))
                   )}
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
 
-              <WorkspaceSection
+              <ERPSectionShell
                 title="Scrap Lines"
                 description="Scrap stays explicit at the production job and reduces WIP through controlled posting."
               >
                 <div className="space-y-3">
                   {job.scrap_lines.length === 0 ? (
-                    <EmptyState title="No scrap lines" description="Record wastage only when it belongs to this job." />
+                    <ERPEmptyState title="No scrap lines" description="Record wastage only when it belongs to this job." />
                   ) : (
                     job.scrap_lines.map((line) => (
                       <div key={line.id} className="rounded-2xl border border-border bg-background/70 p-3 text-sm">
@@ -623,11 +635,11 @@ export default function AdminManufacturingJobDetailPage() {
                     ))
                   )}
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
             </div>
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

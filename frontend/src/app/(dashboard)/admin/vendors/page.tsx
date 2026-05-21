@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import Link from "next/link";
@@ -55,11 +56,17 @@ export default function AdminVendorsPage() {
     { key: "phone", header: "Phone" },
     { key: "email", header: "Email" },
     { key: "gstin", header: "GSTIN" },
-    { key: "status", header: "Status", render: (row) => row.status || (row.is_active ? "ACTIVE" : "INACTIVE") },
+    {
+      key: "status",
+      header: "Status",
+      render: (row) => (
+        <ERPStatusBadge status={row.status || (row.is_active ? "ACTIVE" : "INACTIVE")} />
+      ),
+    },
   ];
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Vendors"
       subtitle="Internal supplier master for purchase and payable workflows."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendors" }]}
@@ -69,7 +76,10 @@ export default function AdminVendorsPage() {
       ]}
       stats={[{ label: "Vendors", value: String(vendors.length), tone: "info" }]}
     >
-      <WorkspaceSection title="Vendor Register" description="This list is additive to accounting vendor master and does not affect customer billing flows.">
+      <ERPSectionShell
+        title="Vendor register"
+        description="Supplier master list used for purchasing and payable workflows. This remains additive to accounting vendor master and does not affect customer billing flows."
+      >
         <EnterpriseDataTable
           data={vendors}
           columns={columns}
@@ -78,7 +88,7 @@ export default function AdminVendorsPage() {
           emptyTitle="No vendors found"
           emptyDescription="Create vendors from Accounting > Vendors."
         />
-      </WorkspaceSection>
-    </PortalPage>
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

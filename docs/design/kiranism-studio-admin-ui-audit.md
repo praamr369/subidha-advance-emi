@@ -2511,3 +2511,139 @@ Non-goals: no backend changes; no auth/session changes; no new service calls; no
 ### 12) Next recommended phase
 
 - Phase 18 — Vendor / manufacturing / marketplace (if present), SAFE_AUTO first.
+
+---
+
+## Phase 18 vendor manufacturing marketplace transformation result
+
+Date: 2026-05-21  
+Scope: SAFE_AUTO + SAFE_LAYOUT_ONLY pages where `businessCategory = Vendor / Manufacturing / Marketplace` (per route-category map).  
+Non-goals: no backend changes; no auth/session changes; no new service calls; no action/validation/visibility changes; no invented endpoints; no mock/fake vendor/procurement/manufacturing records.
+
+### 1) Vendor/manufacturing/marketplace routes touched
+
+- Admin — vendor/procurement + manufacturing workspaces:
+  - `/admin/vendors` (SAFE_AUTO)
+  - `/admin/vendors/[id]` (SAFE_LAYOUT_ONLY)
+  - `/admin/vendors/outstanding` (SAFE_AUTO)
+  - `/admin/vendors/purchases` (SAFE_AUTO)
+  - `/admin/vendors/purchase-returns` (SAFE_AUTO)
+  - `/admin/vendors/quotes` (SAFE_LAYOUT_ONLY)
+  - `/admin/vendors/quotes/[id]` (SAFE_AUTO)
+  - `/admin/vendors/sourcing` (SAFE_AUTO)
+  - `/admin/manufacturing` (SAFE_AUTO)
+  - `/admin/manufacturing/boms` (SAFE_AUTO)
+  - `/admin/manufacturing/jobs` (SAFE_AUTO)
+  - `/admin/manufacturing/jobs/[id]` (SAFE_AUTO)
+- Vendor portal workspaces:
+  - `/vendor` (SAFE_AUTO)
+  - `/vendor/profile` (SAFE_AUTO)
+  - `/vendor/orders` (SAFE_AUTO)
+  - `/vendor/outstanding` (SAFE_AUTO)
+  - `/vendor/quotes` (SAFE_AUTO)
+  - `/vendor/quotes/[id]` (SAFE_LAYOUT_ONLY)
+  - `/vendor/purchase-returns` (SAFE_AUTO)
+  - `/vendor/documents` (SAFE_AUTO)
+  - `/vendor/notifications` (SAFE_AUTO)
+
+### 2) Vendor/manufacturing/marketplace routes deferred
+
+- Not in `businessCategory = Vendor / Manufacturing / Marketplace` (intentionally not modified in Phase 18):
+  - `/vendor/ledger` (categorized Inventory / Stock Control; already transformed in a prior phase)
+  - `/vendor/products` (categorized Products / Catalog Master; already on ERP primitives)
+  - `/admin/vendors/ledger` (categorized Inventory / Stock Control; already transformed in a prior phase)
+  - `/admin/vendors/categories` (categorized Inventory / Stock Control; already transformed in a prior phase)
+  - `/admin/vendors/products` (categorized Products / Catalog Master; already transformed earlier)
+
+### 3) Pages transformed by migrationClass
+
+- SAFE_AUTO transformed:
+  - `/admin/vendors`
+  - `/admin/vendors/outstanding`
+  - `/admin/vendors/purchases`
+  - `/admin/vendors/purchase-returns`
+  - `/admin/vendors/quotes/[id]`
+  - `/admin/vendors/sourcing`
+  - `/admin/manufacturing`
+  - `/admin/manufacturing/boms`
+  - `/admin/manufacturing/jobs`
+  - `/admin/manufacturing/jobs/[id]`
+  - `/vendor`
+  - `/vendor/profile`
+  - `/vendor/orders`
+  - `/vendor/outstanding`
+  - `/vendor/quotes`
+  - `/vendor/purchase-returns`
+  - `/vendor/documents`
+  - `/vendor/notifications`
+- SAFE_LAYOUT_ONLY transformed:
+  - `/admin/vendors/[id]`
+  - `/admin/vendors/quotes`
+  - `/vendor/quotes/[id]`
+- MANUAL_REVIEW transformed: none.
+- DO_NOT_TOUCH transformed: none.
+
+### 4) Components reused
+
+- ERP shell/states:
+  - `frontend/src/components/erp/ERPPageShell.tsx`
+  - `frontend/src/components/erp/ERPLoadingState.tsx`
+  - `frontend/src/components/erp/ERPErrorState.tsx`
+  - `frontend/src/components/erp/ERPEmptyState.tsx`
+- ERP framing:
+  - `frontend/src/components/erp/ERPSectionShell.tsx`
+  - `frontend/src/components/erp/ERPDataToolbar.tsx`
+  - `frontend/src/components/erp/ERPDetailGrid.tsx`
+  - `frontend/src/components/erp/ERPStatusBadge.tsx`
+  - `frontend/src/components/erp/ERPPageHeader.tsx` (vendor notifications header framing)
+- Existing role shells preserved:
+  - `frontend/src/components/layout/page-shells.tsx` (`PartnerVendorWorkspaceShell`)
+  - `frontend/src/components/notifications/NotificationCenterPanel.tsx` (rendered with `showHeader={false}` to avoid duplicate headers)
+
+### 5) Components created, if any
+
+- None.
+
+### 6) Vendor/manufacturing/procurement services/API contracts preserved
+
+- No endpoint path changes, request parameter changes, response normalization changes, or new service calls were introduced.
+- Existing usage preserved:
+  - `@/services/vendors` (vendor register)
+  - `@/services/vendor-ops` (vendor quotes/orders/outstanding/returns + admin vendor detail helpers)
+  - `@/services/vendor-account-links` (admin vendor portal account linking)
+  - `@/services/manufacturing` (overview, BOM, jobs + job transitions)
+  - `@/services/notifications` (vendor notification center)
+
+### 7) Vendor/product/purchase/manufacturing safety confirmation
+
+- No changes to submit handlers, validation logic, or action visibility rules on:
+  - vendor quote submission and admin accept/reject flows
+  - purchase order / receipt / GRN / bill / payment / return workflows
+  - manufacturing job transitions (release/material issue/output/scrap/complete/cancel)
+  - BOM create/activate/deactivate behavior
+- Changes are UI framing only: ERP shells, section hierarchy, dense tables/cards, and safer loading/error/empty states.
+
+### 8) Stock/financial/audit safety confirmation
+
+- No changes to stock mutation semantics, accounting bridge semantics, payable/ledger computation, or posting behavior.
+- UI remains read-first where appropriate; the backend remains the only source of truth for status, balances, posting, and audit records.
+
+### 9) Auth/role safety confirmation
+
+- No changes to JWT/session handling, refresh flow, logout, redirects, middleware, or `RoleGuard`.
+- No role/permission boundary changes; admin-only and vendor-only routes remain guarded as before.
+
+### 10) Duplicate partner commissions route status
+
+- Preserved unchanged (explicit policy):
+  - `frontend/src/app/(dashboard)/partner/commissions/`
+  - `frontend/src/app/(dashboard)/partner/commisions/`
+
+### 11) Remaining vendor/manufacturing UI gaps
+
+- Several vendor/manufacturing/procurement surfaces remain intentionally minimal (placeholder sections) and should be upgraded only when route-category map classifies them SAFE_* and when mutation-heavy actions are manually reviewed.
+- Consider adding consistent register/table primitives to vendor quote/order/return lists where endpoints already provide stable paging/filter shapes (without changing service calls).
+
+### 12) Next recommended phase
+
+- Phase 19 — Compatibility/legacy route cleanup plan only (no deletions), then Phase 20 consistency sweep.

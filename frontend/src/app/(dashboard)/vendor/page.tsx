@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import EmptyState from "@/components/feedback/EmptyState";
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { PartnerVendorWorkspaceShell } from "@/components/layout/page-shells";
 import { MetricStrip } from "@/components/ui/operations";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   getVendorNotificationSummary,
@@ -108,7 +108,7 @@ export default function VendorDashboardPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Vendor Dashboard"
       subtitle="Vendor-scoped workspace for quote requests, purchase orders, ledger, and payable visibility."
       helperNote="This dashboard only shows records linked to your vendor account."
@@ -120,20 +120,9 @@ export default function VendorDashboardPage() {
         { label: "Notifications", href: ROUTES.vendor.notifications, variant: "secondary" },
       ]}
     >
-      {loading ? <LoadingBlock label="Loading vendor dashboard..." /> : null}
-      {!loading && error ? (
-        <ErrorState
-          title="Unable to load vendor dashboard"
-          description={error}
-          onRetry={() => void loadPage()}
-        />
-      ) : null}
-      {!loading && !error && !data ? (
-        <EmptyState
-          title="No vendor dashboard data available"
-          description="Your vendor workspace will show quote requests, orders, and ledger information after account linking."
-        />
-      ) : null}
+      {loading ? <ERPLoadingState label="Loading vendor dashboard..." /> : null}
+      {!loading && error ? <ERPErrorState title="Unable to load vendor dashboard" description={error} onRetry={() => void loadPage()} /> : null}
+      {!loading && !error && !data ? <ERPEmptyState title="No vendor dashboard data available" description="Your vendor workspace will show quote requests, orders, and ledger information after account linking." /> : null}
       {!loading && !error && data ? (
         <PartnerVendorWorkspaceShell
           posture={
@@ -172,10 +161,7 @@ export default function VendorDashboardPage() {
                 {String(data.products_count ?? 0)}
               </p>
 
-              <WorkspaceSection
-                title="Quick Actions"
-                description="Use these actions to process vendor workflows without navigating through multiple pages."
-              >
+              <ERPSectionShell title="Quick actions" description="Open common vendor workflows without navigating multiple pages.">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {quickActions.map((action) => (
                     <Link
@@ -188,11 +174,11 @@ export default function VendorDashboardPage() {
                     </Link>
                   ))}
                 </div>
-              </WorkspaceSection>
+              </ERPSectionShell>
             </>
           }
         />
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

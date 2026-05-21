@@ -5,7 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { requestVendorQuotesViaSourcing, suggestVendors } from "@/services/vendor-ops";
 
@@ -200,7 +204,7 @@ export default function AdminVendorSourcingPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Vendor sourcing workspace"
       subtitle="Ranked supplier recommendations — read-only until procurement records RFQs manually. Orders are never auto-placed."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor sourcing", href: ROUTES.admin.vendorsSourcing }]}
@@ -220,8 +224,10 @@ export default function AdminVendorSourcingPage() {
       {banner ? <div className="mb-3 rounded border border-emerald-600/40 bg-emerald-600/10 p-3 text-sm">{banner}</div> : null}
       {error ? <div className="mb-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
 
-      <section className="mb-8 rounded border p-4 text-sm">
-        <h2 className="mb-2 text-base font-medium">Customer / fulfilment cues & SKU filters</h2>
+      <ERPSectionShell
+        title="Customer / fulfilment cues & SKU filters"
+        description="Use geography cues and SKU filters to rank vendors. Results remain read-only until you explicitly create RFQs."
+      >
         <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
           <input className="h-10 rounded border px-2" placeholder="Customer pincode" value={pincode} onChange={(e) => setPincode(e.target.value)} />
           <input className="h-10 rounded border px-2" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
@@ -247,7 +253,7 @@ export default function AdminVendorSourcingPage() {
         </label>
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" className="h-10 rounded border bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" disabled={loading} onClick={() => void runSuggest()}>
-            {loading ? "Ranking…" : "Run sourcing"}
+        {loading ? "Ranking…" : "Run sourcing"}
           </button>
           <button
             type="button"
@@ -262,24 +268,34 @@ export default function AdminVendorSourcingPage() {
           <div className="font-medium text-foreground">Weights</div>
           Location dominates (30 pts), vendor price posture up to 20, delivery 15, quality 15, warranty 10, reliability 10. Catalog/category/material filters prune non-feasible partners before scoring.
         </div>
-      </section>
+      </ERPSectionShell>
 
-      {loading ? <div className="text-sm text-muted-foreground">Loading supplier intelligence…</div> : null}
-      {!loading && rows.length === 0 && !error ? (
-        <div className="rounded border border-dashed p-6 text-sm text-muted-foreground">
-          Enter geography cues (pincode/state) or SKU/category/material filters — results stay read-only summaries until downstream RFQ creation.
-        </div>
-      ) : null}
+      {error ? <ERPErrorState title="Vendor sourcing unavailable" description={error} /> : null}
 
-      {!loading && rows.length > 0 ? (
-        <div className="space-y-3 text-sm">
+      <ERPSectionShell
+        title="Suggested vendors"
+        description="Results are read-only summaries until downstream RFQ creation. Orders are never auto-placed."
+      >
+        {loading ? <ERPLoadingState label="Loading supplier intelligence..." /> : null}
+        {!loading && rows.length === 0 && !error ? (
+          <ERPEmptyState
+            title="No suggestions yet"
+            description="Enter geography cues (pincode/state) or SKU/category/material filters to see ranked suppliers."
+          />
+        ) : null}
+
+        {!loading && rows.length > 0 ? (
+          <div className="space-y-3 text-sm">
           {rows.map((row) => {
             const lq = row.latest_quote ?? null;
             const expandedRow = !!expanded[row.vendor_id];
             const bd = row.score_breakdown || {};
             const actions = row.actions || {};
             return (
-              <div key={row.vendor_id} className="rounded border p-4">
+              <div
+                key={row.vendor_id}
+                className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <input
@@ -367,8 +383,9 @@ export default function AdminVendorSourcingPage() {
               </div>
             );
           })}
-        </div>
-      ) : null}
-    </PortalPage>
+          </div>
+        ) : null}
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

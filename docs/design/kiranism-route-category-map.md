@@ -614,6 +614,36 @@ Important: this audit pass makes **no UI code changes**. The phases below are th
 - **Prompt title**: “Phase 18 — Vendor portal UI”.
 - **Fast tests**: `cd frontend && npm run check:routes`.
 
+- **Transformed (2026-05-21)** (SAFE_AUTO/SAFE_LAYOUT_ONLY; UI-only):
+  - SAFE_AUTO:
+    - `/admin/vendors`
+    - `/admin/vendors/outstanding`
+    - `/admin/vendors/purchases`
+    - `/admin/vendors/purchase-returns`
+    - `/admin/vendors/quotes/[id]`
+    - `/admin/vendors/sourcing`
+    - `/admin/manufacturing`
+    - `/admin/manufacturing/boms`
+    - `/admin/manufacturing/jobs`
+    - `/admin/manufacturing/jobs/[id]`
+    - `/vendor`
+    - `/vendor/profile`
+    - `/vendor/orders`
+    - `/vendor/outstanding`
+    - `/vendor/quotes`
+    - `/vendor/purchase-returns`
+    - `/vendor/documents`
+    - `/vendor/notifications`
+  - SAFE_LAYOUT_ONLY:
+    - `/admin/vendors/[id]`
+    - `/admin/vendors/quotes`
+    - `/vendor/quotes/[id]`
+- **Deferred (out of scope for Phase 18 category or already migrated)**:
+  - `/vendor/ledger` (categorized Inventory / Stock Control; handled in earlier phase)
+  - `/vendor/products` (categorized Products / Catalog Master; handled in earlier phase)
+  - `/admin/vendors/ledger` and `/admin/vendors/categories` (categorized Inventory / Stock Control; handled earlier)
+  - `/admin/vendors/products` (categorized Products / Catalog Master; handled earlier)
+
 ### Phase 19 — Compatibility/legacy route cleanup plan only
 
 - **Goal**: plan route cleanups/aliases/deprecations; **do not delete routes**.

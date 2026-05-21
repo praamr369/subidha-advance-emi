@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import ErrorState from "@/components/feedback/ErrorState";
-import LoadingBlock from "@/components/feedback/LoadingBlock";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import DataTable from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   activateManufacturingBom,
@@ -183,7 +183,7 @@ export default function AdminManufacturingBomsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="BOM Register"
       subtitle="Maintain additive furniture BOM revisions against the shared finished-good and raw-material inventory master. Activation is explicit so production jobs only release against controlled BOM revisions."
       breadcrumbs={[
@@ -205,16 +205,16 @@ export default function AdminManufacturingBomsPage() {
     >
       <div className="space-y-6">
         {notice ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="rounded-2xl border border-emerald-600/35 bg-emerald-600/10 px-4 py-3 text-sm text-foreground">
             {notice}
           </div>
         ) : null}
-        {loading ? <LoadingBlock label="Loading BOM register..." /> : null}
+        {loading ? <ERPLoadingState label="Loading BOM register..." /> : null}
         {!loading && error ? (
-          <ErrorState title="BOM register unavailable" description={error} onRetry={() => void loadPage()} />
+          <ERPErrorState title="BOM register unavailable" description={error} onRetry={() => void loadPage()} />
         ) : null}
 
-        <WorkspaceSection
+        <ERPSectionShell
           title="Create BOM Draft"
           description="Enter the finished-good inventory profile once, then define raw-material and accessory lines against the shared inventory master."
         >
@@ -327,10 +327,10 @@ export default function AdminManufacturingBomsPage() {
               {saving ? "Saving..." : "Create BOM Draft"}
             </button>
           </div>
-        </WorkspaceSection>
+        </ERPSectionShell>
 
         {!loading && !error ? (
-          <WorkspaceSection
+          <ERPSectionShell
             title="BOM Register"
             description="Activate BOMs only when the line set is ready for release into daily furniture production."
           >
@@ -360,9 +360,9 @@ export default function AdminManufacturingBomsPage() {
                 </div>
               )}
             />
-          </WorkspaceSection>
+          </ERPSectionShell>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

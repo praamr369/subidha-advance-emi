@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPAuditNote from "@/components/erp/ERPAuditNote";
+import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
 import { getVendorQuoteRequest, submitVendorQuote } from "@/services/vendor-ops";
 
@@ -74,7 +80,7 @@ export default function VendorQuoteDetailPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={String(detail?.request_no || pk)}
       subtitle="Submit commercial terms — this remains outside accounting until procurement approves downstream documents."
       breadcrumbs={[
@@ -83,80 +89,138 @@ export default function VendorQuoteDetailPage() {
         { label: String(detail?.request_no || pk) },
       ]}
     >
-      {error ? (
-        <div className="mb-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      {error ? <ERPErrorState title="Unable to load RFQ" description={error} /> : null}
+      {notice ? (
+        <div className="rounded-2xl border border-emerald-600/35 bg-emerald-600/10 p-4 text-sm text-foreground">
+          {notice}
+        </div>
       ) : null}
-      {notice ? <div className="mb-3 rounded border border-green-700/40 bg-green-700/10 p-3 text-sm">{notice}</div> : null}
 
-      {loading ? <div className="text-sm">Loading RFQ…</div> : null}
+      {loading ? <ERPLoadingState label="Loading RFQ..." /> : null}
 
       {!loading && detail ? (
-        <div className="grid gap-4 text-sm md:grid-cols-2">
-          <div className="rounded border p-3 space-y-1">
-            <div className="font-medium">Buyer context</div>
-            <div>Status RFQ: {String(detail.status)}</div>
-            <div>Product: {String(detail.product_name || "—")}</div>
-            <div>
-              Geography: {String(detail.customer_city || "—")} / PIN {String(detail.customer_pincode || "—")}
-            </div>
-            <div>Qty requested: {String(detail.quantity)}</div>
-          </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <ERPSectionShell
+            title="Buyer context"
+            description="RFQ details provided by procurement. Quoting does not post purchase/ledger documents."
+            actions={<ERPStatusBadge status={String(detail.status ?? "—")} />}
+          >
+            <ERPDetailGrid
+              columns={2}
+              items={[
+                { label: "RFQ status", value: String(detail.status ?? "—") },
+                { label: "Product", value: String(detail.product_name || "—") },
+                {
+                  label: "Geography",
+                  value: `${String(detail.customer_city || "—")} / PIN ${String(detail.customer_pincode || "—")}`,
+                },
+                { label: "Qty requested", value: String(detail.quantity ?? "—") },
+              ]}
+            />
+          </ERPSectionShell>
 
-          <div className="rounded border p-3 space-y-2">
-            <div className="font-medium">Your quote row ({String(myQuoteRow.status || "UNKNOWN")})</div>
-            <div className="text-muted-foreground text-xs">Only one row belongs to your vendor portal account.</div>
-            <form className="space-y-2" onSubmit={(e) => void submit(e)}>
+          <ERPSectionShell
+            title="Your quote"
+            description="Only one row belongs to your vendor portal account."
+            actions={<ERPStatusBadge status={String(myQuoteRow.status || "UNKNOWN")} />}
+          >
+            <ERPAuditNote tone={editable ? "info" : "warning"}>
+              {editable
+                ? "Procurement will review and approve downstream documents explicitly. This submission does not post any purchase, stock, or accounting entries."
+                : "Portal editing is blocked for drafts you did not receive or RFQs already closed."}
+            </ERPAuditNote>
+            <form className="space-y-3 text-sm" onSubmit={(e) => void submit(e)}>
               <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs uppercase text-muted-foreground">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Quote price ₹
-                  <input className="mt-1 h-9 w-full rounded border px-2 normal-case" value={price} onChange={(e) => setPrice(e.target.value)} disabled={!editable} />
+                  <input
+                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 normal-case"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    disabled={!editable}
+                  />
                 </label>
-                <label className="text-xs uppercase text-muted-foreground">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Available qty
-                  <input className="mt-1 h-9 w-full rounded border px-2 normal-case" value={availQty} onChange={(e) => setAvailQty(e.target.value)} disabled={!editable} />
+                  <input
+                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 normal-case"
+                    value={availQty}
+                    onChange={(e) => setAvailQty(e.target.value)}
+                    disabled={!editable}
+                  />
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs uppercase text-muted-foreground">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Lead days
-                  <input className="mt-1 h-9 w-full rounded border px-2 normal-case" value={lead} onChange={(e) => setLead(e.target.value)} disabled={!editable} />
+                  <input
+                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 normal-case"
+                    value={lead}
+                    onChange={(e) => setLead(e.target.value)}
+                    disabled={!editable}
+                  />
                 </label>
-                <label className="text-xs uppercase text-muted-foreground">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Warranty mo
-                  <input className="mt-1 h-9 w-full rounded border px-2 normal-case" value={warranty} onChange={(e) => setWarranty(e.target.value)} disabled={!editable} />
+                  <input
+                    className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 normal-case"
+                    value={warranty}
+                    onChange={(e) => setWarranty(e.target.value)}
+                    disabled={!editable}
+                  />
                 </label>
               </div>
-              <label className="flex items-center gap-2 text-xs">
+              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <input type="checkbox" checked={deliveryYes} onChange={(e) => setDeliveryYes(e.target.checked)} disabled={!editable} /> Delivery offered
               </label>
-              <label className="text-xs uppercase text-muted-foreground">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Delivery charge ₹
-                <input className="mt-1 h-9 w-full rounded border px-2 normal-case" value={deliveryCharge} onChange={(e) => setDeliveryCharge(e.target.value)} disabled={!editable} />
+                <input
+                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 normal-case"
+                  value={deliveryCharge}
+                  onChange={(e) => setDeliveryCharge(e.target.value)}
+                  disabled={!editable}
+                />
               </label>
-              <label className="text-xs uppercase text-muted-foreground">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Notes
-                <textarea className="mt-1 w-full rounded border px-2 py-1 normal-case" rows={3} value={note} onChange={(e) => setNote(e.target.value)} disabled={!editable} />
+                <textarea
+                  className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 normal-case"
+                  rows={3}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  disabled={!editable}
+                />
               </label>
-              <label className="text-xs uppercase text-muted-foreground">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Valid until
-                <input type="date" className="mt-1 h-9 w-full rounded border px-2 normal-case" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} disabled={!editable} />
+                <input
+                  type="date"
+                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 normal-case"
+                  value={validUntil}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                  disabled={!editable}
+                />
               </label>
-              <button className="h-10 w-full rounded border bg-primary px-4 text-primary-foreground disabled:opacity-40" type="submit" disabled={busy || !editable}>
+              <button
+                className="h-10 w-full rounded-xl border bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+                type="submit"
+                disabled={busy || !editable}
+              >
                 {busy ? "Saving…" : "Submit / update quote"}
               </button>
-              {!editable ? <div className="text-destructive text-xs">Portal editing is blocked for drafts you did not receive or RFQs already closed.</div> : null}
             </form>
-          </div>
+          </ERPSectionShell>
         </div>
       ) : null}
 
       {!loading ? (
-        <div className="mt-6">
+        <div>
           <Link href={ROUTES.vendor.quotes} className="text-primary underline text-sm">
             Back to invitations
           </Link>
         </div>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }
