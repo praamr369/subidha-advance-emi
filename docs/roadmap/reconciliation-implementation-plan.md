@@ -3,6 +3,9 @@
 Status: **PLAN ONLY (no implementation in this pass)**  
 Phase 1 constraint: **read-only detection + manual resolution notes/status only**. No auto-correct.
 
+Phase E prerequisite (docs-only, completed):
+- `docs/architecture/reconciliation-source-link-map.md` (deterministic evidence map + Phase F readiness classification)
+
 ## 0) Starting Point (Confirmed in repo)
 
 Existing reconciliation surfaces:
@@ -33,6 +36,9 @@ Create a single admin-only “Control Tower” surface that aggregates and triag
 
 Strong recommendation for Phase 1:
 - Start with **computed** endpoints to avoid migrations until the check catalog stabilizes.
+
+Phase F scope rule:
+- Implement only checks tagged `READY_FOR_PHASE_F` in `docs/architecture/reconciliation-source-link-map.md`.
 
 ### Frontend (additive)
 - Add a new admin workspace route under existing admin structure (design only here):
@@ -97,4 +103,3 @@ Frontend checks (minimum):
 - loading/empty/error states for each queue
 - role guard: ADMIN only
 - deep-link navigation correctness for evidence links
-

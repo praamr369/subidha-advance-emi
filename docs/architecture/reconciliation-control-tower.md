@@ -3,6 +3,13 @@
 Status: **AUDIT COMPLETE (docs-only)**  
 Constraint: **Read-only detection + manual resolution notes/status only (Phase 1)**. No auto-correction of financial records.
 
+## 0) Phase E prerequisite (source-link determinism)
+
+Phase E deliverable (docs-only):
+- `docs/architecture/reconciliation-source-link-map.md`
+
+Phase F must implement **only** checks classified as `READY_FOR_PHASE_F` in that source-link map to prevent noisy exceptions.
+
 ## 1) What Exists Today (Confirmed)
 
 ### Payment-level reconciliation (admin-only)
@@ -196,4 +203,3 @@ Admin workspace UI should provide:
 
 - Customer and Partner roles must **never** access admin reconciliation control tower.
 - Cashier access (if any) must be limited to cashier-safe queues (e.g., today’s receipts needing printing) and must never include accounting bridge controls.
-

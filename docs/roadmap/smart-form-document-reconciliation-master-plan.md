@@ -83,6 +83,7 @@ Phase D (implemented 2026-05-21):
 
 Reference docs:
 - `docs/architecture/reconciliation-control-tower.md`
+- `docs/architecture/reconciliation-source-link-map.md` (Phase E: deterministic source-link audit)
 - `docs/roadmap/reconciliation-implementation-plan.md`
 
 Existing signals:
@@ -93,6 +94,9 @@ Existing signals:
 Deliverable (Phase 1):
 - admin-only triage view aggregating deterministic exceptions + manual resolution notes/status
 - no auto-correction
+
+Phase E (implemented 2026-05-21):
+- Completed the deterministic source-link audit required to prevent noisy reconciliation exceptions.
 
 ## Deployment Plan (when implemented)
 
