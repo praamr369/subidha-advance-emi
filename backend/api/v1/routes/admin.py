@@ -487,6 +487,9 @@ from api.v1.views.admin_settlements import (
     BankStatementImportListCreateView,
     BankStatementImportDetailView,
     BankStatementLineListView,
+    SettlementAllocationDetailView,
+    SettlementAllocationListCreateView,
+    SettlementAllocationVoidView,
     UpiSettlementImportListCreateView,
     UpiSettlementImportDetailView,
     UpiSettlementLineListView,
@@ -950,5 +953,9 @@ urlpatterns = [
     path("settlements/upi-imports/", UpiSettlementImportListCreateView.as_view(), name="admin-upi-imports-list-create"),
     path("settlements/upi-imports/<int:pk>/", UpiSettlementImportDetailView.as_view(), name="admin-upi-imports-detail"),
     path("settlements/upi-imports/<int:pk>/lines/", UpiSettlementLineListView.as_view(), name="admin-upi-imports-lines"),
+    # Phase L2: manual settlement allocations (admin-only)
+    path("settlements/allocations/", SettlementAllocationListCreateView.as_view(), name="admin-settlement-allocations-list-create"),
+    path("settlements/allocations/<int:pk>/", SettlementAllocationDetailView.as_view(), name="admin-settlement-allocations-detail"),
+    path("settlements/allocations/<int:pk>/void/", SettlementAllocationVoidView.as_view(), name="admin-settlement-allocations-void"),
     path("", include(router.urls)),
 ]

@@ -1,7 +1,7 @@
 # Bank / UPI Statement Imports + Cashier Day Close — Additive Source-Link Design
 
-Status: **DESIGN + PHASE L0/L1 IMPLEMENTED (2026-05-22)**  
-Scope: additive schema + admin-only import/parsing foundation for **Bank Statement Import** and **UPI Settlement Import**.  
+Status: **DESIGN + PHASE L0/L1/L2 IMPLEMENTED (2026-05-22)**  
+Scope: additive schema + admin-only import/parsing foundation + **manual SettlementAllocation workflow**.  
 Non-goals: no payment posting change, no receipt generation change, no accounting posting change, no auto-match, no auto-correction, no mutation/backfill of historical financial records.
 
 This design introduces **explicit source links** so future reconciliation checks can rely on deterministic evidence rather than free-text inference.
@@ -59,6 +59,32 @@ Notes:
 - XLS/XLSX is intentionally not supported in Phase L1.
 - Parsing rejects bank rows with both debit and credit > 0.
 - Parsing rejects UPI rows where `settlement_date` does not match the import’s `settlement_date`.
+
+## 1.2 Phase L2 implementation (2026-05-22)
+
+Implemented (backend):
+- Admin-only manual allocation endpoints:
+  - `GET /api/v1/admin/settlements/allocations/` (paginated list)
+  - `POST /api/v1/admin/settlements/allocations/` (manual create)
+  - `GET /api/v1/admin/settlements/allocations/{id}/` (detail)
+  - `POST /api/v1/admin/settlements/allocations/{id}/void/` (void; never deletes)
+
+Guarantees (explicit):
+- Manual operator action only: **no auto-match**, **no suggestions**, **no reconciliation checks**, **no source-record mutation** of:
+  - `Payment`, `ReceiptDocument`, `MoneyMovement`, `JournalEntry`, `FinanceAccount`, `CashCounter`, imports, or historical ledger records.
+- Voiding an allocation never deletes it; it only marks it `VOIDED` and records actor/time in `metadata`.
+
+Validation rules (enforced by service; summarized):
+- `source_type` must be one of: `BANK_STATEMENT_LINE | UPI_SETTLEMENT_LINE | CASHIER_DAY_CLOSE`.
+- `source_id` must reference an existing source row.
+- `finance_account` must match the source import’s finance account where deterministic:
+  - BankStatementLine → BankStatementImport.bank_finance_account
+  - UpiSettlementLine → UpiSettlementImport.upi_finance_account
+  - CashierDayClose → CashierDayClose.finance_account (must be set)
+- At least one target required: `payment` or `receipt` or `money_movement`.
+- `matched_amount` must be positive and cannot exceed remaining source amount after existing non-VOIDED/non-REJECTED allocations.
+- Partial allocations are allowed.
+- Duplicate exact active allocation (same source + same target + same amount) is rejected.
 
 ## 2) Proposed additive models (schema)
 

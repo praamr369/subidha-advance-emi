@@ -48,6 +48,13 @@ Phase L1 implemented (2026-05-22):
 - Admin-only bank/UPI import upload + checksum + CSV parsing into line tables.
 - Still **no matching UI**, **no allocations**, **no reconciliation checks**, and **no source-record mutation**.
 
+Phase L2 implemented (2026-05-22):
+- Admin-only **manual** `SettlementAllocation` workflow to link settlement evidence to internal records.
+- Guarantees:
+  - no auto-match / no suggestions
+  - no reconciliation checks
+  - no mutation of `Payment`, `ReceiptDocument`, `MoneyMovement`, journals, finance accounts, or cash counters
+
 Implication (implemented):
 - This phase safely implements **strict, link-backed checks** around:
   - missing/duplicate bridge posting evidence

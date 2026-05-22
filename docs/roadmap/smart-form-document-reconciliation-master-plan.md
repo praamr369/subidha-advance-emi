@@ -157,6 +157,12 @@ Phase L1 (implemented 2026-05-22):
 - Added admin-only upload + checksum + CSV parsing for bank statements and UPI settlements into line tables.
 - Still evidence ingestion only: no matching UI, no allocations, no reconciliation checks, no auto-match, no source-record mutation.
 
+Phase L2 (implemented 2026-05-22):
+- Added admin-only manual `SettlementAllocation` workflow (no auto-match, no suggestions).
+- Guarantees:
+  - no reconciliation checks are created/closed
+  - no mutation of `Payment`, `ReceiptDocument`, `MoneyMovement`, journals, finance accounts, cash counters, or source evidence rows (beyond line matched_status)
+
 ## Deployment Plan (when implemented)
 
 ### Order of rollout (recommended)

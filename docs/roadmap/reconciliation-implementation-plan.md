@@ -178,6 +178,10 @@ Goal:
 - Implement deterministic cash/bank/UPI settlement reconciliation checks classified as `READY_FOR_SETTLEMENT_PHASE`.
 - Detection only; no auto-correction; no source-record mutation.
 
+Phase L2 prerequisite status (2026-05-22):
+- Manual `SettlementAllocation` APIs are implemented (admin-only) to allow explicit evidence linking.
+- Settlement reconciliation checks remain deferred until a dedicated “allocation-backed checks” phase is implemented.
+
 Backend (additive):
 - New service module:
   - `backend/reconciliation/services/cash_bank_upi_reconciliation.py`

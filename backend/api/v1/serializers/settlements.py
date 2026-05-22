@@ -4,6 +4,8 @@ from rest_framework import serializers
 from settlements.models import (
     BankStatementImport,
     BankStatementLine,
+    SettlementAllocation,
+    SettlementAllocationSourceType,
     UpiSettlementImport,
     UpiSettlementLine,
 )
@@ -164,3 +166,54 @@ class UpiSettlementImportCreateSerializer(serializers.ModelSerializer):
         if not file:
             raise serializers.ValidationError({"uploaded_file": "File is required."})
         return attrs
+
+
+class SettlementAllocationSerializer(serializers.ModelSerializer):
+    matched_by_username = serializers.CharField(source="matched_by.username", read_only=True)
+    finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
+
+    class Meta:
+        model = SettlementAllocation
+        fields = [
+            "id",
+            "source_type",
+            "source_id",
+            "finance_account",
+            "finance_account_name",
+            "matched_amount",
+            "status",
+            "payment",
+            "receipt",
+            "money_movement",
+            "matched_by",
+            "matched_by_username",
+            "matched_at",
+            "confidence",
+            "metadata",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class SettlementAllocationCreateSerializer(serializers.Serializer):
+    source_type = serializers.ChoiceField(choices=SettlementAllocationSourceType.choices)
+    source_id = serializers.CharField()
+    finance_account = serializers.IntegerField()
+    matched_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    payment = serializers.IntegerField(required=False, allow_null=True)
+    receipt = serializers.IntegerField(required=False, allow_null=True)
+    money_movement = serializers.IntegerField(required=False, allow_null=True)
+    note = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if not (attrs.get("payment") or attrs.get("receipt") or attrs.get("money_movement")):
+            raise serializers.ValidationError({"payment": "At least one target (payment, receipt, money_movement) is required."})
+        if attrs.get("matched_amount") is not None and attrs["matched_amount"] <= 0:
+            raise serializers.ValidationError({"matched_amount": "matched_amount must be greater than zero."})
+        return attrs
+
+
+class SettlementAllocationVoidSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, default="")

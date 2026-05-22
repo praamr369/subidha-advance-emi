@@ -84,12 +84,38 @@ Test requirements (implemented, backend):
 Goal:
 - Implement operator manual matching: create `SettlementAllocation` rows linking statement/settlement lines to `Payment` / `ReceiptDocument` / `MoneyMovement`.
 
-Backend changes (future):
-- Admin-only endpoints:
-  - create/list/delete/void allocations (never hard-delete; reverse/void instead)
-  - line-level allocation totals summary endpoints (read-only)
+Status:
+- Implemented: **2026-05-22**
 
-Frontend changes (future):
+Backend changes (implemented):
+- Admin-only endpoints:
+  - `GET /api/v1/admin/settlements/allocations/` (paginated list)
+  - `POST /api/v1/admin/settlements/allocations/` (manual create)
+  - `GET /api/v1/admin/settlements/allocations/{id}/` (detail)
+  - `POST /api/v1/admin/settlements/allocations/{id}/void/` (void; never deletes)
+
+Validation rules (implemented, enforced by service):
+- `source_type` must be one of: `BANK_STATEMENT_LINE | UPI_SETTLEMENT_LINE | CASHIER_DAY_CLOSE`
+- `source_id` must reference an existing source row
+- `finance_account` must match deterministic source finance account:
+  - BankStatementLine → BankStatementImport.bank_finance_account
+  - UpiSettlementLine → UpiSettlementImport.upi_finance_account
+  - CashierDayClose → CashierDayClose.finance_account (must be set)
+- At least one target required: `payment` or `receipt` or `money_movement`
+- `matched_amount` must be positive and cannot exceed remaining source amount after existing non-VOIDED/non-REJECTED allocations
+- Partial allocations allowed (multiple allocations can be created until source amount is exhausted)
+- Duplicate exact active allocation (same source + same target + same amount) is rejected
+
+Void behavior (implemented):
+- Voiding sets `SettlementAllocation.status = VOIDED` and records `metadata.voided_at`, `metadata.voided_by_id`, optional `metadata.void_reason`.
+- No allocations are hard-deleted.
+
+Non-goals (guaranteed):
+- No auto-matching / no suggested matching.
+- No reconciliation checks are created/closed.
+- No mutation of `Payment`, `ReceiptDocument`, `MoneyMovement`, `JournalEntry`, finance accounts, cash counters, or any source financial records.
+
+Frontend changes:
 - Admin-only allocation workflow:
   - search internal candidates (payments/receipts/money movements) by date/amount/account
   - add allocations with notes
