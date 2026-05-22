@@ -5,7 +5,12 @@ import { useEffect, useState } from "react";
 
 import EntityLookupCombobox from "@/components/erp/forms/EntityLookupCombobox";
 import type { EntityLookupOption } from "@/components/erp/forms/EntityLookupCombobox";
-import { lookupSettlementFinanceAccounts, resolveSettlementFinanceAccountById } from "@/services/settlement-lookups";
+import { ApiError } from "@/lib/api";
+import {
+  lookupSettlementFinanceAccounts,
+  primeSettlementLookupResolveCache,
+  resolveSettlementFinanceAccountById,
+} from "@/services/settlement-lookups";
 
 type SettlementFinanceAccountLookupProps = {
   label: string;
@@ -37,6 +42,7 @@ export default function SettlementFinanceAccountLookup({
   className,
 }: SettlementFinanceAccountLookupProps) {
   const [selected, setSelected] = useState<EntityLookupOption | null>(null);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,16 +50,41 @@ export default function SettlementFinanceAccountLookup({
     async function resolve() {
       if (!value) {
         setSelected(null);
+        setResolveError(null);
         return;
       }
       if (selected && String(selected.id) === String(value)) return;
-      if (!/^\d+$/.test(String(value))) return;
+      if (!/^\d+$/.test(String(value))) {
+        setResolveError(null);
+        return;
+      }
 
       try {
         const option = await resolveSettlementFinanceAccountById(value);
-        if (!cancelled) setSelected(option);
-      } catch {
-        if (!cancelled) setSelected(null);
+        if (cancelled) return;
+        setSelected(option);
+        setResolveError(null);
+      } catch (error) {
+        if (cancelled) return;
+        setSelected(null);
+
+        const status =
+          error instanceof ApiError
+            ? error.status
+            : typeof error === "object" &&
+                error !== null &&
+                "status" in error &&
+                typeof (error as { status?: unknown }).status === "number"
+              ? (error as { status: number }).status
+              : undefined;
+
+        if (status === 404) {
+          setResolveError("Selected record was not found.");
+        } else if (status === 403) {
+          setResolveError("You are not allowed to view this record.");
+        } else {
+          setResolveError("Could not load selected record preview.");
+        }
       }
     }
 
@@ -70,6 +101,10 @@ export default function SettlementFinanceAccountLookup({
         value={value}
         onChange={(next, option) => {
           setSelected(option ?? null);
+          if (option && next) {
+            primeSettlementLookupResolveCache("finance_account", next, option);
+          }
+          setResolveError(null);
           onChange(next, option);
         }}
         search={(query) => lookupSettlementFinanceAccounts({ query, kind })}
@@ -84,6 +119,21 @@ export default function SettlementFinanceAccountLookup({
         loadingText="Searching finance accounts..."
         emptyText="No finance accounts found"
       />
+      {!selected && resolveError && value && /^\d+$/.test(String(value)) ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-medium">{resolveError}</div>
+            <button
+              type="button"
+              className="text-destructive underline underline-offset-2 hover:opacity-90"
+              onClick={() => void navigator.clipboard?.writeText(String(value))}
+            >
+              Copy ID
+            </button>
+          </div>
+          <div>ID: {String(value)}</div>
+        </div>
+      ) : null}
       {selected ? (
         <div className="rounded-md border bg-muted/20 p-2 text-xs">
           <div className="flex items-center justify-between gap-2">
