@@ -180,11 +180,13 @@ Goal:
 
 Phase L2 prerequisite status (2026-05-22):
 - Manual `SettlementAllocation` APIs are implemented (admin-only) to allow explicit evidence linking.
-- Settlement reconciliation checks remain deferred until a dedicated “allocation-backed checks” phase is implemented.
+- Allocation-backed settlement reconciliation checks are implemented (admin-only; read-only detection) using explicit `SettlementAllocation` evidence.
 
 Backend (additive):
 - New service module:
   - `backend/reconciliation/services/cash_bank_upi_reconciliation.py`
+- New service module (allocation-backed evidence checks):
+  - `backend/reconciliation/services/settlement_allocation_reconciliation.py`
 - Runner registration:
   - `backend/reconciliation/services/reconciliation_runner.py` runs settlement checks in the same Control Tower run (read-only detection).
 
@@ -206,6 +208,19 @@ Explicitly deferred in Settlement:
 - Cashier day-close mismatch checks (no explicit closing record linking covered transactions)
 - Payment.method ↔ FinanceAccount.kind mismatch checks (business rule not formally enforced)
 - “Receipt required for every payment” checks (policy-dependent)
+
+Implemented (allocation-backed; deterministic-only; module=`settlement`):
+- `BANK_STATEMENT_LINE_UNALLOCATED`, `UPI_SETTLEMENT_LINE_UNALLOCATED` (MEDIUM)
+- `BANK_STATEMENT_LINE_PARTIALLY_ALLOCATED`, `UPI_SETTLEMENT_LINE_PARTIALLY_ALLOCATED` (MEDIUM)
+- `BANK_STATEMENT_LINE_OVER_ALLOCATED`, `UPI_SETTLEMENT_LINE_OVER_ALLOCATED`, `CASHIER_DAY_CLOSE_OVER_ALLOCATED` (HIGH)
+- `SETTLEMENT_ALLOCATION_FINANCE_ACCOUNT_MISMATCH` (HIGH)
+- `SETTLEMENT_ALLOCATION_TARGET_INVALID` (HIGH)
+- `BANK_STATEMENT_LINE_MATCH_STATUS_MISMATCH`, `UPI_SETTLEMENT_LINE_MATCH_STATUS_MISMATCH` (MEDIUM)
+- `CASHIER_DAY_CLOSE_VARIANCE_UNRESOLVED` (HIGH)
+
+Guarantees:
+- No auto-match, no suggested matching, and no allocation creation/voiding from reconciliation.
+- No mutation of `Payment`, `ReceiptDocument`, `MoneyMovement`, settlement imports/lines, cashier day-close rows, or allocations.
 
 ## Phase L0 (Implemented) — External settlement evidence schema foundation (2026-05-22)
 

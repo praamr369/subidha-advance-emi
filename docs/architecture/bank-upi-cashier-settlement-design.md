@@ -70,7 +70,7 @@ Implemented (backend):
   - `POST /api/v1/admin/settlements/allocations/{id}/void/` (void; never deletes)
 
 Guarantees (explicit):
-- Manual operator action only: **no auto-match**, **no suggestions**, **no reconciliation checks**, **no source-record mutation** of:
+- Manual operator action only: **no auto-match**, **no suggestions**, and **no reconciliation-side allocation creation/auto-match**, with **no source-record mutation** of:
   - `Payment`, `ReceiptDocument`, `MoneyMovement`, `JournalEntry`, `FinanceAccount`, `CashCounter`, imports, or historical ledger records.
 - Voiding an allocation never deletes it; it only marks it `VOIDED` and records actor/time in `metadata`.
 
@@ -85,6 +85,18 @@ Validation rules (enforced by service; summarized):
 - `matched_amount` must be positive and cannot exceed remaining source amount after existing non-VOIDED/non-REJECTED allocations.
 - Partial allocations are allowed.
 - Duplicate exact active allocation (same source + same target + same amount) is rejected.
+
+## 1.3 Phase L4 implementation (2026-05-22) — Allocation-backed reconciliation checks
+
+Implemented (backend):
+- Allocation-backed deterministic reconciliation checks using explicit `SettlementAllocation` evidence:
+  - `backend/reconciliation/services/settlement_allocation_reconciliation.py` (registered in `backend/reconciliation/services/reconciliation_runner.py`)
+
+Guarantees:
+- Detection only (Control Tower items + evidence); no auto-correction.
+- No auto-match, no suggested matching.
+- No creation/voiding of `SettlementAllocation` from reconciliation.
+- No mutation of `Payment`, `ReceiptDocument`, `MoneyMovement`, settlement imports/lines, cashier day-close rows, or allocations.
 
 ## 2) Proposed additive models (schema)
 

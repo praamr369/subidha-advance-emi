@@ -13,6 +13,7 @@ Non-goals (explicit):
 
 Implementation reference (backend):
 - `backend/reconciliation/services/cash_bank_upi_reconciliation.py` (registered in `backend/reconciliation/services/reconciliation_runner.py`)
+- `backend/reconciliation/services/settlement_allocation_reconciliation.py` (allocation-backed deterministic checks; module=`settlement`)
 
 ## 1) Executive summary
 

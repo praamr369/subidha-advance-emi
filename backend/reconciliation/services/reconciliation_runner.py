@@ -17,6 +17,7 @@ from reconciliation.services.direct_sale_reconciliation import run_direct_sale_b
 from reconciliation.services.emi_reconciliation import run_emi_checks
 from reconciliation.services.inventory_stock_reconciliation import run_inventory_stock_checks
 from reconciliation.services.return_cancellation_reconciliation import run_return_cancellation_checks
+from reconciliation.services.settlement_allocation_reconciliation import run_settlement_allocation_checks
 from reconciliation.services.vendor_payable_reconciliation import run_vendor_payable_checks
 
 
@@ -103,6 +104,18 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
                 "MONEY_MOVEMENT_JOURNAL_SOURCE_LINK_INVALID",
                 "MONEY_MOVEMENT_JOURNAL_AMOUNT_MISMATCH",
                 "MONEY_MOVEMENT_JOURNAL_GROUP_UNBALANCED",
+                "BANK_STATEMENT_LINE_UNALLOCATED",
+                "UPI_SETTLEMENT_LINE_UNALLOCATED",
+                "BANK_STATEMENT_LINE_PARTIALLY_ALLOCATED",
+                "UPI_SETTLEMENT_LINE_PARTIALLY_ALLOCATED",
+                "BANK_STATEMENT_LINE_OVER_ALLOCATED",
+                "UPI_SETTLEMENT_LINE_OVER_ALLOCATED",
+                "CASHIER_DAY_CLOSE_OVER_ALLOCATED",
+                "SETTLEMENT_ALLOCATION_FINANCE_ACCOUNT_MISMATCH",
+                "SETTLEMENT_ALLOCATION_TARGET_INVALID",
+                "BANK_STATEMENT_LINE_MATCH_STATUS_MISMATCH",
+                "UPI_SETTLEMENT_LINE_MATCH_STATUS_MISMATCH",
+                "CASHIER_DAY_CLOSE_VARIANCE_UNRESOLVED",
             ],
         },
     )
@@ -121,6 +134,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         totals = run_inventory_stock_checks(run=run, totals=totals)
         totals = run_vendor_payable_checks(run=run, totals=totals)
         totals = run_cash_bank_upi_settlement_checks(run=run, totals=totals)
+        totals = run_settlement_allocation_checks(run=run, totals=totals)
 
         run.total_checked = totals["checked"]
         run.total_matched = totals["matched"]

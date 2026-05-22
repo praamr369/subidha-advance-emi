@@ -116,6 +116,10 @@ Settlement (Cash/Bank/UPI) (implemented 2026-05-22):
   - MoneyMovement ↔ posted JournalEntry integrity and explicit journal_group balance flags
 - Explicitly deferred: settlement batches, external bank statement matching, cashier day-close mismatch, and any business-rule-dependent invariants (method↔kind, receipt required, etc.).
 
+Settlement allocation-backed checks (implemented 2026-05-22):
+- Implemented deterministic Control Tower checks backed only by explicit `SettlementAllocation` evidence (module=`settlement`).
+- Guarantees: no auto-match, no suggested matching, no allocation creation/voiding, and no source-record mutation.
+
 Phase F (implemented 2026-05-21):
 - Added stored Control Tower runs/items/evidence/resolutions (admin-only).
 - Implemented only deterministic `READY_FOR_PHASE_F` checks (no auto-correction).

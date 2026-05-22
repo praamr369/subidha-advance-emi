@@ -209,6 +209,33 @@ Explicitly deferred in Settlement phase:
 - Payment.method ↔ FinanceAccount.kind mismatch checks (needs formal business rule enforcement)
 - “ReceiptDocument required for every Payment” checks (policy-dependent)
 
+## Settlement allocation-backed checks (Implemented 2026-05-22)
+
+This slice adds **allocation-backed deterministic settlement checks** using explicit `SettlementAllocation` evidence only.
+
+Guarantees:
+- No auto-match, no suggested matching.
+- No `SettlementAllocation` creation/voiding from reconciliation.
+- No mutation of `Payment`, `ReceiptDocument`, `MoneyMovement`, settlement imports/lines, cashier day-close rows, or allocations.
+
+Module used (admin-only queue label):
+- `settlement`
+
+Implemented checks (allocation-backed; deterministic-only):
+- Unallocated active bank/UPI lines (`matched_status=UNMATCHED` + no active allocations)
+- Partial allocations (allocated < source amount)
+- Over-allocations (allocated > source amount)
+- Allocation finance account mismatch vs deterministic source finance account
+- Allocation target invalid (no explicit FK target reference)
+- Source `matched_status` mismatch when all allocations are VOIDED/REJECTED
+- Cashier day-close variance unresolved (variance != 0 and status not APPROVED/REJECTED/VOIDED)
+
+Explicitly deferred in allocation-backed slice:
+- Any settlement matching without explicit allocations
+- Any suggested matching/scoring
+- Any payment-amount-vs-allocation policy checks until business policy is explicit
+- Any automatic closing of reconciliation items
+
 ## Planned next settlement slice (design-only)
 
 To enable external matching without inference, add explicit settlement evidence ingestion + allocation links (manual-only first):

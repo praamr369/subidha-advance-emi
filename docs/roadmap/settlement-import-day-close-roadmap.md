@@ -156,21 +156,33 @@ Test requirements:
 Goal:
 - Add reconciliation exceptions that rely on explicit `SettlementAllocation` evidence (still no auto-correction).
 
-Backend changes (future):
-- Add module(s) to `backend/reconciliation/services/reconciliation_runner.py`:
-  - unmatched aging checks
-  - over/under allocation checks
-  - wrong-account allocation checks
-  - day-close variance approval checks
+Status:
+- Implemented: **2026-05-22**
 
-Frontend changes (future):
-- Control Tower module view additions for the new settlement evidence queues.
+Backend changes (implemented):
+- New service module:
+  - `backend/reconciliation/services/settlement_allocation_reconciliation.py`
+- Runner registration:
+  - `backend/reconciliation/services/reconciliation_runner.py`
+
+Implemented checks (deterministic allocation-backed detection; module=`settlement`):
+- Bank/UPI line unallocated (active import + `matched_status=UNMATCHED` + no active allocations)
+- Partial allocation (allocated < source amount)
+- Over-allocation (allocated > source amount)
+- Allocation finance account mismatch vs deterministic source finance account
+- Allocation target invalid (no explicit target reference)
+- Line `matched_status` mismatch (MATCHED/PARTIAL but all allocations are VOIDED/REJECTED)
+- Cashier day-close variance unresolved (variance != 0 and not APPROVED/REJECTED/VOIDED)
+
+Frontend changes:
+- None (reuses existing Control Tower UI; module label is `settlement`).
 
 Risk level:
 - Low/Medium (deterministic evidence, but may expose operational gaps).
 
 Test requirements:
 - Service-layer reconciliation tests using factory data.
+  - `backend/tests/reconciliation/test_phase_l_settlement_allocation_control_tower.py`
 
 ## Phase L5 — Suggested matching (P2)
 
