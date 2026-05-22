@@ -310,3 +310,21 @@ Additive migrations only:
 Rollback posture:
 - If needed, disable UI/API surfaces and stop writing new imports/allocations; existing financial records remain untouched.
 
+---
+
+## Phase L0 implementation (2026-05-22)
+
+Implemented (schema + tests only):
+- New Django app: `backend/settlements/` (added to `INSTALLED_APPS`)
+- Models:
+  - `BankStatementImport`, `BankStatementLine`
+  - `UpiSettlementImport`, `UpiSettlementLine`
+  - `CashierDayClose`
+  - `SettlementAllocation`
+- Migration: `backend/settlements/migrations/0001_initial.py`
+- Tests: `backend/tests/settlements/test_models.py`
+
+Intentionally not implemented in Phase L0:
+- No import parsing service or file ingestion flow (no parser registry, no background jobs).
+- No matching UI, no suggested matching, no auto-matching, no reconciliation checks.
+- No mutation/backfill of `Payment`, `ReceiptDocument`, `MoneyMovement`, journals, or any historical financial records.

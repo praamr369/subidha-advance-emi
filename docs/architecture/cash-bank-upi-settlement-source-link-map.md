@@ -33,12 +33,16 @@ The repo already contains **explicit links** that make several settlement-adjace
 - There is **no explicit cashier day-close / cash closing** record in the audited models/services that can be linked to `Payment` rows (only reporting-style books).
 - Account-level “pending settlement” in `ReconciliationOverviewService` is deterministic as an **aggregated operational metric**, but it is **not** a per-payment settlement proof.
 
-Planned additive solution (docs-only design; not implemented yet):
-- `docs/architecture/bank-upi-cashier-settlement-design.md` introduces:
+Planned additive solution (design) and Phase L0 implementation (schema-only):
+- `docs/architecture/bank-upi-cashier-settlement-design.md` defines:
   - `BankStatementImport` + `BankStatementLine` (bank statement evidence)
   - `UpiSettlementImport` + `UpiSettlementLine` (gateway settlement evidence)
   - `CashierDayClose` (cash desk operational close snapshot)
   - `SettlementAllocation` (explicit link table used by reconciliation checks)
+
+- Phase L0 implemented (2026-05-22):
+  - `backend/settlements/models.py` + `backend/settlements/migrations/0001_initial.py`
+  - Schema only; no parsing/matching UI; no reconciliation checks yet.
 
 Implication (implemented):
 - This phase safely implements **strict, link-backed checks** around:

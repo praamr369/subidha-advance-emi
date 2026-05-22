@@ -203,7 +203,27 @@ Explicitly deferred in Settlement:
 - Payment.method ↔ FinanceAccount.kind mismatch checks (business rule not formally enforced)
 - “Receipt required for every payment” checks (policy-dependent)
 
-## Phase L (Planned) — External settlement evidence + allocations (design-only)
+## Phase L0 (Implemented) — External settlement evidence schema foundation (2026-05-22)
+
+Goal:
+- Add additive tables for settlement evidence and explicit allocations (schema only).
+
+Implemented (backend):
+- New app: `backend/settlements/`
+- Models:
+  - `BankStatementImport`, `BankStatementLine`
+  - `UpiSettlementImport`, `UpiSettlementLine`
+  - `CashierDayClose`
+  - `SettlementAllocation`
+- Migration: `backend/settlements/migrations/0001_initial.py`
+- Tests: `backend/tests/settlements/test_models.py`
+
+Constraints honored:
+- No changes to payment posting / receipt generation / accounting posting.
+- No matching UI, no parser/import workflows, no auto-match, no reconciliation checks added in L0.
+- No mutation/backfill of `Payment`, `ReceiptDocument`, `MoneyMovement`, journals, finance accounts, cash counters, or historical financial records.
+
+## Phase L (Planned) — External settlement evidence + allocations (operational wiring)
 
 Goal:
 - Add explicit source links required for:

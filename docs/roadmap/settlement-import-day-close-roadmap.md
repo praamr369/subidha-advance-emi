@@ -14,11 +14,16 @@ Reference architecture:
 Goal:
 - Introduce additive tables for settlement evidence and explicit allocations.
 
-Files affected (future implementation):
-- `backend/reconciliation/models.py` (add new models) or a new module imported from it.
-- New migration: `backend/reconciliation/migrations/0002_settlement_imports_and_allocations.py`
+Status:
+- Implemented: **2026-05-22**
 
-Backend changes (future):
+Files affected (implemented):
+- `backend/settlements/models.py`
+- Migration: `backend/settlements/migrations/0001_initial.py`
+- Settings: `backend/core/settings/base.py` (adds `settlements` to `INSTALLED_APPS`)
+- Tests: `backend/tests/settlements/test_models.py`
+
+Backend changes (implemented):
 - Add models:
   - `BankStatementImport`, `BankStatementLine`
   - `UpiSettlementImport`, `UpiSettlementLine`
@@ -148,4 +153,3 @@ Risk level:
 
 Test requirements:
 - Scoring determinism tests and permission coverage.
-

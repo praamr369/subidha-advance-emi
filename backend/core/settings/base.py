@@ -429,6 +429,7 @@ INSTALLED_APPS = [
     "system_jobs",
     "subscriptions",
     "reconciliation",
+    "settlements",
     "django_extensions",
 ]
 

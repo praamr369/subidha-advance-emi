@@ -148,6 +148,11 @@ Phase K (implemented 2026-05-22):
 - Extended Control Tower detection to deterministic vendor payable / purchase accounting evidence checks using explicit posted_journal_entry links and JournalEntry source-link integrity.
 - No auto-correction; no mutation of PurchaseBill/VendorBill/VendorPayment/PurchaseReturn/JournalEntry source records.
 
+Phase L0 (implemented 2026-05-22):
+- Added additive settlement evidence + allocation schema foundation (Bank Statement Import, UPI Settlement Import, Cashier Day Close, Settlement Allocation).
+- Schema only: no parser/import workflows, no matching UI, no auto-matching, no new Control Tower checks.
+- No mutation/backfill of `Payment`, `ReceiptDocument`, `MoneyMovement`, journals, finance accounts, cash counters, or historical financial records.
+
 ## Deployment Plan (when implemented)
 
 ### Order of rollout (recommended)
