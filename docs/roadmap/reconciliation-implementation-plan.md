@@ -166,6 +166,7 @@ Explicitly deferred in Phase K:
 - Vendor payable aging/balance checks if payable/balance is derived across ambiguous sources (no inferred joins).
 - Payment allocation matching when allocation tables/FKs are not explicit.
 - Cash/bank/UPI settlement reconciliation (future phase with explicit settlement evidence links).
+  - Prerequisite audit (docs-only): `docs/architecture/cash-bank-upi-settlement-source-link-map.md`
 
 Tests (backend, targeted):
 - New:

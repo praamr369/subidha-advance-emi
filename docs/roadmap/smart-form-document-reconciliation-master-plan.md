@@ -98,6 +98,10 @@ Deliverable (Phase 1):
 Phase E (implemented 2026-05-21):
 - Completed the deterministic source-link audit required to prevent noisy reconciliation exceptions.
 
+Pre-settlement prerequisite (docs-only, implemented 2026-05-22):
+- Cash / Bank / UPI settlement source-link audit:
+  - `docs/architecture/cash-bank-upi-settlement-source-link-map.md`
+
 Phase F (implemented 2026-05-21):
 - Added stored Control Tower runs/items/evidence/resolutions (admin-only).
 - Implemented only deterministic `READY_FOR_PHASE_F` checks (no auto-correction).

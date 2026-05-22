@@ -5,6 +5,9 @@ Scope: **Source-link evidence map only** — no schema/API/service/frontend chan
 
 This document records **confirmed** (code-backed) source-link patterns across modules so Phase F can implement only **deterministic, low-noise** reconciliation checks.
 
+Related (next-phase prerequisite for settlement reconciliation):
+- `docs/architecture/cash-bank-upi-settlement-source-link-map.md` (cash/bank/UPI settlement source-link audit; deterministic readiness classification)
+
 ## Phase F Implementation Result (2026-05-21)
 
 Phase F implemented a stored Control Tower run model and deterministic checks only.

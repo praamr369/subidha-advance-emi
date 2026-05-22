@@ -220,6 +220,11 @@ Implemented in:
 
 This provides account-level pending settlement totals and flags.
 
+Important (noise prevention):
+- This overview is a **derived operational aggregate**, not a per-payment settlement proof.
+- Before implementing any cash/bank/UPI settlement reconciliation checks, use the explicit-link audit:
+  - `docs/architecture/cash-bank-upi-settlement-source-link-map.md`
+
 ### Accounting bridge records (structured source linking)
 
 Models (existing):
