@@ -44,6 +44,10 @@ Planned additive solution (design) and Phase L0 implementation (schema-only):
   - `backend/settlements/models.py` + `backend/settlements/migrations/0001_initial.py`
   - Schema only; no parsing/matching UI; no reconciliation checks yet.
 
+Phase L1 implemented (2026-05-22):
+- Admin-only bank/UPI import upload + checksum + CSV parsing into line tables.
+- Still **no matching UI**, **no allocations**, **no reconciliation checks**, and **no source-record mutation**.
+
 Implication (implemented):
 - This phase safely implements **strict, link-backed checks** around:
   - missing/duplicate bridge posting evidence

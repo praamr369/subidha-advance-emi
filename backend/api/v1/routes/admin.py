@@ -483,6 +483,14 @@ from api.v1.views.vendor_ops import (
     AdminVendorViewSet,
 )
 from api.v1.views.username_change import AdminUserUsernameChangeView
+from api.v1.views.admin_settlements import (
+    BankStatementImportListCreateView,
+    BankStatementImportDetailView,
+    BankStatementLineListView,
+    UpiSettlementImportListCreateView,
+    UpiSettlementImportDetailView,
+    UpiSettlementLineListView,
+)
 
 router = DefaultRouter()
 router.register(r"batches", BatchAdminViewSet, basename="admin-batches")
@@ -935,5 +943,12 @@ urlpatterns = [
     path("vendor-quotes/<int:pk>/accept/", AdminVendorQuoteAcceptView.as_view()),
     path("vendor-quotes/<int:pk>/reject/", AdminVendorQuoteRejectView.as_view()),
     path("vendors/<int:pk>/account-link/", AdminVendorAccountLinkView.as_view()),
+    # Phase L1: settlement imports
+    path("settlements/bank-imports/", BankStatementImportListCreateView.as_view(), name="admin-bank-imports-list-create"),
+    path("settlements/bank-imports/<int:pk>/", BankStatementImportDetailView.as_view(), name="admin-bank-imports-detail"),
+    path("settlements/bank-imports/<int:pk>/lines/", BankStatementLineListView.as_view(), name="admin-bank-imports-lines"),
+    path("settlements/upi-imports/", UpiSettlementImportListCreateView.as_view(), name="admin-upi-imports-list-create"),
+    path("settlements/upi-imports/<int:pk>/", UpiSettlementImportDetailView.as_view(), name="admin-upi-imports-detail"),
+    path("settlements/upi-imports/<int:pk>/lines/", UpiSettlementLineListView.as_view(), name="admin-upi-imports-lines"),
     path("", include(router.urls)),
 ]

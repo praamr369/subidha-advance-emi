@@ -46,28 +46,38 @@ Test requirements (future):
 ## Phase L1 — Admin import + parsing (P0)
 
 Goal:
-- Allow admin to upload bank statement and UPI settlement files; parse into line rows; store raw payload.
+- Allow admin to upload bank statement and UPI settlement files; parse into line rows; store raw payload (evidence ingestion only).
 
-Backend changes (future):
+Status:
+- Implemented: **2026-05-22**
+
+Backend changes (implemented):
+- Parser services:
+  - `backend/settlements/services/import_parser_service.py`
+  - `backend/settlements/services/bank_statement_parser.py`
+  - `backend/settlements/services/upi_settlement_parser.py`
 - Admin-only API endpoints:
-  - create/list/detail imports
-  - upload file + compute checksum
-  - parse (sync for small files; background later)
-- Parser registry (bank/gateway specific) with strict audit logging.
+  - `POST/GET /api/v1/admin/settlements/bank-imports/`
+  - `GET /api/v1/admin/settlements/bank-imports/{id}/`
+  - `GET /api/v1/admin/settlements/bank-imports/{id}/lines/` (paginated)
+  - `POST/GET /api/v1/admin/settlements/upi-imports/`
+  - `GET /api/v1/admin/settlements/upi-imports/{id}/`
+  - `GET /api/v1/admin/settlements/upi-imports/{id}/lines/` (paginated)
 
-Frontend changes (future):
-- Admin pages:
-  - bank statement import list/detail
-  - UPI settlement import list/detail
-  - line list and drilldown
+Frontend changes:
+- None (Phase L1 backend foundation only).
 
 Risk level:
-- Medium (file handling, parser correctness).
+- Medium (file handling, parser correctness, operator misunderstandings without UI guardrails).
 
-Test requirements:
-- Parser unit tests with known fixtures.
-- Ensure raw payload stored and stable.
-- Ensure checksum prevents accidental duplicate import (if enabled).
+Test requirements (implemented, backend):
+- Upload creates import + lines.
+- Raw payload preserved.
+- Checksum stored.
+- Duplicate upload rejected.
+- Invalid CSV marks import `FAILED` and stores `metadata.parse_error`.
+- Non-admin denied.
+- Upload does not create `SettlementAllocation` and does not create reconciliation items.
 
 ## Phase L2 — Manual matching UI + SettlementAllocation (P0)
 

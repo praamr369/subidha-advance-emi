@@ -218,6 +218,28 @@ Implemented (backend):
 - Migration: `backend/settlements/migrations/0001_initial.py`
 - Tests: `backend/tests/settlements/test_models.py`
 
+## Phase L1 (Implemented) — Admin settlement imports + CSV parsing (2026-05-22)
+
+Goal:
+- Admin-only upload + checksum + CSV parsing for bank statements and UPI settlements into line tables.
+- Evidence ingestion only: no matching UI, no allocations, no reconciliation checks, no source-record mutation.
+
+Implemented (backend):
+- Services:
+  - `backend/settlements/services/import_parser_service.py`
+  - `backend/settlements/services/bank_statement_parser.py`
+  - `backend/settlements/services/upi_settlement_parser.py`
+- Admin endpoints:
+  - `POST/GET /api/v1/admin/settlements/bank-imports/`
+  - `GET /api/v1/admin/settlements/bank-imports/{id}/`
+  - `GET /api/v1/admin/settlements/bank-imports/{id}/lines/`
+  - `POST/GET /api/v1/admin/settlements/upi-imports/`
+  - `GET /api/v1/admin/settlements/upi-imports/{id}/`
+  - `GET /api/v1/admin/settlements/upi-imports/{id}/lines/`
+
+Tests (backend, targeted):
+- `backend/tests/api/test_admin_settlements_imports.py`
+
 Constraints honored:
 - No changes to payment posting / receipt generation / accounting posting.
 - No matching UI, no parser/import workflows, no auto-match, no reconciliation checks added in L0.

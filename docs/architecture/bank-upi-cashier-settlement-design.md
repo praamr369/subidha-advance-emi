@@ -1,7 +1,7 @@
 # Bank / UPI Statement Imports + Cashier Day Close — Additive Source-Link Design
 
-Status: **DESIGN ONLY (docs-only)**  
-Scope: additive schema proposal for future **Bank Statement Import**, **UPI Settlement Import**, and **Cashier Day Close** reconciliation.  
+Status: **DESIGN + PHASE L0/L1 IMPLEMENTED (2026-05-22)**  
+Scope: additive schema + admin-only import/parsing foundation for **Bank Statement Import** and **UPI Settlement Import**.  
 Non-goals: no payment posting change, no receipt generation change, no accounting posting change, no auto-match, no auto-correction, no mutation/backfill of historical financial records.
 
 This design introduces **explicit source links** so future reconciliation checks can rely on deterministic evidence rather than free-text inference.
@@ -27,6 +27,38 @@ The missing piece is: **external settlement evidence ingestion** + **explicit al
 5. Manual matching first (explicit, audited). Suggested matching may be added later, but **never** becomes source-of-truth.
 6. Reconciliation checks rely on **`SettlementAllocation`** (explicit links), not on free-text parsing.
 7. Limit access to **admin/cashier internal roles only**; never expose to customer/partner/vendor roles.
+
+## 1.1 Phase L1 implementation (2026-05-22)
+
+Implemented (backend):
+- Admin-only upload + checksum + CSV parser foundation:
+  - `POST /api/v1/admin/settlements/bank-imports/`
+  - `GET /api/v1/admin/settlements/bank-imports/`
+  - `GET /api/v1/admin/settlements/bank-imports/{id}/`
+  - `GET /api/v1/admin/settlements/bank-imports/{id}/lines/` (paginated)
+  - `POST /api/v1/admin/settlements/upi-imports/`
+  - `GET /api/v1/admin/settlements/upi-imports/`
+  - `GET /api/v1/admin/settlements/upi-imports/{id}/`
+  - `GET /api/v1/admin/settlements/upi-imports/{id}/lines/` (paginated)
+
+Guarantees (explicit):
+- Imports are evidence ingestion only: **no auto-match**, **no allocations**, **no reconciliation checks**, **no mutation of source financial records**.
+- `raw_payload` stores the parsed row payload for each line (audit-friendly).
+- `checksum` is computed via SHA-256 of uploaded file bytes.
+- Duplicate uploads are rejected when `(checksum + finance_account + period/date)` matches an existing non-FAILED/non-VOIDED import.
+
+Supported CSV formats (minimum columns):
+- Bank statement CSV:
+  - Required: `transaction_date`, `description`, `debit`, `credit`
+  - Optional: `value_date`, `reference_no`, `balance`
+- UPI settlement CSV:
+  - Required: `transaction_ref`, `gross_amount`, `net_amount`, `settlement_date`
+  - Optional: `payment_ref`, `fee_amount`
+
+Notes:
+- XLS/XLSX is intentionally not supported in Phase L1.
+- Parsing rejects bank rows with both debit and credit > 0.
+- Parsing rejects UPI rows where `settlement_date` does not match the import’s `settlement_date`.
 
 ## 2) Proposed additive models (schema)
 

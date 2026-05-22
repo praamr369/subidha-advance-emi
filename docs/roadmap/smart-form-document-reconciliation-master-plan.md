@@ -153,6 +153,10 @@ Phase L0 (implemented 2026-05-22):
 - Schema only: no parser/import workflows, no matching UI, no auto-matching, no new Control Tower checks.
 - No mutation/backfill of `Payment`, `ReceiptDocument`, `MoneyMovement`, journals, finance accounts, cash counters, or historical financial records.
 
+Phase L1 (implemented 2026-05-22):
+- Added admin-only upload + checksum + CSV parsing for bank statements and UPI settlements into line tables.
+- Still evidence ingestion only: no matching UI, no allocations, no reconciliation checks, no auto-match, no source-record mutation.
+
 ## Deployment Plan (when implemented)
 
 ### Order of rollout (recommended)
