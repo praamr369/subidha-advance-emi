@@ -203,6 +203,31 @@ Explicitly deferred in Settlement:
 - Payment.method ↔ FinanceAccount.kind mismatch checks (business rule not formally enforced)
 - “Receipt required for every payment” checks (policy-dependent)
 
+## Phase L (Planned) — External settlement evidence + allocations (design-only)
+
+Goal:
+- Add explicit source links required for:
+  - external bank statement matching (manual match first)
+  - UPI settlement matching (manual match first)
+  - cashier day-close mismatch checks (audited snapshot + approvals)
+
+Constraints:
+- No changes to payment posting / receipt generation / accounting posting.
+- No auto-match; no auto-correction; no mutation of existing financial records.
+
+Design docs:
+- `docs/architecture/bank-upi-cashier-settlement-design.md`
+- `docs/roadmap/settlement-import-day-close-roadmap.md`
+
+Planned additive schema:
+- `BankStatementImport`, `BankStatementLine`
+- `UpiSettlementImport`, `UpiSettlementLine`
+- `CashierDayClose`
+- `SettlementAllocation` (explicit matching proof)
+
+Planned check behavior once schema exists:
+- Reconciliation checks read allocations (deterministic evidence) and emit exceptions for unmatched/partial/over allocations and day-close variance approvals.
+
 Tests (backend, targeted):
 - New:
   - `backend/tests/reconciliation/test_phase_k_cash_bank_upi_settlement_control_tower.py`

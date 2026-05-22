@@ -209,6 +209,21 @@ Explicitly deferred in Settlement phase:
 - Payment.method ↔ FinanceAccount.kind mismatch checks (needs formal business rule enforcement)
 - “ReceiptDocument required for every Payment” checks (policy-dependent)
 
+## Planned next settlement slice (design-only)
+
+To enable external matching without inference, add explicit settlement evidence ingestion + allocation links (manual-only first):
+- Design reference: `docs/architecture/bank-upi-cashier-settlement-design.md`
+- Roadmap reference: `docs/roadmap/settlement-import-day-close-roadmap.md`
+
+Planned capabilities (future implementation):
+- Bank statement import and line storage (raw payload + checksum)
+- UPI settlement import and line storage (raw payload + checksum)
+- Cashier day close audited snapshots (submit/approve)
+- `SettlementAllocation` as the explicit “matching proof” table
+
+Control Tower rule:
+- Any new settlement reconciliation checks that claim “matched/unmatched” must be backed by `SettlementAllocation` rows, not text inference.
+
 ## 0) Phase E prerequisite (source-link determinism)
 
 Phase E deliverable (docs-only):

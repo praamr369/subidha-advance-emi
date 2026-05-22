@@ -33,12 +33,21 @@ The repo already contains **explicit links** that make several settlement-adjace
 - There is **no explicit cashier day-close / cash closing** record in the audited models/services that can be linked to `Payment` rows (only reporting-style books).
 - Account-level “pending settlement” in `ReconciliationOverviewService` is deterministic as an **aggregated operational metric**, but it is **not** a per-payment settlement proof.
 
+Planned additive solution (docs-only design; not implemented yet):
+- `docs/architecture/bank-upi-cashier-settlement-design.md` introduces:
+  - `BankStatementImport` + `BankStatementLine` (bank statement evidence)
+  - `UpiSettlementImport` + `UpiSettlementLine` (gateway settlement evidence)
+  - `CashierDayClose` (cash desk operational close snapshot)
+  - `SettlementAllocation` (explicit link table used by reconciliation checks)
+
 Implication (implemented):
 - This phase safely implements **strict, link-backed checks** around:
   - missing/duplicate bridge posting evidence
   - payment↔receipt↔journal linkage integrity (where explicit)
   - money-movement posting integrity (where explicit)
 - This phase must **defer** “bank/UPI settlement matching” until explicit batch/source links exist or are operationally defined.
+
+After the planned schema exists and is populated (manual-only is enough), the “settlement matching” capability becomes **explicit and auditable** via `SettlementAllocation` (no free-text inference).
 
 ## 2) Evidence sources inspected (code-backed)
 
@@ -59,6 +68,36 @@ Targeted tests (evidence of intent/behavior):
 - `backend/tests/accounting/test_payment_collection_bridge_finance_resolution.py`
 - `backend/tests/accounting/test_accounting_money_movement_posting.py`
 - `backend/tests/accounting/test_books_daily_cashbook.py`
+
+## 4) Planned source-link additions (design-only)
+
+This section documents the missing deterministic links required for:
+- external bank statement matching (manual match first)
+- UPI gateway settlement matching (manual match first)
+- cashier day-close mismatch checks (snapshot + approvals)
+- payment-to-settlement-batch matching (explicit allocations)
+
+Design reference (docs-only):
+- `docs/architecture/bank-upi-cashier-settlement-design.md`
+
+Planned explicit evidence tables:
+- Bank statement evidence:
+  - `BankStatementImport` → `FinanceAccount` (bank finance account)
+  - `BankStatementLine` → `BankStatementImport`
+- UPI settlement evidence:
+  - `UpiSettlementImport` → `FinanceAccount` (gateway/bank settlement account)
+  - `UpiSettlementLine` → `UpiSettlementImport`
+- Cash desk close evidence:
+  - `CashierDayClose` → `CashCounter` → `FinanceAccount`
+- Allocation link table (single source-of-truth for settlement matching):
+  - `SettlementAllocation(source_type, source_id)` → one of:
+    - `BankStatementLine`
+    - `UpiSettlementLine`
+    - `CashierDayClose`
+  - `SettlementAllocation.payment/receipt/money_movement` → internal records (explicit FKs)
+
+Reconciliation rule (future):
+- Control Tower settlement checks must rely on `SettlementAllocation` (explicit links) and must not parse statement descriptions to infer matches.
 
 ## 3) Source-link map (required pairs)
 

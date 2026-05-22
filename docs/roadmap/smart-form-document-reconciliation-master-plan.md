@@ -102,6 +102,12 @@ Pre-settlement prerequisite (docs-only, implemented 2026-05-22):
 - Cash / Bank / UPI settlement source-link audit:
   - `docs/architecture/cash-bank-upi-settlement-source-link-map.md`
 
+Next prerequisite for true settlement matching (design-only):
+- External settlement evidence ingestion + explicit allocation links:
+  - `docs/architecture/bank-upi-cashier-settlement-design.md`
+  - `docs/roadmap/settlement-import-day-close-roadmap.md`
+This remains internal-role-only (admin/cashier) and stays read-only against existing financial source records.
+
 Settlement (Cash/Bank/UPI) (implemented 2026-05-22):
 - Implemented only deterministic `READY_FOR_SETTLEMENT_PHASE` checks (no auto-correction; no source-record mutation).
 - Focused on explicit evidence links:
