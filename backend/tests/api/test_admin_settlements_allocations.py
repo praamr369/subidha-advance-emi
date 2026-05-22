@@ -407,3 +407,31 @@ class AdminSettlementAllocationApiTests(APITestCase):
 
         finance_resp = self.client.get("/api/v1/admin/settlements/lookups/finance-accounts/?q=Lookup&kind=BANK")
         self.assertLessEqual(len(finance_resp.data.get("results") or []), 20)
+
+    def test_settlement_lookup_resolve_by_id_is_admin_only_and_returns_display_safe_shape(self):
+        endpoints = [
+            f"/api/v1/admin/settlements/lookups/finance-accounts/{self.bank_account.id}/",
+            f"/api/v1/admin/settlements/lookups/payments/{self.payment.id}/",
+            f"/api/v1/admin/settlements/lookups/receipts/{self.receipt_bank.id}/",
+            f"/api/v1/admin/settlements/lookups/money-movements/{self.movement.id}/",
+        ]
+
+        # Non-admin denied
+        for actor in (self.cashier, self.partner):
+            self.client.force_authenticate(actor)
+            for url in endpoints:
+                resp = self.client.get(url)
+                self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Admin allowed; response shape matches display-safe lookup rows (no raw fields).
+        self.client.force_authenticate(self.admin)
+        for url in endpoints:
+            resp = self.client.get(url)
+            self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+            self.assertIn("id", resp.data)
+            self.assertIn("label", resp.data)
+            allowed = {"id", "label", "subtitle", "amount", "status", "date", "metadata"}
+            self.assertTrue(set(resp.data.keys()).issubset(allowed))
+
+        missing = self.client.get("/api/v1/admin/settlements/lookups/payments/99999999/")
+        self.assertEqual(missing.status_code, status.HTTP_404_NOT_FOUND)

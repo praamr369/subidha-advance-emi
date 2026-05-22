@@ -293,6 +293,42 @@ class SettlementLookupFinanceAccountView(generics.GenericAPIView):
         return Response({"results": results})
 
 
+class SettlementResolveFinanceAccountView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        account_id = self.kwargs.get("pk")
+        try:
+            account = (
+                FinanceAccount.objects.select_related("branch", "chart_account")
+                .filter(is_real_settlement_account=True, is_active=True)
+                .get(pk=account_id)
+            )
+        except FinanceAccount.DoesNotExist:
+            raise Http404("Finance account not found.")
+
+        branch_name = getattr(account.branch, "name", None) if account.branch_id else None
+        subtitle = _compact(
+            [
+                branch_name,
+                f"Kind {account.kind}" if account.kind else None,
+                f"•••• {account.bank_last4}" if account.bank_last4 else None,
+                account.upi_handle or None,
+            ]
+        )
+        return Response(
+            {
+                "id": account.id,
+                "label": account.name,
+                "subtitle": subtitle or None,
+                "metadata": {
+                    "kind": account.kind,
+                    "branch_id": account.branch_id,
+                },
+            }
+        )
+
+
 class SettlementLookupPaymentsView(generics.GenericAPIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
@@ -362,6 +398,55 @@ class SettlementLookupPaymentsView(generics.GenericAPIView):
             )
 
         return Response({"results": results})
+
+
+class SettlementResolvePaymentsView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        payment_id = self.kwargs.get("pk")
+        try:
+            payment = Payment.objects.select_related("customer", "subscription").get(pk=payment_id)
+        except Payment.DoesNotExist:
+            raise Http404("Payment not found.")
+
+        reversal = (payment.allocation_metadata or {}).get("reversal", {}) or {}
+        is_reversed = bool(reversal.get("is_reversed"))
+
+        customer_name = getattr(payment.customer, "name", None) if payment.customer_id else None
+        customer_phone = getattr(payment.customer, "phone", None) if payment.customer_id else None
+        subscription_number = getattr(payment.subscription, "subscription_number", None) if payment.subscription_id else None
+
+        subtitle = _compact(
+            [
+                payment.payment_date.isoformat() if payment.payment_date else None,
+                payment.method,
+                f"Ref {payment.reference_no}" if payment.reference_no else None,
+                f"{customer_name} ({customer_phone})" if customer_name and customer_phone else customer_name,
+                f"Sub {subscription_number}" if subscription_number else None,
+                "REVERSED" if is_reversed else None,
+            ]
+        )
+        label = _compact([f"Payment #{payment.id}", f"₹{_money(payment.amount)}" if payment.amount is not None else None])
+
+        return Response(
+            {
+                "id": payment.id,
+                "label": label,
+                "subtitle": subtitle or None,
+                "amount": _money(payment.amount),
+                "status": "REVERSED" if is_reversed else None,
+                "date": payment.payment_date.isoformat() if payment.payment_date else None,
+                "metadata": {
+                    "method": payment.method,
+                    "reference_no": payment.reference_no,
+                    "customer_name": customer_name,
+                    "customer_phone": customer_phone,
+                    "subscription_number": subscription_number,
+                    "is_reversed": is_reversed,
+                },
+            }
+        )
 
 
 class SettlementLookupReceiptsView(generics.GenericAPIView):
@@ -436,6 +521,53 @@ class SettlementLookupReceiptsView(generics.GenericAPIView):
         return Response({"results": results})
 
 
+class SettlementResolveReceiptsView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        from billing.models import ReceiptDocument
+
+        receipt_id = self.kwargs.get("pk")
+        try:
+            receipt = ReceiptDocument.objects.select_related("finance_account").get(pk=receipt_id)
+        except ReceiptDocument.DoesNotExist:
+            raise Http404("Receipt not found.")
+
+        finance_account_name = getattr(receipt.finance_account, "name", None) if receipt.finance_account_id else None
+        subtitle = _compact(
+            [
+                receipt.receipt_date.isoformat() if receipt.receipt_date else None,
+                receipt.status,
+                finance_account_name,
+                f"{receipt.customer_name_snapshot} ({receipt.customer_phone_snapshot})"
+                if receipt.customer_name_snapshot and receipt.customer_phone_snapshot
+                else (receipt.customer_name_snapshot or None),
+            ]
+        )
+        label = _compact(
+            [
+                f"Receipt {receipt.receipt_no}" if receipt.receipt_no else f"Receipt #{receipt.id}",
+                f"₹{_money(receipt.amount)}" if receipt.amount is not None else None,
+            ]
+        )
+        return Response(
+            {
+                "id": receipt.id,
+                "label": label,
+                "subtitle": subtitle or None,
+                "amount": _money(receipt.amount),
+                "status": receipt.status,
+                "date": receipt.receipt_date.isoformat() if receipt.receipt_date else None,
+                "metadata": {
+                    "receipt_no": receipt.receipt_no,
+                    "receipt_type": receipt.receipt_type,
+                    "finance_account_id": receipt.finance_account_id,
+                    "finance_account_name": finance_account_name,
+                },
+            }
+        )
+
+
 class SettlementLookupMoneyMovementsView(generics.GenericAPIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
@@ -503,3 +635,47 @@ class SettlementLookupMoneyMovementsView(generics.GenericAPIView):
             )
 
         return Response({"results": results})
+
+
+class SettlementResolveMoneyMovementsView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        movement_id = self.kwargs.get("pk")
+        try:
+            movement = MoneyMovement.objects.select_related("from_finance_account", "to_finance_account").get(pk=movement_id)
+        except MoneyMovement.DoesNotExist:
+            raise Http404("Money movement not found.")
+
+        from_name = getattr(movement.from_finance_account, "name", None) if movement.from_finance_account_id else None
+        to_name = getattr(movement.to_finance_account, "name", None) if movement.to_finance_account_id else None
+        subtitle = _compact(
+            [
+                movement.movement_date.isoformat() if movement.movement_date else None,
+                movement.status,
+                f"Ref {movement.reference_no}" if movement.reference_no else None,
+                f"{from_name} → {to_name}" if from_name and to_name else None,
+            ]
+        )
+        label = _compact(
+            [
+                f"Movement {movement.movement_no}" if movement.movement_no else f"Movement #{movement.id}",
+                f"₹{_money(movement.amount)}" if movement.amount is not None else None,
+            ]
+        )
+        return Response(
+            {
+                "id": movement.id,
+                "label": label,
+                "subtitle": subtitle or None,
+                "amount": _money(movement.amount),
+                "status": movement.status,
+                "date": movement.movement_date.isoformat() if movement.movement_date else None,
+                "metadata": {
+                    "movement_no": movement.movement_no,
+                    "reference_no": movement.reference_no,
+                    "from_finance_account_id": movement.from_finance_account_id,
+                    "to_finance_account_id": movement.to_finance_account_id,
+                },
+            }
+        )

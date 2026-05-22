@@ -1,11 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import EntityLookupCombobox from "@/components/erp/forms/EntityLookupCombobox";
 import type { EntityLookupOption } from "@/components/erp/forms/EntityLookupCombobox";
-import { lookupSettlementPayments } from "@/services/settlement-lookups";
+import { lookupSettlementPayments, resolveSettlementPaymentById } from "@/services/settlement-lookups";
 
 type SettlementPaymentLookupProps = {
   label?: string;
@@ -36,6 +36,31 @@ export default function SettlementPaymentLookup({
 }: SettlementPaymentLookupProps) {
   const [selected, setSelected] = useState<EntityLookupOption | null>(null);
   const selectedMeta = selected?.metadata ?? {};
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function resolve() {
+      if (!value) {
+        setSelected(null);
+        return;
+      }
+      if (selected && String(selected.id) === String(value)) return;
+      if (!/^\d+$/.test(String(value))) return;
+
+      try {
+        const option = await resolveSettlementPaymentById(value);
+        if (!cancelled) setSelected(option);
+      } catch {
+        if (!cancelled) setSelected(null);
+      }
+    }
+
+    void resolve();
+    return () => {
+      cancelled = true;
+    };
+  }, [value, selected]);
 
   return (
     <div className="space-y-2">
