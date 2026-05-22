@@ -86,7 +86,14 @@ Implemented (frontend; admin-only evidence surfaces):
   - `GET /admin/settlements/upi-imports`
   - `GET /admin/settlements/upi-imports/{id}`
 
-APIs reused (no new endpoints):
+Lookup UX (admin-only, read-only):
+- Settlement allocation forms use dedicated hardened, admin-only, read-only lookup endpoints (bounded results; display-safe fields only):
+  - Finance accounts: `GET /api/v1/admin/settlements/lookups/finance-accounts/?q=...&kind=BANK|UPI`
+  - Payments: `GET /api/v1/admin/settlements/lookups/payments/?q=...`
+  - Receipts: `GET /api/v1/admin/settlements/lookups/receipts/?q=...`
+  - Money movements: `GET /api/v1/admin/settlements/lookups/money-movements/?q=...`
+
+APIs reused (no business-rule change; lookup-only hardening):
 - Bank imports:
   - `POST/GET /api/v1/admin/settlements/bank-imports/`
   - `GET /api/v1/admin/settlements/bank-imports/{id}/`

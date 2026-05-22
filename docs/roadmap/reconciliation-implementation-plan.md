@@ -3,6 +3,13 @@
 Status: **SETTLEMENT (CASH/BANK/UPI) PHASE IMPLEMENTED (2026-05-22)**  
 Phase 1 constraint: **read-only detection + manual resolution notes/status only**. No auto-correct.
 
+Settlement operator UX note (lookup hardening, admin-only):
+- Settlement allocation forms use dedicated admin-only, read-only, bounded lookup endpoints (display-safe fields only):
+  - `GET /api/v1/admin/settlements/lookups/finance-accounts/?q=...&kind=BANK|UPI`
+  - `GET /api/v1/admin/settlements/lookups/payments/?q=...`
+  - `GET /api/v1/admin/settlements/lookups/receipts/?q=...`
+  - `GET /api/v1/admin/settlements/lookups/money-movements/?q=...`
+
 Phase E prerequisite (docs-only, completed):
 - `docs/architecture/reconciliation-source-link-map.md` (deterministic evidence map + Phase F readiness classification)
 
@@ -187,6 +194,11 @@ Admin operator UI (2026-05-22):
   - `/admin/settlements`
   - `/admin/settlements/bank-imports` (+ detail + line-scoped allocations + void)
   - `/admin/settlements/upi-imports` (+ detail + line-scoped allocations + void)
+- Lookup UX is read-only and admin-only (stores numeric IDs only; no source-record mutation):
+  - Finance accounts: `GET /api/v1/accounting/finance-accounts/?search=...`
+  - Payments: `GET /api/v1/admin/payments/?q=...`
+  - Receipts: `GET /api/v1/billing/receipts/?search=...`
+  - Money movements: `GET /api/v1/accounting/money-movements/?search=...`
 - Guarantees are unchanged:
   - no auto-match, no suggested matching
   - no payment/receipt/movement/accounting mutation from the UI

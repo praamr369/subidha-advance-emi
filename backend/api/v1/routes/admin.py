@@ -490,6 +490,10 @@ from api.v1.views.admin_settlements import (
     SettlementAllocationDetailView,
     SettlementAllocationListCreateView,
     SettlementAllocationVoidView,
+    SettlementLookupFinanceAccountView,
+    SettlementLookupMoneyMovementsView,
+    SettlementLookupPaymentsView,
+    SettlementLookupReceiptsView,
     UpiSettlementImportListCreateView,
     UpiSettlementImportDetailView,
     UpiSettlementLineListView,
@@ -953,6 +957,11 @@ urlpatterns = [
     path("settlements/upi-imports/", UpiSettlementImportListCreateView.as_view(), name="admin-upi-imports-list-create"),
     path("settlements/upi-imports/<int:pk>/", UpiSettlementImportDetailView.as_view(), name="admin-upi-imports-detail"),
     path("settlements/upi-imports/<int:pk>/lines/", UpiSettlementLineListView.as_view(), name="admin-upi-imports-lines"),
+    # Phase L2.2: hardened settlement lookup endpoints (admin-only, read-only)
+    path("settlements/lookups/finance-accounts/", SettlementLookupFinanceAccountView.as_view(), name="admin-settlement-lookup-finance-accounts"),
+    path("settlements/lookups/payments/", SettlementLookupPaymentsView.as_view(), name="admin-settlement-lookup-payments"),
+    path("settlements/lookups/receipts/", SettlementLookupReceiptsView.as_view(), name="admin-settlement-lookup-receipts"),
+    path("settlements/lookups/money-movements/", SettlementLookupMoneyMovementsView.as_view(), name="admin-settlement-lookup-money-movements"),
     # Phase L2: manual settlement allocations (admin-only)
     path("settlements/allocations/", SettlementAllocationListCreateView.as_view(), name="admin-settlement-allocations-list-create"),
     path("settlements/allocations/<int:pk>/", SettlementAllocationDetailView.as_view(), name="admin-settlement-allocations-detail"),

@@ -371,3 +371,39 @@ class AdminSettlementAllocationApiTests(APITestCase):
         detail = self.client.get(f"/api/v1/admin/settlements/allocations/{allocation_id}/")
         self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
         self.assertEqual(detail.data["id"], allocation_id)
+
+    def test_settlement_lookup_endpoints_are_admin_only_and_bounded(self):
+        # Create extra finance accounts to prove bounding (limit enforced by lookup endpoint).
+        for index in range(30):
+            create_finance_account(code=f"SETTLE-LOOKUP-{index:03d}", name=f"Lookup Account {index:03d}", kind="BANK")
+
+        endpoints = [
+            "/api/v1/admin/settlements/lookups/finance-accounts/?q=Lookup&kind=BANK",
+            "/api/v1/admin/settlements/lookups/payments/?q=SETTLE-ALLOC-PAY",
+            "/api/v1/admin/settlements/lookups/receipts/?q=RCT-SETTLE-ALLOC",
+            "/api/v1/admin/settlements/lookups/money-movements/?q=SETTLE-ALLOC-MOV",
+        ]
+
+        # Non-admin denied
+        for actor in (self.cashier, self.partner):
+            self.client.force_authenticate(actor)
+            for url in endpoints:
+                resp = self.client.get(url)
+                self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Admin allowed; response shape is display-safe and bounded.
+        self.client.force_authenticate(self.admin)
+        for url in endpoints:
+            resp = self.client.get(url)
+            self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+            self.assertIn("results", resp.data)
+            self.assertIsInstance(resp.data["results"], list)
+
+            for row in resp.data["results"]:
+                self.assertIn("id", row)
+                self.assertIn("label", row)
+                allowed = {"id", "label", "subtitle", "amount", "status", "date", "metadata"}
+                self.assertTrue(set(row.keys()).issubset(allowed))
+
+        finance_resp = self.client.get("/api/v1/admin/settlements/lookups/finance-accounts/?q=Lookup&kind=BANK")
+        self.assertLessEqual(len(finance_resp.data.get("results") or []), 20)

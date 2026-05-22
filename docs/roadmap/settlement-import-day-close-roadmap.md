@@ -136,6 +136,11 @@ Guarantees (UI):
 - Imports remain evidence only (no posting, no reconciliation closure).
 - Manual allocations only (no auto-match, no suggestions).
 - No new finance-account lookup/select endpoints are introduced in this phase.
+- Lookup UX is admin-only and read-only using dedicated hardened settlement lookup endpoints (bounded and display-safe):
+  - `GET /api/v1/admin/settlements/lookups/finance-accounts/?q=...&kind=BANK|UPI`
+  - `GET /api/v1/admin/settlements/lookups/payments/?q=...`
+  - `GET /api/v1/admin/settlements/lookups/receipts/?q=...`
+  - `GET /api/v1/admin/settlements/lookups/money-movements/?q=...`
 
 Risk level:
 - Medium (operator workflow safety; must be hard to create wrong allocations accidentally).

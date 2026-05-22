@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import Http404
+from django.db.models import Q
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
@@ -30,6 +33,9 @@ from settlements.services.import_parser_service import (
     process_bank_statement_import,
     process_upi_settlement_import,
 )
+
+from accounting.models import FinanceAccount, FinanceAccountKind, MoneyMovement
+from subscriptions.models import Payment
 
 
 class BankStatementImportListCreateView(generics.ListCreateAPIView):
@@ -218,3 +224,282 @@ class SettlementAllocationVoidView(generics.GenericAPIView):
             raise DRFValidationError(str(e))
         response_serializer = SettlementAllocationSerializer(allocation)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+LOOKUP_LIMIT = 20
+
+
+def _compact(parts: list[str | None]) -> str:
+    return " · ".join([part.strip() for part in parts if part and part.strip()])
+
+
+def _money(value: Decimal | None) -> str | None:
+    if value is None:
+        return None
+    return f"{value:.2f}"
+
+
+class SettlementLookupFinanceAccountView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        q = (request.query_params.get("q") or "").strip()
+        kind = (request.query_params.get("kind") or "").strip().upper()
+
+        qs = FinanceAccount.objects.select_related("branch", "chart_account").filter(is_real_settlement_account=True, is_active=True)
+
+        if kind:
+            if kind not in {FinanceAccountKind.BANK, FinanceAccountKind.UPI, FinanceAccountKind.CASH}:
+                raise DRFValidationError({"kind": "Invalid kind. Expected BANK, UPI, or CASH."})
+            qs = qs.filter(kind=kind)
+
+        if q:
+            q_id = None
+            if q.isdigit():
+                try:
+                    q_id = int(q)
+                except ValueError:
+                    q_id = None
+            filters = Q(name__icontains=q) | Q(upi_handle__icontains=q) | Q(bank_last4__icontains=q)
+            if q_id is not None:
+                filters = filters | Q(id=q_id)
+            qs = qs.filter(filters)
+
+        qs = qs.order_by("name", "id")[:LOOKUP_LIMIT]
+
+        results = []
+        for account in qs:
+            branch_name = getattr(account.branch, "name", None) if account.branch_id else None
+            subtitle = _compact(
+                [
+                    branch_name,
+                    f"Kind {account.kind}" if account.kind else None,
+                    f"•••• {account.bank_last4}" if account.bank_last4 else None,
+                    account.upi_handle or None,
+                ]
+            )
+            results.append(
+                {
+                    "id": account.id,
+                    "label": account.name,
+                    "subtitle": subtitle or None,
+                    "metadata": {
+                        "kind": account.kind,
+                        "branch_id": account.branch_id,
+                    },
+                }
+            )
+
+        return Response({"results": results})
+
+
+class SettlementLookupPaymentsView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        q = (request.query_params.get("q") or "").strip()
+
+        qs = Payment.objects.select_related("customer", "subscription").all().order_by("-payment_date", "-id")
+
+        if q:
+            q_id = None
+            if q.isdigit():
+                try:
+                    q_id = int(q)
+                except ValueError:
+                    q_id = None
+
+            filters = (
+                Q(reference_no__icontains=q)
+                | Q(customer__name__icontains=q)
+                | Q(customer__phone__icontains=q)
+                | Q(subscription__subscription_number__icontains=q)
+            )
+            if q_id is not None:
+                filters = filters | Q(id=q_id)
+            qs = qs.filter(filters)
+
+        qs = qs[:LOOKUP_LIMIT]
+
+        results = []
+        for payment in qs:
+            reversal = (payment.allocation_metadata or {}).get("reversal", {}) or {}
+            is_reversed = bool(reversal.get("is_reversed"))
+
+            customer_name = getattr(payment.customer, "name", None) if payment.customer_id else None
+            customer_phone = getattr(payment.customer, "phone", None) if payment.customer_id else None
+            subscription_number = getattr(payment.subscription, "subscription_number", None) if payment.subscription_id else None
+
+            subtitle = _compact(
+                [
+                    payment.payment_date.isoformat() if payment.payment_date else None,
+                    payment.method,
+                    f"Ref {payment.reference_no}" if payment.reference_no else None,
+                    f"{customer_name} ({customer_phone})" if customer_name and customer_phone else customer_name,
+                    f"Sub {subscription_number}" if subscription_number else None,
+                    "REVERSED" if is_reversed else None,
+                ]
+            )
+            label = _compact([f"Payment #{payment.id}", f"₹{_money(payment.amount)}" if payment.amount is not None else None])
+
+            results.append(
+                {
+                    "id": payment.id,
+                    "label": label,
+                    "subtitle": subtitle or None,
+                    "amount": _money(payment.amount),
+                    "status": "REVERSED" if is_reversed else None,
+                    "date": payment.payment_date.isoformat() if payment.payment_date else None,
+                    "metadata": {
+                        "method": payment.method,
+                        "reference_no": payment.reference_no,
+                        "customer_name": customer_name,
+                        "customer_phone": customer_phone,
+                        "subscription_number": subscription_number,
+                        "is_reversed": is_reversed,
+                    },
+                }
+            )
+
+        return Response({"results": results})
+
+
+class SettlementLookupReceiptsView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        from billing.models import ReceiptDocument
+
+        q = (request.query_params.get("q") or "").strip()
+
+        qs = (
+            ReceiptDocument.objects.select_related("finance_account")
+            .all()
+            .order_by("-receipt_date", "-id")
+        )
+
+        if q:
+            q_id = None
+            if q.isdigit():
+                try:
+                    q_id = int(q)
+                except ValueError:
+                    q_id = None
+            filters = (
+                Q(receipt_no__icontains=q)
+                | Q(customer_name_snapshot__icontains=q)
+                | Q(customer_phone_snapshot__icontains=q)
+                | Q(source_reference__icontains=q)
+            )
+            if q_id is not None:
+                filters = filters | Q(id=q_id)
+            qs = qs.filter(filters)
+
+        qs = qs[:LOOKUP_LIMIT]
+
+        results = []
+        for receipt in qs:
+            finance_account_name = getattr(receipt.finance_account, "name", None) if receipt.finance_account_id else None
+            subtitle = _compact(
+                [
+                    receipt.receipt_date.isoformat() if receipt.receipt_date else None,
+                    receipt.status,
+                    finance_account_name,
+                    f"{receipt.customer_name_snapshot} ({receipt.customer_phone_snapshot})"
+                    if receipt.customer_name_snapshot and receipt.customer_phone_snapshot
+                    else (receipt.customer_name_snapshot or None),
+                ]
+            )
+            label = _compact(
+                [
+                    f"Receipt {receipt.receipt_no}" if receipt.receipt_no else f"Receipt #{receipt.id}",
+                    f"₹{_money(receipt.amount)}" if receipt.amount is not None else None,
+                ]
+            )
+            results.append(
+                {
+                    "id": receipt.id,
+                    "label": label,
+                    "subtitle": subtitle or None,
+                    "amount": _money(receipt.amount),
+                    "status": receipt.status,
+                    "date": receipt.receipt_date.isoformat() if receipt.receipt_date else None,
+                    "metadata": {
+                        "receipt_no": receipt.receipt_no,
+                        "receipt_type": receipt.receipt_type,
+                        "finance_account_id": receipt.finance_account_id,
+                        "finance_account_name": finance_account_name,
+                    },
+                }
+            )
+
+        return Response({"results": results})
+
+
+class SettlementLookupMoneyMovementsView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        q = (request.query_params.get("q") or "").strip()
+
+        qs = (
+            MoneyMovement.objects.select_related("from_finance_account", "to_finance_account")
+            .all()
+            .order_by("-movement_date", "-id")
+        )
+
+        if q:
+            q_id = None
+            if q.isdigit():
+                try:
+                    q_id = int(q)
+                except ValueError:
+                    q_id = None
+            filters = (
+                Q(movement_no__icontains=q)
+                | Q(reference_no__icontains=q)
+                | Q(from_finance_account__name__icontains=q)
+                | Q(to_finance_account__name__icontains=q)
+            )
+            if q_id is not None:
+                filters = filters | Q(id=q_id)
+            qs = qs.filter(filters)
+
+        qs = qs[:LOOKUP_LIMIT]
+
+        results = []
+        for movement in qs:
+            from_name = getattr(movement.from_finance_account, "name", None) if movement.from_finance_account_id else None
+            to_name = getattr(movement.to_finance_account, "name", None) if movement.to_finance_account_id else None
+            subtitle = _compact(
+                [
+                    movement.movement_date.isoformat() if movement.movement_date else None,
+                    movement.status,
+                    f"Ref {movement.reference_no}" if movement.reference_no else None,
+                    f"{from_name} → {to_name}" if from_name and to_name else None,
+                ]
+            )
+            label = _compact(
+                [
+                    f"Movement {movement.movement_no}" if movement.movement_no else f"Movement #{movement.id}",
+                    f"₹{_money(movement.amount)}" if movement.amount is not None else None,
+                ]
+            )
+            results.append(
+                {
+                    "id": movement.id,
+                    "label": label,
+                    "subtitle": subtitle or None,
+                    "amount": _money(movement.amount),
+                    "status": movement.status,
+                    "date": movement.movement_date.isoformat() if movement.movement_date else None,
+                    "metadata": {
+                        "movement_no": movement.movement_no,
+                        "reference_no": movement.reference_no,
+                        "from_finance_account_id": movement.from_finance_account_id,
+                        "to_finance_account_id": movement.to_finance_account_id,
+                    },
+                }
+            )
+
+        return Response({"results": results})

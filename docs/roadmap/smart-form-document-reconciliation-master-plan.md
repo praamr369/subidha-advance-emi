@@ -25,6 +25,14 @@ Create an admin-only triage layer aggregating exceptions from existing reconcili
   - `AccountingBridgePosting` links source → journal entry
   - inventory ledger `reference_model/reference_id` traces
 
+Settlement lookup hardening (implemented 2026-05-22):
+- Dedicated admin-only, read-only, bounded lookup endpoints were added for settlement allocation forms:
+  - `GET /api/v1/admin/settlements/lookups/finance-accounts/?q=...&kind=BANK|UPI`
+  - `GET /api/v1/admin/settlements/lookups/payments/?q=...`
+  - `GET /api/v1/admin/settlements/lookups/receipts/?q=...`
+  - `GET /api/v1/admin/settlements/lookups/money-movements/?q=...`
+- These endpoints are lookup-only hardening: no auto-match, no suggestions, no write behavior, and no source-record mutation.
+
 ## Workstreams
 
 ### A) Smart Form & Lookup UX System
@@ -174,6 +182,12 @@ Phase L2 (implemented 2026-05-22):
   - no mutation of `Payment`, `ReceiptDocument`, `MoneyMovement`, journals, finance accounts, cash counters, or source evidence rows (beyond line matched_status)
  - Frontend wiring:
    - `/admin/settlements/bank-imports/{id}` and `/admin/settlements/upi-imports/{id}` include manual allocation forms and line-scoped allocation viewing/voiding.
+ - Lookup UX hardening (frontend-only, read-only; stores numeric IDs only):
+   - Finance account selector reuses `GET /api/v1/accounting/finance-accounts/?search=...&kind=BANK|UPI`
+   - Allocation target selectors reuse:
+     - `GET /api/v1/admin/payments/?q=...` (admin-only payment list)
+     - `GET /api/v1/billing/receipts/?search=...` (admin-only receipt register)
+     - `GET /api/v1/accounting/money-movements/?search=...` (admin-only accounting movements)
 
 ## Deployment Plan (when implemented)
 
