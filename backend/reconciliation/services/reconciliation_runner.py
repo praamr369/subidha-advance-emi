@@ -16,6 +16,7 @@ from reconciliation.services.direct_sale_reconciliation import run_direct_sale_b
 from reconciliation.services.emi_reconciliation import run_emi_checks
 from reconciliation.services.inventory_stock_reconciliation import run_inventory_stock_checks
 from reconciliation.services.return_cancellation_reconciliation import run_return_cancellation_checks
+from reconciliation.services.vendor_payable_reconciliation import run_vendor_payable_checks
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         started_by=started_by,
         started_at=timezone.now(),
         metadata={
-            "phase": "I",
+            "phase": "K",
             "checks": [
                 "PAYMENT_MISSING_RECEIPT_DOCUMENT",
                 "RECEIPT_DOCUMENT_PAYMENT_LINK_INVALID",
@@ -80,6 +81,18 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
                 "PRODUCTION_JOB_RAW_MATERIAL_STOCK_MOVEMENT_MISSING",
                 "PRODUCTION_JOB_RAW_MATERIAL_STOCK_QUANTITY_MISMATCH",
                 "INVENTORY_NEGATIVE_STOCK",
+                "PURCHASE_BILL_POSTED_JOURNAL_MISSING",
+                "PURCHASE_BILL_JOURNAL_SOURCE_LINK_INVALID",
+                "PURCHASE_BILL_DUPLICATE_JOURNAL_SOURCE_REFERENCE",
+                "VENDOR_BILL_POSTED_JOURNAL_MISSING",
+                "VENDOR_BILL_JOURNAL_SOURCE_LINK_INVALID",
+                "VENDOR_BILL_DUPLICATE_JOURNAL_SOURCE_REFERENCE",
+                "VENDOR_PAYMENT_POSTED_JOURNAL_MISSING",
+                "VENDOR_PAYMENT_JOURNAL_SOURCE_LINK_INVALID",
+                "VENDOR_PAYMENT_DUPLICATE_JOURNAL_SOURCE_REFERENCE",
+                "PURCHASE_RETURN_POSTED_JOURNAL_MISSING",
+                "PURCHASE_RETURN_JOURNAL_SOURCE_LINK_INVALID",
+                "PURCHASE_RETURN_DUPLICATE_JOURNAL_SOURCE_REFERENCE",
             ],
         },
     )
@@ -96,6 +109,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         totals = run_direct_sale_billing_checks(run=run, totals=totals)
         totals = run_return_cancellation_checks(run=run, totals=totals)
         totals = run_inventory_stock_checks(run=run, totals=totals)
+        totals = run_vendor_payable_checks(run=run, totals=totals)
 
         run.total_checked = totals["checked"]
         run.total_matched = totals["matched"]

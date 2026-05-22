@@ -148,6 +148,40 @@ Explicitly deferred in Phase J:
 - Delivery workflows beyond the confirmed SubscriptionDelivery bridge (reservation/dispatch routing).
 - Exchange replacement quantity mismatch checks (replacement lines ordering is metadata-dependent).
 
+## Phase K (Implemented 2026-05-22)
+
+Phase K extends the Control Tower check catalog to cover **vendor payable / purchase accounting evidence** using **only** explicit links:
+- OneToOne `posted_journal_entry` links on purchase/vendor models, and
+- `JournalEntry.source_model/source_id` integrity.
+
+Implemented Phase K checks (read-only detection; no mutation; explicit links only):
+- PurchaseBill accounting evidence:
+  - `PURCHASE_BILL_POSTED_JOURNAL_MISSING` (HIGH)
+  - `PURCHASE_BILL_JOURNAL_SOURCE_LINK_INVALID` (HIGH)
+  - `PURCHASE_BILL_DUPLICATE_JOURNAL_SOURCE_REFERENCE` (CRITICAL)
+- VendorBill accounting evidence:
+  - `VENDOR_BILL_POSTED_JOURNAL_MISSING` (HIGH)
+  - `VENDOR_BILL_JOURNAL_SOURCE_LINK_INVALID` (HIGH)
+  - `VENDOR_BILL_DUPLICATE_JOURNAL_SOURCE_REFERENCE` (CRITICAL)
+- VendorPayment accounting evidence:
+  - `VENDOR_PAYMENT_POSTED_JOURNAL_MISSING` (HIGH)
+  - `VENDOR_PAYMENT_JOURNAL_SOURCE_LINK_INVALID` (HIGH)
+  - `VENDOR_PAYMENT_DUPLICATE_JOURNAL_SOURCE_REFERENCE` (CRITICAL)
+- PurchaseReturn accounting evidence (only where explicit posted_journal_entry exists):
+  - `PURCHASE_RETURN_POSTED_JOURNAL_MISSING` (HIGH)
+  - `PURCHASE_RETURN_JOURNAL_SOURCE_LINK_INVALID` (HIGH)
+  - `PURCHASE_RETURN_DUPLICATE_JOURNAL_SOURCE_REFERENCE` (CRITICAL)
+
+Modules used (admin-only queue labels):
+- `purchase` (PurchaseBill, PurchaseReturn)
+- `vendor` (VendorBill)
+- `payable` (VendorPayment)
+
+Explicitly deferred in Phase K:
+- Vendor payable aging and balance reconciliation when balances are derived across ambiguous sources (no inferred joins).
+- Vendor payment allocation matching when an explicit allocation FK/table is not present.
+- Cash/bank/UPI settlement reconciliation (future phase; requires explicit settlement evidence links).
+
 ## 0) Phase E prerequisite (source-link determinism)
 
 Phase E deliverable (docs-only):

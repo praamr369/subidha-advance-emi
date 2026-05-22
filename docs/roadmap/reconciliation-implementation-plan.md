@@ -144,6 +144,33 @@ Tests (backend, targeted):
 - Extended:
   - `backend/tests/reconciliation/test_phase_i_inventory_stock_control_tower.py`
 
+## Phase K Implementation (2026-05-22)
+
+Goal:
+- Add deterministic **vendor payable / purchase accounting evidence** checks using explicit `posted_journal_entry` OneToOne links and `JournalEntry.source_model/source_id` integrity.
+- Detection only (no auto-correction); do not mutate PurchaseBill/VendorBill/VendorPayment/PurchaseReturn/JournalEntry source rows.
+
+Backend (additive):
+- New service module:
+  - `backend/reconciliation/services/vendor_payable_reconciliation.py`
+- Runner registration:
+  - `backend/reconciliation/services/reconciliation_runner.py` runs Phase F + G + H + I + J + K checks in the same run (read-only detection).
+
+Implemented checks (Phase K; explicit-link only):
+- PurchaseBill posted journal missing / invalid source link / duplicate posted journal source reference
+- VendorBill posted journal missing / invalid source link / duplicate posted journal source reference
+- VendorPayment posted journal missing / invalid source link / duplicate posted journal source reference
+- PurchaseReturn posted journal missing / invalid source link / duplicate posted journal source reference
+
+Explicitly deferred in Phase K:
+- Vendor payable aging/balance checks if payable/balance is derived across ambiguous sources (no inferred joins).
+- Payment allocation matching when allocation tables/FKs are not explicit.
+- Cash/bank/UPI settlement reconciliation (future phase with explicit settlement evidence links).
+
+Tests (backend, targeted):
+- New:
+  - `backend/tests/reconciliation/test_phase_j_vendor_payable_control_tower.py`
+
 ## Inventory Source-Link Hardening (Preparation Phase, additive) (2026-05-21)
 
 Goal:

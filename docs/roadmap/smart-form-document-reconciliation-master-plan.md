@@ -126,6 +126,10 @@ Phase J (implemented 2026-05-22):
 - Extended Control Tower detection to deterministic purchase/GRN + delivery bridge + exchange replacement + stock adjustment stock-evidence checks using only allowlisted StockLedger reference contracts.
 - No auto-correction; no mutation of StockLedger or source records.
 
+Phase K (implemented 2026-05-22):
+- Extended Control Tower detection to deterministic vendor payable / purchase accounting evidence checks using explicit posted_journal_entry links and JournalEntry source-link integrity.
+- No auto-correction; no mutation of PurchaseBill/VendorBill/VendorPayment/PurchaseReturn/JournalEntry source records.
+
 ## Deployment Plan (when implemented)
 
 ### Order of rollout (recommended)

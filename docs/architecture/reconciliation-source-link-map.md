@@ -1,6 +1,6 @@
 # Reconciliation Source-Link Map (Deterministic Audit — Phase E)
 
-Status: **AUDIT COMPLETE + PHASE F+G+H+I+J IMPLEMENTED (2026-05-22)**  
+Status: **AUDIT COMPLETE + PHASE F+G+H+I+J+K IMPLEMENTED (2026-05-22)**  
 Scope: **Source-link evidence map only** — no schema/API/service/frontend changes in this phase.
 
 This document records **confirmed** (code-backed) source-link patterns across modules so Phase F can implement only **deterministic, low-noise** reconciliation checks.
@@ -118,6 +118,30 @@ Implemented checks (deterministic; allowlist-only; no auto-correction; no source
   - DirectSaleExchangeReplacement → StockLedger `reference_model="DirectSaleExchangeReplacement"`, `reference_id="{return_id}:{index}"` (missing ledger only; quantity mismatch deferred due to metadata ordering risk).
 - Stock adjustment evidence:
   - StockAdjustmentLine → StockLedger `reference_model="StockAdjustmentLine"`, `reference_id="{adjustment_id}:{line_id}"` (missing ledger + quantity mismatch).
+
+## Phase K Implementation Result (2026-05-22)
+
+Phase K extends the Control Tower check catalog to include **vendor payable / purchase accounting evidence** using only explicit source links:
+- model-level `posted_journal_entry` OneToOne links, and
+- `JournalEntry.source_model/source_id` integrity (no inferred joins).
+
+Implemented checks (deterministic; explicit-link only; no auto-correction; no source-record mutation):
+- PurchaseBill ↔ JournalEntry evidence:
+  - missing posted journal (HIGH)
+  - invalid journal source link (HIGH)
+  - duplicate posted journal source reference (CRITICAL)
+- VendorBill ↔ JournalEntry evidence:
+  - missing posted journal (HIGH)
+  - invalid journal source link (HIGH)
+  - duplicate posted journal source reference (CRITICAL)
+- VendorPayment ↔ JournalEntry evidence:
+  - missing posted journal (HIGH)
+  - invalid journal source link (HIGH)
+  - duplicate posted journal source reference (CRITICAL)
+- PurchaseReturn ↔ JournalEntry evidence (only where explicit posted_journal_entry exists):
+  - missing posted journal (HIGH)
+  - invalid journal source link (HIGH)
+  - duplicate posted journal source reference (CRITICAL)
 
 ## 1) Executive summary
 
@@ -408,9 +432,12 @@ Current “waiver” evidence is distributed (no single `EmiWaiver` model):
 - Deterministic? **Yes** (with known references)
 - Confidence: **High** (journals via OneToOne), **Medium** (stock via string)
 - First safe check:
-  - “Posted purchase bill/vendor payment exists but missing posted journal entry” (model-enforced patterns).
+  - “Posted purchase bill/vendor bill/vendor payment exists but missing posted journal entry” (explicit OneToOne field; deterministic).
+  - “Posted journal entry exists but `JournalEntry.source_model/source_id` does not match the source record” (deterministic; explicit fields).
+  - “Duplicate posted journals reference the same source_model/source_id” (deterministic; count > 1).
 - Deferred checks:
   - Stock quantity vs payable totals cross-check.
+  - Vendor payable aging/balance checks when balances are derived across ambiguous sources (no inferred joins).
 - Risk notes:
   - Phase F should avoid deep AP aging rules unless formalized.
 
