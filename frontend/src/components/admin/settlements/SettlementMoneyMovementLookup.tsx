@@ -1,16 +1,15 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
 
 import EntityLookupCombobox from "@/components/erp/forms/EntityLookupCombobox";
 import type { EntityLookupOption } from "@/components/erp/forms/EntityLookupCombobox";
-import { ApiError } from "@/lib/api";
 import {
   lookupSettlementMoneyMovements,
   primeSettlementLookupResolveCache,
   resolveSettlementMoneyMovementById,
 } from "@/services/settlement-lookups";
+import { useSettlementLookupPreview } from "./useSettlementLookupPreview";
 
 type SettlementMoneyMovementLookupProps = {
   label?: string;
@@ -39,59 +38,11 @@ export default function SettlementMoneyMovementLookup({
   placeholder,
   className,
 }: SettlementMoneyMovementLookupProps) {
-  const [selected, setSelected] = useState<EntityLookupOption | null>(null);
-  const [resolveError, setResolveError] = useState<string | null>(null);
+  const { selected, resolveError, clearError } = useSettlementLookupPreview(
+    value,
+    resolveSettlementMoneyMovementById
+  );
   const selectedMeta = selected?.metadata ?? {};
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function resolve() {
-      if (!value) {
-        setSelected(null);
-        setResolveError(null);
-        return;
-      }
-      if (selected && String(selected.id) === String(value)) return;
-      if (!/^\d+$/.test(String(value))) {
-        setResolveError(null);
-        return;
-      }
-
-      try {
-        const option = await resolveSettlementMoneyMovementById(value);
-        if (cancelled) return;
-        setSelected(option);
-        setResolveError(null);
-      } catch (error) {
-        if (cancelled) return;
-        setSelected(null);
-
-        const status =
-          error instanceof ApiError
-            ? error.status
-            : typeof error === "object" &&
-                error !== null &&
-                "status" in error &&
-                typeof (error as { status?: unknown }).status === "number"
-              ? (error as { status: number }).status
-              : undefined;
-
-        if (status === 404) {
-          setResolveError("Selected record was not found.");
-        } else if (status === 403) {
-          setResolveError("You are not allowed to view this record.");
-        } else {
-          setResolveError("Could not load selected record preview.");
-        }
-      }
-    }
-
-    void resolve();
-    return () => {
-      cancelled = true;
-    };
-  }, [value, selected]);
 
   return (
     <div className="space-y-2">
@@ -99,11 +50,10 @@ export default function SettlementMoneyMovementLookup({
         label={label}
         value={value}
         onChange={(next, option) => {
-          setSelected(option ?? null);
           if (option && next) {
             primeSettlementLookupResolveCache("money_movement", next, option);
           }
-          setResolveError(null);
+          clearError();
           onChange(next, option);
         }}
         search={lookupSettlementMoneyMovements}
