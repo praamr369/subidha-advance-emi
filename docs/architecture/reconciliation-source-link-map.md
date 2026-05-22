@@ -1,6 +1,6 @@
 # Reconciliation Source-Link Map (Deterministic Audit — Phase E)
 
-Status: **AUDIT COMPLETE + PHASE F+G+H+I IMPLEMENTED (2026-05-21)**  
+Status: **AUDIT COMPLETE + PHASE F+G+H+I+J IMPLEMENTED (2026-05-22)**  
 Scope: **Source-link evidence map only** — no schema/API/service/frontend changes in this phase.
 
 This document records **confirmed** (code-backed) source-link patterns across modules so Phase F can implement only **deterministic, low-noise** reconciliation checks.
@@ -97,9 +97,27 @@ Anything else is intentionally **deferred** (ignored by Phase I inventory checks
 
 Explicitly deferred in Phase I:
 - Any inventory reconciliation that requires guessed joins or non-allowlisted `reference_model/reference_id` mapping
-- Purchase/GRN/vendor inventory reconciliation unless explicit FK/source links are confirmed
+- Purchase/vendor inventory reconciliation beyond strict allowlisted StockLedger evidence (e.g., payable/accounting matching) unless explicit links are confirmed
 - Delivery reservation/dispatched inventory checks (requires explicit lifecycle + accounting bridge contract confirmation)
 - Exchange lifecycle inventory checks unless explicit FK + stable status contract exists
+
+## Phase J Implementation Result (2026-05-22)
+
+Phase J extends Phase I inventory checks to include **purchase / GRN + delivery bridge + exchange replacement + stock adjustments** using only the allowlisted StockLedger reference contracts documented in `docs/architecture/inventory-stock-source-link-contracts.md`.
+
+Implemented checks (deterministic; allowlist-only; no auto-correction; no source-record mutation):
+- GRN/GoodsReceipt evidence:
+  - GoodsReceiptLine → StockLedger `reference_model="GoodsReceiptLine"`, `reference_id="{goods_receipt_id}:{line_id}"` (missing ledger + quantity mismatch).
+- Purchase bill evidence:
+  - PurchaseBillLine → StockLedger `reference_model="PurchaseBillLine"`, `reference_id="{purchase_bill_id}:{line_id}"` (missing ledger + quantity mismatch).
+- Purchase return evidence:
+  - PurchaseReturnLine → StockLedger `reference_model="PurchaseReturnLine"`, `reference_id="{purchase_return_id}:{line_id}"` (missing ledger + quantity mismatch).
+- Delivery bridge evidence:
+  - SubscriptionDelivery → StockLedger `reference_model="SubscriptionDelivery"`, `reference_id="{delivery_id}"` (missing ledger + deterministic qty=1.000 mismatch).
+- Exchange replacement evidence:
+  - DirectSaleExchangeReplacement → StockLedger `reference_model="DirectSaleExchangeReplacement"`, `reference_id="{return_id}:{index}"` (missing ledger only; quantity mismatch deferred due to metadata ordering risk).
+- Stock adjustment evidence:
+  - StockAdjustmentLine → StockLedger `reference_model="StockAdjustmentLine"`, `reference_id="{adjustment_id}:{line_id}"` (missing ledger + quantity mismatch).
 
 ## 1) Executive summary
 

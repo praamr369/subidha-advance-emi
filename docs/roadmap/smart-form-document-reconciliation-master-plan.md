@@ -122,6 +122,10 @@ Inventory Source-Link Hardening (preparation, implemented 2026-05-21):
 - Expanded the Phase I StockLedger reference allowlist **only** where reference formats are proven by code/tests.
 - No new reconciliation checks added in this phase (preparation only).
 
+Phase J (implemented 2026-05-22):
+- Extended Control Tower detection to deterministic purchase/GRN + delivery bridge + exchange replacement + stock adjustment stock-evidence checks using only allowlisted StockLedger reference contracts.
+- No auto-correction; no mutation of StockLedger or source records.
+
 ## Deployment Plan (when implemented)
 
 ### Order of rollout (recommended)

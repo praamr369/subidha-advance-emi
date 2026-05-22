@@ -6,7 +6,7 @@ Scope: **inventory stock traceability** via `inventory.StockLedger(reference_mod
 Non-goals:
 - No stock movement behavior changes
 - No mutation/backfill of historical `StockLedger` rows
-- No new reconciliation checks beyond documenting + testing existing writer behavior
+- This document does not change reconciliation behavior; Control Tower checks reuse these contracts (see Phase I/Phase J).
 
 This document standardizes the **deterministic** `StockLedger.reference_model/reference_id` contracts used by current stock-posting workflows so reconciliation can safely expand beyond Phase I without guessing joins or inferring relationships.
 
@@ -90,4 +90,3 @@ If historical `StockLedger.reference_model/reference_id` rows exist with legacy 
   - is deterministic (explicit join keys only),
   - produces an audit log of every row changed,
   - can be rolled back safely.
-

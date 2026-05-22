@@ -116,8 +116,37 @@ StockLedger allowlist (Phase I):
 
 Explicitly deferred in Phase I:
 - Any inventory reconciliation requiring guessed joins or non-allowlisted `reference_model/reference_id` interpretation
-- Purchase/GRN/vendor inventory checks unless explicit FK/source links are confirmed
+- Purchase/GRN/vendor inventory checks beyond strict allowlisted StockLedger evidence (e.g., vendor payable/accounting matching) unless explicit links are confirmed
 - Delivery reservation/dispatched checks until lifecycle + bridge contracts are explicitly confirmed
+
+## Phase J (Implemented 2026-05-22)
+
+Phase J extends Phase I inventory checks to cover **purchase / GRN + delivery bridge + exchange replacement + stock adjustments** using **only** the allowlisted `StockLedger.reference_model/reference_id` contracts confirmed in Inventory Source-Link Hardening.
+
+Implemented Phase J checks (read-only detection; no mutation; allowlist-only):
+- GoodsReceiptLine (GRN) stock evidence:
+  - `GOODS_RECEIPT_STOCK_IN_MISSING` (HIGH)
+  - `GOODS_RECEIPT_STOCK_IN_QUANTITY_MISMATCH` (HIGH)
+- PurchaseBillLine stock evidence (only for POSTED bills; matches current `post_purchase_bill` behavior):
+  - `PURCHASE_BILL_STOCK_IN_MISSING` (HIGH)
+  - `PURCHASE_BILL_STOCK_IN_QUANTITY_MISMATCH` (HIGH)
+- PurchaseReturnLine stock evidence:
+  - `PURCHASE_RETURN_STOCK_OUT_MISSING` (HIGH)
+  - `PURCHASE_RETURN_STOCK_OUT_QUANTITY_MISMATCH` (HIGH)
+- SubscriptionDelivery stock bridge evidence (terminal stock-relevant statuses only; deterministic qty=1.000):
+  - `SUBSCRIPTION_DELIVERY_STOCK_BRIDGE_MISSING` (HIGH)
+  - `SUBSCRIPTION_DELIVERY_STOCK_BRIDGE_QUANTITY_MISMATCH` (HIGH)
+- Direct sale exchange replacement stock evidence (missing-ledger only; quantity mismatch deferred due to metadata-ordering risk):
+  - `DIRECT_SALE_EXCHANGE_REPLACEMENT_STOCK_OUT_MISSING` (HIGH)
+- StockAdjustmentLine stock evidence:
+  - `STOCK_ADJUSTMENT_STOCK_MOVEMENT_MISSING` (HIGH)
+  - `STOCK_ADJUSTMENT_STOCK_QUANTITY_MISMATCH` (HIGH)
+
+Explicitly deferred in Phase J:
+- Vendor payable/accounting reconciliation for purchase flows (journal/payable links are separate phases).
+- Transfer workflows (no deterministic StockLedger writer/contract confirmed for Control Tower use yet).
+- Delivery workflows beyond the confirmed SubscriptionDelivery bridge (reservation/dispatch routing).
+- Exchange replacement quantity mismatch checks (replacement lines ordering is metadata-dependent).
 
 ## 0) Phase E prerequisite (source-link determinism)
 

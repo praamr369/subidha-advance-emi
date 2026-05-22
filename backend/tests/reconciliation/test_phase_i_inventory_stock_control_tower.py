@@ -12,6 +12,7 @@ from accounting.models import (
     JournalEntry,
     JournalEntryStatus,
     JournalEntryType,
+    Vendor,
 )
 from billing.models import (
     BillingDocumentStatus,
@@ -21,12 +22,27 @@ from billing.models import (
     DirectSaleReturn,
     DirectSaleReturnLine,
     DirectSaleReturnStatus,
+    PurchaseReturn,
+    PurchaseReturnLine,
+    PurchaseReturnStatus,
 )
 from branch_control.models import Branch
 from inventory.models import (
+    GoodsReceipt,
+    GoodsReceiptLine,
+    GoodsReceiptStatus,
     InventoryItem,
     InventoryItemType,
+    PurchaseBill,
+    PurchaseBillLine,
+    PurchaseBillStatus,
+    PurchaseOrder,
+    PurchaseOrderLine,
+    PurchaseOrderStatus,
     StockLedger,
+    StockAdjustment,
+    StockAdjustmentLine,
+    StockAdjustmentStatus,
     StockLocation,
     StockMovementType,
 )
@@ -37,7 +53,17 @@ from manufacturing.models import (
     ProductionMaterialIssueLine,
     ProductionReceiptLine,
 )
-from tests.helpers import create_admin_user, create_customer_profile, create_customer_user, create_product
+from subscriptions.models import DeliveryStatus
+from tests.helpers import (
+    create_admin_user,
+    create_batch,
+    create_customer_profile,
+    create_customer_user,
+    create_delivery,
+    create_lucky_id,
+    create_product,
+    create_subscription,
+)
 
 
 class AdminReconciliationControlTowerPhaseIInventoryStockTests(APITestCase):
@@ -410,3 +436,281 @@ class AdminReconciliationControlTowerPhaseIInventoryStockTests(APITestCase):
 
         self.assertEqual(before_stock, StockLedger.objects.count())
         self.assertEqual(before_invoice_status, BillingInvoice.objects.get(pk=inv.id).status)
+
+    def test_grn_received_missing_stock_ledger_creates_item(self):
+        _, item = self._make_stock_tracked_item(product_code="PHI-GRN-001", name="Phase I GRN Item")
+        vendor = Vendor.objects.create(name="Phase I Vendor", phone="9898980001")
+        po = PurchaseOrder.objects.create(
+            po_no="PHI-PO-001",
+            po_date=date(2026, 4, 20),
+            vendor=vendor,
+            stock_location=self.stock_location,
+            status=PurchaseOrderStatus.SENT,
+        )
+        po_line = PurchaseOrderLine.objects.create(
+            purchase_order=po,
+            inventory_item=item,
+            quantity=Decimal("2.000"),
+            unit_cost=Decimal("500.00"),
+            tax_amount=Decimal("0.00"),
+        )
+        receipt = GoodsReceipt.objects.create(
+            receipt_no="PHI-GRN-001",
+            receipt_date=date(2026, 4, 21),
+            purchase_order=po,
+            stock_location=self.stock_location,
+            status=GoodsReceiptStatus.RECEIVED,
+        )
+        grn_line = GoodsReceiptLine.objects.create(
+            goods_receipt=receipt,
+            purchase_order_line=po_line,
+            inventory_item=item,
+            quantity_received=Decimal("2.000"),
+            unit_cost=Decimal("500.00"),
+        )
+
+        _, results = self._run_control_tower(date_from="2026-04-01", date_to="2026-04-30")
+        exception_codes = {row["exception_code"] for row in results}
+        self.assertIn("GOODS_RECEIPT_STOCK_IN_MISSING", exception_codes)
+
+        # Non-allowlisted reference must not satisfy the check.
+        StockLedger.objects.create(
+            inventory_item=item,
+            movement_type=StockMovementType.PURCHASE_IN,
+            quantity_in=Decimal("2.000"),
+            quantity_out=Decimal("0.000"),
+            movement_date=receipt.receipt_date,
+            stock_location=self.stock_location,
+            reference_model="ManualAdjustment",
+            reference_id=f"{receipt.id}:{grn_line.id}",
+            notes="should not satisfy allowlisted GRN check",
+        )
+        _, results2 = self._run_control_tower(date_from="2026-04-01", date_to="2026-04-30")
+        exception_codes2 = {row["exception_code"] for row in results2}
+        self.assertIn("GOODS_RECEIPT_STOCK_IN_MISSING", exception_codes2)
+
+    def test_grn_received_stock_quantity_mismatch_creates_item(self):
+        _, item = self._make_stock_tracked_item(product_code="PHI-GRN-002", name="Phase I GRN Item 2")
+        vendor = Vendor.objects.create(name="Phase I Vendor QTY", phone="9898980004")
+        po = PurchaseOrder.objects.create(
+            po_no="PHI-PO-002",
+            po_date=date(2026, 4, 20),
+            vendor=vendor,
+            stock_location=self.stock_location,
+            status=PurchaseOrderStatus.SENT,
+        )
+        po_line = PurchaseOrderLine.objects.create(
+            purchase_order=po,
+            inventory_item=item,
+            quantity=Decimal("2.000"),
+            unit_cost=Decimal("500.00"),
+            tax_amount=Decimal("0.00"),
+        )
+        receipt = GoodsReceipt.objects.create(
+            receipt_no="PHI-GRN-002",
+            receipt_date=date(2026, 4, 21),
+            purchase_order=po,
+            stock_location=self.stock_location,
+            status=GoodsReceiptStatus.RECEIVED,
+        )
+        grn_line = GoodsReceiptLine.objects.create(
+            goods_receipt=receipt,
+            purchase_order_line=po_line,
+            inventory_item=item,
+            quantity_received=Decimal("2.000"),
+            unit_cost=Decimal("500.00"),
+        )
+        StockLedger.objects.create(
+            inventory_item=item,
+            movement_type=StockMovementType.PURCHASE_IN,
+            quantity_in=Decimal("1.000"),
+            quantity_out=Decimal("0.000"),
+            movement_date=receipt.receipt_date,
+            stock_location=self.stock_location,
+            reference_model="GoodsReceiptLine",
+            reference_id=f"{receipt.id}:{grn_line.id}",
+            notes="wrong qty",
+        )
+
+        _, results = self._run_control_tower(date_from="2026-04-01", date_to="2026-04-30")
+        exception_codes = {row["exception_code"] for row in results}
+        self.assertIn("GOODS_RECEIPT_STOCK_IN_QUANTITY_MISMATCH", exception_codes)
+
+    def test_purchase_bill_posted_missing_stock_ledger_creates_item(self):
+        _, item = self._make_stock_tracked_item(product_code="PHI-PB-001", name="Phase I Purchase Bill Item")
+        vendor = Vendor.objects.create(name="Phase I Vendor 2", phone="9898980002")
+        bill = PurchaseBill.objects.create(
+            bill_no="PHI-PB-001",
+            bill_date=date(2026, 4, 22),
+            vendor=vendor,
+            stock_location=self.stock_location,
+            status=PurchaseBillStatus.POSTED,
+            subtotal=Decimal("1000.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("1000.00"),
+        )
+        PurchaseBillLine.objects.create(
+            purchase_bill=bill,
+            inventory_item=item,
+            description="PB line",
+            quantity=Decimal("1.000"),
+            unit_cost=Decimal("1000.00"),
+            taxable_value=Decimal("1000.00"),
+            tax_amount=Decimal("0.00"),
+            line_total=Decimal("1000.00"),
+        )
+
+        _, results = self._run_control_tower(date_from="2026-04-01", date_to="2026-04-30")
+        exception_codes = {row["exception_code"] for row in results}
+        self.assertIn("PURCHASE_BILL_STOCK_IN_MISSING", exception_codes)
+
+    def test_purchase_return_posted_missing_stock_ledger_creates_item(self):
+        _, item = self._make_stock_tracked_item(product_code="PHI-PR-001", name="Phase I Purchase Return Item")
+        vendor = Vendor.objects.create(name="Phase I Vendor 3", phone="9898980003")
+        bill = PurchaseBill.objects.create(
+            bill_no="PHI-PB-002",
+            bill_date=date(2026, 4, 23),
+            vendor=vendor,
+            stock_location=self.stock_location,
+            status=PurchaseBillStatus.POSTED,
+            subtotal=Decimal("1000.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("1000.00"),
+        )
+        pb_line = PurchaseBillLine.objects.create(
+            purchase_bill=bill,
+            inventory_item=item,
+            description="PB line for return",
+            quantity=Decimal("1.000"),
+            unit_cost=Decimal("1000.00"),
+            taxable_value=Decimal("1000.00"),
+            tax_amount=Decimal("0.00"),
+            line_total=Decimal("1000.00"),
+        )
+        purchase_return = PurchaseReturn.objects.create(
+            return_no="PHI-PR-001",
+            purchase_bill=bill,
+            vendor=vendor,
+            status=PurchaseReturnStatus.POSTED,
+            return_date=date(2026, 4, 24),
+            reason="Return test",
+            subtotal=Decimal("1000.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("1000.00"),
+            posted_by=self.admin,
+            posted_at=timezone.make_aware(datetime(2026, 4, 24, 10, 0, 0)),
+        )
+        PurchaseReturnLine.objects.create(
+            purchase_return=purchase_return,
+            purchase_bill_line=pb_line,
+            inventory_item=item,
+            description="Return line",
+            quantity=Decimal("1.000"),
+            unit_cost=Decimal("1000.00"),
+            taxable_value=Decimal("1000.00"),
+            tax_amount=Decimal("0.00"),
+            line_total=Decimal("1000.00"),
+        )
+
+        _, results = self._run_control_tower(date_from="2026-04-01", date_to="2026-04-30")
+        exception_codes = {row["exception_code"] for row in results}
+        self.assertIn("PURCHASE_RETURN_STOCK_OUT_MISSING", exception_codes)
+
+    def test_subscription_delivery_delivered_missing_stock_ledger_creates_item(self):
+        _, item = self._make_stock_tracked_item(product_code="PHI-DLV-001", name="Phase I Delivery Item")
+        batch = create_batch(batch_code="PHI-BATCH-001", start_date=date(2026, 4, 1))
+        lucky = create_lucky_id(batch=batch, lucky_number=1)
+        subscription = create_subscription(
+            customer=self.customer,
+            product=item.product,
+            batch=batch,
+            lucky_id=lucky,
+            start_date=date(2026, 4, 1),
+        )
+        subscription.branch = self.branch
+        subscription.save(update_fields=["branch"])
+        delivery = create_delivery(
+            subscription=subscription,
+            status=DeliveryStatus.DELIVERED,
+            delivery_reference="PHI-DLV-001",
+        )
+        delivery.delivered_at = timezone.make_aware(datetime(2026, 4, 25, 10, 0, 0))
+        delivery.save(update_fields=["delivered_at"])
+
+        _, results = self._run_control_tower(date_from="2026-04-01", date_to="2026-04-30")
+        exception_codes = {row["exception_code"] for row in results}
+        self.assertIn("SUBSCRIPTION_DELIVERY_STOCK_BRIDGE_MISSING", exception_codes)
+
+    def test_exchange_replacement_missing_stock_ledger_creates_item(self):
+        _, item = self._make_stock_tracked_item(product_code="PHI-EX-001", name="Phase I Exchange Item")
+        sale = self._make_direct_sale()
+        inv = self._make_posted_invoice(direct_sale=sale)
+        sale_line = sale.lines.create(
+            product=item.product,
+            inventory_item=item,
+            description="Sale line for exchange",
+            quantity=Decimal("1.000"),
+            unit_price=Decimal("1000.00"),
+            discount_amount=Decimal("0.00"),
+            taxable_value=Decimal("1000.00"),
+            cgst_amount=Decimal("0.00"),
+            sgst_amount=Decimal("0.00"),
+            igst_amount=Decimal("0.00"),
+            line_total=Decimal("1000.00"),
+        )
+        ret = DirectSaleReturn.objects.create(
+            return_no="PHI-EX-RET-001",
+            direct_sale=sale,
+            original_invoice=inv,
+            customer=self.customer,
+            status=DirectSaleReturnStatus.POSTED,
+            return_kind="DELIVERED_RETURN",
+            stock_destination="SELLABLE",
+            stock_location=self.stock_location,
+            reason="Exchange replacement missing",
+            subtotal=Decimal("100.00"),
+            tax_total=Decimal("0.00"),
+            grand_total=Decimal("100.00"),
+            stock_effect=True,
+            metadata={
+                "financial_mode": "NO_ACTIVE_CUSTOMER_VALUE",
+                "exchange_replacement_lines": [{"inventory_item_id": item.id, "quantity": "1.000"}],
+            },
+            posted_by=self.admin,
+            posted_at=timezone.make_aware(datetime(2026, 4, 26, 10, 0, 0)),
+        )
+        DirectSaleReturnLine.objects.create(
+            direct_sale_return=ret,
+            direct_sale_line=sale_line,
+            inventory_item=item,
+            description="Return line exchange",
+            quantity=Decimal("1.000"),
+            unit_price=Decimal("1000.00"),
+            taxable_value=Decimal("1000.00"),
+            tax_amount=Decimal("0.00"),
+            line_total=Decimal("1000.00"),
+        )
+
+        _, results = self._run_control_tower(date_from="2026-04-01", date_to="2026-04-30")
+        exception_codes = {row["exception_code"] for row in results}
+        self.assertIn("DIRECT_SALE_EXCHANGE_REPLACEMENT_STOCK_OUT_MISSING", exception_codes)
+
+    def test_stock_adjustment_posted_missing_stock_ledger_creates_item(self):
+        _, item = self._make_stock_tracked_item(product_code="PHI-ADJ-001", name="Phase I Adjustment Item")
+        adjustment = StockAdjustment.objects.create(
+            adjustment_no="PHI-ADJ-001",
+            adjustment_date=date(2026, 4, 27),
+            status=StockAdjustmentStatus.POSTED,
+            stock_location=self.stock_location,
+            reason="Adjustment missing ledger",
+        )
+        StockAdjustmentLine.objects.create(
+            stock_adjustment=adjustment,
+            inventory_item=item,
+            quantity_delta=Decimal("1.000"),
+            notes="delta in",
+        )
+
+        _, results = self._run_control_tower(date_from="2026-04-01", date_to="2026-04-30")
+        exception_codes = {row["exception_code"] for row in results}
+        self.assertIn("STOCK_ADJUSTMENT_STOCK_MOVEMENT_MISSING", exception_codes)

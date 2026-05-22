@@ -11,11 +11,20 @@ from billing.models import (
     BillingInvoice,
     DirectSaleReturn,
     DirectSaleReturnStatus,
+    PurchaseReturn,
+    PurchaseReturnLine,
+    PurchaseReturnStatus,
 )
 from inventory.models import (
+    GoodsReceipt,
+    GoodsReceiptStatus,
     InventoryItem,
+    PurchaseBill,
+    PurchaseBillStatus,
     QUANTITY_ZERO,
     SOFT_HOLD_MOVEMENT_TYPES,
+    StockAdjustment,
+    StockAdjustmentStatus,
     StockLedger,
     StockMovementType,
 )
@@ -24,6 +33,7 @@ from manufacturing.models import (
     ProductionJobStatus,
     ProductionMaterialEntryKind,
 )
+from subscriptions.models import DeliveryStatus, SubscriptionDelivery
 from reconciliation.models import (
     ReconciliationEvidence,
     ReconciliationItem,
@@ -34,6 +44,9 @@ from reconciliation.models import (
 
 MODULE_INVENTORY = "inventory"
 MODULE_MANUFACTURING = "manufacturing"
+MODULE_PURCHASE = "purchase"
+MODULE_DELIVERY = "delivery"
+MODULE_EXCHANGE = "exchange"
 
 
 def _qty(value) -> Decimal:
@@ -265,6 +278,583 @@ def run_inventory_stock_checks(*, run, totals: dict) -> dict:
         )
         totals["exceptions"] += 1
         totals["high_risk"] += 1
+
+    # I1/I2) GRN / GoodsReceipt stock evidence (receipt is RECEIVED -> PURCHASE_IN ledger expected).
+    receipts = GoodsReceipt.objects.select_related("purchase_order", "stock_location").prefetch_related(
+        "lines",
+        "lines__inventory_item",
+    )
+    if branch_id:
+        receipts = receipts.filter(branch_id=branch_id)
+    if date_from or date_to:
+        receipts = receipts.filter(_date_range_filter("receipt_date", date_from, date_to))
+    receipts = receipts.filter(status=GoodsReceiptStatus.RECEIVED)
+    totals["checked"] += receipts.count()
+
+    for receipt in receipts:
+        for line in receipt.lines.all():
+            if not line.inventory_item_id:
+                continue
+            if not line.inventory_item.stock_tracking_enabled:
+                continue
+
+            expected_ref_model = "GoodsReceiptLine"
+            expected_ref_id = f"{receipt.id}:{line.id}"
+            if not _allowlisted(expected_ref_model):
+                continue
+
+            entry = (
+                StockLedger.objects.filter(
+                    inventory_item_id=line.inventory_item_id,
+                    movement_type=StockMovementType.PURCHASE_IN,
+                    reference_model=expected_ref_model,
+                    reference_id=expected_ref_id,
+                )
+                .only("id", "quantity_in", "quantity_out", "movement_date")
+                .first()
+            )
+            expected_qty = _qty(getattr(line, "quantity_received", None))
+            if entry is None:
+                item = ReconciliationItem.objects.create(
+                    run=run,
+                    module=MODULE_PURCHASE,
+                    source_type="GoodsReceiptLine",
+                    source_id=str(line.id),
+                    source_label=f"{receipt.receipt_no or f'GRN-{receipt.id}'} line {line.id}",
+                    severity=ReconciliationSeverity.HIGH,
+                    status=ReconciliationItemStatus.MISSING_LEDGER,
+                    exception_code="GOODS_RECEIPT_STOCK_IN_MISSING",
+                    exception_message="GoodsReceipt is RECEIVED but expected PURCHASE_IN StockLedger entry is missing (allowlisted reference_model/reference_id).",
+                    recommended_action="Re-post the goods receipt stock movement via the standard GRN workflow. Do not create StockLedger rows manually (no auto-correction).",
+                    expected_quantity=expected_qty,
+                    actual_quantity=QUANTITY_ZERO,
+                    quantity_delta=expected_qty * Decimal("-1"),
+                    metadata={
+                        "goods_receipt_id": receipt.id,
+                        "goods_receipt_line_id": line.id,
+                        "reference_model": expected_ref_model,
+                        "reference_id": expected_ref_id,
+                        "allowlist_evidence": STOCK_LEDGER_REFERENCE_ALLOWLIST[expected_ref_model].evidence_label,
+                    },
+                )
+                ReconciliationEvidence.objects.create(
+                    item=item,
+                    evidence_type="GoodsReceipt",
+                    object_id=str(receipt.id),
+                    label=receipt.receipt_no or f"GRN-{receipt.id}",
+                    status=receipt.status,
+                    metadata={"receipt_date": str(receipt.receipt_date), "purchase_order_id": receipt.purchase_order_id},
+                )
+                ReconciliationEvidence.objects.create(
+                    item=item,
+                    evidence_type="GoodsReceiptLine",
+                    object_id=str(line.id),
+                    label=f"GRN-LINE-{line.id}",
+                    quantity=expected_qty,
+                    metadata={"inventory_item_id": line.inventory_item_id},
+                )
+                totals["exceptions"] += 1
+                totals["high_risk"] += 1
+                continue
+
+            actual_qty = _qty(entry.quantity_in)
+            if expected_qty != actual_qty:
+                item = ReconciliationItem.objects.create(
+                    run=run,
+                    module=MODULE_PURCHASE,
+                    source_type="GoodsReceiptLine",
+                    source_id=str(line.id),
+                    source_label=f"{receipt.receipt_no or f'GRN-{receipt.id}'} line {line.id}",
+                    severity=ReconciliationSeverity.HIGH,
+                    status=ReconciliationItemStatus.QUANTITY_MISMATCH,
+                    exception_code="GOODS_RECEIPT_STOCK_IN_QUANTITY_MISMATCH",
+                    exception_message="GoodsReceiptLine.quantity_received does not match allowlisted StockLedger.quantity_in for PURCHASE_IN.",
+                    recommended_action="Investigate goods receipt stock posting integrity (no auto-correction).",
+                    expected_quantity=expected_qty,
+                    actual_quantity=actual_qty,
+                    quantity_delta=_qty(actual_qty - expected_qty),
+                    metadata={
+                        "goods_receipt_id": receipt.id,
+                        "goods_receipt_line_id": line.id,
+                        "stock_ledger_id": entry.id,
+                        "reference_model": expected_ref_model,
+                        "reference_id": expected_ref_id,
+                    },
+                )
+                totals["exceptions"] += 1
+                totals["high_risk"] += 1
+
+    # I3/I4) Purchase bill stock evidence (bill is POSTED -> PURCHASE_IN ledger expected).
+    purchase_bills = PurchaseBill.objects.select_related("vendor", "stock_location").prefetch_related(
+        "lines",
+        "lines__inventory_item",
+    )
+    if branch_id:
+        purchase_bills = purchase_bills.filter(branch_id=branch_id)
+    if date_from or date_to:
+        purchase_bills = purchase_bills.filter(_date_range_filter("bill_date", date_from, date_to))
+    purchase_bills = purchase_bills.filter(status=PurchaseBillStatus.POSTED)
+    totals["checked"] += purchase_bills.count()
+
+    for bill in purchase_bills:
+        for line in bill.lines.all():
+            if not line.inventory_item_id:
+                continue
+            if not line.inventory_item.stock_tracking_enabled:
+                continue
+
+            expected_ref_model = "PurchaseBillLine"
+            expected_ref_id = f"{bill.id}:{line.id}"
+            if not _allowlisted(expected_ref_model):
+                continue
+
+            entry = (
+                StockLedger.objects.filter(
+                    inventory_item_id=line.inventory_item_id,
+                    movement_type=StockMovementType.PURCHASE_IN,
+                    reference_model=expected_ref_model,
+                    reference_id=expected_ref_id,
+                )
+                .only("id", "quantity_in", "quantity_out", "movement_date")
+                .first()
+            )
+            expected_qty = _qty(line.quantity)
+            if entry is None:
+                item = ReconciliationItem.objects.create(
+                    run=run,
+                    module=MODULE_PURCHASE,
+                    source_type="PurchaseBillLine",
+                    source_id=str(line.id),
+                    source_label=f"{bill.bill_no or f'PB-{bill.id}'} line {line.id}",
+                    severity=ReconciliationSeverity.HIGH,
+                    status=ReconciliationItemStatus.MISSING_LEDGER,
+                    exception_code="PURCHASE_BILL_STOCK_IN_MISSING",
+                    exception_message="PurchaseBill is POSTED but expected PURCHASE_IN StockLedger entry is missing (allowlisted reference_model/reference_id).",
+                    recommended_action="Post the purchase bill via the standard purchase bill workflow (which posts stock). Do not create StockLedger rows manually (no auto-correction).",
+                    expected_quantity=expected_qty,
+                    actual_quantity=QUANTITY_ZERO,
+                    quantity_delta=expected_qty * Decimal("-1"),
+                    metadata={
+                        "purchase_bill_id": bill.id,
+                        "purchase_bill_line_id": line.id,
+                        "reference_model": expected_ref_model,
+                        "reference_id": expected_ref_id,
+                        "allowlist_evidence": STOCK_LEDGER_REFERENCE_ALLOWLIST[expected_ref_model].evidence_label,
+                    },
+                )
+                ReconciliationEvidence.objects.create(
+                    item=item,
+                    evidence_type="PurchaseBill",
+                    object_id=str(bill.id),
+                    label=bill.bill_no or f"PB-{bill.id}",
+                    status=bill.status,
+                    metadata={"bill_date": str(bill.bill_date), "vendor_id": bill.vendor_id},
+                )
+                ReconciliationEvidence.objects.create(
+                    item=item,
+                    evidence_type="PurchaseBillLine",
+                    object_id=str(line.id),
+                    label=f"PB-LINE-{line.id}",
+                    quantity=expected_qty,
+                    metadata={"inventory_item_id": line.inventory_item_id},
+                )
+                totals["exceptions"] += 1
+                totals["high_risk"] += 1
+                continue
+
+            actual_qty = _qty(entry.quantity_in)
+            if expected_qty != actual_qty:
+                item = ReconciliationItem.objects.create(
+                    run=run,
+                    module=MODULE_PURCHASE,
+                    source_type="PurchaseBillLine",
+                    source_id=str(line.id),
+                    source_label=f"{bill.bill_no or f'PB-{bill.id}'} line {line.id}",
+                    severity=ReconciliationSeverity.HIGH,
+                    status=ReconciliationItemStatus.QUANTITY_MISMATCH,
+                    exception_code="PURCHASE_BILL_STOCK_IN_QUANTITY_MISMATCH",
+                    exception_message="PurchaseBillLine.quantity does not match allowlisted StockLedger.quantity_in for PURCHASE_IN.",
+                    recommended_action="Investigate purchase bill stock posting integrity (no auto-correction).",
+                    expected_quantity=expected_qty,
+                    actual_quantity=actual_qty,
+                    quantity_delta=_qty(actual_qty - expected_qty),
+                    metadata={
+                        "purchase_bill_id": bill.id,
+                        "purchase_bill_line_id": line.id,
+                        "stock_ledger_id": entry.id,
+                        "reference_model": expected_ref_model,
+                        "reference_id": expected_ref_id,
+                    },
+                )
+                totals["exceptions"] += 1
+                totals["high_risk"] += 1
+
+    # I5/I6) Purchase return stock evidence (return is POSTED -> PURCHASE_RETURN_OUT ledger expected).
+    purchase_returns = PurchaseReturn.objects.select_related("purchase_bill").prefetch_related(
+        "lines",
+        "lines__inventory_item",
+    )
+    if branch_id:
+        purchase_returns = purchase_returns.filter(purchase_bill__branch_id=branch_id)
+    if date_from or date_to:
+        purchase_returns = purchase_returns.filter(_date_range_filter("return_date", date_from, date_to))
+    purchase_returns = purchase_returns.filter(status=PurchaseReturnStatus.POSTED)
+    totals["checked"] += purchase_returns.count()
+
+    for purchase_return in purchase_returns:
+        for line in purchase_return.lines.all():
+            if not line.inventory_item_id:
+                continue
+            if not line.inventory_item.stock_tracking_enabled:
+                continue
+
+            expected_ref_model = "PurchaseReturnLine"
+            expected_ref_id = f"{purchase_return.id}:{line.id}"
+            if not _allowlisted(expected_ref_model):
+                continue
+
+            entry = (
+                StockLedger.objects.filter(
+                    inventory_item_id=line.inventory_item_id,
+                    movement_type=StockMovementType.PURCHASE_RETURN_OUT,
+                    reference_model=expected_ref_model,
+                    reference_id=expected_ref_id,
+                )
+                .only("id", "quantity_in", "quantity_out", "movement_date")
+                .first()
+            )
+            expected_qty = _qty(line.quantity)
+            if entry is None:
+                item = ReconciliationItem.objects.create(
+                    run=run,
+                    module=MODULE_PURCHASE,
+                    source_type="PurchaseReturnLine",
+                    source_id=str(line.id),
+                    source_label=f"{purchase_return.return_no or f'PR-{purchase_return.id}'} line {line.id}",
+                    severity=ReconciliationSeverity.HIGH,
+                    status=ReconciliationItemStatus.MISSING_LEDGER,
+                    exception_code="PURCHASE_RETURN_STOCK_OUT_MISSING",
+                    exception_message="PurchaseReturn is POSTED but expected PURCHASE_RETURN_OUT StockLedger entry is missing (allowlisted reference_model/reference_id).",
+                    recommended_action="Post the purchase return stock movement via the standard purchase return workflow. Do not create StockLedger rows manually (no auto-correction).",
+                    expected_quantity=expected_qty,
+                    actual_quantity=QUANTITY_ZERO,
+                    quantity_delta=expected_qty * Decimal("-1"),
+                    metadata={
+                        "purchase_return_id": purchase_return.id,
+                        "purchase_return_line_id": line.id,
+                        "reference_model": expected_ref_model,
+                        "reference_id": expected_ref_id,
+                        "allowlist_evidence": STOCK_LEDGER_REFERENCE_ALLOWLIST[expected_ref_model].evidence_label,
+                    },
+                )
+                ReconciliationEvidence.objects.create(
+                    item=item,
+                    evidence_type="PurchaseReturn",
+                    object_id=str(purchase_return.id),
+                    label=purchase_return.return_no or f"PR-{purchase_return.id}",
+                    status=purchase_return.status,
+                    metadata={"return_date": str(purchase_return.return_date), "purchase_bill_id": purchase_return.purchase_bill_id},
+                )
+                ReconciliationEvidence.objects.create(
+                    item=item,
+                    evidence_type="PurchaseReturnLine",
+                    object_id=str(line.id),
+                    label=f"PR-LINE-{line.id}",
+                    quantity=expected_qty,
+                    metadata={"inventory_item_id": line.inventory_item_id, "purchase_bill_line_id": line.purchase_bill_line_id},
+                )
+                totals["exceptions"] += 1
+                totals["high_risk"] += 1
+                continue
+
+            actual_qty = _qty(entry.quantity_out)
+            if expected_qty != actual_qty:
+                item = ReconciliationItem.objects.create(
+                    run=run,
+                    module=MODULE_PURCHASE,
+                    source_type="PurchaseReturnLine",
+                    source_id=str(line.id),
+                    source_label=f"{purchase_return.return_no or f'PR-{purchase_return.id}'} line {line.id}",
+                    severity=ReconciliationSeverity.HIGH,
+                    status=ReconciliationItemStatus.QUANTITY_MISMATCH,
+                    exception_code="PURCHASE_RETURN_STOCK_OUT_QUANTITY_MISMATCH",
+                    exception_message="PurchaseReturnLine.quantity does not match allowlisted StockLedger.quantity_out for PURCHASE_RETURN_OUT.",
+                    recommended_action="Investigate purchase return stock posting integrity (no auto-correction).",
+                    expected_quantity=expected_qty,
+                    actual_quantity=actual_qty,
+                    quantity_delta=_qty(actual_qty - expected_qty),
+                    metadata={
+                        "purchase_return_id": purchase_return.id,
+                        "purchase_return_line_id": line.id,
+                        "stock_ledger_id": entry.id,
+                        "reference_model": expected_ref_model,
+                        "reference_id": expected_ref_id,
+                    },
+                )
+                totals["exceptions"] += 1
+                totals["high_risk"] += 1
+
+    # I7/I8) Delivery bridge stock evidence (DELIVERED/RETURNED + bridge enabled -> allowlisted ledger expected).
+    deliveries = SubscriptionDelivery.objects.select_related(
+        "subscription",
+        "subscription__product",
+        "subscription__product__inventory_profile",
+    )
+    if branch_id:
+        deliveries = deliveries.filter(subscription__branch_id=branch_id)
+    delivered_q = _date_range_filter("delivered_at__date", date_from, date_to)
+    returned_q = _date_range_filter("returned_at__date", date_from, date_to)
+    created_q = _date_range_filter("created_at__date", date_from, date_to)
+    if date_from or date_to:
+        deliveries = deliveries.filter(delivered_q | returned_q | created_q)
+    deliveries = deliveries.filter(status__in=[DeliveryStatus.DELIVERED, DeliveryStatus.RETURNED])
+    totals["checked"] += deliveries.count()
+
+    for delivery in deliveries:
+        subscription = delivery.subscription
+        product = getattr(subscription, "product", None)
+        inventory_item = getattr(product, "inventory_profile", None) if product else None
+        if inventory_item is None or not inventory_item.stock_tracking_enabled:
+            continue
+        if not inventory_item.delivery_stock_bridge_enabled:
+            continue
+
+        expected_ref_model = "SubscriptionDelivery"
+        expected_ref_id = str(delivery.id)
+        if not _allowlisted(expected_ref_model):
+            continue
+
+        expected_movement_type = (
+            StockMovementType.EMI_DELIVERY_OUT if delivery.status == DeliveryStatus.DELIVERED else StockMovementType.EMI_RETURN_IN
+        )
+        entry = (
+            StockLedger.objects.filter(
+                inventory_item_id=inventory_item.id,
+                movement_type=expected_movement_type,
+                reference_model=expected_ref_model,
+                reference_id=expected_ref_id,
+            )
+            .only("id", "quantity_in", "quantity_out", "movement_date")
+            .first()
+        )
+        expected_qty = Decimal("1.000")
+        if entry is None:
+            item = ReconciliationItem.objects.create(
+                run=run,
+                module=MODULE_DELIVERY,
+                source_type="SubscriptionDelivery",
+                source_id=str(delivery.id),
+                source_label=delivery.delivery_reference or f"DLV-{delivery.id}",
+                severity=ReconciliationSeverity.HIGH,
+                status=ReconciliationItemStatus.MISSING_LEDGER,
+                exception_code="SUBSCRIPTION_DELIVERY_STOCK_BRIDGE_MISSING",
+                exception_message="SubscriptionDelivery is in a stock-relevant terminal status but expected allowlisted StockLedger bridge entry is missing.",
+                recommended_action="Sync the delivery inventory bridge via the standard delivery workflow (no auto-correction).",
+                expected_quantity=_qty(expected_qty),
+                actual_quantity=QUANTITY_ZERO,
+                quantity_delta=_qty(expected_qty) * Decimal("-1"),
+                metadata={
+                    "subscription_delivery_id": delivery.id,
+                    "subscription_id": delivery.subscription_id,
+                    "delivery_status": delivery.status,
+                    "inventory_item_id": inventory_item.id,
+                    "movement_type": expected_movement_type,
+                    "reference_model": expected_ref_model,
+                    "reference_id": expected_ref_id,
+                    "allowlist_evidence": STOCK_LEDGER_REFERENCE_ALLOWLIST[expected_ref_model].evidence_label,
+                },
+            )
+            ReconciliationEvidence.objects.create(
+                item=item,
+                evidence_type="SubscriptionDelivery",
+                object_id=str(delivery.id),
+                label=delivery.delivery_reference or f"DLV-{delivery.id}",
+                status=delivery.status,
+                metadata={"subscription_id": delivery.subscription_id},
+            )
+            totals["exceptions"] += 1
+            totals["high_risk"] += 1
+            continue
+
+        actual_qty = _qty(entry.quantity_out if expected_movement_type == StockMovementType.EMI_DELIVERY_OUT else entry.quantity_in)
+        if _qty(expected_qty) != actual_qty:
+            item = ReconciliationItem.objects.create(
+                run=run,
+                module=MODULE_DELIVERY,
+                source_type="SubscriptionDelivery",
+                source_id=str(delivery.id),
+                source_label=delivery.delivery_reference or f"DLV-{delivery.id}",
+                severity=ReconciliationSeverity.HIGH,
+                status=ReconciliationItemStatus.QUANTITY_MISMATCH,
+                exception_code="SUBSCRIPTION_DELIVERY_STOCK_BRIDGE_QUANTITY_MISMATCH",
+                exception_message="SubscriptionDelivery bridge expects a deterministic quantity of 1.000 but StockLedger quantity differs.",
+                recommended_action="Investigate delivery bridge stock posting integrity (no auto-correction).",
+                expected_quantity=_qty(expected_qty),
+                actual_quantity=actual_qty,
+                quantity_delta=_qty(actual_qty - _qty(expected_qty)),
+                metadata={
+                    "subscription_delivery_id": delivery.id,
+                    "inventory_item_id": inventory_item.id,
+                    "stock_ledger_id": entry.id,
+                    "movement_type": expected_movement_type,
+                    "reference_model": expected_ref_model,
+                    "reference_id": expected_ref_id,
+                },
+            )
+            totals["exceptions"] += 1
+            totals["high_risk"] += 1
+
+    # I9) Direct sale exchange replacement stock evidence (POSTED + persisted replacement list -> allowlisted ledger expected).
+    exchange_returns = DirectSaleReturn.objects.select_related("direct_sale").filter(status=DirectSaleReturnStatus.POSTED)
+    if branch_id:
+        exchange_returns = exchange_returns.filter(direct_sale__branch_id=branch_id)
+    if date_from or date_to:
+        exchange_returns = exchange_returns.filter(_date_range_filter("posted_at__date", date_from, date_to) | created_q)
+    totals["checked"] += exchange_returns.count()
+
+    for ret in exchange_returns:
+        replacement_lines = list((ret.metadata or {}).get("exchange_replacement_lines") or [])
+        if not replacement_lines:
+            continue
+        expected_ref_model = "DirectSaleExchangeReplacement"
+        if not _allowlisted(expected_ref_model):
+            continue
+        for index, row in enumerate(replacement_lines, start=1):
+            try:
+                inventory_item_id = int(row.get("inventory_item_id") or 0)
+            except Exception:
+                inventory_item_id = 0
+            if inventory_item_id <= 0:
+                continue
+            item = InventoryItem.objects.filter(pk=inventory_item_id).only("id", "stock_tracking_enabled").first()
+            if item is None or not item.stock_tracking_enabled:
+                continue
+            expected_ref_id = f"{ret.id}:{index}"
+            entry = StockLedger.objects.filter(
+                inventory_item_id=item.id,
+                movement_type=StockMovementType.SALE_OUT,
+                reference_model=expected_ref_model,
+                reference_id=expected_ref_id,
+            ).only("id", "quantity_out", "movement_date").first()
+            if entry is None:
+                item_row = ReconciliationItem.objects.create(
+                    run=run,
+                    module=MODULE_EXCHANGE,
+                    source_type="DirectSaleExchangeReplacement",
+                    source_id=f"{ret.id}:{index}",
+                    source_label=f"{ret.return_no or f'DSRET-{ret.id}'} replacement {index}",
+                    severity=ReconciliationSeverity.HIGH,
+                    status=ReconciliationItemStatus.MISSING_LEDGER,
+                    exception_code="DIRECT_SALE_EXCHANGE_REPLACEMENT_STOCK_OUT_MISSING",
+                    exception_message="DirectSaleReturn has exchange replacement lines but expected allowlisted SALE_OUT StockLedger entry is missing.",
+                    recommended_action="Post exchange replacement stock movement via the standard exchange workflow. Do not create StockLedger rows manually (no auto-correction).",
+                    metadata={
+                        "direct_sale_return_id": ret.id,
+                        "reference_model": expected_ref_model,
+                        "reference_id": expected_ref_id,
+                        "allowlist_evidence": STOCK_LEDGER_REFERENCE_ALLOWLIST[expected_ref_model].evidence_label,
+                        "replacement_index": index,
+                        "inventory_item_id": item.id,
+                    },
+                )
+                ReconciliationEvidence.objects.create(
+                    item=item_row,
+                    evidence_type="DirectSaleReturn",
+                    object_id=str(ret.id),
+                    label=ret.return_no or f"DSRET-{ret.id}",
+                    status=ret.status,
+                    metadata={"has_exchange_replacements": True},
+                )
+                totals["exceptions"] += 1
+                totals["high_risk"] += 1
+
+    # I10/I11) Stock adjustment stock evidence (POSTED -> allowlisted ADJUSTMENT_IN/OUT ledger expected).
+    adjustments = StockAdjustment.objects.select_related("stock_location").prefetch_related(
+        "lines",
+        "lines__inventory_item",
+    )
+    if branch_id:
+        adjustments = adjustments.filter(stock_location__branch_id=branch_id)
+    if date_from or date_to:
+        adjustments = adjustments.filter(_date_range_filter("adjustment_date", date_from, date_to))
+    adjustments = adjustments.filter(status=StockAdjustmentStatus.POSTED)
+    totals["checked"] += adjustments.count()
+
+    for adjustment in adjustments:
+        for line in adjustment.lines.all():
+            if not line.inventory_item_id:
+                continue
+            if not line.inventory_item.stock_tracking_enabled:
+                continue
+            expected_ref_model = "StockAdjustmentLine"
+            expected_ref_id = f"{adjustment.id}:{line.id}"
+            if not _allowlisted(expected_ref_model):
+                continue
+            movement_type = (
+                StockMovementType.ADJUSTMENT_IN if _qty(line.quantity_delta) > QUANTITY_ZERO else StockMovementType.ADJUSTMENT_OUT
+            )
+            entry = StockLedger.objects.filter(
+                inventory_item_id=line.inventory_item_id,
+                movement_type=movement_type,
+                reference_model=expected_ref_model,
+                reference_id=expected_ref_id,
+            ).only("id", "quantity_in", "quantity_out", "movement_date").first()
+            expected_qty = _qty(abs(_qty(line.quantity_delta)))
+            if entry is None:
+                item = ReconciliationItem.objects.create(
+                    run=run,
+                    module=MODULE_INVENTORY,
+                    source_type="StockAdjustmentLine",
+                    source_id=str(line.id),
+                    source_label=f"{adjustment.adjustment_no or f'ADJ-{adjustment.id}'} line {line.id}",
+                    severity=ReconciliationSeverity.HIGH,
+                    status=ReconciliationItemStatus.MISSING_LEDGER,
+                    exception_code="STOCK_ADJUSTMENT_STOCK_MOVEMENT_MISSING",
+                    exception_message="StockAdjustment is POSTED but expected allowlisted StockLedger adjustment movement is missing.",
+                    recommended_action="Post the stock adjustment via the standard adjustment workflow. Do not create StockLedger rows manually (no auto-correction).",
+                    expected_quantity=expected_qty,
+                    actual_quantity=QUANTITY_ZERO,
+                    quantity_delta=expected_qty * Decimal("-1"),
+                    metadata={
+                        "stock_adjustment_id": adjustment.id,
+                        "stock_adjustment_line_id": line.id,
+                        "movement_type": movement_type,
+                        "reference_model": expected_ref_model,
+                        "reference_id": expected_ref_id,
+                        "allowlist_evidence": STOCK_LEDGER_REFERENCE_ALLOWLIST[expected_ref_model].evidence_label,
+                    },
+                )
+                totals["exceptions"] += 1
+                totals["high_risk"] += 1
+                continue
+
+            actual_qty = _qty(entry.quantity_in if movement_type == StockMovementType.ADJUSTMENT_IN else entry.quantity_out)
+            if expected_qty != actual_qty:
+                item = ReconciliationItem.objects.create(
+                    run=run,
+                    module=MODULE_INVENTORY,
+                    source_type="StockAdjustmentLine",
+                    source_id=str(line.id),
+                    source_label=f"{adjustment.adjustment_no or f'ADJ-{adjustment.id}'} line {line.id}",
+                    severity=ReconciliationSeverity.HIGH,
+                    status=ReconciliationItemStatus.QUANTITY_MISMATCH,
+                    exception_code="STOCK_ADJUSTMENT_STOCK_QUANTITY_MISMATCH",
+                    exception_message="StockAdjustmentLine.quantity_delta does not match allowlisted StockLedger quantity for adjustment movement.",
+                    recommended_action="Investigate stock adjustment posting integrity (no auto-correction).",
+                    expected_quantity=expected_qty,
+                    actual_quantity=actual_qty,
+                    quantity_delta=_qty(actual_qty - expected_qty),
+                    metadata={
+                        "stock_adjustment_id": adjustment.id,
+                        "stock_adjustment_line_id": line.id,
+                        "stock_ledger_id": entry.id,
+                        "movement_type": movement_type,
+                        "reference_model": expected_ref_model,
+                        "reference_id": expected_ref_id,
+                    },
+                )
+                totals["exceptions"] += 1
+                totals["high_risk"] += 1
 
     # I1/I2) DirectSaleReturn stock restoration (only when deterministic: stock_effect + allowlisted DirectSaleReturnLine refs).
     returns = DirectSaleReturn.objects.select_related("direct_sale").prefetch_related(

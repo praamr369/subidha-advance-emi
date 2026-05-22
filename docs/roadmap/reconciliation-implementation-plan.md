@@ -111,11 +111,38 @@ Implemented checks (Phase I; allowlist-only):
 
 Explicitly deferred in Phase I:
 - Any inventory reconciliation requiring non-allowlisted `reference_model/reference_id` interpretation
-- Purchase/GRN/vendor inventory checks unless explicit FK/source links are confirmed
+- Purchase/vendor inventory checks beyond strict allowlisted StockLedger evidence (e.g., payable/accounting matching) unless explicit links are confirmed
 - Delivery reservation/dispatched inventory checks until lifecycle + bridge contracts are explicitly confirmed
 
 Tests (backend, targeted):
 - `backend/tests/reconciliation/test_phase_i_inventory_stock_control_tower.py`
+
+## Phase J Implementation (2026-05-22)
+
+Goal:
+- Extend the Control Tower with deterministic **purchase / GRN + delivery + exchange** stock-evidence checks using only allowlisted `StockLedger.reference_model/reference_id` contracts.
+- Detection only (no auto-correction); do not mutate StockLedger or source records.
+
+Backend (additive):
+- Extend existing module:
+  - `backend/reconciliation/services/inventory_stock_reconciliation.py`
+
+Implemented checks (Phase J; allowlist-only):
+- GoodsReceiptLine evidence (`GOODS_RECEIPT_STOCK_IN_MISSING`, `GOODS_RECEIPT_STOCK_IN_QUANTITY_MISMATCH`)
+- PurchaseBillLine evidence (`PURCHASE_BILL_STOCK_IN_MISSING`, `PURCHASE_BILL_STOCK_IN_QUANTITY_MISMATCH`)
+- PurchaseReturnLine evidence (`PURCHASE_RETURN_STOCK_OUT_MISSING`, `PURCHASE_RETURN_STOCK_OUT_QUANTITY_MISMATCH`)
+- SubscriptionDelivery bridge evidence (`SUBSCRIPTION_DELIVERY_STOCK_BRIDGE_MISSING`, `SUBSCRIPTION_DELIVERY_STOCK_BRIDGE_QUANTITY_MISMATCH`)
+- Direct sale exchange replacement evidence (`DIRECT_SALE_EXCHANGE_REPLACEMENT_STOCK_OUT_MISSING`) (missing-ledger only)
+- StockAdjustmentLine evidence (`STOCK_ADJUSTMENT_STOCK_MOVEMENT_MISSING`, `STOCK_ADJUSTMENT_STOCK_QUANTITY_MISMATCH`)
+
+Explicitly deferred in Phase J:
+- Vendor payable/accounting reconciliation (separate deterministic journal/payable linking phase).
+- Transfers and delivery flows beyond the confirmed SubscriptionDelivery bridge.
+- Exchange replacement quantity mismatch (metadata ordering risk).
+
+Tests (backend, targeted):
+- Extended:
+  - `backend/tests/reconciliation/test_phase_i_inventory_stock_control_tower.py`
 
 ## Inventory Source-Link Hardening (Preparation Phase, additive) (2026-05-21)
 
