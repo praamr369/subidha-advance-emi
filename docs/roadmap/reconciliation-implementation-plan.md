@@ -1,6 +1,6 @@
 # Reconciliation Control Tower — Implementation Plan (Additive)
 
-Status: **PHASE I IMPLEMENTED (2026-05-21)**  
+Status: **SETTLEMENT (CASH/BANK/UPI) PHASE IMPLEMENTED (2026-05-22)**  
 Phase 1 constraint: **read-only detection + manual resolution notes/status only**. No auto-correct.
 
 Phase E prerequisite (docs-only, completed):
@@ -165,12 +165,47 @@ Implemented checks (Phase K; explicit-link only):
 Explicitly deferred in Phase K:
 - Vendor payable aging/balance checks if payable/balance is derived across ambiguous sources (no inferred joins).
 - Payment allocation matching when allocation tables/FKs are not explicit.
-- Cash/bank/UPI settlement reconciliation (future phase with explicit settlement evidence links).
-  - Prerequisite audit (docs-only): `docs/architecture/cash-bank-upi-settlement-source-link-map.md`
+- Bank/UPI settlement batch matching and external bank statement matching (future phase; requires explicit settlement batch/statement ingestion + allocation links).
+- Cashier day-close / cash desk closing mismatch checks (future phase; requires explicit closing records linking covered transactions).
 
 Tests (backend, targeted):
 - New:
   - `backend/tests/reconciliation/test_phase_j_vendor_payable_control_tower.py`
+
+## Settlement (Cash/Bank/UPI) Implementation (2026-05-22)
+
+Goal:
+- Implement deterministic cash/bank/UPI settlement reconciliation checks classified as `READY_FOR_SETTLEMENT_PHASE`.
+- Detection only; no auto-correction; no source-record mutation.
+
+Backend (additive):
+- New service module:
+  - `backend/reconciliation/services/cash_bank_upi_reconciliation.py`
+- Runner registration:
+  - `backend/reconciliation/services/reconciliation_runner.py` runs settlement checks in the same Control Tower run (read-only detection).
+
+Implemented checks (Settlement; deterministic-only):
+- Payment bridge evidence:
+  - missing bridge
+  - invalid journal source link
+  - duplicate posted journal source reference
+  - posted journal amount mismatch (only when deterministic via balanced journal line totals)
+- ReceiptDocument posted journal amount mismatch (only when deterministic via balanced journal line totals)
+- MoneyMovement:
+  - POSTED but posted journal missing
+  - posted journal source link mismatch
+  - posted journal amount mismatch (only when deterministic via balanced journal line totals)
+  - linked journal group unbalanced (explicit journal_group only; no inference)
+
+Explicitly deferred in Settlement:
+- Settlement batch inference and external bank statement matching (no explicit batch/statement links today)
+- Cashier day-close mismatch checks (no explicit closing record linking covered transactions)
+- Payment.method ↔ FinanceAccount.kind mismatch checks (business rule not formally enforced)
+- “Receipt required for every payment” checks (policy-dependent)
+
+Tests (backend, targeted):
+- New:
+  - `backend/tests/reconciliation/test_phase_k_cash_bank_upi_settlement_control_tower.py`
 
 ## Inventory Source-Link Hardening (Preparation Phase, additive) (2026-05-21)
 

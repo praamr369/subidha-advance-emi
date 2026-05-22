@@ -180,7 +180,34 @@ Modules used (admin-only queue labels):
 Explicitly deferred in Phase K:
 - Vendor payable aging and balance reconciliation when balances are derived across ambiguous sources (no inferred joins).
 - Vendor payment allocation matching when an explicit allocation FK/table is not present.
-- Cash/bank/UPI settlement reconciliation (future phase; requires explicit settlement evidence links).
+- Bank/UPI settlement batch matching and external bank statement matching (future phase; requires explicit settlement batch/statement ingestion + allocation links).
+- Cashier day-close / cash desk closing mismatch checks (future phase; requires explicit closing records linking covered transactions).
+
+## Settlement (Cash/Bank/UPI) (Implemented 2026-05-22)
+
+This phase adds **deterministic** cash/bank/UPI settlement reconciliation using only explicit links classified as `READY_FOR_SETTLEMENT_PHASE`.
+
+Implemented settlement checks (read-only detection; no mutation; no inferred settlement batches):
+- Payment settlement evidence:
+  - `PAYMENT_SETTLEMENT_BRIDGE_MISSING` (HIGH)
+  - `PAYMENT_SETTLEMENT_JOURNAL_SOURCE_LINK_INVALID` (HIGH)
+  - `PAYMENT_SETTLEMENT_DUPLICATE_JOURNAL_SOURCE_REFERENCE` (CRITICAL)
+  - `PAYMENT_SETTLEMENT_JOURNAL_AMOUNT_MISMATCH` (HIGH, only when deterministic via balanced journal line totals)
+- ReceiptDocument settlement evidence:
+  - `RECEIPT_SETTLEMENT_JOURNAL_AMOUNT_MISMATCH` (HIGH, only when deterministic via balanced journal line totals)
+- MoneyMovement settlement moves:
+  - `MONEY_MOVEMENT_POSTED_JOURNAL_MISSING` (HIGH)
+  - `MONEY_MOVEMENT_JOURNAL_SOURCE_LINK_INVALID` (HIGH)
+  - `MONEY_MOVEMENT_JOURNAL_AMOUNT_MISMATCH` (HIGH, only when deterministic via balanced journal line totals)
+  - `MONEY_MOVEMENT_JOURNAL_GROUP_UNBALANCED` (CRITICAL, only when explicit journal_group exists)
+
+Module used (admin-only queue label):
+- `CASH_BANK_UPI_SETTLEMENT_PHASE`
+
+Explicitly deferred in Settlement phase:
+- Settlement batch inference, bank statement matching, and per-payment settlement proof (needs explicit schema/process)
+- Payment.method ↔ FinanceAccount.kind mismatch checks (needs formal business rule enforcement)
+- “ReceiptDocument required for every Payment” checks (policy-dependent)
 
 ## 0) Phase E prerequisite (source-link determinism)
 

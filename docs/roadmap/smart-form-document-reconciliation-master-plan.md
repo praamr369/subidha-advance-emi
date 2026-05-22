@@ -102,6 +102,14 @@ Pre-settlement prerequisite (docs-only, implemented 2026-05-22):
 - Cash / Bank / UPI settlement source-link audit:
   - `docs/architecture/cash-bank-upi-settlement-source-link-map.md`
 
+Settlement (Cash/Bank/UPI) (implemented 2026-05-22):
+- Implemented only deterministic `READY_FOR_SETTLEMENT_PHASE` checks (no auto-correction; no source-record mutation).
+- Focused on explicit evidence links:
+  - Payment ↔ bridge posting ↔ JournalEntry source-link integrity
+  - ReceiptDocument ↔ posted JournalEntry amount integrity (deterministic-only)
+  - MoneyMovement ↔ posted JournalEntry integrity and explicit journal_group balance flags
+- Explicitly deferred: settlement batches, external bank statement matching, cashier day-close mismatch, and any business-rule-dependent invariants (method↔kind, receipt required, etc.).
+
 Phase F (implemented 2026-05-21):
 - Added stored Control Tower runs/items/evidence/resolutions (admin-only).
 - Implemented only deterministic `READY_FOR_PHASE_F` checks (no auto-correction).

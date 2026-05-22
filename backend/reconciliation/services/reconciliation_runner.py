@@ -12,6 +12,7 @@ from reconciliation.models import (
     ReconciliationRunStatus,
 )
 from reconciliation.services.accounting_bridge_reconciliation import run_accounting_bridge_checks
+from reconciliation.services.cash_bank_upi_reconciliation import run_cash_bank_upi_settlement_checks
 from reconciliation.services.direct_sale_reconciliation import run_direct_sale_billing_checks
 from reconciliation.services.emi_reconciliation import run_emi_checks
 from reconciliation.services.inventory_stock_reconciliation import run_inventory_stock_checks
@@ -93,6 +94,15 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
                 "PURCHASE_RETURN_POSTED_JOURNAL_MISSING",
                 "PURCHASE_RETURN_JOURNAL_SOURCE_LINK_INVALID",
                 "PURCHASE_RETURN_DUPLICATE_JOURNAL_SOURCE_REFERENCE",
+                "PAYMENT_SETTLEMENT_BRIDGE_MISSING",
+                "PAYMENT_SETTLEMENT_JOURNAL_SOURCE_LINK_INVALID",
+                "PAYMENT_SETTLEMENT_DUPLICATE_JOURNAL_SOURCE_REFERENCE",
+                "PAYMENT_SETTLEMENT_JOURNAL_AMOUNT_MISMATCH",
+                "RECEIPT_SETTLEMENT_JOURNAL_AMOUNT_MISMATCH",
+                "MONEY_MOVEMENT_POSTED_JOURNAL_MISSING",
+                "MONEY_MOVEMENT_JOURNAL_SOURCE_LINK_INVALID",
+                "MONEY_MOVEMENT_JOURNAL_AMOUNT_MISMATCH",
+                "MONEY_MOVEMENT_JOURNAL_GROUP_UNBALANCED",
             ],
         },
     )
@@ -110,6 +120,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         totals = run_return_cancellation_checks(run=run, totals=totals)
         totals = run_inventory_stock_checks(run=run, totals=totals)
         totals = run_vendor_payable_checks(run=run, totals=totals)
+        totals = run_cash_bank_upi_settlement_checks(run=run, totals=totals)
 
         run.total_checked = totals["checked"]
         run.total_matched = totals["matched"]

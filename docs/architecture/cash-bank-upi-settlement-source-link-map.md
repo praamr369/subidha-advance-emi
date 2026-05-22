@@ -1,15 +1,18 @@
 # Cash / Bank / UPI Settlement — Source-Link Audit (Pre-Reconciliation)
 
-Status: **AUDIT COMPLETE (docs-only) (2026-05-22)**  
-Scope: **Cash / Bank / UPI settlement source-link evidence map only** — no schema/API/service/frontend changes in this phase.
+Status: **AUDIT COMPLETE + READY CHECKS IMPLEMENTED (2026-05-22)**  
+Scope: **Cash / Bank / UPI settlement reconciliation (deterministic checks only)** — additive detection only; no auto-correction; no source-record mutation.
 
-This document records **confirmed (code-backed)** source-link patterns needed to implement **deterministic, low-noise** cash/bank/UPI settlement reconciliation in a later phase.
+This document records **confirmed (code-backed)** source-link patterns and the check classification used to implement **deterministic, low-noise** cash/bank/UPI settlement reconciliation.
 
 Non-goals (explicit):
 - Do not change payment posting, receipt generation, accounting posting, cashier closing behavior, finance account behavior, or cash/bank/UPI behavior.
 - Do not mutate `Payment`, `ReceiptDocument`, `JournalEntry`, `FinanceAccount`, `MoneyMovement`, `CashCounter`, or any other source records.
 - Do not infer missing links from free-text references.
-- Do not implement reconciliation checks yet.
+- Do not implement settlement batch inference, external bank statement matching, or cashier day-close mismatch in this phase.
+
+Implementation reference (backend):
+- `backend/reconciliation/services/cash_bank_upi_reconciliation.py` (registered in `backend/reconciliation/services/reconciliation_runner.py`)
 
 ## 1) Executive summary
 
@@ -30,12 +33,12 @@ The repo already contains **explicit links** that make several settlement-adjace
 - There is **no explicit cashier day-close / cash closing** record in the audited models/services that can be linked to `Payment` rows (only reporting-style books).
 - Account-level “pending settlement” in `ReconciliationOverviewService` is deterministic as an **aggregated operational metric**, but it is **not** a per-payment settlement proof.
 
-Implication:
-- The next settlement phase can safely implement **strict, link-backed checks** around:
+Implication (implemented):
+- This phase safely implements **strict, link-backed checks** around:
   - missing/duplicate bridge posting evidence
   - payment↔receipt↔journal linkage integrity (where explicit)
   - money-movement posting integrity (where explicit)
-- The next settlement phase must **defer** “bank/UPI settlement matching” until explicit batch/source links exist or are operationally defined.
+- This phase must **defer** “bank/UPI settlement matching” until explicit batch/source links exist or are operationally defined.
 
 ## 2) Evidence sources inspected (code-backed)
 
@@ -330,6 +333,17 @@ Evidence: receipt bridge journal should match receipt.amount for posted receipts
 6) **MoneyMovement POSTED but missing posted journal / or journal amount mismatch**  
 Evidence: `MoneyMovement.posted_journal_entry` and balanced lines between from/to chart accounts.
 
+Implemented exception codes (Control Tower module `CASH_BANK_UPI_SETTLEMENT_PHASE`):
+- `PAYMENT_SETTLEMENT_BRIDGE_MISSING`
+- `PAYMENT_SETTLEMENT_JOURNAL_SOURCE_LINK_INVALID`
+- `PAYMENT_SETTLEMENT_DUPLICATE_JOURNAL_SOURCE_REFERENCE`
+- `PAYMENT_SETTLEMENT_JOURNAL_AMOUNT_MISMATCH` (deterministic-only; requires balanced journal line totals)
+- `RECEIPT_SETTLEMENT_JOURNAL_AMOUNT_MISMATCH` (deterministic-only; requires balanced journal line totals)
+- `MONEY_MOVEMENT_POSTED_JOURNAL_MISSING`
+- `MONEY_MOVEMENT_JOURNAL_SOURCE_LINK_INVALID`
+- `MONEY_MOVEMENT_JOURNAL_AMOUNT_MISMATCH` (deterministic-only; requires balanced journal line totals)
+- `MONEY_MOVEMENT_JOURNAL_GROUP_UNBALANCED` (explicit journal_group only; no inference)
+
 ### NEEDS_SCHEMA_LINK
 
 Relation missing or ambiguous; requires additive source references before reliable settlement reconciliation.
@@ -414,4 +428,3 @@ Explicitly defer:
 - Bank/UPI settlement statement matching.
 - Cash desk day-close mismatch checks.
 - Any check requiring inferred joins between payments ↔ movements ↔ external statements.
-

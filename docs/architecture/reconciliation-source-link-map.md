@@ -146,6 +146,30 @@ Implemented checks (deterministic; explicit-link only; no auto-correction; no so
   - invalid journal source link (HIGH)
   - duplicate posted journal source reference (CRITICAL)
 
+## Settlement (Cash/Bank/UPI) Implementation Result (2026-05-22)
+
+This phase adds **deterministic** cash/bank/UPI settlement reconciliation checks using only explicit source links (READY_FOR_SETTLEMENT_PHASE in `docs/architecture/cash-bank-upi-settlement-source-link-map.md`).
+
+Implemented checks (detection only; no auto-correction; no source-record mutation):
+- Payment settlement bridge evidence:
+  - Payment exists but missing `AccountingBridgePosting(source_model="Payment", purpose="PAYMENT_COLLECTION")` (HIGH) → `PAYMENT_SETTLEMENT_BRIDGE_MISSING`
+  - Bridge journal `JournalEntry.source_model/source_id` mismatch vs Payment (HIGH) → `PAYMENT_SETTLEMENT_JOURNAL_SOURCE_LINK_INVALID`
+  - Duplicate POSTED journal source reference for Payment (CRITICAL) → `PAYMENT_SETTLEMENT_DUPLICATE_JOURNAL_SOURCE_REFERENCE`
+  - Payment bridge journal amount mismatch vs `Payment.amount` where deterministic via balanced journal line totals (HIGH) → `PAYMENT_SETTLEMENT_JOURNAL_AMOUNT_MISMATCH`
+- ReceiptDocument settlement evidence:
+  - ReceiptDocument posted journal amount mismatch vs `ReceiptDocument.amount` where deterministic via balanced journal line totals (HIGH) → `RECEIPT_SETTLEMENT_JOURNAL_AMOUNT_MISMATCH`
+- MoneyMovement settlement moves:
+  - MoneyMovement `status=POSTED` but `posted_journal_entry_id` missing (HIGH) → `MONEY_MOVEMENT_POSTED_JOURNAL_MISSING`
+  - MoneyMovement posted journal `JournalEntry.source_model/source_id` mismatch (HIGH) → `MONEY_MOVEMENT_JOURNAL_SOURCE_LINK_INVALID`
+  - MoneyMovement posted journal amount mismatch vs `MoneyMovement.amount` where deterministic via balanced journal line totals (HIGH) → `MONEY_MOVEMENT_JOURNAL_AMOUNT_MISMATCH`
+  - MoneyMovement linked journal group unbalanced (CRITICAL) when explicit `journal_group` exists (no inference) → `MONEY_MOVEMENT_JOURNAL_GROUP_UNBALANCED`
+
+Explicitly deferred (must remain deferred until schema links/business rules exist):
+- Bank/UPI settlement batch matching, external bank statement matching, and per-payment settlement proof
+- Cashier day-close / cash desk closing mismatch checks
+- Payment.method ↔ FinanceAccount.kind rules unless formally enforced in code
+- “Receipt required for every payment” (policy-dependent)
+
 ## 1) Executive summary
 
 ### What is already deterministic (high confidence)
