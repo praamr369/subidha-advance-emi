@@ -13,6 +13,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import FieldHelp from "@/components/erp/forms/FieldHelp";
+import SettlementFinanceAccountLookup from "@/components/admin/settlements/SettlementFinanceAccountLookup";
 import { ApiError } from "@/lib/api";
 import { listUpiImports, createUpiImport } from "@/services/settlements";
 import type { UpiSettlementImport } from "@/types/settlements";
@@ -25,6 +26,7 @@ export default function UpiImportsList() {
   const [showUpload, setShowUpload] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [upiFinanceAccountId, setUpiFinanceAccountId] = useState<string | null>(null);
 
   const formatError = useCallback((err: unknown, fallback: string) => {
     if (err instanceof ApiError) return err.readableMessage || fallback;
@@ -52,7 +54,7 @@ export default function UpiImportsList() {
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const upi_finance_account = Number(formData.get("upi_finance_account"));
+    const upi_finance_account = Number(upiFinanceAccountId);
     const settlement_date = String(formData.get("settlement_date"));
     const uploaded_file = formData.get("uploaded_file") as File;
     if (!upi_finance_account || !settlement_date || !uploaded_file) {
@@ -64,6 +66,7 @@ export default function UpiImportsList() {
       await createUpiImport({ upi_finance_account, settlement_date, uploaded_file });
       setUploadError(null);
       setShowUpload(false);
+      setUpiFinanceAccountId(null);
       fetchData();
     } catch (err: unknown) {
       setUploadError(formatError(err, "Upload failed."));
@@ -93,7 +96,7 @@ export default function UpiImportsList() {
         <ERPDataToolbar
           left={
             <div className="text-sm text-muted-foreground">
-              Use a finance account ID. A lookup selector is intentionally not added in this phase.
+              Upload evidence only. Choose the UPI finance account for the settlement being imported.
             </div>
           }
           right={
@@ -112,23 +115,23 @@ export default function UpiImportsList() {
             onSubmit={handleUpload}
           >
             <div className="grid gap-3 md:grid-cols-2">
-              <label className="text-sm text-muted-foreground">
-                UPI finance account ID
-                <input
-                  type="number"
-                  name="upi_finance_account"
-                  className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
-                  required
-                  min={1}
-                />
-                <div className="mt-2">
+              <SettlementFinanceAccountLookup
+                label="UPI finance account"
+                value={upiFinanceAccountId}
+                onChange={(value) => setUpiFinanceAccountId(value)}
+                kind="UPI"
+                required
+                help={
                   <FieldHelp
                     meaning={
-                      <>Use the numeric `FinanceAccount.id` for the UPI account that owns this settlement evidence.</>
+                      <>
+                        Select the UPI finance account that owns this settlement evidence. This only attributes evidence; it does not
+                        post accounting or mutate payment/receipt/movement records.
+                      </>
                     }
                   />
-                </div>
-              </label>
+                }
+              />
               <label className="text-sm text-muted-foreground">
                 Settlement date
                 <input

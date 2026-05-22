@@ -15,6 +15,9 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ERPAuditNote from "@/components/erp/ERPAuditNote";
 import FieldHelp from "@/components/erp/forms/FieldHelp";
+import SettlementMoneyMovementLookup from "@/components/admin/settlements/SettlementMoneyMovementLookup";
+import SettlementPaymentLookup from "@/components/admin/settlements/SettlementPaymentLookup";
+import SettlementReceiptLookup from "@/components/admin/settlements/SettlementReceiptLookup";
 import { ApiError } from "@/lib/api";
 import {
   createAllocation,
@@ -44,6 +47,8 @@ export default function BankImportDetail({ params }: { params: { id: string } })
   const [allocationsError, setAllocationsError] = useState<string | null>(null);
 
   const [selectedLineId, setSelectedLineId] = useState<string>("");
+  const [targetType, setTargetType] = useState<"" | "PAYMENT" | "RECEIPT" | "MONEY_MOVEMENT">("");
+  const [targetId, setTargetId] = useState<string | null>(null);
   const [allocating, setAllocating] = useState(false);
   const [allocationError, setAllocationError] = useState<string | null>(null);
 
@@ -100,8 +105,8 @@ export default function BankImportDetail({ params }: { params: { id: string } })
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const source_id = String(formData.get("source_id") || "");
-    const target_type = String(formData.get("target_type") || "");
-    const target_id = Number(formData.get("target_id"));
+    const target_type = targetType;
+    const target_id = Number(targetId);
     const matched_amount = String(formData.get("matched_amount"));
     const note = String(formData.get("note"));
 
@@ -126,6 +131,8 @@ export default function BankImportDetail({ params }: { params: { id: string } })
     try {
       await createAllocation(payload);
       setAllocationError(null);
+      setTargetType("");
+      setTargetId(null);
       const [refreshedLines] = await Promise.all([listBankImportLines(importId)]);
       setLines(refreshedLines.results ?? []);
       await loadAllocationsForLine(source_id);
@@ -287,6 +294,12 @@ export default function BankImportDetail({ params }: { params: { id: string } })
                   name="target_type"
                   className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
                   required
+                  value={targetType}
+                  onChange={(event) => {
+                    const next = (event.target.value || "") as "" | "PAYMENT" | "RECEIPT" | "MONEY_MOVEMENT";
+                    setTargetType(next);
+                    setTargetId(null);
+                  }}
                 >
                   <option value="">Select target type</option>
                   <option value="PAYMENT">Payment</option>
@@ -294,26 +307,65 @@ export default function BankImportDetail({ params }: { params: { id: string } })
                   <option value="MONEY_MOVEMENT">Money movement</option>
                 </select>
               </label>
-              <label className="text-sm text-muted-foreground">
-                Target ID
-                <input
-                  type="number"
-                  name="target_id"
-                  className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+              {targetType === "PAYMENT" ? (
+                <SettlementPaymentLookup
+                  label="Payment target"
+                  value={targetId}
+                  onChange={(value) => setTargetId(value)}
                   required
-                  min={1}
+                  help={
+                    <FieldHelp
+                      meaning={
+                        <>
+                          Read-only lookup. Selecting a payment only stores its numeric ID in the allocation payload; it does not edit
+                          the payment, generate receipts, post accounting, or close reconciliation items.
+                        </>
+                      }
+                    />
+                  }
                 />
-                <div className="mt-2">
-                  <FieldHelp
-                    meaning={
-                      <>
-                        Enter the numeric ID of an existing target record (Payment / ReceiptDocument / MoneyMovement). This UI does not
-                        create targets.
-                      </>
-                    }
-                  />
+              ) : null}
+              {targetType === "RECEIPT" ? (
+                <SettlementReceiptLookup
+                  label="ReceiptDocument target"
+                  value={targetId}
+                  onChange={(value) => setTargetId(value)}
+                  required
+                  help={
+                    <FieldHelp
+                      meaning={
+                        <>
+                          Read-only lookup. Selecting a receipt only stores its numeric ID in the allocation payload; it does not
+                          mutate the receipt or post additional entries.
+                        </>
+                      }
+                    />
+                  }
+                />
+              ) : null}
+              {targetType === "MONEY_MOVEMENT" ? (
+                <SettlementMoneyMovementLookup
+                  label="MoneyMovement target"
+                  value={targetId}
+                  onChange={(value) => setTargetId(value)}
+                  required
+                  help={
+                    <FieldHelp
+                      meaning={
+                        <>
+                          Read-only lookup. Selecting a money movement only stores its numeric ID in the allocation payload; it does
+                          not change the movement status or accounting posting.
+                        </>
+                      }
+                    />
+                  }
+                />
+              ) : null}
+              {!targetType ? (
+                <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 text-sm text-muted-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]">
+                  Select a target type to search for an existing Payment, ReceiptDocument, or MoneyMovement.
                 </div>
-              </label>
+              ) : null}
               <label className="text-sm text-muted-foreground">
                 Matched amount
                 <input

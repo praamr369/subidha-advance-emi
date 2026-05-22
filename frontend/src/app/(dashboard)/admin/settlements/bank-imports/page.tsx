@@ -12,6 +12,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import FieldHelp from "@/components/erp/forms/FieldHelp";
+import SettlementFinanceAccountLookup from "@/components/admin/settlements/SettlementFinanceAccountLookup";
 import { ApiError } from "@/lib/api";
 import { listBankImports, createBankImport } from "@/services/settlements";
 import type { BankStatementImport } from "@/types/settlements";
@@ -24,6 +25,7 @@ export default function BankImportsList() {
   const [showUpload, setShowUpload] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [bankFinanceAccountId, setBankFinanceAccountId] = useState<string | null>(null);
 
   const formatError = useCallback((err: unknown, fallback: string) => {
     if (err instanceof ApiError) return err.readableMessage || fallback;
@@ -51,7 +53,7 @@ export default function BankImportsList() {
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const bank_finance_account = Number(formData.get("bank_finance_account"));
+    const bank_finance_account = Number(bankFinanceAccountId);
     const statement_period_from = String(formData.get("statement_period_from"));
     const statement_period_to = String(formData.get("statement_period_to"));
     const uploaded_file = formData.get("uploaded_file") as File;
@@ -69,6 +71,7 @@ export default function BankImportsList() {
       });
       setUploadError(null);
       setShowUpload(false);
+      setBankFinanceAccountId(null);
       fetchData();
     } catch (err: unknown) {
       setUploadError(formatError(err, "Upload failed."));
@@ -98,7 +101,7 @@ export default function BankImportsList() {
         <ERPDataToolbar
           left={
             <div className="text-sm text-muted-foreground">
-              Use a finance account ID. A lookup selector is intentionally not added in this phase.
+              Upload evidence only. Choose the bank finance account for the statement being imported.
             </div>
           }
           right={
@@ -117,23 +120,23 @@ export default function BankImportsList() {
             onSubmit={handleUpload}
           >
             <div className="grid gap-3 md:grid-cols-2">
-              <label className="text-sm text-muted-foreground">
-                Bank finance account ID
-                <input
-                  type="number"
-                  name="bank_finance_account"
-                  className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
-                  required
-                  min={1}
-                />
-                <div className="mt-2">
+              <SettlementFinanceAccountLookup
+                label="Bank finance account"
+                value={bankFinanceAccountId}
+                onChange={(value) => setBankFinanceAccountId(value)}
+                kind="BANK"
+                required
+                help={
                   <FieldHelp
                     meaning={
-                      <>Use the numeric `FinanceAccount.id` for the bank account that owns this statement evidence.</>
+                      <>
+                        Select the BANK finance account that owns this statement evidence. This only attributes evidence; it does not
+                        post accounting or mutate payment/receipt/movement records.
+                      </>
                     }
                   />
-                </div>
-              </label>
+                }
+              />
               <label className="text-sm text-muted-foreground">
                 Statement period from
                 <input
