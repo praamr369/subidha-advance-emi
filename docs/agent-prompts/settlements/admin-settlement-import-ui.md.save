@@ -1,0 +1,245 @@
+You are working on SUBIDHA CORE – Lucky Plan EMI System.
+
+Goal:
+Implement admin-only Settlement Import / Detail UI so staff can operate Bank Statement Import and UPI Settlement Import evidence from the webapp.
+
+This phase is frontend UI + existing API integration only.
+
+Do not implement auto-matching.
+Do not implement suggested matching.
+Do not change allocation validation.
+Do not change reconciliation checks.
+Do not mutate Payment, ReceiptDocument, MoneyMovement, JournalEntry, FinanceAccount, CashCounter, or source records.
+
+Context:
+Completed:
+- L0 settlement schema foundation.
+- L1 admin-only bank/UPI import parser endpoints.
+- L2 admin-only manual SettlementAllocation APIs.
+- Allocation-backed Reconciliation Control Tower checks.
+
+Existing APIs:
+- POST/GET /api/v1/admin/settlements/bank-imports/
+- GET /api/v1/admin/settlements/bank-imports/{id}/
+- GET /api/v1/admin/settlements/bank-imports/{id}/lines/
+- POST/GET /api/v1/admin/settlements/upi-imports/
+- GET /api/v1/admin/settlements/upi-imports/{id}/
+- GET /api/v1/admin/settlements/upi-imports/{id}/lines/
+- GET /api/v1/admin/settlements/allocations/
+- POST /api/v1/admin/settlements/allocations/
+- GET /api/v1/admin/settlements/allocations/{id}/
+- POST /api/v1/admin/settlements/allocations/{id}/void/
+
+Strict constraints:
+- Do not change backend unless a real API contract mismatch is found.
+- Do not add new APIs unless strictly required.
+- Do not change payment posting.
+- Do not change receipt generation.
+- Do not change accounting posting.
+- Do not change finance account behavior.
+- Do not change cashier collection behavior.
+- Do not auto-match payments.
+- Do not suggest matches.
+- Do not create reconciliation items from the UI.
+- Do not close reconciliation items from the UI.
+- Admin-only access.
+- Do not expose settlement UI to customer/partner/vendor/cashier.
+- Do not run bash scripts/run-release-candidate.sh.
+
+Required first step:
+Inspect:
+- frontend/src/app/(dashboard)/admin
+- frontend/src/components/erp
+- frontend/src/services
+- frontend/src/lib/api
+- frontend/src/types
+- existing admin reconciliation pages
+- existing upload/import pages
+- backend/api/v1/views/admin_settlements.py
+- backend/api/v1/serializers/settlements.py
+- backend/tests/api/test_admin_settlements_imports.py
+- backend/tests/api/test_admin_settlements_allocations.py
+
+Frontend implementation:
+
+1. Add types:
+- frontend/src/types/settlements.ts
+
+Include:
+- BankStatementImport
+- BankStatementLine
+- UpiSettlementImport
+- UpiSettlementLine
+- SettlementAllocation
+- paginated response types
+- create request types for import upload and allocation
+
+2. Add service:
+- frontend/src/services/settlements.ts
+
+Methods:
+- listBankImports
+- createBankImport
+- getBankImport
+- listBankImportLines
+- listUpiImports
+- createUpiImport
+- getUpiImport
+- listUpiImportLines
+- listAllocations
+- createAllocation
+- voidAllocation
+
+Use existing apiFetch/client conventions.
+
+3. Add admin routes:
+- frontend/src/app/(dashboard)/admin/settlements/page.tsx
+- frontend/src/app/(dashboard)/admin/settlements/bank-imports/page.tsx
+- frontend/src/app/(dashboard)/admin/settlements/bank-imports/[id]/page.tsx
+- frontend/src/app/(dashboard)/admin/settlements/upi-imports/page.tsx
+- frontend/src/app/(dashboard)/admin/settlements/upi-imports/[id]/page.tsx
+
+4. UI requirements:
+Use:
+- ERPPageShell
+- ERPSectionShell
+- ERPDataToolbar
+- ERPLoadingState
+- ERPErrorState
+- ERPEmptyState
+- ERPStatusBadge
+- ERPAuditNote
+- ERPDetailGrid
+
+Main /admin/settlements:
+- settlement evidence overview
+- links to Bank Imports and UPI Imports
+- clear note:
+  “Imports only store evidence. They do not match payments, post accounting, or close reconciliation items.”
+
+Bank imports list:
+- import_no
+- finance account
+- period
+- status
+- checksum
+- uploaded_at
+- line count if available from API
+- action: View
+
+Bank import detail:
+- import metadata panel
+- line table:
+  transaction_date, description, reference_no, debit, credit, matched_status
+- allocation panel or allocation table filtered by source if API supports it
+- manual allocation drawer/form only if existing allocation API is clear:
+  source_type fixed to BANK_STATEMENT_LINE
+  source_id selected from line
+  finance_account derived from import
+  target type: Payment / Receipt / MoneyMovement
+  target id entered manually for now
+  matched amount
+  note/metadata
+- Show clear warnings:
+  “Manual allocation only.”
+  “No payment record is edited.”
+  “No accounting entry is created.”
+  “No reconciliation exception is closed automatically.”
+
+UPI imports list:
+- import_no
+- finance account
+- settlement_date
+- status
+- checksum
+- uploaded_at
+- action: View
+
+UPI import detail:
+- metadata panel
+- line table:
+  settlement_date, transaction_ref, payment_ref, gross_amount, fee_amount, net_amount, matched_status
+- manual allocation form if safe:
+  source_type fixed to UPI_SETTLEMENT_LINE
+  source_id selected from line
+  finance_account derived from import
+  target type: Payment / Receipt / MoneyMovement
+  target id entered manually
+  matched amount
+  note/metadata
+
+5. Upload forms:
+Bank upload form:
+- finance_account id
+- statement_period_from
+- statement_period_to
+- CSV file
+- submit
+
+UPI upload form:
+- finance_account id
+- settlement_date
+- CSV file
+- submit
+
+Do not add fake finance account lookups.
+If no finance-account lookup exists, use a numeric finance_account field with FieldHelp, or reuse an existing finance-account selector if already available.
+
+6. Navigation:
+Add admin navigation entry only if it follows current navigation conventions.
+Label:
+- Settlements
+Place under Finance / Accounting / Reconciliation area if appropriate.
+Do not remove or rename existing navigation items.
+
+7. Documentation:
+Update:
+- docs/architecture/bank-upi-cashier-settlement-design.md
+- docs/roadmap/settlement-import-day-close-roadmap.md
+- docs/roadmap/reconciliation-implementation-plan.md
+- docs/roadmap/smart-form-document-reconciliation-master-plan.md
+
+Add:
+- admin UI implementation result
+- pages added
+- API contracts reused
+- upload behavior
+- manual allocation behavior
+- no auto-match guarantee
+- next phase recommendation
+
+Testing:
+Do NOT run:
+bash scripts/run-release-candidate.sh
+
+Run frontend:
+cd frontend
+npm run lint
+npm run typecheck
+npm run build
+npm run check:routes
+
+Run backend only if backend changed:
+cd backend
+../.venv/bin/python manage.py test tests.settlements tests.api.test_admin_settlements_imports tests.api.test_admin_settlements_allocations tests.reconciliation -v 1
+
+Required output:
+1. Summary
+2. Pages added
+3. Components/services/types added
+4. Backend files changed, if any
+5. APIs reused
+6. Upload behavior
+7. Manual allocation behavior
+8. Source records mutation safety
+9. Admin-only permission safety
+10. Financial integrity impact
+11. Auditability impact
+12. Daily shop usability impact
+13. Reconciliation compatibility impact
+14. Tests run and results
+15. Risks
+16. Next recommended phase
+
+Important:
+This is admin settlement UI only. No auto-match, no suggestions, no reconciliation behavior change, no source-record mutation.

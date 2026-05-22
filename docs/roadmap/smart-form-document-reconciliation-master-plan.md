@@ -159,13 +159,21 @@ Phase L0 (implemented 2026-05-22):
 
 Phase L1 (implemented 2026-05-22):
 - Added admin-only upload + checksum + CSV parsing for bank statements and UPI settlements into line tables.
-- Still evidence ingestion only: no matching UI, no allocations, no reconciliation checks, no auto-match, no source-record mutation.
+- Implemented admin-only settlement import UI (evidence ingestion only):
+  - `/admin/settlements/bank-imports` and `/admin/settlements/upi-imports` support upload + list + detail views.
+- Still evidence ingestion only:
+  - no auto-match, no suggested matching
+  - no allocations created automatically
+  - no reconciliation items created/closed
+  - no source-record mutation of `Payment`, `ReceiptDocument`, `MoneyMovement`, journals, finance accounts, or cash counters
 
 Phase L2 (implemented 2026-05-22):
 - Added admin-only manual `SettlementAllocation` workflow (no auto-match, no suggestions).
 - Guarantees:
   - no reconciliation checks are created/closed
   - no mutation of `Payment`, `ReceiptDocument`, `MoneyMovement`, journals, finance accounts, cash counters, or source evidence rows (beyond line matched_status)
+ - Frontend wiring:
+   - `/admin/settlements/bank-imports/{id}` and `/admin/settlements/upi-imports/{id}` include manual allocation forms and line-scoped allocation viewing/voiding.
 
 ## Deployment Plan (when implemented)
 

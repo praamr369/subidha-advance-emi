@@ -74,6 +74,51 @@ Guarantees (explicit):
   - `Payment`, `ReceiptDocument`, `MoneyMovement`, `JournalEntry`, `FinanceAccount`, `CashCounter`, imports, or historical ledger records.
 - Voiding an allocation never deletes it; it only marks it `VOIDED` and records actor/time in `metadata`.
 
+## 1.3 Phase L2.1 Admin settlement UI (2026-05-22)
+
+Implemented (frontend; admin-only evidence surfaces):
+- Overview:
+  - `GET /admin/settlements`
+- Bank statement imports:
+  - `GET /admin/settlements/bank-imports`
+  - `GET /admin/settlements/bank-imports/{id}`
+- UPI settlement imports:
+  - `GET /admin/settlements/upi-imports`
+  - `GET /admin/settlements/upi-imports/{id}`
+
+APIs reused (no new endpoints):
+- Bank imports:
+  - `POST/GET /api/v1/admin/settlements/bank-imports/`
+  - `GET /api/v1/admin/settlements/bank-imports/{id}/`
+  - `GET /api/v1/admin/settlements/bank-imports/{id}/lines/`
+- UPI imports:
+  - `POST/GET /api/v1/admin/settlements/upi-imports/`
+  - `GET /api/v1/admin/settlements/upi-imports/{id}/`
+  - `GET /api/v1/admin/settlements/upi-imports/{id}/lines/`
+- Allocations:
+  - `GET/POST /api/v1/admin/settlements/allocations/` (with `source_type` / `source_id` filters)
+  - `POST /api/v1/admin/settlements/allocations/{id}/void/`
+
+Upload behavior (guardrailed):
+- Uses numeric finance-account IDs intentionally (no finance-account lookup selector added in this phase).
+- Bank import POST fields:
+  - `bank_finance_account`, `statement_period_from`, `statement_period_to`, `uploaded_file` (multipart)
+- UPI import POST fields:
+  - `upi_finance_account`, `settlement_date`, `uploaded_file` (multipart)
+
+Manual allocation behavior (guardrailed):
+- Manual allocations only; no auto-match, no suggested matching.
+- Target selection is explicit and maps to existing API targets:
+  - `payment` OR `receipt` OR `money_movement` (exactly one target should be provided per operator action)
+- Allocations are displayed filtered by selected source line (uses `source_type` + `source_id` filters).
+- Voiding an allocation uses the existing void endpoint and does not delete rows.
+
+Non-goals remain enforced:
+- No payment posting change.
+- No receipt generation change.
+- No accounting posting change.
+- No reconciliation item creation/closure from the settlement pages.
+
 Validation rules (enforced by service; summarized):
 - `source_type` must be one of: `BANK_STATEMENT_LINE | UPI_SETTLEMENT_LINE | CASHIER_DAY_CLOSE`.
 - `source_id` must reference an existing source row.

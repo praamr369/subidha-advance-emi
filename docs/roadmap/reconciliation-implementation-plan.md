@@ -182,6 +182,16 @@ Phase L2 prerequisite status (2026-05-22):
 - Manual `SettlementAllocation` APIs are implemented (admin-only) to allow explicit evidence linking.
 - Allocation-backed settlement reconciliation checks are implemented (admin-only; read-only detection) using explicit `SettlementAllocation` evidence.
 
+Admin operator UI (2026-05-22):
+- Admin-only settlement evidence pages are implemented:
+  - `/admin/settlements`
+  - `/admin/settlements/bank-imports` (+ detail + line-scoped allocations + void)
+  - `/admin/settlements/upi-imports` (+ detail + line-scoped allocations + void)
+- Guarantees are unchanged:
+  - no auto-match, no suggested matching
+  - no payment/receipt/movement/accounting mutation from the UI
+  - no reconciliation items are created or closed from these pages (Control Tower remains the triage surface)
+
 Backend (additive):
 - New service module:
   - `backend/reconciliation/services/cash_bank_upi_reconciliation.py`

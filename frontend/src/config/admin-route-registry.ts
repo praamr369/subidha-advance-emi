@@ -212,6 +212,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Finance & Accounting", "Reconciliation", ROUTES.admin.financeCanonicalReconciliation, "Reconciliation queue.", {
     badgeSource: "queue.reconciliation_pending",
   }),
+  item(
+    "Finance & Accounting",
+    "Settlements",
+    ROUTES.admin.settlements,
+    "Admin-only bank statement and UPI settlement evidence imports with manual allocations (no auto-matching, no posting changes)."
+  ),
   item("Finance & Accounting", "Deposits", ROUTES.admin.financeDeposits, "Security deposits and refunds.", {
     badgeSource: "queue.deposit_refunds_pending",
   }),

@@ -116,9 +116,26 @@ Non-goals (guaranteed):
 - No mutation of `Payment`, `ReceiptDocument`, `MoneyMovement`, `JournalEntry`, finance accounts, cash counters, or any source financial records.
 
 Frontend changes:
-- Admin-only allocation workflow:
-  - search internal candidates (payments/receipts/money movements) by date/amount/account
-  - add allocations with notes
+- Implemented: **2026-05-22**
+- Admin-only settlement evidence UI:
+  - `GET /admin/settlements` (overview and guardrail notes)
+  - `GET /admin/settlements/bank-imports` (upload + list)
+  - `GET /admin/settlements/bank-imports/{id}` (metadata + lines + manual allocation + allocation void)
+  - `GET /admin/settlements/upi-imports` (upload + list)
+  - `GET /admin/settlements/upi-imports/{id}` (metadata + lines + manual allocation + allocation void)
+- Frontend files:
+  - `frontend/src/app/(dashboard)/admin/settlements/page.tsx`
+  - `frontend/src/app/(dashboard)/admin/settlements/bank-imports/page.tsx`
+  - `frontend/src/app/(dashboard)/admin/settlements/bank-imports/[id]/page.tsx`
+  - `frontend/src/app/(dashboard)/admin/settlements/upi-imports/page.tsx`
+  - `frontend/src/app/(dashboard)/admin/settlements/upi-imports/[id]/page.tsx`
+  - `frontend/src/services/settlements.ts`
+  - `frontend/src/types/settlements.ts`
+
+Guarantees (UI):
+- Imports remain evidence only (no posting, no reconciliation closure).
+- Manual allocations only (no auto-match, no suggestions).
+- No new finance-account lookup/select endpoints are introduced in this phase.
 
 Risk level:
 - Medium (operator workflow safety; must be hard to create wrong allocations accidentally).
