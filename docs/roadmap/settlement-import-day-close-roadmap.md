@@ -156,7 +156,7 @@ Goal:
 
 Context note:
 - Current payment validity for cashier day-close is only deterministic for EMI payment reversals when `OperationalCancellation` exists.
-- Future day-close design should add explicit receipt invalidation evidence and a clear day-close transaction linkage contract before adding reconciliation checks.
+- Future day-close design should add explicit receipt invalidation evidence and a clear day-close transaction linkage contract before adding reconciliation checks. In particular, receipts should not be treated as active or excluded settlement evidence solely by `ReceiptDocument.posted_journal_entry`; a dedicated invalidation event or explicit `OperationalCancellation.SourceType.BILLING_RECEIPT` linkage is required.
 
 Backend changes (future):
 - Cashier-scoped endpoints:

@@ -123,7 +123,7 @@ Settlement (Cash/Bank/UPI) (implemented 2026-05-22):
   - ReceiptDocument ↔ posted JournalEntry amount integrity (deterministic-only)
   - MoneyMovement ↔ posted JournalEntry integrity and explicit journal_group balance flags
 - Explicitly deferred: settlement batches, external bank statement matching, cashier day-close mismatch, and any business-rule-dependent invariants (method↔kind, receipt required, etc.).
-- Noted current validity gap: payment invalidation is authoritative only via `OperationalCancellation` for EMI reversals, and receipt invalidation lacks a similarly explicit deterministic source-link contract.
+- Noted current validity gap: payment invalidation is authoritative only via `OperationalCancellation` for EMI reversals, and receipt invalidation lacks a similarly explicit deterministic source-link contract. Receipt bridge evidence is therefore limited today because `ReceiptDocument.posted_journal_entry` can remain present after a receipt has been voided.
 
 Settlement allocation-backed checks (implemented 2026-05-22):
 - Implemented deterministic Control Tower checks backed only by explicit `SettlementAllocation` evidence (module=`settlement`).

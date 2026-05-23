@@ -201,6 +201,8 @@ Implemented settlement checks (read-only detection; no mutation; no inferred set
   - `MONEY_MOVEMENT_JOURNAL_AMOUNT_MISMATCH` (HIGH, only when deterministic via balanced journal line totals)
   - `MONEY_MOVEMENT_JOURNAL_GROUP_UNBALANCED` (CRITICAL, only when explicit journal_group exists)
 
+- Receipt invalidation evidence is intentionally deferred until a first-class receipt invalidation contract exists; see `docs/architecture/receipt-validity-source-link-audit.md`.
+
 Module used (admin-only queue label):
 - `CASH_BANK_UPI_SETTLEMENT_PHASE`
 
@@ -208,7 +210,7 @@ Explicitly deferred in Settlement phase:
 - Settlement batch inference, bank statement matching, and per-payment settlement proof (needs explicit schema/process)
 - Payment.method ↔ FinanceAccount.kind mismatch checks (needs formal business rule enforcement)
 - “ReceiptDocument required for every Payment” checks (policy-dependent)
-- Cashier day-close mismatch checks until explicit day-close records are linked deterministically to covered payments/receipts.
+- Cashier day-close mismatch checks until explicit day-close records are linked deterministically to covered payments/receipts and explicit receipt invalidation evidence exists for voided receipts.
 
 ## Settlement allocation-backed checks (Implemented 2026-05-22)
 

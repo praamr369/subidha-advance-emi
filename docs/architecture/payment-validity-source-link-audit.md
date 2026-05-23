@@ -49,6 +49,7 @@ Current receipt validity evidence is derived from:
 Key observation:
 
 - Receipt voiding or cancellation does not currently appear to generate a dedicated explicit invalidation signal equivalent to `OperationalCancellation`.
+- `OperationalCancellation.SourceType.BILLING_RECEIPT` exists as a natural extension point, but current receipt void paths do not populate it.
 - Receipt invalidity is therefore inferred from receipt status + journal reversal paths rather than a single deterministic source-link contract.
 
 ### 2.3 Cashier day-close totals
@@ -141,7 +142,7 @@ To harden payment validity without changing existing posting or receipt behavior
 - keep new signals additive and audit-only at first
 - avoid inferring invalidity from non-authoritative metadata
 - prefer explicit links or status enums over soft inference
-- continue using `OperationalCancellation` as source evidence where it is already authoritative
+- continue using `OperationalCancellation` as source evidence where it is already authoritative; consider extending it for `SourceType.BILLING_RECEIPT` receipt invalidation events
 - add explicit invalidation signals for receipts if receipt voiding is expected to affect day-close/settlement totals
 - add a stable `CashierDayClose` linking mechanism before implementing cashier mismatch checks
 - use `SettlementAllocation` as the eventual explicit proof contract for external bank/UPI match evidence
