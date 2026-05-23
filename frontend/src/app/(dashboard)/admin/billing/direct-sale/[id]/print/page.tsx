@@ -189,7 +189,7 @@ export default function DirectSaleInvoicePrintPage() {
             Outstanding balance remains collectible. This print view does not settle payment or alter receivables.
           </div>
         ) : null}
-        <DocumentTermsBlock terms={sale.terms ? [sale.terms] : undefined} />
+        <DocumentTermsBlock />
         <DocumentSignatureBlock
           labels={[
             subidhaDocumentTheme.signatureLabels.authorized,
