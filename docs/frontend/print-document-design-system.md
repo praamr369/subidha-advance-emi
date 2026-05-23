@@ -1,14 +1,12 @@
 # Subidha Print Document Design System
 
-Status: **PARTIAL FRONTEND ROLLOUT ON `update` BRANCH**
+Status: **PHASE 1B IMPLEMENTED ON `update` BRANCH**
 
-This pass introduces a branded, reusable print/PDF document design system for SUBIDHA CORE.
+This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial state.
 
-## Scope implemented
+## Shared frontend document primitives
 
-### Shared frontend document primitives
-
-Added reusable components under:
+Reusable components live under:
 
 ```text
 frontend/src/components/documents/
@@ -28,9 +26,9 @@ Components:
 - `DocumentSignatureBlock`
 - `PrintToolbar`
 
-### Shared document theme and formatters
+## Shared document theme and formatters
 
-Added:
+Shared configuration lives under:
 
 ```text
 frontend/src/lib/documents/document-theme.ts
@@ -48,7 +46,15 @@ The theme centralizes:
 - document color tokens
 - supported copy labels
 
-### Print CSS
+The formatter layer centralizes:
+
+- INR currency display
+- Indian date/date-time display
+- safe text fallbacks
+- status watermark mapping
+- invoice title by tax mode
+
+## Print CSS rules
 
 `DocumentPage` includes print-safe global CSS for:
 
@@ -56,21 +62,21 @@ The theme centralizes:
 - safe print margins
 - print-only document visibility
 - browser Save as PDF
-- avoiding page breaks inside document cards/rows/signature blocks
+- avoiding page breaks inside document cards, rows, and signature blocks
 - repeating table headers where supported
 - hiding the toolbar during print
 
-## Document route implemented
+## Implemented routes
 
 ### Direct Sale Invoice
 
-Implemented route:
+Route:
 
 ```text
 /admin/billing/direct-sale/[id]/print
 ```
 
-Source data:
+Source contract:
 
 ```text
 GET /billing/direct-sales/:id/
@@ -80,6 +86,12 @@ Frontend service:
 
 ```text
 frontend/src/services/billing.ts#getDirectSale
+```
+
+Route helper:
+
+```text
+buildAdminDirectSalePrintRoute(id)
 ```
 
 The page uses existing `DirectSale` fields only:
@@ -101,25 +113,66 @@ The page uses existing `DirectSale` fields only:
 - finance account
 - delivery/customer address snapshots
 
-## Financial safety
+### Payment Receipt / EMI Receipt
 
-This design system is read-only.
+Route:
 
-It does not change:
+```text
+/admin/billing/receipts/[id]/print
+```
 
-- financial calculations
-- payment posting
-- invoice balance calculation
-- receipt generation
-- EMI logic
-- accounting
-- reconciliation
-- lucky draw
-- commission/payout
-- waiver logic
-- receivable logic
+Source contract:
 
-No frontend totals are treated as financial truth. The direct-sale invoice print page displays values from the backend payload.
+```text
+GET /billing/receipts/:id/
+```
+
+Route helper:
+
+```text
+buildAdminBillingReceiptPrintRoute(id)
+```
+
+Operational wiring:
+
+```text
+frontend/src/app/(dashboard)/admin/billing/receipts/page.tsx
+```
+
+The receipt register now exposes a row-level `Print / Save PDF` action that opens the branded receipt print route.
+
+The receipt print page uses existing `ReceiptDocument` fields and optional display fields when present:
+
+- receipt number
+- receipt date
+- receipt type
+- source type/reference
+- direct-sale reference where available
+- customer snapshot
+- customer phone
+- branch/counter
+- finance account
+- paid amount
+- status
+- journal reference where available
+- notes
+
+Optional payment display fields such as method/reference/collector are displayed only if the API payload exposes them. The print page does not invent these values.
+
+## Financial display safety rules
+
+All print routes must follow these rules:
+
+1. Print pages are read-only.
+2. Browser print is allowed; application data mutation is not.
+3. No frontend recalculation of financial truth.
+4. No fake totals.
+5. No fake tax values.
+6. No fake receipt/payment references.
+7. Missing optional display values must show a safe fallback such as `—`.
+8. Cancelled, voided, returned, reversed, or draft records must not visually appear as normal active/paid records.
+9. Outstanding balances must remain visible when the backend payload reports them.
+10. Print views must not settle payment, close receivables, post accounting, generate receipts, reconcile items, or mutate operational records.
 
 ## Status/watermark behavior
 
@@ -132,14 +185,46 @@ The print shell supports status watermarks for:
 - `RETURNED`
 - `REVERSED`
 
-These prevent cancelled/voided/draft/returned documents from visually appearing as normal paid documents.
+Receipt print also shows an explicit warning when a receipt status is voided/cancelled/reversed.
+
+## Deterministic test coverage
+
+Added:
+
+```text
+frontend/tests/e2e/document_print_smoke.spec.ts
+```
+
+Coverage:
+
+- Direct-sale invoice print route loads with mocked API payload.
+- Business name is visible.
+- Invoice/sale reference is visible.
+- Customer is visible.
+- Item table content is visible.
+- Grand total, received amount, and balance due are visible.
+- Print toolbar is visible.
+- Receipt print route loads with mocked API payload.
+- Receipt number, customer, source reference, paid amount section, and print toolbar are visible.
+
+These tests use mocked frontend API responses and do not depend on live shop data.
+
+## How to wire new document types
+
+For each new document type:
+
+1. Identify the existing backend detail endpoint.
+2. Confirm the frontend service/type already exposes the required display fields.
+3. Add only additive serializer fields when the backend model already has the display data but the serializer does not expose it.
+4. Build the print page using shared document components.
+5. Add a row/detail action from the existing operational page.
+6. Add deterministic Playwright coverage with mocked API payloads unless a stable fixture already exists.
+7. Keep the route read-only.
 
 ## Deferred document types
 
-The following templates should be wired only after confirming existing routes/data contracts:
+The following templates remain deferred until their existing route/data contracts are confirmed and wired safely:
 
-- Payment Receipt
-- EMI Receipt
 - Delivery Challan
 - Lucky Plan / Subscription Contract
 - Rent/Lease Contract
@@ -147,18 +232,12 @@ The following templates should be wired only after confirming existing routes/da
 - Day Close report
 - Reconciliation report
 
-Do not invent fake document routes or fake API fields for these. Reuse the shared components once the existing payload contracts are identified.
+## Notes for the next pass
 
-## Suggested next phase
+Direct-sale invoice print has a canonical route helper and deterministic smoke coverage. The next low-risk UI pass should add a dedicated row action inside the large direct-sale workspace action column using:
 
-Phase: **Receipt and Delivery Print Route Wiring**
+```text
+buildAdminDirectSalePrintRoute(row.id)
+```
 
-Goal:
-
-- locate existing receipt detail route/data contract
-- add receipt print page using `ReceiptDocument`
-- locate direct-sale delivery case detail contract
-- add delivery challan print page using `DeliveryRecord`
-- add Playwright smoke coverage for direct-sale invoice and receipt/challan print pages
-
-Risk level: Low, if kept read-only and payload-driven.
+That change should be made as a small targeted UI patch to avoid disturbing the existing direct-sale operational action logic.
