@@ -32,6 +32,7 @@ The repo already contains **explicit links** that make several settlement-adjace
 
 - There is **no explicit model** that links a bank/UPI “settlement batch” to the set of `Payment` rows it settles.
 - There is **no explicit cashier day-close / cash closing** record in the audited models/services that can be linked to `Payment` rows (only reporting-style books).
+- Receipt invalidation is not yet backed by a dedicated explicit source-link contract; voided receipts are inferred by status/journal reversal instead of a single canonical invalidation record.
 - Account-level “pending settlement” in `ReconciliationOverviewService` is deterministic as an **aggregated operational metric**, but it is **not** a per-payment settlement proof.
 
 Planned additive solution (design) and Phase L0 implementation (schema-only):

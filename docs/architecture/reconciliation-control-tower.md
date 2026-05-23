@@ -208,6 +208,7 @@ Explicitly deferred in Settlement phase:
 - Settlement batch inference, bank statement matching, and per-payment settlement proof (needs explicit schema/process)
 - Payment.method ↔ FinanceAccount.kind mismatch checks (needs formal business rule enforcement)
 - “ReceiptDocument required for every Payment” checks (policy-dependent)
+- Cashier day-close mismatch checks until explicit day-close records are linked deterministically to covered payments/receipts.
 
 ## Settlement allocation-backed checks (Implemented 2026-05-22)
 

@@ -154,6 +154,10 @@ Test requirements:
 Goal:
 - Add cashier day-close draft/submit + admin approve/reject, without mutating payments.
 
+Context note:
+- Current payment validity for cashier day-close is only deterministic for EMI payment reversals when `OperationalCancellation` exists.
+- Future day-close design should add explicit receipt invalidation evidence and a clear day-close transaction linkage contract before adding reconciliation checks.
+
 Backend changes (future):
 - Cashier-scoped endpoints:
   - create day-close draft

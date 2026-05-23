@@ -230,6 +230,7 @@ Explicitly deferred in Settlement:
 - Cashier day-close mismatch checks (no explicit closing record linking covered transactions)
 - Payment.method ↔ FinanceAccount.kind mismatch checks (business rule not formally enforced)
 - “Receipt required for every payment” checks (policy-dependent)
+- Receipt invalidation / void evidence normalization before adding cashier day-close or settlement exclusion checks.
 
 Implemented (allocation-backed; deterministic-only; module=`settlement`):
 - `BANK_STATEMENT_LINE_UNALLOCATED`, `UPI_SETTLEMENT_LINE_UNALLOCATED` (MEDIUM)
