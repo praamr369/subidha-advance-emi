@@ -1,13 +1,21 @@
 # Financial Source Lifecycle Event Design
 
-Status: **PHASE 1 SCHEMA FOUNDATION IMPLEMENTED**
+Status: **PHASE 1 WRITE-POINT INTEGRATION (LIMITED) IMPLEMENTED**
 Scope: additive lifecycle/evidence events for payment, receipt, money movement, and future settlement source validity.
 
 Implementation note:
 - Schema and service helpers were added in `backend/reconciliation`.
 - Migration: `backend/reconciliation/migrations/0002_financialsourcelifecycleevent.py`.
 - Helpers added: `create_lifecycle_event`, `get_latest_lifecycle_event`, `get_invalidating_events`, `is_source_invalidated`, `is_payment_valid_for_cash_evidence`, `is_receipt_valid_for_settlement`.
-- No write-point integration into payment/receipt/reversal flows has been added in this phase.
+- Phase 1 write-point integration (limited) is now wired for the safest existing invalidation paths:
+  - EMI payment reversal/cancellation via `OperationalCancellation(SourceType.EMI_PAYMENT)` creation
+  - Receipt void via `billing_service.void_receipt_document()` (explicit status change + reversal journal)
+
+Guarantees (Phase 1):
+- No backfill of historical records.
+- No lifecycle events created from read paths.
+- No changes to payment posting, receipt generation, or accounting posting semantics.
+- No changes to day-close computation, settlement allocation, or reconciliation checks (events are evidence-only).
 
 ## 1) Objective
 

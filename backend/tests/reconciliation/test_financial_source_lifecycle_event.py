@@ -8,6 +8,7 @@ from billing.models import BillingDocumentStatus, ReceiptDocument, ReceiptType
 from reconciliation.models import FinancialSourceLifecycleEvent, ReconciliationItem
 from reconciliation.services.financial_source_lifecycle_event_service import (
     create_lifecycle_event,
+    create_lifecycle_event_for_operational_cancellation,
     get_invalidating_events,
     get_latest_lifecycle_event,
     is_payment_valid_for_cash_evidence,
@@ -15,11 +16,14 @@ from reconciliation.services.financial_source_lifecycle_event_service import (
 )
 from settlements.models import SettlementAllocation
 from subscriptions.models import OperationalCancellation, Payment
+from subscriptions.services.payment_service import reverse_payment_for_admin
+from billing.services.billing_service import void_receipt_document
 from tests.helpers import (
     create_admin_user,
     create_batch,
     create_customer_profile,
     create_emi,
+    create_finance_account,
     create_lucky_id,
     create_product,
     create_subscription,
@@ -59,11 +63,13 @@ class FinancialSourceLifecycleEventServiceTests(TestCase):
             entry_date=date(2026, 5, 2),
             entry_type=JournalEntryType.SYSTEM_BRIDGE,
         )
+        self.finance_account = create_finance_account(code="FLE-FIN-001", name="FLE Cash Account", kind="CASH")
         self.receipt = ReceiptDocument.objects.create(
             receipt_no="FLE-RCT-001",
             receipt_type=ReceiptType.EMI_PAYMENT_RECEIPT,
             status=BillingDocumentStatus.POSTED,
             receipt_date=date(2026, 5, 2),
+            finance_account=self.finance_account,
             customer=self.customer,
             subscription=self.subscription,
             payment=self.payment,
@@ -150,6 +156,43 @@ class FinancialSourceLifecycleEventServiceTests(TestCase):
 
         self.assertFalse(is_payment_valid_for_cash_evidence(self.payment))
 
+    def test_operational_cancellation_for_emi_payment_creates_lifecycle_invalidation_event(self):
+        result = reverse_payment_for_admin(
+            payment_id=self.payment.id,
+            reversed_by=self.admin,
+            reason="Test reversal",
+        )
+        self.assertTrue(result.get("updated"))
+
+        cancellation = OperationalCancellation.objects.get(
+            source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
+            source_id=self.payment.id,
+        )
+        event = FinancialSourceLifecycleEvent.objects.filter(related_cancellation=cancellation).order_by("-id").first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.source_type, FinancialSourceLifecycleEvent.SourceType.EMI_PAYMENT)
+        self.assertEqual(event.source_id, self.payment.id)
+        self.assertEqual(event.event_type, FinancialSourceLifecycleEvent.EventType.REVERSED)
+        self.assertEqual(event.event_status, FinancialSourceLifecycleEvent.EventStatus.ACTIVE)
+        self.assertEqual(event.related_payment_id, self.payment.id)
+        self.assertEqual(event.related_cancellation_id, cancellation.id)
+        self.assertFalse(is_payment_valid_for_cash_evidence(self.payment))
+
+    def test_duplicate_operational_cancellation_processing_does_not_duplicate_lifecycle_events(self):
+        cancellation = OperationalCancellation.objects.create(
+            source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
+            source_id=self.payment.id,
+            cancellation_type=OperationalCancellation.CancellationType.PAYMENT_REVERSAL,
+            cancelled_by=self.admin,
+            reason="Reversed payment",
+            amount_snapshot=self.payment.amount,
+        )
+        first = create_lifecycle_event_for_operational_cancellation(cancellation=cancellation, related_payment=self.payment)
+        second = create_lifecycle_event_for_operational_cancellation(cancellation=cancellation, related_payment=self.payment)
+        self.assertIsNotNone(first)
+        self.assertIsNone(second)
+        self.assertEqual(FinancialSourceLifecycleEvent.objects.filter(related_cancellation=cancellation).count(), 1)
+
     def test_payment_validity_respects_lifecycle_invalidation_event(self):
         create_lifecycle_event(
             source_type=FinancialSourceLifecycleEvent.SourceType.EMI_PAYMENT,
@@ -175,6 +218,22 @@ class FinancialSourceLifecycleEventServiceTests(TestCase):
         )
 
         self.assertFalse(is_receipt_valid_for_settlement(self.receipt))
+
+    def test_void_receipt_document_creates_lifecycle_invalidation_event(self):
+        receipt, updated = void_receipt_document(receipt_id=self.receipt.id, performed_by=self.admin, reason="Test void")
+        self.assertTrue(updated)
+        self.assertEqual(receipt.status, BillingDocumentStatus.VOID)
+
+        event = FinancialSourceLifecycleEvent.objects.filter(
+            source_type=FinancialSourceLifecycleEvent.SourceType.BILLING_RECEIPT,
+            source_id=receipt.id,
+            event_type=FinancialSourceLifecycleEvent.EventType.VOIDED,
+            event_status=FinancialSourceLifecycleEvent.EventStatus.ACTIVE,
+        ).order_by("-id").first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.related_receipt_id, receipt.id)
+        self.assertEqual(event.related_payment_id, self.payment.id)
+        self.assertFalse(is_receipt_valid_for_settlement(receipt))
 
     def test_helpers_do_not_mutate_payment_or_receipt_document(self):
         payment_amount_before = self.payment.amount

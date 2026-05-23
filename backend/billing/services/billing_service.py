@@ -48,6 +48,8 @@ from inventory.services.stock_service import (
 )
 from subscriptions.models import AuditLog, FulfillmentStatus, Payment
 from subscriptions.services.audit_service import log_audit
+from reconciliation.models import FinancialSourceLifecycleEvent
+from reconciliation.services.financial_source_lifecycle_event_service import create_lifecycle_event
 
 
 def _money(value) -> Decimal:
@@ -1318,6 +1320,34 @@ def void_receipt_document(*, receipt_id: int, performed_by, reason: str):
     receipt.status = BillingDocumentStatus.VOID
     receipt.notes = f"{(receipt.notes or '').strip()}\nVoid reason: {reason}".strip()
     receipt.save(update_fields=["status", "notes", "updated_at"])
+    if not FinancialSourceLifecycleEvent.objects.filter(
+        source_type=FinancialSourceLifecycleEvent.SourceType.BILLING_RECEIPT,
+        source_id=receipt.id,
+        event_type=FinancialSourceLifecycleEvent.EventType.VOIDED,
+        event_status=FinancialSourceLifecycleEvent.EventStatus.ACTIVE,
+    ).exists():
+        create_lifecycle_event(
+            source_type=FinancialSourceLifecycleEvent.SourceType.BILLING_RECEIPT,
+            source_id=receipt.id,
+            event_type=FinancialSourceLifecycleEvent.EventType.VOIDED,
+            event_status=FinancialSourceLifecycleEvent.EventStatus.ACTIVE,
+            reason=reason,
+            amount=receipt.amount,
+            created_by=performed_by,
+            related_receipt=receipt,
+            related_payment=receipt.payment if receipt.payment_id else None,
+            related_invoice=receipt.billing_invoice if receipt.billing_invoice_id else None,
+            related_journal=reversal_journal,
+            metadata={
+                "receipt_id": receipt.id,
+                "receipt_no": receipt.receipt_no,
+                "receipt_type": receipt.receipt_type,
+                "payment_id": receipt.payment_id,
+                "billing_invoice_id": receipt.billing_invoice_id,
+                "direct_sale_id": receipt.direct_sale_id,
+                "void_reason": reason,
+            },
+        )
     if receipt.billing_invoice_id:
         recalculate_invoice_settlement(receipt.billing_invoice)
     if receipt.direct_sale_id:

@@ -39,7 +39,9 @@ Key observation:
 - This signal is explicit and deterministic for EMI payment reversal flows, but only if `OperationalCancellation` is created consistently.
 
 Implementation note:
-- The new schema foundation for lifecycle events has been added in `backend/reconciliation`, but current cashier day-close and payment flows still depend on existing `OperationalCancellation` semantics.
+- The lifecycle event schema foundation exists in `backend/reconciliation`.
+- Phase 1 now emits explicit lifecycle invalidation events when an EMI payment is reversed (at `OperationalCancellation(SourceType.EMI_PAYMENT)` creation).
+- Cashier day-close and reconciliation behavior remains unchanged in this phase; `OperationalCancellation` remains authoritative and is still used by existing day-close filters.
 
 ### 2.2 Receipt validity
 

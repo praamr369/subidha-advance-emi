@@ -60,7 +60,10 @@ Key observation:
 - the only evidence of invalidation is therefore derived from `ReceiptDocument.status` and the reversal journal behavior, not from a first-class source-link contract
 
 Implementation note:
-- A schema foundation for generic lifecycle events now exists in `backend/reconciliation`, but receipt invalidation is still not wired into that event layer.
+- A schema foundation for generic lifecycle events exists in `backend/reconciliation`.
+- Phase 1 now emits explicit receipt invalidation evidence for the explicit void path:
+  - `backend/billing/services/billing_service.py:void_receipt_document()` writes `FinancialSourceLifecycleEvent(EventType.VOIDED)` for the receipt.
+- Receipt status/journal behavior remains authoritative for the receipt itself; the lifecycle event is evidence-only and is not consumed by day-close/settlement allocation logic in this phase.
 
 ## 3) Current explicit source-link evidence for receipts
 

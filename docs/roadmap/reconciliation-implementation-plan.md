@@ -3,6 +3,10 @@
 Status: **SETTLEMENT (CASH/BANK/UPI) PHASE IMPLEMENTED (2026-05-22)**  
 Phase 1 constraint: **read-only detection + manual resolution notes/status only**. No auto-correct.
 
+Lifecycle evidence note (2026-05-23):
+- `FinancialSourceLifecycleEvent` now has limited Phase 1 write-point integration for invalidation evidence (EMI payment reversal cancellations + receipt void).
+- Control Tower checks and settlement allocation logic remain unchanged in this phase; lifecycle events are not consumed for reconciliation decisions yet.
+
 Settlement operator UX note (lookup hardening, admin-only):
 - Settlement allocation forms use dedicated admin-only, read-only, bounded lookup endpoints (display-safe fields only):
   - `GET /api/v1/admin/settlements/lookups/finance-accounts/?q=...&kind=BANK|UPI`

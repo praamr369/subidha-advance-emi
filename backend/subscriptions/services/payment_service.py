@@ -6,6 +6,9 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
+from reconciliation.services.financial_source_lifecycle_event_service import (
+    create_lifecycle_event_for_operational_cancellation,
+)
 from accounting.models import FinanceAccount, FinanceAccountKind
 from accounting.services.finance_account_collection_guard import (
     assert_finance_account_allowed_for_payment_collection,
@@ -819,7 +822,7 @@ def reverse_payment_for_admin(
         source_id=payment.id,
     ).exists():
         raise ValueError("Payment already has an audited reversal.")
-    OperationalCancellation.objects.create(
+    cancellation = OperationalCancellation.objects.create(
         source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
         source_id=payment.id,
         source_reference=payment.reference_no or f"PAY-{payment.id}",
@@ -839,6 +842,10 @@ def reverse_payment_for_admin(
             "subscription_id": payment.subscription_id,
             "emi_id": payment.emi_id,
         },
+    )
+    create_lifecycle_event_for_operational_cancellation(
+        cancellation=cancellation,
+        related_payment=payment,
     )
 
     reverse_commission_for_payment(

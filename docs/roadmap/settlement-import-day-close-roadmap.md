@@ -158,7 +158,7 @@ Context note:
 - Current payment validity for cashier day-close is only deterministic for EMI payment reversals when `OperationalCancellation` exists.
 - Future day-close design should add explicit receipt invalidation evidence and a clear day-close transaction linkage contract before adding reconciliation checks. In particular, receipts should not be treated as active or excluded settlement evidence solely by `ReceiptDocument.posted_journal_entry`; a dedicated invalidation event or explicit `OperationalCancellation.SourceType.BILLING_RECEIPT` linkage is required.
 - The preferred path is a generic lifecycle event layer for financial source validity. See `docs/architecture/financial-source-lifecycle-event-design.md` for the additive design.
-- Implementation note: the lifecycle event schema foundation has already been added to `backend/reconciliation`, but Phase L3 remains design-only with no day-close integration yet.
+- Implementation note: lifecycle event schema exists, and Phase 1 now emits invalidation events for EMI payment reversals and receipt voids. Phase L3 remains design-only with no day-close integration yet.
 
 Backend changes (future):
 - Cashier-scoped endpoints:

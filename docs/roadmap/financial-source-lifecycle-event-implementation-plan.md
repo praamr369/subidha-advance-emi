@@ -1,6 +1,6 @@
 # Financial Source Lifecycle Event Implementation Plan
 
-Status: **PHASE 1 SCHEMA FOUNDATION IMPLEMENTED**
+Status: **PHASE 1 WRITE-POINT INTEGRATION (LIMITED) IMPLEMENTED**
 Scope: additive implementation phases for a canonical validity-event layer covering payment, receipt, money movement, and future settlement evidence.
 
 ## 1) Goal
@@ -41,18 +41,20 @@ Acceptance criteria:
 - no model or code changes are made in this phase
 - implementation plan contains explicit write/read boundary definitions
 
-### Phase 1: Add generic event model schema
+### Phase 1: Add generic event model schema + safest invalidation write points
 
 Goal: add a standalone `FinancialSourceLifecycleEvent` model in an audit/reconciliation boundary.
 
 Status: **IMPLEMENTED IN SCHEMA FOUNDATION**
 
-This phase added the additive `FinancialSourceLifecycleEvent` model and read helper services in `backend/reconciliation` without wiring any write points to payment, receipt, or reconciliation flows.
+This phase added the additive `FinancialSourceLifecycleEvent` model and read helper services in `backend/reconciliation` and wires lifecycle invalidation events into the safest existing write points only (no posting/generation changes).
 
 Scope:
 - new model only
 - no source modifications
-- no lifecycle event write points wired yet
+- limited write-point integration for invalidation evidence only:
+  - EMI payment reversal: `OperationalCancellation(SourceType.EMI_PAYMENT)` creation emits `FinancialSourceLifecycleEvent(EventType.REVERSED)`
+  - Receipt void: `void_receipt_document()` emits `FinancialSourceLifecycleEvent(EventType.VOIDED)`
 
 Core fields:
 - `event_no`
@@ -71,8 +73,8 @@ Design constraints:
 
 Acceptance criteria:
 - model exists with required fields and indexes
-- documentation clearly states the event layer is not yet used for active reconciliations
-- tests cover model validation and schema constraints only
+- documentation clearly states the event layer is evidence-only and not yet consumed by reconciliation/day-close/settlement allocation logic
+- tests cover helper correctness and Phase 1 write-point idempotency
 
 ### Phase 2: Add event write points for lifecycle changes
 
