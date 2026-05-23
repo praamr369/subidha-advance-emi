@@ -5,7 +5,10 @@ export type PaginatedResponse<T> = {
   results: T[];
 };
 
-export type SettlementSourceType = "BANK_STATEMENT_LINE" | "UPI_SETTLEMENT_LINE";
+export type SettlementSourceType =
+  | "BANK_STATEMENT_LINE"
+  | "UPI_SETTLEMENT_LINE"
+  | "CASHIER_DAY_CLOSE";
 
 export type BankStatementImport = {
   id: number;
@@ -122,4 +125,66 @@ export type SettlementAllocationCreatePayload = {
 
 export type SettlementAllocationVoidPayload = {
   reason?: string;
+};
+
+// === Cashier Day Close Types ===
+
+export type CashierDayCloseStatus = 
+  | "DRAFT"
+  | "SUBMITTED"
+  | "APPROVED"
+  | "REJECTED"
+  | "VOIDED";
+
+export type CashierDayClose = {
+  id: number;
+  close_no: string;
+  cashier: number;
+  cashier_username?: string;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  cash_counter?: number | null;
+  cash_counter_name?: string | null;
+  finance_account?: number | null;
+  finance_account_name?: string | null;
+  business_date: string;
+  opening_cash: string;
+  system_cash_total: string;
+  counted_cash: string;
+  variance: string;
+  status: CashierDayCloseStatus;
+  closed_by?: number | null;
+  closed_by_username?: string | null;
+  closed_at?: string | null;
+  approved_by?: number | null;
+  approved_by_username?: string | null;
+  approved_at?: string | null;
+  notes: string;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CashierDayCloseCreatePayload = {
+  business_date: string;
+  counted_cash: string;
+  branch?: number | null;
+  cash_counter?: number | null;
+  finance_account?: number | null;
+  opening_cash?: string;
+  notes?: string;
+};
+
+export type CashierDayClosePreviewResponse = {
+  business_date: string;
+  system_cash_total: string;
+};
+
+export type CashierDayCloseApprovalPayload = {
+  notes?: string;
+};
+
+export type CashierDayCloseRejectPayload = {
+  notes: string;
 };

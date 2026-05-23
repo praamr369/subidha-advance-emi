@@ -5,11 +5,16 @@ import type {
   UpiSettlementImport,
   UpiSettlementLine,
   SettlementAllocation,
+  CashierDayClose,
+  CashierDayClosePreviewResponse,
   PaginatedResponse,
   BankImportCreatePayload,
   UpiImportCreatePayload,
   SettlementAllocationCreatePayload,
   SettlementAllocationVoidPayload,
+  CashierDayCloseCreatePayload,
+  CashierDayCloseApprovalPayload,
+  CashierDayCloseRejectPayload,
 } from "@/types/settlements";
 
 // Helper to build query string for optional params
@@ -116,4 +121,79 @@ export async function voidAllocation(
     method: "POST",
     body: payload,
   });
+}
+
+// === Cashier day-close (evidence only) ===
+
+export async function previewCashierDayClose(params?: {
+  business_date?: string;
+  branch_id?: number | null;
+  cash_counter_id?: number | null;
+  finance_account_id?: number | null;
+}) {
+  return apiFetch<CashierDayClosePreviewResponse>(
+    `/cashier/day-close/preview/${buildQuery(params)}`
+  );
+}
+
+export async function getCashierCurrentDayClose() {
+  return apiFetch<CashierDayClose>("/cashier/day-close/current/");
+}
+
+export async function listCashierDayCloses(params?: QueryParams) {
+  return apiFetch<PaginatedResponse<CashierDayClose>>(
+    `/cashier/day-close/${buildQuery(params)}`
+  );
+}
+
+export async function createCashierDayClose(payload: CashierDayCloseCreatePayload) {
+  return apiFetch<CashierDayClose>("/cashier/day-close/", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function getCashierDayClose(id: number | string) {
+  return apiFetch<CashierDayClose>(`/cashier/day-close/${id}/`);
+}
+
+export async function submitCashierDayClose(id: number | string) {
+  return apiFetch<CashierDayClose>(`/cashier/day-close/${id}/submit/`, {
+    method: "POST",
+    body: {},
+  });
+}
+
+// === Admin day-close review (evidence only) ===
+
+export async function listAdminCashierDayCloses(params?: QueryParams) {
+  return apiFetch<PaginatedResponse<CashierDayClose>>(
+    `/admin/settlements/cashier-day-closes/${buildQuery(params)}`
+  );
+}
+
+export async function getAdminCashierDayClose(id: number | string) {
+  return apiFetch<CashierDayClose>(
+    `/admin/settlements/cashier-day-closes/${id}/`
+  );
+}
+
+export async function approveAdminCashierDayClose(
+  id: number | string,
+  payload: CashierDayCloseApprovalPayload = {}
+) {
+  return apiFetch<CashierDayClose>(
+    `/admin/settlements/cashier-day-closes/${id}/approve/`,
+    { method: "POST", body: payload }
+  );
+}
+
+export async function rejectAdminCashierDayClose(
+  id: number | string,
+  payload: CashierDayCloseRejectPayload
+) {
+  return apiFetch<CashierDayClose>(
+    `/admin/settlements/cashier-day-closes/${id}/reject/`,
+    { method: "POST", body: payload }
+  );
 }

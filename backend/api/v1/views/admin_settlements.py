@@ -14,6 +14,9 @@ from api.v1.serializers.settlements import (
     BankStatementImportSerializer,
     BankStatementImportCreateSerializer,
     BankStatementLineSerializer,
+    CashierDayCloseSerializer,
+    CashierDayCloseApprovalSerializer,
+    CashierDayCloseRejectSerializer,
     SettlementAllocationCreateSerializer,
     SettlementAllocationSerializer,
     SettlementAllocationVoidSerializer,
@@ -24,6 +27,7 @@ from api.v1.serializers.settlements import (
 from settlements.models import (
     BankStatementImport,
     BankStatementLine,
+    CashierDayClose,
     SettlementAllocation,
     UpiSettlementImport,
     UpiSettlementLine,
@@ -679,3 +683,112 @@ class SettlementResolveMoneyMovementsView(generics.GenericAPIView):
                 },
             }
         )
+
+
+# === Cashier Day Close Admin Views ===
+
+
+class CashierDayCloseListView(generics.ListAPIView):
+    """Admin list view for all cashier day-closes."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    serializer_class = CashierDayCloseSerializer
+    queryset = CashierDayClose.objects.select_related(
+        "cashier",
+        "branch",
+        "cash_counter",
+        "finance_account",
+        "closed_by",
+        "approved_by",
+    ).all().order_by("-business_date", "-created_at", "-id")
+    
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # Filter by status if provided
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter.upper())
+        # Filter by cashier if provided
+        cashier_id = self.request.query_params.get("cashier_id")
+        if cashier_id:
+            qs = qs.filter(cashier_id=cashier_id)
+        # Filter by date if provided
+        business_date = self.request.query_params.get("business_date")
+        if business_date:
+            qs = qs.filter(business_date=business_date)
+        return qs
+
+
+class CashierDayCloseDetailView(generics.RetrieveAPIView):
+    """Admin detail view for a specific cashier day-close."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    serializer_class = CashierDayCloseSerializer
+    queryset = CashierDayClose.objects.select_related(
+        "cashier",
+        "branch",
+        "cash_counter",
+        "finance_account",
+        "closed_by",
+        "approved_by",
+    ).all()
+
+
+class CashierDayCloseApproveView(generics.GenericAPIView):
+    """Admin approval view: SUBMITTED → APPROVED."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    serializer_class = CashierDayCloseApprovalSerializer
+    queryset = CashierDayClose.objects.all()
+    
+    def post(self, request, *args, **kwargs):
+        from settlements.services.cashier_day_close_service import (
+            CashierDayCloseApprovalPayload,
+            approve_cashier_day_close,
+        )
+        
+        day_close = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        notes = serializer.validated_data.get("notes", "")
+        payload = CashierDayCloseApprovalPayload(user_id=request.user.id, notes=notes or None)
+        
+        try:
+            day_close = approve_cashier_day_close(day_close, payload)
+        except DjangoValidationError as e:
+            detail = e.message_dict if hasattr(e, "message_dict") else str(e)
+            raise DRFValidationError(detail)
+        except Exception as e:
+            raise DRFValidationError(str(e))
+        
+        response_serializer = CashierDayCloseSerializer(day_close)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+class CashierDayCloseRejectView(generics.GenericAPIView):
+    """Admin rejection view: SUBMITTED → REJECTED."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    serializer_class = CashierDayCloseRejectSerializer
+    queryset = CashierDayClose.objects.all()
+    
+    def post(self, request, *args, **kwargs):
+        from settlements.services.cashier_day_close_service import (
+            CashierDayCloseRejectionPayload,
+            reject_cashier_day_close,
+        )
+        
+        day_close = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        notes = serializer.validated_data.get("notes", "")
+        payload = CashierDayCloseRejectionPayload(user_id=request.user.id, notes=notes)
+        
+        try:
+            day_close = reject_cashier_day_close(day_close, payload)
+        except DjangoValidationError as e:
+            detail = e.message_dict if hasattr(e, "message_dict") else str(e)
+            raise DRFValidationError(detail)
+        except Exception as e:
+            raise DRFValidationError(str(e))
+        
+        response_serializer = CashierDayCloseSerializer(day_close)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

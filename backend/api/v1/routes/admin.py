@@ -487,6 +487,10 @@ from api.v1.views.admin_settlements import (
     BankStatementImportListCreateView,
     BankStatementImportDetailView,
     BankStatementLineListView,
+    CashierDayCloseListView,
+    CashierDayCloseDetailView,
+    CashierDayCloseApproveView,
+    CashierDayCloseRejectView,
     SettlementAllocationDetailView,
     SettlementAllocationListCreateView,
     SettlementAllocationVoidView,
@@ -974,5 +978,10 @@ urlpatterns = [
     path("settlements/allocations/", SettlementAllocationListCreateView.as_view(), name="admin-settlement-allocations-list-create"),
     path("settlements/allocations/<int:pk>/", SettlementAllocationDetailView.as_view(), name="admin-settlement-allocations-detail"),
     path("settlements/allocations/<int:pk>/void/", SettlementAllocationVoidView.as_view(), name="admin-settlement-allocations-void"),
+    # Phase L3: cashier day-close (admin approval workflow)
+    path("settlements/cashier-day-closes/", CashierDayCloseListView.as_view(), name="admin-cashier-day-closes-list"),
+    path("settlements/cashier-day-closes/<int:pk>/", CashierDayCloseDetailView.as_view(), name="admin-cashier-day-closes-detail"),
+    path("settlements/cashier-day-closes/<int:pk>/approve/", CashierDayCloseApproveView.as_view(), name="admin-cashier-day-closes-approve"),
+    path("settlements/cashier-day-closes/<int:pk>/reject/", CashierDayCloseRejectView.as_view(), name="admin-cashier-day-closes-reject"),
     path("", include(router.urls)),
 ]

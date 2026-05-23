@@ -31,6 +31,13 @@ from api.v1.views.direct_sale_workspace import (
     CashierDirectSalePreviewView,
 )
 from api.v1.views.customer_intelligence import CustomerOperationalSummaryView
+from api.v1.views.cashier_day_close import (
+    CashierDayClosePreviewView,
+    CashierDayCloseCurrentView,
+    CashierDayCloseListCreateView,
+    CashierDayCloseDetailView,
+    CashierDayCloseSubmitView,
+)
 
 urlpatterns = [
     path(
@@ -58,4 +65,10 @@ urlpatterns = [
     path("collect-direct-sale/", CashierCollectDirectSalePayment.as_view(), name="cashier-collect-direct-sale"),
     path("billing/products/search/", CashierBillingProductSearchView.as_view(), name="cashier-billing-product-search"),
     path("direct-sales/preview/", CashierDirectSalePreviewView.as_view(), name="cashier-direct-sale-preview"),
+    # Day close endpoints
+    path("day-close/preview/", CashierDayClosePreviewView.as_view(), name="cashier-day-close-preview"),
+    path("day-close/current/", CashierDayCloseCurrentView.as_view(), name="cashier-day-close-current"),
+    path("day-close/", CashierDayCloseListCreateView.as_view(), name="cashier-day-close-list-create"),
+    path("day-close/<int:pk>/", CashierDayCloseDetailView.as_view(), name="cashier-day-close-detail"),
+    path("day-close/<int:pk>/submit/", CashierDayCloseSubmitView.as_view(), name="cashier-day-close-submit"),
 ]

@@ -4,6 +4,7 @@ from rest_framework import serializers
 from settlements.models import (
     BankStatementImport,
     BankStatementLine,
+    CashierDayClose,
     SettlementAllocation,
     SettlementAllocationSourceType,
     UpiSettlementImport,
@@ -217,3 +218,87 @@ class SettlementAllocationCreateSerializer(serializers.Serializer):
 
 class SettlementAllocationVoidSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+# === Cashier Day Close Serializers ===
+
+
+class CashierDayCloseSerializer(serializers.ModelSerializer):
+    """Read-only detail serializer for cashier day-close records."""
+    cashier_username = serializers.CharField(source="cashier.username", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True, allow_null=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True, allow_null=True)
+    cash_counter_name = serializers.CharField(source="cash_counter.name", read_only=True, allow_null=True)
+    finance_account_name = serializers.CharField(source="finance_account.name", read_only=True, allow_null=True)
+    closed_by_username = serializers.CharField(source="closed_by.username", read_only=True, allow_null=True)
+    approved_by_username = serializers.CharField(source="approved_by.username", read_only=True, allow_null=True)
+
+    class Meta:
+        model = CashierDayClose
+        fields = [
+            "id",
+            "close_no",
+            "cashier",
+            "cashier_username",
+            "branch",
+            "branch_code",
+            "branch_name",
+            "cash_counter",
+            "cash_counter_name",
+            "finance_account",
+            "finance_account_name",
+            "business_date",
+            "opening_cash",
+            "system_cash_total",
+            "counted_cash",
+            "variance",
+            "status",
+            "closed_by",
+            "closed_by_username",
+            "closed_at",
+            "approved_by",
+            "approved_by_username",
+            "approved_at",
+            "notes",
+            "metadata",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class CashierDayCloseCreateSerializer(serializers.Serializer):
+    """Serializer for creating a new cashier day-close draft."""
+    business_date = serializers.DateField()
+    counted_cash = serializers.DecimalField(max_digits=12, decimal_places=2)
+    branch = serializers.IntegerField(required=False, allow_null=True)
+    cash_counter = serializers.IntegerField(required=False, allow_null=True)
+    finance_account = serializers.IntegerField(required=False, allow_null=True)
+    opening_cash = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default="0.00")
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if attrs.get("counted_cash") is not None and attrs["counted_cash"] < 0:
+            raise serializers.ValidationError({"counted_cash": "Counted cash cannot be negative."})
+        return attrs
+
+
+class CashierDayCloseSubmitSerializer(serializers.Serializer):
+    """Serializer for submitting a cashier day-close (DRAFT → SUBMITTED)."""
+    # No input fields; just accept the submission request
+
+
+class CashierDayCloseApprovalSerializer(serializers.Serializer):
+    """Serializer for admin approval of a day-close (SUBMITTED → APPROVED)."""
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class CashierDayCloseRejectSerializer(serializers.Serializer):
+    """Serializer for admin rejection of a day-close (SUBMITTED → REJECTED)."""
+    notes = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_notes(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("Rejection notes are required and cannot be empty.")
+        return value.strip()

@@ -46,6 +46,12 @@ export default function SettlementsOverview() {
               >
                 UPI imports
               </Link>
+              <Link
+                href={ROUTES.admin.settlementsDayCloses}
+                className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground hover:bg-[var(--surface-muted)]"
+              >
+                Day-closes
+              </Link>
             </div>
           }
         />
@@ -79,6 +85,20 @@ export default function SettlementsOverview() {
                 Open UPI imports →
               </Link>
             </div>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine)]">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Cashier day-close evidence
+          </div>
+          <div className="mt-2 text-sm leading-6 text-muted-foreground">
+            Review cashier day-close variance as evidence only. Approval/rejection does not create accounting entries, allocations, or reconciliation item closures.
+          </div>
+          <div className="mt-3">
+            <Link className="text-sm font-semibold text-primary hover:underline" href={ROUTES.admin.settlementsDayCloses}>
+              Open day-closes →
+            </Link>
           </div>
         </div>
       </ERPSectionShell>

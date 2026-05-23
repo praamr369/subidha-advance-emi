@@ -214,6 +214,7 @@ export const ROUTES = {
     settlements: "/admin/settlements",
     settlementsBankImports: "/admin/settlements/bank-imports",
     settlementsUpiImports: "/admin/settlements/upi-imports",
+    settlementsDayCloses: "/admin/settlements/day-closes",
     paymentReconciliation: "/admin/payments/reconciliation",
     financeCommissions: "/admin/finance/commissions",
     financeSettledCommissions: "/admin/finance/commissions/settled",
@@ -319,6 +320,7 @@ export const ROUTES = {
     collect: "/cashier/collect",
     payments: "/cashier/payments",
     notifications: "/cashier/notifications",
+    dayClose: "/cashier/day-close",
   },
   vendor: {
     root: "/vendor",
