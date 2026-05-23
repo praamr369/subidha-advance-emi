@@ -41,6 +41,7 @@ import { getAdminDirectSaleReturnEligibility, type DirectSaleReturnEligibility }
 import {
   buildAdminBillingDocumentRoute,
   buildAdminBillingInvoicesRoute,
+  buildAdminDirectSalePrintRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { ApiError } from "@/lib/api";
@@ -516,12 +517,20 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       header: "Invoice",
       render: (row) =>
         row.billing_invoice_id ? (
-          <Link
-            href={buildAdminBillingDocumentRoute(row.billing_invoice_id)}
-            className="font-medium text-primary underline-offset-4 hover:underline"
-          >
-            {row.billing_invoice_no || `Invoice ${row.billing_invoice_id}`}
-          </Link>
+          <div className="flex flex-col gap-1">
+            <Link
+              href={buildAdminBillingDocumentRoute(row.billing_invoice_id)}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              {row.billing_invoice_no || `Invoice ${row.billing_invoice_id}`}
+            </Link>
+            <Link
+              href={buildAdminDirectSalePrintRoute(row.id)}
+              className="text-xs font-semibold text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+            >
+              Invoice PDF
+            </Link>
+          </div>
         ) : (
           "Draft"
         ),
