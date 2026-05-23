@@ -33,6 +33,8 @@ DIRECT_SALE_SUCCESS_TERMINAL_STATUSES = (
     ServiceDeskCaseStatus.RESOLVED,
 )
 
+PAYMENT_HOLD_BLOCKING_REASON = "Outstanding balance must be collected before delivery release."
+
 
 def map_case_status_to_delivery_status(case_status: str) -> str:
     token = (case_status or "").strip().upper()
@@ -45,6 +47,31 @@ def map_case_status_to_delivery_status(case_status: str) -> str:
     if token == ServiceDeskCaseStatus.AUTHORIZED:
         return DeliveryStatus.SCHEDULED
     return DeliveryStatus.PENDING
+
+
+def _payment_exception_release_active(*, case: ServiceDeskCase, balance: Decimal, source_reversed: bool) -> bool:
+    return bool(
+        not source_reversed
+        and balance > Decimal("0.00")
+        and case.payment_exception_approved
+        and case.payment_exception_approved_at
+    )
+
+
+def _release_blocking_reasons(blocking_reasons: list[str]) -> list[str]:
+    return [
+        reason
+        for reason in blocking_reasons
+        if reason != PAYMENT_HOLD_BLOCKING_REASON
+    ]
+
+
+def _release_next_actions(next_actions: list[str]) -> list[str]:
+    released_actions = list(next_actions)
+    for action in ["SCHEDULE_DELIVERY", "MARK_DELIVERED"]:
+        if action not in released_actions:
+            released_actions.append(action)
+    return released_actions
 
 
 def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
@@ -76,6 +103,21 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         DirectSaleStatus.EXCHANGED_CLOSED,
         DirectSaleStatus.CANCELLED,
     }
+    payment_release_active = _payment_exception_release_active(
+        case=case,
+        balance=balance,
+        source_reversed=source_reversed,
+    )
+    blocking_reasons = list(op["blocking_reasons"])
+    next_actions = list(op["next_actions"])
+    if payment_release_active and phase_code == "PAYMENT_HOLD":
+        phase_code = "READY_FOR_DELIVERY"
+        phase_label = "Ready for delivery"
+        blocking_reasons = _release_blocking_reasons(blocking_reasons)
+        next_actions = _release_next_actions(next_actions)
+    elif case.payment_exception_approved and "SCHEDULE_DELIVERY" not in next_actions:
+        next_actions.append("SCHEDULE_DELIVERY")
+
     returnable_exists = False
     if source_reversed:
         try:
@@ -125,9 +167,10 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         except Exception:
             inventory_snapshot = None
 
+    stock_blocked = bool(snap.get("stock_blocked"))
     stock_hint = (
         "Stock gate active — resolve purchase or intake before dispatch."
-        if snap.get("stock_blocked")
+        if stock_blocked
         else None
     )
 
@@ -146,11 +189,7 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
             "note": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/note/",
             "approve_payment_exception": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/approve-payment-exception/",
         }
-    blocked_by_stock = bool(snap.get("stock_blocked"))
-    blocked_by_payment = bool(balance > Decimal("0.00")) and not bool(case.payment_exception_approved)
-    next_actions = list(op["next_actions"])
-    if case.payment_exception_approved and "SCHEDULE_DELIVERY" not in next_actions:
-        next_actions.append("SCHEDULE_DELIVERY")
+    blocked_by_payment = bool(balance > Decimal("0.00")) and not payment_release_active
 
     return {
         "record_kind": "DIRECT_SALE_DELIVERY",
@@ -232,21 +271,21 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "payment_state": snap.get("payment_state") or ("PAID" if balance <= Decimal("0.00") else "OUTSTANDING"),
         "operational_state": op["operational_state"],
         "next_actions": next_actions,
-        "blocking_reasons": op["blocking_reasons"],
+        "blocking_reasons": blocking_reasons,
         "status_label": phase_label,
         "stock_state": op.get("inventory_state"),
         "stock_return_status": (
             "SALE_RETURN_IN_POSTED" if return_pickup_completed else "PENDING_RETURN_PICKUP" if return_pickup_required else None
         ),
-        "delivery_state": snap.get("phase_code"),
-        "blocked_by_stock": blocked_by_stock,
+        "delivery_state": phase_code,
+        "blocked_by_stock": stock_blocked,
         "blocked_by_payment": blocked_by_payment,
         "payment_exception_approved_at": case.payment_exception_approved_at.isoformat() if case.payment_exception_approved_at else None,
         "payment_exception_approved_by_username": (
             case.payment_exception_approved_by.username if case.payment_exception_approved_by_id else None
         ),
         "payment_exception_reason": case.payment_exception_reason or None,
-        "payment_exception_acknowledged": bool(case.payment_exception_approved),
+        "payment_exception_acknowledged": bool(case.payment_exception_acknowledged),
         "payment_exception_outstanding_amount_snapshot": str(balance) if case.payment_exception_approved else None,
         "action_endpoints": action_endpoints,
         "links": {
