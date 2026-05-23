@@ -18,7 +18,7 @@ from billing.services.direct_sale_operational_state import get_direct_sale_opera
 from billing.services.reversal_service import get_returnable_quantity
 from inventory.services.demand_planning_service import stock_status_for_delivery
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
-from subscriptions.models import DeliveryStatus
+from subscriptions.models import AuditLog, DeliveryStatus
 
 
 ACTIVE_DIRECT_SALE_CASE_STATUSES = (
@@ -34,6 +34,7 @@ DIRECT_SALE_SUCCESS_TERMINAL_STATUSES = (
 )
 
 PAYMENT_HOLD_BLOCKING_REASON = "Outstanding balance must be collected before delivery release."
+PAYMENT_EXCEPTION_APPROVED_EVENT = "DIRECT_SALE_DELIVERY_PAYMENT_EXCEPTION_APPROVED"
 
 
 def map_case_status_to_delivery_status(case_status: str) -> str:
@@ -72,6 +73,26 @@ def _release_next_actions(next_actions: list[str]) -> list[str]:
         if action not in released_actions:
             released_actions.append(action)
     return released_actions
+
+
+def _payment_exception_outstanding_snapshot(*, case: ServiceDeskCase, fallback_balance: Decimal) -> str | None:
+    if not case.payment_exception_approved:
+        return None
+    metadata = (
+        AuditLog.objects.filter(
+            model_name="ServiceDeskCase",
+            object_id=case.id,
+            metadata__event=PAYMENT_EXCEPTION_APPROVED_EVENT,
+        )
+        .order_by("-created_at", "-id")
+        .values_list("metadata", flat=True)
+        .first()
+    )
+    if isinstance(metadata, dict):
+        snapshot = metadata.get("outstanding_amount")
+        if snapshot not in (None, ""):
+            return str(snapshot)
+    return str(fallback_balance)
 
 
 def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
@@ -190,6 +211,10 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
             "approve_payment_exception": f"/api/v1/admin/deliveries/direct-sale-cases/{case_id}/approve-payment-exception/",
         }
     blocked_by_payment = bool(balance > Decimal("0.00")) and not payment_release_active
+    outstanding_snapshot = _payment_exception_outstanding_snapshot(
+        case=case,
+        fallback_balance=balance,
+    )
 
     return {
         "record_kind": "DIRECT_SALE_DELIVERY",
@@ -286,7 +311,7 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         ),
         "payment_exception_reason": case.payment_exception_reason or None,
         "payment_exception_acknowledged": bool(case.payment_exception_acknowledged),
-        "payment_exception_outstanding_amount_snapshot": str(balance) if case.payment_exception_approved else None,
+        "payment_exception_outstanding_amount_snapshot": outstanding_snapshot,
         "action_endpoints": action_endpoints,
         "links": {
             "open_invoice": f"/admin/billing/documents/{getattr(invoice, 'id', '')}" if getattr(invoice, "id", None) else None,
