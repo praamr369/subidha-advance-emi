@@ -260,6 +260,7 @@ class ServiceDeskCase(ServiceDeskTimeStampedModel):
         related_name="resolved_service_desk_cases",
     )
     payment_exception_approved = models.BooleanField(default=False, db_index=True)
+    payment_exception_acknowledged = models.BooleanField(default=False, db_index=True)
     payment_exception_reason = models.TextField(blank=True, default="")
     payment_exception_approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
