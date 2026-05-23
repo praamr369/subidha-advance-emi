@@ -202,6 +202,14 @@ export function buildAdminBillingDocumentRoute(id: number | string): string {
   return `${ROUTES.admin.billingDocuments}/${id}`;
 }
 
+export function buildAdminDirectSalePrintRoute(id: number | string): string {
+  return `${ROUTES.admin.billingDirectSaleWorkspace}/${id}/print`;
+}
+
+export function buildAdminBillingReceiptPrintRoute(id: number | string): string {
+  return `${ROUTES.admin.billingReceipts}/${id}/print`;
+}
+
 export function buildAdminCrmPartyRoute(id: number | string): string {
   return `${ROUTES.admin.crmParties}/${id}`;
 }
