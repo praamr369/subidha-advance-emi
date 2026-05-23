@@ -38,6 +38,9 @@ Key observation:
 - The system relies on `OperationalCancellation` as the authoritative external evidence that a payment should be excluded from cashier day-close totals.
 - This signal is explicit and deterministic for EMI payment reversal flows, but only if `OperationalCancellation` is created consistently.
 
+Implementation note:
+- The new schema foundation for lifecycle events has been added in `backend/reconciliation`, but current cashier day-close and payment flows still depend on existing `OperationalCancellation` semantics.
+
 ### 2.2 Receipt validity
 
 Current receipt validity evidence is derived from:

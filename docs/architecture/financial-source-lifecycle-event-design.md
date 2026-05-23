@@ -1,7 +1,13 @@
 # Financial Source Lifecycle Event Design
 
-Status: **DESIGN ONLY**
+Status: **PHASE 1 SCHEMA FOUNDATION IMPLEMENTED**
 Scope: additive lifecycle/evidence events for payment, receipt, money movement, and future settlement source validity.
+
+Implementation note:
+- Schema and service helpers were added in `backend/reconciliation`.
+- Migration: `backend/reconciliation/migrations/0002_financialsourcelifecycleevent.py`.
+- Helpers added: `create_lifecycle_event`, `get_latest_lifecycle_event`, `get_invalidating_events`, `is_source_invalidated`, `is_payment_valid_for_cash_evidence`, `is_receipt_valid_for_settlement`.
+- No write-point integration into payment/receipt/reversal flows has been added in this phase.
 
 ## 1) Objective
 
@@ -14,7 +20,7 @@ Design a safe, additive canonical validity-event layer for financial source life
 - reconciliation checks
 - underlying source records for existing Payment, ReceiptDocument, MoneyMovement, JournalEntry, FinanceAccount, CashCounter
 
-This is a read-only design phase. No models, migrations, APIs, services, or frontend changes are implemented here.
+This is a read-only implementation boundary for existing flows; phase 1 adds the model and helper services, but no runtime integration has been wired yet.
 
 ## 2) Current gap
 

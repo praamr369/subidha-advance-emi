@@ -1,6 +1,6 @@
 # Financial Source Lifecycle Event Implementation Plan
 
-Status: **DESIGN ONLY**
+Status: **PHASE 1 SCHEMA FOUNDATION IMPLEMENTED**
 Scope: additive implementation phases for a canonical validity-event layer covering payment, receipt, money movement, and future settlement evidence.
 
 ## 1) Goal
@@ -44,6 +44,10 @@ Acceptance criteria:
 ### Phase 1: Add generic event model schema
 
 Goal: add a standalone `FinancialSourceLifecycleEvent` model in an audit/reconciliation boundary.
+
+Status: **IMPLEMENTED IN SCHEMA FOUNDATION**
+
+This phase added the additive `FinancialSourceLifecycleEvent` model and read helper services in `backend/reconciliation` without wiring any write points to payment, receipt, or reconciliation flows.
 
 Scope:
 - new model only

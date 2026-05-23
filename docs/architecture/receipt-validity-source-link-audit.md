@@ -59,6 +59,9 @@ Key observation:
 - no dedicated receipt invalidation event or record is created during this void path
 - the only evidence of invalidation is therefore derived from `ReceiptDocument.status` and the reversal journal behavior, not from a first-class source-link contract
 
+Implementation note:
+- A schema foundation for generic lifecycle events now exists in `backend/reconciliation`, but receipt invalidation is still not wired into that event layer.
+
 ## 3) Current explicit source-link evidence for receipts
 
 The audit confirms these explicit links are present and code-backed:

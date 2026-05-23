@@ -118,6 +118,8 @@ Implemented checks (Phase I; allowlist-only):
 
 Explicitly deferred in Phase I:
 - Any inventory reconciliation requiring non-allowlisted `reference_model/reference_id` interpretation
+
+Note: Phase 1 schema foundation for `FinancialSourceLifecycleEvent` has been implemented in `backend/reconciliation`; no reconciliation consumption of those events has been added yet.
 - Purchase/vendor inventory checks beyond strict allowlisted StockLedger evidence (e.g., payable/accounting matching) unless explicit links are confirmed
 - Delivery reservation/dispatched inventory checks until lifecycle + bridge contracts are explicitly confirmed
 
