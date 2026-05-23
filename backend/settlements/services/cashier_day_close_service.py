@@ -27,13 +27,16 @@ from django.core.exceptions import ValidationError
 from django.db.models import Sum
 from django.utils import timezone
 
+from reconciliation.services.financial_source_lifecycle_event_service import (
+    is_payment_valid_for_cash_evidence,
+)
 from settlements.models import (
     MONEY_ZERO,
     CashierDayClose,
     CashierDayCloseStatus,
 )
 
-from subscriptions.models import OperationalCancellation, Payment, PaymentMethod
+from subscriptions.models import Payment, PaymentMethod
 
 
 def compute_system_cash_total(
@@ -61,17 +64,6 @@ def compute_system_cash_total(
         method=PaymentMethod.CASH,
     )
 
-    # Evidence-only exclusion: if an explicit operational cancellation exists for the
-    # payment record, it is not considered a valid cash-collection evidence source.
-    cancelled_payment_ids = (
-        OperationalCancellation.objects.filter(
-            source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
-        )
-        .exclude(source_id__isnull=True)
-        .values_list("source_id", flat=True)
-    )
-    qs = qs.exclude(id__in=cancelled_payment_ids)
-
     if branch_id is not None:
         qs = qs.filter(branch_id=branch_id)
     if cash_counter_id is not None:
@@ -79,7 +71,19 @@ def compute_system_cash_total(
     if finance_account_id is not None:
         qs = qs.filter(finance_account_id=finance_account_id)
 
-    total = qs.aggregate(total_amount=Sum("amount"))
+    # Evidence-only validity gate:
+    # - preserves existing OperationalCancellation(SourceType.EMI_PAYMENT) compatibility
+    # - also excludes explicit FinancialSourceLifecycleEvent invalidations
+    # - never creates lifecycle events or mutates source records from the read path
+    valid_payment_ids = [
+        payment.id
+        for payment in qs.only("id")
+        if is_payment_valid_for_cash_evidence(payment)
+    ]
+    if not valid_payment_ids:
+        return MONEY_ZERO
+
+    total = qs.filter(id__in=valid_payment_ids).aggregate(total_amount=Sum("amount"))
     value = total.get("total_amount")
     return value if value is not None else MONEY_ZERO
 
