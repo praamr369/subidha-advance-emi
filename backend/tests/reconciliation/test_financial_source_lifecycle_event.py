@@ -9,6 +9,7 @@ from reconciliation.models import FinancialSourceLifecycleEvent, ReconciliationI
 from reconciliation.services.financial_source_lifecycle_event_service import (
     create_lifecycle_event,
     create_lifecycle_event_for_operational_cancellation,
+    create_lifecycle_event_for_receipt_invalidation,
     get_invalidating_events,
     get_latest_lifecycle_event,
     is_payment_valid_for_cash_evidence,
@@ -234,6 +235,33 @@ class FinancialSourceLifecycleEventServiceTests(TestCase):
         self.assertEqual(event.related_receipt_id, receipt.id)
         self.assertEqual(event.related_payment_id, self.payment.id)
         self.assertFalse(is_receipt_valid_for_settlement(receipt))
+
+    def test_duplicate_receipt_invalidation_helper_does_not_duplicate_events(self):
+        first = create_lifecycle_event_for_receipt_invalidation(
+            receipt=self.receipt,
+            event_type=FinancialSourceLifecycleEvent.EventType.VOIDED,
+            reason="Duplicate helper test",
+            performed_by=self.admin,
+            metadata={"test_marker": "first"},
+        )
+        second = create_lifecycle_event_for_receipt_invalidation(
+            receipt=self.receipt,
+            event_type=FinancialSourceLifecycleEvent.EventType.VOIDED,
+            reason="Duplicate helper test",
+            performed_by=self.admin,
+            metadata={"test_marker": "second"},
+        )
+        self.assertIsNotNone(first)
+        self.assertIsNone(second)
+        self.assertEqual(
+            FinancialSourceLifecycleEvent.objects.filter(
+                source_type=FinancialSourceLifecycleEvent.SourceType.BILLING_RECEIPT,
+                source_id=self.receipt.id,
+                event_type=FinancialSourceLifecycleEvent.EventType.VOIDED,
+                event_status=FinancialSourceLifecycleEvent.EventStatus.ACTIVE,
+            ).count(),
+            1,
+        )
 
     def test_helpers_do_not_mutate_payment_or_receipt_document(self):
         payment_amount_before = self.payment.amount

@@ -56,8 +56,8 @@ The current receipt invalidation flow observable in code is:
 Key observation:
 
 - the receipt remains linked to its original `posted_journal_entry`
-- no dedicated receipt invalidation event or record is created during this void path
-- the only evidence of invalidation is therefore derived from `ReceiptDocument.status` and the reversal journal behavior, not from a first-class source-link contract
+- Phase 1 now records an explicit receipt invalidation evidence event (`FinancialSourceLifecycleEvent(EventType.VOIDED)`) during this void write path
+- the receipt remains invalidated authoritatively by `ReceiptDocument.status` + reversal journal behavior; lifecycle events are evidence-only and not consumed for settlement/day-close decisions in this phase
 
 Implementation note:
 - A schema foundation for generic lifecycle events exists in `backend/reconciliation`.

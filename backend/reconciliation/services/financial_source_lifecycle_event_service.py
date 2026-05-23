@@ -160,6 +160,69 @@ def create_lifecycle_event_for_operational_cancellation(
     )
 
 
+def _lifecycle_event_exists_for_receipt_invalidation(
+    *, receipt: ReceiptDocument, event_type: str
+) -> bool:
+    if receipt is None or not getattr(receipt, "id", None):
+        return False
+    return FinancialSourceLifecycleEvent.objects.filter(
+        source_type=FinancialSourceLifecycleEvent.SourceType.BILLING_RECEIPT,
+        source_id=receipt.id,
+        event_type=event_type,
+        event_status=FinancialSourceLifecycleEvent.EventStatus.ACTIVE,
+    ).exists()
+
+
+def create_lifecycle_event_for_receipt_invalidation(
+    *,
+    receipt: ReceiptDocument,
+    event_type: str,
+    reason: str,
+    performed_by=None,
+    related_journal=None,
+    metadata: dict | None = None,
+) -> FinancialSourceLifecycleEvent | None:
+    """
+    Phase 1 write-point integration helper.
+
+    Evidence-only:
+    - Must be idempotent
+    - Must not change existing receipt void/reversal behavior
+    """
+    if receipt is None or not getattr(receipt, "id", None):
+        raise ValueError("ReceiptDocument instance is required.")
+
+    if _lifecycle_event_exists_for_receipt_invalidation(receipt=receipt, event_type=event_type):
+        return None
+
+    safe_metadata = dict(metadata or {})
+    safe_metadata.update(
+        {
+            "receipt_id": receipt.id,
+            "receipt_no": getattr(receipt, "receipt_no", None),
+            "receipt_type": getattr(receipt, "receipt_type", None),
+            "payment_id": getattr(receipt, "payment_id", None),
+            "billing_invoice_id": getattr(receipt, "billing_invoice_id", None),
+            "direct_sale_id": getattr(receipt, "direct_sale_id", None),
+        }
+    )
+
+    return create_lifecycle_event(
+        source_type=FinancialSourceLifecycleEvent.SourceType.BILLING_RECEIPT,
+        source_id=receipt.id,
+        event_type=event_type,
+        event_status=FinancialSourceLifecycleEvent.EventStatus.ACTIVE,
+        reason=reason,
+        amount=getattr(receipt, "amount", None),
+        created_by=performed_by,
+        related_receipt=receipt,
+        related_payment=receipt.payment if getattr(receipt, "payment_id", None) else None,
+        related_invoice=receipt.billing_invoice if getattr(receipt, "billing_invoice_id", None) else None,
+        related_journal=related_journal,
+        metadata=safe_metadata,
+    )
+
+
 def get_latest_lifecycle_event(source_type: str, source_id: int) -> FinancialSourceLifecycleEvent | None:
     return (
         FinancialSourceLifecycleEvent.objects.filter(source_type=source_type, source_id=source_id)

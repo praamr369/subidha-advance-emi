@@ -54,7 +54,7 @@ Scope:
 - no source modifications
 - limited write-point integration for invalidation evidence only:
   - EMI payment reversal: `OperationalCancellation(SourceType.EMI_PAYMENT)` creation emits `FinancialSourceLifecycleEvent(EventType.REVERSED)`
-  - Receipt void: `void_receipt_document()` emits `FinancialSourceLifecycleEvent(EventType.VOIDED)`
+  - Receipt void: `void_receipt_document()` emits `FinancialSourceLifecycleEvent(EventType.VOIDED)` (idempotent helper-backed)
 
 Core fields:
 - `event_no`

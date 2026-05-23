@@ -7,6 +7,7 @@ Implementation note:
 - Schema and service helpers were added in `backend/reconciliation`.
 - Migration: `backend/reconciliation/migrations/0002_financialsourcelifecycleevent.py`.
 - Helpers added: `create_lifecycle_event`, `get_latest_lifecycle_event`, `get_invalidating_events`, `is_source_invalidated`, `is_payment_valid_for_cash_evidence`, `is_receipt_valid_for_settlement`.
+- Idempotent write-point helper added for receipt invalidation: `create_lifecycle_event_for_receipt_invalidation` (used by explicit receipt void path).
 - Phase 1 write-point integration (limited) is now wired for the safest existing invalidation paths:
   - EMI payment reversal/cancellation via `OperationalCancellation(SourceType.EMI_PAYMENT)` creation
   - Receipt void via `billing_service.void_receipt_document()` (explicit status change + reversal journal)
@@ -29,6 +30,7 @@ Design a safe, additive canonical validity-event layer for financial source life
 - underlying source records for existing Payment, ReceiptDocument, MoneyMovement, JournalEntry, FinanceAccount, CashCounter
 
 This is a read-only implementation boundary for existing flows; phase 1 adds the model and helper services, but no runtime integration has been wired yet.
+This is a read-only implementation boundary for existing flows; phase 1 adds the model and helper services and wires *only* the safest invalidation write points (events remain evidence-only and are not consumed by reconciliation/day-close/settlements yet).
 
 ## 2) Current gap
 

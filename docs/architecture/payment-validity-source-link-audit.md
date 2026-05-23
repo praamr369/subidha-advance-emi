@@ -53,9 +53,9 @@ Current receipt validity evidence is derived from:
 
 Key observation:
 
-- Receipt voiding or cancellation does not currently appear to generate a dedicated explicit invalidation signal equivalent to `OperationalCancellation`.
+- Receipt invalidation now has explicit evidence via `FinancialSourceLifecycleEvent` for the explicit void write path (`void_receipt_document()`).
 - `OperationalCancellation.SourceType.BILLING_RECEIPT` exists as a natural extension point, but current receipt void paths do not populate it.
-- Receipt invalidity is therefore inferred from receipt status + journal reversal paths rather than a single deterministic source-link contract.
+- Receipt invalidity is still primarily driven by receipt status + reversal journal behavior; lifecycle events are evidence-only and do not change posting/day-close/settlement logic in Phase 1.
 
 ### 2.3 Cashier day-close totals
 
