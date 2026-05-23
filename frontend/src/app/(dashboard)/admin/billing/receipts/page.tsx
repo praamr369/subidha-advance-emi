@@ -13,7 +13,7 @@ import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import ActionButton from "@/components/ui/ActionButton";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
-import { buildAdminBillingDocumentRoute } from "@/lib/route-builders";
+import { buildAdminBillingDocumentRoute, buildAdminBillingReceiptPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import type { ReceiptDocument } from "@/services/billing";
@@ -62,6 +62,9 @@ export default function BillingReceiptsPage() {
       header: "Actions",
       render: (row) => (
         <div className="flex flex-wrap gap-2">
+          <ActionButton href={buildAdminBillingReceiptPrintRoute(row.id)} variant="primary">
+            Print / Save PDF
+          </ActionButton>
           {row.billing_invoice ? (
             <ActionButton href={buildAdminBillingDocumentRoute(row.billing_invoice)} variant="outline">
               Billing Detail
@@ -144,7 +147,7 @@ export default function BillingReceiptsPage() {
       <PrintActionBanner
         className="mb-4"
         title="Receipt Print / PDF"
-        description="Print this posted receipt preview for customer handover or save it as PDF for records."
+        description="Print this posted receipt preview for customer handover or save it as PDF for records. Use the row action for the branded A4 receipt template."
         share={receiptShare}
       />
 
