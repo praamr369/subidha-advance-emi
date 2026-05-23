@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, Iterable
 
 from django.utils import timezone
 
@@ -24,6 +24,20 @@ OP_CANCELLATION_EVENT_TYPES_BY_CANCELLATION_TYPE = {
     OperationalCancellation.CancellationType.VOID_UNPOSTED: FinancialSourceLifecycleEvent.EventType.CANCELLED,
     OperationalCancellation.CancellationType.CANCEL_DRAFT: FinancialSourceLifecycleEvent.EventType.CANCELLED,
 }
+
+
+def _normalize_payment_ids(payment_ids: Iterable[int]) -> set[int]:
+    normalized_ids: set[int] = set()
+    for payment_id in payment_ids:
+        if payment_id is None:
+            continue
+        try:
+            normalized_id = int(payment_id)
+        except (TypeError, ValueError):
+            continue
+        if normalized_id > 0:
+            normalized_ids.add(normalized_id)
+    return normalized_ids
 
 
 def generate_financial_source_lifecycle_event_no(*, event_date: date | None = None) -> str:
@@ -244,21 +258,46 @@ def is_source_invalidated(source_type: str, source_id: int) -> bool:
     return get_invalidating_events(source_type=source_type, source_id=source_id).exists()
 
 
+def get_invalidated_payment_ids_for_cash_evidence(payment_ids: Iterable[int]) -> set[int]:
+    """
+    Return the subset of payment IDs invalid for cashier cash evidence.
+
+    Read-only optimization helper:
+    - preserves existing OperationalCancellation(SourceType.EMI_PAYMENT) compatibility
+    - uses the same FinancialSourceLifecycleEvent invalidating event contract as single-source helpers
+    - does not create lifecycle events
+    - does not mutate payment, receipt, allocation, reconciliation, or source records
+    """
+    normalized_payment_ids = _normalize_payment_ids(payment_ids)
+    if not normalized_payment_ids:
+        return set()
+
+    cancellation_invalidated_ids = set(
+        OperationalCancellation.objects.filter(
+            source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
+            source_id__in=normalized_payment_ids,
+        )
+        .exclude(source_id__isnull=True)
+        .values_list("source_id", flat=True)
+    )
+
+    lifecycle_invalidated_ids = set(
+        FinancialSourceLifecycleEvent.objects.filter(
+            source_type=FinancialSourceLifecycleEvent.SourceType.EMI_PAYMENT,
+            source_id__in=normalized_payment_ids,
+            event_type__in=INVALIDATING_EVENT_TYPES,
+            event_status=FinancialSourceLifecycleEvent.EventStatus.ACTIVE,
+        ).values_list("source_id", flat=True)
+    )
+
+    return {int(payment_id) for payment_id in cancellation_invalidated_ids | lifecycle_invalidated_ids}
+
+
 def is_payment_valid_for_cash_evidence(payment: Payment) -> bool:
     if payment is None:
         raise ValueError("Payment instance is required.")
 
-    cancelled_payment_exists = OperationalCancellation.objects.filter(
-        source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
-        source_id=payment.id,
-    ).exists()
-    if cancelled_payment_exists:
-        return False
-
-    if is_source_invalidated(FinancialSourceLifecycleEvent.SourceType.EMI_PAYMENT, payment.id):
-        return False
-
-    return True
+    return payment.id not in get_invalidated_payment_ids_for_cash_evidence([payment.id])
 
 
 def is_receipt_valid_for_settlement(receipt: ReceiptDocument) -> bool:
