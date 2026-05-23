@@ -9,7 +9,10 @@ from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount
 from billing.models import BillingDocumentStatus, BillingSourceType, ReceiptDocument, ReceiptType
 from branch_control.models import Branch, CashCounter
 from reconciliation.models import FinancialSourceLifecycleEvent, ReconciliationItem
-from reconciliation.services.financial_source_lifecycle_event_service import create_lifecycle_event
+from reconciliation.services.financial_source_lifecycle_event_service import (
+    create_lifecycle_event,
+    get_invalidated_payment_ids_for_cash_evidence,
+)
 from settlements.models import CashierDayClose, SettlementAllocation
 from settlements.services.cashier_day_close_service import compute_system_cash_total
 from subscriptions.models import OperationalCancellation, Payment, PaymentMethod
@@ -111,16 +114,8 @@ class CashierDayCloseLifecycleValidityTest(TestCase):
             finance_account=finance_account if finance_account is not None else self.finance_account,
         )
 
-    def test_day_close_valid_cash_payment_still_included(self):
-        self._create_payment(amount="125.00")
-
-        total = compute_system_cash_total(cashier_id=self.cashier.id, business_date="2026-05-22")
-
-        self.assertEqual(total, Decimal("125.00"))
-
-    def test_day_close_existing_operational_cancellation_still_excluded(self):
-        payment = self._create_payment(amount="125.00")
-        OperationalCancellation.objects.create(
+    def _cancel_payment(self, payment: Payment) -> OperationalCancellation:
+        return OperationalCancellation.objects.create(
             source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
             source_id=payment.id,
             cancellation_type=OperationalCancellation.CancellationType.PAYMENT_REVERSAL,
@@ -132,13 +127,8 @@ class CashierDayCloseLifecycleValidityTest(TestCase):
             amount_snapshot=payment.amount,
         )
 
-        total = compute_system_cash_total(cashier_id=self.cashier.id, business_date="2026-05-22")
-
-        self.assertEqual(total, Decimal("0.00"))
-
-    def test_day_close_lifecycle_payment_invalidation_excluded(self):
-        payment = self._create_payment(amount="125.00")
-        create_lifecycle_event(
+    def _lifecycle_invalidate_payment(self, payment: Payment) -> FinancialSourceLifecycleEvent:
+        return create_lifecycle_event(
             source_type=FinancialSourceLifecycleEvent.SourceType.EMI_PAYMENT,
             source_id=payment.id,
             event_type=FinancialSourceLifecycleEvent.EventType.REVERSED,
@@ -148,6 +138,60 @@ class CashierDayCloseLifecycleValidityTest(TestCase):
             created_by=self.admin,
             related_payment=payment,
         )
+
+    def test_set_based_helper_returns_operational_cancellation_invalidated_ids(self):
+        valid_payment = self._create_payment(amount="125.00")
+        cancelled_payment = self._create_payment(amount="225.00")
+        self._cancel_payment(cancelled_payment)
+
+        invalidated_ids = get_invalidated_payment_ids_for_cash_evidence(
+            [valid_payment.id, cancelled_payment.id]
+        )
+
+        self.assertEqual(invalidated_ids, {cancelled_payment.id})
+
+    def test_set_based_helper_returns_lifecycle_invalidated_ids(self):
+        valid_payment = self._create_payment(amount="125.00")
+        lifecycle_invalidated_payment = self._create_payment(amount="225.00")
+        self._lifecycle_invalidate_payment(lifecycle_invalidated_payment)
+
+        invalidated_ids = get_invalidated_payment_ids_for_cash_evidence(
+            [valid_payment.id, lifecycle_invalidated_payment.id]
+        )
+
+        self.assertEqual(invalidated_ids, {lifecycle_invalidated_payment.id})
+
+    def test_set_based_helper_combines_operational_and_lifecycle_invalidated_ids(self):
+        valid_payment = self._create_payment(amount="125.00")
+        cancelled_payment = self._create_payment(amount="225.00")
+        lifecycle_invalidated_payment = self._create_payment(amount="325.00")
+        self._cancel_payment(cancelled_payment)
+        self._lifecycle_invalidate_payment(lifecycle_invalidated_payment)
+
+        invalidated_ids = get_invalidated_payment_ids_for_cash_evidence(
+            [valid_payment.id, cancelled_payment.id, lifecycle_invalidated_payment.id]
+        )
+
+        self.assertEqual(invalidated_ids, {cancelled_payment.id, lifecycle_invalidated_payment.id})
+
+    def test_day_close_valid_cash_payment_still_included(self):
+        self._create_payment(amount="125.00")
+
+        total = compute_system_cash_total(cashier_id=self.cashier.id, business_date="2026-05-22")
+
+        self.assertEqual(total, Decimal("125.00"))
+
+    def test_day_close_existing_operational_cancellation_still_excluded(self):
+        payment = self._create_payment(amount="125.00")
+        self._cancel_payment(payment)
+
+        total = compute_system_cash_total(cashier_id=self.cashier.id, business_date="2026-05-22")
+
+        self.assertEqual(total, Decimal("0.00"))
+
+    def test_day_close_lifecycle_payment_invalidation_excluded(self):
+        payment = self._create_payment(amount="125.00")
+        self._lifecycle_invalidate_payment(payment)
 
         total = compute_system_cash_total(cashier_id=self.cashier.id, business_date="2026-05-22")
 
