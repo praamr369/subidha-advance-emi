@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
+
+
+MONEY_ZERO = Decimal("0.00")
 
 
 class ReconciliationRunStatus(models.TextChoices):
@@ -223,4 +229,98 @@ class ReconciliationResolution(models.Model):
         indexes = [
             models.Index(fields=["action", "created_at"]),
         ]
+
+
+class FinancialSourceLifecycleEvent(models.Model):
+    class SourceType(models.TextChoices):
+        EMI_PAYMENT = "EMI_PAYMENT", "EMI Payment"
+        BILLING_RECEIPT = "BILLING_RECEIPT", "Billing Receipt"
+        MONEY_MOVEMENT = "MONEY_MOVEMENT", "Money Movement"
+        BANK_STATEMENT_LINE = "BANK_STATEMENT_LINE", "Bank Statement Line"
+        UPI_SETTLEMENT_LINE = "UPI_SETTLEMENT_LINE", "UPI Settlement Line"
+        CASHIER_DAY_CLOSE = "CASHIER_DAY_CLOSE", "Cashier Day Close"
+        JOURNAL_ENTRY = "JOURNAL_ENTRY", "Journal Entry"
+        OTHER = "OTHER", "Other"
+
+    class EventType(models.TextChoices):
+        POSTED = "POSTED", "Posted"
+        REVERSED = "REVERSED", "Reversed"
+        VOIDED = "VOIDED", "Voided"
+        CANCELLED = "CANCELLED", "Cancelled"
+        REFUNDED = "REFUNDED", "Refunded"
+        ADJUSTED = "ADJUSTED", "Adjusted"
+        SUPERSEDED = "SUPERSEDED", "Superseded"
+
+    class EventStatus(models.TextChoices):
+        ACTIVE = "ACTIVE", "Active"
+        SUPERSEDED = "SUPERSEDED", "Superseded"
+        VOIDED = "VOIDED", "Voided"
+
+    event_no = models.CharField(max_length=40, unique=True, db_index=True)
+    source_type = models.CharField(max_length=40, choices=SourceType.choices, db_index=True)
+    source_id = models.PositiveBigIntegerField(db_index=True)
+    event_type = models.CharField(max_length=24, choices=EventType.choices, db_index=True)
+    event_status = models.CharField(max_length=24, choices=EventStatus.choices, default=EventStatus.ACTIVE, db_index=True)
+    reason = models.TextField(blank=True, default="")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(MONEY_ZERO)])
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="financial_source_lifecycle_events",
+    )
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    related_payment = models.ForeignKey(
+        "subscriptions.Payment",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lifecycle_events",
+    )
+    related_receipt = models.ForeignKey(
+        "billing.ReceiptDocument",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lifecycle_events",
+    )
+    related_invoice = models.ForeignKey(
+        "billing.BillingInvoice",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lifecycle_events",
+    )
+    related_journal = models.ForeignKey(
+        "accounting.JournalEntry",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lifecycle_events",
+    )
+    related_cancellation = models.ForeignKey(
+        "subscriptions.OperationalCancellation",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lifecycle_events",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "financial_source_lifecycle_events"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["source_type", "source_id"]),
+            models.Index(fields=["event_type"]),
+            models.Index(fields=["event_status"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["related_payment"]),
+            models.Index(fields=["related_receipt"]),
+            models.Index(fields=["related_cancellation"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event_no} {self.source_type}#{self.source_id} {self.event_type}"
 
