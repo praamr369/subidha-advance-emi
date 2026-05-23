@@ -47,8 +47,20 @@ export default function CashierDayClosePage() {
   const [systemCashTotal, setSystemCashTotal] = useState<string>("0.00");
   const [record, setRecord] = useState<CashierDayClose | null>(null);
 
+  const [branchId, setBranchId] = useState<string>("");
+  const [cashCounterId, setCashCounterId] = useState<string>("");
+  const [financeAccountId, setFinanceAccountId] = useState<string>("");
+
   const [countedCash, setCountedCash] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+
+  function parseOptionalId(value: string): number | null {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isInteger(parsed)) return null;
+    return parsed;
+  }
 
   const variancePreview = useMemo(() => {
     const counted = Number(countedCash || 0);
@@ -58,8 +70,17 @@ export default function CashierDayClosePage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    const parsedBranchId = parseOptionalId(branchId);
+    const parsedCashCounterId = parseOptionalId(cashCounterId);
+    const parsedFinanceAccountId = parseOptionalId(financeAccountId);
+
     try {
-      const preview = await previewCashierDayClose({ business_date: businessDate });
+      const preview = await previewCashierDayClose({
+        business_date: businessDate,
+        branch_id: parsedBranchId,
+        cash_counter_id: parsedCashCounterId,
+        finance_account_id: parsedFinanceAccountId,
+      });
       setSystemCashTotal(preview.system_cash_total || "0.00");
     } catch (err) {
       setSystemCashTotal("0.00");
@@ -67,7 +88,9 @@ export default function CashierDayClosePage() {
     }
 
     try {
-      const current = await getCashierCurrentDayClose();
+      const current = await getCashierCurrentDayClose({
+        cash_counter_id: parsedCashCounterId,
+      });
       setRecord(current);
       setCountedCash(current.counted_cash || "");
       setNotes(current.notes || "");
@@ -82,7 +105,7 @@ export default function CashierDayClosePage() {
     } finally {
       setLoading(false);
     }
-  }, [businessDate]);
+  }, [businessDate, branchId, cashCounterId, financeAccountId]);
 
   useEffect(() => {
     void load();
@@ -92,10 +115,16 @@ export default function CashierDayClosePage() {
     event.preventDefault();
     setCreating(true);
     try {
+      const parsedBranchId = parseOptionalId(branchId);
+      const parsedCashCounterId = parseOptionalId(cashCounterId);
+      const parsedFinanceAccountId = parseOptionalId(financeAccountId);
       const created = await createCashierDayClose({
         business_date: businessDate,
         counted_cash: countedCash,
         notes,
+        branch: parsedBranchId,
+        cash_counter: parsedCashCounterId,
+        finance_account: parsedFinanceAccountId,
       });
       setRecord(created);
       setError(null);
@@ -180,6 +209,57 @@ export default function CashierDayClosePage() {
       statusBadge={record ? { label: record.status, tone: record.status === "DRAFT" ? "info" : "warning" } : undefined}
     >
       <ERPSectionShell title="Business day" description="Today’s cash position (system) vs counted cash (evidence).">
+        {!record ? (
+          <div className="mb-4 rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Optional scope filters
+            </div>
+            <div className="mt-2 grid gap-3 md:grid-cols-3">
+              <label className="block">
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Branch ID</div>
+                <input
+                  className="mt-1 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm"
+                  inputMode="numeric"
+                  placeholder="e.g. 1"
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                />
+              </label>
+              <label className="block">
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cash counter ID</div>
+                <input
+                  className="mt-1 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm"
+                  inputMode="numeric"
+                  placeholder="e.g. 3"
+                  value={cashCounterId}
+                  onChange={(e) => setCashCounterId(e.target.value)}
+                />
+              </label>
+              <label className="block">
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finance account ID</div>
+                <input
+                  className="mt-1 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm"
+                  inputMode="numeric"
+                  placeholder="e.g. 5"
+                  value={financeAccountId}
+                  onChange={(e) => setFinanceAccountId(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-muted-foreground">
+                System total is based on valid CASH payments collected by this cashier for the selected date and filters.
+              </div>
+              <button
+                type="button"
+                className="rounded-xl border border-border bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                onClick={() => void load()}
+              >
+                Refresh preview
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -192,7 +272,9 @@ export default function CashierDayClosePage() {
               System cash total
             </div>
             <div className="mt-2 text-sm font-semibold text-foreground">{money(record?.system_cash_total ?? systemCashTotal)}</div>
-            <div className="mt-1 text-xs text-muted-foreground">Cash payments collected by you (CASH method) for the date.</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              System total is based on valid CASH payments collected by this cashier for the selected date and filters.
+            </div>
           </div>
           <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">

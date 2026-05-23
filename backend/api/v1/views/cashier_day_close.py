@@ -95,13 +95,21 @@ class CashierDayCloseCurrentView(generics.GenericAPIView):
         
         # Get today's day-close (if exists)
         today = timezone.now().date()
-        day_close = (
-            CashierDayClose.objects
-            .filter(cashier_id=request.user.id, business_date=today)
+        cash_counter_id = request.query_params.get("cash_counter_id")
+        try:
+            cash_counter_id = int(cash_counter_id) if cash_counter_id not in (None, "") else None
+        except (TypeError, ValueError):
+            raise DRFValidationError({"detail": "Invalid query parameter; expected integer."})
+
+        qs = (
+            CashierDayClose.objects.filter(cashier_id=request.user.id, business_date=today)
             .exclude(status="VOIDED")
-            .order_by("-created_at")
-            .first()
+            .order_by("-created_at", "-id")
         )
+        if cash_counter_id is not None:
+            qs = qs.filter(cash_counter_id=cash_counter_id)
+
+        day_close = qs.first()
         
         if not day_close:
             return Response({"detail": "No day-close exists for today."}, status=status.HTTP_404_NOT_FOUND)

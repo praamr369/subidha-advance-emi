@@ -79,7 +79,12 @@ export default function AdminDayClosesPage() {
         render: (row) => (
           <div className="space-y-1">
             <div className="font-medium text-foreground">{row.cashier_username || `User #${row.cashier}`}</div>
-            <div className="text-xs text-muted-foreground">{row.branch_name || "—"}</div>
+            <div className="text-xs text-muted-foreground">
+              Branch {row.branch_name || "—"} · Counter {row.cash_counter_name || "—"}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Finance {row.finance_account_name || "—"}
+            </div>
           </div>
         ),
       },

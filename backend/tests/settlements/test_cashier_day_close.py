@@ -34,12 +34,13 @@ from settlements.services.cashier_day_close_service import (
     CashierDayCloseSubmitPayload,
     CashierDayCloseApprovalPayload,
     CashierDayCloseRejectionPayload,
+    compute_system_cash_total,
     create_cashier_day_close_draft,
     submit_cashier_day_close,
     approve_cashier_day_close,
     reject_cashier_day_close,
 )
-from subscriptions.models import Payment, PaymentMethod
+from subscriptions.models import OperationalCancellation, Payment, PaymentMethod
 
 from tests.helpers import (
     create_admin_user,
@@ -60,12 +61,18 @@ class CashierDayCloseServiceTest(TestCase):
     def setUp(self):
         """Set up test users, branches, and accounting infrastructure."""
         self.cashier = create_cashier_user(username="cashier1", phone="9000000101")
+        self.cashier2 = create_cashier_user(username="cashier2", phone="9000000103")
         self.admin = create_admin_user(username="admin1", phone="9000000102")
 
         # Create branch
         self.branch = Branch.objects.create(
             code="BR001",
             name="Main Branch",
+            status="ACTIVE",
+        )
+        self.branch2 = Branch.objects.create(
+            code="BR002",
+            name="Second Branch",
             status="ACTIVE",
         )
 
@@ -85,6 +92,21 @@ class CashierDayCloseServiceTest(TestCase):
             is_real_settlement_account=True,
             is_active=True,
         )
+        chart_account2 = ChartOfAccount.objects.create(
+            code="1011",
+            name="Cash 2",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        self.finance_account2 = FinanceAccount.objects.create(
+            branch=self.branch2,
+            chart_account=chart_account2,
+            name="Cash Counter 2",
+            kind=FinanceAccountKind.CASH,
+            is_real_settlement_account=True,
+            is_active=True,
+        )
 
         # Create cash counter (requires finance_account)
         self.cash_counter = CashCounter.objects.create(
@@ -94,6 +116,202 @@ class CashierDayCloseServiceTest(TestCase):
             name="Counter 1",
             is_active=True,
         )
+        self.cash_counter2 = CashCounter.objects.create(
+            branch=self.branch2,
+            finance_account=self.finance_account2,
+            code="CC002",
+            name="Counter 2",
+            is_active=True,
+        )
+
+        # Shared subscription fixtures for Payment creation
+        self.customer = create_customer_profile(phone="9000000199")
+        self.product = create_product(product_code="TP-CDC-001")
+        self.batch = create_batch(batch_code="BATCH-CDC-001")
+        self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=11)
+        self.subscription = create_subscription(
+            customer=self.customer,
+            product=self.product,
+            batch=self.batch,
+            lucky_id=self.lucky_id,
+        )
+
+    def _create_payment(
+        self,
+        *,
+        cashier,
+        payment_date: str,
+        amount: str,
+        method: str = PaymentMethod.CASH,
+        branch=None,
+        cash_counter=None,
+        finance_account=None,
+    ) -> Payment:
+        return Payment.objects.create(
+            customer=self.customer,
+            subscription=self.subscription,
+            amount=Decimal(amount),
+            method=method,
+            payment_date=payment_date,
+            collected_by=cashier,
+            branch=branch,
+            cash_counter=cash_counter,
+            finance_account=finance_account,
+        )
+
+    def test_system_cash_total_filters_by_cashier(self):
+        self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-22",
+            amount="100.00",
+            branch=self.branch,
+            cash_counter=self.cash_counter,
+            finance_account=self.finance_account,
+        )
+        self._create_payment(
+            cashier=self.cashier2,
+            payment_date="2026-05-22",
+            amount="250.00",
+            branch=self.branch,
+            cash_counter=self.cash_counter,
+            finance_account=self.finance_account,
+        )
+
+        total = compute_system_cash_total(cashier_id=self.cashier.id, business_date="2026-05-22")
+        self.assertEqual(total, Decimal("100.00"))
+
+    def test_system_cash_total_filters_by_business_date(self):
+        self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-22",
+            amount="100.00",
+            branch=self.branch,
+            cash_counter=self.cash_counter,
+            finance_account=self.finance_account,
+        )
+        self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-23",
+            amount="250.00",
+            branch=self.branch,
+            cash_counter=self.cash_counter,
+            finance_account=self.finance_account,
+        )
+
+        total = compute_system_cash_total(cashier_id=self.cashier.id, business_date="2026-05-22")
+        self.assertEqual(total, Decimal("100.00"))
+
+    def test_system_cash_total_filters_by_cash_counter_when_provided(self):
+        self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-22",
+            amount="100.00",
+            branch=self.branch,
+            cash_counter=self.cash_counter,
+            finance_account=self.finance_account,
+        )
+        self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-22",
+            amount="250.00",
+            branch=self.branch2,
+            cash_counter=self.cash_counter2,
+            finance_account=self.finance_account2,
+        )
+
+        total = compute_system_cash_total(
+            cashier_id=self.cashier.id,
+            business_date="2026-05-22",
+            cash_counter_id=self.cash_counter.id,
+        )
+        self.assertEqual(total, Decimal("100.00"))
+
+    def test_system_cash_total_filters_by_branch_when_provided(self):
+        self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-22",
+            amount="100.00",
+            branch=self.branch,
+            cash_counter=self.cash_counter,
+            finance_account=self.finance_account,
+        )
+        self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-22",
+            amount="250.00",
+            branch=self.branch2,
+            cash_counter=self.cash_counter2,
+            finance_account=self.finance_account2,
+        )
+
+        total = compute_system_cash_total(
+            cashier_id=self.cashier.id,
+            business_date="2026-05-22",
+            branch_id=self.branch.id,
+        )
+        self.assertEqual(total, Decimal("100.00"))
+
+    def test_system_cash_total_filters_by_finance_account_when_provided(self):
+        self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-22",
+            amount="100.00",
+            branch=self.branch,
+            cash_counter=self.cash_counter,
+            finance_account=self.finance_account,
+        )
+        self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-22",
+            amount="250.00",
+            branch=self.branch2,
+            cash_counter=self.cash_counter2,
+            finance_account=self.finance_account2,
+        )
+
+        total = compute_system_cash_total(
+            cashier_id=self.cashier.id,
+            business_date="2026-05-22",
+            finance_account_id=self.finance_account.id,
+        )
+        self.assertEqual(total, Decimal("100.00"))
+
+    def test_system_cash_total_excludes_non_cash(self):
+        self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-22",
+            amount="100.00",
+            method=PaymentMethod.UPI,
+            branch=self.branch,
+            cash_counter=self.cash_counter,
+            finance_account=self.finance_account,
+        )
+        total = compute_system_cash_total(cashier_id=self.cashier.id, business_date="2026-05-22")
+        self.assertEqual(total, Decimal("0.00"))
+
+    def test_system_cash_total_excludes_cancelled_payments_when_explicit_cancellation_exists(self):
+        payment = self._create_payment(
+            cashier=self.cashier,
+            payment_date="2026-05-22",
+            amount="100.00",
+            branch=self.branch,
+            cash_counter=self.cash_counter,
+            finance_account=self.finance_account,
+        )
+        OperationalCancellation.objects.create(
+            source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
+            source_id=payment.id,
+            cancellation_type=OperationalCancellation.CancellationType.PAYMENT_REVERSAL,
+            reason="Test reversal",
+            cancelled_by=self.admin,
+            requested_by=self.admin,
+            approved_by=self.admin,
+            customer=self.customer,
+            amount_snapshot=payment.amount,
+        )
+
+        total = compute_system_cash_total(cashier_id=self.cashier.id, business_date="2026-05-22")
+        self.assertEqual(total, Decimal("0.00"))
 
     def test_create_day_close_draft(self):
         """Test creating a draft day-close."""
@@ -151,6 +369,31 @@ class CashierDayCloseServiceTest(TestCase):
         # Try to create duplicate
         with self.assertRaises(Exception):
             create_cashier_day_close_draft(payload)
+
+    def test_duplicate_active_day_close_scoped_by_cash_counter_when_present(self):
+        payload1 = CashierDayCloseCreatePayload(
+            cashier_id=self.cashier.id,
+            business_date="2026-05-22",
+            counted_cash=Decimal("10000.00"),
+            system_cash_total=Decimal("9950.00"),
+            cash_counter_id=self.cash_counter.id,
+        )
+        payload2 = CashierDayCloseCreatePayload(
+            cashier_id=self.cashier.id,
+            business_date="2026-05-22",
+            counted_cash=Decimal("20000.00"),
+            system_cash_total=Decimal("19900.00"),
+            cash_counter_id=self.cash_counter2.id,
+        )
+
+        day_close1 = create_cashier_day_close_draft(payload1)
+        self.assertEqual(day_close1.cash_counter_id, self.cash_counter.id)
+
+        day_close2 = create_cashier_day_close_draft(payload2)
+        self.assertEqual(day_close2.cash_counter_id, self.cash_counter2.id)
+
+        with self.assertRaises(Exception):
+            create_cashier_day_close_draft(payload1)
 
     def test_submit_day_close(self):
         """Test submitting a draft day-close."""

@@ -33,7 +33,7 @@ from settlements.models import (
     CashierDayCloseStatus,
 )
 
-from subscriptions.models import Payment, PaymentMethod
+from subscriptions.models import OperationalCancellation, Payment, PaymentMethod
 
 
 def compute_system_cash_total(
@@ -60,11 +60,23 @@ def compute_system_cash_total(
         payment_date=business_date,
         method=PaymentMethod.CASH,
     )
-    if branch_id:
+
+    # Evidence-only exclusion: if an explicit operational cancellation exists for the
+    # payment record, it is not considered a valid cash-collection evidence source.
+    cancelled_payment_ids = (
+        OperationalCancellation.objects.filter(
+            source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
+        )
+        .exclude(source_id__isnull=True)
+        .values_list("source_id", flat=True)
+    )
+    qs = qs.exclude(id__in=cancelled_payment_ids)
+
+    if branch_id is not None:
         qs = qs.filter(branch_id=branch_id)
-    if cash_counter_id:
+    if cash_counter_id is not None:
         qs = qs.filter(cash_counter_id=cash_counter_id)
-    if finance_account_id:
+    if finance_account_id is not None:
         qs = qs.filter(finance_account_id=finance_account_id)
 
     total = qs.aggregate(total_amount=Sum("amount"))
@@ -149,7 +161,7 @@ def create_cashier_day_close_draft(payload: CashierDayCloseCreatePayload) -> Cas
         business_date=payload.business_date,
         status__in=[CashierDayCloseStatus.DRAFT, CashierDayCloseStatus.SUBMITTED],
     )
-    if payload.cash_counter_id:
+    if payload.cash_counter_id is not None:
         duplicate_query = duplicate_query.filter(cash_counter_id=payload.cash_counter_id)
     if duplicate_query.exists():
         raise ValidationError(

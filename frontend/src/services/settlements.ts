@@ -136,8 +136,10 @@ export async function previewCashierDayClose(params?: {
   );
 }
 
-export async function getCashierCurrentDayClose() {
-  return apiFetch<CashierDayClose>("/cashier/day-close/current/");
+export async function getCashierCurrentDayClose(params?: {
+  cash_counter_id?: number | null;
+}) {
+  return apiFetch<CashierDayClose>(`/cashier/day-close/current/${buildQuery(params)}`);
 }
 
 export async function listCashierDayCloses(params?: QueryParams) {
