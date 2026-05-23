@@ -122,7 +122,7 @@ def schedule_direct_sale_delivery(
     notes: str = "",
 ):
     case, sale = _lock_direct_sale_case(case_id=case_id)
-    _validate_delivery_gate(sale=sale)
+    _validate_delivery_gate_allowing_payment_exception(case=case, sale=sale)
     if case.status in {ServiceDeskCaseStatus.RESOLVED, ServiceDeskCaseStatus.CLOSED}:
         raise ValueError("Direct sale is already delivered.")
     if case.status == ServiceDeskCaseStatus.CANCELLED:
@@ -303,12 +303,14 @@ def approve_direct_sale_delivery_payment_exception(*, case_id: int, actor, reaso
         raise ValueError("Payment exception is only valid when outstanding balance exists.")
 
     case.payment_exception_approved = True
+    case.payment_exception_acknowledged = True
     case.payment_exception_reason = reason
     case.payment_exception_approved_by = actor
     case.payment_exception_approved_at = timezone.now()
     case.save(
         update_fields=[
             "payment_exception_approved",
+            "payment_exception_acknowledged",
             "payment_exception_reason",
             "payment_exception_approved_by",
             "payment_exception_approved_at",
