@@ -260,6 +260,7 @@ def sync_direct_sale_delivery_case(*, sale: DirectSale, actor=None) -> ServiceDe
             finance_status=ServiceDeskFinanceStatus.NOT_REQUIRED,
             stock_status=desired_stock,
             resolution_summary=resolution_summary,
+            payment_exception_acknowledged=False,
         )
     else:
         updates = []
