@@ -419,6 +419,8 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         case = ServiceDeskCase.objects.get(direct_sale_id=response.data["id"])
         self.assertEqual(case.case_type, ServiceDeskCaseType.DIRECT_SALE_DELIVERY)
         self.assertEqual(case.status, ServiceDeskCaseStatus.OPEN)
+        self.assertFalse(case.payment_exception_acknowledged)
+        self.assertFalse(case.payment_exception_approved)
         self.assertEqual(response.data.get("delivery_status"), "DRAFT_HOLD")
         self.assertEqual(response.data.get("delivery_request_id"), case.id)
 
