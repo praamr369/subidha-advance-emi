@@ -321,6 +321,7 @@ For each pair:
   - None (no batch link to payments)
 - Deferred checks:
   - “Bank/UPI settlement mismatch” checks.
+  - Receipt invalidation or cashier day-close exclusion checks that depend on `ReceiptDocument.posted_journal_entry` without a dedicated lifecycle event contract.
 
 ### 3.13 Finance account transaction / ledger (if present)
 

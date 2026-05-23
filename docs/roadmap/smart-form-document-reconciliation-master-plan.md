@@ -32,6 +32,7 @@ Settlement lookup hardening (implemented 2026-05-22):
   - `GET /api/v1/admin/settlements/lookups/receipts/?q=...`
   - `GET /api/v1/admin/settlements/lookups/money-movements/?q=...`
 - These endpoints are lookup-only hardening: no auto-match, no suggestions, no write behavior, and no source-record mutation.
+- The settlement and reconciliation roadmap remains dependent on a generic lifecycle event design for receipt invalidation and explicit cashier day-close evidence; see `docs/architecture/financial-source-lifecycle-event-design.md`.
 
 ## Workstreams
 

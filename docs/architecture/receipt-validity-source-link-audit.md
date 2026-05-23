@@ -140,3 +140,17 @@ The findings show that:
 - `Receipts` currently rely on `status` + journal reversal inference for invalidation
 - an explicit invalidation source-link contract is missing for deterministic settlement and cashier use
 - future schema should be additive, backward-compatible, and explicit rather than inferring invalidation from existing posted journals or receipt status alone
+
+## 6) Additive lifecycle event design recommendation
+
+The recommended path is a generic `FinancialSourceLifecycleEvent` layer that treats receipt validity the same way as payment and money movement validity.
+
+Key recommendation:
+- do not rely on `ReceiptDocument.status = POSTED` or `posted_journal_entry` presence as proof of an active receipt.
+- create explicit `VOIDED`, `CANCELLED`, `REFUNDED`, and `SUPERSEDED` lifecycle events for receipts.
+- preserve existing receipt generation and posting behavior.
+- keep events append-only and audit-only for the first implementation.
+
+See also:
+- `docs/architecture/financial-source-lifecycle-event-design.md`
+- `docs/roadmap/financial-source-lifecycle-event-implementation-plan.md`

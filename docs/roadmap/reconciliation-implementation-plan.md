@@ -231,6 +231,7 @@ Explicitly deferred in Settlement:
 - Payment.method ↔ FinanceAccount.kind mismatch checks (business rule not formally enforced)
 - “Receipt required for every payment” checks (policy-dependent)
 - Receipt invalidation / void evidence normalization before adding cashier day-close or settlement exclusion checks. See `docs/architecture/receipt-validity-source-link-audit.md` for current receipt lifecycle evidence and the missing explicit invalidation contract.
+- Lifecycle event evidence should be scoped in a dedicated design document before these checks are enabled; see `docs/architecture/financial-source-lifecycle-event-design.md`.
 
 Implemented (allocation-backed; deterministic-only; module=`settlement`):
 - `BANK_STATEMENT_LINE_UNALLOCATED`, `UPI_SETTLEMENT_LINE_UNALLOCATED` (MEDIUM)

@@ -172,3 +172,18 @@ These proposals are documentation-only and additive.
 This audit is read-only. No model or migration changes are applied.
 
 The findings identify current reliance on `OperationalCancellation` for payment invalidation and the missing equivalent explicit receipt invalidation signal. Any future schema change should prioritize additive, backward-compatible audit records rather than rewriting existing payment/receipt posting behavior.
+
+## 6) Additive lifecycle event design recommendation
+
+The safest future design is a generic lifecycle event layer that records explicit posting, reversal, voiding, cancellation, refund, and supersession events for financial sources.
+
+Key recommendation:
+- prefer a generic `FinancialSourceLifecycleEvent` model rather than overloading `OperationalCancellation` or creating narrow per-source event tables.
+- preserve `OperationalCancellation` as the existing authoritative payment reversal anchor.
+- keep the event model append-only, audit-only, and separate from accounting posting.
+- do not require historical backfill for the first implementation.
+- do not infer validity from `ReceiptDocument.posted_journal_entry` alone; consume explicit lifecycle events instead.
+
+See also:
+- `docs/architecture/financial-source-lifecycle-event-design.md`
+- `docs/roadmap/financial-source-lifecycle-event-implementation-plan.md`

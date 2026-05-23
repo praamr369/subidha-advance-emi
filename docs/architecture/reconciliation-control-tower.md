@@ -202,6 +202,7 @@ Implemented settlement checks (read-only detection; no mutation; no inferred set
   - `MONEY_MOVEMENT_JOURNAL_GROUP_UNBALANCED` (CRITICAL, only when explicit journal_group exists)
 
 - Receipt invalidation evidence is intentionally deferred until a first-class receipt invalidation contract exists; see `docs/architecture/receipt-validity-source-link-audit.md`.
+- A generic lifecycle event layer is the intended future contract for receipt invalidation and cashier day-close evidence; see `docs/architecture/financial-source-lifecycle-event-design.md`.
 
 Module used (admin-only queue label):
 - `CASH_BANK_UPI_SETTLEMENT_PHASE`
