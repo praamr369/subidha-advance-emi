@@ -28,7 +28,7 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from reconciliation.services.financial_source_lifecycle_event_service import (
-    is_payment_valid_for_cash_evidence,
+    get_invalidated_payment_ids_for_cash_evidence,
 )
 from settlements.models import (
     MONEY_ZERO,
@@ -71,15 +71,16 @@ def compute_system_cash_total(
     if finance_account_id is not None:
         qs = qs.filter(finance_account_id=finance_account_id)
 
+    candidate_payment_ids = set(qs.values_list("id", flat=True))
+    if not candidate_payment_ids:
+        return MONEY_ZERO
+
     # Evidence-only validity gate:
     # - preserves existing OperationalCancellation(SourceType.EMI_PAYMENT) compatibility
     # - also excludes explicit FinancialSourceLifecycleEvent invalidations
     # - never creates lifecycle events or mutates source records from the read path
-    valid_payment_ids = [
-        payment.id
-        for payment in qs.only("id")
-        if is_payment_valid_for_cash_evidence(payment)
-    ]
+    invalidated_payment_ids = get_invalidated_payment_ids_for_cash_evidence(candidate_payment_ids)
+    valid_payment_ids = candidate_payment_ids - invalidated_payment_ids
     if not valid_payment_ids:
         return MONEY_ZERO
 
