@@ -43,30 +43,58 @@ export function DocumentPage({
   watermark?: string | null;
 }) {
   return (
-    <main className="document-screen min-h-screen bg-[#f4eadb] px-4 py-8 print:bg-white print:p-0">
+    <main className="document-screen fixed inset-0 z-[1000] min-h-screen overflow-y-auto bg-[#f4eadb] px-4 py-8 print:static print:z-auto print:overflow-visible print:bg-white print:p-0">
       <style jsx global>{`
         @page {
           size: A4;
           margin: 12mm;
         }
+        .document-screen,
+        .document-screen * {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
         @media print {
           html,
           body {
+            width: 210mm;
+            min-height: 297mm;
             background: #ffffff !important;
           }
+          .print-toolbar,
+          .dashboard-app,
+          .portal-scroll-area,
+          header:not(.document-header),
+          nav,
+          aside,
+          [data-dashboard-shell],
+          [data-document-link-strip] {
+            display: none !important;
+          }
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
           .print-document,
           .print-document * {
-            visibility: visible;
+            visibility: visible !important;
+          }
+          .document-screen {
+            display: block !important;
+            position: static !important;
+            inset: auto !important;
+            width: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
+            background: #ffffff !important;
           }
           .print-document {
-            position: absolute;
-            inset: 0;
+            position: static !important;
             width: 186mm !important;
+            max-width: 186mm !important;
             margin: 0 auto !important;
             box-shadow: none !important;
+            color: #2f2418 !important;
+            background: #ffffff !important;
           }
           .document-no-break,
           .document-card,
@@ -81,18 +109,27 @@ export function DocumentPage({
           tfoot {
             display: table-footer-group;
           }
+          th {
+            color: #2f2418 !important;
+            background: #f5ead8 !important;
+          }
           .document-print-footer {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
+            background: #ffffff !important;
+          }
+          .document-watermark {
+            color: rgba(185, 28, 28, 0.16) !important;
+            border-color: rgba(254, 202, 202, 0.45) !important;
           }
         }
       `}</style>
       <section className="print-document relative mx-auto w-full max-w-[210mm] overflow-hidden rounded-[18px] border border-[#e6d6bd] bg-[#fffaf0] text-[#2f2418] shadow-2xl print:max-w-none print:rounded-none print:border-0 print:bg-white print:shadow-none">
         {watermark ? (
-          <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden">
-            <div className="rotate-[-28deg] select-none border-[6px] border-red-200 px-12 py-5 text-7xl font-black uppercase tracking-[0.22em] text-red-200/45 print:text-red-200/35">
+          <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden" aria-hidden="true">
+            <div className="document-watermark rotate-[-28deg] select-none border-[6px] border-red-200 px-12 py-5 text-7xl font-black uppercase tracking-[0.22em] text-red-200/40 print:text-red-200/30">
               {watermark}
             </div>
           </div>
@@ -114,7 +151,7 @@ export function DocumentHeader({
 }) {
   const theme = subidhaDocumentTheme;
   return (
-    <header className="document-no-break border-b-4 border-[#8a5a22] pb-5">
+    <header className="document-header document-no-break border-b-4 border-[#8a5a22] pb-5">
       <div className="flex items-start justify-between gap-6">
         <div className="flex items-start gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#d9c39c] bg-white text-xl font-black text-[#7b4c1f]">
@@ -134,7 +171,7 @@ export function DocumentHeader({
             </div>
           </div>
         </div>
-        <div className="min-w-[190px] rounded-2xl border border-[#d9c39c] bg-white/80 p-4 text-right">
+        <div className="min-w-[190px] rounded-2xl border border-[#d9c39c] bg-white p-4 text-right">
           <div className="inline-flex rounded-full border border-[#c99a47] bg-[#fff2cf] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#6f4e27]">
             {copyLabel}
           </div>
@@ -158,13 +195,13 @@ export function DocumentTitleStrip({
   status?: string | null;
 }) {
   return (
-    <div className="document-no-break my-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#6f4e27] px-5 py-4 text-white">
+    <div className="document-no-break my-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#6f4e27] bg-[#6f4e27] px-5 py-4 text-white">
       <div>
         <h1 className="text-xl font-black uppercase tracking-[0.16em]">{title}</h1>
-        {subtitle ? <p className="mt-1 text-sm text-white/80">{subtitle}</p> : null}
+        {subtitle ? <p className="mt-1 text-sm text-white/90">{subtitle}</p> : null}
       </div>
       {status ? (
-        <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wide">
+        <span className="rounded-full border border-white/40 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wide">
           {status}
         </span>
       ) : null}
@@ -174,7 +211,7 @@ export function DocumentTitleStrip({
 
 export function DocumentMetadataGrid({ items }: { items: MetadataItem[] }) {
   return (
-    <section className="document-card grid gap-3 rounded-2xl border border-[#e6d6bd] bg-white/70 p-4 sm:grid-cols-2 lg:grid-cols-4">
+    <section className="document-card grid gap-3 rounded-2xl border border-[#e6d6bd] bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
       {items.map((item) => (
         <div key={item.label}>
           <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">{item.label}</div>
@@ -284,7 +321,7 @@ export function DocumentSignatureBlock({ labels }: { labels: string[] }) {
 
 export function DocumentAuditFooter({ generatedAt }: { generatedAt?: string }) {
   return (
-    <footer className="document-print-footer mt-6 border-t border-[#e6d6bd] pt-3 text-center text-[10px] leading-4 text-[#7c6a56]">
+    <footer className="document-print-footer mt-6 border-t border-[#e6d6bd] bg-white pt-3 text-center text-[10px] leading-4 text-[#7c6a56]">
       Generated by SUBIDHA CORE · {formatDocumentDateTime(generatedAt || new Date())} · Audit copy for business records
     </footer>
   );
