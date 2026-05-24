@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -11,6 +12,7 @@ import { AccountingControlShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
 import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { buildAdminJournalEntryPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
   createManualJournalEntry,
@@ -274,6 +276,12 @@ export default function AccountingJournalsPage() {
                       </div>
 
                       <div className="mt-4 flex flex-wrap gap-2">
+                        <Link
+                          href={buildAdminJournalEntryPrintRoute(journal.id)}
+                          className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
+                        >
+                          Journal Entry PDF / Print
+                        </Link>
                         {journal.status === "DRAFT" ? (
                           <button
                             type="button"
