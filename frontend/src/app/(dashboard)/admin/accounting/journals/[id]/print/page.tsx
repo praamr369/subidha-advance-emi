@@ -5,16 +5,13 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  DocumentAmountSummary,
   DocumentAuditFooter,
   DocumentHeader,
-  DocumentLineItemsTable,
   DocumentMetadataGrid,
   DocumentPage,
   DocumentSignatureBlock,
   DocumentTermsBlock,
   DocumentTitleStrip,
-  type DocumentLineItem,
 } from "@/components/documents/document-shell";
 import { PrintToolbar } from "@/components/documents/print-toolbar";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -36,40 +33,6 @@ import type { JournalEntry } from "@/services/accounting";
 
 function statusLabel(status: string | null | undefined): string {
   return unsafeDocumentStatusLabel(status) || normalizeDocumentStatus(status) || "—";
-}
-
-function lineRows(entry: JournalEntry): DocumentLineItem[] {
-  return (entry.lines || []).map((line, index) => ({
-    key: line.id || `${entry.id}-${index}`,
-    description: safeDocumentText(line.chart_account_name, `Line ${index + 1}`),
-    code: [line.chart_account_code, line.description].map((part) => (part || "").trim()).filter(Boolean).join(" · "),
-    quantity: "—",
-    rate: formatDocumentMoney(line.debit_amount),
-    discount: "—",
-    tax: "—",
-    total: formatDocumentMoney(line.credit_amount),
-  }));
-}
-
-function totalOf(entry: JournalEntry, key: "debit_amount" | "credit_amount"): number {
-  return (entry.lines || []).reduce((sum, line) => {
-    const amount = Number(line[key] || 0);
-    return sum + (Number.isFinite(amount) ? amount : 0);
-  }, 0);
-}
-
-function isUnbalanced(entry: JournalEntry): boolean {
-  return totalOf(entry, "debit_amount") !== totalOf(entry, "credit_amount");
-}
-
-function warning(entry: JournalEntry): string | null {
-  if (isUnbalanced(entry)) return "This journal entry is UNBALANCED. It must not be treated as a normal posted accounting voucher.";
-  return documentUnsafeStatusMessage(entry.status, "journal entry voucher");
-}
-
-function watermark(entry: JournalEntry): string | null {
-  if (isUnbalanced(entry)) return "UNBALANCED";
-  return documentStatusWatermark(entry.status);
 }
 
 export default function AdminJournalEntryPrintPage() {
@@ -111,15 +74,12 @@ export default function AdminJournalEntryPrintPage() {
     return <ERPErrorState title="Unable to load journal entry voucher" description={error || "The requested journal entry could not be loaded."} />;
   }
 
-  const totalDebit = totalOf(entry, "debit_amount");
-  const totalCredit = totalOf(entry, "credit_amount");
-  const diff = totalDebit - totalCredit;
-  const warn = warning(entry);
+  const warn = documentUnsafeStatusMessage(entry.status, "journal entry voucher");
 
   return (
     <>
       <PrintToolbar copyLabel={copyLabel} onCopyLabelChange={setCopyLabel} backHref={ROUTES.admin.accountingJournals} />
-      <DocumentPage watermark={watermark(entry)}>
+      <DocumentPage watermark={documentStatusWatermark(entry.status)}>
         <DocumentHeader copyLabel={copyLabel} documentNo={entry.entry_no} documentDate={formatDocumentDate(entry.entry_date)} />
         <DocumentTitleStrip title="JOURNAL ENTRY VOUCHER" subtitle="Read-only accounting voucher generated from existing journal-entry records." status={statusLabel(entry.status)} />
         {warn ? <div className="document-card mb-4 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">{warn}</div> : null}
@@ -145,18 +105,34 @@ export default function AdminJournalEntryPrintPage() {
             <div className="mt-2 whitespace-pre-line text-xs leading-5 text-[#6f5c46]">{entry.memo || entry.void_reason}</div>
           </section>
         ) : null}
-        <section className="mt-5">
-          <div className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Debit / Credit Lines</div>
-          <DocumentLineItemsTable items={lineRows(entry)} />
+        <section className="document-card my-5 overflow-hidden rounded-2xl border border-[#d9c39c] bg-white">
+          <div className="border-b border-[#eadcc6] px-3 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">
+            Debit / Credit Lines
+          </div>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-[#f0dfbd] text-left text-[11px] uppercase tracking-[0.1em] text-[#5e3818]">
+                <th className="px-3 py-3">Account Code</th>
+                <th className="px-3 py-3">Account Name</th>
+                <th className="px-3 py-3">Line Narration</th>
+                <th className="px-3 py-3 text-right">Debit</th>
+                <th className="px-3 py-3 text-right">Credit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(entry.lines || []).map((line, index) => (
+                <tr key={line.id || `${entry.id}-${index}`} className="border-t border-[#eadcc6] align-top">
+                  <td className="px-3 py-3 font-semibold text-[#2f2418]">{safeDocumentText(line.chart_account_code)}</td>
+                  <td className="px-3 py-3 text-[#2f2418]">{safeDocumentText(line.chart_account_name)}</td>
+                  <td className="px-3 py-3 text-[#6f5c46]">{safeDocumentText(line.description)}</td>
+                  <td className="px-3 py-3 text-right">{formatDocumentMoney(line.debit_amount)}</td>
+                  <td className="px-3 py-3 text-right">{formatDocumentMoney(line.credit_amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
-        <DocumentAmountSummary
-          rows={[
-            { label: "Total Debit", value: formatDocumentMoney(totalDebit), strong: true },
-            { label: "Total Credit", value: formatDocumentMoney(totalCredit), strong: true },
-            { label: "Difference / Imbalance", value: formatDocumentMoney(diff), strong: true, danger: diff !== 0 },
-          ]}
-        />
-        <DocumentTermsBlock terms={["This voucher is generated from the existing backend journal entry payload only.", "Totals shown here are a display summary of backend journal lines and do not post, approve, void, reverse, or reconcile this entry.", "Draft, voided, reversed, cancelled, failed, or unbalanced entries must not be treated as normal posted journal vouchers."]} />
+        <DocumentTermsBlock terms={["This voucher is generated from the existing backend journal entry payload only.", "Debit and credit line amounts are backend-provided. This print page does not calculate debit/credit totals, imbalance, posting state, or reconciliation state.", "Draft, voided, reversed, cancelled, failed, or backend-marked unbalanced entries must not be treated as normal posted journal vouchers."]} />
         <DocumentSignatureBlock labels={["Prepared By Signature", "Approved By Signature"]} />
         <div className="document-screen-only mt-5 flex justify-between gap-4 text-xs text-[#7c6a56]"><Link href={ROUTES.admin.accountingJournals} className="font-semibold text-[#6f4e27] underline-offset-4 hover:underline">Back to journal register</Link><span>Read-only journal entry voucher generated from existing backend payloads.</span></div>
         <DocumentAuditFooter generatedAt={generatedAt} />
