@@ -1,8 +1,8 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 3C IMPLEMENTED ON `update` BRANCH**
+Status: **PHASE 3D QA CONSOLIDATED ON `update` BRANCH**
 
-This document records the branded print/PDF document system for SUBIDHA CORE. Print pages are intentionally read-only and payload-driven. They display backend-provided records and must not mutate financial, stock, delivery, subscription, EMI, waiver, lucky draw, rent/lease deposit, billing, refund, possession, return-inspection, commission, payout, cancellation, reversal, vendor payable, purchase, inventory valuation, cashier settlement, payment, receipt, reconciliation, allocation, money movement, journal, finance account, source lifecycle, or accounting records.
+This document records the branded print/PDF document system for SUBIDHA CORE. Print pages are evidence documents, not posting engines. They are intentionally read-only and payload-driven. They display backend-provided records and must not mutate financial, stock, delivery, subscription, EMI, waiver, lucky draw, rent/lease deposit, billing, refund, possession, return-inspection, commission, payout, cancellation, reversal, vendor payable, purchase, inventory valuation, cashier settlement, payment, receipt, reconciliation, allocation, money movement, journal, finance account, source lifecycle, or accounting records.
 
 ## Shared frontend primitives
 
@@ -35,7 +35,7 @@ frontend/src/lib/documents/formatters.ts
 
 The formatter layer centralizes INR display, Indian date/date-time display, safe fallbacks, normalized status labels, unsafe status labels, unsafe status watermarks, unsafe warning messages, and positive amount checks.
 
-Current shared unsafe statuses include:
+Shared unsafe statuses include:
 
 ```text
 CANCELLED
@@ -47,11 +47,15 @@ CLOSED
 INACTIVE
 DEFAULTED
 FAILED
+REOPENED
+INCOMPLETE
+UNBALANCED
+UNRECONCILED
 ```
 
 Document-specific warning states:
 
-- Cashier day-close reports show an explicit **UNBALANCED** watermark/warning when backend `variance` is non-zero.
+- Cashier day-close reports show **UNBALANCED** when backend `variance` is non-zero.
 - Reconciliation reports show **UNRECONCILED** when backend run totals expose open exceptions or high-risk items.
 
 ## Dashboard-shell isolation
@@ -81,7 +85,7 @@ This prevents sidebar, topbar, command palette triggers, quick-action buttons, w
 - screen document preview and static print flow.
 - hiding toolbar during print.
 - hiding screen-only navigation with `.document-screen-only` and `[data-print-hidden]`.
-- hiding non-document `header`, `nav`, `aside`, dashboard shell, dashboard sidebar/topbar, and document link strips during print.
+- hiding non-document `header`, `nav`, `aside`, dashboard shell, dashboard sidebar/topbar, operational buttons, and document link strips during print.
 - preventing page breaks inside cards, totals, rows, tables, and signatures.
 - readable table headers and white print backgrounds when browser background graphics are disabled.
 - light watermarks that do not block text.
@@ -100,67 +104,56 @@ This prevents sidebar, topbar, command palette triggers, quick-action buttons, w
 | Cashier Day Close Report | `/admin/settlements/day-closes/[id]/print` | `GET /admin/settlements/cashier-day-closes/:id/` | Day-close register/review actions `Day Close Report PDF / Print` | `buildAdminCashierDayClosePrintRoute(id)` |
 | Reconciliation Report | `/admin/reconciliation/reports/[id]/print` | `GET /admin/reconciliation/runs/:id/` and `GET /admin/reconciliation/items/?run=:id` | Reconciliation run history/detail actions `Reconciliation Report PDF / Print` | `buildAdminReconciliationReportPrintRoute(id)` |
 
-## Document-specific safety notes
+## Phase 3 financial/audit route QA results
 
-### Direct Sale Invoice
+Audited Phase 3 routes:
 
-Uses existing direct-sale payload fields for invoice/sale references, customer snapshot, lines, totals, received amount, balance due, invoice status, and payment state. The page does not post payments, update invoice state, generate receipts, move stock, or alter delivery readiness.
+```text
+/admin/purchases/:id/bill/print
+/admin/vendors/payments/:id/voucher/print
+/admin/settlements/day-closes/:id/print
+/admin/reconciliation/reports/:id/print
+```
 
-### Payment / EMI Receipt
+Confirmed:
 
-Uses existing receipt payload fields only. Unsafe receipt statuses render visible warning and watermark. Voided, cancelled, or reversed receipts are retained for audit and are not proof of active payment.
+- All four routes call read APIs only.
+- No print route calls mutation endpoints.
+- No route recalculates financial truth.
+- Print toolbar is screen-only and hidden during print media.
+- Screen-only back links are hidden during print media.
+- Dashboard shell/sidebar/topbar/operational actions are hidden during print media.
+- Audit footer and signature blocks remain printable.
+- White print background and explicit borders keep documents readable when browser background graphics are disabled.
 
-### Direct Sale Delivery Challan
-
-Uses existing delivery payload fields only. Payment-exception release documents explicitly state that delivery was operationally released, receivable remains collectible, and approval does not settle payment. The page does not schedule, dispatch, cancel, note, move stock, mark delivered, or approve exceptions.
-
-### Lucky Plan / Subscription Contract
-
-Uses existing admin subscription/customer payload fields only. It does not build an EMI schedule or calculate EMI from product price. Winner/waiver notes are display-only and only reflect backend winner/waiver fields.
-
-### Rent / Lease Contract
-
-Uses existing subscription, rent/lease profile, customer, financial summary, and optional possession payload fields only. The page does not generate billing schedules or calculate rent, lease amount, deposit, refund, deduction, outstanding balance, due dates, possession, or return condition.
+## Phase 3 evidence-document rules
 
 ### Purchase Bill / Vendor Bill
 
-Uses existing vendor bill, vendor, and vendor outstanding payloads only. It does not calculate bill totals, tax, payable, inventory value, stock receipt status, or accounting truth. Unsafe purchase statuses show warning/watermark.
+Uses existing vendor bill, vendor, and vendor outstanding payloads only. It does not calculate purchase totals, tax totals, payable, inventory value, stock receipt status, or accounting truth. Unsafe purchase statuses show warning/watermark.
 
 ### Vendor Payment Voucher
 
-Uses existing vendor payment, optional vendor bill, vendor, and vendor outstanding payloads only. It does not calculate allocation, payable balance, accounting posting, reconciliation state, or settlement truth.
+Uses existing vendor payment, optional vendor bill, vendor, and vendor outstanding payloads only. It does not calculate payment allocation, payable balance, accounting posting, reconciliation state, or settlement truth.
 
 ### Cashier Day Close Report
 
-Uses existing admin day-close payload fields only: close number, cashier, branch/counter, finance account, business date, opening cash, system cash, counted/declared cash, variance, status, closed/approved metadata, notes, and optional metadata-provided counts/method summaries. It does not calculate cashier totals, variance, expected cash, declared cash, payment counts, receipt counts, or reconciliation status.
+Uses existing admin day-close payload fields only: close number, cashier, branch/counter, finance account, business date, opening cash, system cash, counted/declared cash, variance, status, closed/approved metadata, notes, and optional metadata-provided counts/method summaries. It does not calculate cashier expected total, declared total, variance, payment counts, receipt counts, or reconciliation status.
 
 ### Reconciliation Report
 
-Uses existing Control Tower reconciliation run and item payloads only:
-
-- run/report reference from `run_no`.
-- scope/module as report type/source.
-- date period from `date_from`/`date_to` or `started_at`.
-- status from backend run status.
-- prepared by from `started_by_username`.
-- generated/finished timestamps from backend run timestamps.
-- total source records, matched count, exception count, and high-risk count from run fields.
-- expected, matched, unmatched, and variance amounts only when backend run `metadata` exposes them.
-- source references and exception table from backend reconciliation item rows.
-
-The page does **not** recalculate expected amount, matched amount, unmatched amount, variance, exception count, reconciliation status, ledger state, or accounting truth. It does not create or mutate reconciliation items, settlements, payments, receipts, money movements, journal entries, finance accounts, source lifecycle events, operational cancellations, or accounting records. Runs with failed/cancelled/incomplete status or open exceptions must not be treated as fully reconciled.
+Uses existing Control Tower reconciliation run and item payloads only. It does not recalculate expected amount, matched amount, unmatched amount, variance, exception count, reconciliation status, ledger state, or accounting truth. It does not create or mutate reconciliation items, settlements, payments, receipts, money movements, journal entries, finance accounts, source lifecycle events, operational cancellations, or accounting records.
 
 ## Global financial and audit safety rules
 
 1. Print pages are read-only.
 2. Browser print is allowed; application mutation is not.
 3. No frontend recalculation of financial truth.
-4. No fake totals, tax values, payment references, receipt references, report references, or source references.
-5. No fake EMI schedules, rent/lease schedules, purchase totals, payable balances, cashier totals, reconciliation counts, variance, or ledger status.
-6. Missing optional display values must use safe fallbacks such as `—`.
-7. Unsafe states must not visually appear as normal active/paid/settled/reconciled records.
-8. Outstanding balances, variance, and exceptions must remain visible when backend payloads expose them.
-9. Print views must not settle payments, close receivables/payables, post accounting, generate receipts/vouchers, reconcile items, approve/reject/reopen records, or mutate operational records.
+4. No fake totals, tax values, payment references, receipt references, report references, source references, cashier counts, reconciliation counts, variance, ledger state, or accounting state.
+5. Missing optional display values must use safe fallbacks such as `—`.
+6. Unsafe states must not visually appear as normal active/paid/settled/reconciled records.
+7. Outstanding balances, variance, and exceptions must remain visible when backend payloads expose them.
+8. Print views must not settle payments, close receivables/payables, post accounting, generate receipts/vouchers, reconcile items, approve/reject/reopen records, move stock, mutate finance accounts, or mutate operational records.
 
 ## Deterministic test coverage
 
@@ -175,7 +168,13 @@ frontend/tests/e2e/cashier_day_close_print_smoke.spec.ts
 frontend/tests/e2e/reconciliation_report_print_smoke.spec.ts
 ```
 
-These tests use mocked API responses and do not depend on live shop data. They verify business identity, titles, references, key backend-provided figures, warnings/watermarks where practical, signatures, audit footer, print toolbar screen behavior, toolbar hiding under print media, absence of dashboard chrome, and deterministic operational entry-point links.
+These tests use mocked API responses and do not depend on live shop data. They verify business identity, document titles, references, key backend-provided figures, warnings/watermarks, signatures, audit footer, print toolbar screen behavior, toolbar hiding under print media, screen-only navigation hiding under print media, absence of dashboard chrome, and deterministic operational entry-point links.
+
+Phase 3D tightened:
+
+- Shared unsafe status labels for `REOPENED`, `INCOMPLETE`, `UNBALANCED`, and `UNRECONCILED`.
+- Day-close smoke assertion for `UNBALANCED` watermark.
+- Reconciliation smoke assertion for `UNRECONCILED` watermark.
 
 ## Deferred document types
 
@@ -186,3 +185,4 @@ The following templates remain deferred until their existing route/data contract
 - Deposit refund advice.
 - Purchase return / debit note customer-vendor copy.
 - Vendor quote request / vendor quote comparison copy.
+- Accounting ledger/P&L/balance-sheet reports.
