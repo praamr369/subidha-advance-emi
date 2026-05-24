@@ -93,59 +93,7 @@ const subscriptionFixture = {
   delivery_summary: null,
   deliveries: [],
   documents: [],
-  emis: [
-    {
-      id: 1,
-      month_no: 1,
-      due_date: "2026-05-24",
-      amount: "1000.00",
-      status: "PAID",
-      derived_status: "PAID",
-      paid_amount: "1000.00",
-      total_paid: "1000.00",
-      reversed_amount: "0.00",
-      waived_amount: "0.00",
-      waiver_ledger_amount: "0.00",
-      balance_amount: "0.00",
-      is_overdue: false,
-      is_status_consistent: true,
-      warnings: [],
-    },
-    {
-      id: 2,
-      month_no: 2,
-      due_date: "2026-06-24",
-      amount: "1000.00",
-      status: "PAID",
-      derived_status: "PAID",
-      paid_amount: "1000.00",
-      total_paid: "1000.00",
-      reversed_amount: "0.00",
-      waived_amount: "0.00",
-      waiver_ledger_amount: "0.00",
-      balance_amount: "0.00",
-      is_overdue: false,
-      is_status_consistent: true,
-      warnings: [],
-    },
-    {
-      id: 3,
-      month_no: 3,
-      due_date: "2026-07-24",
-      amount: "1000.00",
-      status: "PENDING",
-      derived_status: "PENDING",
-      paid_amount: "0.00",
-      total_paid: "0.00",
-      reversed_amount: "0.00",
-      waived_amount: "0.00",
-      waiver_ledger_amount: "0.00",
-      balance_amount: "1000.00",
-      is_overdue: false,
-      is_status_consistent: true,
-      warnings: [],
-    },
-  ],
+  emis: [],
 };
 
 const customerFixture = {
@@ -182,6 +130,12 @@ async function mockSubscriptionContractApis(page: Parameters<typeof test>[0]["pa
   });
 }
 
+async function expectNoDashboardChrome(page: Parameters<typeof test>[0]["page"]) {
+  await expect(page.getByRole("button", { name: "Open quick actions" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Open command palette/i })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: /sidebar navigation/i })).toHaveCount(0);
+}
+
 test("subscription contract print route renders branded Lucky Plan agreement", async ({ page }) => {
   await mockSubscriptionContractApis(page);
 
@@ -195,11 +149,17 @@ test("subscription contract print route renders branded Lucky Plan agreement", a
   await expect(page.getByText("LUCKY-SOFA-01").first()).toBeVisible();
   await expect(page.getByText("15 months").first()).toBeVisible();
   await expect(page.getByText("Monthly EMI").first()).toBeVisible();
+  await expect(page.getByText("Contract Price").first()).toBeVisible();
+  await expect(page.getByText("Outstanding / Balance").first()).toBeVisible();
+  await expect(page.getByText("No winner benefit is recorded")).toBeVisible();
+  await expect(page.getByText("Future EMI waiver is shown only from backend waiver records")).toBeVisible();
+  await expect(page.getByText("Pay monthly EMI dues as per the backend contract record")).toBeVisible();
   await expect(page.getByText("Customer Signature")).toBeVisible();
   await expect(page.getByText("Authorized Signature")).toBeVisible();
   await expect(page.getByRole("button", { name: "Print / Save PDF" })).toBeVisible();
   await expect(page.getByText("Subscription document output")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Contract PDF / Print" })).toHaveCount(0);
+  await expectNoDashboardChrome(page);
 });
 
 test("subscription detail exposes contract print link", async ({ page }) => {
