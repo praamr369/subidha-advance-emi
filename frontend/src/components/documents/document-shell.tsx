@@ -54,6 +54,9 @@ export function DocumentPage({
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
+        .document-screen-only {
+          display: block;
+        }
         @media print {
           html,
           body {
@@ -62,11 +65,18 @@ export function DocumentPage({
             background: #ffffff !important;
           }
           .print-toolbar,
+          .document-screen-only,
           header:not(.document-header),
           nav,
           aside,
-          [data-document-link-strip] {
+          [data-document-link-strip],
+          [data-dashboard-shell],
+          [data-dashboard-sidebar],
+          [data-dashboard-topbar],
+          [data-operational-action],
+          [data-print-hidden] {
             display: none !important;
+            visibility: hidden !important;
           }
           body * {
             visibility: hidden !important;
@@ -98,6 +108,7 @@ export function DocumentPage({
           .document-no-break,
           .document-card,
           .document-signature,
+          .document-amount-summary,
           tr {
             break-inside: avoid;
             page-break-inside: avoid;
@@ -112,6 +123,12 @@ export function DocumentPage({
             color: #2f2418 !important;
             background: #f5ead8 !important;
           }
+          .document-card,
+          .document-amount-summary,
+          .document-signature {
+            background: #ffffff !important;
+            border-color: #d9c39c !important;
+          }
           .document-print-footer {
             position: fixed;
             bottom: 0;
@@ -120,8 +137,8 @@ export function DocumentPage({
             background: #ffffff !important;
           }
           .document-watermark {
-            color: rgba(185, 28, 28, 0.16) !important;
-            border-color: rgba(254, 202, 202, 0.45) !important;
+            color: rgba(185, 28, 28, 0.12) !important;
+            border-color: rgba(254, 202, 202, 0.35) !important;
           }
         }
       `}</style>
@@ -274,7 +291,7 @@ export function DocumentLineItemsTable({ items }: { items: DocumentLineItem[] })
 
 export function DocumentAmountSummary({ rows }: { rows: AmountRow[] }) {
   return (
-    <section className="document-card ml-auto w-full max-w-sm rounded-2xl border border-[#d9c39c] bg-white p-4">
+    <section className="document-amount-summary document-card ml-auto w-full max-w-sm rounded-2xl border border-[#d9c39c] bg-white p-4">
       {rows.map((row) => (
         <div
           key={row.label}
