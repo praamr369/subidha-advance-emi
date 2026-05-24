@@ -12,7 +12,7 @@ export function PrintToolbar({
   backHref?: string;
 }) {
   return (
-    <div className="print-toolbar sticky top-0 z-30 border-b border-border bg-background/95 px-4 py-3 backdrop-blur print:hidden">
+    <div className="print-toolbar fixed inset-x-0 top-0 z-[1100] border-b border-border bg-background/95 px-4 py-3 backdrop-blur print:hidden">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-foreground">Document Preview</div>
