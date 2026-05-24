@@ -164,6 +164,10 @@ export function buildAdminVendorPaymentVoucherPrintRoute(id: number | string): s
   return `${ADMIN_VENDOR_PAYMENTS_ROUTE}/${id}/voucher/print`;
 }
 
+export function buildAdminCashierDayClosePrintRoute(id: number | string): string {
+  return `${ROUTES.admin.settlementsDayCloses}/${id}/print`;
+}
+
 export function buildAdminPaymentRoute(id: number | string): string {
   return `${ROUTES.admin.payments}/${id}`;
 }
