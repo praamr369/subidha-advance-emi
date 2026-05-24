@@ -1,8 +1,8 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 2A IMPLEMENTED ON `update` BRANCH**
+Status: **PHASE 2B IMPLEMENTED ON `update` BRANCH**
 
-This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial, stock, delivery-state, or accounting records.
+This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial, stock, delivery-state, subscription-state, EMI, waiver, lucky draw, reconciliation, or accounting records.
 
 ## Shared frontend document primitives
 
@@ -184,7 +184,67 @@ The delivery challan print page uses existing normalized `DeliveryRecord` fields
 - outstanding balance where provided
 - payment-exception approval metadata where provided
 
-## Financial, stock, and delivery safety rules
+### Lucky Plan / Subscription Contract
+
+Route:
+
+```text
+/admin/subscriptions/[id]/contract/print
+```
+
+Source contracts:
+
+```text
+GET /admin/subscriptions/:id/
+GET /admin/customers/:id/
+```
+
+The customer detail call is display-only and is used only when the subscription payload exposes a customer id. It provides already-existing customer address/email display data. If that request fails, the print page still renders the subscription contract with safe fallbacks.
+
+Route helper:
+
+```text
+buildAdminSubscriptionContractPrintRoute(id)
+```
+
+Operational wiring:
+
+```text
+frontend/src/app/(dashboard)/admin/subscriptions/[id]/layout.tsx
+```
+
+Print route:
+
+```text
+frontend/src/app/(dashboard)/admin/subscriptions/[id]/contract/print/page.tsx
+```
+
+The subscription detail route displays `Contract PDF / Print` above the operational subscription detail page. The action is isolated in the `[id]` layout and hidden for nested print routes, so it does not disturb subscription transition buttons, cancellation actions, payment views, delivery actions, timeline sections, or document upload flows.
+
+The subscription contract print page uses existing admin subscription/customer payload fields only:
+
+- subscription reference / `subscription_number` fallback
+- customer name, phone, address, city, and email where available
+- product name and product code
+- product base price / contract price
+- tenure months
+- monthly EMI amount
+- batch code and batch status
+- lucky number
+- subscription status
+- start date / created date
+- backend financial summary paid, waived, pending, remaining, and outstanding amounts where available
+- backend winner status, winner month, lucky number, waiver scope, waived count, and waived amount where available
+- fulfillment and delivery display fields where available
+- customer obligations
+- business obligations
+- cancellation, return, and service note as a terms/control statement
+- authorized signatory and customer signature blocks
+- audit footer
+
+The page does **not** build an EMI schedule. It does **not** calculate EMI from product price. It prints backend-provided `total_amount`, `monthly_amount`, `tenure_months`, `financial_summary`, and winner/waiver fields only.
+
+## Financial, stock, delivery, and subscription safety rules
 
 All print routes must follow these rules:
 
@@ -194,13 +254,16 @@ All print routes must follow these rules:
 4. No fake totals.
 5. No fake tax values.
 6. No fake receipt/payment references.
-7. Missing optional display values must show a safe fallback such as `—`.
-8. Cancelled, failed, voided, returned, reversed, or draft records must not visually appear as normal active/paid records.
-9. Outstanding balances must remain visible when the backend payload reports them.
-10. Print views must not settle payment, close receivables, post accounting, generate receipts, reconcile items, or mutate operational records.
-11. Delivery challans must not schedule, dispatch, cancel, create notes, move stock, mark delivered, or approve payment exceptions.
-12. Delivery must not be displayed as complete unless the backend delivery status/date says it is delivered.
-13. Admin outstanding-release approval must be displayed as operational release only; receivable collection remains active.
+7. No fake EMI schedules.
+8. No fake lucky winner, waiver, batch, lucky ID, product, customer, or contract terms.
+9. Missing optional display values must show a safe fallback such as `—`.
+10. Cancelled, failed, voided, returned, reversed, inactive, closed, completed, or draft records must not visually appear as normal active/paid records.
+11. Outstanding balances must remain visible when the backend payload reports them.
+12. Print views must not settle payment, close receivables, post accounting, generate receipts, reconcile items, or mutate operational records.
+13. Subscription contract print must not create, update, cancel, close, approve, activate, request return, waive, draw, or mutate subscription/EMI/payment/waiver/lucky ID records.
+14. Delivery challans must not schedule, dispatch, cancel, create notes, move stock, mark delivered, or approve payment exceptions.
+15. Delivery must not be displayed as complete unless the backend delivery status/date says it is delivered.
+16. Admin outstanding-release approval must be displayed as operational release only; receivable collection remains active.
 
 ## Status/watermark behavior
 
@@ -220,6 +283,13 @@ Delivery Challan also maps these unsafe delivery states to watermarks:
 - `RETURNED`
 - `REVERSED`
 
+Subscription Contract also maps these non-active contract states to watermarks:
+
+- `CLOSED`
+- `COMPLETED`
+- `DEFAULTED`
+- `INACTIVE`
+
 Receipt print also shows an explicit warning when a receipt status is voided/cancelled/reversed.
 
 ## Deterministic test coverage
@@ -228,6 +298,7 @@ Added / updated:
 
 ```text
 frontend/tests/e2e/document_print_smoke.spec.ts
+frontend/tests/e2e/subscription_contract_print_smoke.spec.ts
 ```
 
 Coverage:
@@ -245,6 +316,9 @@ Coverage:
 - Direct-sale delivery challan print route loads with mocked API payload.
 - Delivery challan route shows business name, delivery title, delivery reference, source reference, customer/receiver, address/status, and print toolbar.
 - Direct-sale delivery detail route exposes `Delivery Challan / Print` link.
+- Subscription contract print route loads with mocked API payload.
+- Subscription contract route shows business name, contract title, subscription reference, customer, product, product code, EMI/tenure, signature blocks, and print toolbar.
+- Subscription detail route exposes `Contract PDF / Print` link.
 
 These tests use mocked frontend API responses and do not depend on live shop data.
 
@@ -264,7 +338,6 @@ For each new document type:
 
 The following templates remain deferred until their existing route/data contracts are confirmed and wired safely:
 
-- Subscription / Lucky Plan Contract
 - Rent/Lease Contract
 - Purchase Bill / Vendor Payment Voucher
 - Day Close report
