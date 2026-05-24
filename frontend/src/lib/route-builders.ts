@@ -149,6 +149,10 @@ export function buildAdminSubscriptionContractPrintRoute(id: number | string): s
   return `${ROUTES.admin.subscriptions}/${id}/contract/print`;
 }
 
+export function buildAdminRentLeaseContractPrintRoute(id: number | string): string {
+  return `${ROUTES.admin.rentLeaseContracts}/${id}/contract/print`;
+}
+
 export function buildAdminPaymentRoute(id: number | string): string {
   return `${ROUTES.admin.payments}/${id}`;
 }
