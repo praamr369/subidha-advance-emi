@@ -12,6 +12,7 @@ import {
   ERPStatusBadge,
 } from "@/components/erp";
 import { ApiError } from "@/lib/api";
+import { buildAdminCashierDayClosePrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
   approveAdminCashierDayClose,
@@ -160,7 +161,10 @@ export default function AdminDayCloseDetailPage() {
       ]}
       headerMode="erp"
       statusBadge={{ label: record.status, tone: record.status === "SUBMITTED" ? "warning" : "info" }}
-      actions={[{ href: ROUTES.admin.settlementsDayCloses, label: "Back", variant: "secondary" }]}
+      actions={[
+        { href: ROUTES.admin.settlementsDayCloses, label: "Back", variant: "secondary" },
+        { href: buildAdminCashierDayClosePrintRoute(record.id), label: "Day Close Report PDF / Print", variant: "secondary" },
+      ]}
     >
       <ERPSectionShell title="Record details" description="Cashier evidence snapshot and variance for the business date.">
         {error ? (
