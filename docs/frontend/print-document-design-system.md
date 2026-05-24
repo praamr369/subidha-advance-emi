@@ -1,6 +1,6 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 3D QA CONSOLIDATED ON `update` BRANCH**
+Status: **PHASE 4A ACCOUNTING PRINT ROUTES IMPLEMENTED ON `update` BRANCH**
 
 This document records the branded print/PDF document system for SUBIDHA CORE. Print pages are evidence documents, not posting engines. They are intentionally read-only and payload-driven. They display backend-provided records and must not mutate financial, stock, delivery, subscription, EMI, waiver, lucky draw, rent/lease deposit, billing, refund, possession, return-inspection, commission, payout, cancellation, reversal, vendor payable, purchase, inventory valuation, cashier settlement, payment, receipt, reconciliation, allocation, money movement, journal, finance account, source lifecycle, or accounting records.
 
@@ -57,6 +57,7 @@ Document-specific warning states:
 
 - Cashier day-close reports show **UNBALANCED** when backend `variance` is non-zero.
 - Reconciliation reports show **UNRECONCILED** when backend run totals expose open exceptions or high-risk items.
+- Journal entry vouchers show unsafe status warnings for backend `DRAFT`, `VOID`, `VOIDED`, `REVERSED`, `CANCELLED`, `FAILED`, `UNBALANCED`, or related unsafe status labels when exposed.
 
 ## Dashboard-shell isolation
 
@@ -103,6 +104,41 @@ This prevents sidebar, topbar, command palette triggers, quick-action buttons, w
 | Vendor Payment Voucher | `/admin/vendors/payments/[id]/voucher/print` | `GET /inventory/vendor-payments/:id/`, optional `GET /inventory/vendor-bills/:id/`, optional `GET /admin/vendors/:id/`, optional `GET /admin/vendors/:id/outstanding/` | Vendor payments list row action `Vendor Payment Voucher PDF / Print` | `buildAdminVendorPaymentVoucherPrintRoute(id)` |
 | Cashier Day Close Report | `/admin/settlements/day-closes/[id]/print` | `GET /admin/settlements/cashier-day-closes/:id/` | Day-close register/review actions `Day Close Report PDF / Print` | `buildAdminCashierDayClosePrintRoute(id)` |
 | Reconciliation Report | `/admin/reconciliation/reports/[id]/print` | `GET /admin/reconciliation/runs/:id/` and `GET /admin/reconciliation/items/?run=:id` | Reconciliation run history/detail actions `Reconciliation Report PDF / Print` | `buildAdminReconciliationReportPrintRoute(id)` |
+| Journal Entry Voucher | `/admin/accounting/journals/[id]/print` | `GET /accounting/journal-entries/:id/` | Accounting journal register row action `Journal Entry PDF / Print` | `buildAdminJournalEntryPrintRoute(id)` |
+| Ledger Account Statement | `/admin/accounting/ledger/[accountId]/statement/print` | `GET /accounting/reports/general-ledger/?account_id=:accountId&start_date=&end_date=` | Accounting Books finance-account card action `Ledger Statement PDF / Print` using linked chart account id | `buildAdminLedgerStatementPrintRoute(accountId, params)` |
+
+## Accounting Phase 4A evidence-document rules
+
+### Journal Entry Voucher
+
+The journal entry voucher print route uses the existing `JournalEntry` detail payload only:
+
+- entry number / journal reference.
+- entry date / posting date.
+- entry type.
+- backend status.
+- source type, source model, source id, source reference, and voucher type where exposed.
+- backend created, posted, and approved metadata where exposed.
+- memo / void reason where exposed.
+- backend journal lines with chart account code, account name, line narration, debit amount, and credit amount.
+- audit footer and prepared/approved signature blocks.
+
+The print page does **not** calculate debit total, credit total, imbalance, posting state, approval state, reversal state, reconciliation state, or ledger balance. It does not create, post, approve, reverse, void, cancel, edit, or reconcile journal entries.
+
+### Ledger Account Statement
+
+The ledger account statement print route uses the existing backend general-ledger report payload only:
+
+- account name.
+- account code.
+- account type.
+- report period/date range.
+- transaction rows from backend report rows.
+- row date, journal reference, source reference, narration/memo, debit, credit, and backend running balance.
+- backend closing balance.
+- audit footer and prepared/reviewer signature blocks.
+
+Opening balance is shown only when a backend report contract exposes it. The current general-ledger contract exposes closing balance and row running balances; it does not expose opening balance, so the print page shows a safe fallback for opening balance. The page does **not** calculate running balances, opening balance, closing balance, debit/credit totals, account state, or reconciliation state.
 
 ## Phase 3 financial/audit route QA results
 
@@ -126,34 +162,16 @@ Confirmed:
 - Audit footer and signature blocks remain printable.
 - White print background and explicit borders keep documents readable when browser background graphics are disabled.
 
-## Phase 3 evidence-document rules
-
-### Purchase Bill / Vendor Bill
-
-Uses existing vendor bill, vendor, and vendor outstanding payloads only. It does not calculate purchase totals, tax totals, payable, inventory value, stock receipt status, or accounting truth. Unsafe purchase statuses show warning/watermark.
-
-### Vendor Payment Voucher
-
-Uses existing vendor payment, optional vendor bill, vendor, and vendor outstanding payloads only. It does not calculate payment allocation, payable balance, accounting posting, reconciliation state, or settlement truth.
-
-### Cashier Day Close Report
-
-Uses existing admin day-close payload fields only: close number, cashier, branch/counter, finance account, business date, opening cash, system cash, counted/declared cash, variance, status, closed/approved metadata, notes, and optional metadata-provided counts/method summaries. It does not calculate cashier expected total, declared total, variance, payment counts, receipt counts, or reconciliation status.
-
-### Reconciliation Report
-
-Uses existing Control Tower reconciliation run and item payloads only. It does not recalculate expected amount, matched amount, unmatched amount, variance, exception count, reconciliation status, ledger state, or accounting truth. It does not create or mutate reconciliation items, settlements, payments, receipts, money movements, journal entries, finance accounts, source lifecycle events, operational cancellations, or accounting records.
-
 ## Global financial and audit safety rules
 
 1. Print pages are read-only.
 2. Browser print is allowed; application mutation is not.
 3. No frontend recalculation of financial truth.
-4. No fake totals, tax values, payment references, receipt references, report references, source references, cashier counts, reconciliation counts, variance, ledger state, or accounting state.
+4. No fake totals, tax values, payment references, receipt references, report references, source references, cashier counts, reconciliation counts, variance, debit/credit totals, ledger balances, running balances, journal status, ledger state, or accounting state.
 5. Missing optional display values must use safe fallbacks such as `—`.
-6. Unsafe states must not visually appear as normal active/paid/settled/reconciled records.
-7. Outstanding balances, variance, and exceptions must remain visible when backend payloads expose them.
-8. Print views must not settle payments, close receivables/payables, post accounting, generate receipts/vouchers, reconcile items, approve/reject/reopen records, move stock, mutate finance accounts, or mutate operational records.
+6. Unsafe states must not visually appear as normal active/paid/settled/reconciled/posted records.
+7. Outstanding balances, variance, exceptions, unsafe statuses, and backend-exposed ledger balances must remain visible when backend payloads expose them.
+8. Print views must not settle payments, close receivables/payables, post accounting, generate receipts/vouchers, reconcile items, approve/reject/reopen records, post/void/reverse journals, move stock, mutate finance accounts, or mutate operational records.
 
 ## Deterministic test coverage
 
@@ -166,15 +184,17 @@ frontend/tests/e2e/rent_lease_contract_print_smoke.spec.ts
 frontend/tests/e2e/purchase_vendor_document_print_smoke.spec.ts
 frontend/tests/e2e/cashier_day_close_print_smoke.spec.ts
 frontend/tests/e2e/reconciliation_report_print_smoke.spec.ts
+frontend/tests/e2e/accounting_journal_ledger_print_smoke.spec.ts
 ```
 
 These tests use mocked API responses and do not depend on live shop data. They verify business identity, document titles, references, key backend-provided figures, warnings/watermarks, signatures, audit footer, print toolbar screen behavior, toolbar hiding under print media, screen-only navigation hiding under print media, absence of dashboard chrome, and deterministic operational entry-point links.
 
-Phase 3D tightened:
+Phase 4A added:
 
-- Shared unsafe status labels for `REOPENED`, `INCOMPLETE`, `UNBALANCED`, and `UNRECONCILED`.
-- Day-close smoke assertion for `UNBALANCED` watermark.
-- Reconciliation smoke assertion for `UNRECONCILED` watermark.
+- Journal Entry Voucher print route smoke.
+- Ledger Account Statement print route smoke.
+- Journal register print-link smoke.
+- Accounting Books ledger statement print-link smoke.
 
 ## Deferred document types
 
@@ -185,4 +205,6 @@ The following templates remain deferred until their existing route/data contract
 - Deposit refund advice.
 - Purchase return / debit note customer-vendor copy.
 - Vendor quote request / vendor quote comparison copy.
-- Accounting ledger/P&L/balance-sheet reports.
+- Profit & Loss print report.
+- Balance Sheet print report.
+- Trial Balance print report.
