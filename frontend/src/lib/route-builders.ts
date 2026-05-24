@@ -7,6 +7,8 @@ type QueryParamPrimitive = string | number | boolean | null | undefined;
 const ADMIN_RENT_LEASE_CONTRACTS_ROUTE = "/admin/rent-lease/contracts";
 const ADMIN_VENDOR_PAYMENTS_ROUTE = "/admin/vendors/payments";
 const ADMIN_RECONCILIATION_REPORTS_ROUTE = "/admin/reconciliation/reports";
+const ADMIN_ACCOUNTING_JOURNALS_ROUTE = "/admin/accounting/journals";
+const ADMIN_ACCOUNTING_LEDGER_ROUTE = "/admin/accounting/ledger";
 
 type AdminReconciliationRouteParams = {
   view?: AdminReconciliationView;
@@ -78,6 +80,11 @@ type AdminLeadsRouteParams = {
   assignee?: string | null;
   date_from?: string | null;
   date_to?: string | null;
+};
+
+type AdminLedgerStatementParams = {
+  start_date?: string | null;
+  end_date?: string | null;
 };
 
 function appendQueryValue(
@@ -171,6 +178,17 @@ export function buildAdminCashierDayClosePrintRoute(id: number | string): string
 
 export function buildAdminReconciliationReportPrintRoute(id: number | string): string {
   return `${ADMIN_RECONCILIATION_REPORTS_ROUTE}/${id}/print`;
+}
+
+export function buildAdminJournalEntryPrintRoute(id: number | string): string {
+  return `${ADMIN_ACCOUNTING_JOURNALS_ROUTE}/${id}/print`;
+}
+
+export function buildAdminLedgerStatementPrintRoute(
+  accountId: number | string,
+  params: AdminLedgerStatementParams = {}
+): string {
+  return buildRouteWithQuery(`${ADMIN_ACCOUNTING_LEDGER_ROUTE}/${accountId}/statement/print`, params);
 }
 
 export function buildAdminPaymentRoute(id: number | string): string {
