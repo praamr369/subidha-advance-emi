@@ -1,3 +1,16 @@
+const UNSAFE_DOCUMENT_STATUS_LABELS: Record<string, string> = {
+  CANCELLED: "CANCELLED",
+  VOID: "VOIDED",
+  VOIDED: "VOIDED",
+  REVERSED: "REVERSED",
+  RETURNED: "RETURNED",
+  DRAFT: "DRAFT",
+  CLOSED: "CLOSED",
+  INACTIVE: "INACTIVE",
+  DEFAULTED: "DEFAULTED",
+  FAILED: "FAILED",
+};
+
 export function formatDocumentMoney(value: string | number | null | undefined): string {
   const numeric = Number(value ?? 0);
   const safeValue = Number.isFinite(numeric) ? numeric : 0;
@@ -37,12 +50,35 @@ export function joinDocumentLines(parts: Array<string | null | undefined>): stri
   return parts.map((part) => (part || "").trim()).filter(Boolean).join("\n");
 }
 
+export function normalizeDocumentStatus(value: string | null | undefined): string {
+  return String(value || "").trim().toUpperCase();
+}
+
+export function unsafeDocumentStatusLabel(status: string | null | undefined): string | null {
+  const token = normalizeDocumentStatus(status);
+  return UNSAFE_DOCUMENT_STATUS_LABELS[token] ?? null;
+}
+
+export function isUnsafeDocumentStatus(status: string | null | undefined): boolean {
+  return unsafeDocumentStatusLabel(status) !== null;
+}
+
 export function documentStatusWatermark(status: string | null | undefined): string | null {
-  const token = (status || "").trim().toUpperCase();
-  if (["CANCELLED", "VOID", "VOIDED", "DRAFT", "RETURNED", "REVERSED"].includes(token)) {
-    return token === "VOID" ? "VOIDED" : token;
-  }
-  return null;
+  return unsafeDocumentStatusLabel(status);
+}
+
+export function documentUnsafeStatusMessage(
+  status: string | null | undefined,
+  documentName = "document"
+): string | null {
+  const label = unsafeDocumentStatusLabel(status);
+  if (!label) return null;
+  return `This ${documentName} is ${label}. It must not be treated as a normal active or paid record.`;
+}
+
+export function hasPositiveDocumentAmount(value: string | number | null | undefined): boolean {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) && amount > 0;
 }
 
 export function documentTitleForTaxMode(taxMode: string | null | undefined): string {
