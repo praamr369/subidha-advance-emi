@@ -82,6 +82,58 @@ const receiptFixture = {
   posted_journal_entry_no: "JE-PRINT-501",
 };
 
+const deliveryFixture = {
+  id: 901,
+  case_id: 901,
+  service_case_id: 901,
+  case_no: "CASE-DEL-901",
+  record_kind: "DIRECT_SALE_DELIVERY",
+  source_type: "DIRECT_SALE",
+  source_label: "DS-PRINT-101",
+  delivery_reference: "DCH-PRINT-901",
+  sale_no: "DS-PRINT-101",
+  sale_number: "DS-PRINT-101",
+  direct_sale_id: 101,
+  invoice_number: "DSI-2026-00001",
+  invoice_document_no: "DSI-2026-00001",
+  billing_invoice_id: 701,
+  customer_id: 501,
+  customer_name: "Print Smoke Customer",
+  customer_phone: "9000000101",
+  receiver_name: "Receiver Smoke",
+  receiver_phone: "9000000202",
+  delivery_address_snapshot: "Court More\nAsansol, West Bengal 713304",
+  product_id: 301,
+  product_name: "Subidha Premium Sofa",
+  product_code: "SF-SOFA-PRINT",
+  status: "SCHEDULED",
+  status_label: "Scheduled",
+  delivery_display: "Ready for delivery",
+  delivery_state: "READY_FOR_DELIVERY",
+  delivery_phase_code: "READY_FOR_DELIVERY",
+  payment_state: "PARTIAL",
+  invoice_state: "POSTED",
+  stock_state: "AVAILABLE",
+  scheduled_date: "2026-05-25",
+  delivered_at: null,
+  grand_total: "11000.00",
+  received_total: "5000.00",
+  balance_total: "6000.00",
+  operational_notes: "Handle with care.",
+  blocked_by_payment: false,
+  blocked_by_stock: false,
+  payment_exception_approved_at: "2026-05-24T10:30:00+05:30",
+  payment_exception_approved_by_username: "admin",
+  payment_exception_reason: "Manager approved delivery before final collection.",
+  payment_exception_outstanding_amount_snapshot: "6000.00",
+  links: {
+    open_invoice: "/admin/billing/documents/701",
+    open_direct_sale: "/admin/billing/direct-sale?highlight_sale=101",
+    open_customer: "/admin/customers/501",
+    open_service_case: "/admin/service-desk/cases/901",
+  },
+};
+
 const emptyPage = { count: 0, next: null, previous: null, results: [] };
 
 async function mockDocumentApis(page: Parameters<typeof test>[0]["page"]) {
@@ -107,6 +159,16 @@ async function mockDocumentApis(page: Parameters<typeof test>[0]["page"]) {
       contentType: "application/json",
       body: JSON.stringify(receiptFixture),
     });
+  });
+  await page.route("**/admin/deliveries/direct-sale-cases/901/", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(deliveryFixture),
+    });
+  });
+  await page.route("**/admin/audit-logs/timeline/ServiceDeskCase/901/", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(emptyPage) });
   });
 }
 
@@ -168,4 +230,30 @@ test("direct-sale workspace exposes branded invoice PDF link", async ({ page }) 
   const printLink = page.getByRole("link", { name: "Invoice PDF" }).first();
   await expect(printLink).toBeVisible();
   await expect(printLink).toHaveAttribute("href", "/admin/billing/direct-sale/101/print");
+});
+
+test("direct-sale delivery challan print route renders branded challan", async ({ page }) => {
+  await mockDocumentApis(page);
+
+  await page.goto("/admin/deliveries/direct-sale-cases/901/print");
+
+  await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
+  await expect(page.getByText("DELIVERY CHALLAN")).toBeVisible();
+  await expect(page.getByText("DCH-PRINT-901").first()).toBeVisible();
+  await expect(page.getByText("Print Smoke Customer").first()).toBeVisible();
+  await expect(page.getByText("Receiver Smoke").first()).toBeVisible();
+  await expect(page.getByText("DSI-2026-00001").first()).toBeVisible();
+  await expect(page.getByText("Court More").first()).toBeVisible();
+  await expect(page.getByText("Ready for delivery").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Print / Save PDF" })).toBeVisible();
+});
+
+test("direct-sale delivery detail exposes delivery challan print link", async ({ page }) => {
+  await mockDocumentApis(page);
+
+  await page.goto("/admin/deliveries/direct-sale-cases/901");
+
+  const challanLink = page.getByRole("link", { name: "Delivery Challan / Print" }).first();
+  await expect(challanLink).toBeVisible();
+  await expect(challanLink).toHaveAttribute("href", "/admin/deliveries/direct-sale-cases/901/print");
 });
