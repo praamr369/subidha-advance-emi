@@ -1,6 +1,6 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 4A ACCOUNTING PRINT ROUTES IMPLEMENTED ON `update` BRANCH**
+Status: **PHASE 4B FINANCE ACCOUNT STATEMENT IMPLEMENTED ON `update` BRANCH**
 
 This document records the branded print/PDF document system for SUBIDHA CORE. Print pages are evidence documents, not posting engines. They are intentionally read-only and payload-driven. They display backend-provided records and must not mutate financial, stock, delivery, subscription, EMI, waiver, lucky draw, rent/lease deposit, billing, refund, possession, return-inspection, commission, payout, cancellation, reversal, vendor payable, purchase, inventory valuation, cashier settlement, payment, receipt, reconciliation, allocation, money movement, journal, finance account, source lifecycle, or accounting records.
 
@@ -58,6 +58,7 @@ Document-specific warning states:
 - Cashier day-close reports show **UNBALANCED** when backend `variance` is non-zero.
 - Reconciliation reports show **UNRECONCILED** when backend run totals expose open exceptions or high-risk items.
 - Journal entry vouchers show unsafe status warnings for backend `DRAFT`, `VOID`, `VOIDED`, `REVERSED`, `CANCELLED`, `FAILED`, `UNBALANCED`, or related unsafe status labels when exposed.
+- Finance account statements show **INACTIVE** when the backend finance account detail payload exposes `is_active=false`.
 
 ## Dashboard-shell isolation
 
@@ -106,6 +107,7 @@ This prevents sidebar, topbar, command palette triggers, quick-action buttons, w
 | Reconciliation Report | `/admin/reconciliation/reports/[id]/print` | `GET /admin/reconciliation/runs/:id/` and `GET /admin/reconciliation/items/?run=:id` | Reconciliation run history/detail actions `Reconciliation Report PDF / Print` | `buildAdminReconciliationReportPrintRoute(id)` |
 | Journal Entry Voucher | `/admin/accounting/journals/[id]/print` | `GET /accounting/journal-entries/:id/` | Accounting journal register row action `Journal Entry PDF / Print` | `buildAdminJournalEntryPrintRoute(id)` |
 | Ledger Account Statement | `/admin/accounting/ledger/[accountId]/statement/print` | `GET /accounting/reports/general-ledger/?account_id=:accountId&start_date=&end_date=` | Accounting Books finance-account card action `Ledger Statement PDF / Print` using linked chart account id | `buildAdminLedgerStatementPrintRoute(accountId, params)` |
+| Finance Account Statement | `/admin/finance/accounts/[id]/statement/print` | `GET /accounting/finance-accounts/:id/` and `GET /accounting/reports/cashbook/?finance_account_id=:id&start_date=&end_date=` | Accounting Books finance-account card action `Finance Account Statement PDF / Print` | `buildAdminFinanceAccountStatementPrintRoute(id, params)` |
 
 ## Accounting Phase 4A evidence-document rules
 
@@ -140,6 +142,42 @@ The ledger account statement print route uses the existing backend general-ledge
 
 Opening balance is shown only when a backend report contract exposes it. The current general-ledger contract exposes closing balance and row running balances; it does not expose opening balance, so the print page shows a safe fallback for opening balance. The page does **not** calculate running balances, opening balance, closing balance, debit/credit totals, account state, or reconciliation state.
 
+## Accounting Phase 4B evidence-document rules
+
+### Finance Account Statement
+
+The finance account statement print route uses two existing read contracts only:
+
+```text
+GET /accounting/finance-accounts/:id/
+GET /accounting/reports/cashbook/?finance_account_id=:id&start_date=&end_date=
+```
+
+The finance account detail payload provides account identity and setup state:
+
+- finance account name.
+- finance account kind/type.
+- linked chart account code/name.
+- branch code/name when exposed.
+- active/inactive state.
+
+The cashbook report payload provides backend statement rows and backend ledger-derived balance fields:
+
+- report period/date range.
+- transaction rows.
+- row date.
+- journal reference.
+- source type / voucher type / source reference where exposed.
+- narration/memo/description where exposed.
+- backend debit amount.
+- backend credit amount.
+- backend running balance.
+- backend closing balance.
+
+Opening balance and reconciliation status are shown only when a backend report contract exposes them. The current cashbook/general-ledger-backed contract exposes row running balances and closing balance but does not expose opening balance or reconciliation status, so the print page uses safe fallbacks for those fields.
+
+The print page does **not** calculate opening balance, closing balance, running balance, inflow/outflow totals, variance, reconciliation state, account health, or finance account truth. It does not mutate finance accounts, money movements, settlements, payments, receipts, journal entries, cash counters, reconciliation rows, vendor records, inventory, EMI records, rent/lease deposits, or accounting records.
+
 ## Phase 3 financial/audit route QA results
 
 Audited Phase 3 routes:
@@ -167,11 +205,11 @@ Confirmed:
 1. Print pages are read-only.
 2. Browser print is allowed; application mutation is not.
 3. No frontend recalculation of financial truth.
-4. No fake totals, tax values, payment references, receipt references, report references, source references, cashier counts, reconciliation counts, variance, debit/credit totals, ledger balances, running balances, journal status, ledger state, or accounting state.
+4. No fake totals, tax values, payment references, receipt references, report references, source references, cashier counts, reconciliation counts, variance, debit/credit totals, ledger balances, running balances, journal status, ledger state, finance account state, or accounting state.
 5. Missing optional display values must use safe fallbacks such as `—`.
 6. Unsafe states must not visually appear as normal active/paid/settled/reconciled/posted records.
-7. Outstanding balances, variance, exceptions, unsafe statuses, and backend-exposed ledger balances must remain visible when backend payloads expose them.
-8. Print views must not settle payments, close receivables/payables, post accounting, generate receipts/vouchers, reconcile items, approve/reject/reopen records, post/void/reverse journals, move stock, mutate finance accounts, or mutate operational records.
+7. Outstanding balances, variance, exceptions, unsafe statuses, backend-exposed ledger balances, and inactive finance account state must remain visible when backend payloads expose them.
+8. Print views must not settle payments, close receivables/payables, post accounting, generate receipts/vouchers, reconcile items, approve/reject/reopen records, post/void/reverse journals, move stock, mutate finance accounts, mutate money movements, mutate cash counters, or mutate operational records.
 
 ## Deterministic test coverage
 
@@ -196,6 +234,12 @@ Phase 4A added:
 - Journal register print-link smoke.
 - Accounting Books ledger statement print-link smoke.
 
+Phase 4B added:
+
+- Finance Account Statement print route smoke.
+- Inactive finance account warning smoke.
+- Accounting Books finance account statement print-link smoke.
+
 ## Deferred document types
 
 The following templates remain deferred until their existing route/data contracts are confirmed and wired safely:
@@ -208,3 +252,9 @@ The following templates remain deferred until their existing route/data contract
 - Profit & Loss print report.
 - Balance Sheet print report.
 - Trial Balance print report.
+
+The following finance account statement fields remain display-deferred until backend report contracts expose them directly:
+
+- opening balance.
+- reconciliation status.
+- cash counter identity.
