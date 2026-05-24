@@ -1,0 +1,152 @@
+import { expect, test } from "@playwright/test";
+
+import { authStatePath } from "./helpers/smoke-data";
+
+test.use({ storageState: authStatePath("admin") });
+
+const runFixture = {
+  id: 301,
+  run_no: 9001,
+  scope: "PHASE_F",
+  module: "CONTROL_TOWER",
+  branch: 2,
+  date_from: "2026-05-01",
+  date_to: "2026-05-24",
+  status: "COMPLETED",
+  started_by: 1,
+  started_by_username: "admin",
+  started_at: "2026-05-24T21:00:00+05:30",
+  finished_at: "2026-05-24T21:05:00+05:30",
+  total_checked: 25,
+  total_matched: 22,
+  total_exceptions: 3,
+  high_risk_count: 1,
+  metadata: {
+    branch_name: "Asansol Main Branch",
+    finance_account_name: "Main Bank Account",
+    source_module: "Subscriptions / Payments",
+    expected_amount: "25000.00",
+    matched_amount: "22000.00",
+    unmatched_amount: "3000.00",
+    variance_amount: "3000.00",
+    pending_review_count: 3,
+    reviewed_by: "admin.manager",
+    reviewed_at: "2026-05-24T21:10:00+05:30",
+  },
+};
+
+const itemFixture = {
+  id: 401,
+  run: 301,
+  run_no: 9001,
+  module: "PAYMENTS",
+  source_type: "EMI_PAYMENT",
+  source_id: "701",
+  source_label: "Payment REF-PRINT-701",
+  expected_amount: "5000.00",
+  actual_amount: "4000.00",
+  amount_delta: "1000.00",
+  expected_quantity: null,
+  actual_quantity: null,
+  quantity_delta: null,
+  severity: "HIGH",
+  status: "AMOUNT_MISMATCH",
+  exception_code: "PAYMENT_AMOUNT_MISMATCH",
+  exception_message: "Payment amount does not match expected ledger amount.",
+  recommended_action: "Review payment and ledger evidence.",
+  assigned_to: null,
+  resolved_by: null,
+  resolved_at: null,
+  metadata: {},
+  created_at: "2026-05-24T21:02:00+05:30",
+  updated_at: "2026-05-24T21:02:00+05:30",
+};
+
+async function mockReconciliationReportApis(page: Parameters<typeof test>[0]["page"]) {
+  await page.route("**/admin/reconciliation/runs/301/", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(runFixture) });
+  });
+  await page.route("**/admin/reconciliation/runs/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ count: 1, next: null, previous: null, results: [runFixture] }),
+    });
+  });
+  await page.route("**/admin/reconciliation/modules/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ run: runFixture, results: [{ module: "PAYMENTS", open_count: 3, high_risk_count: 1 }] }),
+    });
+  });
+  await page.route("**/admin/reconciliation/items/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ count: 1, next: null, previous: null, results: [itemFixture] }),
+    });
+  });
+}
+
+async function expectNoDashboardChrome(page: Parameters<typeof test>[0]["page"]) {
+  await expect(page.getByRole("button", { name: "Open quick actions" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Open command palette/i })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: /sidebar navigation/i })).toHaveCount(0);
+}
+
+async function expectPrintControlsHiddenDuringPrint(page: Parameters<typeof test>[0]["page"]) {
+  await page.emulateMedia({ media: "print" });
+  await expect(page.getByRole("button", { name: "Print / Save PDF" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Back to reconciliation run" })).toBeHidden();
+  await expect(page.getByText("Read-only reconciliation report generated from existing backend payloads.")).toBeHidden();
+  await page.emulateMedia({ media: "screen" });
+}
+
+test("reconciliation report print route renders branded unreconciled report", async ({ page }) => {
+  await mockReconciliationReportApis(page);
+
+  await page.goto("/admin/reconciliation/reports/301/print");
+
+  await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
+  await expect(page.getByText("RECONCILIATION REPORT")).toBeVisible();
+  await expect(page.getByText("RUN-9001").first()).toBeVisible();
+  await expect(page.getByText("COMPLETED").first()).toBeVisible();
+  await expect(page.getByText("This reconciliation report has open exceptions")).toBeVisible();
+  await expect(page.getByText("Expected Amount")).toBeVisible();
+  await expect(page.getByText("Matched Amount")).toBeVisible();
+  await expect(page.getByText("Unmatched Amount")).toBeVisible();
+  await expect(page.getByText("Variance Amount")).toBeVisible();
+  await expect(page.getByText("Exception / Source References")).toBeVisible();
+  await expect(page.getByText("PAYMENT_AMOUNT_MISMATCH")).toBeVisible();
+  await expect(page.getByText("Payment REF-PRINT-701")).toBeVisible();
+  await expect(page.getByText("Prepared By Signature")).toBeVisible();
+  await expect(page.getByText("Reviewer / Admin Signature")).toBeVisible();
+  await expect(page.getByText("Generated by SUBIDHA CORE")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Print / Save PDF" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Back to reconciliation run" })).toBeVisible();
+  await expectNoDashboardChrome(page);
+  await expectPrintControlsHiddenDuringPrint(page);
+});
+
+test("reconciliation run history exposes report print link", async ({ page }) => {
+  await mockReconciliationReportApis(page);
+
+  await page.goto("/admin/reconciliation/runs");
+
+  await expect(page.getByText("#9001").first()).toBeVisible();
+  const printLink = page.getByRole("link", { name: "Reconciliation Report PDF / Print" }).first();
+  await expect(printLink).toBeVisible();
+  await expect(printLink).toHaveAttribute("href", "/admin/reconciliation/reports/301/print");
+});
+
+test("reconciliation run detail exposes report print action", async ({ page }) => {
+  await mockReconciliationReportApis(page);
+
+  await page.goto("/admin/reconciliation/runs/301");
+
+  await expect(page.getByText("Reconciliation Run #9001").first()).toBeVisible();
+  const printLink = page.getByRole("link", { name: "Reconciliation Report PDF / Print" }).first();
+  await expect(printLink).toBeVisible();
+  await expect(printLink).toHaveAttribute("href", "/admin/reconciliation/reports/301/print");
+});
