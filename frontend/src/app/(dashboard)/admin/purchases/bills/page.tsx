@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -7,6 +8,7 @@ import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import { buildAdminPurchaseBillPrintRoute } from "@/lib/route-builders";
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import { listVendorBills, type VendorBill } from "@/services/inventory";
 
@@ -39,6 +41,18 @@ export default function AdminPurchaseBillsPage() {
     { key: "vendor_name", header: "Vendor" },
     { key: "status", header: "Status" },
     { key: "grand_total", header: "Total" },
+    {
+      key: "document_actions",
+      header: "Documents",
+      render: (row) => (
+        <Link
+          href={buildAdminPurchaseBillPrintRoute(row.id)}
+          className="inline-flex h-8 items-center rounded-lg border border-amber-300 bg-amber-50 px-3 text-xs font-semibold text-amber-950 hover:bg-amber-100"
+        >
+          Purchase Bill PDF / Print
+        </Link>
+      ),
+    },
   ];
   return (
     <PortalPage
