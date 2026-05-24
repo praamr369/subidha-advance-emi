@@ -15,11 +15,14 @@ import {
   DocumentTermsBlock,
   DocumentTitleStrip,
 } from "@/components/documents/document-shell";
-import PrintToolbar from "@/components/documents/print-toolbar";
+import { PrintToolbar } from "@/components/documents/print-toolbar";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { apiFetch } from "@/lib/api";
-import { subidhaDocumentTheme } from "@/lib/documents/document-theme";
+import {
+  subidhaDocumentTheme,
+  type DocumentCopyLabel,
+} from "@/lib/documents/document-theme";
 import {
   documentStatusWatermark,
   formatDocumentDate,
@@ -98,10 +101,7 @@ type CustomerRecord = {
 };
 
 function subscriptionReference(subscription: SubscriptionContractRecord): string {
-  return (
-    safeDocumentText(subscription.subscription_number, "") ||
-    `SUB-${subscription.id}`
-  );
+  return safeDocumentText(subscription.subscription_number, "") || `SUB-${subscription.id}`;
 }
 
 function formatLuckyNumber(value: number | null | undefined): string {
@@ -143,6 +143,7 @@ export default function AdminSubscriptionContractPrintPage() {
   const subscriptionId = params?.id;
   const [subscription, setSubscription] = useState<SubscriptionContractRecord | null>(null);
   const [customer, setCustomer] = useState<CustomerRecord | null>(null);
+  const [copyLabel, setCopyLabel] = useState<DocumentCopyLabel>("Original");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -229,12 +230,13 @@ export default function AdminSubscriptionContractPrintPage() {
   return (
     <>
       <PrintToolbar
-        title="Lucky Plan Agreement"
+        copyLabel={copyLabel}
+        onCopyLabelChange={setCopyLabel}
         backHref={buildAdminSubscriptionRoute(subscription.id)}
       />
       <DocumentPage watermark={watermark}>
         <DocumentHeader
-          copyLabel="Original"
+          copyLabel={copyLabel}
           documentNo={reference}
           documentDate={formatDocumentDate(subscription.start_date || subscription.created_at)}
         />
