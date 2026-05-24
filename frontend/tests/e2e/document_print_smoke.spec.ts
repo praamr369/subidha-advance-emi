@@ -62,7 +62,7 @@ const receiptFixture = {
   id: 501,
   receipt_no: "RCT-PRINT-501",
   receipt_type: "RETAIL_RECEIPT",
-  status: "POSTED",
+  status: "VOIDED",
   receipt_date: "2026-05-24",
   branch_name: "Asansol Main Branch",
   cash_counter_name: "Front Counter",
@@ -189,6 +189,12 @@ async function mockWorkspaceApis(page: Parameters<typeof test>[0]["page"]) {
   });
 }
 
+async function expectNoDashboardChrome(page: Parameters<typeof test>[0]["page"]) {
+  await expect(page.getByRole("button", { name: "Open quick actions" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Open command palette/i })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: /sidebar navigation/i })).toHaveCount(0);
+}
+
 test("direct-sale invoice print route renders branded financial document", async ({ page }) => {
   await mockDocumentApis(page);
 
@@ -202,7 +208,9 @@ test("direct-sale invoice print route renders branded financial document", async
   await expect(page.getByText("Grand Total")).toBeVisible();
   await expect(page.getByText("Received")).toBeVisible();
   await expect(page.getByText("Balance Due")).toBeVisible();
+  await expect(page.getByText("Outstanding balance remains collectible")).toBeVisible();
   await expect(page.getByRole("button", { name: "Print / Save PDF" })).toBeVisible();
+  await expectNoDashboardChrome(page);
 });
 
 test("receipt print route renders branded receipt and unsafe-status guard surface", async ({ page }) => {
@@ -213,11 +221,14 @@ test("receipt print route renders branded receipt and unsafe-status guard surfac
   await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
   await expect(page.getByText("PAYMENT RECEIPT")).toBeVisible();
   await expect(page.getByText("RCT-PRINT-501").first()).toBeVisible();
+  await expect(page.getByText("VOIDED").first()).toBeVisible();
+  await expect(page.getByText("This receipt is VOIDED")).toBeVisible();
   await expect(page.getByText("Print Smoke Customer").first()).toBeVisible();
   await expect(page.getByText("Amount Paid")).toBeVisible();
   await expect(page.getByText("Source Ref")).toBeVisible();
   await expect(page.getByText("DSI-2026-00001").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Print / Save PDF" })).toBeVisible();
+  await expectNoDashboardChrome(page);
 });
 
 test("direct-sale workspace exposes branded invoice PDF link", async ({ page }) => {
@@ -245,9 +256,13 @@ test("direct-sale delivery challan print route renders branded challan", async (
   await expect(page.getByText("DSI-2026-00001").first()).toBeVisible();
   await expect(page.getByText("Court More").first()).toBeVisible();
   await expect(page.getByText("Ready for delivery").first()).toBeVisible();
+  await expect(page.getByText("Outstanding balance remains collectible: 6000.00")).toBeVisible();
+  await expect(page.getByText("Delivery was operationally released")).toBeVisible();
+  await expect(page.getByText("receivable remains collectible and approval does not settle payment")).toBeVisible();
   await expect(page.getByRole("button", { name: "Print / Save PDF" })).toBeVisible();
   await expect(page.getByText("Delivery documents")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Delivery Challan / Print" })).toHaveCount(0);
+  await expectNoDashboardChrome(page);
 });
 
 test("direct-sale delivery detail exposes delivery challan print link", async ({ page }) => {
