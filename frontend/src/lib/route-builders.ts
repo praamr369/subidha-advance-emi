@@ -5,6 +5,7 @@ export type AdminReconciliationView = "subscriptions" | "payments";
 type QueryParamPrimitive = string | number | boolean | null | undefined;
 
 const ADMIN_RENT_LEASE_CONTRACTS_ROUTE = "/admin/rent-lease/contracts";
+const ADMIN_VENDOR_PAYMENTS_ROUTE = "/admin/vendors/payments";
 
 type AdminReconciliationRouteParams = {
   view?: AdminReconciliationView;
@@ -153,6 +154,14 @@ export function buildAdminSubscriptionContractPrintRoute(id: number | string): s
 
 export function buildAdminRentLeaseContractPrintRoute(id: number | string): string {
   return `${ADMIN_RENT_LEASE_CONTRACTS_ROUTE}/${id}/contract/print`;
+}
+
+export function buildAdminPurchaseBillPrintRoute(id: number | string): string {
+  return `${ROUTES.admin.purchases}/${id}/bill/print`;
+}
+
+export function buildAdminVendorPaymentVoucherPrintRoute(id: number | string): string {
+  return `${ADMIN_VENDOR_PAYMENTS_ROUTE}/${id}/voucher/print`;
 }
 
 export function buildAdminPaymentRoute(id: number | string): string {
