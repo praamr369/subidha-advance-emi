@@ -6,6 +6,7 @@ type QueryParamPrimitive = string | number | boolean | null | undefined;
 
 const ADMIN_RENT_LEASE_CONTRACTS_ROUTE = "/admin/rent-lease/contracts";
 const ADMIN_VENDOR_PAYMENTS_ROUTE = "/admin/vendors/payments";
+const ADMIN_RECONCILIATION_REPORTS_ROUTE = "/admin/reconciliation/reports";
 
 type AdminReconciliationRouteParams = {
   view?: AdminReconciliationView;
@@ -166,6 +167,10 @@ export function buildAdminVendorPaymentVoucherPrintRoute(id: number | string): s
 
 export function buildAdminCashierDayClosePrintRoute(id: number | string): string {
   return `${ROUTES.admin.settlementsDayCloses}/${id}/print`;
+}
+
+export function buildAdminReconciliationReportPrintRoute(id: number | string): string {
+  return `${ADMIN_RECONCILIATION_REPORTS_ROUTE}/${id}/print`;
 }
 
 export function buildAdminPaymentRoute(id: number | string): string {
