@@ -1,8 +1,8 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 2C IMPLEMENTED ON `update` BRANCH**
+Status: **PHASE 2D QA HARDENED ON `update` BRANCH**
 
-This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial, stock, delivery-state, subscription-state, EMI, waiver, lucky draw, reconciliation, rent/lease deposit, billing, refund, possession, return-inspection, or accounting records.
+This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial, stock, delivery-state, subscription-state, EMI, waiver, lucky draw, reconciliation, rent/lease deposit, billing, refund, possession, return-inspection, commission, payout, reversal, cancellation, or accounting records.
 
 ## Shared frontend document primitives
 
@@ -51,120 +51,109 @@ The formatter layer centralizes:
 - INR currency display
 - Indian date/date-time display
 - safe text fallbacks
-- status watermark mapping
 - invoice title by tax mode
+- normalized document status display
+- unsafe status labels
+- unsafe status watermark mapping
+- unsafe status warning messages
+- positive amount checks for outstanding/balance visibility
+
+Current shared unsafe statuses:
+
+```text
+CANCELLED
+VOID / VOIDED
+REVERSED
+RETURNED
+DRAFT
+CLOSED
+INACTIVE
+DEFAULTED
+FAILED
+```
+
+## Dashboard-shell isolation
+
+Print routes are routed outside the operational dashboard chrome by:
+
+```text
+frontend/src/components/layout/AdminShellRouter.tsx
+frontend/src/app/(dashboard)/admin/layout.tsx
+```
+
+`AdminShellRouter` keeps `RoleGuard` active for admin-only access, but bypasses `DashboardShell` for routes ending in:
+
+```text
+/print
+/contract/print
+```
+
+This prevents sidebar, topbar, command palette triggers, quick-action buttons, workspace menus, and business setup banners from contaminating print document previews or printed output.
 
 ## Print CSS rules
 
 `DocumentPage` includes print-safe global CSS for:
 
-- A4 page size
+- `@page { size: A4; margin: 12mm; }`
+- fixed full-screen document preview overlay during screen use
+- static A4 document flow during browser print
+- print-only document visibility isolation
+- toolbar hidden during print
+- non-document `header`, `nav`, `aside`, and `data-document-link-strip` hidden during print
 - safe print margins
-- print-only document visibility
 - browser Save as PDF
 - avoiding page breaks inside document cards, rows, and signature blocks
 - repeating table headers where supported
-- hiding the toolbar during print
+- readable table headers
+- white print background so documents remain readable when browser background graphics are disabled
+- light unsafe-status watermark that does not block document text
 
-## Implemented routes
+`PrintToolbar` is fixed above the document preview and hidden in print output.
+
+## Implemented routes and UI entry points
+
+| Document | Print route | Source contract | UI entry point | Route helper |
+|---|---|---|---|---|
+| Direct Sale Invoice | `/admin/billing/direct-sale/[id]/print` | `GET /billing/direct-sales/:id/` | Direct-sale workspace row action `Invoice PDF` | `buildAdminDirectSalePrintRoute(id)` |
+| Payment / EMI Receipt | `/admin/billing/receipts/[id]/print` | `GET /billing/receipts/:id/` | Receipt register row action `Print / Save PDF` | `buildAdminBillingReceiptPrintRoute(id)` |
+| Direct Sale Delivery Challan | `/admin/deliveries/direct-sale-cases/[caseId]/print` | `GET /admin/deliveries/direct-sale-cases/:caseId/` | Delivery case detail `Delivery Challan / Print` | `buildAdminDirectSaleDeliveryChallanPrintRoute(id)` |
+| Lucky Plan / Subscription Contract | `/admin/subscriptions/[id]/contract/print` | `GET /admin/subscriptions/:id/`, optional `GET /admin/customers/:id/` | Subscription detail `Contract PDF / Print` | `buildAdminSubscriptionContractPrintRoute(id)` |
+| Rent / Lease Contract | `/admin/rent-lease/contracts/[id]/contract/print` | `GET /admin/subscriptions/:id/`, optional `GET /admin/customers/:id/`, optional `GET /admin/contracts/:id/possession/` | Subscription detail `Rent / Lease Contract PDF / Print` only when `plan_type` is `RENT` or `LEASE` and matching profile exists | `buildAdminRentLeaseContractPrintRoute(id)` |
+
+## Document-specific safety notes
 
 ### Direct Sale Invoice
 
-Route:
+The direct-sale invoice print route uses existing direct-sale payload fields only:
 
-```text
-/admin/billing/direct-sale/[id]/print
-```
+- invoice/sale references
+- customer snapshot
+- line items
+- totals
+- received amount
+- balance due
+- invoice/payment status
 
-Source contract:
+Outstanding balance is visible when backend payload reports it. The print page does not post payments, update invoice state, create receipts, move stock, or alter delivery readiness.
 
-```text
-GET /billing/direct-sales/:id/
-```
+### Payment / EMI Receipt
 
-Frontend service:
+The receipt print route uses existing receipt payload fields only:
 
-```text
-frontend/src/services/billing.ts#getDirectSale
-```
+- receipt number
+- receipt type
+- receipt status
+- source reference
+- customer snapshot
+- amount paid
+- finance account/payment method where exposed
+- balance-after-payment where exposed
 
-Route helper:
-
-```text
-buildAdminDirectSalePrintRoute(id)
-```
-
-Operational wiring:
-
-```text
-frontend/src/app/(dashboard)/admin/billing/direct-sale/DirectSaleWorkspace.tsx
-```
-
-The direct-sale workspace invoice column exposes `Invoice PDF`, which opens the branded print route without changing direct-sale operations.
-
-### Payment Receipt / EMI Receipt
-
-Route:
-
-```text
-/admin/billing/receipts/[id]/print
-```
-
-Source contract:
-
-```text
-GET /billing/receipts/:id/
-```
-
-Route helper:
-
-```text
-buildAdminBillingReceiptPrintRoute(id)
-```
-
-Operational wiring:
-
-```text
-frontend/src/app/(dashboard)/admin/billing/receipts/page.tsx
-```
-
-The receipt register exposes a row-level `Print / Save PDF` action that opens the branded receipt print route.
+Unsafe receipt statuses render a visible warning and watermark. Voided, cancelled, or reversed receipts are preserved as audit records and must not be treated as proof of active payment.
 
 ### Direct Sale Delivery Challan
 
-Route:
-
-```text
-/admin/deliveries/direct-sale-cases/[caseId]/print
-```
-
-Source contract:
-
-```text
-GET /admin/deliveries/direct-sale-cases/:caseId/
-```
-
-Frontend service:
-
-```text
-frontend/src/services/deliveries.ts#getAdminDirectSaleDeliveryCase
-```
-
-Route helper:
-
-```text
-buildAdminDirectSaleDeliveryChallanPrintRoute(id)
-```
-
-Operational wiring:
-
-```text
-frontend/src/app/(dashboard)/admin/deliveries/direct-sale-cases/[caseId]/layout.tsx
-```
-
-The direct-sale delivery case route displays `Delivery Challan / Print` above the operational detail page. This keeps the print affordance visible without changing schedule, dispatch, cancellation, payment-release, stock, mark-delivered, or note actions.
-
-The delivery challan print page uses existing normalized `DeliveryRecord` fields only:
+The delivery challan print route uses existing normalized `DeliveryRecord` fields only:
 
 - delivery reference
 - service desk case number
@@ -184,42 +173,17 @@ The delivery challan print page uses existing normalized `DeliveryRecord` fields
 - outstanding balance where provided
 - payment-exception approval metadata where provided
 
+For payment-exception release cases, the document explicitly states:
+
+```text
+Delivery was operationally released.
+Receivable remains collectible.
+Approval does not settle payment.
+```
+
+The delivery challan must not schedule, dispatch, cancel, create notes, move stock, mark delivered, or approve payment exceptions.
+
 ### Lucky Plan / Subscription Contract
-
-Route:
-
-```text
-/admin/subscriptions/[id]/contract/print
-```
-
-Source contracts:
-
-```text
-GET /admin/subscriptions/:id/
-GET /admin/customers/:id/
-```
-
-The customer detail call is display-only and is used only when the subscription payload exposes a customer id. It provides already-existing customer address/email display data. If that request fails, the print page still renders the subscription contract with safe fallbacks.
-
-Route helper:
-
-```text
-buildAdminSubscriptionContractPrintRoute(id)
-```
-
-Operational wiring:
-
-```text
-frontend/src/app/(dashboard)/admin/subscriptions/[id]/layout.tsx
-```
-
-Print route:
-
-```text
-frontend/src/app/(dashboard)/admin/subscriptions/[id]/contract/print/page.tsx
-```
-
-The subscription detail route displays `Contract PDF / Print` above the operational subscription detail page. The action is isolated in the `[id]` layout and hidden for nested print routes, so it does not disturb subscription transition buttons, cancellation actions, payment views, delivery actions, timeline sections, or document upload flows.
 
 The subscription contract print page uses existing admin subscription/customer payload fields only:
 
@@ -244,45 +208,11 @@ The subscription contract print page uses existing admin subscription/customer p
 
 The page does **not** build an EMI schedule. It does **not** calculate EMI from product price. It prints backend-provided `total_amount`, `monthly_amount`, `tenure_months`, `financial_summary`, and winner/waiver fields only.
 
+Lucky winner and waiver notes are display-only. Winner benefit, where applicable, waives only future eligible EMI rows as recorded by backend winner and waiver records.
+
 ### Rent / Lease Contract
 
-Route:
-
-```text
-/admin/rent-lease/contracts/[id]/contract/print
-```
-
-The `[id]` is the existing subscription id because the current backend stores rent/lease contracts as subscription-backed records with `plan_type=RENT` or `plan_type=LEASE` plus an attached `rent_profile` or `lease_profile`.
-
-Source contracts:
-
-```text
-GET /admin/subscriptions/:id/
-GET /admin/customers/:id/
-GET /admin/contracts/:id/possession/
-```
-
-The customer and possession calls are display-only. The possession call is optional and is used only for already-existing serial, handover, expected return, actual return, and condition-note fields. If either optional request fails, the print page renders with safe fallbacks.
-
-Route helper:
-
-```text
-buildAdminRentLeaseContractPrintRoute(id)
-```
-
-Operational wiring:
-
-```text
-frontend/src/app/(dashboard)/admin/subscriptions/[id]/layout.tsx
-```
-
-Print route:
-
-```text
-frontend/src/app/(dashboard)/admin/rent-lease/contracts/[id]/contract/print/page.tsx
-```
-
-The subscription detail layout exposes `Rent / Lease Contract PDF / Print` only when the existing detail payload confirms a rent/lease plan and matching `rent_profile` or `lease_profile`. Nested print routes still return children only, so the operational strip does not contaminate print output.
+The rent/lease contract route is subscription-backed. The `[id]` is the existing subscription id because current backend rent/lease contracts are stored as `Subscription` with `plan_type=RENT` or `plan_type=LEASE` plus an attached `rent_profile` or `lease_profile`.
 
 The rent/lease contract print page uses existing subscription, rent/lease profile, customer, financial summary, and optional possession payload fields only:
 
@@ -309,7 +239,7 @@ The rent/lease contract print page uses existing subscription, rent/lease profil
 - authorized signatory and customer signature blocks
 - audit footer
 
-The page does **not** generate billing schedules or demand rows. It does **not** calculate monthly rent, lease amount, deposit, refund, deduction, outstanding balance, or due-date rules. Missing optional values render as `—`.
+The page does **not** generate billing schedules or demand rows. It does **not** calculate monthly rent, lease amount, deposit, refund, deduction, outstanding balance, or due-date rules. Security deposit refund, deduction, withholding, and final refund status must be processed only through backend deposit/refund and return-inspection controls.
 
 ## Financial, stock, delivery, and subscription safety rules
 
@@ -325,7 +255,7 @@ All print routes must follow these rules:
 8. No fake lucky winner, waiver, batch, lucky ID, product, customer, or contract terms.
 9. No fake rent/lease monthly billing schedule, deposit, refund, deduction, possession, serial, due-date, or return condition data.
 10. Missing optional display values must show a safe fallback such as `—`.
-11. Cancelled, failed, voided, returned, reversed, inactive, closed, completed, or draft records must not visually appear as normal active/paid records.
+11. Cancelled, failed, voided, returned, reversed, inactive, closed, completed, defaulted, or draft records must not visually appear as normal active/paid records.
 12. Outstanding balances must remain visible when the backend payload reports them.
 13. Print views must not settle payment, close receivables, post accounting, generate receipts, reconcile items, or mutate operational records.
 14. Subscription contract print must not create, update, cancel, close, approve, activate, request return, waive, draw, or mutate subscription/EMI/payment/waiver/lucky ID records.
@@ -333,34 +263,6 @@ All print routes must follow these rules:
 16. Delivery challans must not schedule, dispatch, cancel, create notes, move stock, mark delivered, or approve payment exceptions.
 17. Delivery must not be displayed as complete unless the backend delivery status/date says it is delivered.
 18. Admin outstanding-release approval must be displayed as operational release only; receivable collection remains active.
-
-## Status/watermark behavior
-
-The print shell supports status watermarks for:
-
-- `CANCELLED`
-- `VOID`
-- `VOIDED`
-- `DRAFT`
-- `RETURNED`
-- `REVERSED`
-
-Delivery Challan also maps these unsafe delivery states to watermarks:
-
-- `FAILED`
-- `CANCELLED`
-- `RETURNED`
-- `REVERSED`
-
-Subscription Contract and Rent / Lease Contract also map these non-active contract states to watermarks:
-
-- `CLOSED`
-- `COMPLETED`
-- `DEFAULTED`
-- `INACTIVE`
-- `RETURNED`
-
-Receipt print also shows an explicit warning when a receipt status is voided/cancelled/reversed.
 
 ## Deterministic test coverage
 
@@ -380,18 +282,22 @@ Coverage:
 - Customer is visible.
 - Item table content is visible.
 - Grand total, received amount, and balance due are visible.
+- Outstanding balance remains visible.
 - Print toolbar is visible.
+- Dashboard sidebar/topbar/quick-action chrome is absent from print routes.
 - Receipt print route loads with mocked API payload.
 - Receipt number, customer, source reference, paid amount section, and print toolbar are visible.
+- Unsafe receipt status shows visible warning and watermark.
 - Direct-sale workspace exposes branded `Invoice PDF` link.
 - Direct-sale delivery challan print route loads with mocked API payload.
 - Delivery challan route shows business name, delivery title, delivery reference, source reference, customer/receiver, address/status, and print toolbar.
+- Payment-exception delivery release says operational release only, receivable remains collectible, and approval does not settle payment.
 - Direct-sale delivery detail route exposes `Delivery Challan / Print` link.
 - Subscription contract print route loads with mocked API payload.
-- Subscription contract route shows business name, contract title, subscription reference, customer, product, product code, EMI/tenure, signature blocks, and print toolbar.
+- Subscription contract route shows business name, contract title, subscription reference, customer, product, product code, EMI/tenure, outstanding balance, signature blocks, and print toolbar.
 - Subscription detail route exposes `Contract PDF / Print` link.
 - Rent/lease contract print route loads with mocked API payload.
-- Rent/lease contract route shows business name, agreement title, contract reference, customer, asset/product, product code, asset serial when exposed, monthly lease/rent amount, security deposit, refundable deposit, signature blocks, and print toolbar.
+- Rent/lease contract route shows business name, agreement title, contract reference, customer, asset/product, product code, asset serial when exposed, monthly lease/rent amount, security deposit, refundable deposit, outstanding balance, deposit-liability note, signature blocks, and print toolbar.
 - Rent/lease subscription detail exposes `Rent / Lease Contract PDF / Print` only when the mocked subscription payload is rent/lease profile-backed.
 
 These tests use mocked frontend API responses and do not depend on live shop data.
@@ -407,15 +313,17 @@ For each new document type:
 5. Add a row/detail action from the existing operational page.
 6. Add deterministic Playwright coverage with mocked API payloads unless a stable fixture already exists.
 7. Keep the route read-only.
+8. Add unsafe status mapping only through the shared formatter helpers.
+9. Keep outstanding balances visible when backend payload reports them.
 
-## Deferred document types
+## Deferred Phase 3 document types
 
 The following templates remain deferred until their existing route/data contracts are confirmed and wired safely:
 
 - Purchase Bill / Vendor Payment Voucher
+- Vendor payment voucher / payable settlement document
 - Day Close report
 - Reconciliation report
-
-## Delivery document gaps deferred
-
-Current Delivery Challan is wired for direct-sale service desk delivery cases only. Subscription, rent, and lease delivery challans remain deferred until their route convention and detail contracts are selected for the same branded document system.
+- Subscription/rent/lease delivery challans beyond direct-sale delivery cases
+- Return inspection customer copy
+- Deposit refund advice
