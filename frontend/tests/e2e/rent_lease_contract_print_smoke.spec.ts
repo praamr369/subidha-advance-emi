@@ -110,6 +110,12 @@ async function mockRentLeaseContractApis(page: Parameters<typeof test>[0]["page"
   });
 }
 
+async function expectNoDashboardChrome(page: Parameters<typeof test>[0]["page"]) {
+  await expect(page.getByRole("button", { name: "Open quick actions" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Open command palette/i })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: /sidebar navigation/i })).toHaveCount(0);
+}
+
 test("rent lease contract print route renders branded agreement", async ({ page }) => {
   await mockRentLeaseContractApis(page);
 
@@ -125,9 +131,15 @@ test("rent lease contract print route renders branded agreement", async ({ page 
   await expect(page.getByText("Monthly Lease").first()).toBeVisible();
   await expect(page.getByText("Security Deposit").first()).toBeVisible();
   await expect(page.getByText("Refundable Deposit").first()).toBeVisible();
+  await expect(page.getByText("Outstanding / Balance").first()).toBeVisible();
+  await expect(page.getByText("Deposit Liability / Refund Note")).toBeVisible();
+  await expect(page.getByText("Security deposit refund, deduction, withholding, and final refund status must be processed only through backend")).toBeVisible();
+  await expect(page.getByText("deduction values are displayed only from backend contract records")).toBeVisible();
+  await expect(page.getByText("does not generate a billing schedule or demand rows")).toBeVisible();
   await expect(page.getByText("Customer Signature")).toBeVisible();
   await expect(page.getByText("Authorized Signature")).toBeVisible();
   await expect(page.getByRole("button", { name: "Print / Save PDF" })).toBeVisible();
+  await expectNoDashboardChrome(page);
 });
 
 test("rent lease subscription detail exposes rent lease contract print link", async ({ page }) => {
