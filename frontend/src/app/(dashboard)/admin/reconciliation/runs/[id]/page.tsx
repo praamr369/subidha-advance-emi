@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -9,6 +10,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
 import ActionButton from "@/components/ui/ActionButton";
+import { buildAdminReconciliationReportPrintRoute } from "@/lib/route-builders";
 import { normalizeApiError } from "@/services/api";
 import { getReconciliationModules, getReconciliationRun, listReconciliationItems } from "@/services/reconciliation/control-tower";
 import type { ReconciliationItem, ReconciliationModuleSummary, ReconciliationRun } from "@/types/reconciliation";
@@ -83,9 +85,19 @@ export default function AdminReconciliationRunDetailPage({ params }: { params: {
               ) : null
             }
             right={
-              <ActionButton variant="outline" onClick={() => void load()}>
-                Refresh
-              </ActionButton>
+              <div className="flex flex-wrap gap-2">
+                {run ? (
+                  <Link
+                    href={buildAdminReconciliationReportPrintRoute(run.id)}
+                    className="inline-flex h-10 items-center rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm font-semibold text-foreground hover:bg-[var(--surface-muted)]"
+                  >
+                    Reconciliation Report PDF / Print
+                  </Link>
+                ) : null}
+                <ActionButton variant="outline" onClick={() => void load()}>
+                  Refresh
+                </ActionButton>
+              </div>
             }
           />
 
@@ -109,4 +121,3 @@ export default function AdminReconciliationRunDetailPage({ params }: { params: {
     </ERPPageShell>
   );
 }
-
