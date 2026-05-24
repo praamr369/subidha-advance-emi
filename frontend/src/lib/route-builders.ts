@@ -145,6 +145,10 @@ export function buildAdminSubscriptionRoute(id: number | string): string {
   return `${ROUTES.admin.subscriptions}/${id}`;
 }
 
+export function buildAdminSubscriptionContractPrintRoute(id: number | string): string {
+  return `${ROUTES.admin.subscriptions}/${id}/contract/print`;
+}
+
 export function buildAdminPaymentRoute(id: number | string): string {
   return `${ROUTES.admin.payments}/${id}`;
 }
