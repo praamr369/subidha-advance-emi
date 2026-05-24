@@ -14,6 +14,7 @@ import {
 } from "@/components/erp";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import { ApiError } from "@/lib/api";
+import { buildAdminCashierDayClosePrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { listAdminCashierDayCloses } from "@/services/settlements";
 import type { CashierDayClose } from "@/types/settlements";
@@ -113,11 +114,16 @@ export default function AdminDayClosesPage() {
       },
       {
         key: "actions",
-        title: "",
+        title: "Actions",
         render: (row) => (
-          <Link className="text-sm font-semibold text-primary hover:underline" href={`${ROUTES.admin.settlementsDayCloses}/${row.id}`}>
-            Review →
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link className="text-sm font-semibold text-primary hover:underline" href={`${ROUTES.admin.settlementsDayCloses}/${row.id}`}>
+              Review →
+            </Link>
+            <Link className="text-sm font-semibold text-primary hover:underline" href={buildAdminCashierDayClosePrintRoute(row.id)}>
+              Day Close Report PDF / Print
+            </Link>
+          </div>
         ),
       },
     ],
