@@ -18,7 +18,7 @@ export default function DirectSaleDeliveryCaseLayout({ children }: { children: R
   return (
     <>
       {caseId ? (
-        <div className="print:hidden border-b border-border bg-background/95 px-4 py-3">
+        <div data-document-link-strip className="print:hidden border-b border-border bg-background/95 px-4 py-3">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-foreground">Delivery documents</div>
