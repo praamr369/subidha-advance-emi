@@ -249,9 +249,7 @@ export default function AdminRentLeaseContractPrintPage() {
     subscription.financial_summary?.outstanding_amount ??
     subscription.financial_summary?.remaining_amount ??
     subscription.financial_summary?.pending_amount;
-  const watermark =
-    documentStatusWatermark(status) ||
-    (["CLOSED", "COMPLETED", "DEFAULTED", "INACTIVE", "RETURNED"].includes(status) ? status : null);
+  const watermark = documentStatusWatermark(status);
 
   return (
     <>
@@ -445,7 +443,7 @@ export default function AdminRentLeaseContractPrintPage() {
           ]}
         />
 
-        <div className="mt-5 flex justify-between gap-4 text-xs text-[#7c6a56]">
+        <div className="document-screen-only mt-5 flex justify-between gap-4 text-xs text-[#7c6a56]">
           <Link href={buildAdminSubscriptionRoute(subscription.id)} className="font-semibold text-[#6f4e27] underline-offset-4 hover:underline">
             Back to subscription record
           </Link>
