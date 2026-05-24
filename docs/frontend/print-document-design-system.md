@@ -1,8 +1,8 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 2D QA HARDENED ON `update` BRANCH**
+Status: **PHASE 3A IMPLEMENTED ON `update` BRANCH**
 
-This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial, stock, delivery-state, subscription-state, EMI, waiver, lucky draw, reconciliation, rent/lease deposit, billing, refund, possession, return-inspection, commission, payout, reversal, cancellation, or accounting records.
+This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial, stock, delivery-state, subscription-state, EMI, waiver, lucky draw, reconciliation, rent/lease deposit, billing, refund, possession, return-inspection, commission, payout, reversal, cancellation, vendor payable, purchase, inventory valuation, or accounting records.
 
 ## Shared frontend document primitives
 
@@ -86,6 +86,7 @@ frontend/src/app/(dashboard)/admin/layout.tsx
 ```text
 /print
 /contract/print
+/voucher/print
 ```
 
 This prevents sidebar, topbar, command palette triggers, quick-action buttons, workspace menus, and business setup banners from contaminating print document previews or printed output.
@@ -99,10 +100,11 @@ This prevents sidebar, topbar, command palette triggers, quick-action buttons, w
 - static A4 document flow during browser print
 - print-only document visibility isolation
 - toolbar hidden during print
+- screen-only navigation hidden through `.document-screen-only` and `[data-print-hidden]`
 - non-document `header`, `nav`, `aside`, and `data-document-link-strip` hidden during print
 - safe print margins
 - browser Save as PDF
-- avoiding page breaks inside document cards, rows, and signature blocks
+- avoiding page breaks inside document cards, rows, totals, and signature blocks
 - repeating table headers where supported
 - readable table headers
 - white print background so documents remain readable when browser background graphics are disabled
@@ -119,6 +121,8 @@ This prevents sidebar, topbar, command palette triggers, quick-action buttons, w
 | Direct Sale Delivery Challan | `/admin/deliveries/direct-sale-cases/[caseId]/print` | `GET /admin/deliveries/direct-sale-cases/:caseId/` | Delivery case detail `Delivery Challan / Print` | `buildAdminDirectSaleDeliveryChallanPrintRoute(id)` |
 | Lucky Plan / Subscription Contract | `/admin/subscriptions/[id]/contract/print` | `GET /admin/subscriptions/:id/`, optional `GET /admin/customers/:id/` | Subscription detail `Contract PDF / Print` | `buildAdminSubscriptionContractPrintRoute(id)` |
 | Rent / Lease Contract | `/admin/rent-lease/contracts/[id]/contract/print` | `GET /admin/subscriptions/:id/`, optional `GET /admin/customers/:id/`, optional `GET /admin/contracts/:id/possession/` | Subscription detail `Rent / Lease Contract PDF / Print` only when `plan_type` is `RENT` or `LEASE` and matching profile exists | `buildAdminRentLeaseContractPrintRoute(id)` |
+| Purchase Bill / Vendor Bill | `/admin/purchases/[id]/bill/print` | `GET /inventory/vendor-bills/:id/`, optional `GET /admin/vendors/:id/`, optional `GET /admin/vendors/:id/outstanding/` | Vendor bills list row action `Purchase Bill PDF / Print` | `buildAdminPurchaseBillPrintRoute(id)` |
+| Vendor Payment Voucher | `/admin/vendors/payments/[id]/voucher/print` | `GET /inventory/vendor-payments/:id/`, optional `GET /inventory/vendor-bills/:id/`, optional `GET /admin/vendors/:id/`, optional `GET /admin/vendors/:id/outstanding/` | Vendor payments list row action `Vendor Payment Voucher PDF / Print` | `buildAdminVendorPaymentVoucherPrintRoute(id)` |
 
 ## Document-specific safety notes
 
@@ -149,7 +153,7 @@ The receipt print route uses existing receipt payload fields only:
 - finance account/payment method where exposed
 - balance-after-payment where exposed
 
-Unsafe receipt statuses render a visible warning and watermark. Voided, cancelled, or reversed receipts are preserved as audit records and must not be treated as proof of active payment.
+Unsafe receipt statuses render a visible warning and watermark. Voided, cancelled, or reversed receipts are preserved for audit and are not proof of active payment.
 
 ### Direct Sale Delivery Challan
 
@@ -241,6 +245,52 @@ The rent/lease contract print page uses existing subscription, rent/lease profil
 
 The page does **not** generate billing schedules or demand rows. It does **not** calculate monthly rent, lease amount, deposit, refund, deduction, outstanding balance, or due-date rules. Security deposit refund, deduction, withholding, and final refund status must be processed only through backend deposit/refund and return-inspection controls.
 
+### Purchase Bill / Vendor Bill
+
+The purchase bill print route uses existing inventory/vendor bill and vendor display payloads only:
+
+- bill number / purchase reference
+- bill date
+- vendor name, phone, address, email, and GSTIN where exposed
+- purchase order reference where exposed
+- goods receipt reference where exposed
+- finance account where exposed
+- posted journal reference where exposed
+- line items from backend bill lines
+- SKU/product name/description
+- quantity
+- unit cost
+- tax amount
+- line total
+- subtotal
+- tax total
+- grand total
+- vendor payments total and outstanding balance where backend vendor outstanding exposes them
+- notes
+- authorized signatory and vendor acknowledgement signature
+- audit footer
+
+The page does **not** calculate vendor bill totals, tax, payable, inventory value, stock receipt status, or accounting truth. It displays backend fields only. Unsafe purchase bill status shows a warning/watermark and must not be treated as a normal payable document.
+
+### Vendor Payment Voucher
+
+The vendor payment voucher print route uses existing inventory vendor payment, optional vendor bill, vendor, and vendor outstanding payloads only:
+
+- payment/voucher number
+- payment date
+- vendor name, phone, address, email, and GSTIN where exposed
+- finance account/payment method where exposed
+- transaction/reference id
+- paid amount
+- allocated vendor bill when `vendor_bill` is exposed
+- payable balance after payment where backend outstanding exposes it
+- posted journal reference where exposed
+- notes
+- authorized signatory and vendor receiver signature
+- audit footer
+
+The page does **not** calculate payment allocation, payable balance, accounting posting, reconciliation state, or vendor settlement. Cancelled, reversed, or voided vendor payment vouchers are retained for audit and are not proof of active settlement.
+
 ## Financial, stock, delivery, and subscription safety rules
 
 All print routes must follow these rules:
@@ -254,15 +304,18 @@ All print routes must follow these rules:
 7. No fake EMI schedules.
 8. No fake lucky winner, waiver, batch, lucky ID, product, customer, or contract terms.
 9. No fake rent/lease monthly billing schedule, deposit, refund, deduction, possession, serial, due-date, or return condition data.
-10. Missing optional display values must show a safe fallback such as `—`.
-11. Cancelled, failed, voided, returned, reversed, inactive, closed, completed, defaulted, or draft records must not visually appear as normal active/paid records.
-12. Outstanding balances must remain visible when the backend payload reports them.
-13. Print views must not settle payment, close receivables, post accounting, generate receipts, reconcile items, or mutate operational records.
-14. Subscription contract print must not create, update, cancel, close, approve, activate, request return, waive, draw, or mutate subscription/EMI/payment/waiver/lucky ID records.
-15. Rent/lease contract print must not create, update, activate, cancel, close, bill, collect, refund, deduct, reconcile, post accounting, change possession, move inventory, or mutate return-inspection records.
-16. Delivery challans must not schedule, dispatch, cancel, create notes, move stock, mark delivered, or approve payment exceptions.
-17. Delivery must not be displayed as complete unless the backend delivery status/date says it is delivered.
-18. Admin outstanding-release approval must be displayed as operational release only; receivable collection remains active.
+10. No fake purchase bill totals, tax, vendor invoice numbers, stock quantities, inventory valuation, payment allocation, payable balance, or accounting status.
+11. Missing optional display values must show a safe fallback such as `—`.
+12. Cancelled, failed, voided, returned, reversed, inactive, closed, completed, defaulted, or draft records must not visually appear as normal active/paid records.
+13. Outstanding balances must remain visible when the backend payload reports them.
+14. Print views must not settle payment, close receivables/payables, post accounting, generate receipts/vouchers, reconcile items, or mutate operational records.
+15. Subscription contract print must not create, update, cancel, close, approve, activate, request return, waive, draw, or mutate subscription/EMI/payment/waiver/lucky ID records.
+16. Rent/lease contract print must not create, update, activate, cancel, close, bill, collect, refund, deduct, reconcile, post accounting, change possession, move inventory, or mutate return-inspection records.
+17. Purchase bill print must not create, update, approve, post, cancel, reverse, receive stock, mutate vendor ledgers, move inventory, or post accounting.
+18. Vendor payment voucher print must not create, update, approve, post, cancel, reverse, allocate, reconcile, mutate payables, or post accounting.
+19. Delivery challans must not schedule, dispatch, cancel, create notes, move stock, mark delivered, or approve payment exceptions.
+20. Delivery must not be displayed as complete unless the backend delivery status/date says it is delivered.
+21. Admin outstanding-release approval must be displayed as operational release only; receivable collection remains active.
 
 ## Deterministic test coverage
 
@@ -272,6 +325,7 @@ Added / updated:
 frontend/tests/e2e/document_print_smoke.spec.ts
 frontend/tests/e2e/subscription_contract_print_smoke.spec.ts
 frontend/tests/e2e/rent_lease_contract_print_smoke.spec.ts
+frontend/tests/e2e/purchase_vendor_document_print_smoke.spec.ts
 ```
 
 Coverage:
@@ -299,6 +353,12 @@ Coverage:
 - Rent/lease contract print route loads with mocked API payload.
 - Rent/lease contract route shows business name, agreement title, contract reference, customer, asset/product, product code, asset serial when exposed, monthly lease/rent amount, security deposit, refundable deposit, outstanding balance, deposit-liability note, signature blocks, and print toolbar.
 - Rent/lease subscription detail exposes `Rent / Lease Contract PDF / Print` only when the mocked subscription payload is rent/lease profile-backed.
+- Purchase bill print route loads with mocked vendor bill, vendor, and outstanding payloads.
+- Purchase bill route shows business name, purchase bill title, bill reference, vendor, item table, totals, outstanding payable, unsafe status warning, audit footer, signatures, and print toolbar.
+- Vendor payment voucher print route loads with mocked payment, vendor bill, vendor, and outstanding payloads.
+- Vendor payment voucher route shows business name, voucher title, payment reference, vendor, payment method, transaction reference, allocated bill, paid amount, payable balance, audit footer, signatures, and print toolbar.
+- Vendor bills list exposes `Purchase Bill PDF / Print`.
+- Vendor payments list exposes `Vendor Payment Voucher PDF / Print`.
 
 These tests use mocked frontend API responses and do not depend on live shop data.
 
@@ -320,10 +380,10 @@ For each new document type:
 
 The following templates remain deferred until their existing route/data contracts are confirmed and wired safely:
 
-- Purchase Bill / Vendor Payment Voucher
-- Vendor payment voucher / payable settlement document
 - Day Close report
 - Reconciliation report
 - Subscription/rent/lease delivery challans beyond direct-sale delivery cases
 - Return inspection customer copy
 - Deposit refund advice
+- Purchase return / debit note customer-vendor copy
+- Vendor quote request / vendor quote comparison copy
