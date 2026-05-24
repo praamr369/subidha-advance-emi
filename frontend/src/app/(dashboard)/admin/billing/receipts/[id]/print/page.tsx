@@ -18,8 +18,11 @@ import { PrintToolbar } from "@/components/documents/print-toolbar";
 import { subidhaDocumentTheme, type DocumentCopyLabel } from "@/lib/documents/document-theme";
 import {
   documentStatusWatermark,
+  documentUnsafeStatusMessage,
   formatDocumentDate,
   formatDocumentMoney,
+  normalizeDocumentStatus,
+  unsafeDocumentStatusLabel,
   safeDocumentText,
 } from "@/lib/documents/formatters";
 import { apiFetch } from "@/lib/api";
@@ -40,12 +43,7 @@ function receiptTitle(receipt: ReceiptPrintPayload): string {
 }
 
 function receiptDisplayStatus(status: string | null | undefined): string {
-  const token = String(status || "").trim().toUpperCase();
-  if (token === "POSTED") return "POSTED";
-  if (token === "VOID") return "VOIDED";
-  if (token === "CANCELLED") return "CANCELLED";
-  if (token === "REVERSED") return "REVERSED";
-  return token || "—";
+  return unsafeDocumentStatusLabel(status) || normalizeDocumentStatus(status) || "—";
 }
 
 function sourceReference(receipt: ReceiptPrintPayload): string {
@@ -126,7 +124,7 @@ export default function BillingReceiptPrintPage() {
   }
 
   const displayStatus = receiptDisplayStatus(receipt.status);
-  const isUnsafeStatus = ["VOID", "VOIDED", "CANCELLED", "REVERSED"].includes(displayStatus);
+  const unsafeStatusMessage = documentUnsafeStatusMessage(receipt.status, "receipt");
 
   return (
     <>
@@ -142,9 +140,9 @@ export default function BillingReceiptPrintPage() {
           subtitle="Receipt generated from posted Subidha billing records."
           status={displayStatus}
         />
-        {isUnsafeStatus ? (
+        {unsafeStatusMessage ? (
           <div className="document-card mb-4 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">
-            This receipt is {displayStatus}. It must not be treated as a normal paid receipt.
+            {unsafeStatusMessage}
           </div>
         ) : null}
         <DocumentMetadataGrid
