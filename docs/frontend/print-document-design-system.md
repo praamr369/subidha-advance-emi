@@ -1,8 +1,8 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 2B IMPLEMENTED ON `update` BRANCH**
+Status: **PHASE 2C IMPLEMENTED ON `update` BRANCH**
 
-This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial, stock, delivery-state, subscription-state, EMI, waiver, lucky draw, reconciliation, or accounting records.
+This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial, stock, delivery-state, subscription-state, EMI, waiver, lucky draw, reconciliation, rent/lease deposit, billing, refund, possession, return-inspection, or accounting records.
 
 ## Shared frontend document primitives
 
@@ -244,6 +244,73 @@ The subscription contract print page uses existing admin subscription/customer p
 
 The page does **not** build an EMI schedule. It does **not** calculate EMI from product price. It prints backend-provided `total_amount`, `monthly_amount`, `tenure_months`, `financial_summary`, and winner/waiver fields only.
 
+### Rent / Lease Contract
+
+Route:
+
+```text
+/admin/rent-lease/contracts/[id]/contract/print
+```
+
+The `[id]` is the existing subscription id because the current backend stores rent/lease contracts as subscription-backed records with `plan_type=RENT` or `plan_type=LEASE` plus an attached `rent_profile` or `lease_profile`.
+
+Source contracts:
+
+```text
+GET /admin/subscriptions/:id/
+GET /admin/customers/:id/
+GET /admin/contracts/:id/possession/
+```
+
+The customer and possession calls are display-only. The possession call is optional and is used only for already-existing serial, handover, expected return, actual return, and condition-note fields. If either optional request fails, the print page renders with safe fallbacks.
+
+Route helper:
+
+```text
+buildAdminRentLeaseContractPrintRoute(id)
+```
+
+Operational wiring:
+
+```text
+frontend/src/app/(dashboard)/admin/subscriptions/[id]/layout.tsx
+```
+
+Print route:
+
+```text
+frontend/src/app/(dashboard)/admin/rent-lease/contracts/[id]/contract/print/page.tsx
+```
+
+The subscription detail layout exposes `Rent / Lease Contract PDF / Print` only when the existing detail payload confirms a rent/lease plan and matching `rent_profile` or `lease_profile`. Nested print routes still return children only, so the operational strip does not contaminate print output.
+
+The rent/lease contract print page uses existing subscription, rent/lease profile, customer, financial summary, and optional possession payload fields only:
+
+- contract reference, using backend `contract_reference` or `subscription_number` when exposed, otherwise a safe subscription fallback
+- contract type: Rent or Lease
+- customer name, phone, address, city, and email where available
+- asset/product name and code
+- asset serial/identifier when possession exposes `serial_number`
+- contract start date
+- tenure months
+- monthly rent/lease amount from backend `monthly_amount`
+- refundable security deposit
+- security deposit amount and percent
+- deposit refund status, return condition, deduction amount, and refund amount
+- lease buyout amount and ownership-transfer flag where exposed
+- branch
+- contract status
+- delivery/fulfillment/possession status where exposed
+- outstanding balance from backend financial summary where exposed
+- handover notes and return/damage notes where exposed
+- customer obligations
+- business obligations
+- return/handover condition and damage/deduction note
+- authorized signatory and customer signature blocks
+- audit footer
+
+The page does **not** generate billing schedules or demand rows. It does **not** calculate monthly rent, lease amount, deposit, refund, deduction, outstanding balance, or due-date rules. Missing optional values render as `—`.
+
 ## Financial, stock, delivery, and subscription safety rules
 
 All print routes must follow these rules:
@@ -256,14 +323,16 @@ All print routes must follow these rules:
 6. No fake receipt/payment references.
 7. No fake EMI schedules.
 8. No fake lucky winner, waiver, batch, lucky ID, product, customer, or contract terms.
-9. Missing optional display values must show a safe fallback such as `—`.
-10. Cancelled, failed, voided, returned, reversed, inactive, closed, completed, or draft records must not visually appear as normal active/paid records.
-11. Outstanding balances must remain visible when the backend payload reports them.
-12. Print views must not settle payment, close receivables, post accounting, generate receipts, reconcile items, or mutate operational records.
-13. Subscription contract print must not create, update, cancel, close, approve, activate, request return, waive, draw, or mutate subscription/EMI/payment/waiver/lucky ID records.
-14. Delivery challans must not schedule, dispatch, cancel, create notes, move stock, mark delivered, or approve payment exceptions.
-15. Delivery must not be displayed as complete unless the backend delivery status/date says it is delivered.
-16. Admin outstanding-release approval must be displayed as operational release only; receivable collection remains active.
+9. No fake rent/lease monthly billing schedule, deposit, refund, deduction, possession, serial, due-date, or return condition data.
+10. Missing optional display values must show a safe fallback such as `—`.
+11. Cancelled, failed, voided, returned, reversed, inactive, closed, completed, or draft records must not visually appear as normal active/paid records.
+12. Outstanding balances must remain visible when the backend payload reports them.
+13. Print views must not settle payment, close receivables, post accounting, generate receipts, reconcile items, or mutate operational records.
+14. Subscription contract print must not create, update, cancel, close, approve, activate, request return, waive, draw, or mutate subscription/EMI/payment/waiver/lucky ID records.
+15. Rent/lease contract print must not create, update, activate, cancel, close, bill, collect, refund, deduct, reconcile, post accounting, change possession, move inventory, or mutate return-inspection records.
+16. Delivery challans must not schedule, dispatch, cancel, create notes, move stock, mark delivered, or approve payment exceptions.
+17. Delivery must not be displayed as complete unless the backend delivery status/date says it is delivered.
+18. Admin outstanding-release approval must be displayed as operational release only; receivable collection remains active.
 
 ## Status/watermark behavior
 
@@ -283,12 +352,13 @@ Delivery Challan also maps these unsafe delivery states to watermarks:
 - `RETURNED`
 - `REVERSED`
 
-Subscription Contract also maps these non-active contract states to watermarks:
+Subscription Contract and Rent / Lease Contract also map these non-active contract states to watermarks:
 
 - `CLOSED`
 - `COMPLETED`
 - `DEFAULTED`
 - `INACTIVE`
+- `RETURNED`
 
 Receipt print also shows an explicit warning when a receipt status is voided/cancelled/reversed.
 
@@ -299,6 +369,7 @@ Added / updated:
 ```text
 frontend/tests/e2e/document_print_smoke.spec.ts
 frontend/tests/e2e/subscription_contract_print_smoke.spec.ts
+frontend/tests/e2e/rent_lease_contract_print_smoke.spec.ts
 ```
 
 Coverage:
@@ -319,6 +390,9 @@ Coverage:
 - Subscription contract print route loads with mocked API payload.
 - Subscription contract route shows business name, contract title, subscription reference, customer, product, product code, EMI/tenure, signature blocks, and print toolbar.
 - Subscription detail route exposes `Contract PDF / Print` link.
+- Rent/lease contract print route loads with mocked API payload.
+- Rent/lease contract route shows business name, agreement title, contract reference, customer, asset/product, product code, asset serial when exposed, monthly lease/rent amount, security deposit, refundable deposit, signature blocks, and print toolbar.
+- Rent/lease subscription detail exposes `Rent / Lease Contract PDF / Print` only when the mocked subscription payload is rent/lease profile-backed.
 
 These tests use mocked frontend API responses and do not depend on live shop data.
 
@@ -338,7 +412,6 @@ For each new document type:
 
 The following templates remain deferred until their existing route/data contracts are confirmed and wired safely:
 
-- Rent/Lease Contract
 - Purchase Bill / Vendor Payment Voucher
 - Day Close report
 - Reconciliation report
