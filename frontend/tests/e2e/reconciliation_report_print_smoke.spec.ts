@@ -112,6 +112,7 @@ test("reconciliation report print route renders branded unreconciled report", as
   await expect(page.getByText("RECONCILIATION REPORT")).toBeVisible();
   await expect(page.getByText("RUN-9001").first()).toBeVisible();
   await expect(page.getByText("COMPLETED").first()).toBeVisible();
+  await expect(page.getByText("UNRECONCILED")).toBeVisible();
   await expect(page.getByText("This reconciliation report has open exceptions")).toBeVisible();
   await expect(page.getByText("Expected Amount")).toBeVisible();
   await expect(page.getByText("Matched Amount")).toBeVisible();
