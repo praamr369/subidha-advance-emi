@@ -62,18 +62,17 @@ export function DocumentPage({
             background: #ffffff !important;
           }
           .print-toolbar,
-          .dashboard-app,
-          .portal-scroll-area,
           header:not(.document-header),
           nav,
           aside,
-          [data-dashboard-shell],
           [data-document-link-strip] {
             display: none !important;
           }
           body * {
             visibility: hidden !important;
           }
+          .document-screen,
+          .document-screen *,
           .print-document,
           .print-document * {
             visibility: visible !important;
