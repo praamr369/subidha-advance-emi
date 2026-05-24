@@ -10,7 +10,10 @@ import { RegistryPageShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
 import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { buildAdminLedgerStatementPrintRoute } from "@/lib/route-builders";
+import {
+  buildAdminFinanceAccountStatementPrintRoute,
+  buildAdminLedgerStatementPrintRoute,
+} from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
   createMoneyMovement,
@@ -374,6 +377,12 @@ export default function AccountingBooksPage() {
                             <div className="text-sm font-semibold text-foreground">{money(account.opening_balance)}</div>
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">
+                            <Link
+                              href={buildAdminFinanceAccountStatementPrintRoute(account.id)}
+                              className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
+                            >
+                              Finance Account Statement PDF / Print
+                            </Link>
                             <Link
                               href={buildAdminLedgerStatementPrintRoute(account.chart_account)}
                               className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
