@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSelectedLayoutSegment } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { buildAdminDirectSaleDeliveryChallanPrintRoute } from "@/lib/route-builders";
 
 export default function DirectSaleDeliveryCaseLayout({ children }: { children: ReactNode }) {
   const params = useParams<{ caseId: string }>();
+  const selectedSegment = useSelectedLayoutSegment();
   const caseId = params?.caseId;
+
+  if (selectedSegment === "print") {
+    return <>{children}</>;
+  }
 
   return (
     <>
