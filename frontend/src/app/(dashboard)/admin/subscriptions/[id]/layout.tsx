@@ -62,7 +62,7 @@ export default function AdminSubscriptionDetailLayout({ children }: { children: 
 
   return (
     <>
-      <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+      <div data-document-link-strip className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm shadow-sm">
           <div>
             <div className="font-semibold text-amber-950">Subscription document output</div>
