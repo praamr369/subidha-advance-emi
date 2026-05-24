@@ -1,10 +1,5 @@
-import DashboardShell from "@/components/layout/DashboardShell";
-import RoleGuard from "@/components/guards/RoleGuard";
+import AdminShellRouter from "@/components/layout/AdminShellRouter";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <RoleGuard allowedRoles={["ADMIN"]}>
-      <DashboardShell>{children}</DashboardShell>
-    </RoleGuard>
-  );
+  return <AdminShellRouter>{children}</AdminShellRouter>;
 }
