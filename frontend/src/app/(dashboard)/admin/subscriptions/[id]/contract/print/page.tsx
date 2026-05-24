@@ -221,9 +221,7 @@ export default function AdminSubscriptionContractPrintPage() {
     winnerSummary?.winner_month ?? financialSummary?.winner_month ?? subscription.winner_month;
   const outstandingAmount =
     financialSummary?.outstanding_amount ?? financialSummary?.remaining_amount ?? financialSummary?.pending_amount;
-  const watermark =
-    documentStatusWatermark(status) ||
-    (["CLOSED", "COMPLETED", "DEFAULTED", "INACTIVE"].includes(status) ? status : null);
+  const watermark = documentStatusWatermark(status);
   const productPrice =
     subscription.product_base_price ?? financialSummary?.total_amount ?? subscription.total_amount;
 
@@ -328,7 +326,7 @@ export default function AdminSubscriptionContractPrintPage() {
             <div className={`mt-4 rounded-xl border px-4 py-3 text-sm ${winnerRecorded ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-[#eadcc6] bg-[#fff6e4] text-[#6f5c46]"}`}>
               {winnerRecorded
                 ? `Winner benefit recorded${winnerMonth ? ` for month ${winnerMonth}` : ""}. Future EMI waiver is shown only from backend waiver records.`
-                : "No winner benefit is recorded for this subscription in the current backend payload."}
+                : "No winner benefit is recorded for this subscription in the current backend payload. Future EMI waiver is shown only from backend waiver records."}
               {winnerSummary?.waiver_scope ? ` Scope: ${winnerSummary.waiver_scope}.` : ""}
             </div>
           </section>
