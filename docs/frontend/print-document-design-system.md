@@ -1,8 +1,8 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 1B IMPLEMENTED ON `update` BRANCH**
+Status: **PHASE 2A IMPLEMENTED ON `update` BRANCH**
 
-This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial state.
+This document records the branded print/PDF document system for SUBIDHA CORE. The system is intentionally read-only and payload-driven: printable pages display backend-provided business records and never mutate financial, stock, delivery-state, or accounting records.
 
 ## Shared frontend document primitives
 
@@ -94,24 +94,13 @@ Route helper:
 buildAdminDirectSalePrintRoute(id)
 ```
 
-The page uses existing `DirectSale` fields only:
+Operational wiring:
 
-- sale reference
-- invoice number where available
-- customer snapshots
-- branch data
-- tax mode
-- invoice/payment/status fields
-- line items
-- subtotal
-- discount
-- taxable total
-- tax total
-- grand total
-- received amount
-- balance due
-- finance account
-- delivery/customer address snapshots
+```text
+frontend/src/app/(dashboard)/admin/billing/direct-sale/DirectSaleWorkspace.tsx
+```
+
+The direct-sale workspace invoice column exposes `Invoice PDF`, which opens the branded print route without changing direct-sale operations.
 
 ### Payment Receipt / EMI Receipt
 
@@ -139,27 +128,63 @@ Operational wiring:
 frontend/src/app/(dashboard)/admin/billing/receipts/page.tsx
 ```
 
-The receipt register now exposes a row-level `Print / Save PDF` action that opens the branded receipt print route.
+The receipt register exposes a row-level `Print / Save PDF` action that opens the branded receipt print route.
 
-The receipt print page uses existing `ReceiptDocument` fields and optional display fields when present:
+### Direct Sale Delivery Challan
 
-- receipt number
-- receipt date
-- receipt type
-- source type/reference
-- direct-sale reference where available
-- customer snapshot
-- customer phone
-- branch/counter
-- finance account
-- paid amount
-- status
-- journal reference where available
-- notes
+Route:
 
-Optional payment display fields such as method/reference/collector are displayed only if the API payload exposes them. The print page does not invent these values.
+```text
+/admin/deliveries/direct-sale-cases/[caseId]/print
+```
 
-## Financial display safety rules
+Source contract:
+
+```text
+GET /admin/deliveries/direct-sale-cases/:caseId/
+```
+
+Frontend service:
+
+```text
+frontend/src/services/deliveries.ts#getAdminDirectSaleDeliveryCase
+```
+
+Route helper:
+
+```text
+buildAdminDirectSaleDeliveryChallanPrintRoute(id)
+```
+
+Operational wiring:
+
+```text
+frontend/src/app/(dashboard)/admin/deliveries/direct-sale-cases/[caseId]/layout.tsx
+```
+
+The direct-sale delivery case route displays `Delivery Challan / Print` above the operational detail page. This keeps the print affordance visible without changing schedule, dispatch, cancellation, payment-release, stock, mark-delivered, or note actions.
+
+The delivery challan print page uses existing normalized `DeliveryRecord` fields only:
+
+- delivery reference
+- service desk case number
+- source type
+- source reference
+- invoice reference
+- sale reference
+- customer name and phone
+- receiver name and phone
+- delivery address snapshot
+- product name and product code
+- delivery status and delivery gate
+- payment gate
+- scheduled date
+- delivered date
+- notes / operational remarks
+- outstanding balance where provided
+- payment-exception approval metadata where provided
+
+## Financial, stock, and delivery safety rules
 
 All print routes must follow these rules:
 
@@ -170,9 +195,12 @@ All print routes must follow these rules:
 5. No fake tax values.
 6. No fake receipt/payment references.
 7. Missing optional display values must show a safe fallback such as `—`.
-8. Cancelled, voided, returned, reversed, or draft records must not visually appear as normal active/paid records.
+8. Cancelled, failed, voided, returned, reversed, or draft records must not visually appear as normal active/paid records.
 9. Outstanding balances must remain visible when the backend payload reports them.
 10. Print views must not settle payment, close receivables, post accounting, generate receipts, reconcile items, or mutate operational records.
+11. Delivery challans must not schedule, dispatch, cancel, create notes, move stock, mark delivered, or approve payment exceptions.
+12. Delivery must not be displayed as complete unless the backend delivery status/date says it is delivered.
+13. Admin outstanding-release approval must be displayed as operational release only; receivable collection remains active.
 
 ## Status/watermark behavior
 
@@ -185,11 +213,18 @@ The print shell supports status watermarks for:
 - `RETURNED`
 - `REVERSED`
 
+Delivery Challan also maps these unsafe delivery states to watermarks:
+
+- `FAILED`
+- `CANCELLED`
+- `RETURNED`
+- `REVERSED`
+
 Receipt print also shows an explicit warning when a receipt status is voided/cancelled/reversed.
 
 ## Deterministic test coverage
 
-Added:
+Added / updated:
 
 ```text
 frontend/tests/e2e/document_print_smoke.spec.ts
@@ -206,6 +241,10 @@ Coverage:
 - Print toolbar is visible.
 - Receipt print route loads with mocked API payload.
 - Receipt number, customer, source reference, paid amount section, and print toolbar are visible.
+- Direct-sale workspace exposes branded `Invoice PDF` link.
+- Direct-sale delivery challan print route loads with mocked API payload.
+- Delivery challan route shows business name, delivery title, delivery reference, source reference, customer/receiver, address/status, and print toolbar.
+- Direct-sale delivery detail route exposes `Delivery Challan / Print` link.
 
 These tests use mocked frontend API responses and do not depend on live shop data.
 
@@ -225,19 +264,12 @@ For each new document type:
 
 The following templates remain deferred until their existing route/data contracts are confirmed and wired safely:
 
-- Delivery Challan
-- Lucky Plan / Subscription Contract
+- Subscription / Lucky Plan Contract
 - Rent/Lease Contract
 - Purchase Bill / Vendor Payment Voucher
 - Day Close report
 - Reconciliation report
 
-## Notes for the next pass
+## Delivery document gaps deferred
 
-Direct-sale invoice print has a canonical route helper and deterministic smoke coverage. The next low-risk UI pass should add a dedicated row action inside the large direct-sale workspace action column using:
-
-```text
-buildAdminDirectSalePrintRoute(row.id)
-```
-
-That change should be made as a small targeted UI patch to avoid disturbing the existing direct-sale operational action logic.
+Current Delivery Challan is wired for direct-sale service desk delivery cases only. Subscription, rent, and lease delivery challans remain deferred until their route convention and detail contracts are selected for the same branded document system.
