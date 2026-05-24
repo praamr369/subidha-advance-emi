@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useParams, useSelectedLayoutSegment } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { buildAdminSubscriptionContractPrintRoute } from "@/lib/route-builders";
+import {
+  buildAdminRentLeaseContractPrintRoute,
+  buildAdminSubscriptionContractPrintRoute,
+} from "@/lib/route-builders";
 
 export default function AdminSubscriptionDetailLayout({ children }: { children: ReactNode }) {
   const params = useParams<{ id: string }>();
@@ -22,15 +25,23 @@ export default function AdminSubscriptionDetailLayout({ children }: { children: 
           <div>
             <div className="font-semibold text-amber-950">Subscription document output</div>
             <div className="text-xs text-amber-800">
-              Generate the read-only Lucky Plan agreement from the existing subscription detail payload.
+              Generate read-only customer-facing contract documents from existing subscription payloads.
             </div>
           </div>
-          <Link
-            href={buildAdminSubscriptionContractPrintRoute(subscriptionId)}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
-          >
-            Contract PDF / Print
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={buildAdminSubscriptionContractPrintRoute(subscriptionId)}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
+            >
+              Contract PDF / Print
+            </Link>
+            <Link
+              href={buildAdminRentLeaseContractPrintRoute(subscriptionId)}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
+            >
+              Rent / Lease Contract PDF / Print
+            </Link>
+          </div>
         </div>
       </div>
       {children}
