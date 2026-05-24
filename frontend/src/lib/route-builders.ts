@@ -81,34 +81,19 @@ function appendQueryValue(
   key: string,
   value: QueryParamPrimitive
 ) {
-  if (value === null || value === undefined) {
-    return;
-  }
-
-  if (typeof value === "string" && !value.trim()) {
-    return;
-  }
-
+  if (value === null || value === undefined) return;
+  if (typeof value === "string" && !value.trim()) return;
   search.set(key, String(value));
 }
 
-function buildRouteWithQuery(
-  destination: string,
-  params: Record<string, QueryParamPrimitive>
-) {
+function buildRouteWithQuery(destination: string, params: Record<string, QueryParamPrimitive>) {
   const search = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(params)) {
-    appendQueryValue(search, key, value);
-  }
-
+  for (const [key, value] of Object.entries(params)) appendQueryValue(search, key, value);
   const query = search.toString();
   return query ? `${destination}?${query}` : destination;
 }
 
-export function buildAdminReconciliationRoute(
-  params: AdminReconciliationRouteParams = {}
-): string {
+export function buildAdminReconciliationRoute(params: AdminReconciliationRouteParams = {}): string {
   return buildRouteWithQuery(ROUTES.admin.financeCanonicalReconciliation, {
     view: params.view === "payments" ? "payments" : null,
     subscription: params.subscription,
@@ -120,57 +105,39 @@ export function buildAdminReconciliationRoute(
   });
 }
 
-export function buildAdminCollectionsRoute(
-  params: AdminCollectionsRouteParams = {}
-): string {
+export function buildAdminCollectionsRoute(params: AdminCollectionsRouteParams = {}): string {
   return buildRouteWithQuery(ROUTES.admin.collections, params);
 }
 
-export function buildAdminPaymentsRoute(
-  params: AdminPaymentsRouteParams = {}
-): string {
+export function buildAdminPaymentsRoute(params: AdminPaymentsRouteParams = {}): string {
   return buildRouteWithQuery(ROUTES.admin.payments, params);
 }
 
-export function buildAdminDeliveriesRoute(
-  params: AdminDeliveriesRouteParams = {}
-): string {
+export function buildAdminDeliveriesRoute(params: AdminDeliveriesRouteParams = {}): string {
   return buildRouteWithQuery(ROUTES.admin.deliveries, params);
 }
 
-export function buildAdminSupportRequestsRoute(
-  params: AdminSupportRequestsRouteParams = {}
-): string {
+export function buildAdminSupportRequestsRoute(params: AdminSupportRequestsRouteParams = {}): string {
   return buildRouteWithQuery(ROUTES.admin.supportRequests, params);
 }
 
-export function buildAdminSubscriptionRequestsRoute(
-  params: AdminSubscriptionRequestsRouteParams = {}
-): string {
+export function buildAdminSubscriptionRequestsRoute(params: AdminSubscriptionRequestsRouteParams = {}): string {
   return buildRouteWithQuery(ROUTES.admin.subscriptionRequests, params);
 }
 
-export function buildAdminLeadsRoute(
-  params: AdminLeadsRouteParams = {}
-): string {
+export function buildAdminLeadsRoute(params: AdminLeadsRouteParams = {}): string {
   return buildRouteWithQuery(ROUTES.admin.leads, params);
 }
 
-export function buildAdminBillingRegisterRoute(
-  params: AdminBillingRouteParams = {}
-): string {
+export function buildAdminBillingRegisterRoute(params: AdminBillingRouteParams = {}): string {
   return buildRouteWithQuery(ROUTES.admin.billingRegister, params);
 }
 
-export function buildAdminBillingInvoicesRoute(
-  params: Omit<AdminBillingRouteParams, "payment" | "billing_invoice"> = {}
-): string {
+export function buildAdminBillingInvoicesRoute(params: Omit<AdminBillingRouteParams, "payment" | "billing_invoice"> = {}): string {
   return buildRouteWithQuery(ROUTES.admin.billingInvoices, params);
 }
 
-export function buildAdminBillingReceiptsRoute(
-  params: Pick<AdminBillingRouteParams, "payment" | "billing_invoice" | "direct_sale" | "subscription" | "customer" | "source_type"> = {}
-): string {
+export function buildAdminBillingReceiptsRoute(params: Pick<AdminBillingRouteParams, "payment" | "billing_invoice" | "direct_sale" | "subscription" | "customer" | "source_type"> = {}): string {
   return buildRouteWithQuery(ROUTES.admin.billingReceipts, params);
 }
 
@@ -196,6 +163,10 @@ export function buildAdminLuckyIdRoute(id: number | string): string {
 
 export function buildAdminDeliveryRoute(id: number | string): string {
   return `${ROUTES.admin.deliveries}/${id}`;
+}
+
+export function buildAdminDirectSaleDeliveryChallanPrintRoute(id: number | string): string {
+  return `${ROUTES.admin.deliveries}/direct-sale-cases/${id}/print`;
 }
 
 export function buildAdminBillingDocumentRoute(id: number | string): string {
