@@ -26,7 +26,6 @@ import {
   documentStatusWatermark,
   documentUnsafeStatusMessage,
   formatDocumentDate,
-  formatDocumentDateTime,
   formatDocumentMoney,
   joinDocumentLines,
   normalizeDocumentStatus,
