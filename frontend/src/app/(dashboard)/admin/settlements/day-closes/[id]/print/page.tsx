@@ -19,6 +19,7 @@ import {
 import { PrintToolbar } from "@/components/documents/print-toolbar";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import { type DocumentCopyLabel } from "@/lib/documents/document-theme";
 import {
   documentStatusWatermark,
   documentUnsafeStatusMessage,
@@ -32,7 +33,6 @@ import {
 import { ROUTES } from "@/lib/routes";
 import { getAdminCashierDayClose } from "@/services/settlements";
 import type { CashierDayClose } from "@/types/settlements";
-import { subidhaDocumentTheme, type DocumentCopyLabel } from "@/lib/documents/document-theme";
 
 type MetadataValue = string | number | boolean | null | undefined | Record<string, unknown> | Array<unknown>;
 
