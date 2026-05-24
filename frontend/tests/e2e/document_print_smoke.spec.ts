@@ -246,6 +246,8 @@ test("direct-sale delivery challan print route renders branded challan", async (
   await expect(page.getByText("Court More").first()).toBeVisible();
   await expect(page.getByText("Ready for delivery").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Print / Save PDF" })).toBeVisible();
+  await expect(page.getByText("Delivery documents")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Delivery Challan / Print" })).toHaveCount(0);
 });
 
 test("direct-sale delivery detail exposes delivery challan print link", async ({ page }) => {
