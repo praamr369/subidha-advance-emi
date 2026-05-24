@@ -38,7 +38,7 @@ function periodLabel(report: GeneralLedgerReport): string {
 function lineRows(report: GeneralLedgerReport): DocumentLineItem[] {
   return (report.rows || []).slice(0, 80).map((row, index) => ({
     key: `${row.journal_entry_id}-${index}`,
-    description: safeDocumentText(row.narration || row.memo || row.description, row.entry_no),
+    description: safeDocumentText(row.memo || row.description, row.entry_no),
     code: [row.entry_date, row.entry_no, row.source_type, row.source_reference]
       .map((part) => (part || "").trim())
       .filter(Boolean)
