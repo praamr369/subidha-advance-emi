@@ -9,6 +9,7 @@ const ADMIN_VENDOR_PAYMENTS_ROUTE = "/admin/vendors/payments";
 const ADMIN_RECONCILIATION_REPORTS_ROUTE = "/admin/reconciliation/reports";
 const ADMIN_ACCOUNTING_JOURNALS_ROUTE = "/admin/accounting/journals";
 const ADMIN_ACCOUNTING_LEDGER_ROUTE = "/admin/accounting/ledger";
+const ADMIN_FINANCE_ACCOUNTS_ROUTE = "/admin/finance/accounts";
 
 type AdminReconciliationRouteParams = {
   view?: AdminReconciliationView;
@@ -189,6 +190,13 @@ export function buildAdminLedgerStatementPrintRoute(
   params: AdminLedgerStatementParams = {}
 ): string {
   return buildRouteWithQuery(`${ADMIN_ACCOUNTING_LEDGER_ROUTE}/${accountId}/statement/print`, params);
+}
+
+export function buildAdminFinanceAccountStatementPrintRoute(
+  financeAccountId: number | string,
+  params: AdminLedgerStatementParams = {}
+): string {
+  return buildRouteWithQuery(`${ADMIN_FINANCE_ACCOUNTS_ROUTE}/${financeAccountId}/statement/print`, params);
 }
 
 export function buildAdminPaymentRoute(id: number | string): string {
