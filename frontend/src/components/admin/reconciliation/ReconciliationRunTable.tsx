@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import Table from "@/components/ui/table";
+import { buildAdminReconciliationReportPrintRoute } from "@/lib/route-builders";
 import { cn } from "@/lib/utils";
 import type { ReconciliationRun } from "@/types/reconciliation";
 
@@ -22,6 +23,7 @@ export default function ReconciliationRunTable({ runs }: { runs: ReconciliationR
           <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Exceptions</th>
           <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">High Risk</th>
           <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Started</th>
+          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Documents</th>
         </tr>
       }
       body={
@@ -38,6 +40,11 @@ export default function ReconciliationRunTable({ runs }: { runs: ReconciliationR
               <td className="px-4 py-3 text-right text-sm">{run.total_exceptions}</td>
               <td className="px-4 py-3 text-right text-sm">{run.high_risk_count}</td>
               <td className="px-4 py-3 text-sm">{run.started_at}</td>
+              <td className="px-4 py-3 text-sm">
+                <Link href={buildAdminReconciliationReportPrintRoute(run.id)} className="font-semibold text-primary hover:underline">
+                  Reconciliation Report PDF / Print
+                </Link>
+              </td>
             </tr>
           ))}
         </>
