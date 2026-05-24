@@ -22,21 +22,13 @@ import {
   documentStatusWatermark,
   formatDocumentDate,
   formatDocumentDateTime,
+  hasPositiveDocumentAmount,
   safeDocumentText,
 } from "@/lib/documents/formatters";
-import { buildAdminDirectSaleDeliveryChallanPrintRoute } from "@/lib/route-builders";
 import {
   getAdminDirectSaleDeliveryCase,
   type DeliveryRecord,
 } from "@/services/deliveries";
-
-function deliveryWatermark(status?: string | null): string | null {
-  const token = String(status || "").trim().toUpperCase();
-  if (["CANCELLED", "FAILED", "VOID", "VOIDED", "RETURNED", "REVERSED"].includes(token)) {
-    return token === "VOID" ? "VOIDED" : token;
-  }
-  return documentStatusWatermark(token);
-}
 
 function sourceReference(delivery: DeliveryRecord): string {
   return (
@@ -127,14 +119,14 @@ export default function DirectSaleDeliveryChallanPrintPage() {
 
   const caseId = delivery.case_id || delivery.service_case_id || delivery.id;
   const challanNo = delivery.delivery_reference || delivery.case_no || `Delivery ${caseId}`;
-  const outstanding = Number(delivery.balance_total || 0);
+  const hasOutstanding = hasPositiveDocumentAmount(delivery.balance_total);
   const releasedWithOutstanding = Boolean(delivery.payment_exception_approved_at);
   const backHref = `/admin/deliveries/direct-sale-cases/${caseId}`;
 
   return (
     <>
       <PrintToolbar copyLabel={copyLabel} onCopyLabelChange={setCopyLabel} backHref={backHref} />
-      <DocumentPage watermark={deliveryWatermark(delivery.status)}>
+      <DocumentPage watermark={documentStatusWatermark(delivery.status)}>
         <DocumentHeader
           copyLabel={copyLabel}
           documentNo={challanNo}
@@ -185,19 +177,19 @@ export default function DirectSaleDeliveryChallanPrintPage() {
             { label: "Delivered At", value: formatDocumentDateTime(delivery.delivered_at) },
           ]}
         />
-        {outstanding > 0 ? (
+        {hasOutstanding ? (
           <div className="document-card mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
             Outstanding balance remains collectible: {delivery.balance_total}. This delivery challan does not settle payment or alter receivables.
           </div>
         ) : null}
         {releasedWithOutstanding ? (
           <div className="document-card mt-4 rounded-2xl border border-sky-300 bg-sky-50 p-4 text-sm text-sky-900">
-            <div className="font-semibold">Admin release with outstanding balance recorded.</div>
+            <div className="font-semibold">Delivery was operationally released with outstanding balance recorded.</div>
             <div className="mt-1">
               Approved by {delivery.payment_exception_approved_by_username || "—"} at {formatDocumentDateTime(delivery.payment_exception_approved_at)}.
               Reason: {delivery.payment_exception_reason || "—"}. Snapshot: {delivery.payment_exception_outstanding_amount_snapshot || "—"}.
             </div>
-            <div className="mt-1 font-semibold">This approval only releases delivery operations; receivable collection remains active.</div>
+            <div className="mt-1 font-semibold">This approval only releases delivery operations; receivable remains collectible and approval does not settle payment.</div>
           </div>
         ) : null}
         {delivery.operational_notes || delivery.notes || delivery.failure_or_cancellation_reason ? (
