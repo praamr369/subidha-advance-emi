@@ -9,6 +9,10 @@ const UNSAFE_DOCUMENT_STATUS_LABELS: Record<string, string> = {
   INACTIVE: "INACTIVE",
   DEFAULTED: "DEFAULTED",
   FAILED: "FAILED",
+  REOPENED: "REOPENED",
+  INCOMPLETE: "INCOMPLETE",
+  UNBALANCED: "UNBALANCED",
+  UNRECONCILED: "UNRECONCILED",
 };
 
 export function formatDocumentMoney(value: string | number | null | undefined): string {
