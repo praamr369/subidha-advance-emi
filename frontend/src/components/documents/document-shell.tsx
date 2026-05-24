@@ -43,7 +43,7 @@ export function DocumentPage({
   watermark?: string | null;
 }) {
   return (
-    <main className="document-screen fixed inset-0 z-[1000] min-h-screen overflow-y-auto bg-[#f4eadb] px-4 py-8 print:static print:z-auto print:overflow-visible print:bg-white print:p-0">
+    <main className="document-screen fixed inset-0 z-[1000] min-h-screen overflow-y-auto bg-[#f4eadb] px-4 pb-8 pt-24 print:static print:z-auto print:overflow-visible print:bg-white print:p-0">
       <style jsx global>{`
         @page {
           size: A4;
