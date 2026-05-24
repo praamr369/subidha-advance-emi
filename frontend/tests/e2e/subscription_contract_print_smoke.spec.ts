@@ -198,6 +198,8 @@ test("subscription contract print route renders branded Lucky Plan agreement", a
   await expect(page.getByText("Customer Signature")).toBeVisible();
   await expect(page.getByText("Authorized Signature")).toBeVisible();
   await expect(page.getByRole("button", { name: "Print / Save PDF" })).toBeVisible();
+  await expect(page.getByText("Subscription document output")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Contract PDF / Print" })).toHaveCount(0);
 });
 
 test("subscription detail exposes contract print link", async ({ page }) => {
@@ -205,6 +207,7 @@ test("subscription detail exposes contract print link", async ({ page }) => {
 
   await page.goto("/admin/subscriptions/801");
 
+  await expect(page.getByText("Subscription document output")).toBeVisible();
   const contractLink = page.getByRole("link", { name: "Contract PDF / Print" }).first();
   await expect(contractLink).toBeVisible();
   await expect(contractLink).toHaveAttribute("href", "/admin/subscriptions/801/contract/print");
