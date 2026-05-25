@@ -1,4 +1,5 @@
 from rest_framework import permissions, status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -11,6 +12,7 @@ from api.v1.serializers.business_setup import (
     BusinessResetResponseSerializer,
     DocumentNumberingStateSerializer,
     DocumentNumberingUpdateSerializer,
+    DocumentPrintSettingsSerializer,
     ModularResetExecuteRequestSerializer,
     ResetScopePreviewRequestSerializer,
     RestoreExecuteRequestSerializer,
@@ -20,6 +22,7 @@ from api.v1.serializers.business_setup import (
     RestorePreviewRequestSerializer,
     SetupChecklistSerializer,
 )
+from api.v1.views.admin_document_print_settings import get_or_create_document_print_settings
 from subscriptions.models_business_setup import BusinessDataBackupJob, BusinessDataRestoreJob
 from subscriptions.services.business_setup_service import (
     get_active_business_profile,
@@ -57,12 +60,22 @@ from django.conf import settings
 
 class AdminBusinessProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get(self, request):
+        if request.query_params.get("section") == "document-print-settings":
+            settings_obj = get_or_create_document_print_settings()
+            return Response(
+                DocumentPrintSettingsSerializer(settings_obj, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
         profile = get_active_business_profile()
         if not profile:
             return Response({"detail": "Business profile is not configured yet."}, status=status.HTTP_404_NOT_FOUND)
-        return Response(BusinessProfileSerializer(profile).data)
+        payload = BusinessProfileSerializer(profile).data
+        settings_obj = get_or_create_document_print_settings()
+        payload["document_print_settings"] = DocumentPrintSettingsSerializer(settings_obj, context={"request": request}).data
+        return Response(payload)
 
     def put(self, request):
         return self._save(request, partial=False)
@@ -71,11 +84,28 @@ class AdminBusinessProfileView(APIView):
         return self._save(request, partial=True)
 
     def _save(self, request, partial: bool):
+        if request.query_params.get("section") == "document-print-settings":
+            settings_obj = get_or_create_document_print_settings()
+            serializer = DocumentPrintSettingsSerializer(
+                settings_obj,
+                data=request.data,
+                partial=True,
+                context={"request": request},
+            )
+            serializer.is_valid(raise_exception=True)
+            settings_obj = serializer.save()
+            return Response(
+                DocumentPrintSettingsSerializer(settings_obj, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
         instance = get_active_business_profile()
         serializer = BusinessProfileSerializer(instance=instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         profile = upsert_business_profile(data=serializer.validated_data, instance=instance)
-        return Response(BusinessProfileSerializer(profile).data, status=status.HTTP_200_OK)
+        payload = BusinessProfileSerializer(profile).data
+        settings_obj = get_or_create_document_print_settings()
+        payload["document_print_settings"] = DocumentPrintSettingsSerializer(settings_obj, context={"request": request}).data
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class BusinessSetupChecklistView(APIView):
