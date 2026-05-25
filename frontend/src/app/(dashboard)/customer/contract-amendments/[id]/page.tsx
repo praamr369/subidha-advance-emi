@@ -8,7 +8,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
-import { DetailPanel, WorkflowCard } from "@/components/ui/operations";
+import { DetailPanel } from "@/components/ui/operations";
 import { amendmentContractTypeLabel, amendmentTypeLabel, getCustomerAmendment, type AmendmentRecord } from "@/services/amendments";
 
 function safeJson(value?: Record<string, unknown> | null) {
@@ -73,24 +73,24 @@ export default function CustomerAmendmentDetailPage() {
           <>
             <DetailPanel title="Status timeline" description="No implementation step exists in this phase."><Timeline status={row.status} /></DetailPanel>
             <div className="grid gap-4 lg:grid-cols-2">
-              <WorkflowCard title="Request summary" description="Source contract and requester context.">
+              <DetailPanel title="Request summary" description="Source contract and requester context.">
                 <dl className="grid gap-3 text-sm">
                   <div><dt className="text-muted-foreground">Status</dt><dd><ERPStatusBadge status={row.status} /></dd></div>
                   <div><dt className="text-muted-foreground">Contract</dt><dd>{amendmentContractTypeLabel(row.contract_type)} · {sourceLabel(row)}</dd></div>
                   <div><dt className="text-muted-foreground">Type</dt><dd>{amendmentTypeLabel(row.amendment_type)}</dd></div>
                   <div><dt className="text-muted-foreground">Requested</dt><dd>{dateLabel(row.created_at)}</dd></div>
                 </dl>
-              </WorkflowCard>
-              <WorkflowCard title="Admin decision" description="Approval/rejection record only.">
+              </DetailPanel>
+              <DetailPanel title="Admin decision" description="Approval/rejection record only.">
                 <dl className="grid gap-3 text-sm">
                   <div><dt className="text-muted-foreground">Approved by</dt><dd>{row.approved_by_username || "—"}</dd></div>
                   <div><dt className="text-muted-foreground">Approved at</dt><dd>{dateLabel(row.approved_at)}</dd></div>
                   <div><dt className="text-muted-foreground">Admin note</dt><dd>{row.admin_note || "—"}</dd></div>
                   <div><dt className="text-muted-foreground">Rejection reason</dt><dd>{row.rejection_reason || "—"}</dd></div>
                 </dl>
-              </WorkflowCard>
+              </DetailPanel>
             </div>
-            <WorkflowCard title="Reason" description="Submitted reason."><p className="text-sm text-muted-foreground">{row.reason}</p></WorkflowCard>
+            <DetailPanel title="Reason" description="Submitted reason."><p className="text-sm text-muted-foreground">{row.reason}</p></DetailPanel>
             <div className="grid gap-4 lg:grid-cols-3">
               <DetailPanel title="Old values" description="Source snapshot."><pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.old_values || row.previous_values)}</pre></DetailPanel>
               <DetailPanel title="Requested values" description="Requested correction/change."><pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.requested_values || row.new_values)}</pre></DetailPanel>
