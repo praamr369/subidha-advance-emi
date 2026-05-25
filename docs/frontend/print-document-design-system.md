@@ -1,6 +1,6 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 4C CUSTOMER ACCOUNT STATEMENT IMPLEMENTED ON `update` BRANCH**
+Status: **PHASE 5A BUSINESS SETUP PRINT BRANDING IMPLEMENTED ON `update` BRANCH**
 
 This document records the branded print/PDF document system for SUBIDHA CORE. Print pages are evidence documents, not posting engines. They are intentionally read-only and payload-driven. They display backend-provided records and must not mutate financial, stock, delivery, subscription, EMI, waiver, lucky draw, rent/lease deposit, billing, refund, possession, return-inspection, commission, payout, cancellation, reversal, vendor payable, purchase, inventory valuation, cashier settlement, payment, receipt, reconciliation, allocation, money movement, journal, finance account, source lifecycle, or accounting records.
 
@@ -91,6 +91,45 @@ This prevents sidebar, topbar, command palette triggers, quick-action buttons, w
 - preventing page breaks inside cards, totals, rows, tables, and signatures.
 - readable table headers and white print backgrounds when browser background graphics are disabled.
 - light watermarks that do not block text.
+
+## Phase 5A Business Setup controlled print branding
+
+Phase 5A adds editable print/PDF presentation settings controlled from Business Setup:
+
+```text
+/admin/settings/business-setup/print-branding
+```
+
+The frontend reads and writes settings through the existing admin Business Profile route convention:
+
+```text
+GET /admin/business-profile/?section=document-print-settings
+PATCH /admin/business-profile/?section=document-print-settings
+```
+
+Backend storage is additive:
+
+```text
+DocumentPrintSettings
+```
+
+The settings are presentation-only. They control logo, print business name, tagline, print address/contact fields, tax label display, document-specific terms, footer note, signature labels, compact/comfortable density, show/hide logo, and show/hide watermark. They do not post, settle, reverse, reconcile, allocate, calculate, approve, cancel, return, move stock, mutate accounting, mutate journals, mutate finance balances, mutate payouts, mutate commissions, or mutate audit truth.
+
+Uploaded print logos are stored in media storage through the backend `business_logo` field. Uploaded logos must be image files and are validated by extension, MIME type, and size. If no uploaded logo exists, documents fall back to the static frontend logo path. Uploaded logo files must never be committed to Git.
+
+All document print routes use `DocumentPage`, `DocumentHeader`, `DocumentTermsBlock`, `DocumentSignatureBlock`, and `DocumentAuditFooter`, so they automatically consume the Business Setup print settings. If the settings API fails, the shared shell falls back to the static Subidha theme and the document still renders.
+
+Document-specific terms are selected by route:
+
+- Direct sale invoice: `invoice_terms`.
+- Billing receipt: `receipt_terms`.
+- Direct-sale delivery challan: `delivery_challan_terms`.
+- Lucky Plan / Advance EMI contract: `subscription_contract_terms`.
+- Rent / Lease contract: `rent_lease_contract_terms`.
+- Purchase bill: `purchase_bill_terms`.
+- Vendor payment voucher: `vendor_voucher_terms`.
+- Ledger, finance account, and customer statements: `account_statement_terms`.
+- Internal reports and audit footers: `report_footer_note`.
 
 ## Implemented print routes and entry points
 
@@ -217,6 +256,7 @@ Confirmed:
 6. Unsafe states must not visually appear as normal active/paid/settled/reconciled/posted records.
 7. Outstanding balances, variance, exceptions, unsafe statuses, backend-exposed ledger balances, and inactive finance account state must remain visible when backend payloads expose them.
 8. Print views must not settle payments, close receivables/payables, post accounting, generate receipts/vouchers, reconcile items, approve/reject/reopen records, post/void/reverse journals, move stock, mutate finance accounts, mutate money movements, mutate cash counters, or mutate operational records.
+9. Business Setup print branding settings are presentation-only and must not override backend record truth, unsafe status warnings, payment state, ledger balances, contract state, delivery state, or audit state.
 
 ## Deterministic test coverage
 
@@ -253,6 +293,14 @@ Phase 4C added:
 - Customer Account Statement print route smoke.
 - Customer detail account statement print-link smoke.
 - Customer statement safety assertions confirming no frontend running-balance generation.
+
+Phase 5A requires local validation for:
+
+- Business Setup Print & PDF Branding page load.
+- Admin edit/save of print settings.
+- Logo upload/change/remove validation.
+- Dynamic print header/terms/footer rendering with mocked print settings.
+- Static fallback behavior when the settings API fails.
 
 ## Deferred document types
 
