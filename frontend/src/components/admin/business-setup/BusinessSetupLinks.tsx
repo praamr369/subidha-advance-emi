@@ -5,6 +5,7 @@ import { ROUTES } from "@/lib/routes";
 const links = [
   { href: "/admin/settings/business-setup", label: "Overview" },
   { href: "/admin/settings/business-setup/profile", label: "Business Profile" },
+  { href: "/admin/settings/business-setup/print-branding", label: "Print & PDF Branding" },
   { href: "/admin/settings/business-setup/public-site", label: "Public Site" },
   { href: "/admin/settings/policies", label: "Policy Governance" },
   { href: "/admin/settings/business-compliance", label: "Business Compliance" },
