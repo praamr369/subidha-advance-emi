@@ -1,7 +1,14 @@
+from pathlib import Path
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from subscriptions.models_business_setup import BusinessProfile
+from subscriptions.models_document_print_settings import (
+    DOCUMENT_PRINT_LOGO_EXTENSIONS,
+    DOCUMENT_PRINT_LOGO_MAX_BYTES,
+    DocumentPrintSettings,
+)
 
 
 class BusinessSetupModelSerializer(serializers.ModelSerializer):
@@ -37,6 +44,50 @@ class BusinessProfileSerializer(BusinessSetupModelSerializer):
         model = BusinessProfile
         fields = "__all__"
         read_only_fields = ("id", "created_at", "updated_at")
+
+
+class DocumentPrintSettingsSerializer(BusinessSetupModelSerializer):
+    business_logo_url = serializers.SerializerMethodField()
+    clear_logo = serializers.BooleanField(write_only=True, required=False, default=False)
+
+    class Meta:
+        model = DocumentPrintSettings
+        fields = "__all__"
+        read_only_fields = ("id", "created_at", "updated_at", "business_logo_url")
+        extra_kwargs = {"business_logo": {"required": False, "allow_null": True}}
+
+    def get_business_logo_url(self, instance):
+        logo = getattr(instance, "business_logo", None)
+        if not logo:
+            return ""
+        try:
+            url = logo.url
+        except ValueError:
+            return ""
+        request = self.context.get("request")
+        return request.build_absolute_uri(url) if request else url
+
+    def validate_business_logo(self, value):
+        if not value:
+            return value
+        extension = Path(getattr(value, "name", "") or "").suffix.lower()
+        if extension not in DOCUMENT_PRINT_LOGO_EXTENSIONS:
+            raise serializers.ValidationError("Logo must be JPG, JPEG, PNG, WEBP, or GIF.")
+        content_type = (getattr(value, "content_type", "") or "").lower()
+        if content_type and not content_type.startswith("image/"):
+            raise serializers.ValidationError("Logo upload must be an image file.")
+        size = getattr(value, "size", 0) or 0
+        if size > DOCUMENT_PRINT_LOGO_MAX_BYTES:
+            raise serializers.ValidationError("Logo must be 2 MB or smaller.")
+        return value
+
+    def update(self, instance, validated_data):
+        clear_logo = bool(validated_data.pop("clear_logo", False))
+        if clear_logo and instance.business_logo:
+            instance.business_logo.delete(save=False)
+            instance.business_logo = None
+        return super().update(instance, validated_data)
+
 
 class SetupChecklistSerializer(serializers.Serializer):
     is_ready_for_go_live = serializers.BooleanField()
