@@ -146,7 +146,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="contractamendment",
             name="updated_at",
-            field=models.DateTimeField(auto_now=True, db_index=True),
+            field=models.DateTimeField(auto_now=True, blank=True, db_index=True, null=True),
         ),
         migrations.AddIndex(
             model_name="contractamendment",
