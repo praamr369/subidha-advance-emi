@@ -1,6 +1,7 @@
 # Generated for Phase 5A document print branding settings.
 
 import django.db.models.deletion
+import django.utils.timezone
 from django.db import migrations, models
 
 import subscriptions.models_document_print_settings
