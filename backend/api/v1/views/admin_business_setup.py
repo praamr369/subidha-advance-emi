@@ -22,7 +22,6 @@ from api.v1.serializers.business_setup import (
     RestorePreviewRequestSerializer,
     SetupChecklistSerializer,
 )
-from api.v1.views.admin_document_print_settings import get_or_create_document_print_settings
 from subscriptions.models_business_setup import BusinessDataBackupJob, BusinessDataRestoreJob
 from subscriptions.services.business_setup_service import (
     get_active_business_profile,
@@ -40,6 +39,7 @@ from subscriptions.services.document_numbering_service import (
     get_document_numbering_state,
     upsert_document_numbering,
 )
+from subscriptions.services.document_print_settings_service import get_or_create_document_print_settings
 from subscriptions.services.business_reset_governance_service import (
     build_reset_preview,
     create_backup_job,
