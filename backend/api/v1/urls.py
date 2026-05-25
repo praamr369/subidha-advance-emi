@@ -6,6 +6,7 @@ urlpatterns = [
     path("health/", PublicApiHealthView.as_view()),
     path("health/deep/", PublicApiDeepHealthView.as_view()),
     path("auth/", include("api.v1.routes.auth")),
+    path("admin/", include("api.v1.routes.contract_amendments_admin")),
     path("admin/", include("api.v1.routes.admin")),
     path("branch-control/", include("api.v1.routes.branch_control")),
     path("accounting/", include("api.v1.routes.accounting")),
@@ -16,8 +17,10 @@ urlpatterns = [
     path("service-desk/", include("api.v1.routes.service_desk")),
     path("reminders/", include("api.v1.routes.reminders")),
     path("dashboards/", include("api.v1.routes.dashboard_surfaces")),
+    path("partner/", include("api.v1.routes.contract_amendments_partner")),
     path("partner/", include("api.v1.routes.partner")),
     path("vendor/", include("api.v1.routes.vendor")),
+    path("customer/", include("api.v1.routes.contract_amendments_customer")),
     path("customer/", include("api.v1.routes.customer")),
     # Phase 1: shared customer lookup/create (admin + partner access)
     path("customers/", include("api.v1.routes.customers")),
