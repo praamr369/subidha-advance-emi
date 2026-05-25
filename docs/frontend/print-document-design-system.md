@@ -1,6 +1,6 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 4B FINANCE ACCOUNT STATEMENT IMPLEMENTED ON `update` BRANCH**
+Status: **PHASE 4C CUSTOMER ACCOUNT STATEMENT IMPLEMENTED ON `update` BRANCH**
 
 This document records the branded print/PDF document system for SUBIDHA CORE. Print pages are evidence documents, not posting engines. They are intentionally read-only and payload-driven. They display backend-provided records and must not mutate financial, stock, delivery, subscription, EMI, waiver, lucky draw, rent/lease deposit, billing, refund, possession, return-inspection, commission, payout, cancellation, reversal, vendor payable, purchase, inventory valuation, cashier settlement, payment, receipt, reconciliation, allocation, money movement, journal, finance account, source lifecycle, or accounting records.
 
@@ -108,6 +108,7 @@ This prevents sidebar, topbar, command palette triggers, quick-action buttons, w
 | Journal Entry Voucher | `/admin/accounting/journals/[id]/print` | `GET /accounting/journal-entries/:id/` | Accounting journal register row action `Journal Entry PDF / Print` | `buildAdminJournalEntryPrintRoute(id)` |
 | Ledger Account Statement | `/admin/accounting/ledger/[accountId]/statement/print` | `GET /accounting/reports/general-ledger/?account_id=:accountId&start_date=&end_date=` | Accounting Books finance-account card action `Ledger Statement PDF / Print` using linked chart account id | `buildAdminLedgerStatementPrintRoute(accountId, params)` |
 | Finance Account Statement | `/admin/finance/accounts/[id]/statement/print` | `GET /accounting/finance-accounts/:id/` and `GET /accounting/reports/cashbook/?finance_account_id=:id&start_date=&end_date=` | Accounting Books finance-account card action `Finance Account Statement PDF / Print` | `buildAdminFinanceAccountStatementPrintRoute(id, params)` |
+| Customer Account Statement | `/admin/customers/[id]/statement/print` | `GET /admin/customers/:id/`, `GET /admin/subscriptions/?customer=:id`, `GET /admin/payments/?customer=:id` | Customer detail `Customer Account Statement PDF / Print` | `buildAdminCustomerAccountStatementPrintRoute(id, params)` |
 
 ## Accounting Phase 4A evidence-document rules
 
@@ -178,6 +179,12 @@ Opening balance and reconciliation status are shown only when a backend report c
 
 The print page does **not** calculate opening balance, closing balance, running balance, inflow/outflow totals, variance, reconciliation state, account health, or finance account truth. It does not mutate finance accounts, money movements, settlements, payments, receipts, journal entries, cash counters, reconciliation rows, vendor records, inventory, EMI records, rent/lease deposits, or accounting records.
 
+## Phase 4C customer evidence-document note
+
+### Customer Account Statement
+
+`/admin/customers/:id/statement/print` is a read-only customer account summary/evidence document. It uses existing customer, subscriptions, and payments read APIs only. It does **not** calculate running balance or total outstanding until a backend customer statement ledger exists. Direct-sale and rent/lease totals are deferred and must not be inferred in this print view. Full route notes are recorded in `docs/frontend/customer-account-statement-print.md`.
+
 ## Phase 3 financial/audit route QA results
 
 Audited Phase 3 routes:
@@ -223,6 +230,7 @@ frontend/tests/e2e/purchase_vendor_document_print_smoke.spec.ts
 frontend/tests/e2e/cashier_day_close_print_smoke.spec.ts
 frontend/tests/e2e/reconciliation_report_print_smoke.spec.ts
 frontend/tests/e2e/accounting_journal_ledger_print_smoke.spec.ts
+frontend/tests/e2e/customer_account_statement_print_smoke.spec.ts
 ```
 
 These tests use mocked API responses and do not depend on live shop data. They verify business identity, document titles, references, key backend-provided figures, warnings/watermarks, signatures, audit footer, print toolbar screen behavior, toolbar hiding under print media, screen-only navigation hiding under print media, absence of dashboard chrome, and deterministic operational entry-point links.
@@ -239,6 +247,12 @@ Phase 4B added:
 - Finance Account Statement print route smoke.
 - Inactive finance account warning smoke.
 - Accounting Books finance account statement print-link smoke.
+
+Phase 4C added:
+
+- Customer Account Statement print route smoke.
+- Customer detail account statement print-link smoke.
+- Customer statement safety assertions confirming no frontend running-balance generation.
 
 ## Deferred document types
 
@@ -258,3 +272,12 @@ The following finance account statement fields remain display-deferred until bac
 - opening balance.
 - reconciliation status.
 - cash counter identity.
+
+The following customer account statement fields remain display-deferred until backend statement/ledger contracts expose them directly:
+
+- backend customer ledger rows.
+- backend total outstanding.
+- backend direct-sale receivable rows.
+- backend rent/lease due rows.
+- backend running balance.
+- backend customer account health/risk state.
