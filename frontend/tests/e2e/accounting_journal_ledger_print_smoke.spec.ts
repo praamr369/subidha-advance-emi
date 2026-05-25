@@ -77,6 +77,15 @@ const financeAccountFixture = {
   updated_at: "2026-05-24T09:00:00+05:30",
 };
 
+const unlinkedFinanceAccountFixture = {
+  ...financeAccountFixture,
+  id: 703,
+  name: "Unmapped Wallet Account",
+  chart_account: null,
+  chart_account_code: "",
+  chart_account_name: "",
+};
+
 const inactiveFinanceAccountFixture = {
   ...financeAccountFixture,
   id: 702,
@@ -172,7 +181,7 @@ async function mockAccountingPrintApis(page: Parameters<typeof test>[0]["page"])
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ count: 1, next: null, previous: null, results: [financeAccountFixture] }),
+      body: JSON.stringify({ count: 2, next: null, previous: null, results: [financeAccountFixture, unlinkedFinanceAccountFixture] }),
     });
   });
   await page.route("**/accounting/money-movements/**", async (route) => {
@@ -312,4 +321,15 @@ test("accounting books exposes ledger and finance account statement print links"
   const ledgerPrintLink = page.getByRole("link", { name: "Ledger Statement PDF / Print" }).first();
   await expect(ledgerPrintLink).toBeVisible();
   await expect(ledgerPrintLink).toHaveAttribute("href", "/admin/accounting/ledger/101/statement/print");
+});
+
+test("accounting books withholds ledger statement link when finance account has no linked chart account", async ({ page }) => {
+  await mockAccountingPrintApis(page);
+
+  await page.goto("/admin/accounting/books");
+
+  await expect(page.getByText("Unmapped Wallet Account").first()).toBeVisible();
+  await expect(page.getByText("Ledger Statement unavailable: no linked chart account")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ledger Statement PDF / Print" })).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "Finance Account Statement PDF / Print" })).toHaveCount(2);
 });
