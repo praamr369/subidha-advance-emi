@@ -48,6 +48,11 @@ function fieldClassName() {
   return "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground";
 }
 
+function linkedChartAccountId(account: FinanceAccount): number | null {
+  const value = (account as FinanceAccount & { chart_account?: number | null }).chart_account;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
 export default function AccountingBooksPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -365,33 +370,45 @@ export default function AccountingBooksPage() {
                     />
                   ) : (
                     <div className="grid gap-3">
-                      {financeAccounts.map((account) => (
-                        <div key={account.id} className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="text-sm font-semibold text-foreground">{account.name}</div>
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                {account.kind} • {account.chart_account_code} • {account.chart_account_name}
+                      {financeAccounts.map((account) => {
+                        const chartAccountId = linkedChartAccountId(account);
+                        return (
+                          <div key={account.id} className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <div className="text-sm font-semibold text-foreground">{account.name}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {account.kind} • {account.chart_account_code || "No chart code"} • {account.chart_account_name || "No linked chart account"}
+                                </div>
                               </div>
+                              <div className="text-sm font-semibold text-foreground">{money(account.opening_balance)}</div>
                             </div>
-                            <div className="text-sm font-semibold text-foreground">{money(account.opening_balance)}</div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Link
+                                href={buildAdminFinanceAccountStatementPrintRoute(account.id)}
+                                className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
+                              >
+                                Finance Account Statement PDF / Print
+                              </Link>
+                              {chartAccountId ? (
+                                <Link
+                                  href={buildAdminLedgerStatementPrintRoute(chartAccountId)}
+                                  className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
+                                >
+                                  Ledger Statement PDF / Print
+                                </Link>
+                              ) : (
+                                <span
+                                  title="Ledger statement requires a linked chart account."
+                                  className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-900"
+                                >
+                                  Ledger Statement unavailable: no linked chart account
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <Link
-                              href={buildAdminFinanceAccountStatementPrintRoute(account.id)}
-                              className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
-                            >
-                              Finance Account Statement PDF / Print
-                            </Link>
-                            <Link
-                              href={buildAdminLedgerStatementPrintRoute(account.chart_account)}
-                              className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
-                            >
-                              Ledger Statement PDF / Print
-                            </Link>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </WorkspaceSection>
