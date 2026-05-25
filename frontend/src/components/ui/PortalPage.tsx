@@ -2,10 +2,12 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { AlertTriangle, CheckCircle2, ChevronRight, Info, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
 import ERPPageHeader from "@/components/erp/ERPPageHeader";
+import { buildAdminCustomerAccountStatementPrintRoute } from "@/lib/route-builders";
 import { cn } from "@/lib/utils";
 
 type PortalAction = {
@@ -106,6 +108,17 @@ function normalizeStatValue(value: string | number): string | number {
   return trimmed || "—";
 }
 
+function buildCustomerStatementAction(pathname: string | null): PortalAction | null {
+  const match = pathname?.match(/^\/admin\/customers\/([^/?#]+)$/);
+  const customerId = match?.[1];
+  if (!customerId) return null;
+  return {
+    href: buildAdminCustomerAccountStatementPrintRoute(customerId),
+    label: "Customer Account Statement PDF / Print",
+    variant: "secondary",
+  };
+}
+
 export default function PortalPage({
   eyebrow,
   title,
@@ -122,11 +135,16 @@ export default function PortalPage({
   presentation = "page",
   headerMode = "portal",
 }: PortalPageProps) {
+  const pathname = usePathname();
+  const customerStatementAction = buildCustomerStatementAction(pathname);
+  const resolvedActions = customerStatementAction && !actions.some((action) => action.href === customerStatementAction.href)
+    ? [...actions, customerStatementAction]
+    : actions;
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
   const widthStyle =
     resolvedMaxWidth === "none" || resolvedMaxWidth === "100%" ? undefined : { maxWidth: resolvedMaxWidth };
   const isPopup = presentation === "popup";
-  const showPopupMeta = isPopup && Boolean(subtitle || helperNote || statusBadge || actions.length > 0);
+  const showPopupMeta = isPopup && Boolean(subtitle || helperNote || statusBadge || resolvedActions.length > 0);
 
   return (
     <div
@@ -224,9 +242,9 @@ export default function PortalPage({
                   ) : null}
                 </div>
 
-                {actions.length > 0 ? (
+                {resolvedActions.length > 0 ? (
                   <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
-                    {actions.map((action) => (
+                    {resolvedActions.map((action) => (
                       <Link
                         key={`${action.href}-${action.label}`}
                         href={action.href}
@@ -273,9 +291,9 @@ export default function PortalPage({
                     ) : null
                   }
                   actions={
-                    actions.length > 0 ? (
+                    resolvedActions.length > 0 ? (
                       <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
-                        {actions.map((action) => (
+                        {resolvedActions.map((action) => (
                           <Link
                             key={`${action.href}-${action.label}`}
                             href={action.href}
@@ -369,9 +387,9 @@ export default function PortalPage({
                     ) : null}
                   </div>
 
-                  {actions.length > 0 ? (
+                  {resolvedActions.length > 0 ? (
                     <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
-                      {actions.map((action) => (
+                      {resolvedActions.map((action) => (
                         <Link
                           key={`${action.href}-${action.label}`}
                           href={action.href}
