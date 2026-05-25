@@ -9,6 +9,7 @@ class SubscriptionsConfig(AppConfig):
         super().import_models()
         import subscriptions.models_business_setup  # noqa
         import subscriptions.models_document_print_settings  # noqa
+        import subscriptions.models_contract_amendment  # noqa
 
     def ready(self):
         import subscriptions.signals  # noqa
