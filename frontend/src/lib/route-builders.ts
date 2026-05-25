@@ -199,6 +199,13 @@ export function buildAdminFinanceAccountStatementPrintRoute(
   return buildRouteWithQuery(`${ADMIN_FINANCE_ACCOUNTS_ROUTE}/${financeAccountId}/statement/print`, params);
 }
 
+export function buildAdminCustomerAccountStatementPrintRoute(
+  customerId: number | string,
+  params: AdminLedgerStatementParams = {}
+): string {
+  return buildRouteWithQuery(`${ROUTES.admin.customers}/${customerId}/statement/print`, params);
+}
+
 export function buildAdminPaymentRoute(id: number | string): string {
   return `${ROUTES.admin.payments}/${id}`;
 }
