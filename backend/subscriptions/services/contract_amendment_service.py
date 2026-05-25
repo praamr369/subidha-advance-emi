@@ -94,7 +94,7 @@ def create_amendment(
     requested_values: dict | None = None,
     reason: str,
     requested_by,
-    requested_role: str,
+    requested_role: str = "CUSTOMER",
     admin_note: str = "",
     metadata: dict | None = None,
     previous_values: dict | None = None,
