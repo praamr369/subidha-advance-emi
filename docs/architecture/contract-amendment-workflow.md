@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: **Phase 1 backend foundation implemented on `update` branch**
+Status: **Phase 1 backend foundation implemented on `update` branch; Phase 2 UI stabilized on `update` branch**
 
 ## Scope
 
@@ -30,6 +30,18 @@ Not implemented in Phase 1:
 - No lucky ID or batch change execution.
 - No future EMI or rent/lease schedule recalculation.
 - No Direct Sale amendment support.
+
+## Phase 2 UI boundary
+
+Phase 2 adds role-scoped request/review UI only.
+
+- Customer UI: list, create, and view own amendment requests.
+- Partner UI: list, create, and view linked customer amendment requests.
+- Admin UI: list, inspect, mark under review, approve decision, and reject decision.
+
+Admin approval remains a decision record only. It does not write approved values into contracts, subscriptions, EMI schedules, lucky IDs, batches, products, rent/lease demands, deposits, payments, accounting, reconciliation, commissions, payouts, delivery, stock, or inventory records.
+
+The Phase 2 frontend service must not contain an implementation/apply method, and amendment screens must not expose actions labeled `Apply`, `Implement`, `Execute`, or `Update contract`.
 
 ## Data model
 
@@ -96,9 +108,9 @@ POST /api/v1/admin/contract-amendments/{id}/reject/
 
 ## Integrity rules
 
-Phase 1 never mutates source contracts or posted financial records.
+Phase 1 and Phase 2 never mutate source contracts or posted financial records.
 
-It does not change:
+They do not change:
 
 - EMI schedules.
 - Payment history.
@@ -122,7 +134,6 @@ Audit log entries are emitted for request, approval, and rejection. Implementati
 
 ## Deferred phases
 
-- Phase 2: Customer, partner, and admin UI only.
 - Phase 3: Low-risk implementation actions only.
 - Phase 4: Product change implementation only.
 - Phase 5: Lucky ID / Batch change implementation only.
