@@ -1,5 +1,35 @@
 import { ApiError, apiFetch } from "@/lib/api";
 
+export type DocumentPrintSettings = {
+  id?: number;
+  business_profile?: number | null;
+  business_logo?: string | null;
+  business_logo_url?: string;
+  business_name?: string;
+  business_tagline?: string;
+  print_address?: string;
+  print_phone?: string;
+  print_email?: string;
+  print_website?: string;
+  tax_label?: string;
+  invoice_terms?: string;
+  receipt_terms?: string;
+  delivery_challan_terms?: string;
+  subscription_contract_terms?: string;
+  rent_lease_contract_terms?: string;
+  purchase_bill_terms?: string;
+  vendor_voucher_terms?: string;
+  account_statement_terms?: string;
+  report_footer_note?: string;
+  authorized_signatory_label?: string;
+  customer_signature_label?: string;
+  document_layout_density?: "COMFORTABLE" | "COMPACT" | string;
+  show_watermark?: boolean;
+  show_logo?: boolean;
+  is_active?: boolean;
+  clear_logo?: boolean;
+};
+
 export type BusinessProfile = {
   id?: number;
   legal_name: string;
@@ -25,6 +55,7 @@ export type BusinessProfile = {
   timezone_name?: string;
   logo_url?: string;
   is_active?: boolean;
+  document_print_settings?: DocumentPrintSettings;
 };
 
 export type SetupChecklistItem = {
@@ -77,6 +108,17 @@ export async function getBusinessProfile(): Promise<BusinessProfile | null> {
 
 export async function saveBusinessProfile(payload: Partial<BusinessProfile>): Promise<BusinessProfile> {
   return apiFetch<BusinessProfile>("/admin/business-profile/", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function getDocumentPrintSettings(): Promise<DocumentPrintSettings> {
+  return apiFetch<DocumentPrintSettings>("/admin/business-profile/?section=document-print-settings");
+}
+
+export async function saveDocumentPrintSettings(payload: Partial<DocumentPrintSettings> | FormData): Promise<DocumentPrintSettings> {
+  return apiFetch<DocumentPrintSettings>("/admin/business-profile/?section=document-print-settings", {
     method: "PATCH",
     body: payload,
   });
