@@ -113,6 +113,11 @@ function hasOwn(payload: unknown, key: string): boolean {
   return Boolean(payload && typeof payload === "object" && Object.prototype.hasOwnProperty.call(payload, key));
 }
 
+function moneyOrDash(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  return formatDocumentMoney(value);
+}
+
 function statusToken(value: string | null | undefined): string {
   return safeDocumentText(value, "UNKNOWN").toUpperCase();
 }
@@ -320,7 +325,7 @@ export default function AdminCustomerAccountStatementPrintPage() {
         {payload.totalPaidAmountExposed ? (
           <section className="document-card my-4 rounded-2xl border border-[#d9c39c] bg-[#fff6e4] p-4">
             <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">Backend-Reported Total Paid</div>
-            <div className="mt-2 text-2xl font-black text-[#2f2418]">{formatDocumentMoney(payload.totalPaidAmount)}</div>
+            <div className="mt-2 text-2xl font-black text-[#2f2418]">{moneyOrDash(payload.totalPaidAmount)}</div>
             <div className="mt-1 text-xs text-[#6f5c46]">Displayed only because the payments API exposed `total_paid_amount`.</div>
           </section>
         ) : null}
@@ -361,8 +366,8 @@ export default function AdminCustomerAccountStatementPrintPage() {
                       </td>
                       <td className="px-3 py-3">{statusToken(subscription.status)}</td>
                       <td className="px-3 py-3 text-right">{typeof subscription.tenure_months === "number" ? `${subscription.tenure_months} mo` : "—"}</td>
-                      <td className="px-3 py-3 text-right">{formatDocumentMoney(subscription.monthly_amount)}</td>
-                      <td className="px-3 py-3 text-right font-semibold">{formatDocumentMoney(subscription.total_amount)}</td>
+                      <td className="px-3 py-3 text-right">{moneyOrDash(subscription.monthly_amount)}</td>
+                      <td className="px-3 py-3 text-right font-semibold">{moneyOrDash(subscription.total_amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -419,7 +424,7 @@ export default function AdminCustomerAccountStatementPrintPage() {
                       <td className="px-3 py-3">{formatDocumentDate(payment.payment_date || payment.paid_at || payment.created_at)}</td>
                       <td className="px-3 py-3">{sourceReference(payment)}</td>
                       <td className="px-3 py-3">{safeDocumentText(payment.method)}</td>
-                      <td className="px-3 py-3 text-right font-semibold">{formatDocumentMoney(payment.amount)}</td>
+                      <td className="px-3 py-3 text-right font-semibold">{moneyOrDash(payment.amount)}</td>
                       <td className="px-3 py-3">{payment.is_reversed ? "REVERSED" : statusToken(payment.status || "POSTED")}</td>
                     </tr>
                   ))}
