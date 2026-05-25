@@ -52,6 +52,11 @@ export const documentCopyLabels: DocumentCopyLabel[] = [
   "Duplicate",
 ];
 
+const fallbackAddressLines = [
+  "Subidha Furniture, Asansol",
+  "West Bengal, India",
+];
+
 function splitTerms(value?: string | null): string[] {
   return String(value || "")
     .split(/\r?\n/)
@@ -61,7 +66,7 @@ function splitTerms(value?: string | null): string[] {
 
 function splitAddress(value?: string | null): string[] {
   const lines = splitTerms(value);
-  return lines.length ? lines : subidhaDocumentTheme.addressLines;
+  return lines.length ? lines : fallbackAddressLines;
 }
 
 export const subidhaDocumentTheme: DocumentBrandTheme = {
@@ -74,10 +79,7 @@ export const subidhaDocumentTheme: DocumentBrandTheme = {
   phone: "+91 77972 80952",
   email: "support@subidhafurnitureasansol.com",
   website: "subidhafurnitureasansol.com",
-  addressLines: [
-    "Subidha Furniture, Asansol",
-    "West Bengal, India",
-  ],
+  addressLines: fallbackAddressLines,
   panLabel: "PAN: —",
   gstLabel: "GSTIN: —",
   taxLabel: "GSTIN: —",
