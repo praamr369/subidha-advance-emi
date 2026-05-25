@@ -96,7 +96,7 @@ def _extend_contract_amendment_model() -> None:
     _contribute("implemented_by", models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="implemented_contract_amendments", null=True, blank=True))
     _contribute("implemented_at", models.DateTimeField(null=True, blank=True, db_index=True))
     _contribute("metadata", models.JSONField(default=dict, blank=True))
-    _contribute("updated_at", models.DateTimeField(auto_now=True, db_index=True))
+    _contribute("updated_at", models.DateTimeField(auto_now=True, db_index=True, null=True, blank=True))
 
 
 def source_contract(self):
