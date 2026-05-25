@@ -1,6 +1,6 @@
 # Contract Amendment Phase 2 UI Addendum
 
-Status: implemented on `update`.
+Status: implemented and stabilized on `update`.
 
 ## UI routes
 
@@ -27,6 +27,26 @@ Admin:
 /admin/contract-amendments/[id]
 ```
 
+## Component ownership
+
+Phase 2 UI components are role-scoped:
+
+- Customer amendment pages own customer list/create/detail rendering.
+- `PartnerList.tsx`, `PartnerCreate.tsx`, and `PartnerDetail.tsx` are partner-only.
+- `AdminList.tsx` and `AdminDetail.tsx` are admin-only.
+
+Admin components must not be exported from partner component files.
+
+## Role-safe navigation
+
+The workflow is discoverable through the existing role navigation shell:
+
+- Customer: `My amendment requests`.
+- Partner: `Customer amendment requests`.
+- Admin: `Contract Amendments`.
+
+Admin amendment register links are not exposed to customer, partner, cashier, vendor, or public shells. Customer and partner request pages remain scoped to their own route families.
+
 ## Endpoint usage
 
 The frontend service uses only the Phase 1 amendment endpoints:
@@ -35,17 +55,28 @@ The frontend service uses only the Phase 1 amendment endpoints:
 - partner list/create/detail
 - admin list/detail/review/approve/reject
 
-There is no frontend method for implementation/apply.
+There is no frontend service method for implementation/apply, and no UI calls a contract implementation endpoint.
 
 ## Boundary
 
-Phase 2 is UI only. Customer and partner pages submit amendment requests. Admin pages support review, approval, and rejection only.
+Phase 2 is UI only. Customer and partner pages submit amendment requests. Admin pages support review, approval decision, and rejection decision only.
+
+Admin approval records a decision. It does not implement the approved values into any source contract or financial schedule.
 
 Direct Sale is not supported by this UI.
 
+## Safety copy
+
+All amendment surfaces must keep the decision-only safety notice clear:
+
+- approval records an admin decision only
+- approved amendments are not implemented in this phase
+- no EMI, payment, lucky ID, product, rent/lease, accounting, inventory, reconciliation, commission, payout, delivery, stock, or source contract record is changed from this UI
+
+Do not introduce UI labels or actions named `Apply`, `Implement`, `Execute`, or `Update contract` for amendment decisions. Admin approval wording should remain `Approve decision` or `Approve request`.
+
 ## Deferred work
 
-- Sidebar/registry link polishing if route registry updates are required.
 - Phase 3 low-risk implementation actions.
 - Phase 4 product change implementation.
 - Phase 5 lucky ID and batch change implementation.
