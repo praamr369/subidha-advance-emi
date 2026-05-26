@@ -117,3 +117,36 @@ class ContractAmendmentRejectSerializer(serializers.Serializer):
 
 class ContractAmendmentStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=sorted(PHASE1_STATUSES), required=False)
+
+
+class ProductRecontractPreviewRequestSerializer(serializers.Serializer):
+    preview_tenure_months = serializers.IntegerField(required=False, min_value=1)
+    effective_date = serializers.DateField(required=False, allow_null=True)
+
+
+class ProductRecontractPreviewSerializer(serializers.Serializer):
+    preview_status = serializers.CharField()
+    impact_type = serializers.CharField()
+    blocked_reason = serializers.CharField(allow_blank=True, required=False)
+    source_record_mutation = serializers.BooleanField()
+    subscription_id = serializers.IntegerField(required=False)
+    subscription_number = serializers.CharField(allow_blank=True, required=False, allow_null=True)
+    old_product_id = serializers.IntegerField(required=False, allow_null=True)
+    old_product_name = serializers.CharField(allow_blank=True, required=False)
+    old_product_code = serializers.CharField(allow_blank=True, required=False)
+    new_product_id = serializers.IntegerField(required=False, allow_null=True)
+    new_product_name = serializers.CharField(allow_blank=True, required=False)
+    new_product_code = serializers.CharField(allow_blank=True, required=False)
+    old_contract_total = serializers.CharField(required=False)
+    new_contract_total = serializers.CharField(required=False)
+    price_difference = serializers.CharField(required=False)
+    amount_already_paid = serializers.CharField(required=False)
+    old_remaining_balance = serializers.CharField(required=False)
+    proposed_new_remaining_balance = serializers.CharField(required=False)
+    current_tenure_months = serializers.IntegerField(required=False)
+    preview_tenure_months = serializers.IntegerField(required=False)
+    current_monthly_amount = serializers.CharField(required=False)
+    proposed_monthly_amount = serializers.CharField(required=False)
+    pending_emi_count = serializers.IntegerField(required=False)
+    effective_date_preview = serializers.CharField(required=False)
+    warnings = serializers.ListField(child=serializers.CharField())
