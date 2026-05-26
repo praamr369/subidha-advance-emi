@@ -74,7 +74,7 @@ const approvedProductChangeFixture = {
 const blockedProductChangeFixture = {
   ...approvedProductChangeFixture,
   is_implementable: false,
-  implementation_block_reason: "Product change would require price/EMI/tenure recalculation because target product base price differs from the locked contract total amount.",
+  implementation_block_reason: "Financial product change requires contract repricing preview and reconciliation and is not implemented in this phase.",
 };
 
 async function mockAmendments(page: Page, role: "customer" | "partner" | "admin", fixture = amendmentFixture) {
@@ -170,23 +170,23 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toBeVisible();
   });
 
-  test("admin amendment detail shows product reference implementation for approved product change", async ({ page }) => {
+  test("admin amendment detail shows same-price product reference correction for approved product change", async ({ page }) => {
     await mockAmendments(page, "admin", approvedProductChangeFixture);
     await page.goto("/admin/contract-amendments/1");
 
-    await expect(page.getByText("This changes only the contract product reference.")).toBeVisible();
-    await expect(page.getByText("Product reference preview")).toBeVisible();
+    await expect(page.getByText("This only corrects the stored product reference when the contract value remains unchanged.")).toBeVisible();
+    await expect(page.getByText("Product reference correction preview")).toBeVisible();
     await expect(page.getByText("New Sofa")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Implement approved product reference change" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Implement approved same-price product reference correction" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
   });
 
-  test("admin amendment detail does not show implementation button for blocked product change", async ({ page }) => {
+  test("admin amendment detail does not show implementation button for blocked financial product change", async ({ page }) => {
     await mockAmendments(page, "admin", blockedProductChangeFixture);
     await page.goto("/admin/contract-amendments/1");
 
-    await expect(page.getByRole("button", { name: "Implement approved product reference change" })).toHaveCount(0);
-    await expect(page.getByText("Product change would require price/EMI/tenure recalculation")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Implement approved same-price product reference correction" })).toHaveCount(0);
+    await expect(page.getByText("Financial product change requires contract repricing preview and reconciliation")).toBeVisible();
   });
 
   test("admin implementation button calls only the guarded implement endpoint", async ({ page }) => {
@@ -208,7 +208,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
 
     const main = page.locator("#main-content");
     await expect(main.getByRole("heading", { name: "AMD-SMOKE-001" })).toBeVisible();
-    await expect(page.getByText("Only approved whitelisted corrections or safe product reference changes can move to implementation.")).toBeVisible();
+    await expect(page.getByText("Only approved whitelisted corrections or same-price product reference corrections can move to implementation.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve decision" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
@@ -223,7 +223,7 @@ test.describe("customer and partner amendment implementation visibility", () => 
     await page.goto("/customer/contract-amendments/1");
 
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Implement approved product reference change" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Implement approved same-price product reference correction" })).toHaveCount(0);
   });
 });
 
@@ -235,6 +235,6 @@ test.describe("partner amendment implementation visibility", () => {
     await page.goto("/partner/contract-amendments/1");
 
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Implement approved product reference change" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Implement approved same-price product reference correction" })).toHaveCount(0);
   });
 });
