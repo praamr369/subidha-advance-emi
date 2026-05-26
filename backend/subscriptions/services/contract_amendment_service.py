@@ -2,9 +2,10 @@
 
 Phase 1 records auditable requests and admin review decisions.
 Phase 3 implements only whitelisted customer contact/address corrections.
-Phase 4 implements only approved product reference changes that do not alter
-financial truth, EMI schedules, lucky IDs, batches, stock, delivery, accounting,
-reconciliation, commission, payout, waiver, rent/lease demand, or deposits.
+Phase 4 implements only approved same-price product reference corrections. It does
+not implement true financial product upgrade/downgrade, repricing, EMI schedule
+changes, reconciliation, accounting, payout, stock, delivery, waiver, rent/lease
+demand, or deposit changes.
 """
 from __future__ import annotations
 
@@ -85,11 +86,12 @@ _PHASE3_BLOCKED_AMENDMENTS = {
 }
 
 _PHASE3_BLOCK_MESSAGE = (
-    "Only whitelisted non-financial customer contact/address corrections and Phase 4 safe product reference changes can be implemented. "
-    "Financial, EMI, lucky ID, batch, rent/lease billing, deposit, accounting, inventory, reconciliation, commission, payout, delivery, stock, and audit-sensitive changes remain blocked."
+    "Only whitelisted non-financial customer contact/address corrections and Phase 4 same-price product reference corrections can be implemented. "
+    "Financial product changes, EMI, lucky ID, batch, rent/lease billing, deposit, accounting, inventory, reconciliation, commission, payout, delivery, stock, and audit-sensitive changes remain blocked."
 )
 
-_PHASE4_PRODUCT_CHANGE_PHASE = "PHASE_4_PRODUCT_REFERENCE_CHANGE"
+_PHASE4_PRODUCT_REFERENCE_CORRECTION_PHASE = "PHASE_4_PRODUCT_REFERENCE_CORRECTION"
+_PHASE4_FINANCIAL_PRODUCT_CHANGE_MESSAGE = "Financial product change requires contract repricing preview and reconciliation and is not implemented in this phase."
 _PHASE4_PRODUCT_ID_KEYS = {"approved_product_id", "product_id", "target_product_id", "new_product_id"}
 _PHASE4_PRODUCT_DISPLAY_ONLY_KEYS = {
     "approved_product_name",
@@ -110,10 +112,19 @@ _PHASE4_PRODUCT_DISPLAY_ONLY_KEYS = {
     "display_label",
 }
 _PHASE4_FORBIDDEN_KEY_TOKENS = {
+    "new_total_amount",
     "total_amount",
     "monthly_amount",
-    "tenure_months",
     "emi_amount",
+    "tenure_months",
+    "price_difference",
+    "extra_amount",
+    "refund_amount",
+    "adjustment_amount",
+    "recalculation",
+    "payment_adjustment",
+    "accounting_adjustment",
+    "reconciliation_adjustment",
     "price",
     "batch",
     "lucky_id",
@@ -227,7 +238,7 @@ def _financial_snapshot(source: Subscription) -> dict:
 def _product_change_values(amendment: ContractAmendment) -> dict:
     values = amendment.approved_values or amendment.requested_values or amendment.new_values or {}
     if not isinstance(values, dict):
-        raise ValidationError({"detail": "Approved product change values must be a JSON object."})
+        raise ValidationError({"detail": "Approved product reference correction values must be a JSON object."})
     return values
 
 
@@ -260,25 +271,25 @@ def _product_change_block_reason(amendment: ContractAmendment) -> str:
     if amendment.amendment_type != "PRODUCT_CHANGE":
         return _PHASE3_BLOCK_MESSAGE
     if amendment.contract_type not in {"EMI_SUBSCRIPTION", "RENT_LEASE"}:
-        return "Product change supports EMI subscription and rent/lease contracts only."
+        return "Product reference correction supports EMI subscription and rent/lease contracts only."
     try:
         values = _product_change_values(amendment)
     except ValidationError:
-        return "Approved product change values must be a JSON object."
+        return "Approved product reference correction values must be a JSON object."
     target_product_id, forbidden_keys, unsupported_keys = _phase4_product_change_candidate(values)
     if forbidden_keys:
-        return "Product change cannot include financial, EMI, lucky ID, batch, payment, deposit, waiver, accounting, reconciliation, inventory, stock, delivery, commission, or payout keys: " + ", ".join(forbidden_keys) + "."
+        return "Same-price product reference correction cannot include financial, EMI, tenure, lucky ID, batch, payment, deposit, waiver, accounting, reconciliation, inventory, stock, delivery, commission, or payout keys: " + ", ".join(forbidden_keys) + "."
     if unsupported_keys:
-        return f"Product change blocked: unsupported product-change value keys: {', '.join(unsupported_keys)}."
+        return f"Product reference correction blocked: unsupported value keys: {', '.join(unsupported_keys)}."
     if not target_product_id:
-        return "Product change requires approved_product_id."
+        return "Product reference correction requires approved_product_id."
     source = amendment.source_contract()
     if not source:
-        return "Source subscription is required for product change."
+        return "Source subscription is required for product reference correction."
     if source.status in _PRODUCT_CHANGE_TERMINAL_STATUSES:
-        return f"Product change is blocked for terminal subscription status '{source.status}'."
+        return f"Product reference correction is blocked for terminal subscription status '{source.status}'."
     if source.status not in _AMENDABLE_STATUSES:
-        return f"Product change is not allowed for subscription status '{source.status}'."
+        return f"Product reference correction is not allowed for subscription status '{source.status}'."
     try:
         target_product = Product.objects.get(pk=target_product_id)
     except Product.DoesNotExist:
@@ -294,7 +305,7 @@ def _product_change_block_reason(amendment: ContractAmendment) -> str:
     if source.plan_type == PlanType.LEASE and hasattr(target_product, "is_lease_enabled") and not target_product.is_lease_enabled:
         return "Target product is not enabled for lease contracts."
     if Decimal(str(target_product.base_price)) != Decimal(str(source.total_amount)):
-        return "Product change would require price/EMI/tenure recalculation because target product base price differs from the locked contract total amount."
+        return _PHASE4_FINANCIAL_PRODUCT_CHANGE_MESSAGE
     if source.product_id == target_product.pk:
         return "Target product is already linked to this contract."
     return ""
@@ -454,10 +465,10 @@ def _implement_product_change(*, locked_amendment: ContractAmendment, implemente
     values = _product_change_values(locked_amendment)
     target_product_id, _forbidden_keys, _unsupported_keys = _phase4_product_change_candidate(values)
     if not target_product_id:
-        raise ValidationError({"detail": "Product change requires approved_product_id."})
+        raise ValidationError({"detail": "Product reference correction requires approved_product_id."})
     source = locked_amendment.source_contract()
     if not source:
-        raise ValidationError({"detail": "Source subscription is required for product change."})
+        raise ValidationError({"detail": "Source subscription is required for product reference correction."})
     source = Subscription.objects.select_for_update().select_related("product", "batch", "lucky_id", "customer", "partner").get(pk=source.pk)
     target_product = Product.objects.select_for_update().get(pk=target_product_id)
     locked_amendment.subscription = source if locked_amendment.contract_type == "EMI_SUBSCRIPTION" else None
@@ -474,17 +485,18 @@ def _implement_product_change(*, locked_amendment: ContractAmendment, implemente
     Subscription.objects.filter(pk=source.pk, product_id=old_product_id).update(product=target_product)
     after_financials = _financial_snapshot(source)
     if before_financials != after_financials:
-        raise ValidationError({"detail": "Product change attempted to alter locked financial terms."})
+        raise ValidationError({"detail": "Product reference correction attempted to alter locked financial terms."})
     now = timezone.now()
     locked_amendment.status = "IMPLEMENTED"
     locked_amendment.implemented_by = implemented_by
     locked_amendment.implemented_at = now
     locked_amendment.implemented_values = {
-        "phase": _PHASE4_PRODUCT_CHANGE_PHASE,
+        "phase": _PHASE4_PRODUCT_REFERENCE_CORRECTION_PHASE,
         "source_model": "Subscription",
         "source_id": source.pk,
         "contract_type": locked_amendment.contract_type,
         "amendment_type": "PRODUCT_CHANGE",
+        "semantics": "PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY",
         "before": {**before_product, **before_financials},
         "after": {**after_product, **after_financials},
         "financial_invariants": {
@@ -494,15 +506,15 @@ def _implement_product_change(*, locked_amendment: ContractAmendment, implemente
         },
         "preserved_fields": _PHASE4_PRESERVED_FIELDS,
     }
-    locked_amendment.metadata = {**(locked_amendment.metadata or {}), "approved_without_implementation": False, "implementation_phase": _PHASE4_PRODUCT_CHANGE_PHASE}
+    locked_amendment.metadata = {**(locked_amendment.metadata or {}), "approved_without_implementation": False, "implementation_phase": _PHASE4_PRODUCT_REFERENCE_CORRECTION_PHASE, "implementation_semantics": "PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY"}
     locked_amendment.save(update_fields=["status", "implemented_by", "implemented_at", "implemented_values", "metadata", "updated_at"])
-    log_audit(action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_IMPLEMENTED, instance=source, performed_by=implemented_by, metadata={"amendment_id": locked_amendment.pk, "amendment_no": locked_amendment.amendment_no, "amendment_type": locked_amendment.amendment_type, "implemented_fields": ["product"], "old_product_id": old_product_id, "new_product_id": target_product.pk, "phase": _PHASE4_PRODUCT_CHANGE_PHASE, "financial_terms_preserved": True})
+    log_audit(action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_IMPLEMENTED, instance=source, performed_by=implemented_by, metadata={"amendment_id": locked_amendment.pk, "amendment_no": locked_amendment.amendment_no, "amendment_type": locked_amendment.amendment_type, "implemented_fields": ["product"], "old_product_id": old_product_id, "new_product_id": target_product.pk, "phase": _PHASE4_PRODUCT_REFERENCE_CORRECTION_PHASE, "semantics": "PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY", "financial_terms_preserved": True})
     return locked_amendment
 
 
 @transaction.atomic
 def implement_approved_amendment(*, amendment: ContractAmendment, implemented_by) -> ContractAmendment:
-    locked_amendment = ContractAmendment.objects.select_for_update().select_related("customer", "subscription", "rent_lease_contract").get(pk=amendment.pk)
+    locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
     if locked_amendment.status == "IMPLEMENTED":
         raise ValidationError({"detail": "This amendment is already implemented."})
     if locked_amendment.status != "APPROVED":
