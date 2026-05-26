@@ -74,7 +74,7 @@ class DocumentPrintSettings(BusinessSetupTimeStampedModel):
     class Meta:
         db_table = "document_print_settings"
         ordering = ["-created_at", "-id"]
-        indexes = [models.Index(fields=["is_active"])]
+        indexes = [models.Index(fields=["is_active"], name="document_pr_is_acti_3cb883_idx")]
 
     def clean(self):
         errors = {}

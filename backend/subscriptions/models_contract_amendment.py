@@ -64,6 +64,16 @@ def _contribute(field_name: str, field: models.Field) -> None:
         field.contribute_to_class(ContractAmendment, field_name)
 
 
+def _ensure_index(fields: list[str], name: str) -> None:
+    if not any(index.name == name for index in ContractAmendment._meta.indexes):
+        index = models.Index(fields=fields, name=name)
+        # 0071 already contains these explicit names. One legacy name exceeds
+        # Django's cross-database 30-character model check, but PostgreSQL and
+        # the applied migration state support it.
+        index.max_name_length = max(index.max_name_length, len(name))
+        ContractAmendment._meta.indexes.append(index)
+
+
 def _extend_contract_amendment_model() -> None:
     # Keep the legacy model class and table; add Phase 1 fields additively.
     subscription_field = ContractAmendment._meta.get_field("subscription")
@@ -97,6 +107,10 @@ def _extend_contract_amendment_model() -> None:
     _contribute("implemented_at", models.DateTimeField(null=True, blank=True, db_index=True))
     _contribute("metadata", models.JSONField(default=dict, blank=True))
     _contribute("updated_at", models.DateTimeField(auto_now=True, db_index=True, null=True, blank=True))
+
+    _ensure_index(["contract_type", "status"], "contract_am_type_status_idx")
+    _ensure_index(["customer", "status"], "contract_am_customer_status_idx")
+    _ensure_index(["partner", "status"], "contract_am_partner_status_idx")
 
 
 def source_contract(self):

@@ -35,8 +35,12 @@ class ContractAmendmentPhase1ApiTests(TestCase):
         self.other_customer = Customer.objects.create(user=self.other_customer_user, name="Other Customer", phone="9800000104")
         self.product = Product.objects.create(product_code="AMD-PROD-1", name="Amend Product", base_price=Decimal("20000.00"), is_active=True)
         self.batch = Batch.objects.create(batch_code="AMD-BATCH-1", total_slots=100, duration_months=10, draw_day=5, start_date=date(2026, 1, 1), status=BatchStatus.OPEN)
-        self.lucky_id = LuckyId.objects.create(batch=self.batch, lucky_number=1)
-        self.other_lucky_id = LuckyId.objects.create(batch=self.batch, lucky_number=2)
+        self.lucky_id = LuckyId.objects.filter(batch=self.batch, lucky_number=1).first()
+        if self.lucky_id is None:
+            self.lucky_id = LuckyId.objects.create(batch=self.batch, lucky_number=1)
+        self.other_lucky_id = LuckyId.objects.filter(batch=self.batch, lucky_number=2).first()
+        if self.other_lucky_id is None:
+            self.other_lucky_id = LuckyId.objects.create(batch=self.batch, lucky_number=2)
         self.subscription = Subscription.objects.create(
             customer=self.customer,
             product=self.product,
