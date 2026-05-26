@@ -55,6 +55,18 @@ The preview does not mutate source records. Accounting and reconciliation postin
 
 Product upgrade/downgrade remains preview-only and future-recontract work. It must not be applied from the subscription lifecycle page.
 
+## Product recontract execution design
+
+Current system supports preview only for financial product change. Execution is intentionally deferred until the data model, customer consent workflow, admin approval workflow, future EMI schedule adjustment service, accounting bridge, reconciliation event flow, and printable addendum are implemented.
+
+The future execution design is documented in:
+
+```text
+docs/architecture/contract-amendment-product-recontract-execution-design.md
+```
+
+Financial product recontract execution must preserve historical payments, receipts, paid EMIs, waived EMIs, lucky draw evidence, accounting journals, reconciliation evidence, commission/payout records, delivery records, inventory records, rent/lease demands, and deposit records.
+
 ## Admin API inventory
 
 ```text

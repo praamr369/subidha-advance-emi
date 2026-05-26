@@ -75,6 +75,50 @@ Product upgrade/downgrade is preview/future-recontract only. The lifecycle page 
 
 A future implementation phase must handle price difference approval, EMI recalculation preview approval, paid amount allocation, future EMI schedule generation, receipt/payment treatment, accounting entries, reconciliation impact, customer/admin approval evidence, and audit trail.
 
+Current system supports preview only for financial product change. Execution is intentionally deferred until the model/workflow in `docs/architecture/contract-amendment-product-recontract-execution-design.md` is implemented.
+
+## Phase 6A — Product recontract data model + preview snapshot persistence
+
+Status: **Deferred**
+
+Additive model work only. Persist preview snapshots and old/new schedule previews without mutating subscription, EMI, payment, receipt, accounting, reconciliation, inventory, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
+
+## Phase 6B — Customer consent UI
+
+Status: **Deferred**
+
+Customer sees backend-calculated old/new terms and accepts or rejects. No source mutation.
+
+## Phase 6C — Admin approval workflow
+
+Status: **Deferred**
+
+Admin reviews customer consent, stale preview status, eligibility guards, accounting preview, and reconciliation preview. No source mutation.
+
+## Phase 6D — Future EMI schedule adjustment service
+
+Status: **Deferred**
+
+Create the controlled service for future EMI schedule changes from the effective date only. Historical paid and waived EMIs remain unchanged.
+
+## Phase 6E — Accounting/reconciliation integration
+
+Status: **Deferred**
+
+Route execution impact through existing accounting services and reconciliation lifecycle/event services. Preview, consent, and approval must not post journals or reconciliation rows.
+
+## Phase 6F — Product recontract execution endpoint
+
+Status: **Deferred**
+
+Future admin-only endpoint after all guards, models, tests, and downstream integrations exist. Do not expose an execution button before this phase.
+
+## Phase 6G — Printable recontract addendum
+
+Status: **Deferred**
+
+Generate printable customer/admin agreement evidence from persisted execution snapshots.
+
 ## Phase 5 — Lucky ID / Batch change only
 
 Status: **Deferred**
