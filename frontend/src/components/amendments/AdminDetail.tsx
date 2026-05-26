@@ -54,7 +54,7 @@ const PHASE3_IMPLEMENTATION_WARNING =
   "Only whitelisted non-financial corrections can be implemented in Phase 3. Financial, EMI, lucky ID, batch, rent/lease billing, deposit, accounting, inventory, reconciliation, commission, payout, delivery, stock, and audit-sensitive changes remain blocked.";
 
 const PRODUCT_CHANGE_IMPLEMENTATION_WARNING =
-  "This changes only the contract product reference. Price, EMI, tenure, paid amount, lucky ID, batch, accounting, reconciliation, stock, delivery, commission, payout, waiver, rent/lease billing, and deposit records remain unchanged.";
+  "This only corrects the stored product reference when the contract value remains unchanged. Product upgrade/downgrade with extra cost, lower cost, EMI change, reconciliation, accounting, or contract repricing is not implemented in this phase.";
 
 function canShowImplementationAction(row: AmendmentRecord) {
   if (typeof row.is_implementable === "boolean") return row.is_implementable;
@@ -67,7 +67,7 @@ function implementationWarning(row: AmendmentRecord) {
 
 function implementationLabel(row: AmendmentRecord, busy: string | null) {
   if (busy === "implement") return "Implementing...";
-  if (row.amendment_type === "PRODUCT_CHANGE") return "Implement approved product reference change";
+  if (row.amendment_type === "PRODUCT_CHANGE") return "Implement approved same-price product reference correction";
   return "Implement approved non-financial correction";
 }
 
@@ -76,15 +76,15 @@ function ProductChangePreview({ row }: { row: AmendmentRecord }) {
   const oldValues = row.old_values || row.previous_values || {};
   const nextValues = row.approved_values && Object.keys(row.approved_values).length > 0 ? row.approved_values : row.requested_values || row.new_values || {};
   return (
-    <DetailPanel title="Product reference preview" description="Product-only before/after view. Financial terms are not recalculated in Phase 4.">
+    <DetailPanel title="Product reference correction preview" description="Same-price product reference correction only. Financial product change is deferred.">
       <div className="grid gap-3 text-sm md:grid-cols-2">
         <div className="rounded-2xl border border-border bg-muted/20 p-3">
-          <div className="text-xs font-semibold uppercase text-muted-foreground">Current product</div>
+          <div className="text-xs font-semibold uppercase text-muted-foreground">Current product reference</div>
           <div className="mt-2 font-medium">{displayValue(firstValue(oldValues, ["product_name", "old_product_name", "name"]))}</div>
           <div className="mt-1 text-muted-foreground">ID: {displayValue(firstValue(oldValues, ["product_id", "old_product_id"]))}</div>
         </div>
         <div className="rounded-2xl border border-border bg-muted/20 p-3">
-          <div className="text-xs font-semibold uppercase text-muted-foreground">Approved replacement product</div>
+          <div className="text-xs font-semibold uppercase text-muted-foreground">Approved corrected product reference</div>
           <div className="mt-2 font-medium">{displayValue(firstValue(nextValues, ["approved_product_name", "target_product_name", "new_product_name", "product_name"]))}</div>
           <div className="mt-1 text-muted-foreground">ID: {displayValue(firstValue(nextValues, ["approved_product_id", "target_product_id", "new_product_id", "product_id"]))}</div>
           <div className="mt-1 text-muted-foreground">Code: {displayValue(firstValue(nextValues, ["approved_product_code", "target_product_code", "new_product_code", "product_code"]))}</div>
@@ -157,7 +157,7 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
     <ERPPageShell
       eyebrow="Admin amendment review"
       title={row?.amendment_no || `Amendment #${id}`}
-      subtitle="Review decisions remain separate from guarded implementation. Phase 4 product change updates only the product reference."
+      subtitle="Review decisions remain separate from guarded implementation. Phase 4 corrects only same-price product references."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Contract Amendments", href: "/admin/contract-amendments" }, { label: row?.amendment_no || `#${id}` }]}
       statusBadge={{ label: "Guarded implementation", tone: "warning" }}
     >
@@ -167,7 +167,7 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
         {!loading && error ? <ERPErrorState title="Amendment action failed" description={error} onRetry={() => void load()} /> : null}
         {!loading && row ? (
           <>
-            <DetailPanel title="Status timeline" description="Only approved whitelisted corrections or safe product reference changes can move to implementation.">
+            <DetailPanel title="Status timeline" description="Only approved whitelisted corrections or same-price product reference corrections can move to implementation.">
               <Timeline status={row.status} />
             </DetailPanel>
             <div className="grid gap-4 lg:grid-cols-2">
