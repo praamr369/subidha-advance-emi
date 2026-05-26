@@ -73,33 +73,36 @@ class ContractAmendmentPhase4ProductChangeTests(TestCase):
         payload.update(overrides)
         return ContractAmendment.objects.create(**payload)
 
+    def _counts(self):
+        receipt_model = apps.get_model("billing", "ReceiptDocument", require_ready=False)
+        return {
+            "payments": Payment.objects.count(),
+            "emis": Emi.objects.count(),
+            "receipts": receipt_model.objects.count(),
+        }
+
+    def assert_subscription_unchanged_except_product(self, *, expected_product_id=None, snapshot=None):
+        self.subscription.refresh_from_db()
+        if expected_product_id is not None:
+            self.assertEqual(self.subscription.product_id, expected_product_id)
+        self.assertEqual(self.subscription.total_amount, Decimal("20000.00"))
+        self.assertEqual(self.subscription.monthly_amount, Decimal("2000.00"))
+        self.assertEqual(self.subscription.tenure_months, 10)
+        self.assertEqual(self.subscription.batch_id, self.batch.id)
+        self.assertEqual(self.subscription.lucky_id_id, self.lucky_id.id)
+        if snapshot:
+            self.assertEqual(self._counts(), snapshot)
+
     def test_approved_product_reference_correction_updates_only_subscription_product(self):
         target_product = self.replacement_product()
-        original_total = self.subscription.total_amount
-        original_monthly = self.subscription.monthly_amount
-        original_tenure = self.subscription.tenure_months
-        original_batch_id = self.subscription.batch_id
-        original_lucky_id = self.subscription.lucky_id_id
-        payment_count = Payment.objects.count()
-        emi_count = Emi.objects.count()
-        receipt_model = apps.get_model("billing", "ReceiptDocument", require_ready=False)
-        receipt_count = receipt_model.objects.count()
+        counts = self._counts()
         amendment = self.approved_product_amendment(target_product)
 
         self.client.force_authenticate(self.admin)
         response = self.client.post(f"/api/v1/admin/contract-amendments/{amendment.id}/implement/", {}, format="json")
 
         self.assertEqual(response.status_code, 200, response.data)
-        self.subscription.refresh_from_db()
-        self.assertEqual(self.subscription.product_id, target_product.id)
-        self.assertEqual(self.subscription.total_amount, original_total)
-        self.assertEqual(self.subscription.monthly_amount, original_monthly)
-        self.assertEqual(self.subscription.tenure_months, original_tenure)
-        self.assertEqual(self.subscription.batch_id, original_batch_id)
-        self.assertEqual(self.subscription.lucky_id_id, original_lucky_id)
-        self.assertEqual(Payment.objects.count(), payment_count)
-        self.assertEqual(Emi.objects.count(), emi_count)
-        self.assertEqual(receipt_model.objects.count(), receipt_count)
+        self.assert_subscription_unchanged_except_product(expected_product_id=target_product.id, snapshot=counts)
         self.assertEqual(response.data["implemented_values"]["phase"], "PHASE_4_PRODUCT_REFERENCE_CORRECTION")
         self.assertEqual(response.data["implemented_values"]["semantics"], "PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY")
         self.assertEqual(response.data["implemented_values"]["before"]["old_product_id"], self.product.id)
@@ -140,8 +143,7 @@ class ContractAmendmentPhase4ProductChangeTests(TestCase):
                 response = self.client.post(f"/api/v1/admin/contract-amendments/{amendment.id}/implement/", {}, format="json")
                 self.assertEqual(response.status_code, 400, response.data)
                 self.assertIn(expected, str(response.data).lower())
-                self.subscription.refresh_from_db()
-                self.assertEqual(self.subscription.product_id, self.product.id)
+                self.assert_subscription_unchanged_except_product(expected_product_id=self.product.id)
 
     def test_terminal_subscription_product_reference_correction_is_rejected(self):
         target_product = self.replacement_product("P4-TERM")
@@ -160,5 +162,92 @@ class ContractAmendmentPhase4ProductChangeTests(TestCase):
                 self.client.force_authenticate(user)
                 response = self.client.post(f"/api/v1/admin/contract-amendments/{amendment.id}/implement/", {}, format="json")
                 self.assertEqual(response.status_code, 403)
-        self.subscription.refresh_from_db()
-        self.assertEqual(self.subscription.product_id, self.product.id)
+        self.assert_subscription_unchanged_except_product(expected_product_id=self.product.id)
+
+    def test_recontract_preview_upgrade_returns_extra_payable_without_mutation(self):
+        target_product = self.replacement_product("P4-UPGRADE", price=Decimal("25000.00"))
+        amendment = self.approved_product_amendment(target_product, status="REQUESTED")
+        counts = self._counts()
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(f"/api/v1/admin/contract-amendments/{amendment.id}/product-recontract-preview/", {}, format="json")
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["preview_status"], "READY")
+        self.assertEqual(response.data["impact_type"], "UPGRADE_EXTRA_PAYABLE")
+        self.assertEqual(response.data["old_contract_total"], "20000.00")
+        self.assertEqual(response.data["new_contract_total"], "25000.00")
+        self.assertEqual(response.data["price_difference"], "5000.00")
+        self.assertEqual(response.data["proposed_monthly_amount"], "2500.00")
+        self.assertFalse(response.data["source_record_mutation"])
+        self.assert_subscription_unchanged_except_product(expected_product_id=self.product.id, snapshot=counts)
+
+    def test_recontract_preview_downgrade_returns_credit_required_without_mutation(self):
+        target_product = self.replacement_product("P4-DOWNGRADE", price=Decimal("15000.00"))
+        amendment = self.approved_product_amendment(target_product)
+        counts = self._counts()
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(f"/api/v1/admin/contract-amendments/{amendment.id}/product-recontract-preview/", {}, format="json")
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["impact_type"], "DOWNGRADE_CREDIT_REQUIRED")
+        self.assertEqual(response.data["price_difference"], "-5000.00")
+        self.assertEqual(response.data["proposed_new_remaining_balance"], "15000.00")
+        self.assert_subscription_unchanged_except_product(expected_product_id=self.product.id, snapshot=counts)
+
+    def test_recontract_preview_same_price_returns_reference_correction_impact(self):
+        target_product = self.replacement_product("P4-SAME")
+        amendment = self.approved_product_amendment(target_product)
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(f"/api/v1/admin/contract-amendments/{amendment.id}/product-recontract-preview/", {}, format="json")
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["impact_type"], "SAME_PRICE_REFERENCE_CORRECTION")
+        self.assertEqual(response.data["price_difference"], "0.00")
+        self.assert_subscription_unchanged_except_product(expected_product_id=self.product.id)
+
+    def test_non_admin_roles_cannot_preview_product_recontract(self):
+        target_product = self.replacement_product("P4-PREVIEW-ROLE", price=Decimal("25000.00"))
+        amendment = self.approved_product_amendment(target_product)
+        for user in [self.customer_user, self.partner_user, self.cashier, self.vendor]:
+            with self.subTest(role=user.role):
+                self.client.force_authenticate(user)
+                response = self.client.post(f"/api/v1/admin/contract-amendments/{amendment.id}/product-recontract-preview/", {}, format="json")
+                self.assertEqual(response.status_code, 403)
+
+    def test_preview_rejects_unsupported_amendment_type_and_missing_target(self):
+        unsupported = ContractAmendment.objects.create(
+            subscription=self.subscription,
+            contract_type="EMI_SUBSCRIPTION",
+            customer=self.customer,
+            requested_by=self.customer_user,
+            requested_role="CUSTOMER",
+            amendment_type="CONTACT_CORRECTION",
+            status="APPROVED",
+            approved_values={"phone": "9810000999"},
+            reason="Not product change.",
+            approved_by=self.admin,
+        )
+        missing_target = ContractAmendment.objects.create(
+            subscription=self.subscription,
+            contract_type="EMI_SUBSCRIPTION",
+            customer=self.customer,
+            requested_by=self.customer_user,
+            requested_role="CUSTOMER",
+            amendment_type="PRODUCT_CHANGE",
+            status="APPROVED",
+            approved_values={},
+            reason="Missing target.",
+            approved_by=self.admin,
+        )
+
+        self.client.force_authenticate(self.admin)
+        unsupported_response = self.client.post(f"/api/v1/admin/contract-amendments/{unsupported.id}/product-recontract-preview/", {}, format="json")
+        missing_response = self.client.post(f"/api/v1/admin/contract-amendments/{missing_target.id}/product-recontract-preview/", {}, format="json")
+
+        self.assertEqual(unsupported_response.status_code, 400, unsupported_response.data)
+        self.assertIn("product_change", str(unsupported_response.data).lower())
+        self.assertEqual(missing_response.status_code, 400, missing_response.data)
+        self.assertIn("approved_product_id", str(missing_response.data).lower())
