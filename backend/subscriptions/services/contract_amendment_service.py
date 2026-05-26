@@ -269,7 +269,7 @@ def _product_change_block_reason(amendment: ContractAmendment) -> str:
     if forbidden_keys:
         return "Product change cannot include financial, EMI, lucky ID, batch, payment, deposit, waiver, accounting, reconciliation, inventory, stock, delivery, commission, or payout keys: " + ", ".join(forbidden_keys) + "."
     if unsupported_keys:
-        return f"Unsupported product-change value keys: {', '.join(unsupported_keys)}."
+        return f"Product change blocked: unsupported product-change value keys: {', '.join(unsupported_keys)}."
     if not target_product_id:
         return "Product change requires approved_product_id."
     source = amendment.source_contract()
