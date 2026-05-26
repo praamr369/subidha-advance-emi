@@ -67,13 +67,13 @@ class ContractAmendmentPhase4ProductChangeTests(TestCase):
             "status": "APPROVED",
             "requested_values": {"approved_product_id": target_product.id},
             "approved_values": {"approved_product_id": target_product.id, "approved_product_name": target_product.name},
-            "reason": "Approved product reference change.",
+            "reason": "Approved product reference correction.",
             "approved_by": self.admin,
         }
         payload.update(overrides)
         return ContractAmendment.objects.create(**payload)
 
-    def test_approved_product_change_updates_only_subscription_product(self):
+    def test_approved_product_reference_correction_updates_only_subscription_product(self):
         target_product = self.replacement_product()
         original_total = self.subscription.total_amount
         original_monthly = self.subscription.monthly_amount
@@ -100,26 +100,38 @@ class ContractAmendmentPhase4ProductChangeTests(TestCase):
         self.assertEqual(Payment.objects.count(), payment_count)
         self.assertEqual(Emi.objects.count(), emi_count)
         self.assertEqual(receipt_model.objects.count(), receipt_count)
-        self.assertEqual(response.data["implemented_values"]["phase"], "PHASE_4_PRODUCT_REFERENCE_CHANGE")
+        self.assertEqual(response.data["implemented_values"]["phase"], "PHASE_4_PRODUCT_REFERENCE_CORRECTION")
+        self.assertEqual(response.data["implemented_values"]["semantics"], "PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY")
         self.assertEqual(response.data["implemented_values"]["before"]["old_product_id"], self.product.id)
         self.assertEqual(response.data["implemented_values"]["after"]["new_product_id"], target_product.id)
         self.assertTrue(response.data["implemented_values"]["financial_invariants"]["total_amount_unchanged"])
         self.assertTrue(response.data["implemented_values"]["financial_invariants"]["monthly_amount_unchanged"])
         self.assertTrue(response.data["implemented_values"]["financial_invariants"]["tenure_months_unchanged"])
-        self.assertTrue(AuditLog.objects.filter(action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_IMPLEMENTED, metadata__phase="PHASE_4_PRODUCT_REFERENCE_CHANGE").exists())
+        self.assertTrue(AuditLog.objects.filter(action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_IMPLEMENTED, metadata__phase="PHASE_4_PRODUCT_REFERENCE_CORRECTION").exists())
 
         second = self.client.post(f"/api/v1/admin/contract-amendments/{amendment.id}/implement/", {}, format="json")
         self.assertEqual(second.status_code, 400)
         self.assertIn("already implemented", str(second.data).lower())
 
-    def test_product_change_guards_reject_unsafe_requests(self):
+    def test_legacy_apply_route_does_not_500_on_nullable_rent_lease_join(self):
+        target_product = self.replacement_product("P4-LEGACY")
+        amendment = self.approved_product_amendment(target_product)
+        self.assertIsNone(amendment.rent_lease_contract_id)
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(f"/api/v1/admin/contracts/amendments/{amendment.id}/apply/", {}, format="json")
+
+        self.assertNotEqual(response.status_code, 500)
+        self.assertIn(response.status_code, {200, 400})
+
+    def test_product_reference_correction_guards_reject_unsafe_requests(self):
         target_product = self.replacement_product()
         cases = [
             ({"status": "REQUESTED"}, "approved"),
             ({"approved_values": {}}, "approved_product_id"),
             ({"approved_values": {"approved_product_id": self.replacement_product("P4-INACTIVE", is_active=False).id}}, "inactive"),
-            ({"approved_values": {"approved_product_id": self.replacement_product("P4-PRICE", price=Decimal("25000.00")).id}}, "recalculation"),
-            ({"approved_values": {"approved_product_id": target_product.id, "total_amount": "1.00", "tenure_months": 99, "lucky_id": 1, "batch": 1, "payment": "x", "deposit": "x", "accounting": "x"}}, "cannot include"),
+            ({"approved_values": {"approved_product_id": self.replacement_product("P4-PRICE", price=Decimal("25000.00")).id}}, "financial product change requires contract repricing preview and reconciliation"),
+            ({"approved_values": {"approved_product_id": target_product.id, "new_total_amount": "1.00", "price_difference": "1.00", "extra_amount": "1.00", "refund_amount": "1.00", "adjustment_amount": "1.00", "recalculation": True, "payment_adjustment": "x", "accounting_adjustment": "x", "reconciliation_adjustment": "x", "tenure_months": 99}}, "cannot include"),
         ]
         for index, (overrides, expected) in enumerate(cases):
             with self.subTest(expected=expected):
@@ -131,7 +143,7 @@ class ContractAmendmentPhase4ProductChangeTests(TestCase):
                 self.subscription.refresh_from_db()
                 self.assertEqual(self.subscription.product_id, self.product.id)
 
-    def test_terminal_subscription_product_change_is_rejected(self):
+    def test_terminal_subscription_product_reference_correction_is_rejected(self):
         target_product = self.replacement_product("P4-TERM")
         Subscription.objects.filter(pk=self.subscription.pk).update(status=SubscriptionStatus.CANCELLED)
         amendment = self.approved_product_amendment(target_product)
@@ -140,7 +152,7 @@ class ContractAmendmentPhase4ProductChangeTests(TestCase):
         self.assertEqual(response.status_code, 400, response.data)
         self.assertIn("terminal", str(response.data).lower())
 
-    def test_non_admin_roles_cannot_call_product_change_implement(self):
+    def test_non_admin_roles_cannot_call_product_reference_correction_implement(self):
         target_product = self.replacement_product("P4-ROLE")
         amendment = self.approved_product_amendment(target_product)
         for user in [self.customer_user, self.partner_user, self.cashier, self.vendor]:
