@@ -4,7 +4,7 @@ Status: implemented on `update`.
 
 ## Scope
 
-Phase 3 implements only whitelisted non-financial corrections after admin approval.
+Phase 3 implements only whitelisted non-financial customer corrections after admin approval.
 
 Implemented whitelist:
 
@@ -34,11 +34,16 @@ The service records before/after evidence in `implemented_values`, sets `impleme
 
 A second implementation attempt returns a controlled 400 and does not mutate the source record again.
 
-## Blocked amendments
+## Relationship to Phase 4
+
+Phase 4 adds `PRODUCT_CHANGE` support to the same admin implement endpoint, but it is not part of the Phase 3 customer-field whitelist.
+
+Phase 4 changes only `Subscription.product` when the approved replacement product is safe as a reference-only update. It does not recalculate total price, EMI, tenure, paid amount, lucky ID, batch, waiver, commission, payout, accounting, reconciliation, inventory, stock, delivery, rent/lease billing, deposit, cancellation, return, payment, or receipt records.
+
+## Blocked amendments still requiring later phases
 
 Financial and contract-value amendments remain blocked and require future phases:
 
-- product
 - lucky ID
 - batch
 - EMI
@@ -56,3 +61,5 @@ Financial and contract-value amendments remain blocked and require future phases
 - delivery/stock
 
 Phase 3 does not mutate subscriptions, EMI rows, payments, receipts, journals, waivers, lucky draw records, rent/lease billing demands, deposit records, inventory, stock, reconciliation records, commission records, or payout records.
+
+Phase 5 remains lucky ID / batch. Phase 6 remains EMI / tenure / price recalculation.
