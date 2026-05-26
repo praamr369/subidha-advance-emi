@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import type { ContractRecontractEvent } from "@/services/amendmentPreviews";
 
 export type AmendmentContractType = "EMI_SUBSCRIPTION" | "RENT_LEASE";
 export type AmendmentStatus = "REQUESTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "IMPLEMENTED" | "CANCELLED" | "APPLIED";
@@ -19,6 +20,37 @@ export type AmendmentType =
   | "LEASE_TERM_CHANGE"
   | "OTHER"
   | "PRODUCT_UPGRADE";
+
+export type ProductRecontractConsentStatus = "PENDING" | "ACCEPTED" | "REJECTED";
+
+export type ProductRecontractPreviewSummary = {
+  id: number;
+  status: string;
+  impact_type: string;
+  old_product_id?: number | null;
+  old_product_name?: string | null;
+  old_product_code?: string | null;
+  new_product_id?: number | null;
+  new_product_name?: string | null;
+  new_product_code?: string | null;
+  old_contract_total?: string;
+  new_contract_total?: string;
+  price_difference?: string;
+  amount_already_paid?: string;
+  old_remaining_balance?: string;
+  proposed_new_remaining_balance?: string;
+  current_tenure_months?: number;
+  preview_tenure_months?: number;
+  current_monthly_amount?: string;
+  proposed_monthly_amount?: string;
+  pending_emi_count?: number;
+  effective_date_preview?: string | null;
+  warnings?: string[];
+  customer_consent_status?: ProductRecontractConsentStatus;
+  customer_consented_at?: string | null;
+  customer_consent_note?: string | null;
+  source_record_mutation?: boolean;
+};
 
 export const AMENDMENT_STATUSES: AmendmentStatus[] = ["REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED"];
 export const AMENDMENT_TYPES: Array<{ value: AmendmentType; label: string }> = [
@@ -80,6 +112,7 @@ export type AmendmentRecord = {
   is_implementable?: boolean;
   implementation_block_reason?: string;
   implementable_fields?: string[];
+  latest_product_recontract_preview?: ProductRecontractPreviewSummary | null;
   applied_at?: string | null;
   metadata?: Record<string, unknown>;
   created_at?: string;
@@ -124,6 +157,17 @@ export async function createCustomerAmendment(payload: AmendmentCreatePayload): 
 
 export async function getCustomerAmendment(id: number): Promise<AmendmentRecord> {
   return apiFetch<AmendmentRecord>(`/customer/contract-amendments/${id}/`);
+}
+
+export async function consentProductRecontractPreview(
+  amendmentId: number,
+  decision: Exclude<ProductRecontractConsentStatus, "PENDING">,
+  note = "",
+): Promise<ContractRecontractEvent> {
+  return apiFetch<ContractRecontractEvent>(`/customer/contract-amendments/${amendmentId}/product-recontract/consent/`, {
+    method: "POST",
+    body: { decision, note },
+  });
 }
 
 export async function listPartnerAmendments(): Promise<AmendmentRecord[]> {

@@ -12,6 +12,7 @@ from api.v1.serializers.contract_amendments import (
     ContractAmendmentReviewSerializer,
     ContractAmendmentSerializer,
     ContractRecontractEventSerializer,
+    ProductRecontractCustomerConsentSerializer,
     ProductRecontractPreviewRequestSerializer,
     ProductRecontractPreviewSerializer,
 )
@@ -23,7 +24,11 @@ from subscriptions.services.contract_amendment_service import (
     mark_under_review,
     reject_amendment,
 )
-from subscriptions.services.product_recontract_preview_service import create_product_recontract_preview_snapshot, preview_product_recontract
+from subscriptions.services.product_recontract_preview_service import (
+    create_product_recontract_preview_snapshot,
+    preview_product_recontract,
+    record_product_recontract_customer_consent,
+)
 
 
 def _validation_response(exc: DjangoValidationError) -> Response:
@@ -101,6 +106,30 @@ class CustomerContractAmendmentDetailView(APIView):
         if not amendment:
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(ContractAmendmentSerializer(amendment).data, status=status.HTTP_200_OK)
+
+
+class CustomerContractAmendmentProductRecontractConsentView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def post(self, request, pk: int):
+        customer = _customer_profile_for(request.user)
+        if not customer:
+            return Response({"detail": "Customer profile not found."}, status=status.HTTP_404_NOT_FOUND)
+        amendment = _amendment_queryset().filter(pk=pk, customer=customer).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ProductRecontractCustomerConsentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            event = record_product_recontract_customer_consent(
+                amendment=amendment,
+                customer_user=request.user,
+                decision=serializer.validated_data["decision"],
+                note=serializer.validated_data.get("note", ""),
+            )
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+        return Response(ContractRecontractEventSerializer(event).data, status=status.HTTP_200_OK)
 
 
 class PartnerContractAmendmentListCreateView(APIView):

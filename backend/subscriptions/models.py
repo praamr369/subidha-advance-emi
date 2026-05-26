@@ -4327,6 +4327,11 @@ class ContractRecontractEvent(models.Model):
         SUPERSEDED = "SUPERSEDED", "Superseded"
         CANCELLED = "CANCELLED", "Cancelled"
 
+    class CustomerConsentStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        REJECTED = "REJECTED", "Rejected"
+
     amendment = models.ForeignKey(
         ContractAmendment,
         on_delete=models.PROTECT,
@@ -4376,6 +4381,22 @@ class ContractRecontractEvent(models.Model):
         null=True,
         blank=True,
     )
+    customer_consent_status = models.CharField(
+        max_length=20,
+        choices=CustomerConsentStatus.choices,
+        default=CustomerConsentStatus.PENDING,
+        db_index=True,
+    )
+    customer_consented_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="customer_recontract_consents",
+        null=True,
+        blank=True,
+    )
+    customer_consented_at = models.DateTimeField(null=True, blank=True)
+    customer_consent_note = models.TextField(null=True, blank=True)
+    customer_consent_snapshot = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
     metadata = models.JSONField(default=dict, blank=True)
@@ -4413,6 +4434,8 @@ class ContractRecontractEvent(models.Model):
             errors["preview_snapshot"] = "Preview snapshot must be a JSON object."
         if not isinstance(self.warnings, list):
             errors["warnings"] = "Warnings must be a JSON list."
+        if not isinstance(self.customer_consent_snapshot, dict):
+            errors["customer_consent_snapshot"] = "Customer consent snapshot must be a JSON object."
         if errors:
             raise ValidationError(errors)
 

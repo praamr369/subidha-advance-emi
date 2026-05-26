@@ -7,8 +7,20 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
+import ActionButton from "@/components/ui/ActionButton";
 import { DetailPanel } from "@/components/ui/operations";
-import { amendmentContractTypeLabel, amendmentTypeLabel, getCustomerAmendment, type AmendmentRecord } from "@/services/amendments";
+import {
+  amendmentContractTypeLabel,
+  amendmentTypeLabel,
+  consentProductRecontractPreview,
+  getCustomerAmendment,
+  type AmendmentRecord,
+  type ProductRecontractConsentStatus,
+  type ProductRecontractPreviewSummary,
+} from "@/services/amendments";
+
+const CONSENT_ONLY_WARNING =
+  "Customer consent records agreement or rejection of the preview only. It does not change the product, EMI schedule, payment history, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.";
 
 function safeJson(value?: Record<string, unknown> | null) {
   return JSON.stringify(value && Object.keys(value).length > 0 ? value : {}, null, 2);
@@ -44,6 +56,97 @@ function Timeline({ status }: { status: string }) {
   );
 }
 
+function valueOrDash(value?: string | number | null) {
+  return value === undefined || value === null || value === "" ? "-" : String(value);
+}
+
+function SummaryItem({ label, value }: { label: string; value?: string | number | null }) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/20 p-3">
+      <div className="text-xs font-semibold uppercase text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm font-medium">{valueOrDash(value)}</div>
+    </div>
+  );
+}
+
+function ProductRecontractCustomerConsentPanel({
+  preview,
+  onConsent,
+}: {
+  preview?: ProductRecontractPreviewSummary | null;
+  onConsent: (decision: Exclude<ProductRecontractConsentStatus, "PENDING">, note: string) => Promise<void>;
+}) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState<ProductRecontractConsentStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!preview) return null;
+  const status = preview.customer_consent_status || "PENDING";
+  const canDecide = status === "PENDING";
+
+  async function submit(decision: Exclude<ProductRecontractConsentStatus, "PENDING">) {
+    setBusy(decision);
+    setError(null);
+    try {
+      await onConsent(decision, note);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Consent could not be recorded.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <DetailPanel title="Product recontract preview consent" description="Saved preview snapshot for customer decision.">
+      <div className="space-y-4">
+        <p className="text-sm text-amber-800 dark:text-amber-200">{CONSENT_ONLY_WARNING}</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          <SummaryItem label="Old product" value={`${valueOrDash(preview.old_product_name)} (#${valueOrDash(preview.old_product_id)})`} />
+          <SummaryItem label="New product" value={`${valueOrDash(preview.new_product_name)} (#${valueOrDash(preview.new_product_id)})`} />
+          <SummaryItem label="Old contract total" value={preview.old_contract_total} />
+          <SummaryItem label="New contract total" value={preview.new_contract_total} />
+          <SummaryItem label="Price difference" value={preview.price_difference} />
+          <SummaryItem label="Already paid" value={preview.amount_already_paid} />
+          <SummaryItem label="Proposed remaining balance" value={preview.proposed_new_remaining_balance} />
+          <SummaryItem label="Current EMI" value={preview.current_monthly_amount} />
+          <SummaryItem label="Proposed EMI" value={preview.proposed_monthly_amount} />
+          <SummaryItem label="Impact type" value={preview.impact_type} />
+          <SummaryItem label="Consent status" value={status} />
+        </div>
+        {preview.warnings?.length ? (
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">Warnings</div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+              {preview.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {canDecide ? (
+          <>
+            <label className="block text-sm font-medium">
+              Optional note
+              <textarea className="mt-2 min-h-24 w-full rounded-xl border border-border bg-background p-3 text-sm" value={note} onChange={(event) => setNote(event.target.value)} />
+            </label>
+            <div className="flex flex-wrap gap-3">
+              <ActionButton onClick={() => void submit("ACCEPTED")} disabled={Boolean(busy)}>
+                {busy === "ACCEPTED" ? "Recording..." : "Accept proposed recontract terms"}
+              </ActionButton>
+              <ActionButton variant="outline" onClick={() => void submit("REJECTED")} disabled={Boolean(busy)}>
+                {busy === "REJECTED" ? "Recording..." : "Reject proposed recontract terms"}
+              </ActionButton>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">Customer consent status: {status}</p>
+        )}
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      </div>
+    </DetailPanel>
+  );
+}
+
 export default function CustomerAmendmentDetail({ id }: { id: number }) {
   const [row, setRow] = useState<AmendmentRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +163,28 @@ export default function CustomerAmendmentDetail({ id }: { id: number }) {
       setLoading(false);
     }
   }, [id]);
+
+  const recordConsent = useCallback(
+    async (decision: Exclude<ProductRecontractConsentStatus, "PENDING">, note: string) => {
+      const event = await consentProductRecontractPreview(id, decision, note);
+      setRow((current) =>
+        current
+          ? {
+              ...current,
+              latest_product_recontract_preview: current.latest_product_recontract_preview
+                ? {
+                    ...current.latest_product_recontract_preview,
+                    customer_consent_status: event.customer_consent_status,
+                    customer_consented_at: event.customer_consented_at,
+                    customer_consent_note: event.customer_consent_note,
+                  }
+                : current.latest_product_recontract_preview,
+            }
+          : current,
+      );
+    },
+    [id],
+  );
 
   useEffect(() => {
     if (Number.isFinite(id)) void load();
@@ -135,6 +260,7 @@ export default function CustomerAmendmentDetail({ id }: { id: number }) {
             <DetailPanel title="Reason" description="Submitted reason.">
               <p className="text-sm text-muted-foreground">{row.reason}</p>
             </DetailPanel>
+            <ProductRecontractCustomerConsentPanel preview={row.latest_product_recontract_preview} onConsent={recordConsent} />
             <div className="grid gap-4 lg:grid-cols-3">
               <DetailPanel title="Old values" description="Source snapshot.">
                 <pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">

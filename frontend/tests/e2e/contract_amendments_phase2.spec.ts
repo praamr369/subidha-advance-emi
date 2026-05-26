@@ -136,6 +136,46 @@ const productRecontractEventFixture = {
   blocked_reason: "",
   created_at: "2026-05-26T12:00:00Z",
   created_by_display: "smoke.admin",
+  customer_consent_status: "PENDING",
+  customer_consented_by: null,
+  customer_consented_by_display: null,
+  customer_consented_at: null,
+  customer_consent_note: "",
+  customer_consent_snapshot: {},
+};
+
+const latestProductRecontractPreviewSummary = {
+  id: productRecontractEventFixture.id,
+  status: productRecontractEventFixture.status,
+  impact_type: productRecontractEventFixture.impact_type,
+  old_product_id: productRecontractEventFixture.old_product,
+  old_product_name: productRecontractEventFixture.old_product_name,
+  old_product_code: productRecontractEventFixture.old_product_code,
+  new_product_id: productRecontractEventFixture.new_product,
+  new_product_name: productRecontractEventFixture.new_product_name,
+  new_product_code: productRecontractEventFixture.new_product_code,
+  old_contract_total: productRecontractEventFixture.old_contract_total,
+  new_contract_total: productRecontractEventFixture.new_contract_total,
+  price_difference: productRecontractEventFixture.price_difference,
+  amount_already_paid: productRecontractEventFixture.amount_already_paid,
+  old_remaining_balance: productRecontractEventFixture.old_remaining_balance,
+  proposed_new_remaining_balance: productRecontractEventFixture.new_remaining_balance,
+  current_tenure_months: productRecontractEventFixture.current_tenure_months,
+  preview_tenure_months: productRecontractEventFixture.preview_tenure_months,
+  current_monthly_amount: productRecontractEventFixture.current_monthly_amount,
+  proposed_monthly_amount: productRecontractEventFixture.proposed_monthly_amount,
+  pending_emi_count: productRecontractEventFixture.pending_emi_count,
+  effective_date_preview: productRecontractEventFixture.effective_date_preview,
+  warnings: productRecontractEventFixture.warnings,
+  customer_consent_status: "PENDING",
+  customer_consented_at: null,
+  customer_consent_note: "",
+  source_record_mutation: false,
+};
+
+const approvedProductChangeWithSavedPreviewFixture = {
+  ...approvedProductChangeFixture,
+  latest_product_recontract_preview: latestProductRecontractPreviewSummary,
 };
 
 const lifecycleSubscriptionFixture = {
@@ -186,6 +226,20 @@ async function mockAmendments(page: Page, role: "customer" | "partner" | "admin"
     if (request.method() !== "GET") {
       if (/\/contract-amendments\/1\/product-recontract-preview\/save\/?$/.test(url.pathname)) {
         await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(productRecontractEventFixture) });
+        return;
+      }
+      if (/\/contract-amendments\/1\/product-recontract\/consent\/?$/.test(url.pathname)) {
+        const payload = request.postDataJSON() as { decision?: string; note?: string };
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            ...productRecontractEventFixture,
+            customer_consent_status: payload.decision,
+            customer_consented_at: "2026-05-26T13:00:00Z",
+            customer_consent_note: payload.note || "",
+          }),
+        });
         return;
       }
       if (/\/contract-amendments\/1\/product-recontract-preview\/?$/.test(url.pathname)) {
@@ -341,6 +395,17 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByRole("button", { name: /Apply product change|Execute recontract|Update contract|Recalculate EMI now/i })).toHaveCount(0);
   });
 
+  test("admin amendment detail shows customer consent status read-only", async ({ page }) => {
+    await mockAmendments(page, "admin", approvedProductChangeWithSavedPreviewFixture);
+    await page.goto("/admin/contract-amendments/1");
+
+    await expect(page.getByText("Customer recontract consent")).toBeVisible();
+    await expect(page.getByText("Consent status")).toBeVisible();
+    await expect(page.getByText("#77 · PREVIEWED · UPGRADE_EXTRA_PAYABLE")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Accept proposed recontract terms" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reject proposed recontract terms" })).toHaveCount(0);
+  });
+
   test("admin amendment detail does not show implementation button for blocked financial product change", async ({ page }) => {
     await mockAmendments(page, "admin", blockedProductChangeFixture);
     await page.goto("/admin/contract-amendments/1");
@@ -412,6 +477,40 @@ test.describe("admin contract amendment phase-2 UI", () => {
 test.describe("customer and partner amendment implementation visibility", () => {
   test.use({ storageState: authStatePath("customer") });
 
+  test("customer detail shows saved recontract preview summary and consent-only warning", async ({ page }) => {
+    await mockAmendments(page, "customer", approvedProductChangeWithSavedPreviewFixture);
+    await page.goto("/customer/contract-amendments/1");
+
+    await expect(page.getByText("Product recontract preview consent")).toBeVisible();
+    await expect(page.getByText("Customer consent records agreement or rejection of the preview only. It does not change the product, EMI schedule, payment history, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.")).toBeVisible();
+    await expect(page.getByText("Old Sofa (#2001)")).toBeVisible();
+    await expect(page.getByText("New Sofa (#2002)")).toBeVisible();
+    await expect(page.getByText("25000.00")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Accept proposed recontract terms" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reject proposed recontract terms" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Execute|Apply|Update contract|Recalculate/i })).toHaveCount(0);
+  });
+
+  test("customer can accept proposed recontract terms", async ({ page }) => {
+    await mockAmendments(page, "customer", approvedProductChangeWithSavedPreviewFixture);
+    await page.goto("/customer/contract-amendments/1");
+
+    await page.getByRole("button", { name: "Accept proposed recontract terms" }).click();
+
+    await expect(page.getByText("Customer consent status: ACCEPTED")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Accept proposed recontract terms" })).toHaveCount(0);
+  });
+
+  test("customer can reject proposed recontract terms", async ({ page }) => {
+    await mockAmendments(page, "customer", approvedProductChangeWithSavedPreviewFixture);
+    await page.goto("/customer/contract-amendments/1");
+
+    await page.getByRole("button", { name: "Reject proposed recontract terms" }).click();
+
+    await expect(page.getByText("Customer consent status: REJECTED")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reject proposed recontract terms" })).toHaveCount(0);
+  });
+
   test("customer detail never shows implementation action", async ({ page }) => {
     await mockAmendments(page, "customer", approvedProductChangeFixture);
     await page.goto("/customer/contract-amendments/1");
@@ -427,12 +526,14 @@ test.describe("partner amendment implementation visibility", () => {
   test.use({ storageState: authStatePath("partner") });
 
   test("partner detail never shows implementation action", async ({ page }) => {
-    await mockAmendments(page, "partner", approvedProductChangeFixture);
+    await mockAmendments(page, "partner", approvedProductChangeWithSavedPreviewFixture);
     await page.goto("/partner/contract-amendments/1");
 
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Implement approved same-price product reference correction" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Preview financial product change" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Save preview snapshot" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Accept proposed recontract terms" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reject proposed recontract terms" })).toHaveCount(0);
   });
 });

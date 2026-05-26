@@ -56,6 +56,12 @@ export type ContractRecontractEvent = {
   blocked_reason?: string | null;
   created_at?: string;
   created_by_display?: string | null;
+  customer_consent_status?: "PENDING" | "ACCEPTED" | "REJECTED";
+  customer_consented_by?: number | null;
+  customer_consented_by_display?: string | null;
+  customer_consented_at?: string | null;
+  customer_consent_note?: string | null;
+  customer_consent_snapshot?: Record<string, unknown>;
 };
 
 export async function previewProductRecontractAmendment(id: number): Promise<ProductRecontractPreview> {

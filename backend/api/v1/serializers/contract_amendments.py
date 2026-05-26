@@ -3,6 +3,7 @@ from rest_framework import serializers
 from subscriptions.models import ContractAmendment, ContractRecontractEvent, Subscription
 from subscriptions.models_contract_amendment import PHASE1_AMENDMENT_TYPES, PHASE1_STATUSES
 from subscriptions.services.contract_amendment_service import phase3_implementation_metadata
+from subscriptions.services.product_recontract_preview_service import latest_product_recontract_preview_summary
 
 
 class ContractAmendmentSerializer(serializers.ModelSerializer):
@@ -16,6 +17,7 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
     is_implementable = serializers.SerializerMethodField()
     implementation_block_reason = serializers.SerializerMethodField()
     implementable_fields = serializers.SerializerMethodField()
+    latest_product_recontract_preview = serializers.SerializerMethodField()
 
     class Meta:
         model = ContractAmendment
@@ -61,6 +63,7 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
             "is_implementable",
             "implementation_block_reason",
             "implementable_fields",
+            "latest_product_recontract_preview",
             "applied_at",
             "metadata",
             "created_at",
@@ -76,6 +79,11 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
 
     def get_implementable_fields(self, obj):
         return phase3_implementation_metadata(obj)["implementable_fields"]
+
+    def get_latest_product_recontract_preview(self, obj):
+        if obj.amendment_type != "PRODUCT_CHANGE":
+            return None
+        return latest_product_recontract_preview_summary(obj)
 
 
 class ContractAmendmentCreateSerializer(serializers.Serializer):
@@ -119,6 +127,11 @@ class ContractAmendmentStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=sorted(PHASE1_STATUSES), required=False)
 
 
+class ProductRecontractCustomerConsentSerializer(serializers.Serializer):
+    decision = serializers.ChoiceField(choices=["ACCEPTED", "REJECTED"])
+    note = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+
+
 class ProductRecontractPreviewRequestSerializer(serializers.Serializer):
     preview_tenure_months = serializers.IntegerField(required=False, min_value=1)
     effective_date = serializers.DateField(required=False, allow_null=True)
@@ -159,6 +172,7 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
     old_product_code = serializers.CharField(source="old_product.product_code", read_only=True, allow_null=True)
     new_product_code = serializers.CharField(source="new_product.product_code", read_only=True, allow_null=True)
     created_by_display = serializers.CharField(source="created_by.username", read_only=True, allow_null=True)
+    customer_consented_by_display = serializers.CharField(source="customer_consented_by.username", read_only=True, allow_null=True)
 
     class Meta:
         model = ContractRecontractEvent
@@ -192,6 +206,12 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "created_by_display",
+            "customer_consent_status",
+            "customer_consented_by",
+            "customer_consented_by_display",
+            "customer_consented_at",
+            "customer_consent_note",
+            "customer_consent_snapshot",
             "metadata",
         ]
         read_only_fields = fields

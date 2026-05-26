@@ -95,6 +95,35 @@ function ProductChangePreview({ row }: { row: AmendmentRecord }) {
   );
 }
 
+function ProductRecontractConsentStatusPanel({ row }: { row: AmendmentRecord }) {
+  const preview = row.latest_product_recontract_preview;
+  if (!preview) return null;
+  return (
+    <DetailPanel title="Customer recontract consent" description="Read-only customer decision for the latest saved preview snapshot.">
+      <dl className="grid gap-3 text-sm md:grid-cols-2">
+        <div>
+          <dt className="text-muted-foreground">Consent status</dt>
+          <dd>{preview.customer_consent_status || "PENDING"}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Preview snapshot</dt>
+          <dd>
+            #{preview.id} · {preview.status} · {preview.impact_type}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Consented at</dt>
+          <dd>{preview.customer_consented_at || "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Customer note</dt>
+          <dd>{preview.customer_consent_note || "—"}</dd>
+        </div>
+      </dl>
+    </DetailPanel>
+  );
+}
+
 function Timeline({ status }: { status: string }) {
   return (
     <div className="grid gap-2 md:grid-cols-4">
@@ -185,6 +214,7 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
             </div>
             <ProductChangePreview row={row} />
             <ProductRecontractPreviewPanel amendment={row} />
+            <ProductRecontractConsentStatusPanel row={row} />
             <div className="grid gap-4 lg:grid-cols-3">
               <DetailPanel title="Old values" description="Source snapshot."><pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.old_values || row.previous_values)}</pre></DetailPanel>
               <DetailPanel title="Requested values" description="Requested change."><pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.requested_values || row.new_values)}</pre></DetailPanel>

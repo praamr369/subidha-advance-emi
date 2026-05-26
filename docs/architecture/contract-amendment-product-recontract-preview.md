@@ -1,6 +1,6 @@
 # Contract Amendment Product Recontract Preview
 
-Status: implemented on `update`. Phase 6A preview snapshot persistence is implemented.
+Status: implemented on `update`. Phase 6A preview snapshot persistence and Phase 6B customer consent for saved preview snapshots are implemented.
 
 This phase adds an admin-only preview for financial product recontract requests. It does not execute the recontract.
 
@@ -37,4 +37,14 @@ The existing preview endpoint remains calculation-only. The save endpoint recalc
 
 Saving a preview snapshot is not execution. It does not mutate the real contract, EMI schedule, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
 
-True execution remains future work. It must cover approval, repricing, future EMI schedule change, payment and receipt treatment, accounting entries, reconciliation impact, and audit trail.
+Phase 6B lets a customer view the latest active saved preview snapshot for their own amendment and record `ACCEPTED` or `REJECTED` consent:
+
+```text
+POST /api/v1/customer/contract-amendments/{id}/product-recontract/consent/
+```
+
+The customer detail response exposes a safe `latest_product_recontract_preview` summary with product names, old/new totals, price difference, already paid amount, proposed remaining balance, current/proposed EMI, impact type, warnings, and `customer_consent_status`.
+
+Customer consent is immutable for the saved preview once accepted or rejected. Superseded or cancelled preview snapshots cannot receive consent. Customer consent records agreement or rejection of the preview only; it does not mutate subscription product, total amount, monthly amount, tenure, EMI rows, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records.
+
+Customer consent is required before future admin execution approval. True execution remains future work. It must cover admin approval, repricing, future EMI schedule change, payment and receipt treatment, accounting entries, reconciliation impact, printable addendum, and audit trail.

@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Phase 6A product recontract preview snapshot persistence completed on `update` branch**
+Status: **Phase 6B product recontract customer consent completed on `update` branch**
 
 ## Principle
 
@@ -92,13 +92,21 @@ GET  /api/v1/admin/contract-amendments/{id}/product-recontract-events/
 
 The existing preview endpoint remains calculation-only. The save endpoint recalculates and stores a READY backend snapshot as audit evidence. Prior active previews for the same amendment are marked `SUPERSEDED`, not deleted.
 
-Customer consent, admin execution approval, future EMI schedule change, accounting posting, reconciliation, and printable addendum remain future phases. Full execution remains blocked.
+Customer consent is handled in Phase 6B. Admin execution approval, future EMI schedule change, accounting posting, reconciliation, and printable addendum remain future phases. Full execution remains blocked.
 
 ## Phase 6B — Customer consent UI
 
-Status: **Deferred**
+Status: **Implemented**
 
-Customer sees backend-calculated old/new terms and accepts or rejects. No source mutation.
+Customer sees the latest active saved backend-calculated preview summary for their own amendment and accepts or rejects it with an optional note:
+
+```text
+POST /api/v1/customer/contract-amendments/{id}/product-recontract/consent/
+```
+
+Consent is recorded only on the saved `ContractRecontractEvent` snapshot. It is required before future admin execution approval. It does not mutate subscription product, total amount, monthly amount, tenure, EMI rows, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records.
+
+Admin detail shows customer consent status read-only. Admin override, future EMI schedule update, accounting/reconciliation integration, printable addendum, and execution remain future phases.
 
 ## Phase 6C — Admin approval workflow
 

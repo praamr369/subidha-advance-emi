@@ -42,6 +42,49 @@ def _date(value):
     return parse_date(str(value))
 
 
+def _event_preview_summary(event: ContractRecontractEvent | None) -> dict | None:
+    if not event:
+        return None
+    return {
+        "id": event.pk,
+        "status": event.status,
+        "impact_type": event.impact_type,
+        "old_product_id": event.old_product_id,
+        "old_product_name": event.old_product.name if event.old_product_id else "",
+        "old_product_code": event.old_product.product_code if event.old_product_id else "",
+        "new_product_id": event.new_product_id,
+        "new_product_name": event.new_product.name if event.new_product_id else "",
+        "new_product_code": event.new_product.product_code if event.new_product_id else "",
+        "old_contract_total": _money(event.old_contract_total),
+        "new_contract_total": _money(event.new_contract_total),
+        "price_difference": _money(event.price_difference),
+        "amount_already_paid": _money(event.amount_already_paid),
+        "old_remaining_balance": _money(event.old_remaining_balance),
+        "proposed_new_remaining_balance": _money(event.new_remaining_balance),
+        "current_tenure_months": event.current_tenure_months,
+        "preview_tenure_months": event.preview_tenure_months,
+        "current_monthly_amount": _money(event.current_monthly_amount),
+        "proposed_monthly_amount": _money(event.proposed_monthly_amount),
+        "pending_emi_count": event.pending_emi_count,
+        "effective_date_preview": event.effective_date_preview.isoformat() if event.effective_date_preview else None,
+        "warnings": event.warnings or [],
+        "customer_consent_status": event.customer_consent_status,
+        "customer_consented_at": event.customer_consented_at.isoformat() if event.customer_consented_at else None,
+        "customer_consent_note": event.customer_consent_note or "",
+        "source_record_mutation": False,
+    }
+
+
+def latest_product_recontract_preview_summary(amendment: ContractAmendment) -> dict | None:
+    event = (
+        ContractRecontractEvent.objects.filter(amendment=amendment, status=ContractRecontractEvent.Status.PREVIEWED)
+        .select_related("old_product", "new_product")
+        .order_by("-created_at", "-id")
+        .first()
+    )
+    return _event_preview_summary(event)
+
+
 def _values_for(amendment: ContractAmendment) -> dict:
     values = amendment.approved_values or amendment.requested_values or amendment.new_values or {}
     if not isinstance(values, dict):
@@ -235,6 +278,99 @@ def create_product_recontract_preview_snapshot(
                 "recontract_event_id": event.pk,
                 "subscription_id": source.pk,
                 "impact_type": event.impact_type,
+                "source_record_mutation": False,
+            },
+        )
+        return event
+
+
+def record_product_recontract_customer_consent(
+    *,
+    amendment: ContractAmendment,
+    customer_user,
+    decision: str,
+    note: str = "",
+) -> ContractRecontractEvent:
+    """Record customer consent/rejection against the latest saved preview only."""
+    decision = (decision or "").strip().upper()
+    if decision not in {
+        ContractRecontractEvent.CustomerConsentStatus.ACCEPTED,
+        ContractRecontractEvent.CustomerConsentStatus.REJECTED,
+    }:
+        raise ValidationError({"decision": "Decision must be ACCEPTED or REJECTED."})
+
+    customer = getattr(customer_user, "customer_profile", None)
+    if not customer:
+        raise ValidationError({"detail": "Customer profile not found."})
+    if amendment.customer_id != customer.id:
+        raise ValidationError({"detail": "You can consent only to your own amendment."})
+
+    with transaction.atomic():
+        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        if locked_amendment.customer_id != customer.id:
+            raise ValidationError({"detail": "You can consent only to your own amendment."})
+
+        event = (
+            ContractRecontractEvent.objects.select_for_update()
+            .select_related("old_product", "new_product", "subscription")
+            .filter(amendment=locked_amendment)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if not event:
+            raise ValidationError({"detail": "No saved product recontract preview exists for this amendment."})
+        if event.status != ContractRecontractEvent.Status.PREVIEWED:
+            raise ValidationError({"detail": "Customer consent requires the latest saved preview to be active and PREVIEWED."})
+        if event.customer_consent_status != ContractRecontractEvent.CustomerConsentStatus.PENDING:
+            raise ValidationError({"detail": "Customer consent has already been recorded for this preview."})
+
+        consented_at = timezone.now()
+        snapshot = _event_preview_summary(event) or {}
+        snapshot.update(
+            {
+                "decision": decision,
+                "note": note or "",
+                "consented_by": customer_user.pk,
+                "consented_at": consented_at.isoformat(),
+                "phase": "PHASE_6B_CUSTOMER_CONSENT_ONLY",
+                "source_record_mutation": False,
+            }
+        )
+
+        event.customer_consent_status = decision
+        event.customer_consented_by = customer_user
+        event.customer_consented_at = consented_at
+        event.customer_consent_note = note or ""
+        event.customer_consent_snapshot = snapshot
+        metadata = event.metadata or {}
+        metadata["customer_consent_status"] = decision
+        metadata["customer_consent_recorded_at"] = event.customer_consented_at.isoformat()
+        metadata["phase"] = "PHASE_6B_CUSTOMER_CONSENT_ONLY"
+        metadata["source_record_mutation"] = False
+        event.metadata = metadata
+        event.save(
+            update_fields=[
+                "customer_consent_status",
+                "customer_consented_by",
+                "customer_consented_at",
+                "customer_consent_note",
+                "customer_consent_snapshot",
+                "metadata",
+                "updated_at",
+            ]
+        )
+
+        log_audit(
+            action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_APPROVED,
+            instance=locked_amendment,
+            performed_by=customer_user,
+            metadata={
+                "event": "CONTRACT_RECONTRACT_CUSTOMER_CONSENT_RECORDED",
+                "phase": "PHASE_6B_CUSTOMER_CONSENT_ONLY",
+                "amendment_id": locked_amendment.pk,
+                "recontract_event_id": event.pk,
+                "subscription_id": event.subscription_id,
+                "decision": decision,
                 "source_record_mutation": False,
             },
         )

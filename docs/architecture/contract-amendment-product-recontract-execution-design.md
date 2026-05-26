@@ -1,6 +1,6 @@
 # Contract Amendment Product Recontract Execution Design
 
-Status: execution design only. Phase 6A preview snapshot persistence is implemented, but no execution endpoint, mutation service, customer consent, admin execution approval, or frontend execution control is implemented.
+Status: execution design only. Phase 6A preview snapshot persistence and Phase 6B customer consent for saved preview snapshots are implemented, but no execution endpoint, mutation service, admin execution approval, or frontend execution control is implemented.
 
 Branch: `update`
 
@@ -112,6 +112,8 @@ Recommended constraints and indexes:
 - check `current_tenure_months > 0`
 - check `executed_at` and `executed_by` are present when status is `EXECUTED`
 
+Phase 6B implemented the current consent fields additively on `ContractRecontractEvent`: `customer_consent_status`, `customer_consented_by`, `customer_consented_at`, `customer_consent_note`, and `customer_consent_snapshot`. These fields capture customer decision evidence only and do not advance the event to execution.
+
 ### Optional Child Models
 
 `ContractRecontractScheduleLine`
@@ -143,6 +145,8 @@ Recommended constraints and indexes:
 
 - Customer sees old and new product, old and new contract amount, amount already paid, new remaining balance, proposed future EMI/tenure, effective date, credit/refund policy, and warnings.
 - Customer accepts or rejects.
+- Phase 6B records this decision only against the latest active saved `PREVIEWED` snapshot.
+- Customer consent is required before any future admin execution approval.
 - No subscription, EMI, payment, receipt, accounting, reconciliation, waiver, delivery, stock, commission, payout, rent/lease deposit, or demand mutation.
 
 ### Stage C - Admin Approval
@@ -150,6 +154,7 @@ Recommended constraints and indexes:
 - Admin reviews customer consent, preview snapshot, eligibility guards, stale preview check, accounting impact, reconciliation impact, waiver/draw risk, and delivery/inventory notes.
 - Admin approval records approval evidence only.
 - No source mutation yet.
+- Admin approval remains future work. Phase 6B does not allow admins to consent on behalf of customers or override customer consent.
 
 ### Stage D - Execution
 
@@ -172,6 +177,8 @@ Required transaction shape:
 - create reconciliation/lifecycle source events only through reconciliation services
 - emit audit/business events
 - mark event `EXECUTED` with execution snapshot
+
+Execution remains future work after Phase 6B. Future EMI schedule update, accounting/reconciliation integration, and printable addendum generation are not part of customer consent.
 
 ### Stage E - Post-Execution Audit/Reconciliation
 
