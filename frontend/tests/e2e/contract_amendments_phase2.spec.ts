@@ -77,12 +77,47 @@ const blockedProductChangeFixture = {
   implementation_block_reason: "Financial product change requires contract repricing preview and reconciliation and is not implemented in this phase.",
 };
 
+const productRecontractPreviewFixture = {
+  preview_status: "READY",
+  impact_type: "UPGRADE_EXTRA_PAYABLE",
+  blocked_reason: "",
+  source_record_mutation: false,
+  old_product_id: 2001,
+  old_product_name: "Old Sofa",
+  old_product_code: "SOFA-OLD",
+  new_product_id: 2002,
+  new_product_name: "New Sofa",
+  new_product_code: "SOFA-NEW",
+  old_contract_total: "20000.00",
+  new_contract_total: "25000.00",
+  price_difference: "5000.00",
+  amount_already_paid: "4000.00",
+  old_remaining_balance: "16000.00",
+  proposed_new_remaining_balance: "21000.00",
+  current_tenure_months: 10,
+  preview_tenure_months: 10,
+  current_monthly_amount: "2000.00",
+  proposed_monthly_amount: "2500.00",
+  pending_emi_count: 8,
+  effective_date_preview: "2026-05-26",
+  warnings: [
+    "Preview only — no source records are mutated.",
+    "No contract, EMI, payment, receipt, accounting, reconciliation, stock, delivery, commission, payout, waiver, rent/lease demand, or deposit records are changed.",
+    "Accounting and reconciliation are not posted by this preview.",
+    "Final execution requires a later approved financial implementation phase.",
+  ],
+};
+
 async function mockAmendments(page: Page, role: "customer" | "partner" | "admin", fixture = amendmentFixture) {
   await page.route(`**/api/v1/${role}/contract-amendments/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
 
     if (request.method() !== "GET") {
+      if (/\/contract-amendments\/1\/product-recontract-preview\/?$/.test(url.pathname)) {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(productRecontractPreviewFixture) });
+        return;
+      }
       if (/\/contract-amendments\/1\/implement\/?$/.test(url.pathname)) {
         await route.fulfill({
           status: 200,
@@ -181,6 +216,23 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
   });
 
+  test("admin amendment detail previews backend financial product change impact", async ({ page }) => {
+    await mockAmendments(page, "admin", approvedProductChangeFixture);
+    await page.goto("/admin/contract-amendments/1");
+
+    await expect(page.getByRole("button", { name: "Preview financial product change" })).toBeVisible();
+    await page.getByRole("button", { name: "Preview financial product change" }).click();
+
+    await expect(page.getByText("UPGRADE_EXTRA_PAYABLE")).toBeVisible();
+    await expect(page.getByText("20000.00")).toBeVisible();
+    await expect(page.getByText("25000.00")).toBeVisible();
+    await expect(page.getByText("5000.00")).toBeVisible();
+    await expect(page.getByText("4000.00")).toBeVisible();
+    await expect(page.getByText("21000.00")).toBeVisible();
+    await expect(page.getByText("Preview only — no contract, EMI, payment, receipt, accounting, reconciliation, stock, delivery, commission, payout, or waiver records are changed.")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
+  });
+
   test("admin amendment detail does not show implementation button for blocked financial product change", async ({ page }) => {
     await mockAmendments(page, "admin", blockedProductChangeFixture);
     await page.goto("/admin/contract-amendments/1");
@@ -224,6 +276,7 @@ test.describe("customer and partner amendment implementation visibility", () => 
 
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Implement approved same-price product reference correction" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Preview financial product change" })).toHaveCount(0);
   });
 });
 
@@ -236,5 +289,6 @@ test.describe("partner amendment implementation visibility", () => {
 
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Implement approved same-price product reference correction" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Preview financial product change" })).toHaveCount(0);
   });
 });
