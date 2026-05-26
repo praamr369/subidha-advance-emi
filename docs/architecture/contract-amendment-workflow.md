@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: **Phase 1 backend foundation implemented; Phase 2 UI stabilized; Phase 3 guarded implementation added on `update` branch**
+Status: **Phase 1 backend foundation implemented; Phase 2 UI stabilized; Phase 3 guarded customer corrections implemented; Phase 4 guarded product reference change implemented on `update` branch**
 
 ## Scope
 
@@ -21,15 +21,7 @@ Implemented actions:
 - Partner can request amendments for linked partner contracts only.
 - Admin can list, inspect, move to review, approve, and reject requests.
 - Rejection requires a rejection reason.
-- Approval records `approved_values`, `approved_by`, and `approved_at` but does not implement changes.
-
-Not implemented in Phase 1:
-
-- No implement endpoint.
-- No product change execution.
-- No lucky ID or batch change execution.
-- No future EMI or rent/lease schedule recalculation.
-- No Direct Sale amendment support.
+- Approval records `approved_values`, `approved_by`, and `approved_at` but does not automatically implement changes.
 
 ## Phase 2 UI boundary
 
@@ -37,9 +29,9 @@ Phase 2 adds role-scoped request/review UI only.
 
 - Customer UI: list, create, and view own amendment requests.
 - Partner UI: list, create, and view linked customer amendment requests.
-- Admin UI: list, inspect, mark under review, approve decision, and reject decision.
+- Admin UI: list, inspect, mark under review, approve decision, reject decision, and show guarded implementation metadata.
 
-Admin approval remains separate from implementation. Phase 3 adds one admin-only implementation action for explicitly whitelisted non-financial corrections.
+Admin approval remains separate from implementation. Implementation requires a separate admin-only action.
 
 ## Phase 3 boundary
 
@@ -52,32 +44,49 @@ Implemented types:
 
 Implementation is admin-only, audited, idempotent, and records before/after field evidence in `implemented_values`. A second implementation attempt returns a controlled 400 and does not mutate again.
 
-Still blocked:
+## Phase 4 boundary
 
-- product
+Phase 4 implements only approved `PRODUCT_CHANGE` amendments that are safe as a product-reference update.
+
+Implemented behavior:
+
+- Updates `Subscription.product` to the approved replacement product.
+- Requires `approved_values.approved_product_id` or an accepted equivalent product id key.
+- Requires amendment status `APPROVED`.
+- Requires an eligible source EMI/rent/lease subscription.
+- Requires the target product to be active and lifecycle-eligible.
+- Requires the target product to be enabled for the source plan type when product mode flags exist.
+- Requires the target product `base_price` to equal the locked source contract `total_amount`; otherwise the change is blocked as requiring price/EMI/tenure recalculation.
+- Records old/new product evidence and financial invariants in `implemented_values`.
+- Emits `CONTRACT_AMENDMENT_IMPLEMENTED` audit metadata with `phase = PHASE_4_PRODUCT_REFERENCE_CHANGE`.
+
+Phase 4 does **not** recalculate or mutate:
+
+- total price
+- EMI amount
+- tenure
+- paid amount
+- EMI rows
+- payment records
+- receipt documents
 - lucky ID
 - batch
-- EMI
-- tenure
-- price
-- payment
-- waiver
-- rent/lease billing
-- deposit
-- accounting
-- reconciliation
-- inventory
-- commission
-- payout
-- delivery/stock
+- waiver rows
+- commission or payout records
+- accounting journals
+- reconciliation records
+- rent/lease monthly demand
+- security deposit records
+- inventory or stock records
+- delivery records
 
-Future phases are required before any financial or contract-value amendment can be implemented.
+Price, EMI, and tenure recalculation remains Phase 6 or later. Lucky ID and batch changes remain Phase 5 or later.
 
 ## Data model
 
-The existing legacy `contract_amendments` table is extended additively for Phase 1 compatibility. Legacy fields remain available for older admin contract lifecycle routes.
+The existing legacy `contract_amendments` table is extended additively for compatibility. Legacy fields remain available for older admin contract lifecycle routes.
 
-Phase 1 fields include:
+Important fields include:
 
 - `amendment_no`
 - `contract_type`
@@ -102,11 +111,13 @@ Phase 1 fields include:
 - `metadata`
 - timestamps
 
+No Phase 4 migration is required because product change uses existing amendment and subscription fields.
+
 ## Contract type rules
 
 - `EMI_SUBSCRIPTION` requires exactly one `subscription` source and that source must be an EMI subscription.
 - `RENT_LEASE` requires exactly one `rent_lease_contract` source and that source must be RENT or LEASE.
-- Direct Sale has no model field and is impossible through the Phase 1 serializers and service validation.
+- Direct Sale has no model field and is impossible through serializers and service validation.
 
 ## API inventory
 
@@ -137,9 +148,16 @@ POST /api/v1/admin/contract-amendments/{id}/reject/
 POST /api/v1/admin/contract-amendments/{id}/implement/
 ```
 
+The implement endpoint is reused. It dispatches by amendment type:
+
+- Phase 3 customer field corrections.
+- Phase 4 product reference changes.
+
+Customer and partner serializers expose state only; they do not expose implementation actions.
+
 ## Integrity rules
 
-Phase 1 and Phase 2 never mutate source contracts or posted financial records. Phase 3 mutates only whitelisted customer display/contact fields.
+Phase 1 and Phase 2 never mutate source contracts or posted financial records. Phase 3 mutates only whitelisted customer display/contact fields. Phase 4 mutates only `Subscription.product` after strict approval, eligibility, and financial-invariant guards.
 
 They do not change:
 
@@ -155,18 +173,15 @@ They do not change:
 - Commission or payout records.
 - Direct Sale records.
 
-The legacy admin `apply_amendment` service path is intentionally blocked in Phase 1 so implementation cannot occur accidentally before later controlled phases.
-In Phase 3, the legacy service path delegates to the same whitelist implementation service and remains blocked for unsupported or financial amendment types.
+The legacy admin `apply_amendment` service path delegates to the same guarded implementation service and remains blocked for unsupported or financial amendment types.
 
 ## Auditability
 
 Each request captures an immutable source snapshot in `old_values`. Customer/partner requested changes are stored in `requested_values`. Admin approval stores `approved_values` separately. Rejection stores `rejection_reason`.
 
-Audit log entries are emitted for request, approval, rejection, and Phase 3 implementation. Implementation captures source model, source id, field-level before values, and field-level after values.
+Audit log entries are emitted for request, approval, rejection, Phase 3 implementation, and Phase 4 product reference implementation. Phase 4 implementation captures old product, new product, unchanged financial terms, preserved-field list, source model, source id, and audit metadata.
 
 ## Deferred phases
 
-- Phase 3: Low-risk implementation actions only. Implemented for customer contact/address corrections.
-- Phase 4: Product change implementation only.
 - Phase 5: Lucky ID / Batch change implementation only.
 - Phase 6: Future financial obligation recalculation only.
