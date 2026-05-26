@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: **Phase 1 backend foundation implemented; Phase 2 UI stabilized; Phase 3 guarded customer corrections implemented; Phase 4 guarded product reference change implemented on `update` branch**
+Status: **Phase 1 backend foundation implemented; Phase 2 UI stabilized; Phase 3 guarded customer corrections implemented; Phase 4 same-price product reference correction implemented on `update` branch**
 
 ## Scope
 
@@ -46,19 +46,26 @@ Implementation is admin-only, audited, idempotent, and records before/after fiel
 
 ## Phase 4 boundary
 
-Phase 4 implements only approved `PRODUCT_CHANGE` amendments that are safe as a product-reference update.
+Phase 4 is **same-price product reference correction only**. It is not full financial product upgrade/downgrade.
+
+The existing `PRODUCT_CHANGE` enum remains for compatibility, but the current implementation treats it as:
+
+```text
+PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY
+```
 
 Implemented behavior:
 
-- Updates `Subscription.product` to the approved replacement product.
+- Updates only `Subscription.product` to the approved corrected product reference.
 - Requires `approved_values.approved_product_id` or an accepted equivalent product id key.
 - Requires amendment status `APPROVED`.
 - Requires an eligible source EMI/rent/lease subscription.
 - Requires the target product to be active and lifecycle-eligible.
 - Requires the target product to be enabled for the source plan type when product mode flags exist.
-- Requires the target product `base_price` to equal the locked source contract `total_amount`; otherwise the change is blocked as requiring price/EMI/tenure recalculation.
-- Records old/new product evidence and financial invariants in `implemented_values`.
-- Emits `CONTRACT_AMENDMENT_IMPLEMENTED` audit metadata with `phase = PHASE_4_PRODUCT_REFERENCE_CHANGE`.
+- Requires the target product `base_price` to equal the locked source contract `total_amount`.
+- Blocks different-price target products with: `Financial product change requires contract repricing preview and reconciliation and is not implemented in this phase.`
+- Records old/new product reference evidence, same-price semantics, and financial invariants in `implemented_values`.
+- Emits `CONTRACT_AMENDMENT_IMPLEMENTED` audit metadata with `phase = PHASE_4_PRODUCT_REFERENCE_CORRECTION`.
 
 Phase 4 does **not** recalculate or mutate:
 
@@ -80,7 +87,7 @@ Phase 4 does **not** recalculate or mutate:
 - inventory or stock records
 - delivery records
 
-Price, EMI, and tenure recalculation remains Phase 6 or later. Lucky ID and batch changes remain Phase 5 or later.
+True product change is deferred. It must include price difference, EMI recalculation preview, paid amount allocation, future EMI schedule change, receipt/payment treatment, accounting entries, reconciliation impact, customer/admin approval, and audit trail.
 
 ## Data model
 
@@ -111,7 +118,7 @@ Important fields include:
 - `metadata`
 - timestamps
 
-No Phase 4 migration is required because product change uses existing amendment and subscription fields.
+No Phase 4 migration is required because product reference correction uses existing amendment and subscription fields.
 
 ## Contract type rules
 
@@ -148,16 +155,22 @@ POST /api/v1/admin/contract-amendments/{id}/reject/
 POST /api/v1/admin/contract-amendments/{id}/implement/
 ```
 
-The implement endpoint is reused. It dispatches by amendment type:
+Legacy admin apply route remains supported by the same guarded service and must never 500 on nullable rent/lease joins:
+
+```text
+POST /api/v1/admin/contracts/amendments/{id}/apply/
+```
+
+The implement/apply service dispatches by amendment type:
 
 - Phase 3 customer field corrections.
-- Phase 4 product reference changes.
+- Phase 4 same-price product reference corrections.
 
 Customer and partner serializers expose state only; they do not expose implementation actions.
 
 ## Integrity rules
 
-Phase 1 and Phase 2 never mutate source contracts or posted financial records. Phase 3 mutates only whitelisted customer display/contact fields. Phase 4 mutates only `Subscription.product` after strict approval, eligibility, and financial-invariant guards.
+Phase 1 and Phase 2 never mutate source contracts or posted financial records. Phase 3 mutates only whitelisted customer display/contact fields. Phase 4 mutates only `Subscription.product` after strict approval, eligibility, same-price, and financial-invariant guards.
 
 They do not change:
 
@@ -173,15 +186,13 @@ They do not change:
 - Commission or payout records.
 - Direct Sale records.
 
-The legacy admin `apply_amendment` service path delegates to the same guarded implementation service and remains blocked for unsupported or financial amendment types.
-
 ## Auditability
 
 Each request captures an immutable source snapshot in `old_values`. Customer/partner requested changes are stored in `requested_values`. Admin approval stores `approved_values` separately. Rejection stores `rejection_reason`.
 
-Audit log entries are emitted for request, approval, rejection, Phase 3 implementation, and Phase 4 product reference implementation. Phase 4 implementation captures old product, new product, unchanged financial terms, preserved-field list, source model, source id, and audit metadata.
+Audit log entries are emitted for request, approval, rejection, Phase 3 implementation, and Phase 4 product reference correction. Phase 4 captures old product, new product, unchanged financial terms, preserved-field list, source model, source id, and audit metadata.
 
 ## Deferred phases
 
-- Phase 5: Lucky ID / Batch change implementation only.
+- Phase 5: Lucky ID / Batch change implementation only. This must wait until product-change financial semantics are settled.
 - Phase 6: Future financial obligation recalculation only.
