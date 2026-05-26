@@ -89,6 +89,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Sales", "Direct-Sale Collection", `${ROUTES.admin.financeCollect}?workflow=direct-sale`, "Collect retail receivables against invoiced direct sales."),
 
   item("Subscriptions", "Subscription Workflows", ROUTES.admin.subscriptions, "Advance EMI, rent, lease, and partner subscription workflow landing."),
+  item(
+    "Subscriptions",
+    "Contract Amendments",
+    ROUTES.admin.contractAmendments,
+    "Admin decision register for customer and partner amendment requests."
+  ),
   item("Subscriptions", "Advance EMI", `${ROUTES.admin.subscriptions}?plan_type=EMI&workflow=advance`, "Advance EMI contract workflow.", {
     children: [
       item("Subscriptions", "Create Advance EMI Contract", ROUTES.admin.subscriptionsAdvanceEmiCreate, "Create an Advance EMI contract."),

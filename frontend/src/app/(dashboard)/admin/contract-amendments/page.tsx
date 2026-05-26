@@ -1,5 +1,6 @@
 import AdminAmendmentList from "@/components/amendments/AdminList";
 
-export default function Page({ searchParams }: { searchParams: { status?: string; contract_type?: string } }) {
-  return <AdminAmendmentList status={searchParams.status || ""} contractType={searchParams.contract_type || ""} />;
+export default async function Page({ searchParams }: { searchParams: Promise<{ status?: string; contract_type?: string }> }) {
+  const resolvedSearchParams = await searchParams;
+  return <AdminAmendmentList status={resolvedSearchParams.status || ""} contractType={resolvedSearchParams.contract_type || ""} />;
 }

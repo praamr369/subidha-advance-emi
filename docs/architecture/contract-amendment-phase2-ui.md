@@ -31,7 +31,7 @@ Admin:
 
 Phase 2 UI components are role-scoped:
 
-- Customer amendment pages own customer list/create/detail rendering.
+- `CustomerList.tsx`, `CustomerCreate.tsx`, and `CustomerDetail.tsx` are customer-only.
 - `PartnerList.tsx`, `PartnerCreate.tsx`, and `PartnerDetail.tsx` are partner-only.
 - `AdminList.tsx` and `AdminDetail.tsx` are admin-only.
 
@@ -39,13 +39,13 @@ Admin components must not be exported from partner component files.
 
 ## Role-safe navigation
 
-The workflow is discoverable through the existing role navigation shell:
+The workflow is discoverable through the existing role navigation shell and registry files:
 
 - Customer: `My amendment requests`.
 - Partner: `Customer amendment requests`.
 - Admin: `Contract Amendments`.
 
-Admin amendment register links are not exposed to customer, partner, cashier, vendor, or public shells. Customer and partner request pages remain scoped to their own route families.
+Admin amendment register links are sourced from the admin route registry and are not exposed to customer, partner, cashier, vendor, or public shells. Customer and partner request pages remain scoped to their own route families.
 
 ## Endpoint usage
 

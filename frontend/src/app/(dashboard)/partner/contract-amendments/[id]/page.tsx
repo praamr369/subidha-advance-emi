@@ -1,5 +1,6 @@
 import PartnerAmendmentDetail from "../../../../../components/amendments/PartnerDetail";
 
-export default function Page({ params }: { params: { id: string } }) {
-  return <PartnerAmendmentDetail id={Number(params.id)} />;
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
+  return <PartnerAmendmentDetail id={Number(resolvedParams.id)} />;
 }

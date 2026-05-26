@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import AmendmentSafetyNotice from "@/components/amendments/SafetyNotice";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -67,7 +67,7 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const next = await getAdminAmendment(id);
@@ -86,11 +86,11 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
 
   useEffect(() => {
     if (Number.isFinite(id)) void load();
-  }, [id]);
+  }, [id, load]);
 
   async function run(action: "review" | "approve" | "reject") {
     setBusy(action);

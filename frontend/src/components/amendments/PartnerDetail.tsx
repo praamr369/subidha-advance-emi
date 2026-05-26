@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import AmendmentSafetyNotice from "@/components/amendments/SafetyNotice";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -29,7 +29,7 @@ export default function PartnerAmendmentDetail({ id }: { id: number }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       setRow(await getPartnerAmendment(id));
@@ -39,9 +39,9 @@ export default function PartnerAmendmentDetail({ id }: { id: number }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
 
-  useEffect(() => { if (Number.isFinite(id)) void load(); }, [id]);
+  useEffect(() => { if (Number.isFinite(id)) void load(); }, [id, load]);
 
   return (
     <ERPPageShell eyebrow="Partner amendment" title={row?.amendment_no || `Amendment #${id}`} subtitle="Read-only linked customer amendment request." breadcrumbs={[{ label: "Partner", href: "/partner" }, { label: "Contract Amendments", href: "/partner/contract-amendments" }, { label: row?.amendment_no || `#${id}` }]} statusBadge={{ label: "Read only", tone: "info" }}>

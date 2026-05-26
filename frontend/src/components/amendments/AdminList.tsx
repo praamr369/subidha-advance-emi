@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import AmendmentSafetyNotice from "@/components/amendments/SafetyNotice";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -46,7 +46,7 @@ export default function AdminAmendmentList({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       setRows(await listAdminAmendments({ status: status || undefined, contractType: contractType || undefined }));
@@ -56,13 +56,13 @@ export default function AdminAmendmentList({
     } finally {
       setLoading(false);
     }
-  }
+  }, [contractType, status]);
 
   useEffect(() => {
     setStatusInput(status);
     setTypeInput(contractType);
     void load();
-  }, [status, contractType]);
+  }, [status, contractType, load]);
 
   const filterHref = () => {
     const params = new URLSearchParams();

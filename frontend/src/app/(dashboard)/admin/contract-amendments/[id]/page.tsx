@@ -1,5 +1,6 @@
 import AdminAmendmentDetail from "@/components/amendments/AdminDetail";
 
-export default function Page({ params }: { params: { id: string } }) {
-  return <AdminAmendmentDetail id={Number(params.id)} />;
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
+  return <AdminAmendmentDetail id={Number(resolvedParams.id)} />;
 }

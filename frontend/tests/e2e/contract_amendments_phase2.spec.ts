@@ -85,7 +85,8 @@ test.describe("customer contract amendment phase-2 UI", () => {
     await mockAmendments(page, "customer");
     await page.goto("/customer/contract-amendments");
 
-    await expect(page.getByRole("heading", { name: "My amendment requests" })).toBeVisible();
+    const main = page.locator("#main-content");
+    await expect(main.getByRole("heading", { name: "My amendment requests" })).toBeVisible();
     await expect(page.getByText("Decision-only amendment phase")).toBeVisible();
     await expect(page.getByText("AMD-SMOKE-001")).toBeVisible();
 
@@ -103,7 +104,8 @@ test.describe("partner contract amendment phase-2 UI", () => {
     await mockAmendments(page, "partner");
     await page.goto("/partner/contract-amendments");
 
-    await expect(page.getByRole("heading", { name: "Customer amendment requests" })).toBeVisible();
+    const main = page.locator("#main-content");
+    await expect(main.getByRole("heading", { name: "Customer amendment requests" })).toBeVisible();
     await expect(page.getByText("Decision-only amendment phase")).toBeVisible();
     await expect(page.getByText("AMD-SMOKE-001")).toBeVisible();
 
@@ -121,7 +123,8 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await mockAmendments(page, "admin");
     await page.goto("/admin/contract-amendments");
 
-    await expect(page.getByRole("heading", { name: "Contract Amendments" })).toBeVisible();
+    const main = page.locator("#main-content");
+    await expect(main.getByRole("heading", { name: "Contract Amendments" })).toBeVisible();
     await expect(page.getByText("Decision-only amendment phase")).toBeVisible();
     await expect(page.getByText("AMD-SMOKE-001")).toBeVisible();
 
@@ -135,7 +138,8 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await mockAmendments(page, "admin");
     await page.goto("/admin/contract-amendments/1");
 
-    await expect(page.getByRole("heading", { name: "AMD-SMOKE-001" })).toBeVisible();
+    const main = page.locator("#main-content");
+    await expect(main.getByRole("heading", { name: "AMD-SMOKE-001" })).toBeVisible();
     await expect(page.getByText("Workflow stops at admin decision in this phase.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve decision" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Apply|Implement|Execute|Update contract/i })).toHaveCount(0);

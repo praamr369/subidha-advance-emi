@@ -155,26 +155,8 @@ function buildAdminNavigationGroups(): NavGroup[] {
   }));
 }
 
-function buildAdminNavigationGroupsWithAmendments(): NavGroup[] {
-  const groups = buildAdminNavigationGroups();
-  const amendmentItem: NavItem = {
-    label: "Contract Amendments",
-    href: ROUTES.admin.contractAmendments,
-    icon: "subscriptions",
-    description: "Admin decision register for customer and partner amendment requests.",
-  };
-  const targetGroup = groups.find((group) => group.title === "Sales & Contracts");
-  if (!targetGroup) {
-    return [...groups, { title: "Sales & Contracts", icon: "subscriptions", items: [amendmentItem] }];
-  }
-  if (!targetGroup.items.some((item) => item.href === amendmentItem.href)) {
-    targetGroup.items.push(amendmentItem);
-  }
-  return groups;
-}
-
 export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
-  ADMIN: buildAdminNavigationGroupsWithAmendments(),
+  ADMIN: buildAdminNavigationGroups(),
 
   PARTNER: [
     {
