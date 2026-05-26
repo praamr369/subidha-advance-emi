@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from subscriptions.models import ContractAmendment, Subscription
 from subscriptions.models_contract_amendment import PHASE1_AMENDMENT_TYPES, PHASE1_STATUSES
+from subscriptions.services.contract_amendment_service import phase3_implementation_metadata
 
 
 class ContractAmendmentSerializer(serializers.ModelSerializer):
@@ -12,6 +13,9 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
     requested_by_username = serializers.CharField(source="requested_by.username", read_only=True)
     approved_by_username = serializers.CharField(source="approved_by.username", read_only=True)
     implemented_by_username = serializers.CharField(source="implemented_by.username", read_only=True)
+    is_implementable = serializers.SerializerMethodField()
+    implementation_block_reason = serializers.SerializerMethodField()
+    implementable_fields = serializers.SerializerMethodField()
 
     class Meta:
         model = ContractAmendment
@@ -54,12 +58,24 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
             "implemented_by",
             "implemented_by_username",
             "implemented_at",
+            "is_implementable",
+            "implementation_block_reason",
+            "implementable_fields",
             "applied_at",
             "metadata",
             "created_at",
             "updated_at",
         ]
         read_only_fields = fields
+
+    def get_is_implementable(self, obj):
+        return phase3_implementation_metadata(obj)["is_implementable"]
+
+    def get_implementation_block_reason(self, obj):
+        return phase3_implementation_metadata(obj)["implementation_block_reason"]
+
+    def get_implementable_fields(self, obj):
+        return phase3_implementation_metadata(obj)["implementable_fields"]
 
 
 class ContractAmendmentCreateSerializer(serializers.Serializer):

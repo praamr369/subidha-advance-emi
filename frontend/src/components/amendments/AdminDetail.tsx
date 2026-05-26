@@ -14,6 +14,7 @@ import {
   amendmentTypeLabel,
   approveAdminAmendment,
   getAdminAmendment,
+  implementAdminContractAmendment,
   rejectAdminAmendment,
   reviewAdminAmendment,
   type AmendmentRecord,
@@ -36,6 +37,16 @@ function sourceLabel(row: AmendmentRecord) {
   return row.contract_type === "RENT_LEASE"
     ? row.rent_lease_contract_number || `Contract #${row.rent_lease_contract ?? "—"}`
     : row.subscription_number || `Subscription #${row.subscription ?? "—"}`;
+}
+
+const SAFE_PHASE3_TYPES = new Set(["ADDRESS_CHANGE", "CONTACT_CORRECTION"]);
+
+const PHASE3_IMPLEMENTATION_WARNING =
+  "Only whitelisted non-financial corrections can be implemented in Phase 3. Financial, EMI, product, lucky ID, batch, rent/lease billing, deposit, accounting, inventory, reconciliation, commission, payout, delivery, stock, and audit-sensitive changes remain blocked.";
+
+function canShowImplementationAction(row: AmendmentRecord) {
+  if (typeof row.is_implementable === "boolean") return row.is_implementable;
+  return row.status === "APPROVED" && SAFE_PHASE3_TYPES.has(row.amendment_type);
 }
 
 function Timeline({ status }: { status: string }) {
@@ -92,7 +103,7 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
     if (Number.isFinite(id)) void load();
   }, [id, load]);
 
-  async function run(action: "review" | "approve" | "reject") {
+  async function run(action: "review" | "approve" | "reject" | "implement") {
     setBusy(action);
     setError(null);
     try {
@@ -106,6 +117,9 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
         if (!rejectionReason.trim()) throw new Error("Rejection reason is required.");
         setRow(await rejectAdminAmendment(id, { rejection_reason: rejectionReason.trim(), admin_note: adminNote }));
       }
+      if (action === "implement") {
+        setRow(await implementAdminContractAmendment(id));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed.");
     } finally {
@@ -117,13 +131,13 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
     <ERPPageShell
       eyebrow="Admin amendment review"
       title={row?.amendment_no || `Amendment #${id}`}
-      subtitle="Review, approve, or reject only. No implementation action is available."
+      subtitle="Review decisions remain separate from Phase 3 whitelisted non-financial implementation."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Contract Amendments", href: "/admin/contract-amendments" },
         { label: row?.amendment_no || `#${id}` },
       ]}
-      statusBadge={{ label: "Decision only", tone: "warning" }}
+      statusBadge={{ label: "Phase 3 guarded", tone: "warning" }}
     >
       <div className="space-y-5">
         <AmendmentSafetyNotice />
@@ -131,7 +145,7 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
         {!loading && error ? <ERPErrorState title="Amendment action failed" description={error} onRetry={() => void load()} /> : null}
         {!loading && row ? (
           <>
-            <DetailPanel title="Status timeline" description="Workflow stops at admin decision in this phase.">
+            <DetailPanel title="Status timeline" description="Only approved whitelisted non-financial corrections can move to implementation in Phase 3.">
               <Timeline status={row.status} />
             </DetailPanel>
             <div className="grid gap-4 lg:grid-cols-2">
@@ -185,6 +199,11 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
                   {safeJson(row.approved_values)}
                 </pre>
               </DetailPanel>
+              <DetailPanel title="Implemented values" description="Captured before/after implementation evidence.">
+                <pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">
+                  {safeJson(row.implemented_values)}
+                </pre>
+              </DetailPanel>
             </div>
             <DetailPanel title="Admin decision controls" description="Review, approve, or reject only.">
               <label className="block text-sm font-medium">
@@ -229,6 +248,23 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
                 >
                   {busy === "reject" ? "Rejecting..." : "Reject decision"}
                 </ActionButton>
+              </div>
+            </DetailPanel>
+            <DetailPanel title="Phase 3 implementation" description="Admin-only non-financial correction implementation.">
+              <div className="space-y-3">
+                <p className="text-sm text-amber-800 dark:text-amber-200">{PHASE3_IMPLEMENTATION_WARNING}</p>
+                {row.implementation_block_reason ? (
+                  <p className="text-sm text-muted-foreground">{row.implementation_block_reason}</p>
+                ) : null}
+                {canShowImplementationAction(row) ? (
+                  <ActionButton
+                    variant="outline"
+                    onClick={() => void run("implement")}
+                    disabled={Boolean(busy)}
+                  >
+                    {busy === "implement" ? "Implementing..." : "Implement approved non-financial correction"}
+                  </ActionButton>
+                ) : null}
               </div>
             </DetailPanel>
           </>

@@ -16,6 +16,7 @@ from subscriptions.models import ContractAmendment, Subscription
 from subscriptions.services.contract_amendment_service import (
     approve_amendment,
     create_amendment,
+    implement_approved_amendment,
     mark_under_review,
     reject_amendment,
 )
@@ -229,6 +230,23 @@ class AdminContractAmendmentRejectView(APIView):
                 rejected_by=request.user,
                 rejection_reason=serializer.validated_data["rejection_reason"],
                 admin_note=serializer.validated_data.get("admin_note", ""),
+            )
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+        return Response(ContractAmendmentSerializer(amendment).data, status=status.HTTP_200_OK)
+
+
+class AdminContractAmendmentImplementView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        amendment = _amendment_queryset().filter(pk=pk).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            amendment = implement_approved_amendment(
+                amendment=amendment,
+                implemented_by=request.user,
             )
         except DjangoValidationError as exc:
             return _validation_response(exc)

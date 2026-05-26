@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Phase 1 implemented on `update` branch**
+Status: **Phase 3 low-risk implementation completed on `update` branch**
 
 ## Principle
 
@@ -41,7 +41,7 @@ Integrity notes:
 
 ## Phase 2 — UI only
 
-Status: **Next phase**
+Status: **Implemented**
 
 Goal:
 
@@ -62,17 +62,40 @@ Planned routes:
 
 ## Phase 3 — Low-risk implementation only
 
-Status: **Deferred**
+Status: **Implemented**
 
-Allowed types only:
+Implemented types only:
 
 - `ADDRESS_CHANGE`
 - `CONTACT_CORRECTION`
-- `LEGAL_DOCUMENT_CORRECTION`
-- `SCHEDULE_CORRECTION` only when no financial date/amount recalculation is required
-- `OTHER` only when admin marks no financial, inventory, lucky-draw, rent/lease, or accounting impact
 
-High-risk amendments remain blocked.
+Implemented source fields:
+
+- `ADDRESS_CHANGE`: `Customer.address`, `Customer.city`
+- `CONTACT_CORRECTION`: `Customer.phone`
+
+Implementation requires admin approval first, runs through `POST /api/v1/admin/contract-amendments/{id}/implement/`, records `implemented_values`, sets implementation metadata, and emits `CONTRACT_AMENDMENT_IMPLEMENTED`.
+
+Blocked until future phases:
+
+- product
+- lucky ID
+- batch
+- EMI
+- tenure
+- price
+- payment
+- waiver
+- rent/lease billing
+- deposit
+- accounting
+- reconciliation
+- inventory
+- commission
+- payout
+- delivery/stock
+
+Future phases are required for financial and contract-value amendments.
 
 ## Phase 4 — Product change implementation only
 

@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: **Phase 1 backend foundation implemented on `update` branch; Phase 2 UI stabilized on `update` branch**
+Status: **Phase 1 backend foundation implemented; Phase 2 UI stabilized; Phase 3 guarded implementation added on `update` branch**
 
 ## Scope
 
@@ -39,9 +39,39 @@ Phase 2 adds role-scoped request/review UI only.
 - Partner UI: list, create, and view linked customer amendment requests.
 - Admin UI: list, inspect, mark under review, approve decision, and reject decision.
 
-Admin approval remains a decision record only. It does not write approved values into contracts, subscriptions, EMI schedules, lucky IDs, batches, products, rent/lease demands, deposits, payments, accounting, reconciliation, commissions, payouts, delivery, stock, or inventory records.
+Admin approval remains separate from implementation. Phase 3 adds one admin-only implementation action for explicitly whitelisted non-financial corrections.
 
-The Phase 2 frontend service must not contain an implementation/apply method, and amendment screens must not expose actions labeled `Apply`, `Implement`, `Execute`, or `Update contract`.
+## Phase 3 boundary
+
+Phase 3 implements only whitelisted non-financial corrections after an amendment is already `APPROVED`.
+
+Implemented types:
+
+- `CONTACT_CORRECTION`: updates `Customer.phone` only.
+- `ADDRESS_CHANGE`: updates `Customer.address` and `Customer.city` only.
+
+Implementation is admin-only, audited, idempotent, and records before/after field evidence in `implemented_values`. A second implementation attempt returns a controlled 400 and does not mutate again.
+
+Still blocked:
+
+- product
+- lucky ID
+- batch
+- EMI
+- tenure
+- price
+- payment
+- waiver
+- rent/lease billing
+- deposit
+- accounting
+- reconciliation
+- inventory
+- commission
+- payout
+- delivery/stock
+
+Future phases are required before any financial or contract-value amendment can be implemented.
 
 ## Data model
 
@@ -104,11 +134,12 @@ GET  /api/v1/admin/contract-amendments/{id}/
 POST /api/v1/admin/contract-amendments/{id}/review/
 POST /api/v1/admin/contract-amendments/{id}/approve/
 POST /api/v1/admin/contract-amendments/{id}/reject/
+POST /api/v1/admin/contract-amendments/{id}/implement/
 ```
 
 ## Integrity rules
 
-Phase 1 and Phase 2 never mutate source contracts or posted financial records.
+Phase 1 and Phase 2 never mutate source contracts or posted financial records. Phase 3 mutates only whitelisted customer display/contact fields.
 
 They do not change:
 
@@ -125,16 +156,17 @@ They do not change:
 - Direct Sale records.
 
 The legacy admin `apply_amendment` service path is intentionally blocked in Phase 1 so implementation cannot occur accidentally before later controlled phases.
+In Phase 3, the legacy service path delegates to the same whitelist implementation service and remains blocked for unsupported or financial amendment types.
 
 ## Auditability
 
 Each request captures an immutable source snapshot in `old_values`. Customer/partner requested changes are stored in `requested_values`. Admin approval stores `approved_values` separately. Rejection stores `rejection_reason`.
 
-Audit log entries are emitted for request, approval, and rejection. Implementation values remain empty until later phases.
+Audit log entries are emitted for request, approval, rejection, and Phase 3 implementation. Implementation captures source model, source id, field-level before values, and field-level after values.
 
 ## Deferred phases
 
-- Phase 3: Low-risk implementation actions only.
+- Phase 3: Low-risk implementation actions only. Implemented for customer contact/address corrections.
 - Phase 4: Product change implementation only.
 - Phase 5: Lucky ID / Batch change implementation only.
 - Phase 6: Future financial obligation recalculation only.

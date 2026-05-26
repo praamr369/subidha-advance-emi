@@ -77,6 +77,9 @@ export type AmendmentRecord = {
   implemented_by?: number | null;
   implemented_by_username?: string | null;
   implemented_at?: string | null;
+  is_implementable?: boolean;
+  implementation_block_reason?: string;
+  implementable_fields?: string[];
   applied_at?: string | null;
   metadata?: Record<string, unknown>;
   created_at?: string;
@@ -154,6 +157,10 @@ export async function approveAdminAmendment(id: number, payload: { approved_valu
 
 export async function rejectAdminAmendment(id: number, payload: { rejection_reason: string; admin_note?: string }): Promise<AmendmentRecord> {
   return apiFetch<AmendmentRecord>(`/admin/contract-amendments/${id}/reject/`, { method: "POST", body: payload });
+}
+
+export async function implementAdminContractAmendment(id: number): Promise<AmendmentRecord> {
+  return apiFetch<AmendmentRecord>(`/admin/contract-amendments/${id}/implement/`, { method: "POST", body: {} });
 }
 
 export function amendmentTypeLabel(value?: string | null): string {

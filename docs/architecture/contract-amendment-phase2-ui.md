@@ -49,31 +49,32 @@ Admin amendment register links are sourced from the admin route registry and are
 
 ## Endpoint usage
 
-The frontend service uses only the Phase 1 amendment endpoints:
+The frontend service uses the Phase 1 amendment endpoints plus the Phase 3 admin-only implementation endpoint:
 
 - customer list/create/detail
 - partner list/create/detail
 - admin list/detail/review/approve/reject
+- admin implement for approved whitelisted non-financial corrections
 
-There is no frontend service method for implementation/apply, and no UI calls a contract implementation endpoint.
+There is no frontend apply/execute/update-contract method. Customer and partner UI never call implementation.
 
-## Boundary
+## Phase 3 boundary
 
-Phase 2 is UI only. Customer and partner pages submit amendment requests. Admin pages support review, approval decision, and rejection decision only.
+Phase 2 is UI only. Phase 3 adds a guarded admin action for only whitelisted non-financial corrections.
 
-Admin approval records a decision. It does not implement the approved values into any source contract or financial schedule.
+Admin approval records a decision. Implementation requires a separate admin action after approval.
 
 Direct Sale is not supported by this UI.
 
 ## Safety copy
 
-All amendment surfaces must keep the decision-only safety notice clear:
+All amendment surfaces must keep the guarded safety notice clear:
 
-- approval records an admin decision only
-- approved amendments are not implemented in this phase
-- no EMI, payment, lucky ID, product, rent/lease, accounting, inventory, reconciliation, commission, payout, delivery, stock, or source contract record is changed from this UI
+- Phase 3 supports only whitelisted non-financial corrections
+- financial and contract-value amendments remain blocked/deferred
+- no EMI, payment, lucky ID, product, rent/lease billing, deposit, accounting, inventory, reconciliation, commission, payout, delivery, stock, or source contract financial record is changed from this UI
 
-Do not introduce UI labels or actions named `Apply`, `Implement`, `Execute`, or `Update contract` for amendment decisions. Admin approval wording should remain `Approve decision` or `Approve request`.
+Do not introduce UI labels or actions named `Apply change`, `Execute`, `Update contract`, or `Implement amendment`. The allowed Phase 3 button label is `Implement approved non-financial correction`.
 
 ## Deferred work
 

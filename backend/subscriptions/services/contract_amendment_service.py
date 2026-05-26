@@ -11,7 +11,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from subscriptions.models import AuditLog, ContractAmendment, PlanType, Subscription, SubscriptionStatus
+from subscriptions.models import AuditLog, ContractAmendment, Customer, PlanType, Subscription, SubscriptionStatus
 from subscriptions.models_contract_amendment import PHASE1_AMENDMENT_TYPES
 from subscriptions.services.audit_service import log_audit
 
@@ -34,6 +34,58 @@ _HIGH_RISK_AMENDMENTS = {
     "RENT_AMOUNT_CHANGE",
     "LEASE_TERM_CHANGE",
 }
+
+_PHASE3_IMPLEMENTABLE_AMENDMENTS = {
+    "CONTACT_CORRECTION": {
+        "model": Customer,
+        "source": "customer",
+        "allowed_fields": {"phone"},
+    },
+    "ADDRESS_CHANGE": {
+        "model": Customer,
+        "source": "customer",
+        "allowed_fields": {"address", "city"},
+    },
+}
+
+_PHASE3_BLOCKED_AMENDMENTS = {
+    "PRODUCT_CHANGE",
+    "LUCKY_ID_CHANGE",
+    "BATCH_CHANGE",
+    "EMI_AMOUNT_CHANGE",
+    "TENURE_EXTENSION",
+    "TENURE_CHANGE",
+    "CONTRACT_PRICE_CHANGE",
+    "CONTRACT_VALUE_CHANGE",
+    "PAYMENT_ADJUSTMENT",
+    "RECEIPT_ADJUSTMENT",
+    "WAIVER_CHANGE",
+    "RENT_AMOUNT_CHANGE",
+    "LEASE_AMOUNT_CHANGE",
+    "LEASE_TERM_CHANGE",
+    "RENT_LEASE_DEMAND_CHANGE",
+    "SECURITY_DEPOSIT_CHANGE",
+    "DEPOSIT_ADJUSTMENT",
+    "DEPOSIT_REFUND_CHANGE",
+    "ACCOUNTING_CHANGE",
+    "JOURNAL_POSTING",
+    "RECONCILIATION_CHANGE",
+    "SETTLEMENT_ALLOCATION",
+    "COMMISSION_CHANGE",
+    "PAYOUT_CHANGE",
+    "DELIVERY_CONTACT_CORRECTION",
+    "DELIVERY_STOCK_CHANGE",
+    "INVENTORY_MOVEMENT",
+    "CANCELLATION_RETURN_REVERSAL",
+    "PRODUCT_UPGRADE",
+}
+
+_PHASE3_BLOCK_MESSAGE = (
+    "Only whitelisted non-financial customer contact/address corrections can be "
+    "implemented in Phase 3. Financial, EMI, product, lucky ID, batch, rent/lease "
+    "billing, deposit, accounting, inventory, reconciliation, commission, payout, "
+    "delivery, stock, and audit-sensitive changes remain blocked."
+)
 
 
 def _source_for(*, contract_type: str, subscription: Subscription | None = None, rent_lease_contract: Subscription | None = None) -> Subscription:
@@ -82,6 +134,57 @@ def _review_flags(contract_type: str, amendment_type: str) -> dict:
         "requires_accounting_review": amendment_type in _HIGH_RISK_AMENDMENTS,
         "requires_rent_lease_review": contract_type == "RENT_LEASE" or amendment_type in {"DEPOSIT_ADJUSTMENT", "RENT_AMOUNT_CHANGE", "LEASE_TERM_CHANGE"},
     }
+
+
+def phase3_implementation_metadata(amendment: ContractAmendment) -> dict:
+    config = _PHASE3_IMPLEMENTABLE_AMENDMENTS.get(amendment.amendment_type)
+    if amendment.status != "APPROVED":
+        return {
+            "is_implementable": False,
+            "implementation_block_reason": "Implementation requires APPROVED status.",
+            "implementable_fields": sorted(config["allowed_fields"]) if config else [],
+        }
+    if not config:
+        return {
+            "is_implementable": False,
+            "implementation_block_reason": _PHASE3_BLOCK_MESSAGE,
+            "implementable_fields": [],
+        }
+
+    values = amendment.approved_values or amendment.requested_values or amendment.new_values or {}
+    requested_keys = set(values.keys())
+    allowed_fields = set(config["allowed_fields"])
+    unsupported_keys = sorted(requested_keys - allowed_fields)
+    if unsupported_keys:
+        return {
+            "is_implementable": False,
+            "implementation_block_reason": f"Unsupported requested value keys for Phase 3 implementation: {', '.join(unsupported_keys)}.",
+            "implementable_fields": sorted(allowed_fields),
+        }
+    if not requested_keys:
+        return {
+            "is_implementable": False,
+            "implementation_block_reason": "No approved values are available to implement.",
+            "implementable_fields": sorted(allowed_fields),
+        }
+    return {
+        "is_implementable": True,
+        "implementation_block_reason": "",
+        "implementable_fields": sorted(allowed_fields),
+    }
+
+
+def _implementation_values_for(amendment: ContractAmendment, allowed_fields: set[str]) -> dict:
+    values = amendment.approved_values or amendment.requested_values or amendment.new_values or {}
+    if not isinstance(values, dict):
+        raise ValidationError({"detail": "Approved values must be a JSON object."})
+    unsupported_keys = sorted(set(values.keys()) - allowed_fields)
+    if unsupported_keys:
+        raise ValidationError({"detail": f"Unsupported requested value keys for Phase 3 implementation: {', '.join(unsupported_keys)}."})
+    selected = {key: values[key] for key in sorted(values.keys()) if key in allowed_fields}
+    if not selected:
+        raise ValidationError({"detail": "No whitelisted approved values are available to implement."})
+    return selected
 
 
 @transaction.atomic
@@ -202,4 +305,79 @@ def reject_amendment(*, amendment: ContractAmendment, rejected_by, rejection_rea
 
 @transaction.atomic
 def apply_amendment(*, amendment: ContractAmendment, applied_by) -> ContractAmendment:
-    raise ValidationError("Implementation is blocked in Phase 1. Use later controlled implementation phases.")
+    return implement_approved_amendment(amendment=amendment, implemented_by=applied_by)
+
+
+@transaction.atomic
+def implement_approved_amendment(*, amendment: ContractAmendment, implemented_by) -> ContractAmendment:
+    locked_amendment = (
+        ContractAmendment.objects.select_for_update()
+        .select_related("customer", "subscription", "rent_lease_contract")
+        .get(pk=amendment.pk)
+    )
+
+    if locked_amendment.status == "IMPLEMENTED":
+        raise ValidationError({"detail": "This amendment is already implemented."})
+    if locked_amendment.status != "APPROVED":
+        raise ValidationError({"detail": f"Cannot implement amendment in status '{locked_amendment.status}'. Must be APPROVED."})
+
+    config = _PHASE3_IMPLEMENTABLE_AMENDMENTS.get(locked_amendment.amendment_type)
+    if not config or locked_amendment.amendment_type in _PHASE3_BLOCKED_AMENDMENTS:
+        raise ValidationError({"detail": _PHASE3_BLOCK_MESSAGE})
+
+    metadata = phase3_implementation_metadata(locked_amendment)
+    if not metadata["is_implementable"]:
+        raise ValidationError({"detail": metadata["implementation_block_reason"]})
+
+    if config["source"] != "customer" or not locked_amendment.customer_id:
+        raise ValidationError({"detail": "Phase 3 implementation requires a linked customer source record."})
+
+    customer = Customer.objects.select_for_update().get(pk=locked_amendment.customer_id)
+    values = _implementation_values_for(locked_amendment, set(config["allowed_fields"]))
+    field_changes = {}
+    update_fields = []
+
+    for field_name, after_value in values.items():
+        before_value = getattr(customer, field_name)
+        setattr(customer, field_name, after_value)
+        update_fields.append(field_name)
+        field_changes[field_name] = {
+            "source_model": "Customer",
+            "source_id": customer.pk,
+            "before": before_value,
+            "after": after_value,
+        }
+
+    customer.save(update_fields=update_fields)
+
+    now = timezone.now()
+    locked_amendment.status = "IMPLEMENTED"
+    locked_amendment.implemented_by = implemented_by
+    locked_amendment.implemented_at = now
+    locked_amendment.implemented_values = {
+        "phase": "PHASE_3_WHITELISTED_NON_FINANCIAL",
+        "source_model": "Customer",
+        "source_id": customer.pk,
+        "fields": field_changes,
+    }
+    locked_amendment.metadata = {
+        **(locked_amendment.metadata or {}),
+        "approved_without_implementation": False,
+        "implementation_phase": "PHASE_3_WHITELISTED_NON_FINANCIAL",
+    }
+    locked_amendment.save(update_fields=["status", "implemented_by", "implemented_at", "implemented_values", "metadata", "updated_at"])
+
+    source = locked_amendment.source_contract()
+    log_audit(
+        action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_IMPLEMENTED,
+        instance=source,
+        performed_by=implemented_by,
+        metadata={
+            "amendment_id": locked_amendment.pk,
+            "amendment_no": locked_amendment.amendment_no,
+            "amendment_type": locked_amendment.amendment_type,
+            "implemented_fields": sorted(field_changes.keys()),
+            "phase": "PHASE_3_WHITELISTED_NON_FINANCIAL",
+        },
+    )
+    return locked_amendment
