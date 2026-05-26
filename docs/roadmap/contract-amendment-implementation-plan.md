@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Phase 3 low-risk implementation completed on `update` branch**
+Status: **Phase 4 product-reference implementation completed on `update` branch**
 
 ## Principle
 
@@ -31,12 +31,11 @@ Implemented:
 - Added customer-scoped APIs.
 - Added partner-scoped APIs.
 - Added admin review/approve/reject APIs.
-- Blocked implementation/apply behavior in Phase 1.
 
 Integrity notes:
 
 - Existing legacy amendment rows remain compatible.
-- Source contracts are not mutated.
+- Source contracts are not mutated during request/review/approval.
 - Posted payments, receipts, journals, EMI rows, waivers, lucky draw records, inventory, settlement, commissions, and payouts are not changed.
 
 ## Phase 2 — UI only
@@ -46,10 +45,10 @@ Status: **Implemented**
 Goal:
 
 - Add customer, partner, and admin amendment register/detail/request UI.
-- No contract mutation.
+- No contract mutation from request/review screens.
 - Admin subscription lifecycle page should show review/register wording, not admin-as-requester wording.
 
-Planned routes:
+Routes:
 
 - `/customer/contract-amendments`
 - `/customer/contract-amendments/new`
@@ -76,37 +75,45 @@ Implemented source fields:
 
 Implementation requires admin approval first, runs through `POST /api/v1/admin/contract-amendments/{id}/implement/`, records `implemented_values`, sets implementation metadata, and emits `CONTRACT_AMENDMENT_IMPLEMENTED`.
 
-Blocked until future phases:
-
-- product
-- lucky ID
-- batch
-- EMI
-- tenure
-- price
-- payment
-- waiver
-- rent/lease billing
-- deposit
-- accounting
-- reconciliation
-- inventory
-- commission
-- payout
-- delivery/stock
-
-Future phases are required for financial and contract-value amendments.
+Phase 3 does not mutate subscriptions, EMI rows, payments, receipts, journals, waivers, lucky draw records, rent/lease billing demands, deposit records, inventory, stock, reconciliation records, commission records, or payout records.
 
 ## Phase 4 — Product change implementation only
 
-Status: **Deferred**
+Status: **Implemented**
 
-Scope:
+Implemented behavior:
 
-- EMI subscription product change.
-- Rent/lease asset or product change.
+- `PRODUCT_CHANGE` updates only `Subscription.product`.
+- Implementation is admin-only and approval-required.
+- Implementation runs through `POST /api/v1/admin/contract-amendments/{id}/implement/`.
+- The amendment row and source subscription are locked transactionally.
+- `implemented_values` captures old/new product data and financial invariant flags.
+- `CONTRACT_AMENDMENT_IMPLEMENTED` is emitted with `phase = PHASE_4_PRODUCT_REFERENCE_CHANGE`.
 
-No automatic financial recalculation or inventory movement unless a safe approved service exists.
+Preserved fields and workflows:
+
+- `total_amount`
+- `monthly_amount`
+- tenure
+- EMI rows
+- payments
+- receipts
+- lucky ID
+- batch
+- waiver rows
+- commission records
+- payout records
+- accounting journals
+- reconciliation records
+- inventory records
+- stock records
+- delivery records
+- rent/lease billing
+- deposit records
+- cancellation records
+- return records
+
+Product change is blocked when the target product would require price, EMI, or tenure recalculation. It is also blocked for terminal/cancelled source subscriptions and inactive/non-eligible target products.
 
 ## Phase 5 — Lucky ID / Batch change only
 
