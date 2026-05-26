@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import AmendmentSafetyNotice from "@/components/amendments/SafetyNotice";
+import ProductRecontractPreviewPanel from "@/components/amendments/ProductRecontractPreviewPanel";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
@@ -183,6 +184,7 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
               <DetailPanel title="Request reason" description="Submitted reason."><p className="text-sm text-muted-foreground">{row.reason}</p></DetailPanel>
             </div>
             <ProductChangePreview row={row} />
+            <ProductRecontractPreviewPanel amendment={row} />
             <div className="grid gap-4 lg:grid-cols-3">
               <DetailPanel title="Old values" description="Source snapshot."><pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.old_values || row.previous_values)}</pre></DetailPanel>
               <DetailPanel title="Requested values" description="Requested change."><pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.requested_values || row.new_values)}</pre></DetailPanel>
