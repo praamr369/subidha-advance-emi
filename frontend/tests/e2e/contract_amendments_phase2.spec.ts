@@ -108,6 +108,46 @@ const productRecontractPreviewFixture = {
   ],
 };
 
+const lifecycleSubscriptionFixture = {
+  id: 1001,
+  subscription_number: "SUB-SMOKE-001",
+  customer: 501,
+  customer_name: "Smoke Customer",
+  customer_phone: "9000000000",
+  product: 2001,
+  product_name: "Old Sofa",
+  product_code: "SOFA-OLD",
+  batch: 301,
+  batch_code: "BATCH-SMOKE",
+  lucky_id: 401,
+  lucky_number: 7,
+  plan_type: "EMI",
+  monthly_amount: "2000.00",
+  total_amount: "20000.00",
+  tenure_months: 10,
+  status: "ACTIVE",
+  start_date: "2026-01-01",
+  created_at: "2026-01-01T00:00:00Z",
+  terms_locked_at: "2026-01-01T00:00:00Z",
+};
+
+const lifecycleProductUpgradeFixture = {
+  id: 1,
+  subscription: 1001,
+  amendment_type: "PRODUCT_UPGRADE",
+  status: "APPROVED",
+  previous_values: { product_id: 2001, total_amount: "20000.00" },
+  new_values: { product_id: 2002, total_amount: "25000.00", price_difference: "5000.00" },
+  reason: "Customer requested upgrade to higher priced product.",
+  rejection_reason: null,
+  notes: "",
+  requested_by: 501,
+  approved_by: 1,
+  approved_at: "2026-05-26T10:30:00Z",
+  applied_at: null,
+  created_at: "2026-05-26T10:00:00Z",
+};
+
 async function mockAmendments(page: Page, role: "customer" | "partner" | "admin", fixture = amendmentFixture) {
   await page.route(`**/api/v1/${role}/contract-amendments/**`, async (route) => {
     const request = route.request();
@@ -136,6 +176,21 @@ async function mockAmendments(page: Page, role: "customer" | "partner" | "admin"
     }
 
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ count: 1, results: [fixture] }) });
+  });
+}
+
+async function mockSubscriptionLifecycle(page: Page, amendments = [lifecycleProductUpgradeFixture]) {
+  await page.route("**/api/v1/admin/subscriptions/1001/**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(lifecycleSubscriptionFixture) });
+  });
+  await page.route("**/api/v1/admin/contracts/1001/amendments/**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(amendments) });
+  });
+  await page.route("**/api/v1/admin/contracts/1001/possession/**", async (route) => {
+    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ detail: "No possession record found." }) });
+  });
+  await page.route("**/api/v1/admin/contracts/1001/return-inspection/**", async (route) => {
+    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ detail: "No inspection found." }) });
   });
 }
 
@@ -211,7 +266,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
 
     await expect(page.getByText("This only corrects the stored product reference when the contract value remains unchanged.")).toBeVisible();
     await expect(page.getByText("Product reference correction preview")).toBeVisible();
-    await expect(page.getByText("New Sofa")).toBeVisible();
+    await expect(page.getByText("New Sofa", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Implement approved same-price product reference correction" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
   });
@@ -226,7 +281,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByText("UPGRADE_EXTRA_PAYABLE")).toBeVisible();
     await expect(page.getByText("20000.00")).toBeVisible();
     await expect(page.getByText("25000.00")).toBeVisible();
-    await expect(page.getByText("5000.00")).toBeVisible();
+    await expect(page.getByText("5000.00", { exact: true })).toBeVisible();
     await expect(page.getByText("4000.00")).toBeVisible();
     await expect(page.getByText("21000.00")).toBeVisible();
     await expect(page.getByText("Preview only — no contract, EMI, payment, receipt, accounting, reconciliation, stock, delivery, commission, payout, or waiver records are changed.")).toBeVisible();
@@ -252,6 +307,40 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await page.getByRole("button", { name: "Implement approved non-financial correction" }).click();
 
     await expect.poll(() => calls).toEqual(["/api/v1/admin/contract-amendments/1/implement/"]);
+  });
+
+  test("subscription lifecycle amendment panel is read-only and links to amendment detail", async ({ page }) => {
+    const legacyApplyCalls: string[] = [];
+    await mockSubscriptionLifecycle(page);
+    await page.route("**/api/v1/admin/contracts/amendments/1/apply/**", async (route) => {
+      legacyApplyCalls.push(new URL(route.request().url()).pathname);
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          detail:
+            "Only whitelisted non-financial customer contact/address corrections and Phase 4 same-price product reference corrections can be implemented.",
+        }),
+      });
+    });
+
+    await page.goto("/admin/subscriptions/1001/lifecycle");
+
+    const main = page.locator("#main-content");
+    await expect(main.getByText("PRODUCT UPGRADE", { exact: true })).toBeVisible();
+    await expect(main.getByText("Approved").first()).toBeVisible();
+    await expect(main.getByText(/Approved 26 May 2026/)).toBeVisible();
+    await expect(
+      main.getByText(
+        "Financial product upgrade/downgrade requires recontract preview and future approved execution. It is not applied from this lifecycle panel.",
+      ),
+    ).toBeVisible();
+    await expect(main.getByRole("link", { name: "Open amendment" })).toHaveAttribute("href", "/admin/contract-amendments/1");
+    await expect(main.getByRole("button", { name: /^Apply$/ })).toHaveCount(0);
+    await expect(main.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
+    await expect(main.getByText("Only whitelisted non-financial customer contact/address corrections")).toHaveCount(0);
+    await expect.poll(() => legacyApplyCalls).toEqual([]);
   });
 
   test("admin amendment detail still exposes decision controls", async ({ page }) => {

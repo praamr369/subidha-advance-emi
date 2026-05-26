@@ -236,7 +236,11 @@ def _financial_snapshot(source: Subscription) -> dict:
 
 
 def _product_change_values(amendment: ContractAmendment) -> dict:
-    values = amendment.approved_values or amendment.requested_values or amendment.new_values or {}
+    values = (
+        amendment.approved_values
+        if amendment.status == "APPROVED"
+        else amendment.requested_values or amendment.new_values or {}
+    )
     if not isinstance(values, dict):
         raise ValidationError({"detail": "Approved product reference correction values must be a JSON object."})
     return values

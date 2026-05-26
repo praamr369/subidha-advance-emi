@@ -17,10 +17,6 @@ import {
   cancelContract,
   closeContract,
   listContractAmendments,
-  createContractAmendment,
-  approveAmendment,
-  rejectAmendment,
-  applyAmendment,
   getContractPossession,
   createContractPossession,
   recordContractHandover,
@@ -30,7 +26,6 @@ import {
   recordReturnInspection,
   approveReturnInspection,
   type ContractAmendment,
-  type ContractAmendmentType,
   type ProductPossession,
   type ReturnInspection,
   type InspectionCondition,
@@ -53,7 +48,12 @@ function formatDate(value?: string | null): string {
 }
 
 function toErrorMessage(err: unknown): string {
-  if (err instanceof Error && err.message.trim()) return err.message;
+  if (err instanceof Error && err.message.trim()) {
+    if (err.message.includes("Only whitelisted non-financial customer contact/address corrections")) {
+      return "This amendment cannot be implemented from lifecycle. Open amendment detail for review or preview.";
+    }
+    return err.message;
+  }
   return "Action failed.";
 }
 
@@ -66,6 +66,26 @@ function FieldRow({ label, value }: { label: string; value: ReactNode }) {
       <div className="text-sm text-foreground">{value ?? "—"}</div>
     </div>
   );
+}
+
+function hasFinancialProductChangeSemantics(amendment: ContractAmendment): boolean {
+  if (amendment.amendment_type === "PRODUCT_UPGRADE") return true;
+  if (amendment.amendment_type !== "PRODUCT_CHANGE") return false;
+  const previousTotal = amendment.previous_values?.total_amount;
+  const nextTotal = amendment.new_values?.total_amount;
+  if (previousTotal != null && nextTotal != null && String(previousTotal) !== String(nextTotal)) return true;
+  const financialKeys = [
+    "new_total_amount",
+    "total_amount",
+    "monthly_amount",
+    "emi_amount",
+    "tenure_months",
+    "price_difference",
+    "extra_amount",
+    "refund_amount",
+    "adjustment_amount",
+  ];
+  return financialKeys.some((key) => Object.prototype.hasOwnProperty.call(amendment.new_values || {}, key));
 }
 
 function ConfirmInput({
@@ -117,18 +137,6 @@ export default function ContractLifecyclePage() {
   // cancel form
   const [cancelReason, setCancelReason] = useState("");
   const [showCancelForm, setShowCancelForm] = useState(false);
-
-  // amendment create form
-  const [showAmendForm, setShowAmendForm] = useState(false);
-  const [amendType, setAmendType] = useState<ContractAmendmentType>("OTHER");
-  const [amendReason, setAmendReason] = useState("");
-  const [amendNotes, setAmendNotes] = useState("");
-  const [amendPrev, setAmendPrev] = useState("");
-  const [amendNew, setAmendNew] = useState("");
-
-  // rejection form
-  const [rejectAmendId, setRejectAmendId] = useState<number | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
 
   // possession form
   const [showPossessionForm, setShowPossessionForm] = useState(false);
@@ -240,62 +248,6 @@ export default function ContractLifecyclePage() {
     void runAction(async () => {
       await closeContract(subscriptionId);
     }, "Contract closed.");
-  }
-
-  // amendment actions
-  function handleCreateAmendment() {
-    if (!amendReason.trim()) {
-      setActionError("Amendment reason is required.");
-      return;
-    }
-    void runAction(async () => {
-      let prev: Record<string, unknown> = {};
-      let nxt: Record<string, unknown> = {};
-      try {
-        prev = amendPrev.trim() ? (JSON.parse(amendPrev.trim()) as Record<string, unknown>) : {};
-        nxt = amendNew.trim() ? (JSON.parse(amendNew.trim()) as Record<string, unknown>) : {};
-      } catch {
-        throw new Error("Previous/new values must be valid JSON objects.");
-      }
-      await createContractAmendment(subscriptionId, {
-        amendment_type: amendType,
-        previous_values: prev,
-        new_values: nxt,
-        reason: amendReason.trim(),
-        notes: amendNotes.trim() || undefined,
-      });
-      setShowAmendForm(false);
-      setAmendReason("");
-      setAmendNotes("");
-      setAmendPrev("");
-      setAmendNew("");
-    }, "Amendment request created.");
-  }
-
-  function handleApproveAmendment(id: number) {
-    void runAction(async () => {
-      await approveAmendment(id);
-    }, "Amendment approved.");
-  }
-
-  function handleRejectAmendment() {
-    if (rejectAmendId == null) return;
-    if (!rejectReason.trim()) {
-      setActionError("Rejection reason is required.");
-      return;
-    }
-    const id = rejectAmendId;
-    void runAction(async () => {
-      await rejectAmendment(id, rejectReason.trim());
-      setRejectAmendId(null);
-      setRejectReason("");
-    }, "Amendment rejected.");
-  }
-
-  function handleApplyAmendment(id: number) {
-    void runAction(async () => {
-      await applyAmendment(id);
-    }, "Amendment applied.");
   }
 
   // possession actions
@@ -546,79 +498,8 @@ export default function ContractLifecyclePage() {
         {/* Amendments */}
         <FormSection
           title="Contract Amendments"
-          description="Track and manage tenure extensions, product upgrades, address changes, and other controlled corrections. Original terms are never silently overwritten."
+          description="Read-only lifecycle register. Review decisions, previews, and guarded implementation are handled from amendment detail."
         >
-          <div className="mb-4">
-            <ActionButton
-              variant="outline"
-              onClick={() => setShowAmendForm(!showAmendForm)}
-            >
-              {showAmendForm ? "Cancel" : "Request Amendment"}
-            </ActionButton>
-          </div>
-
-          {showAmendForm && (
-            <div className="mb-4 space-y-3 rounded-xl border border-border bg-background p-4">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Amendment Type</label>
-                <select
-                  value={amendType}
-                  onChange={(e) => setAmendType(e.target.value as ContractAmendmentType)}
-                  className="mt-1 h-9 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-ring"
-                >
-                  {(
-                    [
-                      "TENURE_EXTENSION",
-                      "PRODUCT_UPGRADE",
-                      "ADDRESS_CHANGE",
-                      "SCHEDULE_CORRECTION",
-                      "DEPOSIT_ADJUSTMENT",
-                      "LEGAL_DOCUMENT_CORRECTION",
-                      "OTHER",
-                    ] as ContractAmendmentType[]
-                  ).map((t) => (
-                    <option key={t} value={t}>
-                      {t.replaceAll("_", " ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <ConfirmInput
-                label="Reason"
-                value={amendReason}
-                onChange={setAmendReason}
-                placeholder="Why is this amendment needed?"
-                required
-              />
-              <ConfirmInput
-                label="Previous values (JSON)"
-                value={amendPrev}
-                onChange={setAmendPrev}
-                placeholder='e.g. {"tenure_months": 12}'
-              />
-              <ConfirmInput
-                label="New values (JSON)"
-                value={amendNew}
-                onChange={setAmendNew}
-                placeholder='e.g. {"tenure_months": 18}'
-              />
-              <ConfirmInput
-                label="Notes (optional)"
-                value={amendNotes}
-                onChange={setAmendNotes}
-                placeholder="Additional context..."
-              />
-              <div className="flex gap-2">
-                <ActionButton variant="primary" loading={actionBusy} onClick={handleCreateAmendment}>
-                  Submit Amendment
-                </ActionButton>
-                <ActionButton variant="outline" onClick={() => setShowAmendForm(false)}>
-                  Discard
-                </ActionButton>
-              </div>
-            </div>
-          )}
-
           <div className="grid gap-3">
             {amendments.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-muted/50 px-4 py-5 text-sm text-muted-foreground">
@@ -649,74 +530,27 @@ export default function ContractLifecyclePage() {
                       <div className="text-xs text-muted-foreground">
                         Requested {formatDate(amend.created_at)}
                         {amend.approved_at && ` · Approved ${formatDate(amend.approved_at)}`}
-                        {amend.applied_at && ` · Applied ${formatDate(amend.applied_at)}`}
+                        {amend.applied_at && ` · Implemented ${formatDate(amend.applied_at)}`}
                       </div>
+                      {hasFinancialProductChangeSemantics(amend) ? (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                          Financial product upgrade/downgrade requires recontract preview and future approved execution. It is not applied from this lifecycle panel.
+                        </div>
+                      ) : amend.amendment_type === "PRODUCT_CHANGE" ? (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                          Same-price product reference correction is reviewed from amendment detail. This lifecycle panel remains read-only.
+                        </div>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {amend.status === "REQUESTED" && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleApproveAmendment(amend.id)}
-                            disabled={actionBusy}
-                            className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRejectAmendId(amend.id);
-                              setRejectReason("");
-                            }}
-                            disabled={actionBusy}
-                            className="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 transition hover:bg-red-100 disabled:opacity-60"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
-                      {amend.status === "APPROVED" && (
-                        <button
-                          type="button"
-                          onClick={() => handleApplyAmendment(amend.id)}
-                          disabled={actionBusy}
-                          className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-800 transition hover:bg-blue-100 disabled:opacity-60"
-                        >
-                          Apply
-                        </button>
-                      )}
+                      <Link
+                        href={`/admin/contract-amendments/${amend.id}`}
+                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+                      >
+                        {amend.status === "REQUESTED" || amend.status === "UNDER_REVIEW" ? "Review amendment" : "Open amendment"}
+                      </Link>
                     </div>
                   </div>
-
-                  {rejectAmendId === amend.id && (
-                    <div className="mt-3 space-y-2">
-                      <ConfirmInput
-                        label="Rejection reason"
-                        value={rejectReason}
-                        onChange={setRejectReason}
-                        placeholder="Why is this amendment being rejected?"
-                        required
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={handleRejectAmendment}
-                          disabled={actionBusy}
-                          className="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 transition hover:bg-red-100 disabled:opacity-60"
-                        >
-                          Confirm Rejection
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRejectAmendId(null)}
-                          className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))
             )}

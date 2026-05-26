@@ -127,6 +127,27 @@ class ContractAmendmentPhase4ProductChangeTests(TestCase):
         self.assertNotEqual(response.status_code, 500)
         self.assertIn(response.status_code, {200, 400})
 
+    def test_legacy_apply_route_blocks_product_upgrade_without_subscription_mutation(self):
+        target_product = self.replacement_product("P4-UPGRADE-LEGACY", price=Decimal("25000.00"))
+        counts = self._counts()
+        amendment = self.approved_product_amendment(
+            target_product,
+            amendment_type="PRODUCT_UPGRADE",
+            requested_values={"approved_product_id": target_product.id, "price_difference": "5000.00"},
+            approved_values={"approved_product_id": target_product.id, "price_difference": "5000.00"},
+            reason="Legacy product upgrade must remain preview-only.",
+        )
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(f"/api/v1/admin/contracts/amendments/{amendment.id}/apply/", {}, format="json")
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("same-price product reference corrections", str(response.data))
+        amendment.refresh_from_db()
+        self.assertEqual(amendment.status, "APPROVED")
+        self.assertIsNone(amendment.implemented_at)
+        self.assert_subscription_unchanged_except_product(expected_product_id=self.product.id, snapshot=counts)
+
     def test_product_reference_correction_guards_reject_unsafe_requests(self):
         target_product = self.replacement_product()
         cases = [

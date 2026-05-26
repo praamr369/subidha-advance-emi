@@ -64,15 +64,23 @@ export async function closeContract(subscriptionId: number): Promise<ContractLif
 
 // ---------- amendments ----------
 
-export type ContractAmendmentStatus = "REQUESTED" | "APPROVED" | "REJECTED" | "APPLIED";
+export type ContractAmendmentStatus = "REQUESTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "IMPLEMENTED" | "CANCELLED" | "APPLIED";
 export type ContractAmendmentType =
-  | "TENURE_EXTENSION"
-  | "PRODUCT_UPGRADE"
   | "ADDRESS_CHANGE"
-  | "SCHEDULE_CORRECTION"
-  | "DEPOSIT_ADJUSTMENT"
+  | "CONTACT_CORRECTION"
   | "LEGAL_DOCUMENT_CORRECTION"
-  | "OTHER";
+  | "TENURE_EXTENSION"
+  | "SCHEDULE_CORRECTION"
+  | "PRODUCT_CHANGE"
+  | "LUCKY_ID_CHANGE"
+  | "BATCH_CHANGE"
+  | "DEPOSIT_ADJUSTMENT"
+  | "EMI_AMOUNT_CHANGE"
+  | "CONTRACT_PRICE_CHANGE"
+  | "RENT_AMOUNT_CHANGE"
+  | "LEASE_TERM_CHANGE"
+  | "OTHER"
+  | "PRODUCT_UPGRADE";
 
 export type ContractAmendment = {
   id: number;

@@ -32,6 +32,8 @@ The legacy endpoint is also routed through the same guarded service:
 POST /api/v1/admin/contracts/amendments/{id}/apply/
 ```
 
+The subscription lifecycle page does not call either implementation endpoint. Its amendment panel is read-only and may only link to `/admin/contract-amendments/{id}` for review or preview. Apply/execute wording is forbidden in that lifecycle panel.
+
 ## Required conditions
 
 Same-price product reference correction requires:
@@ -67,6 +69,8 @@ A true product upgrade or downgrade is deferred. It requires a future financial 
 - reconciliation impact
 - customer and admin approval
 - audit trail
+
+`PRODUCT_UPGRADE` is treated as financial product change semantics, not as same-price product reference correction. It is preview/future-recontract only and is not implemented through the legacy lifecycle apply route.
 
 Payload keys that attempt financial product change are rejected, including `new_total_amount`, `total_amount`, `monthly_amount`, `emi_amount`, `tenure_months`, `price_difference`, `extra_amount`, `refund_amount`, `adjustment_amount`, `recalculation`, `payment_adjustment`, `accounting_adjustment`, and `reconciliation_adjustment`.
 

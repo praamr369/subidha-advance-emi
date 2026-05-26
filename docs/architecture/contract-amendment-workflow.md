@@ -14,6 +14,8 @@ Customer and partner users can request amendments for allowed linked contracts. 
 
 Customer, partner, and admin amendment screens show request and review state. Customer and partner screens do not expose implementation or recontract preview controls.
 
+The subscription lifecycle page is not an implementation surface. Its Contract Amendments panel is read-only and links to `/admin/contract-amendments/{id}` for review, preview, and any guarded detail-page action. Apply/execute wording is forbidden in the lifecycle amendment panel.
+
 ## Phase 3 — Low-risk implementation
 
 Implemented only:
@@ -50,6 +52,8 @@ SAME_PRICE_REFERENCE_CORRECTION
 ```
 
 The preview does not mutate source records. Accounting and reconciliation posting are future work.
+
+Product upgrade/downgrade remains preview-only and future-recontract work. It must not be applied from the subscription lifecycle page.
 
 ## Admin API inventory
 

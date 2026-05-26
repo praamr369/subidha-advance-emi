@@ -358,6 +358,10 @@ class ContractAmendmentApplyView(APIView):
         from subscriptions.services.contract_amendment_service import apply_amendment
         from django.core.exceptions import ValidationError
         try:
+            # Legacy lifecycle endpoint kept for backward-compatible clients only.
+            # It delegates to the guarded amendment service and must not grow
+            # direct PRODUCT_UPGRADE, repricing, EMI, payment, accounting,
+            # reconciliation, inventory, delivery, lucky ID, or batch behavior.
             amendment = apply_amendment(amendment=amendment, applied_by=request.user)
         except ValidationError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)

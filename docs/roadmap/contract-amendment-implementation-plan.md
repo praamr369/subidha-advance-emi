@@ -20,6 +20,8 @@ Status: **Implemented**
 
 Customer, partner, and admin routes expose role-scoped amendment registers and detail pages. Customer and partner screens do not expose implementation or recontract preview controls.
 
+The subscription lifecycle amendment panel is read-only. It links to amendment detail and must not expose Apply, execute, update-contract, or implementation wording/actions.
+
 ## Phase 3 — Low-risk implementation only
 
 Status: **Implemented**
@@ -66,6 +68,8 @@ SAME_PRICE_REFERENCE_CORRECTION
 ```
 
 The preview does not mutate subscription product, total amount, monthly amount, tenure, EMI rows, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records.
+
+Product upgrade/downgrade is preview/future-recontract only. The lifecycle page is not the execution surface; admins must open `/admin/contract-amendments/{id}` for review or preview.
 
 ## Deferred true product recontract execution
 
