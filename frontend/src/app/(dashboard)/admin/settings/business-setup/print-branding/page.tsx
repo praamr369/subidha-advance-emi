@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
 import PageHeader from "@/components/ui/PageHeader";
+import { shouldBypassNextImageOptimization } from "@/lib/media";
 import {
   getDocumentPrintSettings,
   saveDocumentPrintSettings,
@@ -95,6 +97,7 @@ export default function PrintBrandingSettingsPage() {
   }, []);
 
   const receiptTermsPreview = useMemo(() => termLines(settings.receipt_terms), [settings.receipt_terms]);
+  const logoPreviewUrl = settings.business_logo_url && !clearLogo ? settings.business_logo_url : null;
 
   function updateField(key: keyof DocumentPrintSettings, value: string | boolean) {
     setSettings((current) => ({ ...current, [key]: value }));
@@ -235,8 +238,17 @@ export default function PrintBrandingSettingsPage() {
               <div className="text-xs font-black uppercase tracking-[0.14em] text-[#8a5a22]">Sample document header</div>
               <div className="mt-4 flex gap-3">
                 {settings.show_logo !== false ? (
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[#d9c39c] bg-white text-sm font-black text-[#7b4c1f]">
-                    {settings.business_logo_url && !clearLogo ? <img src={settings.business_logo_url} alt="Document logo preview" className="h-full w-full object-contain" /> : "SF"}
+                  <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-[#d9c39c] bg-white text-sm font-black text-[#7b4c1f]">
+                    {logoPreviewUrl ? (
+                      <Image
+                        src={logoPreviewUrl}
+                        alt="Document logo preview"
+                        fill
+                        className="object-contain"
+                        sizes="56px"
+                        unoptimized={shouldBypassNextImageOptimization(logoPreviewUrl)}
+                      />
+                    ) : "SF"}
                   </div>
                 ) : null}
                 <div>

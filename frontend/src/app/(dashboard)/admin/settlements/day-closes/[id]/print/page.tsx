@@ -70,6 +70,10 @@ function metadataCount(metadata: Record<string, MetadataValue>, keys: string[]):
   return text === null ? null : text;
 }
 
+function rawMoneyValue(value: unknown): string | number | null | undefined {
+  return typeof value === "string" || typeof value === "number" || value == null ? value : undefined;
+}
+
 function buildPaymentMethodSummary(record: CashierDayClose): DocumentLineItem[] {
   const metadata = getMetadata(record);
   const rawRows = metadata.payment_method_summary || metadata.collection_breakdown || metadata.method_summary;
@@ -86,7 +90,7 @@ function buildPaymentMethodSummary(record: CashierDayClose): DocumentLineItem[] 
           rate: "—",
           discount: "—",
           tax: "—",
-          total: formatDocumentMoney(row.amount ?? row.total ?? row.collected),
+          total: formatDocumentMoney(rawMoneyValue(row.amount ?? row.total ?? row.collected)),
         };
       });
   }
@@ -124,7 +128,7 @@ function reportWarning(record: CashierDayClose): string | null {
 
 function reportWatermark(record: CashierDayClose): string | undefined {
   if (hasVariance(record)) return "UNBALANCED";
-  return documentStatusWatermark(record.status);
+  return documentStatusWatermark(record.status) ?? undefined;
 }
 
 export default function AdminCashierDayClosePrintPage() {

@@ -68,9 +68,9 @@ function warning(run: ReconciliationRun): string | null {
 
 function watermark(run: ReconciliationRun): string | undefined {
   const status = String(run.status || "").toUpperCase();
-  if (status === "FAILED" || status === "CANCELLED") return documentStatusWatermark(status);
+  if (status === "FAILED" || status === "CANCELLED") return documentStatusWatermark(status) ?? undefined;
   if (Number(run.total_exceptions || 0) > 0 || Number(run.high_risk_count || 0) > 0) return "UNRECONCILED";
-  return documentStatusWatermark(run.status);
+  return documentStatusWatermark(run.status) ?? undefined;
 }
 
 function itemRows(items: ReconciliationItem[]): DocumentLineItem[] {

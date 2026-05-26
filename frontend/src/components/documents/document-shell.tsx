@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
@@ -11,6 +12,7 @@ import {
   type DocumentTermsKey,
 } from "@/lib/documents/document-theme";
 import { formatDocumentDateTime, safeDocumentText } from "@/lib/documents/formatters";
+import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getDocumentPrintSettings } from "@/services/business-setup";
 
 type MetadataItem = { label: string; value: ReactNode };
@@ -106,8 +108,17 @@ export function DocumentHeader({ copyLabel, documentNo, documentDate }: { copyLa
       <div className="flex items-start justify-between gap-6">
         <div className="flex items-start gap-4">
           {theme.showLogo ? (
-            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-[#d9c39c] bg-white text-xl font-black text-[#7b4c1f]">
-              {theme.logoPath ? <img src={theme.logoPath} alt={`${theme.businessName} logo`} className="h-full w-full object-contain" /> : initials(theme.businessName)}
+            <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-[#d9c39c] bg-white text-xl font-black text-[#7b4c1f]">
+              {theme.logoPath ? (
+                <Image
+                  src={theme.logoPath}
+                  alt={`${theme.businessName} logo`}
+                  fill
+                  className="object-contain"
+                  sizes="64px"
+                  unoptimized={shouldBypassNextImageOptimization(theme.logoPath)}
+                />
+              ) : initials(theme.businessName)}
             </div>
           ) : null}
           <div>
