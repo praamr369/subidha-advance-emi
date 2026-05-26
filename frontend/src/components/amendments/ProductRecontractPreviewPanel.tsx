@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import ActionButton from "@/components/ui/ActionButton";
 import { DetailPanel } from "@/components/ui/operations";
-import { previewProductRecontractAmendment, type ProductRecontractPreview } from "@/services/amendmentPreviews";
+import {
+  listProductRecontractEvents,
+  previewProductRecontractAmendment,
+  saveProductRecontractPreviewSnapshot,
+  type ContractRecontractEvent,
+  type ProductRecontractPreview,
+} from "@/services/amendmentPreviews";
 import type { AmendmentRecord } from "@/services/amendments";
 
 function valueOrDash(value?: string | number | null) {
@@ -22,20 +28,57 @@ function MoneyRow({ label, value }: { label: string; value?: string | number | n
 
 export default function ProductRecontractPreviewPanel({ amendment }: { amendment: AmendmentRecord }) {
   const [preview, setPreview] = useState<ProductRecontractPreview | null>(null);
+  const [events, setEvents] = useState<ContractRecontractEvent[]>([]);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (amendment.amendment_type !== "PRODUCT_CHANGE") return;
+    let mounted = true;
+    listProductRecontractEvents(amendment.id)
+      .then((rows) => {
+        if (mounted) setEvents(rows);
+      })
+      .catch(() => {
+        if (mounted) setEvents([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [amendment.amendment_type, amendment.id]);
 
   if (amendment.amendment_type !== "PRODUCT_CHANGE") return null;
+
+  const latestEvent = events[0];
 
   async function runPreview() {
     setBusy(true);
     setError(null);
+    setSaveMessage(null);
     try {
       setPreview(await previewProductRecontractAmendment(amendment.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Preview failed.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveSnapshot() {
+    setSaving(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      const event = await saveProductRecontractPreviewSnapshot(amendment.id);
+      const rows = await listProductRecontractEvents(amendment.id);
+      setEvents(rows.length > 0 ? rows : [event]);
+      setSaveMessage(`Saved preview snapshot #${event.id}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Preview snapshot save failed.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -46,12 +89,18 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
     >
       <div className="space-y-4">
         <p className="text-sm text-amber-800 dark:text-amber-200">
-          Preview only — no contract, EMI, payment, receipt, accounting, reconciliation, stock, delivery, commission, payout, or waiver records are changed.
+          Saving a preview snapshot does not change the contract, EMI schedule, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
         </p>
-        <ActionButton variant="outline" onClick={() => void runPreview()} disabled={busy}>
-          {busy ? "Previewing..." : "Preview financial product change"}
-        </ActionButton>
+        <div className="flex flex-wrap gap-3">
+          <ActionButton variant="outline" onClick={() => void runPreview()} disabled={busy || saving}>
+            {busy ? "Previewing..." : "Preview financial product change"}
+          </ActionButton>
+          <ActionButton variant="outline" onClick={() => void saveSnapshot()} disabled={busy || saving}>
+            {saving ? "Saving..." : "Save preview snapshot"}
+          </ActionButton>
+        </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {saveMessage ? <p className="text-sm text-emerald-700 dark:text-emerald-300">{saveMessage}</p> : null}
         {preview ? (
           <div className="space-y-4">
             {preview.blocked_reason ? <p className="text-sm text-destructive">{preview.blocked_reason}</p> : null}
@@ -76,6 +125,30 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
                   <li key={warning}>{warning}</li>
                 ))}
               </ul>
+            </div>
+          </div>
+        ) : null}
+        {latestEvent ? (
+          <div className="space-y-3 rounded-2xl border border-border bg-muted/20 p-3">
+            <div>
+              <div className="text-xs font-semibold uppercase text-muted-foreground">Latest saved preview snapshot</div>
+              <div className="mt-1 text-sm font-medium">
+                #{latestEvent.id} · {latestEvent.status} · {latestEvent.impact_type}
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <MoneyRow label="Old product" value={`${valueOrDash(latestEvent.old_product_name)} (#${valueOrDash(latestEvent.old_product)})`} />
+              <MoneyRow label="New product" value={`${valueOrDash(latestEvent.new_product_name)} (#${valueOrDash(latestEvent.new_product)})`} />
+              <MoneyRow label="Old contract total" value={latestEvent.old_contract_total} />
+              <MoneyRow label="New contract total" value={latestEvent.new_contract_total} />
+              <MoneyRow label="Price difference" value={latestEvent.price_difference} />
+              <MoneyRow label="Already paid" value={latestEvent.amount_already_paid} />
+              <MoneyRow label="Old remaining balance" value={latestEvent.old_remaining_balance} />
+              <MoneyRow label="New remaining balance" value={latestEvent.new_remaining_balance} />
+              <MoneyRow label="Current EMI" value={latestEvent.current_monthly_amount} />
+              <MoneyRow label="Proposed EMI" value={latestEvent.proposed_monthly_amount} />
+              <MoneyRow label="Pending EMI count" value={latestEvent.pending_emi_count} />
+              <MoneyRow label="Source record mutation" value={latestEvent.source_record_mutation ? "Yes" : "No"} />
             </div>
           </div>
         ) : null}

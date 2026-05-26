@@ -108,6 +108,36 @@ const productRecontractPreviewFixture = {
   ],
 };
 
+const productRecontractEventFixture = {
+  id: 77,
+  amendment_id: 1,
+  status: "PREVIEWED",
+  impact_type: "UPGRADE_EXTRA_PAYABLE",
+  old_product: 2001,
+  old_product_name: "Old Sofa",
+  old_product_code: "SOFA-OLD",
+  new_product: 2002,
+  new_product_name: "New Sofa",
+  new_product_code: "SOFA-NEW",
+  old_contract_total: "20000.00",
+  new_contract_total: "25000.00",
+  price_difference: "5000.00",
+  amount_already_paid: "4000.00",
+  old_remaining_balance: "16000.00",
+  new_remaining_balance: "21000.00",
+  current_tenure_months: 10,
+  preview_tenure_months: 10,
+  current_monthly_amount: "2000.00",
+  proposed_monthly_amount: "2500.00",
+  pending_emi_count: 8,
+  effective_date_preview: "2026-05-26",
+  source_record_mutation: false,
+  warnings: productRecontractPreviewFixture.warnings,
+  blocked_reason: "",
+  created_at: "2026-05-26T12:00:00Z",
+  created_by_display: "smoke.admin",
+};
+
 const lifecycleSubscriptionFixture = {
   id: 1001,
   subscription_number: "SUB-SMOKE-001",
@@ -154,6 +184,10 @@ async function mockAmendments(page: Page, role: "customer" | "partner" | "admin"
     const url = new URL(request.url());
 
     if (request.method() !== "GET") {
+      if (/\/contract-amendments\/1\/product-recontract-preview\/save\/?$/.test(url.pathname)) {
+        await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(productRecontractEventFixture) });
+        return;
+      }
       if (/\/contract-amendments\/1\/product-recontract-preview\/?$/.test(url.pathname)) {
         await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(productRecontractPreviewFixture) });
         return;
@@ -172,6 +206,11 @@ async function mockAmendments(page: Page, role: "customer" | "partner" | "admin"
 
     if (/\/contract-amendments\/1\/?$/.test(url.pathname)) {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture) });
+      return;
+    }
+
+    if (/\/contract-amendments\/1\/product-recontract-events\/?$/.test(url.pathname)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
       return;
     }
 
@@ -284,8 +323,22 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByText("5000.00", { exact: true })).toBeVisible();
     await expect(page.getByText("4000.00")).toBeVisible();
     await expect(page.getByText("21000.00")).toBeVisible();
-    await expect(page.getByText("Preview only — no contract, EMI, payment, receipt, accounting, reconciliation, stock, delivery, commission, payout, or waiver records are changed.")).toBeVisible();
+    await expect(page.getByText("Saving a preview snapshot does not change the contract, EMI schedule, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.")).toBeVisible();
     await expect(page.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
+  });
+
+  test("admin amendment detail saves product recontract preview snapshot evidence", async ({ page }) => {
+    await mockAmendments(page, "admin", approvedProductChangeFixture);
+    await page.goto("/admin/contract-amendments/1");
+
+    await expect(page.getByRole("button", { name: "Save preview snapshot" })).toBeVisible();
+    await page.getByRole("button", { name: "Save preview snapshot" }).click();
+
+    await expect(page.getByText("Saved preview snapshot #77.")).toBeVisible();
+    await expect(page.getByText("Latest saved preview snapshot")).toBeVisible();
+    await expect(page.getByText("#77 · PREVIEWED · UPGRADE_EXTRA_PAYABLE")).toBeVisible();
+    await expect(page.getByText("Source record mutation")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Apply product change|Execute recontract|Update contract|Recalculate EMI now/i })).toHaveCount(0);
   });
 
   test("admin amendment detail does not show implementation button for blocked financial product change", async ({ page }) => {
@@ -366,6 +419,7 @@ test.describe("customer and partner amendment implementation visibility", () => 
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Implement approved same-price product reference correction" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Preview financial product change" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Save preview snapshot" })).toHaveCount(0);
   });
 });
 
@@ -379,5 +433,6 @@ test.describe("partner amendment implementation visibility", () => {
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Implement approved same-price product reference correction" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Preview financial product change" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Save preview snapshot" })).toHaveCount(0);
   });
 });

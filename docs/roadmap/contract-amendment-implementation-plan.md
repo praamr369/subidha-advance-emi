@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Phase 4 same-price product reference correction and product recontract preview completed on `update` branch**
+Status: **Phase 6A product recontract preview snapshot persistence completed on `update` branch**
 
 ## Principle
 
@@ -79,9 +79,20 @@ Current system supports preview only for financial product change. Execution is 
 
 ## Phase 6A — Product recontract data model + preview snapshot persistence
 
-Status: **Deferred**
+Status: **Implemented**
 
-Additive model work only. Persist preview snapshots and old/new schedule previews without mutating subscription, EMI, payment, receipt, accounting, reconciliation, inventory, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
+Additive model work only. `ContractRecontractEvent` persists backend-calculated preview snapshots without mutating subscription, EMI, payment, receipt, accounting, reconciliation, inventory, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
+
+Admin endpoints:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract-preview/save/
+GET  /api/v1/admin/contract-amendments/{id}/product-recontract-events/
+```
+
+The existing preview endpoint remains calculation-only. The save endpoint recalculates and stores a READY backend snapshot as audit evidence. Prior active previews for the same amendment are marked `SUPERSEDED`, not deleted.
+
+Customer consent, admin execution approval, future EMI schedule change, accounting posting, reconciliation, and printable addendum remain future phases. Full execution remains blocked.
 
 ## Phase 6B — Customer consent UI
 

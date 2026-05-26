@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from subscriptions.models import ContractAmendment, Subscription
+from subscriptions.models import ContractAmendment, ContractRecontractEvent, Subscription
 from subscriptions.models_contract_amendment import PHASE1_AMENDMENT_TYPES, PHASE1_STATUSES
 from subscriptions.services.contract_amendment_service import phase3_implementation_metadata
 
@@ -150,3 +150,48 @@ class ProductRecontractPreviewSerializer(serializers.Serializer):
     pending_emi_count = serializers.IntegerField(required=False)
     effective_date_preview = serializers.CharField(required=False)
     warnings = serializers.ListField(child=serializers.CharField())
+
+
+class ContractRecontractEventSerializer(serializers.ModelSerializer):
+    amendment_id = serializers.IntegerField(read_only=True)
+    old_product_name = serializers.CharField(source="old_product.name", read_only=True, allow_null=True)
+    new_product_name = serializers.CharField(source="new_product.name", read_only=True, allow_null=True)
+    old_product_code = serializers.CharField(source="old_product.product_code", read_only=True, allow_null=True)
+    new_product_code = serializers.CharField(source="new_product.product_code", read_only=True, allow_null=True)
+    created_by_display = serializers.CharField(source="created_by.username", read_only=True, allow_null=True)
+
+    class Meta:
+        model = ContractRecontractEvent
+        fields = [
+            "id",
+            "amendment_id",
+            "status",
+            "impact_type",
+            "old_product",
+            "old_product_name",
+            "old_product_code",
+            "new_product",
+            "new_product_name",
+            "new_product_code",
+            "old_contract_total",
+            "new_contract_total",
+            "price_difference",
+            "amount_already_paid",
+            "old_remaining_balance",
+            "new_remaining_balance",
+            "current_tenure_months",
+            "preview_tenure_months",
+            "current_monthly_amount",
+            "proposed_monthly_amount",
+            "pending_emi_count",
+            "effective_date_preview",
+            "source_record_mutation",
+            "warnings",
+            "blocked_reason",
+            "preview_snapshot",
+            "created_at",
+            "updated_at",
+            "created_by_display",
+            "metadata",
+        ]
+        read_only_fields = fields

@@ -1,6 +1,6 @@
 # Contract Amendment Product Recontract Execution Design
 
-Status: design only. No execution endpoint, mutation service, migration, or frontend execution control is implemented by this document.
+Status: execution design only. Phase 6A preview snapshot persistence is implemented, but no execution endpoint, mutation service, customer consent, admin execution approval, or frontend execution control is implemented.
 
 Branch: `update`
 
@@ -136,7 +136,8 @@ Recommended constraints and indexes:
 - Backend calculates old/new product, contract total, paid amount, remaining balance, proposed tenure/EMI, impact type, warnings, accounting preview, and reconciliation preview.
 - No source mutation.
 - Existing preview endpoint already supports the first read-only impact calculation.
-- Later implementation should persist `ContractRecontractEvent` snapshots after preview approval, not during every transient preview call unless explicitly requested.
+- Phase 6A adds an explicit admin-only save action that persists `ContractRecontractEvent` snapshots as audit evidence. It does not persist during every transient preview call.
+- If preview persistence cannot produce a complete READY backend snapshot, it is rejected rather than saved as partial execution evidence.
 
 ### Stage B - Customer Consent
 
@@ -347,6 +348,8 @@ Must record:
 
 Audit evidence should be append-only in spirit. Corrections should use reversal/cancellation records, not silent mutation.
 
+Phase 6A audit evidence records preview snapshots only. It stores `source_record_mutation = false`, supersedes prior active preview events for the same amendment, and records the latest preview event id in amendment metadata for review. It does not create customer consent, admin execution approval, accounting posting, reconciliation, or printable addendum evidence.
+
 ## 13. Permission Model
 
 - customer may request a financial product recontract
@@ -471,11 +474,22 @@ No destructive migration is expected. Historical payment, EMI, receipt, ledger, 
 
 ### Phase 6A - Data Model and Preview Snapshot Persistence
 
+Status: implemented.
+
 Goal: add event and snapshot persistence without execution.
 
 Risk level: medium because persisted snapshots become audit evidence.
 
-Tests: model validation, one active event guard, preview no mutation.
+Tests: model validation, one active preview snapshot per amendment via superseding, preview no mutation.
+
+Implemented endpoints:
+
+```text
+POST /api/v1/admin/contract-amendments/:id/product-recontract-preview/save/
+GET  /api/v1/admin/contract-amendments/:id/product-recontract-events/
+```
+
+Customer consent, admin execution approval, future EMI schedule changes, accounting posting, reconciliation, and printable addendum remain future phases. Full execution remains blocked.
 
 ### Phase 6B - Customer Consent UI
 

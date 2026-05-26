@@ -28,9 +28,50 @@ export type ProductRecontractPreview = {
   warnings: string[];
 };
 
+export type ContractRecontractEvent = {
+  id: number;
+  amendment_id: number;
+  status: string;
+  impact_type: string;
+  old_product?: number | null;
+  old_product_name?: string | null;
+  old_product_code?: string | null;
+  new_product?: number | null;
+  new_product_name?: string | null;
+  new_product_code?: string | null;
+  old_contract_total: string;
+  new_contract_total: string;
+  price_difference: string;
+  amount_already_paid: string;
+  old_remaining_balance: string;
+  new_remaining_balance: string;
+  current_tenure_months: number;
+  preview_tenure_months: number;
+  current_monthly_amount: string;
+  proposed_monthly_amount: string;
+  pending_emi_count: number;
+  effective_date_preview?: string | null;
+  source_record_mutation: boolean;
+  warnings: string[];
+  blocked_reason?: string | null;
+  created_at?: string;
+  created_by_display?: string | null;
+};
+
 export async function previewProductRecontractAmendment(id: number): Promise<ProductRecontractPreview> {
   return apiFetch<ProductRecontractPreview>(`/admin/contract-amendments/${id}/product-recontract-preview/`, {
     method: "POST",
     body: {},
   });
+}
+
+export async function saveProductRecontractPreviewSnapshot(id: number): Promise<ContractRecontractEvent> {
+  return apiFetch<ContractRecontractEvent>(`/admin/contract-amendments/${id}/product-recontract-preview/save/`, {
+    method: "POST",
+    body: {},
+  });
+}
+
+export async function listProductRecontractEvents(id: number): Promise<ContractRecontractEvent[]> {
+  return apiFetch<ContractRecontractEvent[]>(`/admin/contract-amendments/${id}/product-recontract-events/`);
 }

@@ -11,10 +11,11 @@ from api.v1.serializers.contract_amendments import (
     ContractAmendmentRejectSerializer,
     ContractAmendmentReviewSerializer,
     ContractAmendmentSerializer,
+    ContractRecontractEventSerializer,
     ProductRecontractPreviewRequestSerializer,
     ProductRecontractPreviewSerializer,
 )
-from subscriptions.models import ContractAmendment, Subscription
+from subscriptions.models import ContractAmendment, ContractRecontractEvent, Subscription
 from subscriptions.services.contract_amendment_service import (
     approve_amendment,
     create_amendment,
@@ -22,7 +23,7 @@ from subscriptions.services.contract_amendment_service import (
     mark_under_review,
     reject_amendment,
 )
-from subscriptions.services.product_recontract_preview_service import preview_product_recontract
+from subscriptions.services.product_recontract_preview_service import create_product_recontract_preview_snapshot, preview_product_recontract
 
 
 def _validation_response(exc: DjangoValidationError) -> Response:
@@ -274,3 +275,39 @@ class AdminContractAmendmentProductRecontractPreviewView(APIView):
         except DjangoValidationError as exc:
             return _validation_response(exc)
         return Response(ProductRecontractPreviewSerializer(preview).data, status=status.HTTP_200_OK)
+
+
+class AdminContractAmendmentProductRecontractPreviewSaveView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        amendment = _amendment_queryset().filter(pk=pk).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ProductRecontractPreviewRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            event = create_product_recontract_preview_snapshot(
+                amendment=amendment,
+                requested_by=request.user,
+                preview_tenure_months=serializer.validated_data.get("preview_tenure_months"),
+                effective_date=serializer.validated_data.get("effective_date"),
+            )
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+        return Response(ContractRecontractEventSerializer(event).data, status=status.HTTP_201_CREATED)
+
+
+class AdminContractAmendmentProductRecontractEventListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk: int):
+        amendment = _amendment_queryset().filter(pk=pk).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        events = (
+            ContractRecontractEvent.objects.filter(amendment=amendment)
+            .select_related("amendment", "subscription", "old_product", "new_product", "created_by")
+            .order_by("-created_at", "-id")
+        )
+        return Response(ContractRecontractEventSerializer(events, many=True).data, status=status.HTTP_200_OK)

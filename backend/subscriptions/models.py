@@ -4316,6 +4316,115 @@ class ContractAmendment(models.Model):
         return f"Amendment [{self.amendment_type}] on Sub#{self.subscription_id} [{self.status}]"
 
 
+class ContractRecontractEvent(models.Model):
+    class ImpactType(models.TextChoices):
+        UPGRADE_EXTRA_PAYABLE = "UPGRADE_EXTRA_PAYABLE", "Upgrade Extra Payable"
+        DOWNGRADE_CREDIT_REQUIRED = "DOWNGRADE_CREDIT_REQUIRED", "Downgrade Credit Required"
+        SAME_PRICE_REFERENCE_CORRECTION = "SAME_PRICE_REFERENCE_CORRECTION", "Same Price Reference Correction"
+
+    class Status(models.TextChoices):
+        PREVIEWED = "PREVIEWED", "Previewed"
+        SUPERSEDED = "SUPERSEDED", "Superseded"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    amendment = models.ForeignKey(
+        ContractAmendment,
+        on_delete=models.PROTECT,
+        related_name="recontract_events",
+    )
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="recontract_events",
+    )
+    old_product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="recontract_events_as_old_product",
+        null=True,
+        blank=True,
+    )
+    new_product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="recontract_events_as_new_product",
+        null=True,
+        blank=True,
+    )
+    old_contract_total = models.DecimalField(max_digits=12, decimal_places=2)
+    new_contract_total = models.DecimalField(max_digits=12, decimal_places=2)
+    price_difference = models.DecimalField(max_digits=12, decimal_places=2)
+    amount_already_paid = models.DecimalField(max_digits=12, decimal_places=2)
+    old_remaining_balance = models.DecimalField(max_digits=12, decimal_places=2)
+    new_remaining_balance = models.DecimalField(max_digits=12, decimal_places=2)
+    current_tenure_months = models.PositiveIntegerField()
+    preview_tenure_months = models.PositiveIntegerField()
+    current_monthly_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    proposed_monthly_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    pending_emi_count = models.PositiveIntegerField(default=0)
+    impact_type = models.CharField(max_length=40, choices=ImpactType.choices, db_index=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PREVIEWED, db_index=True)
+    effective_date_preview = models.DateField(null=True, blank=True)
+    preview_snapshot = models.JSONField(default=dict, blank=True)
+    warnings = models.JSONField(default=list, blank=True)
+    blocked_reason = models.TextField(null=True, blank=True)
+    source_record_mutation = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="created_recontract_preview_events",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "contract_recontract_events"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["amendment", "status"], name="recontract_am_status_idx"),
+            models.Index(fields=["subscription", "created_at"], name="recontract_sub_created_idx"),
+            models.Index(fields=["impact_type", "status"], name="recontract_impact_status_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(condition=Q(old_contract_total__gte=0), name="chk_recontract_old_total_gte0"),
+            models.CheckConstraint(condition=Q(new_contract_total__gte=0), name="chk_recontract_new_total_gte0"),
+            models.CheckConstraint(condition=Q(amount_already_paid__gte=0), name="chk_recontract_paid_gte0"),
+            models.CheckConstraint(condition=Q(old_remaining_balance__gte=0), name="chk_recontract_old_bal_gte0"),
+            models.CheckConstraint(condition=Q(new_remaining_balance__gte=0), name="chk_recontract_new_bal_gte0"),
+            models.CheckConstraint(condition=Q(current_monthly_amount__gte=0), name="chk_recontract_cur_emi_gte0"),
+            models.CheckConstraint(condition=Q(proposed_monthly_amount__gte=0), name="chk_recontract_new_emi_gte0"),
+            models.CheckConstraint(condition=Q(current_tenure_months__gt=0), name="chk_recontract_cur_ten_gt0"),
+            models.CheckConstraint(condition=Q(preview_tenure_months__gt=0), name="chk_recontract_prev_ten_gt0"),
+            models.CheckConstraint(condition=Q(source_record_mutation=False), name="chk_recontract_no_src_mut"),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.subscription_id and self.amendment_id:
+            source = self.amendment.source_contract()
+            if source and source.pk != self.subscription_id:
+                errors["subscription"] = "Recontract event subscription must match amendment source contract."
+        if self.source_record_mutation:
+            errors["source_record_mutation"] = "Phase 6A preview persistence cannot mutate source records."
+        if not isinstance(self.preview_snapshot, dict):
+            errors["preview_snapshot"] = "Preview snapshot must be a JSON object."
+        if not isinstance(self.warnings, list):
+            errors["warnings"] = "Warnings must be a JSON list."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.source_record_mutation = False
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Recontract preview #{self.pk} for amendment {self.amendment_id} [{self.status}]"
+
+
 class PossessionStatus(models.TextChoices):
     PENDING_HANDOVER = "PENDING_HANDOVER", "Pending Handover"
     WITH_CUSTOMER = "WITH_CUSTOMER", "With Customer"

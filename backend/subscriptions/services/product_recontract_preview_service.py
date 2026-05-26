@@ -9,9 +9,12 @@ from __future__ import annotations
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 
-from subscriptions.models import ContractAmendment, EmiStatus, MONEY_ZERO, Product, Subscription
+from subscriptions.models import AuditLog, ContractAmendment, ContractRecontractEvent, EmiStatus, MONEY_ZERO, Product, Subscription
+from subscriptions.services.audit_service import log_audit
 
 _PREVIEW_ALLOWED_STATUSES = {"REQUESTED", "UNDER_REVIEW", "APPROVED"}
 _TARGET_PRODUCT_ID_KEYS = ("approved_product_id", "target_product_id", "new_product_id", "product_id")
@@ -29,6 +32,14 @@ def _q2(value: Decimal | int | str | None) -> Decimal:
 
 def _money(value: Decimal | int | str | None) -> str:
     return str(_q2(value))
+
+
+def _date(value):
+    if not value:
+        return None
+    if hasattr(value, "isoformat"):
+        return value
+    return parse_date(str(value))
 
 
 def _values_for(amendment: ContractAmendment) -> dict:
@@ -147,3 +158,84 @@ def preview_product_recontract(*, amendment: ContractAmendment, preview_tenure_m
         "effective_date_preview": preview_effective_date,
         "warnings": _PREVIEW_WARNINGS,
     }
+
+
+def create_product_recontract_preview_snapshot(
+    *,
+    amendment: ContractAmendment,
+    requested_by=None,
+    preview_tenure_months: int | None = None,
+    effective_date=None,
+) -> ContractRecontractEvent:
+    """Persist one backend-calculated product recontract preview as audit evidence only."""
+    with transaction.atomic():
+        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        preview = preview_product_recontract(
+            amendment=locked_amendment,
+            preview_tenure_months=preview_tenure_months,
+            effective_date=effective_date,
+        )
+        if preview.get("preview_status") != "READY":
+            raise ValidationError({"detail": preview.get("blocked_reason") or "Product recontract preview is blocked."})
+
+        source = locked_amendment.source_contract()
+        if not source:
+            raise ValidationError({"detail": "Source subscription is required for product recontract preview persistence."})
+
+        ContractRecontractEvent.objects.select_for_update().filter(
+            amendment=locked_amendment,
+            status=ContractRecontractEvent.Status.PREVIEWED,
+        ).update(status=ContractRecontractEvent.Status.SUPERSEDED, updated_at=timezone.now())
+
+        event = ContractRecontractEvent.objects.create(
+            amendment=locked_amendment,
+            subscription=source,
+            old_product_id=preview.get("old_product_id"),
+            new_product_id=preview.get("new_product_id"),
+            old_contract_total=_q2(preview.get("old_contract_total")),
+            new_contract_total=_q2(preview.get("new_contract_total")),
+            price_difference=_q2(preview.get("price_difference")),
+            amount_already_paid=_q2(preview.get("amount_already_paid")),
+            old_remaining_balance=_q2(preview.get("old_remaining_balance")),
+            new_remaining_balance=_q2(preview.get("proposed_new_remaining_balance")),
+            current_tenure_months=int(preview.get("current_tenure_months") or 0),
+            preview_tenure_months=int(preview.get("preview_tenure_months") or 0),
+            current_monthly_amount=_q2(preview.get("current_monthly_amount")),
+            proposed_monthly_amount=_q2(preview.get("proposed_monthly_amount")),
+            pending_emi_count=int(preview.get("pending_emi_count") or 0),
+            impact_type=preview.get("impact_type") or ContractRecontractEvent.ImpactType.SAME_PRICE_REFERENCE_CORRECTION,
+            effective_date_preview=_date(preview.get("effective_date_preview")),
+            preview_snapshot=preview,
+            warnings=preview.get("warnings") or [],
+            blocked_reason=preview.get("blocked_reason") or "",
+            source_record_mutation=False,
+            created_by=requested_by,
+            metadata={
+                "phase": "PHASE_6A_PREVIEW_SNAPSHOT_ONLY",
+                "source": "product_recontract_preview_service",
+                "source_record_mutation": False,
+            },
+        )
+
+        metadata = locked_amendment.metadata or {}
+        metadata["latest_product_recontract_event_id"] = event.pk
+        metadata["latest_product_recontract_event_status"] = event.status
+        metadata["latest_product_recontract_event_created_at"] = event.created_at.isoformat()
+        locked_amendment.metadata = metadata
+        locked_amendment.save(update_fields=["metadata", "updated_at"])
+
+        log_audit(
+            action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_APPROVED,
+            instance=locked_amendment,
+            performed_by=requested_by,
+            metadata={
+                "event": "CONTRACT_RECONTRACT_PREVIEW_CREATED",
+                "phase": "PHASE_6A_PREVIEW_SNAPSHOT_ONLY",
+                "amendment_id": locked_amendment.pk,
+                "recontract_event_id": event.pk,
+                "subscription_id": source.pk,
+                "impact_type": event.impact_type,
+                "source_record_mutation": False,
+            },
+        )
+        return event
