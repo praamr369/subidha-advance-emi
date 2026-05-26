@@ -1,17 +1,12 @@
 # Contract Amendment Implementation Plan
 
-Status: **Phase 4 product-reference implementation completed on `update` branch**
+Status: **Phase 4 same-price product reference correction completed on `update` branch**
 
 ## Principle
 
 Implement one controlled phase at a time. Do not move to the next phase until the previous phase is reviewed, committed, migrated, and tested.
 
-The amendment workflow is limited to:
-
-- EMI Subscription contracts.
-- Rent / Lease contracts.
-
-Direct Sale amendments are explicitly out of scope. Direct Sale corrections, invoice corrections, return, exchange, refund, cancellation, and billing workflows remain governed by their existing modules.
+The amendment workflow is limited to EMI Subscription contracts and Rent / Lease contracts. Direct Sale amendments are explicitly out of scope.
 
 ## Phase 1 — Backend foundation
 
@@ -24,14 +19,6 @@ Goal:
 - Allow admin review, approval, and rejection.
 - Do not implement or mutate contract terms.
 
-Implemented:
-
-- Extended existing `contract_amendments` table additively.
-- Added Phase 1 fields including contract type, source contract, customer, partner, request/review values, review flags, approval metadata, and implementation placeholders.
-- Added customer-scoped APIs.
-- Added partner-scoped APIs.
-- Added admin review/approve/reject APIs.
-
 Integrity notes:
 
 - Existing legacy amendment rows remain compatible.
@@ -41,12 +28,6 @@ Integrity notes:
 ## Phase 2 — UI only
 
 Status: **Implemented**
-
-Goal:
-
-- Add customer, partner, and admin amendment register/detail/request UI.
-- No contract mutation from request/review screens.
-- Admin subscription lifecycle page should show review/register wording, not admin-as-requester wording.
 
 Routes:
 
@@ -63,11 +44,6 @@ Routes:
 
 Status: **Implemented**
 
-Implemented types only:
-
-- `ADDRESS_CHANGE`
-- `CONTACT_CORRECTION`
-
 Implemented source fields:
 
 - `ADDRESS_CHANGE`: `Customer.address`, `Customer.city`
@@ -77,18 +53,22 @@ Implementation requires admin approval first, runs through `POST /api/v1/admin/c
 
 Phase 3 does not mutate subscriptions, EMI rows, payments, receipts, journals, waivers, lucky draw records, rent/lease billing demands, deposit records, inventory, stock, reconciliation records, commission records, or payout records.
 
-## Phase 4 — Product change implementation only
+## Phase 4 — Same-price product reference correction only
 
 Status: **Implemented**
 
+The existing `PRODUCT_CHANGE` enum remains for compatibility, but the current behavior is only `PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY`.
+
 Implemented behavior:
 
-- `PRODUCT_CHANGE` updates only `Subscription.product`.
+- Updates only `Subscription.product`.
 - Implementation is admin-only and approval-required.
 - Implementation runs through `POST /api/v1/admin/contract-amendments/{id}/implement/`.
-- The amendment row and source subscription are locked transactionally.
-- `implemented_values` captures old/new product data and financial invariant flags.
-- `CONTRACT_AMENDMENT_IMPLEMENTED` is emitted with `phase = PHASE_4_PRODUCT_REFERENCE_CHANGE`.
+- Legacy `POST /api/v1/admin/contracts/amendments/{id}/apply/` delegates to the same safe service.
+- The amendment row is locked without nullable `select_related()` joins.
+- The source subscription is locked separately before mutation.
+- `implemented_values` captures old/new product data, semantic classification, and financial invariant flags.
+- `CONTRACT_AMENDMENT_IMPLEMENTED` is emitted with `phase = PHASE_4_PRODUCT_REFERENCE_CORRECTION`.
 
 Preserved fields and workflows:
 
@@ -113,28 +93,19 @@ Preserved fields and workflows:
 - cancellation records
 - return records
 
-Product change is blocked when the target product would require price, EMI, or tenure recalculation. It is also blocked for terminal/cancelled source subscriptions and inactive/non-eligible target products.
+Financial product upgrade/downgrade is blocked. A target product with a different base price is rejected with: `Financial product change requires contract repricing preview and reconciliation and is not implemented in this phase.`
+
+A future true product-change phase must include price difference, EMI recalculation preview, paid amount allocation, future EMI schedule change, receipt/payment treatment, accounting entries, reconciliation impact, customer/admin approval, and audit trail.
 
 ## Phase 5 — Lucky ID / Batch change only
 
 Status: **Deferred**
 
-Scope:
-
-- EMI subscription only.
-- Rent/lease and Direct Sale blocked.
-
-Draw history, winner history, waivers, payments, receipts, and journals remain immutable.
+Phase 5 must wait until product-change financial semantics are settled.
 
 ## Phase 6 — Future financial obligation recalculation
 
 Status: **Deferred**
-
-Scope:
-
-- Future unpaid EMI obligations.
-- Future unpaid rent/lease obligations.
-- Deposit adjustment audit evidence.
 
 Paid EMIs, posted payments, receipts, journals, winner/waiver history, and past rent/lease payments remain immutable.
 
