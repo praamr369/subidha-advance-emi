@@ -14,6 +14,7 @@ from accounting.models import (
     JournalEntry,
     JournalEntryLine,
 )
+from api.v1.serializers.contract_amendments import ContractRecontractEventSerializer
 from reconciliation.models import FinancialSourceLifecycleEvent, ReconciliationEvidence, ReconciliationItem, ReconciliationRun
 from settlements.models import CashierDayClose, SettlementAllocation
 from subscriptions.models import (
@@ -219,6 +220,8 @@ class ContractRecontractExecutionTests(TestCase):
                 "lucky_id": self.subscription.lucky_id_id,
                 "waived_amount": self.subscription.waived_amount,
                 "winner_month": self.subscription.winner_month,
+                "product_snapshot": self.subscription.product_snapshot,
+                "pricing_snapshot": self.subscription.pricing_snapshot,
             },
             "emis": list(
                 Emi.objects.filter(subscription=self.subscription)
@@ -265,7 +268,7 @@ class ContractRecontractExecutionTests(TestCase):
         self.assertEqual(before_counts, self._counts())
         self.assertEqual(before_state, self._state())
 
-    def test_execution_succeeds_only_with_all_gates_and_updates_subscription_and_pending_emis(self):
+    def test_execution_succeeds_only_with_all_gates_and_updates_subscription_snapshots_and_pending_emis(self):
         self._prepare()
         before_counts = self._counts()
         before_state = self._state()
@@ -280,6 +283,10 @@ class ContractRecontractExecutionTests(TestCase):
         self.assertEqual(self.subscription.total_amount, Decimal("24000.00"))
         self.assertEqual(self.subscription.monthly_amount, Decimal("2400.00"))
         self.assertEqual(self.subscription.tenure_months, 10)
+        self.assertEqual(self.subscription.product_snapshot["product_id"], self.target.id)
+        self.assertEqual(self.subscription.product_snapshot["snapshot_source"], "CONTRACT_RECONTRACT_EXECUTED")
+        self.assertEqual(self.subscription.pricing_snapshot["total_amount"], "24000.00")
+        self.assertEqual(self.subscription.pricing_snapshot["monthly_amount"], "2400.00")
 
         for emi in Emi.objects.filter(subscription=self.subscription, status=EmiStatus.PENDING):
             expected_due, expected_amount = expectation[emi.id]
@@ -304,6 +311,10 @@ class ContractRecontractExecutionTests(TestCase):
         self.assertTrue(event.metadata["execution_performed"])
         self.assertEqual(event.metadata["before_subscription"]["product_id"], self.product.id)
         self.assertEqual(event.metadata["after_subscription"]["product_id"], self.target.id)
+        self.assertTrue(event.metadata["product_snapshot_updated"])
+        self.assertTrue(event.metadata["pricing_snapshot_updated"])
+        self.assertGreater(len(event.metadata["schedule_line_ids"]), 0)
+        self.assertGreater(len(event.metadata["reconciliation_evidence_ids"]), 0)
         self.assertEqual(event.metadata["payments_mutated"], False)
         self.assertEqual(event.metadata["receipts_mutated"], False)
         self.assertEqual(event.metadata["accounting_mutated_by_execution"], False)
@@ -315,6 +326,31 @@ class ContractRecontractExecutionTests(TestCase):
                 metadata__event="CONTRACT_RECONTRACT_EXECUTED",
             ).exists()
         )
+
+    def test_serializer_exposes_execution_metadata_without_raw_metadata_parsing(self):
+        self._prepare()
+        response = self._post(self._execute_url(), self.admin)
+        self.assertEqual(response.status_code, 200, response.data)
+
+        self.assertTrue(response.data["executed"])
+        self.assertEqual(response.data["execution_status"], "EXECUTED")
+        self.assertIsNotNone(response.data["executed_at"])
+        self.assertEqual(response.data["executed_by"], self.admin.id)
+        self.assertIsNotNone(response.data["accounting_bridge_posting_id"])
+        self.assertIsNotNone(response.data["journal_entry_id"])
+        self.assertIsNotNone(response.data["reconciliation_item_id"])
+        self.assertIsNotNone(response.data["reconciliation_run_id"])
+        self.assertGreater(len(response.data["reconciliation_evidence_ids"]), 0)
+        self.assertGreater(len(response.data["schedule_line_ids"]), 0)
+        self.assertEqual(response.data["execution_snapshot"]["after_subscription"]["product_id"], self.target.id)
+        self.assertTrue(response.data["execution_snapshot"]["product_snapshot_updated"])
+        self.assertTrue(response.data["execution_snapshot"]["pricing_snapshot_updated"])
+        self.assertFalse(response.data["execution_snapshot"]["preservation_flags"]["payments_mutated"])
+
+        event = ContractRecontractEvent.objects.get(pk=response.data["id"])
+        serialized = ContractRecontractEventSerializer(event).data
+        self.assertTrue(serialized["executed"])
+        self.assertEqual(serialized["execution_status"], "EXECUTED")
 
     def test_duplicate_execution_rejected(self):
         self._prepare()
@@ -346,6 +382,44 @@ class ContractRecontractExecutionTests(TestCase):
         self.assertIn("posted accounting amount", str(response.data).lower())
         self.assertEqual(before_counts, self._counts())
         self.assertEqual(before_state, self._state())
+
+    def test_stale_or_missing_reconciliation_evidence_rejected(self):
+        self._prepare()
+        item = ReconciliationItem.objects.get(source_type="PRODUCT_RECONTRACT_ADJUSTMENT")
+        ReconciliationEvidence.objects.filter(item=item, evidence_type="JournalEntry").delete()
+        before_counts = self._counts()
+        before_state = self._state()
+
+        response = self._post(self._execute_url(), self.admin)
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("reconciliation evidence is incomplete", str(response.data).lower())
+        self.assertEqual(before_counts, self._counts())
+        self.assertEqual(before_state, self._state())
+
+    def test_paid_waived_and_cancelled_emis_are_not_changed(self):
+        Emi.objects.filter(pk=self.emis[2].pk).update(status=EmiStatus.WAIVED)
+        Emi.objects.filter(pk=self.emis[3].pk).update(status=EmiStatus.CANCELLED)
+        protected_before = list(
+            Emi.objects.filter(subscription=self.subscription)
+            .exclude(status=EmiStatus.PENDING)
+            .order_by("month_no")
+            .values_list("id", "month_no", "due_date", "amount", "status")
+        )
+        self._prepare()
+
+        response = self._post(self._execute_url(), self.admin)
+
+        self.assertEqual(response.status_code, 200, response.data)
+        protected_after = list(
+            Emi.objects.filter(subscription=self.subscription)
+            .exclude(status=EmiStatus.PENDING)
+            .order_by("month_no")
+            .values_list("id", "month_no", "due_date", "amount", "status")
+        )
+        self.assertEqual(protected_before, protected_after)
+        self.assertIn(self.emis[2].id, response.data["execution_snapshot"]["protected_emi_ids"])
+        self.assertIn(self.emis[3].id, response.data["execution_snapshot"]["protected_emi_ids"])
 
     def test_non_admin_cannot_execute(self):
         self._prepare()
