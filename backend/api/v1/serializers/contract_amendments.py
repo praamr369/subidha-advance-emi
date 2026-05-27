@@ -495,3 +495,143 @@ class ContractRecontractFinancialImpactPreviewSerializer(serializers.ModelSerial
             "updated_at",
         ]
         read_only_fields = fields
+
+
+class ProductRecontractReportRowSerializer(serializers.ModelSerializer):
+    amendment_id = serializers.IntegerField(source="amendment.id", read_only=True)
+    amendment_no = serializers.CharField(source="amendment.amendment_no", read_only=True, allow_null=True)
+    subscription_id = serializers.IntegerField(source="subscription.id", read_only=True)
+    subscription_number = serializers.CharField(source="subscription.subscription_number", read_only=True, allow_null=True)
+    customer_id = serializers.IntegerField(source="amendment.customer.id", read_only=True, allow_null=True)
+    customer_name = serializers.CharField(source="amendment.customer.name", read_only=True, allow_null=True)
+    customer_phone = serializers.CharField(source="amendment.customer.phone", read_only=True, allow_null=True)
+    old_product_id = serializers.IntegerField(source="old_product.id", read_only=True, allow_null=True)
+    old_product_name = serializers.CharField(source="old_product.name", read_only=True, allow_null=True)
+    old_product_code = serializers.CharField(source="old_product.product_code", read_only=True, allow_null=True)
+    new_product_id = serializers.IntegerField(source="new_product.id", read_only=True, allow_null=True)
+    new_product_name = serializers.CharField(source="new_product.name", read_only=True, allow_null=True)
+    new_product_code = serializers.CharField(source="new_product.product_code", read_only=True, allow_null=True)
+    schedule_preview_status = serializers.SerializerMethodField()
+    accounting_posting_status = serializers.SerializerMethodField()
+    reconciliation_bridge_status = serializers.SerializerMethodField()
+    executed = serializers.SerializerMethodField()
+    executed_status = serializers.SerializerMethodField()
+    executed_at = serializers.SerializerMethodField()
+    journal_entry_id = serializers.SerializerMethodField()
+    journal_entry_no = serializers.SerializerMethodField()
+    accounting_bridge_posting_id = serializers.SerializerMethodField()
+    reconciliation_item_id = serializers.SerializerMethodField()
+    reconciliation_run_id = serializers.SerializerMethodField()
+    addendum_print_reference = serializers.SerializerMethodField()
+
+    def _metadata(self, obj):
+        return obj.metadata if isinstance(obj.metadata, dict) else {}
+
+    def _bridge(self, obj):
+        bridges = self.context.get("accounting_bridges") or {}
+        return bridges.get(obj.id)
+
+    def _reconciliation_evidence_ids(self, obj):
+        evidence = self.context.get("reconciliation_evidence_ids") or {}
+        return evidence.get(self.get_reconciliation_item_id(obj), [])
+
+    def get_schedule_preview_status(self, obj):
+        line_ids = self._metadata(obj).get("schedule_line_ids") or []
+        if line_ids or obj.schedule_preview_lines.filter(proposed_status=ContractRecontractScheduleLine.ProposedStatus.PREVIEW_ONLY).exists():
+            return "GENERATED"
+        return "MISSING"
+
+    def get_accounting_bridge_posting_id(self, obj):
+        metadata = self._metadata(obj)
+        bridge_id = metadata.get("accounting_bridge_posting_id") or metadata.get("accounting_posting_bridge_id")
+        if bridge_id:
+            return bridge_id
+        bridge = self._bridge(obj)
+        return bridge.id if bridge else None
+
+    def get_journal_entry_id(self, obj):
+        metadata = self._metadata(obj)
+        journal_id = metadata.get("journal_entry_id") or metadata.get("accounting_posting_journal_entry_id")
+        if journal_id:
+            return journal_id
+        bridge = self._bridge(obj)
+        return bridge.journal_entry_id if bridge else None
+
+    def get_journal_entry_no(self, obj):
+        bridge = self._bridge(obj)
+        if bridge and bridge.journal_entry_id:
+            return bridge.journal_entry.entry_no
+        return None
+
+    def get_accounting_posting_status(self, obj):
+        if self.get_accounting_bridge_posting_id(obj) and self.get_journal_entry_id(obj):
+            return "POSTED"
+        return "MISSING"
+
+    def get_reconciliation_item_id(self, obj):
+        metadata = self._metadata(obj)
+        return metadata.get("reconciliation_item_id") or metadata.get("reconciliation_record_id")
+
+    def get_reconciliation_run_id(self, obj):
+        return self._metadata(obj).get("reconciliation_run_id")
+
+    def get_reconciliation_bridge_status(self, obj):
+        if self.get_reconciliation_item_id(obj) and self.get_reconciliation_run_id(obj) and self._reconciliation_evidence_ids(obj):
+            return "LINKED"
+        return "MISSING"
+
+    def get_executed(self, obj):
+        metadata = self._metadata(obj)
+        return bool(metadata.get("execution_performed") is True or metadata.get("execution_status") == "EXECUTED")
+
+    def get_executed_status(self, obj):
+        return "EXECUTED" if self.get_executed(obj) else "NOT_EXECUTED"
+
+    def get_executed_at(self, obj):
+        return self._metadata(obj).get("executed_at")
+
+    def get_addendum_print_reference(self, obj):
+        if not self.get_executed(obj):
+            return None
+        return {
+            "amendment_id": obj.amendment_id,
+            "route": f"/admin/contract-amendments/{obj.amendment_id}/recontract-addendum/print",
+        }
+
+    class Meta:
+        model = ContractRecontractEvent
+        fields = [
+            "id",
+            "amendment_id",
+            "amendment_no",
+            "subscription_id",
+            "subscription_number",
+            "customer_id",
+            "customer_name",
+            "customer_phone",
+            "old_product_id",
+            "old_product_name",
+            "old_product_code",
+            "new_product_id",
+            "new_product_name",
+            "new_product_code",
+            "old_contract_total",
+            "new_contract_total",
+            "price_difference",
+            "customer_consent_status",
+            "admin_approval_status",
+            "schedule_preview_status",
+            "accounting_posting_status",
+            "reconciliation_bridge_status",
+            "executed",
+            "executed_status",
+            "executed_at",
+            "accounting_bridge_posting_id",
+            "journal_entry_id",
+            "journal_entry_no",
+            "reconciliation_item_id",
+            "reconciliation_run_id",
+            "addendum_print_reference",
+            "created_at",
+        ]
+        read_only_fields = fields
