@@ -71,6 +71,11 @@ def _event_preview_summary(event: ContractRecontractEvent | None) -> dict | None
         "customer_consent_status": event.customer_consent_status,
         "customer_consented_at": event.customer_consented_at.isoformat() if event.customer_consented_at else None,
         "customer_consent_note": event.customer_consent_note or "",
+        "admin_approval_status": event.admin_approval_status,
+        "admin_approved_by": event.admin_approved_by_id,
+        "admin_approved_at": event.admin_approved_at.isoformat() if event.admin_approved_at else None,
+        "admin_approval_note": event.admin_approval_note or "",
+        "admin_approval_snapshot": event.admin_approval_snapshot or {},
         "source_record_mutation": False,
     }
 
@@ -372,6 +377,101 @@ def record_product_recontract_customer_consent(
                 "subscription_id": event.subscription_id,
                 "decision": decision,
                 "source_record_mutation": False,
+            },
+        )
+        return event
+
+
+def record_product_recontract_admin_approval(
+    *,
+    amendment: ContractAmendment,
+    admin_user,
+    decision: str,
+    note: str = "",
+) -> ContractRecontractEvent:
+    """Record admin approval/rejection against a customer-accepted preview only."""
+    decision = (decision or "").strip().upper()
+    if decision not in {
+        ContractRecontractEvent.AdminApprovalStatus.APPROVED,
+        ContractRecontractEvent.AdminApprovalStatus.REJECTED,
+    }:
+        raise ValidationError({"decision": "Decision must be APPROVED or REJECTED."})
+
+    with transaction.atomic():
+        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        event = (
+            ContractRecontractEvent.objects.select_for_update()
+            .select_related("old_product", "new_product", "subscription")
+            .filter(amendment=locked_amendment)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if not event:
+            raise ValidationError({"detail": "No saved product recontract preview exists for this amendment."})
+        if event.status != ContractRecontractEvent.Status.PREVIEWED:
+            raise ValidationError({"detail": "Admin approval requires the latest saved preview to be active and PREVIEWED."})
+        if not event.preview_snapshot:
+            raise ValidationError({"detail": "Admin approval requires a saved backend preview snapshot."})
+        if event.customer_consent_status == ContractRecontractEvent.CustomerConsentStatus.PENDING:
+            raise ValidationError({"detail": "Admin approval requires customer ACCEPTED consent first."})
+        if event.customer_consent_status == ContractRecontractEvent.CustomerConsentStatus.REJECTED:
+            raise ValidationError({"detail": "Admin approval is blocked because the customer rejected this preview."})
+        if event.customer_consent_status != ContractRecontractEvent.CustomerConsentStatus.ACCEPTED:
+            raise ValidationError({"detail": "Admin approval requires customer ACCEPTED consent first."})
+        if event.admin_approval_status != ContractRecontractEvent.AdminApprovalStatus.PENDING:
+            raise ValidationError({"detail": "Admin approval decision has already been recorded for this preview."})
+
+        approved_at = timezone.now()
+        snapshot = _event_preview_summary(event) or {}
+        snapshot.update(
+            {
+                "decision": decision,
+                "note": note or "",
+                "approved_by": admin_user.pk,
+                "approved_at": approved_at.isoformat(),
+                "phase": "PHASE_6C_ADMIN_APPROVAL_DECISION_ONLY",
+                "source_record_mutation": False,
+                "execution_performed": False,
+            }
+        )
+
+        event.admin_approval_status = decision
+        event.admin_approved_by = admin_user
+        event.admin_approved_at = approved_at
+        event.admin_approval_note = note or ""
+        event.admin_approval_snapshot = snapshot
+        metadata = event.metadata or {}
+        metadata["admin_approval_status"] = decision
+        metadata["admin_approval_recorded_at"] = event.admin_approved_at.isoformat()
+        metadata["phase"] = "PHASE_6C_ADMIN_APPROVAL_DECISION_ONLY"
+        metadata["source_record_mutation"] = False
+        metadata["execution_performed"] = False
+        event.metadata = metadata
+        event.save(
+            update_fields=[
+                "admin_approval_status",
+                "admin_approved_by",
+                "admin_approved_at",
+                "admin_approval_note",
+                "admin_approval_snapshot",
+                "metadata",
+                "updated_at",
+            ]
+        )
+
+        log_audit(
+            action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_APPROVED,
+            instance=locked_amendment,
+            performed_by=admin_user,
+            metadata={
+                "event": "CONTRACT_RECONTRACT_ADMIN_DECISION_RECORDED",
+                "phase": "PHASE_6C_ADMIN_APPROVAL_DECISION_ONLY",
+                "amendment_id": locked_amendment.pk,
+                "recontract_event_id": event.pk,
+                "subscription_id": event.subscription_id,
+                "decision": decision,
+                "source_record_mutation": False,
+                "execution_performed": False,
             },
         )
         return event

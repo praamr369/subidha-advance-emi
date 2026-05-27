@@ -132,6 +132,11 @@ class ProductRecontractCustomerConsentSerializer(serializers.Serializer):
     note = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
 
 
+class ProductRecontractAdminDecisionSerializer(serializers.Serializer):
+    decision = serializers.ChoiceField(choices=["APPROVED", "REJECTED"])
+    note = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+
+
 class ProductRecontractPreviewRequestSerializer(serializers.Serializer):
     preview_tenure_months = serializers.IntegerField(required=False, min_value=1)
     effective_date = serializers.DateField(required=False, allow_null=True)
@@ -173,6 +178,7 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
     new_product_code = serializers.CharField(source="new_product.product_code", read_only=True, allow_null=True)
     created_by_display = serializers.CharField(source="created_by.username", read_only=True, allow_null=True)
     customer_consented_by_display = serializers.CharField(source="customer_consented_by.username", read_only=True, allow_null=True)
+    admin_approved_by_display = serializers.CharField(source="admin_approved_by.username", read_only=True, allow_null=True)
 
     class Meta:
         model = ContractRecontractEvent
@@ -212,6 +218,12 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
             "customer_consented_at",
             "customer_consent_note",
             "customer_consent_snapshot",
+            "admin_approval_status",
+            "admin_approved_by",
+            "admin_approved_by_display",
+            "admin_approved_at",
+            "admin_approval_note",
+            "admin_approval_snapshot",
             "metadata",
         ]
         read_only_fields = fields

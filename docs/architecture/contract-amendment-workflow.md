@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, and Phase 6B customer consent are implemented on `update`.
+Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, Phase 6B customer consent, and Phase 6C admin decision recording are implemented on `update`.
 
 ## Scope
 
@@ -64,7 +64,7 @@ GET  /api/v1/admin/contract-amendments/{id}/product-recontract-events/
 
 The save endpoint recalculates the preview on the backend and stores a `ContractRecontractEvent` snapshot. Prior active preview events for the same amendment are marked `SUPERSEDED`; retained history remains available through the events endpoint. Amendment metadata stores the latest preview event id for review convenience.
 
-Phase 6A is audit evidence only. It does not change the real contract, EMI schedule, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records. Admin execution approval, future EMI schedule change, accounting posting, reconciliation, and printable addendum remain future phases.
+Phase 6A is audit evidence only. It does not change the real contract, EMI schedule, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records. Customer consent, admin decision recording, future EMI schedule change, accounting posting, reconciliation, execution endpoint, and printable addendum are handled in later phases.
 
 Product upgrade/downgrade remains preview-only and future-recontract work. It must not be applied from the subscription lifecycle page.
 
@@ -80,11 +80,25 @@ Allowed decisions are `ACCEPTED` and `REJECTED`, with an optional note. Consent 
 
 Phase 6B is consent evidence only. It does not mutate `Subscription.product`, contract totals, monthly EMI, tenure, EMI rows, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
 
-Admin amendment detail shows customer consent status read-only. Admins cannot override or submit customer consent in this phase. Customer consent is required before future admin execution approval.
+Admin amendment detail shows customer consent status read-only. Admins cannot override or submit customer consent in this phase. Customer consent is required before admin approval.
+
+## Phase 6C — Admin approval/rejection for customer-accepted previews
+
+Admin users can record a decision for the latest active saved product recontract preview only after the customer consent status is `ACCEPTED`:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/admin-decision/
+```
+
+Allowed decisions are `APPROVED` and `REJECTED`, with an optional note. The endpoint rejects missing saved previews, pending customer consent, customer rejection, superseded/cancelled previews, and second admin decision attempts.
+
+Phase 6C is decision evidence only. It stores admin approval status, actor, timestamp, note, and approval snapshot on `ContractRecontractEvent`. It does not mutate `Subscription.product`, contract totals, monthly EMI, tenure, EMI rows, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
+
+No execution endpoint or execution button exists in Phase 6C. Future EMI schedule update, accounting/reconciliation integration, execution endpoint, and printable addendum remain future phases.
 
 ## Product recontract execution design
 
-Current system supports preview and customer consent evidence only for financial product change. Execution is intentionally deferred until admin approval workflow, future EMI schedule adjustment service, accounting bridge, reconciliation event flow, and printable addendum are implemented.
+Current system supports preview, customer consent, and admin decision evidence only for financial product change. Execution is intentionally deferred until future EMI schedule adjustment service, accounting bridge, reconciliation event flow, execution endpoint, and printable addendum are implemented.
 
 The future execution design is documented in:
 
@@ -105,6 +119,7 @@ POST /api/v1/admin/contract-amendments/{id}/reject/
 POST /api/v1/admin/contract-amendments/{id}/implement/
 POST /api/v1/admin/contract-amendments/{id}/product-recontract-preview/
 POST /api/v1/admin/contract-amendments/{id}/product-recontract-preview/save/
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/admin-decision/
 GET  /api/v1/admin/contract-amendments/{id}/product-recontract-events/
 ```
 
@@ -124,6 +139,6 @@ POST /api/v1/admin/contracts/amendments/{id}/apply/
 
 ## Deferred phases
 
-True product recontract execution requires later phases covering admin execution approval, price difference approval, EMI recalculation preview approval, paid amount allocation, future EMI schedule generation, receipt/payment treatment, accounting entries, reconciliation impact, printable addendum, and audit trail.
+True product recontract execution requires later phases covering price difference execution rules, EMI recalculation preview approval, paid amount allocation, future EMI schedule generation, receipt/payment treatment, accounting entries, reconciliation impact, execution endpoint, printable addendum, and audit trail.
 
 Phase 5 lucky ID / batch work must wait until financial product-change semantics are settled.

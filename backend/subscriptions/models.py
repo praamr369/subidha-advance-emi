@@ -4332,6 +4332,11 @@ class ContractRecontractEvent(models.Model):
         ACCEPTED = "ACCEPTED", "Accepted"
         REJECTED = "REJECTED", "Rejected"
 
+    class AdminApprovalStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+
     amendment = models.ForeignKey(
         ContractAmendment,
         on_delete=models.PROTECT,
@@ -4397,6 +4402,22 @@ class ContractRecontractEvent(models.Model):
     customer_consented_at = models.DateTimeField(null=True, blank=True)
     customer_consent_note = models.TextField(null=True, blank=True)
     customer_consent_snapshot = models.JSONField(default=dict, blank=True)
+    admin_approval_status = models.CharField(
+        max_length=20,
+        choices=AdminApprovalStatus.choices,
+        default=AdminApprovalStatus.PENDING,
+        db_index=True,
+    )
+    admin_approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="admin_recontract_approval_decisions",
+        null=True,
+        blank=True,
+    )
+    admin_approved_at = models.DateTimeField(null=True, blank=True)
+    admin_approval_note = models.TextField(null=True, blank=True)
+    admin_approval_snapshot = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
     metadata = models.JSONField(default=dict, blank=True)
@@ -4436,6 +4457,8 @@ class ContractRecontractEvent(models.Model):
             errors["warnings"] = "Warnings must be a JSON list."
         if not isinstance(self.customer_consent_snapshot, dict):
             errors["customer_consent_snapshot"] = "Customer consent snapshot must be a JSON object."
+        if not isinstance(self.admin_approval_snapshot, dict):
+            errors["admin_approval_snapshot"] = "Admin approval snapshot must be a JSON object."
         if errors:
             raise ValidationError(errors)
 

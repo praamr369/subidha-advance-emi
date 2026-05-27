@@ -7,6 +7,7 @@ import { DetailPanel } from "@/components/ui/operations";
 import {
   listProductRecontractEvents,
   previewProductRecontractAmendment,
+  recordProductRecontractAdminDecision,
   saveProductRecontractPreviewSnapshot,
   type ContractRecontractEvent,
   type ProductRecontractPreview,
@@ -31,6 +32,8 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
   const [events, setEvents] = useState<ContractRecontractEvent[]>([]);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [decisionBusy, setDecisionBusy] = useState<"APPROVED" | "REJECTED" | null>(null);
+  const [adminDecisionNote, setAdminDecisionNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -52,6 +55,10 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
   if (amendment.amendment_type !== "PRODUCT_CHANGE") return null;
 
   const latestEvent = events[0];
+  const canRecordAdminDecision =
+    latestEvent?.status === "PREVIEWED" &&
+    latestEvent.customer_consent_status === "ACCEPTED" &&
+    (latestEvent.admin_approval_status || "PENDING") === "PENDING";
 
   async function runPreview() {
     setBusy(true);
@@ -79,6 +86,22 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
       setError(err instanceof Error ? err.message : "Preview snapshot save failed.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function recordAdminDecision(decision: "APPROVED" | "REJECTED") {
+    setDecisionBusy(decision);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      const event = await recordProductRecontractAdminDecision(amendment.id, decision, adminDecisionNote);
+      const rows = await listProductRecontractEvents(amendment.id);
+      setEvents(rows.length > 0 ? rows : [event]);
+      setSaveMessage(`Admin recontract preview decision recorded: ${decision}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Admin decision failed.");
+    } finally {
+      setDecisionBusy(null);
     }
   }
 
@@ -149,7 +172,39 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
               <MoneyRow label="Proposed EMI" value={latestEvent.proposed_monthly_amount} />
               <MoneyRow label="Pending EMI count" value={latestEvent.pending_emi_count} />
               <MoneyRow label="Source record mutation" value={latestEvent.source_record_mutation ? "Yes" : "No"} />
+              <MoneyRow label="Customer consent status" value={latestEvent.customer_consent_status || "PENDING"} />
+              <MoneyRow label="Admin approval status" value={latestEvent.admin_approval_status || "PENDING"} />
+              <MoneyRow label="Admin approval actor" value={latestEvent.admin_approved_by_display || latestEvent.admin_approved_by} />
+              <MoneyRow label="Admin approval timestamp" value={latestEvent.admin_approved_at} />
             </div>
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+              Admin approval records a decision only. It does not execute product change, recalculate EMI, post accounting, update reconciliation, change stock/delivery, or mutate any contract records.
+            </div>
+            {canRecordAdminDecision ? (
+              <div className="space-y-3">
+                <label className="block text-sm font-medium">
+                  Admin note
+                  <textarea
+                    className="mt-2 min-h-20 w-full rounded-xl border border-border bg-background p-3 text-sm"
+                    value={adminDecisionNote}
+                    onChange={(event) => setAdminDecisionNote(event.target.value)}
+                  />
+                </label>
+                <div className="flex flex-wrap gap-3">
+                  <ActionButton variant="outline" onClick={() => void recordAdminDecision("APPROVED")} disabled={Boolean(decisionBusy) || busy || saving}>
+                    {decisionBusy === "APPROVED" ? "Recording approval..." : "Approve recontract preview for future execution"}
+                  </ActionButton>
+                  <ActionButton variant="outline" onClick={() => void recordAdminDecision("REJECTED")} disabled={Boolean(decisionBusy) || busy || saving}>
+                    {decisionBusy === "REJECTED" ? "Recording rejection..." : "Reject recontract preview"}
+                  </ActionButton>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Admin approval status: {latestEvent.admin_approval_status || "PENDING"}
+                {latestEvent.admin_approval_note ? ` · ${latestEvent.admin_approval_note}` : ""}
+              </div>
+            )}
           </div>
         ) : null}
       </div>

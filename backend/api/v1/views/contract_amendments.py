@@ -12,6 +12,7 @@ from api.v1.serializers.contract_amendments import (
     ContractAmendmentReviewSerializer,
     ContractAmendmentSerializer,
     ContractRecontractEventSerializer,
+    ProductRecontractAdminDecisionSerializer,
     ProductRecontractCustomerConsentSerializer,
     ProductRecontractPreviewRequestSerializer,
     ProductRecontractPreviewSerializer,
@@ -27,6 +28,7 @@ from subscriptions.services.contract_amendment_service import (
 from subscriptions.services.product_recontract_preview_service import (
     create_product_recontract_preview_snapshot,
     preview_product_recontract,
+    record_product_recontract_admin_approval,
     record_product_recontract_customer_consent,
 )
 
@@ -327,6 +329,27 @@ class AdminContractAmendmentProductRecontractPreviewSaveView(APIView):
         return Response(ContractRecontractEventSerializer(event).data, status=status.HTTP_201_CREATED)
 
 
+class AdminContractAmendmentProductRecontractDecisionView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        amendment = _amendment_queryset().filter(pk=pk).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ProductRecontractAdminDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            event = record_product_recontract_admin_approval(
+                amendment=amendment,
+                admin_user=request.user,
+                decision=serializer.validated_data["decision"],
+                note=serializer.validated_data.get("note", ""),
+            )
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+        return Response(ContractRecontractEventSerializer(event).data, status=status.HTTP_200_OK)
+
+
 class AdminContractAmendmentProductRecontractEventListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
@@ -336,7 +359,7 @@ class AdminContractAmendmentProductRecontractEventListView(APIView):
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
         events = (
             ContractRecontractEvent.objects.filter(amendment=amendment)
-            .select_related("amendment", "subscription", "old_product", "new_product", "created_by")
+            .select_related("amendment", "subscription", "old_product", "new_product", "created_by", "customer_consented_by", "admin_approved_by")
             .order_by("-created_at", "-id")
         )
         return Response(ContractRecontractEventSerializer(events, many=True).data, status=status.HTTP_200_OK)

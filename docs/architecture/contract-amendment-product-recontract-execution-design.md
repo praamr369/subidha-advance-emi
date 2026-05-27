@@ -1,6 +1,6 @@
 # Contract Amendment Product Recontract Execution Design
 
-Status: execution design only. Phase 6A preview snapshot persistence and Phase 6B customer consent for saved preview snapshots are implemented, but no execution endpoint, mutation service, admin execution approval, or frontend execution control is implemented.
+Status: execution design only. Phase 6A preview snapshot persistence, Phase 6B customer consent, and Phase 6C admin approval/rejection for customer-accepted saved preview snapshots are implemented, but no execution endpoint, mutation service, or frontend execution control is implemented.
 
 Branch: `update`
 
@@ -114,6 +114,8 @@ Recommended constraints and indexes:
 
 Phase 6B implemented the current consent fields additively on `ContractRecontractEvent`: `customer_consent_status`, `customer_consented_by`, `customer_consented_at`, `customer_consent_note`, and `customer_consent_snapshot`. These fields capture customer decision evidence only and do not advance the event to execution.
 
+Phase 6C implemented the current admin decision fields additively on `ContractRecontractEvent`: `admin_approval_status`, `admin_approved_by`, `admin_approved_at`, `admin_approval_note`, and `admin_approval_snapshot`. These fields capture admin approval/rejection evidence only and do not advance the event to execution.
+
 ### Optional Child Models
 
 `ContractRecontractScheduleLine`
@@ -146,15 +148,16 @@ Phase 6B implemented the current consent fields additively on `ContractRecontrac
 - Customer sees old and new product, old and new contract amount, amount already paid, new remaining balance, proposed future EMI/tenure, effective date, credit/refund policy, and warnings.
 - Customer accepts or rejects.
 - Phase 6B records this decision only against the latest active saved `PREVIEWED` snapshot.
-- Customer consent is required before any future admin execution approval.
+- Customer consent is required before admin approval.
 - No subscription, EMI, payment, receipt, accounting, reconciliation, waiver, delivery, stock, commission, payout, rent/lease deposit, or demand mutation.
 
 ### Stage C - Admin Approval
 
 - Admin reviews customer consent, preview snapshot, eligibility guards, stale preview check, accounting impact, reconciliation impact, waiver/draw risk, and delivery/inventory notes.
+- Phase 6C records `APPROVED` or `REJECTED` only after customer consent is `ACCEPTED`.
 - Admin approval records approval evidence only.
-- No source mutation yet.
-- Admin approval remains future work. Phase 6B does not allow admins to consent on behalf of customers or override customer consent.
+- No source mutation.
+- Admins cannot consent on behalf of customers or override customer consent.
 
 ### Stage D - Execution
 
@@ -178,7 +181,7 @@ Required transaction shape:
 - emit audit/business events
 - mark event `EXECUTED` with execution snapshot
 
-Execution remains future work after Phase 6B. Future EMI schedule update, accounting/reconciliation integration, and printable addendum generation are not part of customer consent.
+Execution remains future work after Phase 6C. Future EMI schedule update, accounting/reconciliation integration, execution endpoint, and printable addendum generation are not part of admin approval.
 
 ### Stage E - Post-Execution Audit/Reconciliation
 
@@ -355,7 +358,7 @@ Must record:
 
 Audit evidence should be append-only in spirit. Corrections should use reversal/cancellation records, not silent mutation.
 
-Phase 6A audit evidence records preview snapshots only. It stores `source_record_mutation = false`, supersedes prior active preview events for the same amendment, and records the latest preview event id in amendment metadata for review. It does not create customer consent, admin execution approval, accounting posting, reconciliation, or printable addendum evidence.
+Phase 6A audit evidence records preview snapshots only. It stores `source_record_mutation = false`, supersedes prior active preview events for the same amendment, and records the latest preview event id in amendment metadata for review. Customer consent is recorded in Phase 6B and admin approval/rejection is recorded in Phase 6C; neither phase creates accounting posting, reconciliation, execution, or printable addendum evidence.
 
 ## 13. Permission Model
 
@@ -496,7 +499,7 @@ POST /api/v1/admin/contract-amendments/:id/product-recontract-preview/save/
 GET  /api/v1/admin/contract-amendments/:id/product-recontract-events/
 ```
 
-Customer consent, admin execution approval, future EMI schedule changes, accounting posting, reconciliation, and printable addendum remain future phases. Full execution remains blocked.
+Customer consent and admin decision recording are implemented. Future EMI schedule changes, accounting posting, reconciliation, execution endpoint, and printable addendum remain future phases. Full execution remains blocked.
 
 ### Phase 6B - Customer Consent UI
 
@@ -508,11 +511,13 @@ Tests: role access, stale preview display, no source mutation.
 
 ### Phase 6C - Admin Approval Workflow
 
-Goal: allow admin approval of consented recontract events.
+Status: implemented.
+
+Goal: allow admin approval/rejection of customer-accepted recontract preview events as decision records only.
 
 Risk level: medium.
 
-Tests: admin-only approval, approval notes, eligibility display, no source mutation.
+Tests: admin-only approval/rejection, approval notes, customer consent required, stale/superseded/cancelled preview blocked, repeated decisions blocked, no source mutation.
 
 ### Phase 6D - Future EMI Schedule Adjustment Service
 

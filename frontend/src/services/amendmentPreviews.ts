@@ -62,6 +62,12 @@ export type ContractRecontractEvent = {
   customer_consented_at?: string | null;
   customer_consent_note?: string | null;
   customer_consent_snapshot?: Record<string, unknown>;
+  admin_approval_status?: "PENDING" | "APPROVED" | "REJECTED";
+  admin_approved_by?: number | null;
+  admin_approved_by_display?: string | null;
+  admin_approved_at?: string | null;
+  admin_approval_note?: string | null;
+  admin_approval_snapshot?: Record<string, unknown>;
 };
 
 export async function previewProductRecontractAmendment(id: number): Promise<ProductRecontractPreview> {
@@ -80,4 +86,15 @@ export async function saveProductRecontractPreviewSnapshot(id: number): Promise<
 
 export async function listProductRecontractEvents(id: number): Promise<ContractRecontractEvent[]> {
   return apiFetch<ContractRecontractEvent[]>(`/admin/contract-amendments/${id}/product-recontract-events/`);
+}
+
+export async function recordProductRecontractAdminDecision(
+  amendmentId: number,
+  decision: "APPROVED" | "REJECTED",
+  note = "",
+): Promise<ContractRecontractEvent> {
+  return apiFetch<ContractRecontractEvent>(`/admin/contract-amendments/${amendmentId}/product-recontract/admin-decision/`, {
+    method: "POST",
+    body: { decision, note },
+  });
 }

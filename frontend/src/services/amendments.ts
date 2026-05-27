@@ -49,6 +49,11 @@ export type ProductRecontractPreviewSummary = {
   customer_consent_status?: ProductRecontractConsentStatus;
   customer_consented_at?: string | null;
   customer_consent_note?: string | null;
+  admin_approval_status?: "PENDING" | "APPROVED" | "REJECTED";
+  admin_approved_by?: number | null;
+  admin_approved_at?: string | null;
+  admin_approval_note?: string | null;
+  admin_approval_snapshot?: Record<string, unknown>;
   source_record_mutation?: boolean;
 };
 

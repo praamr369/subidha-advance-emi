@@ -106,6 +106,10 @@ function ProductRecontractConsentStatusPanel({ row }: { row: AmendmentRecord }) 
           <dd>{preview.customer_consent_status || "PENDING"}</dd>
         </div>
         <div>
+          <dt className="text-muted-foreground">Admin approval status</dt>
+          <dd>{preview.admin_approval_status || "PENDING"}</dd>
+        </div>
+        <div>
           <dt className="text-muted-foreground">Preview snapshot</dt>
           <dd>
             #{preview.id} · {preview.status} · {preview.impact_type}
@@ -118,6 +122,14 @@ function ProductRecontractConsentStatusPanel({ row }: { row: AmendmentRecord }) 
         <div>
           <dt className="text-muted-foreground">Customer note</dt>
           <dd>{preview.customer_consent_note || "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Admin approval timestamp</dt>
+          <dd>{preview.admin_approved_at || "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Admin approval note</dt>
+          <dd>{preview.admin_approval_note || "—"}</dd>
         </div>
       </dl>
     </DetailPanel>

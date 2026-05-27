@@ -1,6 +1,6 @@
 # Contract Amendment Product Recontract Preview
 
-Status: implemented on `update`. Phase 6A preview snapshot persistence and Phase 6B customer consent for saved preview snapshots are implemented.
+Status: implemented on `update`. Phase 6A preview snapshot persistence, Phase 6B customer consent, and Phase 6C admin approval/rejection for customer-accepted saved preview snapshots are implemented.
 
 This phase adds an admin-only preview for financial product recontract requests. It does not execute the recontract.
 
@@ -47,4 +47,14 @@ The customer detail response exposes a safe `latest_product_recontract_preview` 
 
 Customer consent is immutable for the saved preview once accepted or rejected. Superseded or cancelled preview snapshots cannot receive consent. Customer consent records agreement or rejection of the preview only; it does not mutate subscription product, total amount, monthly amount, tenure, EMI rows, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records.
 
-Customer consent is required before future admin execution approval. True execution remains future work. It must cover admin approval, repricing, future EMI schedule change, payment and receipt treatment, accounting entries, reconciliation impact, printable addendum, and audit trail.
+Customer consent is required before admin approval.
+
+Phase 6C lets an admin record `APPROVED` or `REJECTED` for the latest active saved preview only after customer consent is `ACCEPTED`:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/admin-decision/
+```
+
+Admin approval/rejection is a decision record only. It stores approval status, actor, timestamp, note, and an approval snapshot on `ContractRecontractEvent`. It does not mutate subscription product, total amount, monthly amount, tenure, EMI rows, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records.
+
+True execution remains future work. Future EMI schedule update, accounting/reconciliation integration, execution endpoint, and printable addendum generation are not part of Phase 6C.
