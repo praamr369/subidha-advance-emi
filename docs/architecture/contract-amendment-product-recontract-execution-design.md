@@ -1,6 +1,6 @@
 # Contract Amendment Product Recontract Execution Design
 
-Status: execution design plus blocked execution endpoint. Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin approval/rejection, Phase 6D schedule preview-line persistence, and Phase 6E accounting/reconciliation impact preview evidence are implemented. Phase 6F exposes an admin-only execution endpoint, but it is blocked with controlled 400 until real accounting and reconciliation posting integration exists. No frontend execution control is implemented.
+Status: execution design plus blocked execution endpoint. Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin approval/rejection, Phase 6D schedule preview-line persistence, and Phase 6E accounting/reconciliation impact preview evidence are implemented. Phase 6F exposes an admin-only execution endpoint, but it is blocked with controlled 400 until real accounting and reconciliation posting integration exists. Phase 6F.1 posting integration design is documented in `docs/architecture/product-recontract-posting-integration-design.md`. No frontend execution control is implemented.
 
 Branch: `update`
 
@@ -186,6 +186,41 @@ Required transaction shape:
 Phase 6E adds accounting/reconciliation impact preview evidence only and still does not post journals, mutate finance account balances, or create reconciliation items/settlements.
 
 Phase 6F adds the execution endpoint but keeps it blocked. It validates the required gates and row-locks the amendment/event/subscription/pending EMI path, then returns controlled 400 before any source mutation because the current recontract accounting service returns metadata only and the current recontract reconciliation service returns snapshot evidence only. Real EMI/source mutation remains future work until accounting/reconciliation integration creates durable journal and reconciliation evidence in the same transaction.
+
+Phase 6F.1 defines the production posting integration design for real upgrade/downgrade execution. Execution must remain disabled until the future implementation can create durable accounting evidence and durable reconciliation evidence before any subscription or pending EMI mutation.
+
+Required posting design:
+
+- Upgrade posts additional receivable / contract increase:
+  - Dr Customer Receivable / Contract Receivable
+  - Cr Product Recontract Revenue Adjustment / Contract Increase
+  - Amount = `price_difference`
+- Downgrade first reduces unpaid receivable, then creates customer credit liability for any overpaid amount.
+- Refunds are never automatic and must use a separate controlled refund workflow.
+- No cash movement, payment row, receipt row, settlement allocation, or day-close mutation is created at recontract execution.
+- Historical payments, receipts, paid EMIs, posted journals, waiver history, and draw history are preserved.
+- Reconciliation evidence must link recontract event, financial impact preview, accounting bridge posting, posted journal, subscription, expected amount, and actual posted amount.
+
+Recommended future additive records:
+
+- `ContractRecontractPostingRecord`
+- `ContractRecontractReconciliationRecord`
+
+The current `ContractRecontractEvent.metadata` is acceptable for preview snapshots, but execution-grade posting should not rely on metadata-only evidence.
+
+Execution may be enabled only after these gates exist and are tested:
+
+- saved preview
+- accepted customer consent
+- approved admin approval
+- schedule preview lines
+- accounting and reconciliation financial impact preview
+- posting profile and chart accounts ready
+- open accounting period and no posting lock
+- no blocking cancellation, return, reversal, refund, dispute, or in-flight payment conflict
+- durable accounting posting can succeed
+- durable reconciliation evidence can succeed
+- idempotency prevents duplicate execution/posting/reconciliation evidence
 
 ### Stage E - Post-Execution Audit/Reconciliation
 

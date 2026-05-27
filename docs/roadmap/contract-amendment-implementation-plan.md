@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Phase 6F product recontract execution endpoint is present but blocked on `update` branch**
+Status: **Phase 6F product recontract execution endpoint is present but blocked on `update` branch; Phase 6F.1 posting integration design is documented**
 
 ## Principle
 
@@ -176,6 +176,111 @@ Product recontract execution requires accounting and reconciliation posting inte
 It uses `transaction.atomic()`, locks the amendment/event/subscription/pending EMI path, validates latest `PREVIEWED` event, accepted customer consent, approved admin decision, schedule preview lines, financial impact preview statuses, and duplicate-execution metadata before blocking.
 
 No execution button is exposed in the frontend. Do not enable this endpoint until durable accounting evidence and durable reconciliation evidence or queue records are created in the same transaction as any subscription or pending EMI mutation.
+
+## Phase 6F.1 — Product recontract posting integration design
+
+Status: **Implemented as documentation only**
+
+Design document:
+
+```text
+docs/architecture/product-recontract-posting-integration-design.md
+```
+
+This phase defines the required posting integration for real product upgrade/downgrade execution. It does not enable execution and does not mutate subscription, EMI, payment, receipt, accounting, reconciliation, settlement/day-close, inventory, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records.
+
+Design decisions:
+
+- Upgrade creates additional receivable / contract increase.
+- Downgrade reduces unpaid receivable first and creates customer credit liability for any overpaid amount.
+- Refund is separate and controlled; recontract execution does not create refund payment or receipt records.
+- Already paid amount, historical payments, historical receipts, paid EMIs, posted journals, waiver history, and draw history remain preserved.
+- No cash movement occurs at recontract execution.
+- Posting must go through accounting services, preferably idempotent accounting bridge posting.
+- Reconciliation must create durable lifecycle/reconciliation evidence and must not mutate settlement/day-close records.
+- Execution must roll back if accounting posting, reconciliation evidence creation, or pending EMI mutation fails.
+
+Future additive implementation records are recommended:
+
+- `ContractRecontractPostingRecord`
+- `ContractRecontractReconciliationRecord`
+
+Execution remains blocked until Phase 6F.2, Phase 6F.3, and Phase 6F.4 are implemented and tested.
+
+## Phase 6F.2 — Durable accounting posting preview-to-record bridge
+
+Status: **Deferred**
+
+Add durable posting records and accounting service integration:
+
+- create additive `ContractRecontractPostingRecord`
+- validate posting profile/chart-account readiness
+- validate accounting period and posting lock
+- post upgrade/downgrade journal through accounting bridge services only
+- store bridge/journal/group references
+- keep execution endpoint blocked
+
+Required tests:
+
+- upgrade posting creates journal evidence
+- downgrade posting creates receivable reduction/customer credit evidence
+- accounting failure leaves subscription, EMI, payment, receipt, and preview state unchanged
+- no direct finance account balance mutation occurs outside accounting service boundaries
+
+## Phase 6F.3 — Durable reconciliation queue/lifecycle integration
+
+Status: **Deferred**
+
+Add durable reconciliation evidence:
+
+- create additive `ContractRecontractReconciliationRecord`
+- create/link `FinancialSourceLifecycleEvent` or equivalent durable source event
+- link recontract event, financial impact preview, accounting bridge posting, journal entry, subscription, expected amount, and actual amount
+- keep old payments reconciled as-is
+- keep settlement/day-close records unchanged
+- keep execution endpoint blocked
+
+Required tests:
+
+- reconciliation evidence is created for upgrade and downgrade adjustment
+- adjustment amount reconciles to accounting posting amount
+- reconciliation failure rolls back before subscription/EMI mutation
+- day-close and settlement records are unaffected
+
+## Phase 6F.4 — Enable product recontract execution with posting integration
+
+Status: **Deferred**
+
+Only after Phase 6F.2 and Phase 6F.3 are implemented:
+
+- execute inside one transaction
+- lock amendment, event, subscription, financial preview, schedule preview lines, and pending EMIs
+- post accounting evidence
+- create reconciliation evidence
+- mutate subscription and pending EMIs from preview lines
+- mark recontract event executed with audit snapshot
+- preserve historical payment, receipt, paid EMI, waiver, draw, commission, payout, settlement/day-close, rent/lease demand, and deposit records
+
+Required tests:
+
+- paid EMIs and receipts unchanged
+- pending EMIs updated only from preview
+- customer ledger shows old contract, payments received, recontract adjustment, new remaining balance, and future schedule
+- duplicate execution is idempotent
+- all failure paths roll back or compensate through services
+
+## Phase 6F.5 — Product recontract RC hardening
+
+Status: **Deferred**
+
+Before production rollout:
+
+- period-lock and posting-lock failure injection tests
+- duplicate request/race-condition tests
+- operational cancellation/reversal/dispute conflict tests
+- ledger/customer account display tests
+- reconciliation runner regression tests
+- frontend execution control only after backend readiness is explicit
 
 ## Phase 6G — Printable recontract addendum
 
