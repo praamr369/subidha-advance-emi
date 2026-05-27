@@ -6,7 +6,7 @@ from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounting.models import ChartOfAccount, FinanceAccount, FinanceAccountCoaMapping
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountCoaMapping
 from accounting.services.finance_account_readiness import (
     chart_account_allowed_for_collection,
     finance_account_readiness,
@@ -18,11 +18,13 @@ from accounting.services.setup_defaults_service import (
     apply_accounting_setup_defaults,
     preview_accounting_setup_defaults,
 )
-from accounting.services.setup_health_service import get_accounting_setup_health
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting import FinanceAccountCoaMappingSerializer
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
+
+
+COLLECTION_POSTING_SYSTEM_CODE_SUFFIX = "_POSTING"
 
 
 class _AdminBase(APIView):
@@ -54,10 +56,117 @@ class AccountingSetupHealthView(_AdminBase):
         return Response(get_accounting_setup_health())
 
 
+def _posting_child_system_code(parent: ChartOfAccount) -> str:
+    base = (parent.system_code or parent.code or f"COA_{parent.pk}").strip().upper()
+    suffix = COLLECTION_POSTING_SYSTEM_CODE_SUFFIX
+    return f"{base[: max(1, 50 - len(suffix))]}{suffix}"
+
+
+def _posting_child_code(parent: ChartOfAccount) -> str:
+    suffix = "-P"
+    base = (parent.code or f"COA-{parent.pk}").strip().upper()
+    return f"{base[: max(1, 30 - len(suffix))]}{suffix}"
+
+
+def _chart_account_payload(account: ChartOfAccount | None) -> dict | None:
+    if account is None:
+        return None
+    return {
+        "id": account.id,
+        "code": account.code,
+        "name": account.name,
+        "type": account.account_type,
+        "account_type": account.account_type,
+        "is_active": account.is_active,
+        "allow_manual_posting": account.allow_manual_posting,
+        "is_posting": chart_account_allowed_for_collection(account),
+        "parent": (
+            {
+                "id": account.parent_id,
+                "code": getattr(account.parent, "code", None),
+                "name": getattr(account.parent, "name", None),
+            }
+            if account.parent_id
+            else None
+        ),
+    }
+
+
+def _suggest_collection_posting_account(finance_account: FinanceAccount) -> ChartOfAccount | None:
+    current = getattr(finance_account, "chart_account", None)
+    if current and chart_account_allowed_for_collection(current, kind=finance_account.kind):
+        return current
+
+    if current and current.account_type == ChartOfAccountType.ASSET:
+        system_code = _posting_child_system_code(current)
+        child = ChartOfAccount.objects.filter(system_code=system_code, is_active=True).first()
+        if child and chart_account_allowed_for_collection(child, kind=finance_account.kind):
+            return child
+        child = (
+            ChartOfAccount.objects.filter(parent=current, account_type=ChartOfAccountType.ASSET, is_active=True, allow_manual_posting=True)
+            .prefetch_related("children")
+            .order_by("code", "id")
+            .first()
+        )
+        if child and chart_account_allowed_for_collection(child, kind=finance_account.kind):
+            return child
+
+    return (
+        ChartOfAccount.objects.filter(account_type=ChartOfAccountType.ASSET, is_active=True, allow_manual_posting=True)
+        .prefetch_related("children")
+        .order_by("code", "id")
+        .first()
+    )
+
+
+def _ensure_collection_posting_child(finance_account: FinanceAccount) -> ChartOfAccount:
+    current = getattr(finance_account, "chart_account", None)
+    if current and chart_account_allowed_for_collection(current, kind=finance_account.kind):
+        return current
+    if current is None:
+        raise serializers.ValidationError({"detail": "Auto fix requires an existing mapped group/control chart account."})
+    if not current.is_active or current.account_type != ChartOfAccountType.ASSET:
+        raise serializers.ValidationError({"detail": "Auto fix can only create a posting child below an active ASSET group/control account."})
+
+    system_code = _posting_child_system_code(current)
+    existing = ChartOfAccount.objects.filter(system_code=system_code).first()
+    if existing is not None:
+        if not chart_account_allowed_for_collection(existing, kind=finance_account.kind):
+            updates = {}
+            if not existing.is_active:
+                updates["is_active"] = True
+            if not existing.allow_manual_posting:
+                updates["allow_manual_posting"] = True
+            if existing.parent_id != current.id:
+                updates["parent"] = current
+            if existing.account_type != ChartOfAccountType.ASSET:
+                raise serializers.ValidationError({"detail": "Existing auto-fix posting account is not an ASSET account."})
+            if updates:
+                for field, value in updates.items():
+                    setattr(existing, field, value)
+                existing.save(update_fields=[*updates.keys(), "updated_at"])
+        return existing
+
+    code = _posting_child_code(current)
+    if ChartOfAccount.objects.filter(code__iexact=code).exists():
+        code = f"P{current.pk:06d}"
+
+    return ChartOfAccount.objects.create(
+        code=code,
+        name=f"{current.name} Posting",
+        account_type=ChartOfAccountType.ASSET,
+        parent=current,
+        is_active=True,
+        allow_manual_posting=True,
+        system_code=system_code,
+        notes="Auto-created by Accounting Setup to keep group/control account non-posting while allowing collections.",
+    )
+
+
 class AccountingSetupReadinessView(_AdminBase):
     def get(self, request):
         finance_accounts = list(
-            FinanceAccount.objects.select_related("chart_account", "branch").order_by("kind", "name", "id")
+            FinanceAccount.objects.select_related("chart_account", "chart_account__parent", "branch").order_by("kind", "name", "id")
         )
         chart_accounts = list(
             ChartOfAccount.objects.select_related("parent").prefetch_related("children").order_by("code", "id")
@@ -75,6 +184,7 @@ class AccountingSetupReadinessView(_AdminBase):
             else:
                 blockers_count += 1
             chart_account = getattr(account, "chart_account", None)
+            suggested_chart_account = _suggest_collection_posting_account(account)
             finance_rows.append(
                 {
                     "id": account.id,
@@ -90,16 +200,13 @@ class AccountingSetupReadinessView(_AdminBase):
                         if account.branch_id
                         else None
                     ),
-                    "mapped_chart_account": (
-                        {
-                            "id": chart_account.id,
-                            "code": chart_account.code,
-                            "name": chart_account.name,
-                            "type": chart_account.account_type,
-                            "is_posting": chart_account_allowed_for_collection(chart_account),
-                        }
-                        if chart_account is not None
-                        else None
+                    "mapped_chart_account": _chart_account_payload(chart_account),
+                    "suggested_chart_account": _chart_account_payload(suggested_chart_account),
+                    "can_auto_create_posting_account": bool(
+                        chart_account is not None
+                        and not readiness.collection_ready
+                        and chart_account.is_active
+                        and chart_account.account_type == ChartOfAccountType.ASSET
                     ),
                     "collection_ready": readiness.collection_ready,
                     "blocker_reason": readiness.collection_blocker_reason,
@@ -212,7 +319,14 @@ class FinanceAccountMappingPatchView(_AdminBase):
 
 
 class FinanceAccountPrimaryMappingPatchSerializer(serializers.Serializer):
-    chart_account_id = serializers.IntegerField(min_value=1)
+    chart_account_id = serializers.IntegerField(min_value=1, required=False)
+    auto_create_posting_account = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if not attrs.get("chart_account_id") and not attrs.get("auto_create_posting_account"):
+            raise serializers.ValidationError({"chart_account_id": "Select a chart account or enable auto_create_posting_account."})
+        return attrs
 
 
 class FinanceAccountPrimaryMappingPatchView(_AdminBase):
@@ -220,15 +334,19 @@ class FinanceAccountPrimaryMappingPatchView(_AdminBase):
         serializer = FinanceAccountPrimaryMappingPatchSerializer(data=request.data or {})
         serializer.is_valid(raise_exception=True)
 
-        finance_account = FinanceAccount.objects.select_related("chart_account").filter(pk=pk).first()
+        finance_account = FinanceAccount.objects.select_related("chart_account", "chart_account__parent").filter(pk=pk).first()
         if finance_account is None:
             raise serializers.ValidationError({"detail": "Finance account not found."})
 
-        chart_account = ChartOfAccount.objects.prefetch_related("children").filter(
-            pk=serializer.validated_data["chart_account_id"],
-        ).first()
-        if chart_account is None:
-            raise serializers.ValidationError({"chart_account_id": "Chart account not found."})
+        if serializer.validated_data.get("auto_create_posting_account"):
+            chart_account = _ensure_collection_posting_child(finance_account)
+        else:
+            chart_account = ChartOfAccount.objects.prefetch_related("children").filter(
+                pk=serializer.validated_data["chart_account_id"],
+            ).first()
+            if chart_account is None:
+                raise serializers.ValidationError({"chart_account_id": "Chart account not found."})
+
         if not chart_account_allowed_for_collection(chart_account, kind=finance_account.kind):
             raise serializers.ValidationError(
                 {
@@ -257,6 +375,7 @@ class FinanceAccountPrimaryMappingPatchView(_AdminBase):
                 "event": "FINANCE_ACCOUNT_PRIMARY_CHART_MAPPING_UPDATED",
                 "finance_account_id": updated.id,
                 "chart_account_id": updated.chart_account_id,
+                "auto_create_posting_account": bool(serializer.validated_data.get("auto_create_posting_account")),
             },
         )
         return Response(
