@@ -178,9 +178,10 @@ async function mockAmendment(page: Page, role: "admin" | "customer") {
   });
 }
 
-test.describe("executed product recontract visibility", () => {
+test.describe("admin executed product recontract visibility", () => {
+  test.use({ storageState: authStatePath("admin") });
+
   test("admin detail shows executed evidence and no execution controls", async ({ page }) => {
-    test.use({ storageState: authStatePath("admin") });
     await mockAmendment(page, "admin");
     await page.goto("/admin/contract-amendments/1");
 
@@ -192,9 +193,12 @@ test.describe("executed product recontract visibility", () => {
     await expect(page.getByRole("button", { name: "Execute approved recontract" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Apply product change|Update contract|Recalculate EMI now/i })).toHaveCount(0);
   });
+});
+
+test.describe("customer executed product recontract visibility", () => {
+  test.use({ storageState: authStatePath("customer") });
 
   test("customer detail shows read-only executed summary only", async ({ page }) => {
-    test.use({ storageState: authStatePath("customer") });
     await mockAmendment(page, "customer");
     await page.goto("/customer/contract-amendments/1");
 
