@@ -1,64 +1,55 @@
 # Contract Amendment Product Recontract Execution Design
 
-Status: **Phase 6F.4 backend execution is hardened on `update`; frontend execution UI remains intentionally absent.**
+Status: **Phase 6F.6 RC hardening is implemented on `update`.**
 
 Branch: `update`
 
 ## 1. Business meaning
 
-Product recontract is a controlled contract value amendment. It changes future commercial terms of an approved EMI subscription after customer consent, admin approval, accounting posting evidence, and reconciliation bridge evidence.
+Product recontract is a controlled contract value amendment. It changes future commercial terms of an approved EMI subscription after saved preview, customer consent, admin approval, schedule preview, accounting posting evidence, and reconciliation bridge evidence.
 
 Historical payments, receipts, paid EMIs, waived EMIs, cancelled EMIs, lucky draw evidence, posted journals, reconciliation evidence, settlement records, day-close evidence, inventory, delivery, commission, payout, rent/lease demand, and deposit records remain immutable.
 
-## 2. Implemented evidence chain
+## 2. Phase 6F.6 hardening scope
 
-The execution chain is:
+Phase 6F.6 is hardening only. It adds no new mutation logic, no rollback, no reversal, and no weakened evidence gates.
 
-1. Phase 6A — saved backend preview snapshot on `ContractRecontractEvent`.
-2. Phase 6B — customer consent on the saved preview.
-3. Phase 6C — admin approval on the customer-accepted preview.
-4. Phase 6D — future EMI schedule preview lines.
-5. Phase 6E — financial impact preview.
-6. Phase 6F.2 — durable accounting bridge posting and posted journal evidence.
-7. Phase 6F.3 — durable reconciliation/lifecycle evidence.
-8. Phase 6F.4 — final backend source mutation after all evidence verifies.
-9. Phase 6F.4 hardening — explicit execution serializer fields, snapshot refresh policy, stale evidence guards, and frontend no-button regression coverage.
+Implemented hardening:
+
+- explicit serializer/reporting fields for executed state
+- `workflow_flags` for preview, consent, approval, schedule, accounting, reconciliation, and execution status
+- `execution_ready` and `execution_block_reason` read-only fields
+- post-execution blockers for preview/save/consent/admin-decision/schedule/financial/accounting/reconciliation actions
+- admin read-only executed evidence visibility
+- customer read-only executed summary
+- tests for executed-state payload visibility and post-execution blockers
 
 ## 3. Execution endpoint
-
-Admin endpoint:
 
 ```text
 POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/
 ```
 
-Execution runs inside `transaction.atomic()` and row-locks the amendment, event, subscription, schedule preview lines, pending EMI rows, accounting bridge evidence, and reconciliation item where practical.
+The endpoint remains the only final source-mutation path. It still verifies all accounting and reconciliation evidence inside the backend transaction. No page auto-executes recontract.
 
 ## 4. Execution gates
 
-Execution requires:
+Execution still requires:
 
-- amendment exists and status is `APPROVED`
-- amendment type is `PRODUCT_CHANGE`
-- latest recontract event exists
-- event status is `PREVIEWED`
-- event metadata is not already `EXECUTED`
-- customer consent is `ACCEPTED`
-- admin approval is `APPROVED`
-- target product exists on the event
-- schedule preview lines exist and still map exactly to current pending EMI rows
-- financial impact preview exists and is `PREVIEWED`
-- accounting bridge posting exists for the event and purpose `CONTRACT_RECONTRACT_ACCOUNTING_ADJUSTMENT`
-- linked journal exists and is `POSTED`
-- posted journal debit and credit totals balance
-- expected financial impact amount equals posted journal amount
-- reconciliation bridge item exists, is `MATCHED`, and is metadata-linked
-- reconciliation expected amount equals reconciliation actual amount
-- reconciliation variance is zero
-- required reconciliation evidence rows exist, including the journal evidence row
-- subscription is an EMI subscription and is not terminal/cancelled/closed/defaulted/completed/returned
-- subscription batch and lucky ID remain intact
-- no subscription-level operational cancellation record is present
+- amendment status `APPROVED`
+- amendment type `PRODUCT_CHANGE`
+- latest event status `PREVIEWED`
+- no prior execution metadata
+- customer consent `ACCEPTED`
+- admin approval `APPROVED`
+- schedule preview lines mapped to pending EMI rows
+- financial impact preview
+- accounting bridge posting and posted journal
+- zero accounting variance
+- reconciliation item/run/evidence linked and matched
+- zero reconciliation variance
+- active EMI subscription with batch and lucky ID intact
+- no subscription operational cancellation
 
 ## 5. Fields mutated by execution
 
@@ -74,48 +65,20 @@ Only these source fields are changed:
 - pending `Emi.due_date`
 - `ContractRecontractEvent.metadata` execution snapshot
 
-`ContractRecontractEvent.status` remains `PREVIEWED` because the existing status enum does not include `EXECUTED`. Execution truth is stored in explicit metadata:
+`ContractRecontractEvent.status` remains `PREVIEWED`; execution truth is exposed through explicit serializer fields and metadata.
+
+## 6. Explicit serializer/reporting fields
+
+`ContractRecontractEventSerializer` and `ContractAmendmentSerializer.latest_product_recontract_preview` expose:
 
 ```text
-metadata.execution_status = EXECUTED
-metadata.execution_event = CONTRACT_RECONTRACT_EXECUTED
-metadata.execution_performed = true
-```
-
-## 6. Snapshot behavior decision
-
-Execution refreshes `Subscription.product_snapshot` and `Subscription.pricing_snapshot` to the executed authoritative product and financial terms.
-
-Reason:
-
-- existing `Subscription.save()` fills snapshots only when they are empty
-- product recontract changes the current contract product and financial terms
-- stale snapshots would create reporting and print/document ambiguity after execution
-
-Historical snapshot evidence is not lost. The pre-execution product/pricing snapshot is preserved in:
-
-```text
-ContractRecontractEvent.metadata.before_subscription.product_snapshot
-ContractRecontractEvent.metadata.before_subscription.pricing_snapshot
-```
-
-Execution metadata also records:
-
-```text
-product_snapshot_updated = true
-pricing_snapshot_updated = true
-snapshot_policy = "Subscription.product_snapshot and pricing_snapshot were refreshed to the executed authoritative product and financial terms. Prior snapshots are preserved in event metadata before_subscription."
-```
-
-## 7. Explicit serializer/reporting fields
-
-UI and reports must not parse raw `metadata` for execution state. `ContractRecontractEventSerializer` exposes read-only fields:
-
-```text
+workflow_flags
 executed
 executed_at
 executed_by
 execution_status
+execution_ready
+execution_block_reason
 execution_snapshot
 accounting_bridge_posting_id
 journal_entry_id
@@ -123,97 +86,66 @@ reconciliation_item_id
 reconciliation_run_id
 reconciliation_evidence_ids
 schedule_line_ids
+old_monthly_amount
+new_monthly_amount
 ```
 
-`ContractAmendmentSerializer.latest_product_recontract_preview` also exposes these fields for admin/customer amendment detail payloads.
+UI/reporting must use these fields instead of parsing raw metadata.
 
-## 8. Evidence references stored
+## 7. Executed-state visibility
 
-Execution metadata stores:
+Admin amendment detail shows read-only execution evidence, including product/amount/EMI change and accounting/reconciliation references.
 
-- financial impact preview id
-- accounting bridge posting id
-- posted journal entry id
-- reconciliation item id
-- reconciliation run id
-- reconciliation evidence ids
-- schedule preview line ids
-- expected amount
-- posted amount
-- zero variance
-- before/after subscription snapshot
-- before/after pending EMI snapshot
-- updated pending EMI line details
-- protected non-pending EMI ids
+Customer amendment detail shows safe read-only text:
 
-## 9. Records preserved by execution
+```text
+This recontract updated future contract terms after approval. Previous payments and receipts remain unchanged.
+```
+
+Customer, partner, cashier, and vendor users must never see execution controls.
+
+## 8. Post-execution behavior
+
+After execution, the following actions are blocked/read-only with controlled errors or blocked preview payloads:
+
+- product recontract preview generation
+- preview snapshot save
+- customer consent
+- admin decision
+- schedule preview regeneration
+- financial impact preview regeneration
+- accounting posting
+- reconciliation bridge creation
+- duplicate execution
+
+No rollback/reversal button or endpoint is exposed in this phase.
+
+## 9. Snapshot and print policy
+
+Execution refreshes `Subscription.product_snapshot` and `Subscription.pricing_snapshot` to the current executed contract truth. Current contract print views should use current subscription fields/snapshots.
+
+Historical pre-recontract values remain in `ContractRecontractEvent.metadata.before_subscription`. A printable recontract addendum is future Phase 6G.
+
+## 10. Preserved records
 
 Execution does not mutate:
 
 - paid, waived, or cancelled EMI rows
-- historical `Payment` rows
-- `ReceiptDocument` rows
-- accounting bridge postings
-- posted journals
+- payments
+- receipts
+- accounting bridge postings and journal entries
 - reconciliation runs/items/evidence
-- financial source lifecycle events
-- bank statement lines
-- UPI settlement lines
-- cashier day-close records
-- settlement allocations
+- lifecycle events
+- settlement/day-close records
 - finance account balances
-- lucky ID
-- batch
-- lucky draw / waiver records
-- inventory / stock records
-- delivery records
-- commission / payout records
-- rent/lease demands
-- rent/lease deposits
+- lucky ID and batch
+- draw/waiver records
+- stock/inventory and delivery records
+- commission/payout records
+- rent/lease demand or deposit records
 
-## 10. Accounting and reconciliation role
+## 11. Future controlled workflows
 
-Accounting and reconciliation are prerequisite evidence for execution. They are not created by the execution endpoint.
+Printable recontract addendum remains future Phase 6G.
 
-The execution endpoint verifies that:
-
-- accounting bridge posting is present
-- journal is posted
-- expected amount equals posted journal amount
-- reconciliation item is matched/linked
-- reconciliation expected amount equals actual posted amount
-- reconciliation evidence contains links to the event, financial preview, accounting bridge, journal, and lifecycle event
-
-If reconciliation evidence is stale or incomplete, execution returns a controlled error and source records remain unchanged.
-
-## 11. Atomicity
-
-If any gate fails before or during mutation, the transaction rolls back. Subscription and pending EMI mutations must not persist on failure.
-
-## 12. Frontend rule
-
-No frontend execution button is added in Phase 6F.4 hardening.
-
-A future admin UI may expose execution only with all gates visible and a typed confirmation. Required future label:
-
-```text
-Execute approved recontract
-```
-
-Required future typed confirmation:
-
-```text
-EXECUTE RECONTRACT
-```
-
-Required future warning text:
-
-```text
-This will update the subscription product, contract amount, monthly EMI, and pending EMI schedule. It will not alter historical payments, receipts, paid EMIs, accounting postings, reconciliation evidence, lucky ID, batch, stock, delivery, commission, payout, waiver, rent/lease demand, or deposit records.
-```
-
-Customer, partner, cashier, and vendor users must never see execution actions.
-
-## 13. Compatibility
-
-Phase 6F.4 hardening uses existing models and event metadata. No schema migration is required.
+Rollback/reversal remains a separate future controlled workflow requiring explicit accounting, reconciliation, audit, and admin approval design. It is not exposed in Phase 6F.6.
