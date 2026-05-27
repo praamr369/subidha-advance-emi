@@ -174,6 +174,27 @@ class ContractRecontractExecutionTests(TestCase):
     def _execute_url(self):
         return f"/api/v1/admin/contract-amendments/{self.amendment.id}/product-recontract/execute/"
 
+    def _preview_url(self):
+        return f"/api/v1/admin/contract-amendments/{self.amendment.id}/product-recontract-preview/"
+
+    def _preview_save_url(self):
+        return f"/api/v1/admin/contract-amendments/{self.amendment.id}/product-recontract-preview/save/"
+
+    def _schedule_url(self):
+        return f"/api/v1/admin/contract-amendments/{self.amendment.id}/product-recontract/schedule-preview/"
+
+    def _financial_url(self):
+        return f"/api/v1/admin/contract-amendments/{self.amendment.id}/product-recontract/financial-impact-preview/"
+
+    def _customer_detail_url(self):
+        return f"/api/v1/customer/contract-amendments/{self.amendment.id}/"
+
+    def _customer_consent_url(self):
+        return f"/api/v1/customer/contract-amendments/{self.amendment.id}/product-recontract/consent/"
+
+    def _admin_decision_url(self):
+        return f"/api/v1/admin/contract-amendments/{self.amendment.id}/product-recontract/admin-decision/"
+
     def _prepare(self, with_financial_preview=True, with_accounting=True, with_reconciliation=True):
         create_product_recontract_preview_snapshot(amendment=self.amendment, requested_by=self.admin)
         record_product_recontract_customer_consent(amendment=self.amendment, customer_user=self.customer_user, decision="ACCEPTED", note="ok")
@@ -334,6 +355,16 @@ class ContractRecontractExecutionTests(TestCase):
 
         self.assertTrue(response.data["executed"])
         self.assertEqual(response.data["execution_status"], "EXECUTED")
+        self.assertFalse(response.data["execution_ready"])
+        self.assertIn("already been executed", response.data["execution_block_reason"])
+        self.assertEqual(response.data["workflow_flags"]["previewed"], True)
+        self.assertEqual(response.data["workflow_flags"]["customer_consented"], True)
+        self.assertEqual(response.data["workflow_flags"]["admin_approved"], True)
+        self.assertEqual(response.data["workflow_flags"]["accounting_posted"], True)
+        self.assertEqual(response.data["workflow_flags"]["reconciliation_linked"], True)
+        self.assertEqual(response.data["workflow_flags"]["executed"], True)
+        self.assertEqual(response.data["old_monthly_amount"], "2000.00")
+        self.assertEqual(response.data["new_monthly_amount"], "2400.00")
         self.assertIsNotNone(response.data["executed_at"])
         self.assertEqual(response.data["executed_by"], self.admin.id)
         self.assertIsNotNone(response.data["accounting_bridge_posting_id"])
@@ -351,6 +382,53 @@ class ContractRecontractExecutionTests(TestCase):
         serialized = ContractRecontractEventSerializer(event).data
         self.assertTrue(serialized["executed"])
         self.assertEqual(serialized["execution_status"], "EXECUTED")
+
+    def test_customer_detail_payload_exposes_safe_executed_summary(self):
+        self._prepare()
+        response = self._post(self._execute_url(), self.admin)
+        self.assertEqual(response.status_code, 200, response.data)
+
+        self.client.force_authenticate(self.customer_user)
+        detail = self.client.get(self._customer_detail_url(), format="json")
+
+        self.assertEqual(detail.status_code, 200, detail.data)
+        preview = detail.data["latest_product_recontract_preview"]
+        self.assertTrue(preview["executed"])
+        self.assertEqual(preview["execution_status"], "EXECUTED")
+        self.assertEqual(preview["old_monthly_amount"], "2000.00")
+        self.assertEqual(preview["new_monthly_amount"], "2400.00")
+        self.assertIn("execution_snapshot", preview)
+
+    def test_post_execution_preview_and_evidence_actions_are_blocked_or_read_only(self):
+        self._prepare()
+        execute_response = self._post(self._execute_url(), self.admin)
+        self.assertEqual(execute_response.status_code, 200, execute_response.data)
+        before_counts = self._counts()
+        before_state = self._state()
+
+        preview_response = self._post(self._preview_url(), self.admin)
+        self.assertEqual(preview_response.status_code, 200, preview_response.data)
+        self.assertEqual(preview_response.data["preview_status"], "BLOCKED")
+        self.assertIn("already been executed", str(preview_response.data).lower())
+
+        blocked_admin_urls = [
+            self._preview_save_url(),
+            self._schedule_url(),
+            self._financial_url(),
+            self._accounting_url(),
+            self._reconciliation_url(),
+            self._admin_decision_url(),
+        ]
+        for url in blocked_admin_urls:
+            response = self._post(url, self.admin)
+            self.assertEqual(response.status_code, 400, response.data)
+            self.assertIn("executed", str(response.data).lower())
+
+        response = self._post(self._customer_consent_url(), self.customer_user)
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("executed", str(response.data).lower())
+        self.assertEqual(before_counts, self._counts())
+        self.assertEqual(before_state, self._state())
 
     def test_duplicate_execution_rejected(self):
         self._prepare()
