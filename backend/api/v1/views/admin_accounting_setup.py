@@ -18,6 +18,7 @@ from accounting.services.setup_defaults_service import (
     apply_accounting_setup_defaults,
     preview_accounting_setup_defaults,
 )
+from accounting.services.setup_health_service import get_accounting_setup_health
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting import FinanceAccountCoaMappingSerializer
 from subscriptions.models import AuditLog
@@ -124,9 +125,9 @@ def _ensure_collection_posting_child(finance_account: FinanceAccount) -> ChartOf
     if current and chart_account_allowed_for_collection(current, kind=finance_account.kind):
         return current
     if current is None:
-        raise serializers.ValidationError({"detail": "Auto fix requires an existing mapped group/control chart account."})
+        raise serializers.ValidationError({"detail": "Auto repair requires an existing mapped group/control chart account."})
     if not current.is_active or current.account_type != ChartOfAccountType.ASSET:
-        raise serializers.ValidationError({"detail": "Auto fix can only create a posting child below an active ASSET group/control account."})
+        raise serializers.ValidationError({"detail": "Auto repair can only create a posting child below an active ASSET group/control account."})
 
     system_code = _posting_child_system_code(current)
     existing = ChartOfAccount.objects.filter(system_code=system_code).first()
@@ -140,7 +141,7 @@ def _ensure_collection_posting_child(finance_account: FinanceAccount) -> ChartOf
             if existing.parent_id != current.id:
                 updates["parent"] = current
             if existing.account_type != ChartOfAccountType.ASSET:
-                raise serializers.ValidationError({"detail": "Existing auto-fix posting account is not an ASSET account."})
+                raise serializers.ValidationError({"detail": "Existing auto repair posting account is not an ASSET account."})
             if updates:
                 for field, value in updates.items():
                     setattr(existing, field, value)
@@ -159,7 +160,7 @@ def _ensure_collection_posting_child(finance_account: FinanceAccount) -> ChartOf
         is_active=True,
         allow_manual_posting=True,
         system_code=system_code,
-        notes="Auto-created by Accounting Setup to keep group/control account non-posting while allowing collections.",
+        notes="Created by Accounting Setup to keep group/control account non-posting while allowing collections.",
     )
 
 
