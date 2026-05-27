@@ -69,6 +69,29 @@ function SummaryItem({ label, value }: { label: string; value?: string | number 
   );
 }
 
+function ProductRecontractExecutedSummary({ preview }: { preview?: ProductRecontractPreviewSummary | null }) {
+  if (!preview?.executed) return null;
+  return (
+    <DetailPanel title="Product recontract executed" description="Read-only summary of the approved contract update.">
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100">
+          This recontract updated future contract terms after approval. Previous payments and receipts remain unchanged.
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <SummaryItem label="Execution status" value={preview.execution_status || "EXECUTED"} />
+          <SummaryItem label="Executed at" value={preview.executed_at || "-"} />
+          <SummaryItem label="Old product" value={`${valueOrDash(preview.old_product_name)} (#${valueOrDash(preview.old_product_id)})`} />
+          <SummaryItem label="New product" value={`${valueOrDash(preview.new_product_name)} (#${valueOrDash(preview.new_product_id)})`} />
+          <SummaryItem label="Old contract total" value={preview.old_contract_total} />
+          <SummaryItem label="New contract total" value={preview.new_contract_total} />
+          <SummaryItem label="Old monthly EMI" value={preview.old_monthly_amount || preview.current_monthly_amount} />
+          <SummaryItem label="New monthly EMI" value={preview.new_monthly_amount || preview.proposed_monthly_amount} />
+        </div>
+      </div>
+    </DetailPanel>
+  );
+}
+
 function ProductRecontractCustomerConsentPanel({
   preview,
   onConsent,
@@ -80,7 +103,7 @@ function ProductRecontractCustomerConsentPanel({
   const [busy, setBusy] = useState<ProductRecontractConsentStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (!preview) return null;
+  if (!preview || preview.executed) return null;
   const status = preview.customer_consent_status || "PENDING";
   const canDecide = status === "PENDING";
 
@@ -299,25 +322,20 @@ export default function CustomerAmendmentDetail({ id }: { id: number }) {
                 </dl>
               </DetailPanel>
             </div>
+            <ProductRecontractExecutedSummary preview={row.latest_product_recontract_preview} />
+            <ProductRecontractCustomerConsentPanel preview={row.latest_product_recontract_preview} onConsent={recordConsent} />
             <DetailPanel title="Reason" description="Submitted reason.">
               <p className="text-sm text-muted-foreground">{row.reason}</p>
             </DetailPanel>
-            <ProductRecontractCustomerConsentPanel preview={row.latest_product_recontract_preview} onConsent={recordConsent} />
             <div className="grid gap-4 lg:grid-cols-3">
               <DetailPanel title="Old values" description="Source snapshot.">
-                <pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">
-                  {safeJson(row.old_values || row.previous_values)}
-                </pre>
+                <pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.old_values || row.previous_values)}</pre>
               </DetailPanel>
-              <DetailPanel title="Requested values" description="Requested correction/change.">
-                <pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">
-                  {safeJson(row.requested_values || row.new_values)}
-                </pre>
+              <DetailPanel title="Requested values" description="Requested change.">
+                <pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.requested_values || row.new_values)}</pre>
               </DetailPanel>
-              <DetailPanel title="Approved values" description="Admin decision values.">
-                <pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">
-                  {safeJson(row.approved_values)}
-                </pre>
+              <DetailPanel title="Approved values" description="Admin values.">
+                <pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.approved_values)}</pre>
               </DetailPanel>
             </div>
           </>
