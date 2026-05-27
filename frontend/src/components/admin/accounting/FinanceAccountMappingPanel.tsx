@@ -1,9 +1,14 @@
+"use client";
+
+import { useState } from "react";
+
 import ActionButton from "@/components/ui/ActionButton";
 import ChartAccountPostingBadge from "@/components/admin/accounting/ChartAccountPostingBadge";
 import FinanceAccountReadinessBadge from "@/components/admin/accounting/FinanceAccountReadinessBadge";
-import type {
-  AccountingSetupReadinessChartAccount,
-  AccountingSetupReadinessFinanceAccount,
+import {
+  updateFinanceAccountMapping,
+  type AccountingSetupReadinessChartAccount,
+  type AccountingSetupReadinessFinanceAccount,
 } from "@/services/accounting-setup";
 
 type FinanceAccountMappingPanelProps = {
@@ -28,7 +33,7 @@ function paymentMethodLabel(kind: string): string {
 }
 
 function chartLabel(account?: AccountingSetupReadinessChartAccount | null): string {
-  if (!account) return "No suggestion available";
+  if (!account) return "Create posting leaf below current group/control account";
   const parent = account.parent?.code ? ` under ${account.parent.code}` : "";
   return `${account.code} · ${account.name}${parent}`;
 }
@@ -47,6 +52,25 @@ export default function FinanceAccountMappingPanel({
   onRepair,
 }: FinanceAccountMappingPanelProps) {
   const postingChartAccounts = chartAccounts.filter((account) => account.is_posting);
+  const [internalRepairId, setInternalRepairId] = useState<number | null>(null);
+  const [repairError, setRepairError] = useState<string | null>(null);
+  const activeRepairId = repairId ?? internalRepairId;
+
+  async function runRepair(account: AccountingSetupReadinessFinanceAccount) {
+    if (onRepair) {
+      onRepair(account);
+      return;
+    }
+    setInternalRepairId(account.id);
+    setRepairError(null);
+    try {
+      await updateFinanceAccountMapping(account.id, { auto_create_posting_account: true });
+      globalThis.location.assign(globalThis.location.href);
+    } catch (err) {
+      setRepairError(err instanceof Error ? err.message : "Failed to repair finance account mapping.");
+      setInternalRepairId(null);
+    }
+  }
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
@@ -59,6 +83,7 @@ export default function FinanceAccountMappingPanel({
         </div>
         <div className="text-xs text-muted-foreground">Collection accounts only</div>
       </div>
+      {repairError ? <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900">{repairError}</div> : null}
       <div className="mt-3 overflow-x-auto">
         <table className="min-w-full text-left text-xs">
           <thead className="text-muted-foreground">
@@ -85,9 +110,9 @@ export default function FinanceAccountMappingPanel({
                 const mapped = account.mapped_chart_account;
                 const suggested = account.suggested_chart_account;
                 const isEditing = editingId === account.id;
-                const isRepairing = repairId === account.id;
+                const isRepairing = activeRepairId === account.id;
                 const blocker = account.blocker_reason || account.collection_blocker_reason || null;
-                const canRepair = Boolean(account.can_auto_create_posting_account && !account.collection_ready && onRepair);
+                const canRepair = Boolean(account.can_auto_create_posting_account && !account.collection_ready);
                 return (
                   <tr key={account.id} className="border-t border-border align-top">
                     <td className="px-2 py-2">
@@ -123,7 +148,7 @@ export default function FinanceAccountMappingPanel({
                     </td>
                     <td className="max-w-[260px] px-2 py-2">
                       <div className={suggested?.is_posting ? "text-emerald-700" : "text-muted-foreground"}>{chartLabel(suggested)}</div>
-                      {account.can_auto_create_posting_account && !account.collection_ready ? (
+                      {canRepair ? (
                         <div className="mt-1 text-[11px] text-muted-foreground">
                           Repair will create or reuse a posting leaf and remap this finance account.
                         </div>
@@ -148,11 +173,11 @@ export default function FinanceAccountMappingPanel({
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {canRepair ? (
-                            <ActionButton size="sm" variant="primary" onClick={() => onRepair?.(account)} disabled={saving || isRepairing}>
+                            <ActionButton size="sm" variant="primary" onClick={() => void runRepair(account)} disabled={saving || isRepairing}>
                               {isRepairing ? "Repairing..." : "Repair mapping"}
                             </ActionButton>
                           ) : null}
-                          <ActionButton size="sm" variant="secondary" onClick={() => onEdit(account)} disabled={saving || Boolean(repairId)}>
+                          <ActionButton size="sm" variant="secondary" onClick={() => onEdit(account)} disabled={saving || Boolean(activeRepairId)}>
                             Edit Mapping
                           </ActionButton>
                         </div>
