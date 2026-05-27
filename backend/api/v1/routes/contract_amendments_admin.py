@@ -3,6 +3,9 @@ from django.urls import path
 from api.v1.views.contract_recontract_accounting import (
     AdminContractAmendmentProductRecontractAccountingPostingView,
 )
+from api.v1.views.contract_recontract_reconciliation import (
+    AdminContractAmendmentProductRecontractReconciliationBridgeView,
+)
 from api.v1.views.contract_amendments import (
     AdminContractAmendmentApproveView,
     AdminContractAmendmentDetailView,
@@ -31,6 +34,7 @@ urlpatterns = [
     path("contract-amendments/<int:pk>/product-recontract/schedule-preview/", AdminContractAmendmentProductRecontractSchedulePreviewView.as_view()),
     path("contract-amendments/<int:pk>/product-recontract/financial-impact-preview/", AdminContractAmendmentProductRecontractFinancialImpactPreviewView.as_view()),
     path("contract-amendments/<int:pk>/product-recontract/accounting-posting/", AdminContractAmendmentProductRecontractAccountingPostingView.as_view()),
+    path("contract-amendments/<int:pk>/product-recontract/reconciliation-bridge/", AdminContractAmendmentProductRecontractReconciliationBridgeView.as_view()),
     path("contract-amendments/<int:pk>/product-recontract/execute/", AdminContractAmendmentProductRecontractExecuteView.as_view()),
     path("contract-amendments/<int:pk>/product-recontract/admin-decision/", AdminContractAmendmentProductRecontractDecisionView.as_view()),
     path("contract-amendments/<int:pk>/product-recontract-events/", AdminContractAmendmentProductRecontractEventListView.as_view()),
