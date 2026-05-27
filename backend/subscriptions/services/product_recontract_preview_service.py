@@ -26,8 +26,10 @@ from subscriptions.models import (
     Subscription,
 )
 from subscriptions.services.audit_service import log_audit
-
 _PREVIEW_ALLOWED_STATUSES = {"REQUESTED", "UNDER_REVIEW", "APPROVED"}
+_EXECUTION_BLOCKED_MESSAGE = (
+    "Product recontract execution requires accounting and reconciliation posting integration and is not enabled yet."
+)
 _TARGET_PRODUCT_ID_KEYS = ("approved_product_id", "target_product_id", "new_product_id", "product_id")
 _PREVIEW_WARNINGS = [
     "Preview only — no source records are mutated.",
@@ -803,3 +805,83 @@ def create_product_recontract_financial_impact_preview(
             },
         )
         return preview
+
+
+def execute_product_recontract_event(*, amendment: ContractAmendment, executed_by=None) -> ContractRecontractEvent:
+    """
+    Validate execution gates for a product recontract event, then block execution.
+
+    Guarantees:
+    - customer ACCEPTED and admin APPROVED are required
+    - schedule preview and financial/accounting preview must exist and be PREVIEWED
+    - runs inside one transaction with row locks
+    - pending EMI rows are locked and mapping is rechecked before the controlled block
+    - no Subscription, EMI, payment, receipt, journal, reconciliation, waiver, delivery,
+      stock, commission, payout, rent/lease demand, or deposit mutation is performed
+    """
+    with transaction.atomic():
+        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        if locked_amendment.amendment_type != "PRODUCT_CHANGE":
+            raise ValidationError({"detail": "Product recontract execution is supported only for PRODUCT_CHANGE amendments."})
+        if locked_amendment.status != "APPROVED":
+            raise ValidationError({"detail": f"Cannot execute recontract for amendment status '{locked_amendment.status}'. Must be APPROVED."})
+
+        event = (
+            ContractRecontractEvent.objects.select_for_update()
+            .select_related("subscription", "old_product", "new_product")
+            .prefetch_related("schedule_preview_lines")
+            .filter(amendment=locked_amendment)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if not event:
+            raise ValidationError({"detail": "No recontract event exists for this amendment."})
+        if event.status != ContractRecontractEvent.Status.PREVIEWED:
+            raise ValidationError({"detail": "Execution requires latest recontract event status PREVIEWED."})
+        if event.customer_consent_status != ContractRecontractEvent.CustomerConsentStatus.ACCEPTED:
+            raise ValidationError({"detail": "Execution requires customer consent ACCEPTED."})
+        if event.admin_approval_status != ContractRecontractEvent.AdminApprovalStatus.APPROVED:
+            raise ValidationError({"detail": "Execution requires admin approval APPROVED."})
+
+        existing_exec = (event.metadata or {}).get("execution_status")
+        if existing_exec == "EXECUTED":
+            raise ValidationError({"detail": "This recontract event is already executed."})
+
+        schedule_lines = list(
+            event.schedule_preview_lines.filter(proposed_status=ContractRecontractScheduleLine.ProposedStatus.PREVIEW_ONLY)
+            .select_related("original_emi")
+            .order_by("line_no", "id")
+        )
+        if not schedule_lines:
+            raise ValidationError({"detail": "Execution requires schedule preview lines in PREVIEW_ONLY status."})
+
+        financial_preview = (
+            ContractRecontractFinancialImpactPreview.objects.select_for_update()
+            .filter(
+                event=event,
+                accounting_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED,
+                reconciliation_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED,
+            )
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if not financial_preview:
+            raise ValidationError({"detail": "Execution requires latest financial impact preview with accounting and reconciliation PREVIEWED status."})
+        if financial_preview.blocked_reason:
+            raise ValidationError({"detail": f"Execution blocked: {financial_preview.blocked_reason}"})
+
+        subscription = Subscription.objects.select_for_update().get(pk=event.subscription_id)
+        pending_emis = list(
+            Emi.objects.select_for_update()
+            .filter(subscription_id=subscription.id, status=EmiStatus.PENDING)
+            .order_by("month_no", "due_date", "id")
+        )
+        if len(pending_emis) != len(schedule_lines):
+            raise ValidationError({"detail": "Execution blocked: pending EMI rows and schedule preview line count do not match."})
+
+        schedule_by_emi_id = {line.original_emi_id: line for line in schedule_lines if line.original_emi_id}
+        pending_ids = [emi.id for emi in pending_emis]
+        if set(schedule_by_emi_id.keys()) != set(pending_ids):
+            raise ValidationError({"detail": "Execution blocked: schedule preview mapping no longer matches pending EMI records."})
+
+        raise ValidationError({"detail": _EXECUTION_BLOCKED_MESSAGE})

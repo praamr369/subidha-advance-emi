@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Phase 6E product recontract accounting/reconciliation impact preview evidence completed on `update` branch**
+Status: **Phase 6F product recontract execution endpoint is present but blocked on `update` branch**
 
 ## Principle
 
@@ -71,11 +71,11 @@ The preview does not mutate subscription product, total amount, monthly amount, 
 
 Product upgrade/downgrade is preview/future-recontract only. The lifecycle page is not the execution surface; admins must open `/admin/contract-amendments/{id}` for review or preview.
 
-## Deferred true product recontract execution
+## Blocked true product recontract execution
 
-A future implementation phase must handle price difference approval, EMI recalculation preview approval, paid amount allocation, future EMI schedule generation, receipt/payment treatment, accounting entries, reconciliation impact, customer/admin approval evidence, and audit trail.
+A future implementation phase must handle price difference approval, paid amount allocation, receipt/payment treatment, durable accounting entries, durable reconciliation evidence or queue records, printable addendum, and audit trail.
 
-Current system supports preview only for financial product change. Execution is intentionally deferred until the model/workflow in `docs/architecture/contract-amendment-product-recontract-execution-design.md` is implemented.
+Current system supports preview, consent/approval evidence, schedule preview evidence, financial impact preview evidence, and a blocked execution endpoint for financial product change. Execution source mutation is intentionally disabled until accounting and reconciliation posting integration is implemented.
 
 ## Phase 6A — Product recontract data model + preview snapshot persistence
 
@@ -92,7 +92,7 @@ GET  /api/v1/admin/contract-amendments/{id}/product-recontract-events/
 
 The existing preview endpoint remains calculation-only. The save endpoint recalculates and stores a READY backend snapshot as audit evidence. Prior active previews for the same amendment are marked `SUPERSEDED`, not deleted.
 
-Customer consent is handled in Phase 6B and admin decision recording is handled in Phase 6C. Future EMI schedule change, accounting posting, reconciliation, execution endpoint, and printable addendum remain future phases. Full execution remains blocked.
+Customer consent is handled in Phase 6B and admin decision recording is handled in Phase 6C. Schedule preview, financial impact preview, and a blocked execution endpoint are handled in later phases. Accounting posting, reconciliation posting, real source mutation, and printable addendum remain future phases. Full execution remains blocked.
 
 ## Phase 6B — Customer consent UI
 
@@ -140,7 +140,7 @@ POST /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
 GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
 ```
 
-Phase 6D does not mutate `Emi` rows, `Subscription.product`, `Subscription.total_amount`, `Subscription.monthly_amount`, `Subscription.tenure_months`, payments, receipts, accounting, or reconciliation. It is preview evidence only; execution remains deferred.
+Phase 6D does not mutate `Emi` rows, `Subscription.product`, `Subscription.total_amount`, `Subscription.monthly_amount`, `Subscription.tenure_months`, payments, receipts, accounting, or reconciliation. It is preview evidence only.
 
 ## Phase 6E — Accounting/reconciliation impact preview evidence only
 
@@ -155,13 +155,27 @@ POST /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-
 GET  /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
 ```
 
-Phase 6E does not post journals, does not mutate finance account balances, does not create reconciliation items/settlements, and does not execute recontract changes. Execution remains future work.
+Phase 6E does not post journals, does not mutate finance account balances, does not create reconciliation items/settlements, and does not execute recontract changes.
 
 ## Phase 6F — Product recontract execution endpoint
 
-Status: **Deferred**
+Status: **Blocked pending accounting/reconciliation posting integration**
 
-Future admin-only endpoint after all guards, models, tests, and downstream integrations exist. Do not expose an execution button before this phase.
+Admin endpoint:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/
+```
+
+The endpoint is admin-only and keeps the execution gates testable, but it intentionally returns controlled 400:
+
+```text
+Product recontract execution requires accounting and reconciliation posting integration and is not enabled yet.
+```
+
+It uses `transaction.atomic()`, locks the amendment/event/subscription/pending EMI path, validates latest `PREVIEWED` event, accepted customer consent, approved admin decision, schedule preview lines, financial impact preview statuses, and duplicate-execution metadata before blocking.
+
+No execution button is exposed in the frontend. Do not enable this endpoint until durable accounting evidence and durable reconciliation evidence or queue records are created in the same transaction as any subscription or pending EMI mutation.
 
 ## Phase 6G — Printable recontract addendum
 

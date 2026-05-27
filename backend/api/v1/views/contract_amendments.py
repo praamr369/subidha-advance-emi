@@ -28,6 +28,8 @@ from subscriptions.services.contract_amendment_service import (
     reject_amendment,
 )
 from subscriptions.services.product_recontract_preview_service import (
+    _EXECUTION_BLOCKED_MESSAGE,
+    execute_product_recontract_event,
     create_product_recontract_schedule_preview,
     create_product_recontract_preview_snapshot,
     create_product_recontract_financial_impact_preview,
@@ -425,3 +427,19 @@ class AdminContractAmendmentProductRecontractFinancialImpactPreviewView(APIView)
             return Response([], status=status.HTTP_200_OK)
         previews = event.financial_impact_previews.all().order_by("-created_at", "-id")
         return Response(ContractRecontractFinancialImpactPreviewSerializer(previews, many=True).data, status=status.HTTP_200_OK)
+
+
+class AdminContractAmendmentProductRecontractExecuteView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        amendment = _amendment_queryset().filter(pk=pk).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            event = execute_product_recontract_event(amendment=amendment, executed_by=request.user)
+        except DjangoValidationError as exc:
+            if getattr(exc, "messages", None) == [_EXECUTION_BLOCKED_MESSAGE]:
+                return Response({"detail": _EXECUTION_BLOCKED_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
+            return _validation_response(exc)
+        return Response(ContractRecontractEventSerializer(event).data, status=status.HTTP_200_OK)

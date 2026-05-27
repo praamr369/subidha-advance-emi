@@ -485,12 +485,12 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByRole("button", { name: "Preview financial product change" })).toBeVisible();
     await page.getByRole("button", { name: "Preview financial product change" }).click();
 
-    await expect(page.getByText("UPGRADE_EXTRA_PAYABLE")).toBeVisible();
-    await expect(page.getByText("20000.00")).toBeVisible();
-    await expect(page.getByText("25000.00")).toBeVisible();
-    await expect(page.getByText("5000.00", { exact: true })).toBeVisible();
-    await expect(page.getByText("4000.00")).toBeVisible();
-    await expect(page.getByText("21000.00")).toBeVisible();
+    await expect(page.getByText("UPGRADE_EXTRA_PAYABLE").first()).toBeVisible();
+    await expect(page.getByText("20000.00", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("25000.00", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("5000.00", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("4000.00", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("21000.00", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Saving a preview snapshot does not change the contract, EMI schedule, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.")).toBeVisible();
     await expect(page.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
   });
@@ -567,7 +567,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByText("This creates accounting and reconciliation preview evidence only. No journal, finance account, settlement, reconciliation, EMI, payment, receipt, product, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records are changed.")).toBeVisible();
     await page.getByRole("button", { name: "Generate accounting & reconciliation preview" }).click();
     await expect(page.getByText("Accounting and reconciliation impact preview generated.")).toBeVisible();
-    await expect(page.getByText("Accounting and reconciliation impact preview")).toBeVisible();
+    await expect(page.getByText("Accounting and reconciliation impact preview", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Execute recontract" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Post journal" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Apply accounting" })).toHaveCount(0);
