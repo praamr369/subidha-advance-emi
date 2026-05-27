@@ -1,10 +1,10 @@
 # Contract Amendment Implementation Plan
 
-Status: **Implemented through Phase 6F.4 backend execution hardening on `update`; frontend execution UI remains deferred.**
+Status: **Implemented through Phase 6F.6 RC hardening on `update`.**
 
 ## Principle
 
-Implement one controlled phase at a time. Final source mutation is allowed only after accounting and reconciliation evidence are both durable, linked, and verified in the execution transaction.
+Implement one controlled phase at a time. Final source mutation is allowed only after accounting and reconciliation evidence are both durable, linked, and verified in the backend execution transaction.
 
 ## Implemented phases
 
@@ -35,7 +35,7 @@ No subscriptions, EMI rows, payments, receipts, journals, waivers, lucky draw re
 
 Status: **Implemented**
 
-The existing `PRODUCT_CHANGE` enum remains for compatibility, but implementation behavior is only `PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY`.
+The existing `PRODUCT_CHANGE` enum remains for compatibility, but generic implementation behavior is only `PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY`.
 
 Implemented behavior:
 
@@ -129,6 +129,7 @@ Implemented behavior:
 - stores bridge and journal references on recontract event metadata
 - rejects duplicate accounting posting
 - creates prerequisite accounting evidence only
+- blocks after recontract execution
 
 No subscription, EMI, payment, receipt, finance account balance, settlement/day-close, inventory, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records are mutated.
 
@@ -148,6 +149,7 @@ Implemented behavior:
 - blocks on variance between expected and posted amount
 - rejects duplicate reconciliation bridge evidence
 - creates prerequisite reconciliation evidence only
+- blocks after recontract execution
 
 No subscription, EMI, payment, receipt, finance account balance, settlement/day-close, inventory, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records are mutated.
 
@@ -169,7 +171,6 @@ Implemented behavior:
 - refreshes `Subscription.product_snapshot` and `Subscription.pricing_snapshot` to the executed authoritative state
 - preserves prior product/pricing snapshots inside `ContractRecontractEvent.metadata.before_subscription`
 - records execution in `ContractRecontractEvent.metadata` because the existing status enum has no `EXECUTED`
-- exposes explicit serializer fields for execution state and evidence references
 - emits `CONTRACT_RECONTRACT_EXECUTED` audit metadata through `CONTRACT_AMENDMENT_IMPLEMENTED`
 
 Mutated fields only:
@@ -199,23 +200,54 @@ Preserved records:
 - commission/payout records
 - rent/lease demand and deposit records
 
+### Phase 6F.5 — Admin typed execution UI
+
+Status: **Implemented**
+
+Implemented behavior:
+
+- admin-only execution panel on amendment detail
+- appears only when backend evidence references are complete
+- requires exact typed confirmation `EXECUTE RECONTRACT`
+- posts only to `/admin/contract-amendments/{id}/product-recontract/execute/`
+- hides execution button after success
+- exposes read-only execution summary
+- no customer, partner, cashier, or vendor execution control
+
+### Phase 6F.6 — RC hardening, reporting, and executed-state visibility
+
+Status: **Implemented**
+
+Implemented behavior:
+
+- exposes `workflow_flags`, `execution_ready`, and `execution_block_reason`
+- exposes old/new monthly amount aliases for reporting
+- exposes execution evidence references on admin/customer detail payloads
+- shows customer read-only executed summary
+- blocks preview/save/consent/admin-decision/schedule/financial/accounting/reconciliation actions after execution
+- keeps duplicate execution blocked
+- documents current subscription print truth and future printable addendum policy
+
+No new backend mutation logic was added. No rollback or reversal behavior was added.
+
 ## Deferred phases
 
-### Phase 6F.5 — RC hardening and UI readiness
+### Phase 6G — Printable recontract addendum and ledger statement
 
 Status: **Deferred**
 
-Required before production rollout:
+Recommended scope:
 
-- failure injection tests beyond current stale-evidence and atomic rollback tests
-- period/posting-lock tests
-- duplicate/idempotency tests under concurrency
-- operational conflict tests
-- customer ledger/account-statement tests
-- printable addendum tests
-- audit export checks
-- frontend typed-confirmation execution UI, if approved
+- printable recontract addendum showing old terms, new terms, consent, approval, accounting reference, reconciliation reference, and execution timestamp
+- customer ledger/account statement view for recontract adjustments
+- admin audit export surface for recontract evidence
+
+### Future controlled reversal workflow
+
+Status: **Deferred**
+
+Any reversal/rollback must be a separate controlled workflow with explicit accounting, reconciliation, audit, approval, and customer communication design. It is not exposed in Phase 6F.6.
 
 ## Frontend rule
 
-No frontend execution button is added in Phase 6F.4 hardening. Admin may show accounting/reconciliation/execution evidence read-only. Any future execution UI must show all gates and require typed confirmation.
+Admin may show execution controls only before execution and only when all backend evidence exists. Customer, partner, cashier, and vendor users must never see execution controls. Subscription lifecycle pages must not expose apply/execute actions; they may link to amendment detail only.
