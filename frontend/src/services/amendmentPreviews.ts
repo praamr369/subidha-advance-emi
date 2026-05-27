@@ -28,6 +28,17 @@ export type ProductRecontractPreview = {
   warnings: string[];
 };
 
+export type ContractRecontractWorkflowFlags = {
+  previewed?: boolean;
+  customer_consented?: boolean;
+  admin_approved?: boolean;
+  schedule_preview_generated?: boolean;
+  financial_impact_previewed?: boolean;
+  accounting_posted?: boolean;
+  reconciliation_linked?: boolean;
+  executed?: boolean;
+};
+
 export type ContractRecontractExecutionSnapshot = {
   before_subscription?: Record<string, unknown>;
   after_subscription?: Record<string, unknown>;
@@ -42,10 +53,13 @@ export type ContractRecontractExecutionSnapshot = {
 };
 
 export type ContractRecontractExecutionFields = {
+  workflow_flags?: ContractRecontractWorkflowFlags;
   executed?: boolean;
   executed_at?: string | null;
   executed_by?: number | null;
   execution_status?: "NOT_EXECUTED" | "EXECUTED" | string;
+  execution_ready?: boolean;
+  execution_block_reason?: string;
   execution_snapshot?: ContractRecontractExecutionSnapshot;
   accounting_bridge_posting_id?: number | null;
   journal_entry_id?: number | null;
@@ -53,6 +67,8 @@ export type ContractRecontractExecutionFields = {
   reconciliation_run_id?: number | null;
   reconciliation_evidence_ids?: number[];
   schedule_line_ids?: number[];
+  old_monthly_amount?: string;
+  new_monthly_amount?: string;
 };
 
 export type ContractRecontractEvent = ContractRecontractExecutionFields & {
