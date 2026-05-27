@@ -28,7 +28,34 @@ export type ProductRecontractPreview = {
   warnings: string[];
 };
 
-export type ContractRecontractEvent = {
+export type ContractRecontractExecutionSnapshot = {
+  before_subscription?: Record<string, unknown>;
+  after_subscription?: Record<string, unknown>;
+  before_pending_emis?: Array<Record<string, unknown>>;
+  after_pending_emis?: Array<Record<string, unknown>>;
+  updated_pending_emi_lines?: Array<Record<string, unknown>>;
+  protected_emi_ids?: number[];
+  snapshot_policy?: string;
+  product_snapshot_updated?: boolean;
+  pricing_snapshot_updated?: boolean;
+  preservation_flags?: Record<string, boolean>;
+};
+
+export type ContractRecontractExecutionFields = {
+  executed?: boolean;
+  executed_at?: string | null;
+  executed_by?: number | null;
+  execution_status?: "NOT_EXECUTED" | "EXECUTED" | string;
+  execution_snapshot?: ContractRecontractExecutionSnapshot;
+  accounting_bridge_posting_id?: number | null;
+  journal_entry_id?: number | null;
+  reconciliation_item_id?: number | null;
+  reconciliation_run_id?: number | null;
+  reconciliation_evidence_ids?: number[];
+  schedule_line_ids?: number[];
+};
+
+export type ContractRecontractEvent = ContractRecontractExecutionFields & {
   id: number;
   amendment_id: number;
   status: string;
@@ -70,6 +97,7 @@ export type ContractRecontractEvent = {
   admin_approval_snapshot?: Record<string, unknown>;
   schedule_preview_lines?: ContractRecontractScheduleLine[];
   latest_financial_impact_preview?: ContractRecontractFinancialImpactPreview | null;
+  metadata?: Record<string, unknown>;
 };
 
 export type ContractRecontractScheduleLine = {
