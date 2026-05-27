@@ -154,6 +154,17 @@ function ProductRecontractCustomerConsentPanel({
             </div>
           </div>
         ) : null}
+        {preview.latest_financial_impact_preview ? (
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">Accounting and reconciliation impact preview (read-only)</div>
+            <div className="mt-2 grid gap-3 md:grid-cols-2">
+              <SummaryItem label="Impact type" value={preview.latest_financial_impact_preview.impact_type} />
+              <SummaryItem label="Price difference" value={preview.latest_financial_impact_preview.price_difference} />
+              <SummaryItem label="Additional receivable" value={preview.latest_financial_impact_preview.additional_receivable_amount} />
+              <SummaryItem label="Credit or reduction" value={preview.latest_financial_impact_preview.credit_or_reduction_amount} />
+            </div>
+          </div>
+        ) : null}
         {canDecide ? (
           <>
             <label className="block text-sm font-medium">

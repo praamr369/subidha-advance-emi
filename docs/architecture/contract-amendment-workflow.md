@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin decision recording, and Phase 6D schedule preview-line persistence are implemented on `update`.
+Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin decision recording, Phase 6D schedule preview-line persistence, and Phase 6E financial impact preview evidence are implemented on `update`.
 
 ## Scope
 
@@ -107,6 +107,17 @@ GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
 
 This creates preview evidence only (`ContractRecontractScheduleLine`). Real EMI rows and all financial/accounting/reconciliation source records remain unchanged. Execution remains a future phase.
 
+## Phase 6E — Accounting/reconciliation impact preview evidence
+
+Admin can generate accounting/reconciliation impact preview evidence only after customer `ACCEPTED`, admin `APPROVED`, and schedule preview lines exist:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
+GET  /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
+```
+
+This creates additive evidence (`ContractRecontractFinancialImpactPreview`) only. No journal posting occurs. No finance account balances are mutated. No reconciliation items or settlements are created. Execution remains future work.
+
 ## Product recontract execution design
 
 Current system supports preview, customer consent, and admin decision evidence only for financial product change. Execution is intentionally deferred until future EMI schedule adjustment service, accounting bridge, reconciliation event flow, execution endpoint, and printable addendum are implemented.
@@ -131,6 +142,8 @@ POST /api/v1/admin/contract-amendments/{id}/implement/
 POST /api/v1/admin/contract-amendments/{id}/product-recontract-preview/
 POST /api/v1/admin/contract-amendments/{id}/product-recontract-preview/save/
 POST /api/v1/admin/contract-amendments/{id}/product-recontract/admin-decision/
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
+GET  /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
 GET  /api/v1/admin/contract-amendments/{id}/product-recontract-events/
 ```
 

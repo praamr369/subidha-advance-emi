@@ -4543,6 +4543,92 @@ class ContractRecontractScheduleLine(models.Model):
         super().save(*args, **kwargs)
 
 
+class ContractRecontractFinancialImpactPreview(models.Model):
+    class ImpactType(models.TextChoices):
+        UPGRADE_EXTRA_PAYABLE = "UPGRADE_EXTRA_PAYABLE", "Upgrade Extra Payable"
+        DOWNGRADE_CREDIT_REQUIRED = "DOWNGRADE_CREDIT_REQUIRED", "Downgrade Credit Required"
+        SAME_PRICE_REFERENCE_CORRECTION = "SAME_PRICE_REFERENCE_CORRECTION", "Same Price Reference Correction"
+
+    class PreviewStatus(models.TextChoices):
+        PREVIEWED = "PREVIEWED", "Previewed"
+        SUPERSEDED = "SUPERSEDED", "Superseded"
+        BLOCKED = "BLOCKED", "Blocked"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    event = models.ForeignKey(
+        ContractRecontractEvent,
+        on_delete=models.PROTECT,
+        related_name="financial_impact_previews",
+    )
+    impact_type = models.CharField(max_length=40, choices=ImpactType.choices, db_index=True)
+    accounting_preview_status = models.CharField(
+        max_length=20,
+        choices=PreviewStatus.choices,
+        default=PreviewStatus.PREVIEWED,
+        db_index=True,
+    )
+    reconciliation_preview_status = models.CharField(
+        max_length=20,
+        choices=PreviewStatus.choices,
+        default=PreviewStatus.PREVIEWED,
+        db_index=True,
+    )
+    price_difference = models.DecimalField(max_digits=12, decimal_places=2)
+    additional_receivable_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    credit_or_reduction_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    projected_customer_balance = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    projected_future_emi_total = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    journal_preview = models.JSONField(default=dict, blank=True)
+    reconciliation_preview = models.JSONField(default=dict, blank=True)
+    warnings = models.JSONField(default=list, blank=True)
+    blocked_reason = models.TextField(null=True, blank=True)
+    source_record_mutation = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="created_recontract_financial_impact_previews",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "contract_recontract_financial_impact_previews"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["event", "accounting_preview_status"], name="recon_fin_prev_evt_acc_idx"),
+            models.Index(fields=["event", "reconciliation_preview_status"], name="recon_fin_prev_evt_rec_idx"),
+            models.Index(fields=["impact_type"], name="recon_fin_prev_impact_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(condition=Q(additional_receivable_amount__gte=0), name="chk_recon_fin_add_recv_gte0"),
+            models.CheckConstraint(condition=Q(credit_or_reduction_amount__gte=0), name="chk_recon_fin_credit_gte0"),
+            models.CheckConstraint(condition=Q(projected_customer_balance__gte=0), name="chk_recon_fin_cust_bal_gte0"),
+            models.CheckConstraint(condition=Q(projected_future_emi_total__gte=0), name="chk_recon_fin_emi_total_gte0"),
+            models.CheckConstraint(condition=Q(source_record_mutation=False), name="chk_recon_fin_no_src_mut"),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.source_record_mutation:
+            errors["source_record_mutation"] = "Financial impact previews cannot mutate source records."
+        if not isinstance(self.journal_preview, dict):
+            errors["journal_preview"] = "Journal preview must be a JSON object."
+        if not isinstance(self.reconciliation_preview, dict):
+            errors["reconciliation_preview"] = "Reconciliation preview must be a JSON object."
+        if not isinstance(self.warnings, list):
+            errors["warnings"] = "Warnings must be a JSON list."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.source_record_mutation = False
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
 class PossessionStatus(models.TextChoices):
     PENDING_HANDOVER = "PENDING_HANDOVER", "Pending Handover"
     WITH_CUSTOMER = "WITH_CUSTOMER", "With Customer"

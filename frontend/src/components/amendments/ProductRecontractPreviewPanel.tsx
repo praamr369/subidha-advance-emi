@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import ActionButton from "@/components/ui/ActionButton";
 import { DetailPanel } from "@/components/ui/operations";
 import {
+  generateProductRecontractFinancialImpactPreview,
+  getProductRecontractFinancialImpactPreview,
   generateProductRecontractSchedulePreview,
   getProductRecontractSchedulePreview,
   listProductRecontractEvents,
@@ -12,6 +14,7 @@ import {
   recordProductRecontractAdminDecision,
   saveProductRecontractPreviewSnapshot,
   type ContractRecontractEvent,
+  type ContractRecontractFinancialImpactPreview,
   type ProductRecontractPreview,
 } from "@/services/amendmentPreviews";
 import type { AmendmentRecord } from "@/services/amendments";
@@ -40,6 +43,8 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [scheduleBusy, setScheduleBusy] = useState(false);
   const [scheduleLines, setScheduleLines] = useState<ContractRecontractEvent["schedule_preview_lines"]>([]);
+  const [financialBusy, setFinancialBusy] = useState(false);
+  const [financialPreviews, setFinancialPreviews] = useState<ContractRecontractFinancialImpactPreview[]>([]);
 
   useEffect(() => {
     if (amendment.amendment_type !== "PRODUCT_CHANGE") return;
@@ -53,6 +58,13 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
       })
       .catch(() => {
         if (mounted) setEvents([]);
+      });
+    getProductRecontractFinancialImpactPreview(amendment.id)
+      .then((rows) => {
+        if (mounted) setFinancialPreviews(rows);
+      })
+      .catch(() => {
+        if (mounted) setFinancialPreviews([]);
       });
     return () => {
       mounted = false;
@@ -70,6 +82,13 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
     latestEvent?.status === "PREVIEWED" &&
     latestEvent.customer_consent_status === "ACCEPTED" &&
     latestEvent.admin_approval_status === "APPROVED";
+  const hasSchedulePreviewLines = Boolean((latestEvent?.schedule_preview_lines || scheduleLines || []).length > 0);
+  const canGenerateFinancialImpactPreview =
+    latestEvent?.status === "PREVIEWED" &&
+    latestEvent.customer_consent_status === "ACCEPTED" &&
+    latestEvent.admin_approval_status === "APPROVED" &&
+    hasSchedulePreviewLines;
+  const latestFinancialImpactPreview = financialPreviews[0] || latestEvent?.latest_financial_impact_preview || null;
 
   async function runPreview() {
     setBusy(true);
@@ -140,6 +159,22 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
     }
   }
 
+  async function generateFinancialImpactPreview() {
+    setFinancialBusy(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      const previewRow = await generateProductRecontractFinancialImpactPreview(amendment.id);
+      const rows = await getProductRecontractFinancialImpactPreview(amendment.id);
+      setFinancialPreviews(rows.length > 0 ? rows : [previewRow]);
+      setSaveMessage("Accounting and reconciliation impact preview generated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Financial impact preview generation failed.");
+    } finally {
+      setFinancialBusy(false);
+    }
+  }
+
   return (
     <DetailPanel
       title="Product recontract preview"
@@ -160,6 +195,11 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
           {canGenerateSchedulePreview ? (
             <ActionButton variant="outline" onClick={() => void generateSchedulePreview()} disabled={scheduleBusy || busy || saving}>
               {scheduleBusy ? "Generating..." : "Generate future EMI schedule preview"}
+            </ActionButton>
+          ) : null}
+          {canGenerateFinancialImpactPreview ? (
+            <ActionButton variant="outline" onClick={() => void generateFinancialImpactPreview()} disabled={financialBusy || scheduleBusy || busy || saving}>
+              {financialBusy ? "Generating..." : "Generate accounting & reconciliation preview"}
             </ActionButton>
           ) : null}
         </div>
@@ -190,6 +230,11 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
                 ))}
               </ul>
             </div>
+          </div>
+        ) : null}
+        {canGenerateFinancialImpactPreview ? (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+            This creates accounting and reconciliation preview evidence only. No journal, finance account, settlement, reconciliation, EMI, payment, receipt, product, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records are changed.
           </div>
         ) : null}
         {latestEvent ? (
@@ -277,6 +322,39 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
                 </tbody>
               </table>
             </div>
+          </div>
+        ) : null}
+        {latestFinancialImpactPreview ? (
+          <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-3">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">Accounting and reconciliation impact preview</div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <MoneyRow label="Impact type" value={latestFinancialImpactPreview.impact_type} />
+              <MoneyRow label="Price difference" value={latestFinancialImpactPreview.price_difference} />
+              <MoneyRow label="Additional receivable amount" value={latestFinancialImpactPreview.additional_receivable_amount} />
+              <MoneyRow label="Credit or reduction amount" value={latestFinancialImpactPreview.credit_or_reduction_amount} />
+              <MoneyRow label="Projected customer balance" value={latestFinancialImpactPreview.projected_customer_balance} />
+              <MoneyRow label="Projected future EMI total" value={latestFinancialImpactPreview.projected_future_emi_total} />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-border bg-background p-3">
+                <div className="text-xs font-semibold uppercase text-muted-foreground">Journal preview lines</div>
+                <pre className="mt-2 overflow-auto text-xs">{JSON.stringify(latestFinancialImpactPreview.journal_preview || {}, null, 2)}</pre>
+              </div>
+              <div className="rounded-xl border border-border bg-background p-3">
+                <div className="text-xs font-semibold uppercase text-muted-foreground">Reconciliation preview rows</div>
+                <pre className="mt-2 overflow-auto text-xs">{JSON.stringify(latestFinancialImpactPreview.reconciliation_preview || {}, null, 2)}</pre>
+              </div>
+            </div>
+            {latestFinancialImpactPreview.warnings?.length ? (
+              <div className="rounded-xl border border-border bg-background p-3">
+                <div className="text-xs font-semibold uppercase text-muted-foreground">Warnings</div>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                  {latestFinancialImpactPreview.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

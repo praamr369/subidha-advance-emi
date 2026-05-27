@@ -1,5 +1,9 @@
 import { apiFetch } from "@/lib/api";
-import type { ContractRecontractEvent, ContractRecontractScheduleLine } from "@/services/amendmentPreviews";
+import type {
+  ContractRecontractEvent,
+  ContractRecontractFinancialImpactPreview,
+  ContractRecontractScheduleLine,
+} from "@/services/amendmentPreviews";
 
 export type AmendmentContractType = "EMI_SUBSCRIPTION" | "RENT_LEASE";
 export type AmendmentStatus = "REQUESTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "IMPLEMENTED" | "CANCELLED" | "APPLIED";
@@ -56,6 +60,7 @@ export type ProductRecontractPreviewSummary = {
   admin_approval_snapshot?: Record<string, unknown>;
   source_record_mutation?: boolean;
   schedule_preview_lines?: ContractRecontractScheduleLine[];
+  latest_financial_impact_preview?: ContractRecontractFinancialImpactPreview | null;
 };
 
 export const AMENDMENT_STATUSES: AmendmentStatus[] = ["REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED"];

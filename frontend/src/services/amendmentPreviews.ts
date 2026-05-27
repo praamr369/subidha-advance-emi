@@ -69,6 +69,7 @@ export type ContractRecontractEvent = {
   admin_approval_note?: string | null;
   admin_approval_snapshot?: Record<string, unknown>;
   schedule_preview_lines?: ContractRecontractScheduleLine[];
+  latest_financial_impact_preview?: ContractRecontractFinancialImpactPreview | null;
 };
 
 export type ContractRecontractScheduleLine = {
@@ -84,6 +85,28 @@ export type ContractRecontractScheduleLine = {
   proposed_status: "PREVIEW_ONLY" | "SUPERSEDED";
   adjustment_type: "EXISTING_PENDING_REPLACEMENT" | "NEW_ADDITIONAL_EMI" | "REDUCED_EMI" | "CREDIT_OFFSET";
   source_record_mutation: boolean;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ContractRecontractFinancialImpactPreview = {
+  id: number;
+  event: number;
+  impact_type: "UPGRADE_EXTRA_PAYABLE" | "DOWNGRADE_CREDIT_REQUIRED" | "SAME_PRICE_REFERENCE_CORRECTION";
+  accounting_preview_status: "PREVIEWED" | "SUPERSEDED" | "BLOCKED" | "CANCELLED";
+  reconciliation_preview_status: "PREVIEWED" | "SUPERSEDED" | "BLOCKED" | "CANCELLED";
+  price_difference: string;
+  additional_receivable_amount: string;
+  credit_or_reduction_amount: string;
+  projected_customer_balance: string;
+  projected_future_emi_total: string;
+  journal_preview: Record<string, unknown>;
+  reconciliation_preview: Record<string, unknown>;
+  warnings: string[];
+  blocked_reason?: string | null;
+  source_record_mutation: boolean;
+  created_by?: number | null;
   metadata?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
@@ -116,6 +139,17 @@ export async function generateProductRecontractSchedulePreview(id: number): Prom
 
 export async function getProductRecontractSchedulePreview(id: number): Promise<ContractRecontractScheduleLine[]> {
   return apiFetch<ContractRecontractScheduleLine[]>(`/admin/contract-amendments/${id}/product-recontract/schedule-preview/`);
+}
+
+export async function generateProductRecontractFinancialImpactPreview(id: number): Promise<ContractRecontractFinancialImpactPreview> {
+  return apiFetch<ContractRecontractFinancialImpactPreview>(`/admin/contract-amendments/${id}/product-recontract/financial-impact-preview/`, {
+    method: "POST",
+    body: {},
+  });
+}
+
+export async function getProductRecontractFinancialImpactPreview(id: number): Promise<ContractRecontractFinancialImpactPreview[]> {
+  return apiFetch<ContractRecontractFinancialImpactPreview[]>(`/admin/contract-amendments/${id}/product-recontract/financial-impact-preview/`);
 }
 
 export async function recordProductRecontractAdminDecision(

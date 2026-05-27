@@ -17,6 +17,7 @@ from subscriptions.models import (
     AuditLog,
     ContractAmendment,
     ContractRecontractEvent,
+    ContractRecontractFinancialImpactPreview,
     ContractRecontractScheduleLine,
     Emi,
     EmiStatus,
@@ -103,7 +104,40 @@ def _event_preview_summary(event: ContractRecontractEvent | None) -> dict | None
             }
             for line in event.schedule_preview_lines.order_by("line_no", "id")
         ],
+        "latest_financial_impact_preview": _latest_financial_impact_preview_summary(event),
         "source_record_mutation": False,
+    }
+
+
+def _latest_financial_impact_preview_summary(event: ContractRecontractEvent | None) -> dict | None:
+    if not event:
+        return None
+    preview = (
+        event.financial_impact_previews.order_by("-created_at", "-id").first()
+        if hasattr(event, "financial_impact_previews")
+        else ContractRecontractFinancialImpactPreview.objects.filter(event=event).order_by("-created_at", "-id").first()
+    )
+    if not preview:
+        return None
+    return {
+        "id": preview.id,
+        "event_id": preview.event_id,
+        "impact_type": preview.impact_type,
+        "accounting_preview_status": preview.accounting_preview_status,
+        "reconciliation_preview_status": preview.reconciliation_preview_status,
+        "price_difference": _money(preview.price_difference),
+        "additional_receivable_amount": _money(preview.additional_receivable_amount),
+        "credit_or_reduction_amount": _money(preview.credit_or_reduction_amount),
+        "projected_customer_balance": _money(preview.projected_customer_balance),
+        "projected_future_emi_total": _money(preview.projected_future_emi_total),
+        "journal_preview": preview.journal_preview or {},
+        "reconciliation_preview": preview.reconciliation_preview or {},
+        "warnings": preview.warnings or [],
+        "blocked_reason": preview.blocked_reason or "",
+        "source_record_mutation": preview.source_record_mutation,
+        "metadata": preview.metadata or {},
+        "created_at": preview.created_at.isoformat() if preview.created_at else None,
+        "updated_at": preview.updated_at.isoformat() if preview.updated_at else None,
     }
 
 
@@ -621,3 +655,151 @@ def record_product_recontract_admin_approval(
             },
         )
         return event
+
+
+def create_product_recontract_financial_impact_preview(
+    *,
+    amendment: ContractAmendment,
+    requested_by=None,
+) -> ContractRecontractFinancialImpactPreview:
+    with transaction.atomic():
+        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        event = (
+            ContractRecontractEvent.objects.select_for_update()
+            .prefetch_related("schedule_preview_lines")
+            .filter(amendment=locked_amendment)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if not event:
+            raise ValidationError({"detail": "No saved product recontract preview exists for this amendment."})
+        if event.status != ContractRecontractEvent.Status.PREVIEWED:
+            raise ValidationError({"detail": "Financial impact preview requires latest recontract event status PREVIEWED."})
+        if event.customer_consent_status != ContractRecontractEvent.CustomerConsentStatus.ACCEPTED:
+            raise ValidationError({"detail": "Financial impact preview requires customer consent status ACCEPTED."})
+        if event.admin_approval_status != ContractRecontractEvent.AdminApprovalStatus.APPROVED:
+            raise ValidationError({"detail": "Financial impact preview requires admin approval status APPROVED."})
+        schedule_lines = list(
+            event.schedule_preview_lines.filter(proposed_status=ContractRecontractScheduleLine.ProposedStatus.PREVIEW_ONLY).order_by(
+                "line_no", "id"
+            )
+        )
+        if not schedule_lines:
+            raise ValidationError({"detail": "Financial impact preview requires generated schedule preview lines."})
+
+        now = timezone.now()
+        ContractRecontractFinancialImpactPreview.objects.select_for_update().filter(
+            event=event,
+            accounting_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED,
+        ).update(accounting_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.SUPERSEDED, updated_at=now)
+        ContractRecontractFinancialImpactPreview.objects.select_for_update().filter(
+            event=event,
+            reconciliation_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED,
+        ).update(reconciliation_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.SUPERSEDED, updated_at=now)
+
+        impact_type = event.impact_type
+        price_difference = _q2(event.price_difference)
+        projected_future_emi_total = _q2(sum((line.proposed_amount for line in schedule_lines), MONEY_ZERO))
+        warnings = [
+            "Preview evidence only. No source records are mutated.",
+            "No journal entries are posted from this preview.",
+            "No reconciliation items or settlements are created from this preview.",
+        ]
+        blocked_reason = ""
+        accounting_status = ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED
+        reconciliation_status = ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED
+        additional_receivable_amount = MONEY_ZERO
+        credit_or_reduction_amount = MONEY_ZERO
+        projected_customer_balance = _q2(event.new_remaining_balance)
+
+        journal_lines = []
+        reconciliation_rows = []
+        if impact_type == ContractRecontractEvent.ImpactType.UPGRADE_EXTRA_PAYABLE:
+            additional_receivable_amount = _q2(price_difference)
+            journal_lines = [
+                {"line_no": 1, "entry_side": "DR", "label": "Customer Receivable / Contract Receivable", "amount": _money(additional_receivable_amount)},
+                {"line_no": 2, "entry_side": "CR", "label": "Product Recontract Revenue Adjustment / Contract Increase", "amount": _money(additional_receivable_amount)},
+            ]
+            reconciliation_rows = [
+                {"reference_type": "CONTRACT_RECONTRACT_EVENT", "reference_id": event.id, "adjustment_type": "RECEIVABLE_INCREASE_PREVIEW", "amount": _money(additional_receivable_amount), "status": "PREVIEWED"}
+            ]
+        elif impact_type == ContractRecontractEvent.ImpactType.DOWNGRADE_CREDIT_REQUIRED:
+            credit_or_reduction_amount = _q2(abs(price_difference))
+            projected_customer_balance = _q2(max(event.new_remaining_balance, MONEY_ZERO))
+            journal_lines = [
+                {"line_no": 1, "entry_side": "DR", "label": "Product Recontract Revenue Adjustment / Contract Decrease", "amount": _money(credit_or_reduction_amount)},
+                {"line_no": 2, "entry_side": "CR", "label": "Customer Credit / Receivable Reduction / Refund Required", "amount": _money(credit_or_reduction_amount)},
+            ]
+            reconciliation_rows = [
+                {"reference_type": "CONTRACT_RECONTRACT_EVENT", "reference_id": event.id, "adjustment_type": "CUSTOMER_CREDIT_PREVIEW", "amount": _money(credit_or_reduction_amount), "status": "PREVIEWED"}
+            ]
+        elif impact_type == ContractRecontractEvent.ImpactType.SAME_PRICE_REFERENCE_CORRECTION:
+            reconciliation_rows = [
+                {"reference_type": "CONTRACT_RECONTRACT_EVENT", "reference_id": event.id, "adjustment_type": "NO_MONETARY_RECONCILIATION_REQUIRED", "amount": _money(MONEY_ZERO), "status": "PREVIEWED"}
+            ]
+        else:
+            blocked_reason = "Financial impact preview blocked: unsupported impact type for accounting mapping."
+            accounting_status = ContractRecontractFinancialImpactPreview.PreviewStatus.BLOCKED
+            reconciliation_status = ContractRecontractFinancialImpactPreview.PreviewStatus.BLOCKED
+            warnings.append(blocked_reason)
+
+        preview = ContractRecontractFinancialImpactPreview.objects.create(
+            event=event,
+            impact_type=impact_type,
+            accounting_preview_status=accounting_status,
+            reconciliation_preview_status=reconciliation_status,
+            price_difference=price_difference,
+            additional_receivable_amount=_q2(additional_receivable_amount),
+            credit_or_reduction_amount=_q2(credit_or_reduction_amount),
+            projected_customer_balance=projected_customer_balance,
+            projected_future_emi_total=projected_future_emi_total,
+            journal_preview={
+                "preview_only": True,
+                "posting_performed": False,
+                "lines": journal_lines,
+            },
+            reconciliation_preview={
+                "preview_only": True,
+                "items_created": False,
+                "rows": reconciliation_rows,
+            },
+            warnings=warnings,
+            blocked_reason=blocked_reason or None,
+            source_record_mutation=False,
+            created_by=requested_by,
+            metadata={
+                "phase": "PHASE_6E_FINANCIAL_IMPACT_PREVIEW_ONLY",
+                "event": "CONTRACT_RECONTRACT_FINANCIAL_IMPACT_PREVIEW_CREATED",
+                "source_record_mutation": False,
+                "journal_posted": False,
+                "reconciliation_created": False,
+                "schedule_preview_line_count": len(schedule_lines),
+            },
+        )
+
+        event_metadata = event.metadata or {}
+        event_metadata["latest_financial_impact_preview_id"] = preview.id
+        event_metadata["phase"] = "PHASE_6E_FINANCIAL_IMPACT_PREVIEW_ONLY"
+        event_metadata["source_record_mutation"] = False
+        event_metadata["journal_posted"] = False
+        event_metadata["reconciliation_created"] = False
+        event.metadata = event_metadata
+        event.save(update_fields=["metadata", "updated_at"])
+
+        log_audit(
+            action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_APPROVED,
+            instance=locked_amendment,
+            performed_by=requested_by,
+            metadata={
+                "event": "CONTRACT_RECONTRACT_FINANCIAL_IMPACT_PREVIEW_CREATED",
+                "phase": "PHASE_6E_FINANCIAL_IMPACT_PREVIEW_ONLY",
+                "amendment_id": locked_amendment.pk,
+                "recontract_event_id": event.pk,
+                "financial_impact_preview_id": preview.pk,
+                "impact_type": impact_type,
+                "source_record_mutation": False,
+                "journal_posted": False,
+                "reconciliation_created": False,
+            },
+        )
+        return preview

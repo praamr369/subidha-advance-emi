@@ -1,6 +1,6 @@
 # Contract Amendment Product Recontract Preview
 
-Status: implemented on `update`. Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin approval/rejection, and Phase 6D future EMI schedule preview lines are implemented.
+Status: implemented on `update`. Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin approval/rejection, Phase 6D future EMI schedule preview lines, and Phase 6E accounting/reconciliation impact preview evidence are implemented.
 
 This phase adds an admin-only preview for financial product recontract requests. It does not execute the recontract.
 
@@ -67,3 +67,14 @@ GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
 ```
 
 It runs only for latest saved `PREVIEWED` event with customer consent `ACCEPTED` and admin approval `APPROVED`. It persists `ContractRecontractScheduleLine` rows as audit evidence only. Actual `Emi` rows, `Subscription` terms, payments, receipts, accounting, and reconciliation are not mutated.
+
+Phase 6E adds backend-generated accounting/reconciliation impact preview evidence only:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
+GET  /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
+```
+
+It persists `ContractRecontractFinancialImpactPreview` evidence for the latest saved `PREVIEWED` recontract event only when customer consent is `ACCEPTED`, admin approval is `APPROVED`, and schedule preview lines exist.
+
+Phase 6E does not post journals, does not mutate finance account balances, does not create reconciliation items or settlements, and does not execute recontract changes. Execution remains future work.

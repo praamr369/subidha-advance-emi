@@ -12,6 +12,7 @@ from api.v1.serializers.contract_amendments import (
     ContractAmendmentReviewSerializer,
     ContractAmendmentSerializer,
     ContractRecontractEventSerializer,
+    ContractRecontractFinancialImpactPreviewSerializer,
     ContractRecontractScheduleLineSerializer,
     ProductRecontractAdminDecisionSerializer,
     ProductRecontractCustomerConsentSerializer,
@@ -29,6 +30,7 @@ from subscriptions.services.contract_amendment_service import (
 from subscriptions.services.product_recontract_preview_service import (
     create_product_recontract_schedule_preview,
     create_product_recontract_preview_snapshot,
+    create_product_recontract_financial_impact_preview,
     preview_product_recontract,
     record_product_recontract_admin_approval,
     record_product_recontract_customer_consent,
@@ -395,3 +397,31 @@ class AdminContractAmendmentProductRecontractSchedulePreviewView(APIView):
             return Response([], status=status.HTTP_200_OK)
         lines = event.schedule_preview_lines.all().order_by("line_no", "id")
         return Response(ContractRecontractScheduleLineSerializer(lines, many=True).data, status=status.HTTP_200_OK)
+
+
+class AdminContractAmendmentProductRecontractFinancialImpactPreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        amendment = _amendment_queryset().filter(pk=pk).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            preview = create_product_recontract_financial_impact_preview(amendment=amendment, requested_by=request.user)
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+        return Response(ContractRecontractFinancialImpactPreviewSerializer(preview).data, status=status.HTTP_201_CREATED)
+
+    def get(self, request, pk: int):
+        amendment = _amendment_queryset().filter(pk=pk).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        event = (
+            ContractRecontractEvent.objects.filter(amendment=amendment)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if not event:
+            return Response([], status=status.HTTP_200_OK)
+        previews = event.financial_impact_previews.all().order_by("-created_at", "-id")
+        return Response(ContractRecontractFinancialImpactPreviewSerializer(previews, many=True).data, status=status.HTTP_200_OK)

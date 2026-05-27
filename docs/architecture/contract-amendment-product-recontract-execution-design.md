@@ -1,6 +1,6 @@
 # Contract Amendment Product Recontract Execution Design
 
-Status: execution design only. Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin approval/rejection, and Phase 6D schedule preview-line persistence are implemented, but no execution endpoint, mutation service, or frontend execution control is implemented.
+Status: execution design only. Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin approval/rejection, Phase 6D schedule preview-line persistence, and Phase 6E accounting/reconciliation impact preview evidence are implemented, but no execution endpoint, mutation service, or frontend execution control is implemented.
 
 Branch: `update`
 
@@ -183,7 +183,9 @@ Required transaction shape:
 - emit audit/business events
 - mark event `EXECUTED` with execution snapshot
 
-Execution remains future work after Phase 6C. Future EMI schedule update, accounting/reconciliation integration, execution endpoint, and printable addendum generation are not part of admin approval.
+Phase 6E adds accounting/reconciliation impact preview evidence only and still does not post journals, mutate finance account balances, or create reconciliation items/settlements.
+
+Execution remains future work after Phase 6E. Future EMI schedule update, accounting/reconciliation integration at posting layer, execution endpoint, and printable addendum generation are not part of preview/consent/approval/evidence phases.
 
 ### Stage E - Post-Execution Audit/Reconciliation
 

@@ -166,6 +166,24 @@ const productRecontractEventFixture = {
   ],
 };
 
+const financialImpactPreviewFixture = {
+  id: 9901,
+  event: productRecontractEventFixture.id,
+  impact_type: "UPGRADE_EXTRA_PAYABLE",
+  accounting_preview_status: "PREVIEWED",
+  reconciliation_preview_status: "PREVIEWED",
+  price_difference: "5000.00",
+  additional_receivable_amount: "5000.00",
+  credit_or_reduction_amount: "0.00",
+  projected_customer_balance: "21000.00",
+  projected_future_emi_total: "21000.00",
+  journal_preview: { preview_only: true, posting_performed: false, lines: [{ line_no: 1, entry_side: "DR", label: "Customer Receivable / Contract Receivable", amount: "5000.00" }] },
+  reconciliation_preview: { preview_only: true, items_created: false, rows: [{ reference_type: "CONTRACT_RECONTRACT_EVENT", amount: "5000.00", status: "PREVIEWED" }] },
+  warnings: ["Preview evidence only. No source records are mutated."],
+  blocked_reason: "",
+  source_record_mutation: false,
+};
+
 const latestProductRecontractPreviewSummary = {
   id: productRecontractEventFixture.id,
   status: productRecontractEventFixture.status,
@@ -199,6 +217,7 @@ const latestProductRecontractPreviewSummary = {
   admin_approval_snapshot: {},
   source_record_mutation: false,
   schedule_preview_lines: productRecontractEventFixture.schedule_preview_lines,
+  latest_financial_impact_preview: financialImpactPreviewFixture,
 };
 
 const approvedProductChangeWithSavedPreviewFixture = {
@@ -325,6 +344,10 @@ async function mockAmendments(page: Page, role: "customer" | "partner" | "admin"
         await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(productRecontractEventFixture) });
         return;
       }
+      if (/\/contract-amendments\/1\/product-recontract\/financial-impact-preview\/?$/.test(url.pathname)) {
+        await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(financialImpactPreviewFixture) });
+        return;
+      }
       if (/\/contract-amendments\/1\/product-recontract-preview\/?$/.test(url.pathname)) {
         await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(productRecontractPreviewFixture) });
         return;
@@ -352,6 +375,10 @@ async function mockAmendments(page: Page, role: "customer" | "partner" | "admin"
     }
     if (/\/contract-amendments\/1\/product-recontract\/schedule-preview\/?$/.test(url.pathname)) {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(productRecontractEventFixture.schedule_preview_lines) });
+      return;
+    }
+    if (/\/contract-amendments\/1\/product-recontract\/financial-impact-preview\/?$/.test(url.pathname)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([financialImpactPreviewFixture]) });
       return;
     }
 
@@ -524,6 +551,30 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByText("Future EMI schedule preview lines")).toBeVisible();
   });
 
+  test("admin can generate accounting and reconciliation impact preview only", async ({ page }) => {
+    const acceptedAndApprovedFixture = {
+      ...approvedProductChangeWithAcceptedPreviewFixture,
+      latest_product_recontract_preview: {
+        ...approvedProductChangeWithAcceptedPreviewFixture.latest_product_recontract_preview,
+        admin_approval_status: "APPROVED",
+        schedule_preview_lines: productRecontractEventFixture.schedule_preview_lines,
+      },
+    };
+    await mockAmendments(page, "admin", acceptedAndApprovedFixture);
+    await page.goto("/admin/contract-amendments/1");
+
+    await expect(page.getByRole("button", { name: "Generate accounting & reconciliation preview" })).toBeVisible();
+    await expect(page.getByText("This creates accounting and reconciliation preview evidence only. No journal, finance account, settlement, reconciliation, EMI, payment, receipt, product, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records are changed.")).toBeVisible();
+    await page.getByRole("button", { name: "Generate accounting & reconciliation preview" }).click();
+    await expect(page.getByText("Accounting and reconciliation impact preview generated.")).toBeVisible();
+    await expect(page.getByText("Accounting and reconciliation impact preview")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Execute recontract" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Post journal" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Apply accounting" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reconcile now" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Update contract" })).toHaveCount(0);
+  });
+
   test("admin can click approve recontract preview for future execution", async ({ page }) => {
     await mockAmendments(page, "admin", approvedProductChangeWithAcceptedPreviewFixture);
     await page.goto("/admin/contract-amendments/1");
@@ -629,6 +680,7 @@ test.describe("customer and partner amendment implementation visibility", () => 
     await expect(page.getByRole("button", { name: "Accept proposed recontract terms" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Reject proposed recontract terms" })).toBeVisible();
     await expect(page.getByText("Future EMI schedule preview lines (read-only)")).toBeVisible();
+    await expect(page.getByText("Accounting and reconciliation impact preview (read-only)")).toBeVisible();
     await expect(page.getByRole("button", { name: /Execute|Apply|Update contract|Recalculate/i })).toHaveCount(0);
   });
 

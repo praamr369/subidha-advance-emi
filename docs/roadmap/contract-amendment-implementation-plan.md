@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Phase 6D product recontract schedule preview-line persistence completed on `update` branch**
+Status: **Phase 6E product recontract accounting/reconciliation impact preview evidence completed on `update` branch**
 
 ## Principle
 
@@ -142,11 +142,20 @@ GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
 
 Phase 6D does not mutate `Emi` rows, `Subscription.product`, `Subscription.total_amount`, `Subscription.monthly_amount`, `Subscription.tenure_months`, payments, receipts, accounting, or reconciliation. It is preview evidence only; execution remains deferred.
 
-## Phase 6E — Accounting/reconciliation integration
+## Phase 6E — Accounting/reconciliation impact preview evidence only
 
-Status: **Deferred**
+Status: **Implemented**
 
-Route execution impact through existing accounting services and reconciliation lifecycle/event services. Preview, consent, and approval must not post journals or reconciliation rows.
+Additive `ContractRecontractFinancialImpactPreview` persists backend-generated accounting and reconciliation impact preview evidence for latest recontract preview events after customer acceptance, admin approval, and schedule preview lines.
+
+Admin endpoints:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
+GET  /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
+```
+
+Phase 6E does not post journals, does not mutate finance account balances, does not create reconciliation items/settlements, and does not execute recontract changes. Execution remains future work.
 
 ## Phase 6F — Product recontract execution endpoint
 
