@@ -140,17 +140,30 @@ const amendment = {
 };
 
 async function mockExecutedAmendment(page: Page) {
-  await page.route("**/api/v1/admin/contract-amendments/1/product-recontract-events/**", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ ...executedPreview, amendment_id: 1 }]) });
-  });
-  await page.route("**/api/v1/admin/contract-amendments/1/product-recontract/schedule-preview/**", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(executedPreview.schedule_preview_lines) });
-  });
-  await page.route("**/api/v1/admin/contract-amendments/1/product-recontract/financial-impact-preview/**", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([executedPreview.latest_financial_impact_preview]) });
-  });
-  await page.route("**/api/v1/admin/contract-amendments/1/**", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(amendment) });
+  await page.route("**/api/v1/admin/contract-amendments/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    if (/\/api\/v1\/admin\/contract-amendments\/1\/?$/.test(url.pathname)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(amendment) });
+      return;
+    }
+    if (/\/api\/v1\/admin\/contract-amendments\/1\/product-recontract-events\/?$/.test(url.pathname)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ ...executedPreview, amendment_id: 1 }]) });
+      return;
+    }
+    if (/\/api\/v1\/admin\/contract-amendments\/1\/product-recontract\/schedule-preview\/?$/.test(url.pathname)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(executedPreview.schedule_preview_lines) });
+      return;
+    }
+    if (/\/api\/v1\/admin\/contract-amendments\/1\/product-recontract\/financial-impact-preview\/?$/.test(url.pathname)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([executedPreview.latest_financial_impact_preview]) });
+      return;
+    }
+    await route.fallback();
   });
 }
 
