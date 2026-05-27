@@ -172,6 +172,9 @@ def execute_product_recontract_reconciliation(
     """
 
     actor = requested_by or performed_by
+    if actor is None or not getattr(actor, "pk", None):
+        raise ValidationError({"detail": "Reconciliation bridge requires an authenticated admin actor."})
+
     locked_event = (
         ContractRecontractEvent.objects.select_for_update()
         .select_related("amendment", "subscription", "old_product", "new_product")
