@@ -1,18 +1,18 @@
 # Product Recontract Posting and Reconciliation Integration Design
 
-Status: **Phase 6F.1 design, Phase 6F.2 accounting posting bridge, and Phase 6F.3 reconciliation bridge are implemented on `update`; final recontract execution remains blocked**
+Status: **Phase 6F.4 backend execution is enabled on `update` after full accounting and reconciliation evidence verification.**
 
 Branch: `update`
 
-This document defines the accounting and reconciliation bridge design for product upgrade/downgrade recontracts. Phase 6F.2 and 6F.3 create durable accounting and reconciliation evidence only. They do not enable final execution and do not mutate `Subscription`, `Emi`, `Payment`, `ReceiptDocument`, `FinanceAccount`, `MoneyMovement`, settlement/day-close records, inventory, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records.
+This document defines the accounting and reconciliation evidence required before product recontract execution.
 
 ## 1. Current repository facts
 
-- Product recontract preview, saved event snapshot, customer consent, admin decision, schedule preview lines, financial impact preview, accounting posting bridge, and reconciliation bridge endpoints exist.
-- `execute_product_recontract_event()` remains intentionally blocked with a controlled 400 until final orchestration is implemented.
+- Product recontract preview, saved event snapshot, customer consent, admin decision, schedule preview lines, financial impact preview, accounting posting bridge, reconciliation bridge, and backend execution exist.
 - Phase 6F.2 posts accounting evidence through `AccountingBridgePosting` and `JournalEntry` using source model `ContractRecontractEvent` and purpose `CONTRACT_RECONTRACT_ACCOUNTING_ADJUSTMENT`.
 - Phase 6F.3 creates reconciliation evidence through existing `ReconciliationRun`, `ReconciliationItem`, `ReconciliationEvidence`, and `FinancialSourceLifecycleEvent` records using logical source type `PRODUCT_RECONTRACT_ADJUSTMENT`.
-- Settlement/day-close systems remain cash-evidence surfaces and are not mutated by product recontract accounting or reconciliation bridge phases.
+- Phase 6F.4 verifies the evidence chain before source mutation.
+- No frontend execution button is added in Phase 6F.4.
 
 ## 2. Business accounting meaning
 
@@ -22,8 +22,8 @@ Product recontract is a contract value amendment, not cash collection.
 - Downgrade reduces unpaid receivable first and creates customer credit liability for any overpaid portion.
 - Already-paid amount remains preserved.
 - Historical payments, receipts, ledgers, paid EMIs, posted journals, waivers, lucky draw evidence, settlement records, and day-close evidence are never rewritten.
-- No receipt is created by recontract accounting or reconciliation bridge phases because no cash is received.
-- Actual future cash collection must continue through the existing payment, receipt, accounting, and settlement workflows.
+- No receipt is created by recontract execution because no cash is received.
+- Actual future cash collection continues through the existing payment, receipt, accounting, and settlement workflows.
 
 ## 3. Accounting bridge behavior — Phase 6F.2
 
@@ -42,23 +42,7 @@ Required gates:
 - financial impact preview exists and has accounting/reconciliation preview statuses `PREVIEWED`
 - no existing accounting bridge posting exists for the event and purpose
 
-Upgrade posting:
-
-```text
-Dr Customer Receivable / Contract Receivable
-Cr Product Recontract Revenue Adjustment / Contract Increase
-Amount = additional receivable amount
-```
-
-Downgrade posting:
-
-```text
-Dr Product Recontract Revenue Adjustment / Contract Decrease
-Cr Customer Receivable / Contract Receivable reduction
-Cr Customer Credit / Customer Advance Liability, if overpaid
-```
-
-Phase 6F.2 creates only accounting evidence:
+The accounting bridge creates only prerequisite evidence:
 
 - `AccountingBridgePosting`
 - posted `JournalEntry`
@@ -91,19 +75,48 @@ Durable evidence created:
 
 - `ReconciliationRun` with scope `PRODUCT_RECONTRACT_ADJUSTMENT`
 - `ReconciliationItem` with source type `PRODUCT_RECONTRACT_ADJUSTMENT`
-- `ReconciliationEvidence` rows linking:
-  - `ContractRecontractEvent`
-  - `ContractRecontractFinancialImpactPreview`
-  - `AccountingBridgePosting`
-  - `JournalEntry`
-  - `FinancialSourceLifecycleEvent`
+- `ReconciliationEvidence` rows linking the event, financial preview, accounting bridge, journal, and lifecycle event
 - `FinancialSourceLifecycleEvent` with logical source metadata for product recontract adjustment
 - audit metadata event `CONTRACT_RECONTRACT_RECONCILIATION_QUEUED`
 - `ContractRecontractEvent.metadata` reconciliation references
 
-Phase 6F.3 is reconciliation evidence only. It does not execute the product change, change real EMI rows, create payments or receipts, settle money, close day-close records, or mutate settlement allocations.
+## 5. Execution behavior — Phase 6F.4
 
-## 5. Amount matching rules
+Admin endpoint:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/
+```
+
+Execution creates no accounting or reconciliation records. It verifies that the accounting and reconciliation evidence already exists and is internally consistent.
+
+Execution mutates only:
+
+- `Subscription.product`
+- `Subscription.total_amount`
+- `Subscription.monthly_amount`
+- `Subscription.tenure_months`
+- pending `Emi.amount`
+- pending `Emi.due_date`
+- `ContractRecontractEvent.metadata` execution snapshot
+
+Execution does not mutate:
+
+- paid/waived/cancelled EMI rows
+- payments
+- receipts
+- accounting entries
+- reconciliation rows
+- settlement/day-close records
+- finance account balances
+- lucky ID or batch
+- lucky draw or waiver records
+- stock/inventory
+- delivery
+- commission/payout
+- rent/lease demand or deposit records
+
+## 6. Amount matching rules
 
 Expected amount is derived from the financial impact preview:
 
@@ -112,20 +125,13 @@ Expected amount is derived from the financial impact preview:
 
 Posted amount is derived from the linked posted journal total. Debit and credit totals must match. The posted amount must equal the expected amount.
 
-If there is variance, the reconciliation bridge returns a controlled error and writes no reconciliation/lifecycle evidence.
+The reconciliation item must also show expected amount equals actual amount and zero variance.
 
-## 6. EMI and payment rules
-
-- Paid EMIs stay unchanged.
-- Pending EMI rows stay unchanged until a later final execution phase.
-- Paid receipts stay unchanged.
-- Historical payment allocation history remains preserved.
-- Recontract adjustment is not a payment and must not appear as cash collection.
-- Future collections use the normal collection workflow after final execution is safely implemented.
+If there is variance, execution returns a controlled error and no subscription or EMI mutation is committed.
 
 ## 7. Settlement and day-close rules
 
-Product recontract bridge phases do not touch:
+Product recontract execution does not touch:
 
 - bank statement lines
 - UPI settlement lines
@@ -135,57 +141,16 @@ Product recontract bridge phases do not touch:
 - settlement status
 - day-close approval/rejection/void status
 
-The bridge is non-cash reconciliation evidence only.
+The adjustment is non-cash contract evidence, not a settlement event.
 
-## 8. Failure and rollback rules
-
-- If accounting posting fails, no reconciliation bridge may be created.
-- If reconciliation bridge amount validation fails, no reconciliation evidence or lifecycle event is created.
-- If reconciliation evidence creation fails, final recontract execution must remain blocked.
-- Duplicate accounting posting is rejected.
-- Duplicate reconciliation bridge evidence is rejected.
-- Future final execution must still run inside one transaction and preserve all historical records.
-
-## 9. Final execution gate checklist
-
-Execution may be enabled only after all gates are implemented and tested:
-
-- saved preview event exists
-- customer accepted
-- admin approved
-- schedule preview exists
-- financial impact preview exists
-- accounting bridge posting exists and is posted
-- reconciliation bridge evidence exists and is linked
-- expected amount equals posted amount
-- pending EMI rows still map to schedule preview lines
-- no blocking cancellation/reversal/dispute exists
-- no duplicate execution metadata exists
-- settlement/day-close and cash workflows remain unaffected
-
-## 10. Rollout plan
+## 8. Rollout plan
 
 - Phase 6F.1: design documentation — implemented.
 - Phase 6F.2: durable accounting posting bridge — implemented.
 - Phase 6F.3: durable reconciliation bridge — implemented.
-- Phase 6F.4: final source mutation orchestration — deferred.
-- Phase 6F.5: RC hardening, failure injection, ledger view, addendum, and UI readiness — deferred.
+- Phase 6F.4: backend execution after evidence verification — implemented.
+- Phase 6F.5: RC hardening, failure injection, ledger view, printable addendum, and admin typed-confirmation UI — deferred.
 
-## 11. Migration notes
+## 9. Migration notes
 
-Phase 6F.3 uses existing reconciliation and lifecycle models. No migration is required.
-
-Future optional additive models may still be introduced for more explicit reporting:
-
-- `ContractRecontractPostingRecord`
-- `ContractRecontractReconciliationRecord`
-- dedicated product recontract revenue adjustment posting profile
-- dedicated customer credit liability posting profile
-
-No destructive migration is required.
-
-## 12. Deployment notes
-
-- Do not expose a frontend final execution button yet.
-- Run backend tests for financial preview, accounting posting, reconciliation bridge, and blocked execution before rollout.
-- Keep final execution blocked until Phase 6F.4 safely mutates subscription and pending EMI rows after accounting and reconciliation evidence is present.
+Phase 6F.4 uses existing models and event metadata. No migration is required.
