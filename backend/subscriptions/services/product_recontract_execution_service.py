@@ -78,6 +78,43 @@ def _snapshot_subscription(subscription: Subscription) -> dict:
         "batch_id": subscription.batch_id,
         "lucky_id": subscription.lucky_id_id,
         "waived_amount": _money(subscription.waived_amount),
+        "product_snapshot": subscription.product_snapshot or {},
+        "pricing_snapshot": subscription.pricing_snapshot or {},
+    }
+
+
+def _product_snapshot_for_execution(event: ContractRecontractEvent) -> dict:
+    product = event.new_product
+    if product is None:
+        return {}
+    return {
+        "product_id": product.id,
+        "product_code": product.product_code,
+        "name": product.name,
+        "base_price": _money(product.base_price),
+        "category": product.category,
+        "subcategory": product.subcategory,
+        "description": product.description,
+        "is_active": product.is_active,
+        "plan_type_default": product.plan_type_default,
+        "is_emi_enabled": product.is_emi_enabled,
+        "is_rent_enabled": product.is_rent_enabled,
+        "is_lease_enabled": product.is_lease_enabled,
+        "snapshot_source": EXECUTION_EVENT,
+        "recontract_event_id": event.id,
+        "amendment_id": event.amendment_id,
+    }
+
+
+def _pricing_snapshot_for_execution(event: ContractRecontractEvent) -> dict:
+    return {
+        "plan_type": event.subscription.plan_type,
+        "tenure_months": int(event.preview_tenure_months),
+        "monthly_amount": _money(event.proposed_monthly_amount),
+        "total_amount": _money(event.new_contract_total),
+        "snapshot_source": EXECUTION_EVENT,
+        "recontract_event_id": event.id,
+        "amendment_id": event.amendment_id,
     }
 
 
@@ -214,6 +251,14 @@ def _schedule_preview_lines(event: ContractRecontractEvent) -> list[ContractReco
     )
 
 
+def _reconciliation_evidence_ids(item: ReconciliationItem) -> list[int]:
+    return list(
+        ReconciliationEvidence.objects.filter(item=item)
+        .order_by("id")
+        .values_list("id", flat=True)
+    )
+
+
 @transaction.atomic
 def execute_product_recontract_event(*, amendment: ContractAmendment, executed_by=None) -> ContractRecontractEvent:
     """
@@ -224,6 +269,7 @@ def execute_product_recontract_event(*, amendment: ContractAmendment, executed_b
     - Subscription.total_amount
     - Subscription.monthly_amount
     - Subscription.tenure_months
+    - Subscription.product_snapshot / pricing_snapshot, as current authoritative snapshots
     - pending EMI amount/due_date from schedule preview lines
     - ContractRecontractEvent metadata execution snapshot
 
@@ -288,6 +334,7 @@ def execute_product_recontract_event(*, amendment: ContractAmendment, executed_b
         bridge=bridge,
         expected_amount=expected_amount,
     )
+    reconciliation_evidence_ids = _reconciliation_evidence_ids(reconciliation_item)
 
     subscription = Subscription.objects.select_for_update().select_related("product", "batch", "lucky_id").get(pk=event.subscription_id)
     _assert_subscription_executable(subscription)
@@ -327,7 +374,18 @@ def execute_product_recontract_event(*, amendment: ContractAmendment, executed_b
     subscription.total_amount = _q2(event.new_contract_total)
     subscription.monthly_amount = _q2(event.proposed_monthly_amount)
     subscription.tenure_months = int(event.preview_tenure_months)
-    subscription.save(update_fields=["product", "total_amount", "monthly_amount", "tenure_months"])
+    subscription.product_snapshot = _product_snapshot_for_execution(event)
+    subscription.pricing_snapshot = _pricing_snapshot_for_execution(event)
+    subscription.save(
+        update_fields=[
+            "product",
+            "total_amount",
+            "monthly_amount",
+            "tenure_months",
+            "product_snapshot",
+            "pricing_snapshot",
+        ]
+    )
 
     updated_lines = []
     for emi in pending_emis:
@@ -350,6 +408,7 @@ def execute_product_recontract_event(*, amendment: ContractAmendment, executed_b
     after_subscription = _snapshot_subscription(subscription)
     after_pending_emis = [_snapshot_emi(emi) for emi in pending_emis]
     executed_at = timezone.now()
+    schedule_line_ids = [line.id for line in schedule_lines]
     event_metadata = event.metadata or {}
     event_metadata.update(
         {
@@ -364,6 +423,8 @@ def execute_product_recontract_event(*, amendment: ContractAmendment, executed_b
             "journal_entry_id": bridge.journal_entry_id,
             "reconciliation_item_id": reconciliation_item.id,
             "reconciliation_run_id": reconciliation_item.run_id,
+            "reconciliation_evidence_ids": reconciliation_evidence_ids,
+            "schedule_line_ids": schedule_line_ids,
             "expected_amount": _money(expected_amount),
             "posted_amount": _money(posted_amount),
             "variance_amount": "0.00",
@@ -373,6 +434,9 @@ def execute_product_recontract_event(*, amendment: ContractAmendment, executed_b
             "after_pending_emis": after_pending_emis,
             "updated_pending_emi_lines": updated_lines,
             "protected_emi_ids": protected_emi_ids,
+            "snapshot_policy": "Subscription.product_snapshot and pricing_snapshot were refreshed to the executed authoritative product and financial terms. Prior snapshots are preserved in event metadata before_subscription.",
+            "product_snapshot_updated": True,
+            "pricing_snapshot_updated": True,
             "payments_mutated": False,
             "receipts_mutated": False,
             "accounting_mutated_by_execution": False,
@@ -416,8 +480,13 @@ def execute_product_recontract_event(*, amendment: ContractAmendment, executed_b
             "accounting_bridge_posting_id": bridge.id,
             "journal_entry_id": bridge.journal_entry_id,
             "reconciliation_item_id": reconciliation_item.id,
+            "reconciliation_run_id": reconciliation_item.run_id,
+            "reconciliation_evidence_ids": reconciliation_evidence_ids,
+            "schedule_line_ids": schedule_line_ids,
             "expected_amount": _money(expected_amount),
             "posted_amount": _money(posted_amount),
+            "product_snapshot_updated": True,
+            "pricing_snapshot_updated": True,
             "payments_mutated": False,
             "receipts_mutated": False,
             "paid_or_non_pending_emis_mutated": False,
