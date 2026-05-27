@@ -187,6 +187,20 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
     admin_approved_by_display = serializers.CharField(source="admin_approved_by.username", read_only=True, allow_null=True)
     schedule_preview_lines = serializers.SerializerMethodField()
     latest_financial_impact_preview = serializers.SerializerMethodField()
+    executed = serializers.SerializerMethodField()
+    executed_at = serializers.SerializerMethodField()
+    executed_by = serializers.SerializerMethodField()
+    execution_status = serializers.SerializerMethodField()
+    execution_snapshot = serializers.SerializerMethodField()
+    accounting_bridge_posting_id = serializers.SerializerMethodField()
+    journal_entry_id = serializers.SerializerMethodField()
+    reconciliation_item_id = serializers.SerializerMethodField()
+    reconciliation_run_id = serializers.SerializerMethodField()
+    reconciliation_evidence_ids = serializers.SerializerMethodField()
+    schedule_line_ids = serializers.SerializerMethodField()
+
+    def _execution_metadata(self, obj):
+        return obj.metadata if isinstance(obj.metadata, dict) else {}
 
     def get_schedule_preview_lines(self, obj):
         lines = getattr(obj, "schedule_preview_lines", None)
@@ -199,6 +213,69 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
         if not latest:
             return None
         return ContractRecontractFinancialImpactPreviewSerializer(latest).data
+
+    def get_executed(self, obj):
+        metadata = self._execution_metadata(obj)
+        return bool(metadata.get("execution_performed") is True or metadata.get("execution_status") == "EXECUTED")
+
+    def get_executed_at(self, obj):
+        return self._execution_metadata(obj).get("executed_at")
+
+    def get_executed_by(self, obj):
+        return self._execution_metadata(obj).get("executed_by")
+
+    def get_execution_status(self, obj):
+        return self._execution_metadata(obj).get("execution_status") or "NOT_EXECUTED"
+
+    def get_execution_snapshot(self, obj):
+        metadata = self._execution_metadata(obj)
+        return {
+            "before_subscription": metadata.get("before_subscription") or {},
+            "after_subscription": metadata.get("after_subscription") or {},
+            "before_pending_emis": metadata.get("before_pending_emis") or [],
+            "after_pending_emis": metadata.get("after_pending_emis") or [],
+            "updated_pending_emi_lines": metadata.get("updated_pending_emi_lines") or [],
+            "protected_emi_ids": metadata.get("protected_emi_ids") or [],
+            "snapshot_policy": metadata.get("snapshot_policy") or "",
+            "product_snapshot_updated": bool(metadata.get("product_snapshot_updated")),
+            "pricing_snapshot_updated": bool(metadata.get("pricing_snapshot_updated")),
+            "preservation_flags": {
+                "payments_mutated": bool(metadata.get("payments_mutated")),
+                "receipts_mutated": bool(metadata.get("receipts_mutated")),
+                "accounting_mutated_by_execution": bool(metadata.get("accounting_mutated_by_execution")),
+                "reconciliation_mutated_by_execution": bool(metadata.get("reconciliation_mutated_by_execution")),
+                "settlement_mutated": bool(metadata.get("settlement_mutated")),
+                "day_close_mutated": bool(metadata.get("day_close_mutated")),
+                "lucky_id_mutated": bool(metadata.get("lucky_id_mutated")),
+                "batch_mutated": bool(metadata.get("batch_mutated")),
+                "waiver_mutated": bool(metadata.get("waiver_mutated")),
+                "lucky_draw_mutated": bool(metadata.get("lucky_draw_mutated")),
+                "inventory_mutated": bool(metadata.get("inventory_mutated")),
+                "delivery_mutated": bool(metadata.get("delivery_mutated")),
+                "commission_mutated": bool(metadata.get("commission_mutated")),
+                "payout_mutated": bool(metadata.get("payout_mutated")),
+                "rent_lease_demand_mutated": bool(metadata.get("rent_lease_demand_mutated")),
+                "deposit_mutated": bool(metadata.get("deposit_mutated")),
+            },
+        }
+
+    def get_accounting_bridge_posting_id(self, obj):
+        return self._execution_metadata(obj).get("accounting_bridge_posting_id")
+
+    def get_journal_entry_id(self, obj):
+        return self._execution_metadata(obj).get("journal_entry_id")
+
+    def get_reconciliation_item_id(self, obj):
+        return self._execution_metadata(obj).get("reconciliation_item_id")
+
+    def get_reconciliation_run_id(self, obj):
+        return self._execution_metadata(obj).get("reconciliation_run_id")
+
+    def get_reconciliation_evidence_ids(self, obj):
+        return self._execution_metadata(obj).get("reconciliation_evidence_ids") or []
+
+    def get_schedule_line_ids(self, obj):
+        return self._execution_metadata(obj).get("schedule_line_ids") or []
 
     class Meta:
         model = ContractRecontractEvent
@@ -246,6 +323,17 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
             "admin_approval_snapshot",
             "schedule_preview_lines",
             "latest_financial_impact_preview",
+            "executed",
+            "executed_at",
+            "executed_by",
+            "execution_status",
+            "execution_snapshot",
+            "accounting_bridge_posting_id",
+            "journal_entry_id",
+            "reconciliation_item_id",
+            "reconciliation_run_id",
+            "reconciliation_evidence_ids",
+            "schedule_line_ids",
             "metadata",
         ]
         read_only_fields = fields
