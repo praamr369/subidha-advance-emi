@@ -803,4 +803,19 @@ def create_product_recontract_financial_impact_preview(
                 "schedule_preview_line_count": len(schedule_lines),
             },
         )
+        log_audit(
+            action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_APPROVED,
+            instance=locked_amendment,
+            performed_by=requested_by,
+            metadata={
+                "event": "CONTRACT_RECONTRACT_FINANCIAL_IMPACT_PREVIEW_CREATED",
+                "phase": "PHASE_6E_FINANCIAL_IMPACT_PREVIEW_ONLY",
+                "amendment_id": locked_amendment.pk,
+                "recontract_event_id": event.pk,
+                "financial_impact_preview_id": preview.pk,
+                "source_record_mutation": False,
+                "journal_posted": False,
+                "reconciliation_created": False,
+            },
+        )
         return preview
