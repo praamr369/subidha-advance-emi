@@ -30,6 +30,7 @@ _PREVIEW_ALLOWED_STATUSES = {"REQUESTED", "UNDER_REVIEW", "APPROVED"}
 _EXECUTION_BLOCKED_MESSAGE = (
     "Product recontract execution requires accounting and reconciliation posting integration and is not enabled yet."
 )
+_POST_EXECUTION_BLOCKED_MESSAGE = "Product recontract has already been executed for this amendment. Further preview, consent, approval, schedule, and financial impact actions are read-only/blocked."
 _TARGET_PRODUCT_ID_KEYS = ("approved_product_id", "target_product_id", "new_product_id", "product_id")
 _PREVIEW_WARNINGS = [
     "Preview only — no source records are mutated.",
@@ -53,6 +54,25 @@ def _date(value):
     if hasattr(value, "isoformat"):
         return value
     return parse_date(str(value))
+
+
+def _event_is_executed(event: ContractRecontractEvent | None) -> bool:
+    if not event:
+        return False
+    metadata = event.metadata if isinstance(event.metadata, dict) else {}
+    return bool(metadata.get("execution_performed") is True or metadata.get("execution_status") == "EXECUTED")
+
+
+def _latest_event(amendment: ContractAmendment, *, lock: bool = False) -> ContractRecontractEvent | None:
+    queryset = ContractRecontractEvent.objects.select_related("old_product", "new_product", "subscription").filter(amendment=amendment)
+    if lock:
+        queryset = queryset.select_for_update()
+    return queryset.order_by("-created_at", "-id").first()
+
+
+def _assert_not_executed_for_amendment(amendment: ContractAmendment) -> None:
+    if _event_is_executed(_latest_event(amendment, lock=True)):
+        raise ValidationError({"detail": _POST_EXECUTION_BLOCKED_MESSAGE})
 
 
 def _event_preview_summary(event: ContractRecontractEvent | None) -> dict | None:
@@ -165,6 +185,8 @@ def _event_for_schedule_preview(amendment: ContractAmendment) -> ContractRecontr
     )
     if not event:
         raise ValidationError({"detail": "No saved product recontract preview exists for this amendment."})
+    if _event_is_executed(event):
+        raise ValidationError({"detail": _POST_EXECUTION_BLOCKED_MESSAGE})
     if event.status != ContractRecontractEvent.Status.PREVIEWED:
         raise ValidationError({"detail": "Schedule preview requires the latest recontract event to be PREVIEWED."})
     if event.customer_consent_status != ContractRecontractEvent.CustomerConsentStatus.ACCEPTED:
@@ -324,6 +346,14 @@ def preview_product_recontract(*, amendment: ContractAmendment, preview_tenure_m
         raise ValidationError({"detail": "Product recontract preview is supported only for PRODUCT_CHANGE amendments."})
     if amendment.status not in _PREVIEW_ALLOWED_STATUSES:
         raise ValidationError({"detail": "Product recontract preview requires REQUESTED, UNDER_REVIEW, or APPROVED status."})
+    if _event_is_executed(_latest_event(amendment)):
+        return {
+            "preview_status": "BLOCKED",
+            "impact_type": "EXECUTED",
+            "blocked_reason": _POST_EXECUTION_BLOCKED_MESSAGE,
+            "warnings": [_POST_EXECUTION_BLOCKED_MESSAGE],
+            "source_record_mutation": False,
+        }
 
     values = _values_for(amendment)
     target_product_id = _target_product_id(values)
@@ -400,6 +430,7 @@ def create_product_recontract_preview_snapshot(
     """Persist one backend-calculated product recontract preview as audit evidence only."""
     with transaction.atomic():
         locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        _assert_not_executed_for_amendment(locked_amendment)
         preview = preview_product_recontract(
             amendment=locked_amendment,
             preview_tenure_months=preview_tenure_months,
@@ -497,15 +528,11 @@ def record_product_recontract_customer_consent(
         if locked_amendment.customer_id != customer.id:
             raise ValidationError({"detail": "You can consent only to your own amendment."})
 
-        event = (
-            ContractRecontractEvent.objects.select_for_update()
-            .select_related("old_product", "new_product", "subscription")
-            .filter(amendment=locked_amendment)
-            .order_by("-created_at", "-id")
-            .first()
-        )
+        event = _latest_event(locked_amendment, lock=True)
         if not event:
             raise ValidationError({"detail": "No saved product recontract preview exists for this amendment."})
+        if _event_is_executed(event):
+            raise ValidationError({"detail": _POST_EXECUTION_BLOCKED_MESSAGE})
         if event.status != ContractRecontractEvent.Status.PREVIEWED:
             raise ValidationError({"detail": "Customer consent requires the latest saved preview to be active and PREVIEWED."})
         if event.customer_consent_status != ContractRecontractEvent.CustomerConsentStatus.PENDING:
@@ -581,15 +608,11 @@ def record_product_recontract_admin_approval(
 
     with transaction.atomic():
         locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
-        event = (
-            ContractRecontractEvent.objects.select_for_update()
-            .select_related("old_product", "new_product", "subscription")
-            .filter(amendment=locked_amendment)
-            .order_by("-created_at", "-id")
-            .first()
-        )
+        event = _latest_event(locked_amendment, lock=True)
         if not event:
             raise ValidationError({"detail": "No saved product recontract preview exists for this amendment."})
+        if _event_is_executed(event):
+            raise ValidationError({"detail": _POST_EXECUTION_BLOCKED_MESSAGE})
         if event.status != ContractRecontractEvent.Status.PREVIEWED:
             raise ValidationError({"detail": "Admin approval requires the latest saved preview to be active and PREVIEWED."})
         if not event.preview_snapshot:
@@ -675,6 +698,8 @@ def create_product_recontract_financial_impact_preview(
         )
         if not event:
             raise ValidationError({"detail": "No saved product recontract preview exists for this amendment."})
+        if _event_is_executed(event):
+            raise ValidationError({"detail": _POST_EXECUTION_BLOCKED_MESSAGE})
         if event.status != ContractRecontractEvent.Status.PREVIEWED:
             raise ValidationError({"detail": "Financial impact preview requires latest recontract event status PREVIEWED."})
         if event.customer_consent_status != ContractRecontractEvent.CustomerConsentStatus.ACCEPTED:
@@ -778,110 +803,4 @@ def create_product_recontract_financial_impact_preview(
                 "schedule_preview_line_count": len(schedule_lines),
             },
         )
-
-        event_metadata = event.metadata or {}
-        event_metadata["latest_financial_impact_preview_id"] = preview.id
-        event_metadata["phase"] = "PHASE_6E_FINANCIAL_IMPACT_PREVIEW_ONLY"
-        event_metadata["source_record_mutation"] = False
-        event_metadata["journal_posted"] = False
-        event_metadata["reconciliation_created"] = False
-        event.metadata = event_metadata
-        event.save(update_fields=["metadata", "updated_at"])
-
-        log_audit(
-            action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_APPROVED,
-            instance=locked_amendment,
-            performed_by=requested_by,
-            metadata={
-                "event": "CONTRACT_RECONTRACT_FINANCIAL_IMPACT_PREVIEW_CREATED",
-                "phase": "PHASE_6E_FINANCIAL_IMPACT_PREVIEW_ONLY",
-                "amendment_id": locked_amendment.pk,
-                "recontract_event_id": event.pk,
-                "financial_impact_preview_id": preview.pk,
-                "impact_type": impact_type,
-                "source_record_mutation": False,
-                "journal_posted": False,
-                "reconciliation_created": False,
-            },
-        )
         return preview
-
-
-def execute_product_recontract_event(*, amendment: ContractAmendment, executed_by=None) -> ContractRecontractEvent:
-    """
-    Validate execution gates for a product recontract event, then block execution.
-
-    Guarantees:
-    - customer ACCEPTED and admin APPROVED are required
-    - schedule preview and financial/accounting preview must exist and be PREVIEWED
-    - runs inside one transaction with row locks
-    - pending EMI rows are locked and mapping is rechecked before the controlled block
-    - no Subscription, EMI, payment, receipt, journal, reconciliation, waiver, delivery,
-      stock, commission, payout, rent/lease demand, or deposit mutation is performed
-    """
-    with transaction.atomic():
-        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
-        if locked_amendment.amendment_type != "PRODUCT_CHANGE":
-            raise ValidationError({"detail": "Product recontract execution is supported only for PRODUCT_CHANGE amendments."})
-        if locked_amendment.status != "APPROVED":
-            raise ValidationError({"detail": f"Cannot execute recontract for amendment status '{locked_amendment.status}'. Must be APPROVED."})
-
-        event = (
-            ContractRecontractEvent.objects.select_for_update()
-            .select_related("subscription", "old_product", "new_product")
-            .prefetch_related("schedule_preview_lines")
-            .filter(amendment=locked_amendment)
-            .order_by("-created_at", "-id")
-            .first()
-        )
-        if not event:
-            raise ValidationError({"detail": "No recontract event exists for this amendment."})
-        if event.status != ContractRecontractEvent.Status.PREVIEWED:
-            raise ValidationError({"detail": "Execution requires latest recontract event status PREVIEWED."})
-        if event.customer_consent_status != ContractRecontractEvent.CustomerConsentStatus.ACCEPTED:
-            raise ValidationError({"detail": "Execution requires customer consent ACCEPTED."})
-        if event.admin_approval_status != ContractRecontractEvent.AdminApprovalStatus.APPROVED:
-            raise ValidationError({"detail": "Execution requires admin approval APPROVED."})
-
-        existing_exec = (event.metadata or {}).get("execution_status")
-        if existing_exec == "EXECUTED":
-            raise ValidationError({"detail": "This recontract event is already executed."})
-
-        schedule_lines = list(
-            event.schedule_preview_lines.filter(proposed_status=ContractRecontractScheduleLine.ProposedStatus.PREVIEW_ONLY)
-            .select_related("original_emi")
-            .order_by("line_no", "id")
-        )
-        if not schedule_lines:
-            raise ValidationError({"detail": "Execution requires schedule preview lines in PREVIEW_ONLY status."})
-
-        financial_preview = (
-            ContractRecontractFinancialImpactPreview.objects.select_for_update()
-            .filter(
-                event=event,
-                accounting_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED,
-                reconciliation_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED,
-            )
-            .order_by("-created_at", "-id")
-            .first()
-        )
-        if not financial_preview:
-            raise ValidationError({"detail": "Execution requires latest financial impact preview with accounting and reconciliation PREVIEWED status."})
-        if financial_preview.blocked_reason:
-            raise ValidationError({"detail": f"Execution blocked: {financial_preview.blocked_reason}"})
-
-        subscription = Subscription.objects.select_for_update().get(pk=event.subscription_id)
-        pending_emis = list(
-            Emi.objects.select_for_update()
-            .filter(subscription_id=subscription.id, status=EmiStatus.PENDING)
-            .order_by("month_no", "due_date", "id")
-        )
-        if len(pending_emis) != len(schedule_lines):
-            raise ValidationError({"detail": "Execution blocked: pending EMI rows and schedule preview line count do not match."})
-
-        schedule_by_emi_id = {line.original_emi_id: line for line in schedule_lines if line.original_emi_id}
-        pending_ids = [emi.id for emi in pending_emis]
-        if set(schedule_by_emi_id.keys()) != set(pending_ids):
-            raise ValidationError({"detail": "Execution blocked: schedule preview mapping no longer matches pending EMI records."})
-
-        raise ValidationError({"detail": _EXECUTION_BLOCKED_MESSAGE})
