@@ -27,9 +27,8 @@ from subscriptions.services.contract_amendment_service import (
     mark_under_review,
     reject_amendment,
 )
+from subscriptions.services.product_recontract_execution_service import execute_product_recontract_event
 from subscriptions.services.product_recontract_preview_service import (
-    _EXECUTION_BLOCKED_MESSAGE,
-    execute_product_recontract_event,
     create_product_recontract_schedule_preview,
     create_product_recontract_preview_snapshot,
     create_product_recontract_financial_impact_preview,
@@ -43,7 +42,10 @@ def _validation_response(exc: DjangoValidationError) -> Response:
     if hasattr(exc, "message_dict"):
         return Response(exc.message_dict, status=status.HTTP_400_BAD_REQUEST)
     if hasattr(exc, "messages"):
-        return Response({"detail": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
+        messages = exc.messages
+        if len(messages) == 1:
+            return Response({"detail": messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": messages}, status=status.HTTP_400_BAD_REQUEST)
     return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -439,7 +441,5 @@ class AdminContractAmendmentProductRecontractExecuteView(APIView):
         try:
             event = execute_product_recontract_event(amendment=amendment, executed_by=request.user)
         except DjangoValidationError as exc:
-            if getattr(exc, "messages", None) == [_EXECUTION_BLOCKED_MESSAGE]:
-                return Response({"detail": _EXECUTION_BLOCKED_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
             return _validation_response(exc)
         return Response(ContractRecontractEventSerializer(event).data, status=status.HTTP_200_OK)
