@@ -1,24 +1,5 @@
 import { request } from "@/services/api";
 
-export type AccountingSetupReadinessFinanceAccount = {
-  id: number;
-  name: string;
-  code?: string;
-  kind: "CASH" | "BANK" | "UPI" | string;
-  branch?: { id?: number | null; code?: string | null; name?: string | null } | null;
-  mapped_chart_account?: {
-    id: number;
-    code: string;
-    name: string;
-    type: string;
-    is_posting: boolean;
-  } | null;
-  collection_ready: boolean;
-  blocker_reason?: string | null;
-  collection_blocker_reason?: string | null;
-  recommended_action?: string | null;
-};
-
 export type AccountingSetupReadinessChartAccount = {
   id: number;
   code: string;
@@ -32,6 +13,21 @@ export type AccountingSetupReadinessChartAccount = {
   allowed_for_cash_collection: boolean;
   allowed_for_bank_collection: boolean;
   allowed_for_upi_collection: boolean;
+};
+
+export type AccountingSetupReadinessFinanceAccount = {
+  id: number;
+  name: string;
+  code?: string;
+  kind: "CASH" | "BANK" | "UPI" | string;
+  branch?: { id?: number | null; code?: string | null; name?: string | null } | null;
+  mapped_chart_account?: AccountingSetupReadinessChartAccount | null;
+  suggested_chart_account?: AccountingSetupReadinessChartAccount | null;
+  can_auto_create_posting_account?: boolean;
+  collection_ready: boolean;
+  blocker_reason?: string | null;
+  collection_blocker_reason?: string | null;
+  recommended_action?: string | null;
 };
 
 export type AccountingSetupReadinessPayload = {
@@ -121,7 +117,10 @@ export async function patchFinanceAccountMapping(id: number, payload: Record<str
   });
 }
 
-export async function updateFinanceAccountMapping(id: number, payload: { chart_account_id: number }) {
+export async function updateFinanceAccountMapping(
+  id: number,
+  payload: { chart_account_id?: number; auto_create_posting_account?: boolean },
+) {
   return request(`/admin/accounting/finance-accounts/${id}/mapping/`, {
     method: "PATCH",
     body: JSON.stringify(payload),
