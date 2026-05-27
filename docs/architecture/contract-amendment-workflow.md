@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin decision recording, Phase 6D schedule preview-line persistence, Phase 6E financial impact preview evidence, Phase 6F.2 accounting posting evidence, Phase 6F.3 reconciliation bridge evidence, and Phase 6F.4 backend execution are implemented on `update`.
+Status: **Implemented through Phase 6F.6 RC hardening on `update`.**
 
 ## Scope
 
@@ -8,152 +8,134 @@ Contract amendments support EMI Subscription and Rent / Lease contracts. Direct 
 
 ## Phase 1 — Request and review foundation
 
-Customer and partner users can request amendments for allowed linked contracts. Admin users can inspect, mark under review, approve, or reject. Approval records decision values but does not automatically mutate financial or operational records.
+Customer and partner users can request amendments for allowed contracts. Admin users can inspect, mark under review, approve, or reject. Approval records decision values but does not automatically mutate financial or operational records.
 
 ## Phase 2 — Role-scoped UI
 
-Customer, partner, and admin amendment screens show request and review state. Customer and partner screens do not expose implementation or recontract preview controls.
+Customer, partner, and admin routes expose role-scoped amendment registers and detail pages. Customer and partner screens do not expose implementation controls.
 
-The subscription lifecycle page is not an implementation surface. Its Contract Amendments panel is read-only and links to `/admin/contract-amendments/{id}` for review, preview, and guarded detail-page actions.
+The subscription lifecycle page is not an implementation surface. Its Contract Amendments panel is read-only and should link to `/admin/contract-amendments/{id}` only.
 
-## Phase 3 — Low-risk implementation
+## Phase 3 — Low-risk implementation only
 
-Implemented only:
+Implemented source fields:
 
-- `CONTACT_CORRECTION`: updates `Customer.phone`
-- `ADDRESS_CHANGE`: updates `Customer.address` and `Customer.city`
+- `ADDRESS_CHANGE`: `Customer.address`, `Customer.city`
+- `CONTACT_CORRECTION`: `Customer.phone`
 
-This is admin-only, approval-required, audited, and idempotent.
+No subscription, EMI, payment, receipt, journal, waiver, lucky draw, rent/lease demand, deposit, inventory, stock, reconciliation, commission, payout, or delivery records are touched.
 
-## Phase 4 — Same-price product reference correction
+## Phase 4 — Same-price product reference correction only
 
-The existing `PRODUCT_CHANGE` enum remains for compatibility, but current implementation is only `PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY`.
+The existing `PRODUCT_CHANGE` enum remains for compatibility, but generic implementation behavior is only `PRODUCT_REFERENCE_CORRECTION_SAME_PRICE_ONLY`.
 
-It can update only `Subscription.product` when the target product base price equals the locked contract total. It does not recalculate price, EMI, tenure, payment, receipt, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
+It can update only `Subscription.product` when the target product base price equals the locked contract total. Different-price target products are handled by product recontract.
 
-Different-price target products are handled by the product recontract workflow.
+## Product recontract workflow
 
-## Product recontract preview
+Product recontract is the controlled path for true financial product changes.
 
-Admin users can preview the financial impact of a true product recontract without applying it:
+Implemented chain:
+
+1. Phase 6A — saved backend preview snapshot.
+2. Phase 6B — customer consent.
+3. Phase 6C — admin decision.
+4. Phase 6D — future EMI schedule preview lines.
+5. Phase 6E — accounting/reconciliation impact preview.
+6. Phase 6F.2 — durable accounting bridge posting.
+7. Phase 6F.3 — durable reconciliation bridge.
+8. Phase 6F.4 — backend execution after evidence verification.
+9. Phase 6F.5 — admin typed execution UI.
+10. Phase 6F.6 — RC hardening, executed-state visibility, read-only reporting, and post-execution blockers.
+
+## Product recontract endpoints
 
 ```text
 POST /api/v1/admin/contract-amendments/{id}/product-recontract-preview/
-```
-
-Impact types:
-
-```text
-UPGRADE_EXTRA_PAYABLE
-DOWNGRADE_CREDIT_REQUIRED
-SAME_PRICE_REFERENCE_CORRECTION
-```
-
-The preview does not mutate source records.
-
-## Phase 6A — Product recontract preview snapshot persistence
-
-```text
 POST /api/v1/admin/contract-amendments/{id}/product-recontract-preview/save/
+POST /api/v1/customer/contract-amendments/{id}/product-recontract/consent/
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/admin-decision/
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
+GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
+GET  /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/accounting-posting/
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/reconciliation-bridge/
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/
 GET  /api/v1/admin/contract-amendments/{id}/product-recontract-events/
 ```
 
-The save endpoint recalculates the preview on the backend and stores a `ContractRecontractEvent` snapshot. Prior active preview events for the same amendment are marked `SUPERSEDED`; retained history remains available through the events endpoint.
+## Execution behavior
 
-## Phase 6B — Customer consent for saved preview snapshots
-
-```text
-POST /api/v1/customer/contract-amendments/{id}/product-recontract/consent/
-```
-
-Allowed decisions are `ACCEPTED` and `REJECTED`, with an optional note. Consent is recorded on the latest active `PREVIEWED` `ContractRecontractEvent` only.
-
-## Phase 6C — Admin approval/rejection for customer-accepted previews
-
-```text
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/admin-decision/
-```
-
-Allowed decisions are `APPROVED` and `REJECTED`, with an optional note. This stores admin approval evidence only and does not mutate source records.
-
-## Phase 6D — Future EMI schedule preview lines
-
-```text
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
-GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
-```
-
-This creates preview evidence only (`ContractRecontractScheduleLine`). Real EMI rows and all financial/accounting/reconciliation source records remain unchanged.
-
-## Phase 6E — Accounting/reconciliation impact preview evidence
-
-```text
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
-GET  /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
-```
-
-This creates additive evidence (`ContractRecontractFinancialImpactPreview`) only. No journal posting occurs. No finance account balances are mutated. No reconciliation items or settlement records are created.
-
-## Phase 6F.2 — Durable accounting posting evidence only
-
-```text
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/accounting-posting/
-```
-
-This posts a real `JournalEntry` through the accounting bridge and links it with `AccountingBridgePosting` using purpose `CONTRACT_RECONTRACT_ACCOUNTING_ADJUSTMENT`. It is prerequisite accounting evidence only. It does not execute the product change, mutate subscription terms, rewrite EMI rows, create payments, create receipts, create settlement allocations, or touch inventory, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
-
-## Phase 6F.3 — Durable reconciliation bridge evidence only
-
-```text
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/reconciliation-bridge/
-```
-
-This creates `ReconciliationRun`, `ReconciliationItem`, `ReconciliationEvidence`, and `FinancialSourceLifecycleEvent` records. The reconciliation item links the recontract event, financial impact preview, accounting bridge posting, posted journal entry, expected adjustment amount, and actual posted amount.
-
-The expected amount must equal the posted journal amount. Variance returns a controlled error.
-
-## Phase 6F.4 — Final backend execution after evidence verification
-
-```text
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/
-```
-
-The endpoint is admin-only and executes only after all preview, consent, approval, accounting, and reconciliation evidence gates pass.
-
-Execution mutates only:
+Execution is admin-only and evidence-gated. It mutates only:
 
 - `Subscription.product`
 - `Subscription.total_amount`
 - `Subscription.monthly_amount`
 - `Subscription.tenure_months`
+- `Subscription.product_snapshot`
+- `Subscription.pricing_snapshot`
 - pending `Emi.amount`
 - pending `Emi.due_date`
-- `ContractRecontractEvent.metadata` execution snapshot
+- `ContractRecontractEvent.metadata`
 
 Execution does not mutate historical payments, receipts, paid/waived/cancelled EMI rows, accounting postings, reconciliation evidence, settlement/day-close records, lucky ID, batch, waiver/lucky draw, inventory, delivery, commission, payout, rent/lease demand, or deposit records.
 
-## Admin API inventory
+## Phase 6F.6 read-only reporting fields
+
+Admin/customer detail payloads expose:
 
 ```text
-GET  /api/v1/admin/contract-amendments/
-GET  /api/v1/admin/contract-amendments/{id}/
-POST /api/v1/admin/contract-amendments/{id}/review/
-POST /api/v1/admin/contract-amendments/{id}/approve/
-POST /api/v1/admin/contract-amendments/{id}/reject/
-POST /api/v1/admin/contract-amendments/{id}/implement/
-POST /api/v1/admin/contract-amendments/{id}/product-recontract-preview/
-POST /api/v1/admin/contract-amendments/{id}/product-recontract-preview/save/
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/admin-decision/
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
-GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
-GET  /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/accounting-posting/
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/reconciliation-bridge/
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/
-GET  /api/v1/admin/contract-amendments/{id}/product-recontract-events/
+workflow_flags
+execution_ready
+execution_block_reason
+executed
+executed_at
+executed_by
+execution_status
+execution_snapshot
+accounting_bridge_posting_id
+journal_entry_id
+reconciliation_item_id
+reconciliation_run_id
+reconciliation_evidence_ids
+schedule_line_ids
+old_monthly_amount
+new_monthly_amount
 ```
 
-## Deferred phases
+## Post-execution blockers
 
-Frontend execution UI, typed confirmation, printable addendum, customer ledger statement, and RC failure-injection hardening remain deferred after backend Phase 6F.4.
+After execution, the following actions are blocked/read-only:
+
+- preview generation
+- preview snapshot save
+- customer consent
+- admin decision
+- schedule preview generation
+- financial impact preview generation
+- accounting posting
+- reconciliation bridge creation
+- duplicate execution
+
+## UI rules
+
+Admin amendment detail may show executed-state evidence and typed execution controls only before execution and only when all evidence exists.
+
+Customer amendment detail may show only a safe read-only executed summary:
+
+```text
+This recontract updated future contract terms after approval. Previous payments and receipts remain unchanged.
+```
+
+Partner, cashier, and vendor users must never see execution controls.
+
+Subscription lifecycle pages must not expose apply/execute actions. They may link to amendment detail only.
+
+## Print and addendum policy
+
+Current subscription/contract print views should use current executed subscription truth. Historical pre-recontract values remain in recontract event metadata.
+
+Printable recontract addendum remains future Phase 6G.
+
+Rollback/reversal remains a future controlled workflow and is not exposed.
