@@ -79,19 +79,21 @@ const completeReadyEvent = {
   schedule_preview_lines: baseScheduleLines,
   latest_financial_impact_preview: baseFinancialImpactPreview,
   executed: false,
-  executed_at: null,
-  executed_by: null,
+  executed_at: null as string | null,
+  executed_by: null as number | null,
   execution_status: "NOT_EXECUTED",
   execution_snapshot: {},
-  accounting_bridge_posting_id: 501,
-  journal_entry_id: 502,
-  reconciliation_item_id: 503,
-  reconciliation_run_id: 504,
+  accounting_bridge_posting_id: 501 as number | null,
+  journal_entry_id: 502 as number | null,
+  reconciliation_item_id: 503 as number | null,
+  reconciliation_run_id: 504 as number | null,
   reconciliation_evidence_ids: [601, 602, 603, 604, 605],
   schedule_line_ids: [9001],
 };
 
-const incompleteEvent = {
+type RecontractEventFixture = typeof completeReadyEvent;
+
+const incompleteEvent: RecontractEventFixture = {
   ...completeReadyEvent,
   accounting_bridge_posting_id: null,
   journal_entry_id: null,
@@ -101,7 +103,7 @@ const incompleteEvent = {
   schedule_line_ids: [],
 };
 
-const executedEvent = {
+const executedEvent: RecontractEventFixture = {
   ...completeReadyEvent,
   executed: true,
   executed_at: "2026-05-26T15:00:00Z",
@@ -121,7 +123,7 @@ const executedEvent = {
   },
 };
 
-function amendmentFor(event: typeof completeReadyEvent) {
+function amendmentFor(event: RecontractEventFixture) {
   return {
     id: 1,
     amendment_no: event.executed ? "AMD-EXECUTED-001" : "AMD-READY-001",
@@ -217,8 +219,8 @@ function amendmentFor(event: typeof completeReadyEvent) {
   };
 }
 
-async function mockAmendment(page: Page, role: "admin" | "customer" | "partner", event = completeReadyEvent, options: { executeRejects?: boolean } = {}) {
-  let currentEvent = event;
+async function mockAmendment(page: Page, role: "admin" | "customer" | "partner", event: RecontractEventFixture = completeReadyEvent, options: { executeRejects?: boolean } = {}) {
+  let currentEvent: RecontractEventFixture = event;
   await page.route(`**/api/v1/${role}/contract-amendments/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
