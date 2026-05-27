@@ -28,6 +28,11 @@ function valueOrDash(value?: string | number | null) {
   return value === undefined || value === null || value === "" ? "—" : String(value);
 }
 
+function snapshotValue(source: Record<string, unknown>, key: string): string | number | null {
+  const value = source[key];
+  return typeof value === "string" || typeof value === "number" ? value : null;
+}
+
 function MoneyRow({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div className="rounded-2xl border border-border bg-muted/20 p-3">
@@ -68,18 +73,20 @@ function hasExecutionEvidence(event: ContractRecontractEvent | undefined, financ
 function ExecutionSummary({ event }: { event: ContractRecontractEvent }) {
   const before = event.execution_snapshot?.before_subscription || {};
   const after = event.execution_snapshot?.after_subscription || {};
+  const beforeProductId = snapshotValue(before, "product_id");
+  const afterProductId = snapshotValue(after, "product_id");
   return (
     <div className="space-y-3 rounded-2xl border border-emerald-300 bg-emerald-50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/30">
       <div className="font-semibold text-emerald-900 dark:text-emerald-100">Execution status: {event.execution_status || "EXECUTED"}</div>
       <div className="grid gap-3 md:grid-cols-2">
         <MoneyRow label="Executed at" value={event.executed_at} />
         <MoneyRow label="Executed by" value={event.executed_by} />
-        <MoneyRow label="Old product" value={event.old_product_name || (before.product_id ? `#${before.product_id}` : "—")} />
-        <MoneyRow label="New product" value={event.new_product_name || (after.product_id ? `#${after.product_id}` : "—")} />
-        <MoneyRow label="Old total" value={typeof before.total_amount === "string" ? before.total_amount : event.old_contract_total} />
-        <MoneyRow label="New total" value={typeof after.total_amount === "string" ? after.total_amount : event.new_contract_total} />
-        <MoneyRow label="Old monthly EMI" value={typeof before.monthly_amount === "string" ? before.monthly_amount : event.current_monthly_amount} />
-        <MoneyRow label="New monthly EMI" value={typeof after.monthly_amount === "string" ? after.monthly_amount : event.proposed_monthly_amount} />
+        <MoneyRow label="Old product" value={event.old_product_name || (beforeProductId ? `#${beforeProductId}` : "—")} />
+        <MoneyRow label="New product" value={event.new_product_name || (afterProductId ? `#${afterProductId}` : "—")} />
+        <MoneyRow label="Old total" value={snapshotValue(before, "total_amount") || event.old_contract_total} />
+        <MoneyRow label="New total" value={snapshotValue(after, "total_amount") || event.new_contract_total} />
+        <MoneyRow label="Old monthly EMI" value={snapshotValue(before, "monthly_amount") || event.current_monthly_amount} />
+        <MoneyRow label="New monthly EMI" value={snapshotValue(after, "monthly_amount") || event.proposed_monthly_amount} />
         <MoneyRow label="Schedule line ids" value={(event.schedule_line_ids || []).join(", ")} />
         <MoneyRow label="Accounting bridge id" value={event.accounting_bridge_posting_id} />
         <MoneyRow label="Journal entry id" value={event.journal_entry_id} />
