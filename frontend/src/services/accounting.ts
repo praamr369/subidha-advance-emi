@@ -38,6 +38,14 @@ export type FinanceAccount = {
   chart_account: number;
   chart_account_code?: string;
   chart_account_name?: string;
+  mapped_chart_account_id?: number | null;
+  mapped_chart_account_code?: string | null;
+  mapped_chart_account_name?: string | null;
+  mapped_chart_account_type?: string | null;
+  mapped_chart_account_is_posting?: boolean | null;
+  collection_ready?: boolean;
+  collection_blocker_reason?: string | null;
+  recommended_action?: string | null;
   opening_balance: string;
   is_active: boolean;
   is_real_settlement_account?: boolean;

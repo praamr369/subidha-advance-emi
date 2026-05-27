@@ -26,6 +26,7 @@ from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 
 from accounts.models import User, UserRole
 from accounts.capabilities import require_capability
+from accounting.services.finance_account_readiness import FinanceAccountPostingReadinessError
 from api.v1.permissions import IsAdmin
 from api.v1.throttles.auth_password_reset import PaymentMutationThrottle
 from api.v1.serializers.admin_resources import (
@@ -1665,6 +1666,11 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ValueError as exc:
+            if isinstance(exc, FinanceAccountPostingReadinessError):
+                return Response(
+                    exc.as_payload(),
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             return Response(
                 {"detail": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST,

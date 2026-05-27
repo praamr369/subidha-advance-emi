@@ -139,6 +139,21 @@ function formatDateLabel(value?: string | null): string {
   }).format(date);
 }
 
+function financeAccountOptionLabel(account: FinanceAccount): string {
+  const coaCode = account.mapped_chart_account_code || account.chart_account_code || "No COA";
+  const coaName = account.mapped_chart_account_name || account.chart_account_name || "unmapped";
+  const ready = account.collection_ready === false ? "Blocked" : "Ready";
+  return `${account.name} · ${account.kind} · ${coaCode} ${coaName} · ${ready}`;
+}
+
+function financeAccountBlocker(account: FinanceAccount | null | undefined): string | null {
+  if (!account || account.collection_ready !== false) return null;
+  return (
+    account.collection_blocker_reason ||
+    "This account cannot receive payments because it is mapped to a non-posting Chart of Account."
+  );
+}
+
 const WORKFLOW_TABS: Array<{
   key: CollectionWorkflow;
   label: string;
@@ -327,6 +342,15 @@ export default function AdminPaymentCollectPage({
       ),
     [financeAccounts, form.payment_method]
   );
+  const selectableFinanceAccounts = useMemo(
+    () => availableFinanceAccounts.filter((account) => account.collection_ready !== false),
+    [availableFinanceAccounts]
+  );
+  const selectedFinanceAccount = useMemo(
+    () => availableFinanceAccounts.find((account) => String(account.id) === form.finance_account_id) ?? null,
+    [availableFinanceAccounts, form.finance_account_id]
+  );
+  const selectedFinanceAccountBlocker = financeAccountBlocker(selectedFinanceAccount);
 
   const updateField = useCallback(function updateField<K extends keyof FormState>(
     key: K,
@@ -508,7 +532,7 @@ export default function AdminPaymentCollectPage({
   useEffect(() => {
     if (
       form.finance_account_id &&
-      availableFinanceAccounts.some(
+      selectableFinanceAccounts.some(
         (account) => String(account.id) === form.finance_account_id
       )
     ) {
@@ -517,9 +541,9 @@ export default function AdminPaymentCollectPage({
 
     updateField(
       "finance_account_id",
-      availableFinanceAccounts[0] ? String(availableFinanceAccounts[0].id) : ""
+      selectableFinanceAccounts[0] ? String(selectableFinanceAccounts[0].id) : ""
     );
-  }, [availableFinanceAccounts, form.finance_account_id, updateField]);
+  }, [form.finance_account_id, selectableFinanceAccounts, updateField]);
 
   useEffect(() => {
     const trimmed = subscriptionSearch.trim();
@@ -712,6 +736,10 @@ export default function AdminPaymentCollectPage({
 
     if (!form.finance_account_id.trim()) {
       return "Finance account is required.";
+    }
+
+    if (selectedFinanceAccountBlocker) {
+      return selectedFinanceAccountBlocker;
     }
 
     if (form.payment_method !== "CASH" && !form.reference_no.trim()) {
@@ -1155,14 +1183,27 @@ export default function AdminPaymentCollectPage({
                 >
                   <option value="">Select finance account</option>
                   {availableFinanceAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name} · {account.kind} · {account.chart_account_code || "No chart code"}
+                    <option key={account.id} value={account.id} disabled={account.collection_ready === false}>
+                      {financeAccountOptionLabel(account)}
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  This route controls the operational finance posting used by the backend collection service.
-                </p>
+                {selectedFinanceAccountBlocker ? (
+                  <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                    <div>{selectedFinanceAccountBlocker}</div>
+                    <div className="mt-1">
+                      Go to{" "}
+                      <Link href="/admin/accounting/setup" className="font-semibold underline">
+                        Accounting Setup - Finance Mapping
+                      </Link>{" "}
+                      to fix.
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    This route controls the operational finance posting used by the backend collection service.
+                  </p>
+                )}
               </div>
 
               <div>

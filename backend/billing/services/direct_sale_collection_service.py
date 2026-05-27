@@ -6,10 +6,10 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from accounting.models import FinanceAccount
 from accounting.services.finance_account_collection_guard import (
     assert_finance_account_allowed_for_payment_collection,
 )
+from accounting.services.finance_posting_service import FinancePostingService
 from billing.models import (
     BillingDocumentStatus,
     BillingInvoice,
@@ -108,13 +108,9 @@ def _resolve_branch_counter_and_finance_account(
     if resolved_finance_account_id is None:
         raise ValueError("Finance account selection is required for direct-sale collection.")
 
-    finance_account = (
-        FinanceAccount.objects.select_related("branch", "chart_account")
-        .filter(pk=resolved_finance_account_id, is_active=True)
-        .first()
+    finance_account = FinancePostingService.resolve_operational_finance_account(
+        finance_account_id=resolved_finance_account_id,
     )
-    if finance_account is None:
-        raise ValueError("Selected finance account is not active.")
 
     if cash_counter and cash_counter.finance_account_id != finance_account.id:
         raise ValueError("Selected cash counter is linked to a different finance account.")

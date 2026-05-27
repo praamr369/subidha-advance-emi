@@ -70,6 +70,21 @@ function formatDateLabel(value?: string | null): string {
   });
 }
 
+function financeAccountOptionLabel(account: FinanceAccount): string {
+  const coaCode = account.mapped_chart_account_code || account.chart_account_code || "No COA";
+  const coaName = account.mapped_chart_account_name || account.chart_account_name || "unmapped";
+  const ready = account.collection_ready === false ? "Blocked" : "Ready";
+  return `${account.name} · ${account.kind} · ${coaCode} ${coaName} · ${ready}`;
+}
+
+function financeAccountBlocker(account: FinanceAccount | null | undefined): string | null {
+  if (!account || account.collection_ready !== false) return null;
+  return (
+    account.collection_blocker_reason ||
+    "This account cannot receive payments because it is mapped to a non-posting Chart of Account."
+  );
+}
+
 function buildDefaultForm(sale: DirectSale | null): FormState {
   return {
     amount: sale?.balance_total || "",
@@ -207,19 +222,28 @@ export default function AdminDirectSaleCollectForm({
       return String(account.branch) === form.branch_id;
     });
   }, [financeAccounts, form.branch_id, form.payment_method]);
+  const selectableFinanceAccounts = useMemo(
+    () => availableFinanceAccounts.filter((account) => account.collection_ready !== false),
+    [availableFinanceAccounts]
+  );
+  const selectedFinanceAccount = useMemo(
+    () => availableFinanceAccounts.find((account) => String(account.id) === form.finance_account_id) ?? null,
+    [availableFinanceAccounts, form.finance_account_id]
+  );
+  const selectedFinanceAccountBlocker = financeAccountBlocker(selectedFinanceAccount);
 
   useEffect(() => {
     if (
       form.finance_account_id &&
-      availableFinanceAccounts.some((account) => String(account.id) === form.finance_account_id)
+      selectableFinanceAccounts.some((account) => String(account.id) === form.finance_account_id)
     ) {
       return;
     }
     setForm((current) => ({
       ...current,
-      finance_account_id: availableFinanceAccounts[0] ? String(availableFinanceAccounts[0].id) : "",
+      finance_account_id: selectableFinanceAccounts[0] ? String(selectableFinanceAccounts[0].id) : "",
     }));
-  }, [availableFinanceAccounts, form.finance_account_id]);
+  }, [form.finance_account_id, selectableFinanceAccounts]);
 
   const selectedSaleState = useMemo(() => {
     if (!selectedSale) {
@@ -316,6 +340,9 @@ export default function AdminDirectSaleCollectForm({
     }
     if (!form.finance_account_id) {
       return "Select a finance account or cash counter before posting collection.";
+    }
+    if (selectedFinanceAccountBlocker) {
+      return selectedFinanceAccountBlocker;
     }
     if (form.payment_method !== "CASH" && !form.reference_no.trim()) {
       return "Reference number is required for UPI, bank, or card direct-sale collections.";
@@ -672,12 +699,24 @@ export default function AdminDirectSaleCollectForm({
               >
                 <option value="">Select finance account</option>
                 {availableFinanceAccounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
+                  <option key={account.id} value={account.id} disabled={account.collection_ready === false}>
+                    {financeAccountOptionLabel(account)}
                     {account.branch_name ? ` · ${account.branch_name}` : ""}
                   </option>
                 ))}
               </select>
+              {selectedFinanceAccountBlocker ? (
+                <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                  <div>{selectedFinanceAccountBlocker}</div>
+                  <div className="mt-1">
+                    Go to{" "}
+                    <Link href="/admin/accounting/setup" className="font-semibold underline">
+                      Accounting Setup - Finance Mapping
+                    </Link>{" "}
+                    to fix.
+                  </div>
+                </div>
+              ) : null}
             </label>
 
             <label className="text-sm text-muted-foreground">

@@ -4,6 +4,7 @@ from decimal import Decimal
 import logging
 
 from accounting.models import FinanceAccount
+from accounting.services.finance_account_readiness import FinanceAccountPostingReadinessError, finance_account_readiness
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
 from accounting.models import JournalEntryGroup
@@ -28,16 +29,26 @@ class FinancePostingService:
         )
         if finance_account is None:
             raise ValueError("Selected finance account was not found.")
-        if not finance_account.is_active:
-            raise ValueError("Selected finance account is not active.")
-
-        chart_account = finance_account.chart_account
-        if not chart_account.is_active:
-            raise ValueError("Selected finance account is linked to an inactive chart account.")
-        if not chart_account.allow_manual_posting:
-            raise ValueError("Selected finance account is linked to a non-posting chart account.")
-        if chart_account.children.exists():
-            raise ValueError("Selected finance account is linked to a group chart account.")
+        readiness = finance_account_readiness(finance_account)
+        if not readiness.collection_ready:
+            chart_account = finance_account.chart_account
+            message = readiness.collection_blocker_reason or "Selected finance account is not posting-ready."
+            if message == "Finance account is inactive.":
+                message = "Selected finance account is not active."
+            elif message == "Mapped chart account is inactive.":
+                message = "Selected finance account is linked to an inactive chart account."
+            elif message == "Mapped chart account is a group/control account, not a posting account.":
+                message = (
+                    "Selected finance account is linked to a non-posting chart account."
+                    if not chart_account.allow_manual_posting
+                    else "Selected finance account is linked to a group chart account."
+                )
+            raise FinanceAccountPostingReadinessError(
+                message,
+                finance_account_id=finance_account.id,
+                mapped_chart_account_id=finance_account.chart_account_id,
+                recommended_action=readiness.recommended_action,
+            )
         return finance_account
 
     @classmethod

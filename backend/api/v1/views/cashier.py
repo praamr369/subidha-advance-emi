@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounting.models import FinanceAccount
+from accounting.services.finance_account_readiness import FinanceAccountPostingReadinessError
 from accounts.capabilities import require_capability
 from api.v1.permissions import IsCashierOrAdmin
 from api.v1.serializers.accounting import FinanceAccountSerializer
@@ -41,6 +42,12 @@ def _parse_optional_int(value, *, field_name: str):
         return int(value)
     except (TypeError, ValueError):
         raise ValueError(f"{field_name} must be a valid integer.")
+
+
+def _value_error_payload(exc: ValueError):
+    if isinstance(exc, FinanceAccountPostingReadinessError):
+        return exc.as_payload()
+    return {"detail": str(exc)}
 
 
 def _outstanding_direct_sale_queryset(*, user):
@@ -173,7 +180,7 @@ class CashierCollectPayment(APIView):
             )
         except ValueError as exc:
             return Response(
-                {"detail": str(exc)},
+                _value_error_payload(exc),
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as exc:
@@ -276,7 +283,7 @@ class CashierCollectAdvance(APIView):
                 cash_counter_id=validated.get("cash_counter_id"),
             )
         except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(_value_error_payload(exc), status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
             {
@@ -429,7 +436,7 @@ class CashierCollectDirectSalePayment(APIView):
             )
         except ValueError as exc:
             return Response(
-                {"detail": str(exc)},
+                _value_error_payload(exc),
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -446,7 +453,7 @@ class CashierCollectDirectSalePayment(APIView):
             )
         except ValueError as exc:
             return Response(
-                {"detail": str(exc)},
+                _value_error_payload(exc),
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as exc:

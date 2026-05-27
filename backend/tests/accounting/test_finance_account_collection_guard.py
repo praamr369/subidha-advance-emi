@@ -29,6 +29,31 @@ from tests.helpers import (
 
 
 class FinanceAccountCollectionGuardTests(TestCase):
+    def test_finance_posting_resolution_rejects_non_posting_chart_account(self):
+        from accounting.services.finance_posting_service import FinancePostingService
+
+        chart = ChartOfAccount.objects.create(
+            code="TEST-NONPOST-CASH",
+            name="Non Posting Cash Control",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=False,
+        )
+        finance_account = FinanceAccount.objects.create(
+            name="Non Posting Cash Desk",
+            kind=FinanceAccountKind.CASH,
+            chart_account=chart,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+
+        with self.assertRaises(ValueError) as ctx:
+            FinancePostingService.resolve_operational_finance_account(
+                finance_account_id=finance_account.id,
+            )
+        self.assertIn("non-posting chart account", str(ctx.exception))
+
     def test_filter_excludes_accounts_mapped_for_emi_income(self):
         from accounting.services.finance_account_collection_guard import (
             filter_finance_accounts_for_payment_collection,

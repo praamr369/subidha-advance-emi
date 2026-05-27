@@ -95,6 +95,21 @@ function overdueLabel(emi: PendingEmiRecord | null | undefined): string {
   return "Due queue";
 }
 
+function financeAccountOptionLabel(account: FinanceAccount): string {
+  const coaCode = account.mapped_chart_account_code || account.chart_account_code || "No COA";
+  const coaName = account.mapped_chart_account_name || account.chart_account_name || "unmapped";
+  const ready = account.collection_ready === false ? "Blocked" : "Ready";
+  return `${account.name} · ${account.kind} · ${coaCode} ${coaName} · ${ready}`;
+}
+
+function financeAccountBlocker(account: FinanceAccount | null | undefined): string | null {
+  if (!account || account.collection_ready !== false) return null;
+  return (
+    account.collection_blocker_reason ||
+    "This account cannot receive payments because it is mapped to a non-posting Chart of Account."
+  );
+}
+
 function isRestrictedSubscriptionStatus(status?: string | null): boolean {
   if (!status) return false;
   const token = status.trim().toUpperCase();
@@ -228,6 +243,20 @@ export default function CashierCollectPage() {
     () => financeAccounts.filter((account) => account.kind === method),
     [financeAccounts, method]
   );
+  const selectableFinanceAccounts = useMemo(
+    () => availableFinanceAccounts.filter((account) => account.collection_ready !== false),
+    [availableFinanceAccounts]
+  );
+  const selectedFinanceAccount = useMemo(
+    () => availableFinanceAccounts.find((account) => String(account.id) === selectedFinanceAccountId) ?? null,
+    [availableFinanceAccounts, selectedFinanceAccountId]
+  );
+  const selectedFinanceAccountBlocker = financeAccountBlocker(selectedFinanceAccount);
+  const selectedAdvanceFinanceAccount = useMemo(
+    () => availableFinanceAccounts.find((account) => String(account.id) === advanceFinanceAccountId) ?? null,
+    [advanceFinanceAccountId, availableFinanceAccounts]
+  );
+  const selectedAdvanceFinanceAccountBlocker = financeAccountBlocker(selectedAdvanceFinanceAccount);
 
   useEffect(() => {
     setCollectionWorkflow(
@@ -263,23 +292,23 @@ export default function CashierCollectPage() {
     setSelectedFinanceAccountId((current) => {
       if (
         current &&
-        availableFinanceAccounts.some((account) => String(account.id) === current)
+        selectableFinanceAccounts.some((account) => String(account.id) === current)
       ) {
         return current;
       }
-      return availableFinanceAccounts[0] ? String(availableFinanceAccounts[0].id) : "";
+      return selectableFinanceAccounts[0] ? String(selectableFinanceAccounts[0].id) : "";
     });
 
     setAdvanceFinanceAccountId((current) => {
       if (
         current &&
-        availableFinanceAccounts.some((account) => String(account.id) === current)
+        selectableFinanceAccounts.some((account) => String(account.id) === current)
       ) {
         return current;
       }
-      return availableFinanceAccounts[0] ? String(availableFinanceAccounts[0].id) : "";
+      return selectableFinanceAccounts[0] ? String(selectableFinanceAccounts[0].id) : "";
     });
-  }, [availableFinanceAccounts]);
+  }, [selectableFinanceAccounts]);
 
   function clearSelectionForNewLookup() {
     setSelectedEmiId(null);
@@ -540,6 +569,10 @@ export default function CashierCollectPage() {
       setCollectError("Select a finance account before collecting payment.");
       return;
     }
+    if (selectedFinanceAccountBlocker) {
+      setCollectError(selectedFinanceAccountBlocker);
+      return;
+    }
 
     if ((method === "UPI" || method === "BANK") && !referenceNo.trim()) {
       setCollectError("Reference number is required for UPI or bank collection.");
@@ -591,6 +624,10 @@ export default function CashierCollectPage() {
 
     if (!advanceFinanceAccountId) {
       setAdvanceError("Select a finance account before collecting advance.");
+      return;
+    }
+    if (selectedAdvanceFinanceAccountBlocker) {
+      setAdvanceError(selectedAdvanceFinanceAccountBlocker);
       return;
     }
 
@@ -1306,14 +1343,27 @@ export default function CashierCollectPage() {
                     >
                       <option value="">Select finance account</option>
                       {availableFinanceAccounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.name} · {account.kind} · {account.chart_account_code || "No chart code"}
+                        <option key={account.id} value={account.id} disabled={account.collection_ready === false}>
+                          {financeAccountOptionLabel(account)}
                         </option>
                       ))}
                     </select>
-                    <p className="mt-2 text-xs text-slate-600">
-                      This selection controls the finance route used for ledger posting and reconciliation visibility.
-                    </p>
+                    {selectedFinanceAccountBlocker ? (
+                      <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                        <div>{selectedFinanceAccountBlocker}</div>
+                        <div className="mt-1">
+                          Go to{" "}
+                          <Link href="/admin/accounting/setup" className="font-semibold underline">
+                            Accounting Setup - Finance Mapping
+                          </Link>{" "}
+                          to fix.
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-xs text-slate-600">
+                        This selection controls the finance route used for ledger posting and reconciliation visibility.
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
@@ -1463,11 +1513,23 @@ export default function CashierCollectPage() {
                     >
                       <option value="">Select finance account</option>
                       {availableFinanceAccounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.name} · {account.kind} · {account.chart_account_code || "No chart code"}
+                        <option key={account.id} value={account.id} disabled={account.collection_ready === false}>
+                          {financeAccountOptionLabel(account)}
                         </option>
                       ))}
                     </select>
+                    {selectedAdvanceFinanceAccountBlocker ? (
+                      <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                        <div>{selectedAdvanceFinanceAccountBlocker}</div>
+                        <div className="mt-1">
+                          Go to{" "}
+                          <Link href="/admin/accounting/setup" className="font-semibold underline">
+                            Accounting Setup - Finance Mapping
+                          </Link>{" "}
+                          to fix.
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div>

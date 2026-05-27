@@ -1,5 +1,51 @@
 import { request } from "@/services/api";
 
+export type AccountingSetupReadinessFinanceAccount = {
+  id: number;
+  name: string;
+  code?: string;
+  kind: "CASH" | "BANK" | "UPI" | string;
+  branch?: { id?: number | null; code?: string | null; name?: string | null } | null;
+  mapped_chart_account?: {
+    id: number;
+    code: string;
+    name: string;
+    type: string;
+    is_posting: boolean;
+  } | null;
+  collection_ready: boolean;
+  blocker_reason?: string | null;
+  collection_blocker_reason?: string | null;
+  recommended_action?: string | null;
+};
+
+export type AccountingSetupReadinessChartAccount = {
+  id: number;
+  code: string;
+  name: string;
+  type: string;
+  account_type?: string;
+  is_active?: boolean;
+  allow_manual_posting?: boolean;
+  is_posting: boolean;
+  parent?: { id?: number | null; code?: string | null; name?: string | null } | null;
+  allowed_for_cash_collection: boolean;
+  allowed_for_bank_collection: boolean;
+  allowed_for_upi_collection: boolean;
+};
+
+export type AccountingSetupReadinessPayload = {
+  finance_accounts: AccountingSetupReadinessFinanceAccount[];
+  chart_accounts: AccountingSetupReadinessChartAccount[];
+  summary: {
+    cash_accounts_ready_count: number;
+    bank_accounts_ready_count: number;
+    upi_accounts_ready_count: number;
+    blockers_count: number;
+    warnings_count: number;
+  };
+};
+
 /** Canonical accounting master + readiness payload (GET /admin/accounting/setup/status/). */
 export type AccountingSetupStatusPayload = {
   status?: string;
@@ -46,6 +92,10 @@ export async function getAccountingSetupStatus(): Promise<AccountingSetupStatusP
   return request<AccountingSetupStatusPayload>("/admin/accounting/setup/status/");
 }
 
+export async function getAccountingSetupReadiness(): Promise<AccountingSetupReadinessPayload> {
+  return request<AccountingSetupReadinessPayload>("/admin/accounting/setup/readiness/");
+}
+
 export async function postAccountingSetupBootstrap(dryRun = false) {
   return request("/admin/accounting/setup/bootstrap/", {
     method: "POST",
@@ -66,6 +116,13 @@ export async function createFinanceAccountMapping(payload: Record<string, unknow
 
 export async function patchFinanceAccountMapping(id: number, payload: Record<string, unknown>) {
   return request(`/admin/accounting/finance-account-mappings/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateFinanceAccountMapping(id: number, payload: { chart_account_id: number }) {
+  return request(`/admin/accounting/finance-accounts/${id}/mapping/`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });

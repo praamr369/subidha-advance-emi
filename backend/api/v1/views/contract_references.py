@@ -6,6 +6,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounting.services.finance_account_readiness import FinanceAccountPostingReadinessError
 from api.v1.permissions import IsAdmin, IsCashierOrAdmin
 from api.v1.serializers.contract_references import (
     ContractReferenceSerializer,
@@ -119,6 +120,8 @@ class UnifiedReceivableCollectView(APIView):
             detail = exc.message_dict if hasattr(exc, "message_dict") else exc.messages
             return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
         except ValueError as exc:
+            if isinstance(exc, FinanceAccountPostingReadinessError):
+                return Response(exc.as_payload(), status=status.HTTP_400_BAD_REQUEST)
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(result, status=response_status)
@@ -166,4 +169,3 @@ class UnifiedReceivablePreviewView(APIView):
 
 class AdminUnifiedReceivablePreviewView(UnifiedReceivablePreviewView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
-

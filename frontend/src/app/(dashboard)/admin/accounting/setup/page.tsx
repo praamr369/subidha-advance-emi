@@ -4,11 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import FinanceAccountMappingPanel from "@/components/admin/accounting/FinanceAccountMappingPanel";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { SetupChecklistPageShell } from "@/components/layout/page-shells";
 import { ROUTES } from "@/lib/routes";
-import { getFinanceAccountMappings, patchFinanceAccountMapping } from "@/services/accounting-setup";
+import {
+  getAccountingSetupReadiness,
+  getFinanceAccountMappings,
+  patchFinanceAccountMapping,
+  updateFinanceAccountMapping,
+  type AccountingSetupReadinessFinanceAccount,
+  type AccountingSetupReadinessPayload,
+} from "@/services/accounting-setup";
 import {
   applyAccountingSetupDefaults,
   getAccountingSetupHealth,
@@ -55,6 +63,7 @@ const PURPOSE_LABELS: Record<string, string> = {
 
 export default function AdminAccountingSetupPage() {
   const [health, setHealth] = useState<AccountingSetupHealthResponse | null>(null);
+  const [readiness, setReadiness] = useState<AccountingSetupReadinessPayload | null>(null);
   const [mappings, setMappings] = useState<MappingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -62,6 +71,9 @@ export default function AdminAccountingSetupPage() {
   const [defaultsPreview, setDefaultsPreview] = useState<AccountingSetupDefaultsPreviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<MappingRow | null>(null);
+  const [editingFinanceAccount, setEditingFinanceAccount] =
+    useState<AccountingSetupReadinessFinanceAccount | null>(null);
+  const [selectedChartAccountId, setSelectedChartAccountId] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editDefault, setEditDefault] = useState(false);
   const [editActive, setEditActive] = useState(true);
@@ -70,12 +82,14 @@ export default function AdminAccountingSetupPage() {
     setLoading(true);
     setError(null);
     try {
-      const [healthRes, mappingRes] = await Promise.all([
+      const [healthRes, mappingRes, readinessRes] = await Promise.all([
         getAccountingSetupHealth(),
         getFinanceAccountMappings() as Promise<{ results?: MappingRow[] }>,
+        getAccountingSetupReadiness(),
       ]);
       setHealth(healthRes);
       setMappings(mappingRes.results ?? []);
+      setReadiness(readinessRes);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load accounting setup.");
     } finally {
@@ -159,6 +173,29 @@ export default function AdminAccountingSetupPage() {
     }
   }, [editActive, editDefault, editNotes, editing, load]);
 
+  const openFinanceMappingEdit = useCallback((row: AccountingSetupReadinessFinanceAccount) => {
+    setEditingFinanceAccount(row);
+    setSelectedChartAccountId(row.mapped_chart_account ? String(row.mapped_chart_account.id) : "");
+  }, []);
+
+  const submitFinanceMappingEdit = useCallback(async () => {
+    if (!editingFinanceAccount || !selectedChartAccountId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await updateFinanceAccountMapping(editingFinanceAccount.id, {
+        chart_account_id: Number(selectedChartAccountId),
+      });
+      setEditingFinanceAccount(null);
+      setSelectedChartAccountId("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update finance account mapping.");
+    } finally {
+      setSaving(false);
+    }
+  }, [editingFinanceAccount, load, selectedChartAccountId]);
+
   if (loading) {
     return (
       <PortalPage title="Accounting Setup" subtitle="Simple finance-account to chart-account mapping setup for day-one operations.">
@@ -211,6 +248,23 @@ export default function AdminAccountingSetupPage() {
                 </div>
               </div>
             </div>
+            {readiness ? (
+              <div
+                className={[
+                  "rounded-lg border px-3 py-2 text-xs sm:text-sm",
+                  readiness.summary.blockers_count > 0
+                    ? "border-red-200 bg-red-50 text-red-900"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-900",
+                ].join(" ")}
+              >
+                <span className="font-semibold">Finance Readiness Banner</span>
+                {": "}
+                Cash ready {readiness.summary.cash_accounts_ready_count}
+                {" · "}Bank ready {readiness.summary.bank_accounts_ready_count}
+                {" · "}UPI ready {readiness.summary.upi_accounts_ready_count}
+                {" · "}Blocked {readiness.summary.blockers_count}
+              </div>
+            ) : null}
           </div>
         }
         blockers={
@@ -264,6 +318,34 @@ export default function AdminAccountingSetupPage() {
         }
         evidence={
           <>
+        {readiness ? (
+          <>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="text-sm font-semibold text-foreground">Why blocked?</div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                Payment collection can only post into active Finance Accounts mapped to active, posting-enabled leaf ASSET chart accounts.
+                Group/control Chart of Accounts remain visible for setup review but cannot receive collections.
+              </div>
+              <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+                Suggested Default Setup preview is review-only here. It does not silently apply mappings or rewrite historical payments, receipts, journals, settlements, reconciliations, or day-close records.
+              </div>
+            </div>
+            <FinanceAccountMappingPanel
+              financeAccounts={readiness.finance_accounts}
+              chartAccounts={readiness.chart_accounts}
+              saving={saving}
+              editingId={editingFinanceAccount?.id ?? null}
+              selectedChartAccountId={selectedChartAccountId}
+              onEdit={openFinanceMappingEdit}
+              onCancelEdit={() => {
+                setEditingFinanceAccount(null);
+                setSelectedChartAccountId("");
+              }}
+              onChartAccountChange={setSelectedChartAccountId}
+              onSave={() => void submitFinanceMappingEdit()}
+            />
+          </>
+        ) : null}
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-foreground">Finance Account Mapping Table</div>

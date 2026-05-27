@@ -22,6 +22,7 @@ from billing.models import (
     ReceiptDocument,
 )
 from accounting.services.books_service import build_cash_book, build_daily_billing_book
+from accounting.services.finance_account_readiness import FinanceAccountPostingReadinessError
 from billing.services.direct_sale_finalize_response import build_finalize_invoice_api_response
 from billing.services.billing_service import (
     approve_billing_credit_note,
@@ -274,6 +275,8 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
         except DirectSale.DoesNotExist as exc:
             raise Http404 from exc
         except ValueError as exc:
+            if isinstance(exc, FinanceAccountPostingReadinessError):
+                raise ValidationError(exc.as_payload()) from exc
             raise ValidationError({"detail": str(exc)}) from exc
 
         return Response(

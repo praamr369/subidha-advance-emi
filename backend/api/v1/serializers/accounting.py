@@ -40,6 +40,10 @@ from accounting.services.journal_posting_service import (
     create_journal_entry,
     update_draft_journal_entry,
 )
+from accounting.services.finance_account_readiness import (
+    chart_account_is_posting_ready,
+    finance_account_readiness,
+)
 from accounting.services.master_edit_service import (
     AccountingMasterUpdateService,
     get_chart_account_editability,
@@ -259,9 +263,36 @@ class ChartOfAccountUpdateSerializer(serializers.ModelSerializer):
 class FinanceAccountSerializer(serializers.ModelSerializer):
     chart_account_code = serializers.CharField(source="chart_account.code", read_only=True)
     chart_account_name = serializers.CharField(source="chart_account.name", read_only=True)
+    mapped_chart_account_id = serializers.IntegerField(source="chart_account_id", read_only=True)
+    mapped_chart_account_code = serializers.CharField(source="chart_account.code", read_only=True)
+    mapped_chart_account_name = serializers.CharField(source="chart_account.name", read_only=True)
+    mapped_chart_account_type = serializers.CharField(source="chart_account.account_type", read_only=True)
+    mapped_chart_account_is_posting = serializers.SerializerMethodField()
+    collection_ready = serializers.SerializerMethodField()
+    collection_blocker_reason = serializers.SerializerMethodField()
+    recommended_action = serializers.SerializerMethodField()
     branch_code = serializers.CharField(source="branch.code", read_only=True)
     branch_name = serializers.CharField(source="branch.name", read_only=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+    def _readiness(self, obj):
+        cached = getattr(obj, "_collection_readiness", None)
+        if cached is None:
+            cached = finance_account_readiness(obj)
+            setattr(obj, "_collection_readiness", cached)
+        return cached
+
+    def get_mapped_chart_account_is_posting(self, obj):
+        return chart_account_is_posting_ready(getattr(obj, "chart_account", None))
+
+    def get_collection_ready(self, obj):
+        return self._readiness(obj).collection_ready
+
+    def get_collection_blocker_reason(self, obj):
+        return self._readiness(obj).collection_blocker_reason
+
+    def get_recommended_action(self, obj):
+        return self._readiness(obj).recommended_action
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -293,6 +324,14 @@ class FinanceAccountSerializer(serializers.ModelSerializer):
             "chart_account",
             "chart_account_code",
             "chart_account_name",
+            "mapped_chart_account_id",
+            "mapped_chart_account_code",
+            "mapped_chart_account_name",
+            "mapped_chart_account_type",
+            "mapped_chart_account_is_posting",
+            "collection_ready",
+            "collection_blocker_reason",
+            "recommended_action",
             "opening_balance",
             "is_real_settlement_account",
             "is_active",
@@ -381,6 +420,7 @@ class FinanceAccountCoaMappingSerializer(serializers.ModelSerializer):
     chart_account_name = serializers.CharField(source="chart_account.name", read_only=True)
     chart_account_code = serializers.CharField(source="chart_account.code", read_only=True)
     chart_account_type = serializers.CharField(source="chart_account.account_type", read_only=True)
+    chart_account_is_posting = serializers.SerializerMethodField()
 
     class Meta:
         model = FinanceAccountCoaMapping
@@ -394,6 +434,7 @@ class FinanceAccountCoaMappingSerializer(serializers.ModelSerializer):
             "chart_account_code",
             "chart_account_name",
             "chart_account_type",
+            "chart_account_is_posting",
             "purpose",
             "is_default",
             "is_active",
@@ -404,6 +445,9 @@ class FinanceAccountCoaMappingSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_by", "updated_by", "created_at", "updated_at"]
+
+    def get_chart_account_is_posting(self, obj):
+        return chart_account_is_posting_ready(getattr(obj, "chart_account", None))
 
     def validate_purpose(self, value):
         if value not in FinanceAccountMappingPurpose.values:
