@@ -27,6 +27,7 @@ POSTING_PURPOSE = "CONTRACT_RECONTRACT_ACCOUNTING_ADJUSTMENT"
 RECEIVABLE_PROFILE_KEY = "CUSTOMER_RECEIVABLE"
 REVENUE_ADJUSTMENT_PROFILE_KEY = "EMI_INCOME"
 CUSTOMER_CREDIT_PROFILE_KEY = "CUSTOMER_ADVANCE_UNEARNED_REVENUE"
+_POST_EXECUTION_BLOCKED_MESSAGE = "Product recontract has already been executed for this amendment. Further accounting posting actions are read-only/blocked."
 
 
 def _q2(value) -> Decimal:
@@ -35,6 +36,11 @@ def _q2(value) -> Decimal:
 
 def _money(value) -> str:
     return f"{_q2(value):.2f}"
+
+
+def _event_is_executed(event: ContractRecontractEvent) -> bool:
+    metadata = event.metadata if isinstance(event.metadata, dict) else {}
+    return bool(metadata.get("execution_performed") is True or metadata.get("execution_status") == "EXECUTED")
 
 
 def _account_snapshot(account: ChartOfAccount) -> dict:
@@ -292,6 +298,8 @@ def execute_product_recontract_accounting(
         .get(pk=event.pk)
     )
 
+    if _event_is_executed(locked_event):
+        raise ValidationError({"detail": _POST_EXECUTION_BLOCKED_MESSAGE})
     if locked_event.status != ContractRecontractEvent.Status.PREVIEWED:
         raise ValidationError({"detail": "Accounting posting requires latest recontract event status PREVIEWED."})
     if locked_event.customer_consent_status != ContractRecontractEvent.CustomerConsentStatus.ACCEPTED:
