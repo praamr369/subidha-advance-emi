@@ -17,7 +17,7 @@ type FinanceAccountMappingPanelProps = {
   onCancelEdit: () => void;
   onChartAccountChange: (chartAccountId: string) => void;
   onSave: () => void;
-  onRepair: (financeAccount: AccountingSetupReadinessFinanceAccount) => void;
+  onRepair?: (financeAccount: AccountingSetupReadinessFinanceAccount) => void;
 };
 
 function paymentMethodLabel(kind: string): string {
@@ -87,7 +87,7 @@ export default function FinanceAccountMappingPanel({
                 const isEditing = editingId === account.id;
                 const isRepairing = repairId === account.id;
                 const blocker = account.blocker_reason || account.collection_blocker_reason || null;
-                const canRepair = Boolean(account.can_auto_create_posting_account && !account.collection_ready);
+                const canRepair = Boolean(account.can_auto_create_posting_account && !account.collection_ready && onRepair);
                 return (
                   <tr key={account.id} className="border-t border-border align-top">
                     <td className="px-2 py-2">
@@ -123,7 +123,7 @@ export default function FinanceAccountMappingPanel({
                     </td>
                     <td className="max-w-[260px] px-2 py-2">
                       <div className={suggested?.is_posting ? "text-emerald-700" : "text-muted-foreground"}>{chartLabel(suggested)}</div>
-                      {canRepair ? (
+                      {account.can_auto_create_posting_account && !account.collection_ready ? (
                         <div className="mt-1 text-[11px] text-muted-foreground">
                           Repair will create or reuse a posting leaf and remap this finance account.
                         </div>
@@ -148,7 +148,7 @@ export default function FinanceAccountMappingPanel({
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {canRepair ? (
-                            <ActionButton size="sm" variant="primary" onClick={() => onRepair(account)} disabled={saving || isRepairing}>
+                            <ActionButton size="sm" variant="primary" onClick={() => onRepair?.(account)} disabled={saving || isRepairing}>
                               {isRepairing ? "Repairing..." : "Repair mapping"}
                             </ActionButton>
                           ) : null}
