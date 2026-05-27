@@ -12,6 +12,8 @@ from subscriptions.models_contract_amendment import PHASE1_AMENDMENT_TYPES, PHAS
 from subscriptions.services.contract_amendment_service import phase3_implementation_metadata
 from subscriptions.services.product_recontract_preview_service import latest_product_recontract_preview_summary
 
+PRODUCT_RECONTRACT_AMENDMENT_TYPES = {"PRODUCT_CHANGE", "PRODUCT_UPGRADE"}
+
 
 class ContractAmendmentSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source="customer.name", read_only=True)
@@ -88,7 +90,7 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
         return phase3_implementation_metadata(obj)["implementable_fields"]
 
     def get_latest_product_recontract_preview(self, obj):
-        if obj.amendment_type != "PRODUCT_CHANGE":
+        if obj.amendment_type not in PRODUCT_RECONTRACT_AMENDMENT_TYPES:
             return None
         summary = latest_product_recontract_preview_summary(obj)
         if not summary:
