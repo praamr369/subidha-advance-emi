@@ -89,7 +89,33 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
     def get_latest_product_recontract_preview(self, obj):
         if obj.amendment_type != "PRODUCT_CHANGE":
             return None
-        return latest_product_recontract_preview_summary(obj)
+        summary = latest_product_recontract_preview_summary(obj)
+        if not summary:
+            return None
+        event = (
+            ContractRecontractEvent.objects.filter(pk=summary.get("id"))
+            .select_related("amendment", "subscription", "old_product", "new_product")
+            .prefetch_related("schedule_preview_lines", "financial_impact_previews")
+            .first()
+        )
+        if not event:
+            return summary
+        serialized = ContractRecontractEventSerializer(event).data
+        for key in (
+            "executed",
+            "executed_at",
+            "executed_by",
+            "execution_status",
+            "execution_snapshot",
+            "accounting_bridge_posting_id",
+            "journal_entry_id",
+            "reconciliation_item_id",
+            "reconciliation_run_id",
+            "reconciliation_evidence_ids",
+            "schedule_line_ids",
+        ):
+            summary[key] = serialized.get(key)
+        return summary
 
 
 class ContractAmendmentCreateSerializer(serializers.Serializer):
