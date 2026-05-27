@@ -123,6 +123,37 @@ function ProductRecontractCustomerConsentPanel({
             </ul>
           </div>
         ) : null}
+        {preview.schedule_preview_lines && preview.schedule_preview_lines.length > 0 ? (
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">Future EMI schedule preview lines (read-only)</div>
+            <div className="mt-2 overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="p-2">Line no</th>
+                    <th className="p-2">Original due date</th>
+                    <th className="p-2">Original amount</th>
+                    <th className="p-2">Proposed due date</th>
+                    <th className="p-2">Proposed amount</th>
+                    <th className="p-2">Adjustment type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.schedule_preview_lines.map((line) => (
+                    <tr key={line.id} className="border-t border-border">
+                      <td className="p-2">{line.line_no}</td>
+                      <td className="p-2">{line.original_due_date || "-"}</td>
+                      <td className="p-2">{line.original_amount || "-"}</td>
+                      <td className="p-2">{line.proposed_due_date || "-"}</td>
+                      <td className="p-2">{line.proposed_amount || "-"}</td>
+                      <td className="p-2">{line.adjustment_type}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
         {canDecide ? (
           <>
             <label className="block text-sm font-medium">

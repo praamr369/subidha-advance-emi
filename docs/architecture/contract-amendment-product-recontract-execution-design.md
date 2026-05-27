@@ -1,6 +1,6 @@
 # Contract Amendment Product Recontract Execution Design
 
-Status: execution design only. Phase 6A preview snapshot persistence, Phase 6B customer consent, and Phase 6C admin approval/rejection for customer-accepted saved preview snapshots are implemented, but no execution endpoint, mutation service, or frontend execution control is implemented.
+Status: execution design only. Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin approval/rejection, and Phase 6D schedule preview-line persistence are implemented, but no execution endpoint, mutation service, or frontend execution control is implemented.
 
 Branch: `update`
 
@@ -162,6 +162,8 @@ Phase 6C implemented the current admin decision fields additively on `ContractRe
 ### Stage D - Execution
 
 Future execution must run in one controlled service using `transaction.atomic`.
+
+Phase 6D only generates `ContractRecontractScheduleLine` preview evidence. It does not execute any source mutation.
 
 Required transaction shape:
 

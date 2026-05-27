@@ -12,6 +12,7 @@ from api.v1.serializers.contract_amendments import (
     ContractAmendmentReviewSerializer,
     ContractAmendmentSerializer,
     ContractRecontractEventSerializer,
+    ContractRecontractScheduleLineSerializer,
     ProductRecontractAdminDecisionSerializer,
     ProductRecontractCustomerConsentSerializer,
     ProductRecontractPreviewRequestSerializer,
@@ -26,6 +27,7 @@ from subscriptions.services.contract_amendment_service import (
     reject_amendment,
 )
 from subscriptions.services.product_recontract_preview_service import (
+    create_product_recontract_schedule_preview,
     create_product_recontract_preview_snapshot,
     preview_product_recontract,
     record_product_recontract_admin_approval,
@@ -360,6 +362,36 @@ class AdminContractAmendmentProductRecontractEventListView(APIView):
         events = (
             ContractRecontractEvent.objects.filter(amendment=amendment)
             .select_related("amendment", "subscription", "old_product", "new_product", "created_by", "customer_consented_by", "admin_approved_by")
+            .prefetch_related("schedule_preview_lines")
             .order_by("-created_at", "-id")
         )
         return Response(ContractRecontractEventSerializer(events, many=True).data, status=status.HTTP_200_OK)
+
+
+class AdminContractAmendmentProductRecontractSchedulePreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        amendment = _amendment_queryset().filter(pk=pk).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            event = create_product_recontract_schedule_preview(amendment=amendment, requested_by=request.user)
+        except DjangoValidationError as exc:
+            return _validation_response(exc)
+        return Response(ContractRecontractEventSerializer(event).data, status=status.HTTP_201_CREATED)
+
+    def get(self, request, pk: int):
+        amendment = _amendment_queryset().filter(pk=pk).first()
+        if not amendment:
+            return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        event = (
+            ContractRecontractEvent.objects.filter(amendment=amendment, status=ContractRecontractEvent.Status.PREVIEWED)
+            .prefetch_related("schedule_preview_lines")
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if not event:
+            return Response([], status=status.HTTP_200_OK)
+        lines = event.schedule_preview_lines.all().order_by("line_no", "id")
+        return Response(ContractRecontractScheduleLineSerializer(lines, many=True).data, status=status.HTTP_200_OK)

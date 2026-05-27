@@ -4471,6 +4471,78 @@ class ContractRecontractEvent(models.Model):
         return f"Recontract preview #{self.pk} for amendment {self.amendment_id} [{self.status}]"
 
 
+class ContractRecontractScheduleLine(models.Model):
+    class ProposedStatus(models.TextChoices):
+        PREVIEW_ONLY = "PREVIEW_ONLY", "Preview Only"
+        SUPERSEDED = "SUPERSEDED", "Superseded"
+
+    class AdjustmentType(models.TextChoices):
+        EXISTING_PENDING_REPLACEMENT = "EXISTING_PENDING_REPLACEMENT", "Existing Pending Replacement"
+        NEW_ADDITIONAL_EMI = "NEW_ADDITIONAL_EMI", "New Additional EMI"
+        REDUCED_EMI = "REDUCED_EMI", "Reduced EMI"
+        CREDIT_OFFSET = "CREDIT_OFFSET", "Credit Offset"
+
+    event = models.ForeignKey(
+        ContractRecontractEvent,
+        on_delete=models.PROTECT,
+        related_name="schedule_preview_lines",
+    )
+    line_no = models.PositiveIntegerField()
+    original_emi = models.ForeignKey(
+        Emi,
+        on_delete=models.PROTECT,
+        related_name="recontract_schedule_preview_lines",
+        null=True,
+        blank=True,
+    )
+    original_due_date = models.DateField(null=True, blank=True)
+    original_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    proposed_due_date = models.DateField()
+    proposed_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    proposed_principal_component = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    proposed_status = models.CharField(
+        max_length=20,
+        choices=ProposedStatus.choices,
+        default=ProposedStatus.PREVIEW_ONLY,
+        db_index=True,
+    )
+    adjustment_type = models.CharField(max_length=40, choices=AdjustmentType.choices, db_index=True)
+    source_record_mutation = models.BooleanField(default=False)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "contract_recontract_schedule_lines"
+        ordering = ["event_id", "line_no", "id"]
+        indexes = [
+            models.Index(fields=["event", "line_no"], name="recon_sch_ev_line_idx"),
+            models.Index(fields=["event", "adjustment_type"], name="recon_sch_ev_adj_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(condition=Q(line_no__gt=0), name="chk_recontract_sched_line_gt0"),
+            models.CheckConstraint(condition=Q(proposed_amount__gte=0), name="chk_recontract_sched_prop_amt_gte0"),
+            models.CheckConstraint(condition=Q(source_record_mutation=False), name="chk_recontract_sched_no_src_mut"),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.source_record_mutation:
+            errors["source_record_mutation"] = "Schedule preview lines must not mutate source records."
+        if self.original_emi_id:
+            if self.event_id and self.original_emi.subscription_id != self.event.subscription_id:
+                errors["original_emi"] = "Original EMI must belong to the same subscription as the recontract event."
+            if self.original_emi.status != EmiStatus.PENDING:
+                errors["original_emi"] = "Only pending EMI rows can be referenced by schedule preview lines."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.source_record_mutation = False
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
 class PossessionStatus(models.TextChoices):
     PENDING_HANDOVER = "PENDING_HANDOVER", "Pending Handover"
     WITH_CUSTOMER = "WITH_CUSTOMER", "With Customer"

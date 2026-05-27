@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from subscriptions.models import ContractAmendment, ContractRecontractEvent, Subscription
+from subscriptions.models import ContractAmendment, ContractRecontractEvent, ContractRecontractScheduleLine, Subscription
 from subscriptions.models_contract_amendment import PHASE1_AMENDMENT_TYPES, PHASE1_STATUSES
 from subscriptions.services.contract_amendment_service import phase3_implementation_metadata
 from subscriptions.services.product_recontract_preview_service import latest_product_recontract_preview_summary
@@ -179,6 +179,13 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
     created_by_display = serializers.CharField(source="created_by.username", read_only=True, allow_null=True)
     customer_consented_by_display = serializers.CharField(source="customer_consented_by.username", read_only=True, allow_null=True)
     admin_approved_by_display = serializers.CharField(source="admin_approved_by.username", read_only=True, allow_null=True)
+    schedule_preview_lines = serializers.SerializerMethodField()
+
+    def get_schedule_preview_lines(self, obj):
+        lines = getattr(obj, "schedule_preview_lines", None)
+        if lines is None:
+            return []
+        return ContractRecontractScheduleLineSerializer(lines.all().order_by("line_no", "id"), many=True).data
 
     class Meta:
         model = ContractRecontractEvent
@@ -224,6 +231,30 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
             "admin_approved_at",
             "admin_approval_note",
             "admin_approval_snapshot",
+            "schedule_preview_lines",
             "metadata",
+        ]
+        read_only_fields = fields
+
+
+class ContractRecontractScheduleLineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContractRecontractScheduleLine
+        fields = [
+            "id",
+            "event",
+            "line_no",
+            "original_emi",
+            "original_due_date",
+            "original_amount",
+            "proposed_due_date",
+            "proposed_amount",
+            "proposed_principal_component",
+            "proposed_status",
+            "adjustment_type",
+            "source_record_mutation",
+            "metadata",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields

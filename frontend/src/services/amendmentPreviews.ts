@@ -68,6 +68,25 @@ export type ContractRecontractEvent = {
   admin_approved_at?: string | null;
   admin_approval_note?: string | null;
   admin_approval_snapshot?: Record<string, unknown>;
+  schedule_preview_lines?: ContractRecontractScheduleLine[];
+};
+
+export type ContractRecontractScheduleLine = {
+  id: number;
+  event: number;
+  line_no: number;
+  original_emi?: number | null;
+  original_due_date?: string | null;
+  original_amount?: string | null;
+  proposed_due_date: string;
+  proposed_amount: string;
+  proposed_principal_component?: string | null;
+  proposed_status: "PREVIEW_ONLY" | "SUPERSEDED";
+  adjustment_type: "EXISTING_PENDING_REPLACEMENT" | "NEW_ADDITIONAL_EMI" | "REDUCED_EMI" | "CREDIT_OFFSET";
+  source_record_mutation: boolean;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export async function previewProductRecontractAmendment(id: number): Promise<ProductRecontractPreview> {
@@ -86,6 +105,17 @@ export async function saveProductRecontractPreviewSnapshot(id: number): Promise<
 
 export async function listProductRecontractEvents(id: number): Promise<ContractRecontractEvent[]> {
   return apiFetch<ContractRecontractEvent[]>(`/admin/contract-amendments/${id}/product-recontract-events/`);
+}
+
+export async function generateProductRecontractSchedulePreview(id: number): Promise<ContractRecontractEvent> {
+  return apiFetch<ContractRecontractEvent>(`/admin/contract-amendments/${id}/product-recontract/schedule-preview/`, {
+    method: "POST",
+    body: {},
+  });
+}
+
+export async function getProductRecontractSchedulePreview(id: number): Promise<ContractRecontractScheduleLine[]> {
+  return apiFetch<ContractRecontractScheduleLine[]>(`/admin/contract-amendments/${id}/product-recontract/schedule-preview/`);
 }
 
 export async function recordProductRecontractAdminDecision(

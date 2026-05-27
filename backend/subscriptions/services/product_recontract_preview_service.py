@@ -13,7 +13,17 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
-from subscriptions.models import AuditLog, ContractAmendment, ContractRecontractEvent, EmiStatus, MONEY_ZERO, Product, Subscription
+from subscriptions.models import (
+    AuditLog,
+    ContractAmendment,
+    ContractRecontractEvent,
+    ContractRecontractScheduleLine,
+    Emi,
+    EmiStatus,
+    MONEY_ZERO,
+    Product,
+    Subscription,
+)
 from subscriptions.services.audit_service import log_audit
 
 _PREVIEW_ALLOWED_STATUSES = {"REQUESTED", "UNDER_REVIEW", "APPROVED"}
@@ -76,6 +86,23 @@ def _event_preview_summary(event: ContractRecontractEvent | None) -> dict | None
         "admin_approved_at": event.admin_approved_at.isoformat() if event.admin_approved_at else None,
         "admin_approval_note": event.admin_approval_note or "",
         "admin_approval_snapshot": event.admin_approval_snapshot or {},
+        "schedule_preview_lines": [
+            {
+                "id": line.id,
+                "line_no": line.line_no,
+                "original_emi_id": line.original_emi_id,
+                "original_due_date": line.original_due_date.isoformat() if line.original_due_date else None,
+                "original_amount": _money(line.original_amount) if line.original_amount is not None else None,
+                "proposed_due_date": line.proposed_due_date.isoformat() if line.proposed_due_date else None,
+                "proposed_amount": _money(line.proposed_amount),
+                "proposed_principal_component": _money(line.proposed_principal_component) if line.proposed_principal_component is not None else None,
+                "proposed_status": line.proposed_status,
+                "adjustment_type": line.adjustment_type,
+                "source_record_mutation": line.source_record_mutation,
+                "metadata": line.metadata or {},
+            }
+            for line in event.schedule_preview_lines.order_by("line_no", "id")
+        ],
         "source_record_mutation": False,
     }
 
@@ -84,10 +111,129 @@ def latest_product_recontract_preview_summary(amendment: ContractAmendment) -> d
     event = (
         ContractRecontractEvent.objects.filter(amendment=amendment, status=ContractRecontractEvent.Status.PREVIEWED)
         .select_related("old_product", "new_product")
+        .prefetch_related("schedule_preview_lines")
         .order_by("-created_at", "-id")
         .first()
     )
     return _event_preview_summary(event)
+
+
+def _event_for_schedule_preview(amendment: ContractAmendment) -> ContractRecontractEvent:
+    event = (
+        ContractRecontractEvent.objects.select_for_update()
+        .select_related("subscription", "old_product", "new_product")
+        .prefetch_related("schedule_preview_lines")
+        .filter(amendment=amendment)
+        .order_by("-created_at", "-id")
+        .first()
+    )
+    if not event:
+        raise ValidationError({"detail": "No saved product recontract preview exists for this amendment."})
+    if event.status != ContractRecontractEvent.Status.PREVIEWED:
+        raise ValidationError({"detail": "Schedule preview requires the latest recontract event to be PREVIEWED."})
+    if event.customer_consent_status != ContractRecontractEvent.CustomerConsentStatus.ACCEPTED:
+        raise ValidationError({"detail": "Schedule preview requires customer consent status ACCEPTED."})
+    if event.admin_approval_status != ContractRecontractEvent.AdminApprovalStatus.APPROVED:
+        raise ValidationError({"detail": "Schedule preview requires admin approval status APPROVED."})
+    return event
+
+
+def _deterministic_installments(total: Decimal, count: int) -> list[Decimal]:
+    q_total = _q2(total)
+    if count <= 0:
+        return []
+    if q_total <= MONEY_ZERO:
+        return [_q2(MONEY_ZERO) for _ in range(count)]
+    unit = _q2(q_total / Decimal(count))
+    rows = [unit for _ in range(count)]
+    balance = q_total - sum(rows)
+    rows[-1] = _q2(rows[-1] + balance)
+    return rows
+
+
+def create_product_recontract_schedule_preview(*, amendment: ContractAmendment, requested_by=None) -> ContractRecontractEvent:
+    """Create and persist preview-only future EMI schedule lines for an approved recontract event."""
+    with transaction.atomic():
+        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        event = _event_for_schedule_preview(locked_amendment)
+        pending_emis = list(
+            Emi.objects.select_for_update()
+            .filter(subscription_id=event.subscription_id, status=EmiStatus.PENDING)
+            .order_by("month_no", "due_date", "id")
+        )
+        pending_count = len(pending_emis)
+        if pending_count <= 0:
+            raise ValidationError(
+                {"detail": "Schedule preview is blocked: no pending EMI rows exist; manual settlement/credit policy is required."}
+            )
+        if event.pending_emi_count and event.pending_emi_count != pending_count:
+            raise ValidationError(
+                {"detail": "Schedule preview is blocked: pending EMI mapping changed after preview snapshot; regenerate product preview first."}
+            )
+
+        ContractRecontractScheduleLine.objects.select_for_update().filter(
+            event=event, proposed_status=ContractRecontractScheduleLine.ProposedStatus.PREVIEW_ONLY
+        ).update(
+            proposed_status=ContractRecontractScheduleLine.ProposedStatus.SUPERSEDED,
+            updated_at=timezone.now(),
+        )
+
+        proposed_amounts = _deterministic_installments(event.new_remaining_balance, pending_count)
+        lines = []
+        for idx, (emi, proposed_amount) in enumerate(zip(pending_emis, proposed_amounts), start=1):
+            adjustment = ContractRecontractScheduleLine.AdjustmentType.EXISTING_PENDING_REPLACEMENT
+            if proposed_amount < _q2(emi.amount):
+                adjustment = ContractRecontractScheduleLine.AdjustmentType.REDUCED_EMI
+            lines.append(
+                ContractRecontractScheduleLine(
+                    event=event,
+                    line_no=idx,
+                    original_emi=emi,
+                    original_due_date=emi.due_date,
+                    original_amount=_q2(emi.amount),
+                    proposed_due_date=emi.due_date,
+                    proposed_amount=proposed_amount,
+                    proposed_principal_component=None,
+                    proposed_status=ContractRecontractScheduleLine.ProposedStatus.PREVIEW_ONLY,
+                    adjustment_type=adjustment,
+                    source_record_mutation=False,
+                    metadata={
+                        "phase": "PHASE_6D_SCHEDULE_PREVIEW_ONLY",
+                        "source_record_mutation": False,
+                    },
+                )
+            )
+        ContractRecontractScheduleLine.objects.bulk_create(lines)
+
+        event_metadata = event.metadata or {}
+        event_metadata["phase"] = "PHASE_6D_SCHEDULE_PREVIEW_ONLY"
+        event_metadata["schedule_preview_created"] = True
+        event_metadata["schedule_preview_created_at"] = timezone.now().isoformat()
+        event_metadata["schedule_preview_line_count"] = len(lines)
+        event_metadata["source_record_mutation"] = False
+        event.metadata = event_metadata
+        event.save(update_fields=["metadata", "updated_at"])
+
+        log_audit(
+            action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_APPROVED,
+            instance=locked_amendment,
+            performed_by=requested_by,
+            metadata={
+                "event": "CONTRACT_RECONTRACT_SCHEDULE_PREVIEW_CREATED",
+                "phase": "PHASE_6D_SCHEDULE_PREVIEW_ONLY",
+                "amendment_id": locked_amendment.pk,
+                "recontract_event_id": event.pk,
+                "subscription_id": event.subscription_id,
+                "line_count": len(lines),
+                "source_record_mutation": False,
+                "execution_performed": False,
+            },
+        )
+    return (
+        ContractRecontractEvent.objects.select_related("old_product", "new_product")
+        .prefetch_related("schedule_preview_lines")
+        .get(pk=event.pk)
+    )
 
 
 def _values_for(amendment: ContractAmendment) -> dict:

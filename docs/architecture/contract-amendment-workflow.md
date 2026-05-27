@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, Phase 6B customer consent, and Phase 6C admin decision recording are implemented on `update`.
+Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin decision recording, and Phase 6D schedule preview-line persistence are implemented on `update`.
 
 ## Scope
 
@@ -95,6 +95,17 @@ Allowed decisions are `APPROVED` and `REJECTED`, with an optional note. The endp
 Phase 6C is decision evidence only. It stores admin approval status, actor, timestamp, note, and approval snapshot on `ContractRecontractEvent`. It does not mutate `Subscription.product`, contract totals, monthly EMI, tenure, EMI rows, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
 
 No execution endpoint or execution button exists in Phase 6C. Future EMI schedule update, accounting/reconciliation integration, execution endpoint, and printable addendum remain future phases.
+
+## Phase 6D — Future EMI schedule preview lines
+
+Admin can generate backend schedule preview lines only after customer `ACCEPTED` and admin `APPROVED` on the latest `PREVIEWED` recontract event:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
+GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
+```
+
+This creates preview evidence only (`ContractRecontractScheduleLine`). Real EMI rows and all financial/accounting/reconciliation source records remain unchanged. Execution remains a future phase.
 
 ## Product recontract execution design
 

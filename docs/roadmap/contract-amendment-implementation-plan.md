@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Phase 6C product recontract admin decision recording completed on `update` branch**
+Status: **Phase 6D product recontract schedule preview-line persistence completed on `update` branch**
 
 ## Principle
 
@@ -124,11 +124,23 @@ Phase 6C does not mutate subscription product, total amount, monthly amount, ten
 
 Future EMI schedule update, accounting/reconciliation integration, product recontract execution endpoint, and printable addendum remain future phases.
 
-## Phase 6D — Future EMI schedule adjustment service
+## Phase 6D — Future EMI schedule adjustment preview model only
 
-Status: **Deferred**
+Status: **Implemented**
 
-Create the controlled service for future EMI schedule changes from the effective date only. Historical paid and waived EMIs remain unchanged.
+Additive `ContractRecontractScheduleLine` persists backend-calculated preview-only future EMI lines for latest recontract event when:
+- event status is `PREVIEWED`
+- customer consent is `ACCEPTED`
+- admin approval is `APPROVED`
+
+Admin endpoints:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
+GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
+```
+
+Phase 6D does not mutate `Emi` rows, `Subscription.product`, `Subscription.total_amount`, `Subscription.monthly_amount`, `Subscription.tenure_months`, payments, receipts, accounting, or reconciliation. It is preview evidence only; execution remains deferred.
 
 ## Phase 6E — Accounting/reconciliation integration
 

@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import ActionButton from "@/components/ui/ActionButton";
 import { DetailPanel } from "@/components/ui/operations";
 import {
+  generateProductRecontractSchedulePreview,
+  getProductRecontractSchedulePreview,
   listProductRecontractEvents,
   previewProductRecontractAmendment,
   recordProductRecontractAdminDecision,
@@ -36,13 +38,18 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
   const [adminDecisionNote, setAdminDecisionNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [scheduleBusy, setScheduleBusy] = useState(false);
+  const [scheduleLines, setScheduleLines] = useState<ContractRecontractEvent["schedule_preview_lines"]>([]);
 
   useEffect(() => {
     if (amendment.amendment_type !== "PRODUCT_CHANGE") return;
     let mounted = true;
     listProductRecontractEvents(amendment.id)
       .then((rows) => {
-        if (mounted) setEvents(rows);
+        if (mounted) {
+          setEvents(rows);
+          setScheduleLines(rows[0]?.schedule_preview_lines || []);
+        }
       })
       .catch(() => {
         if (mounted) setEvents([]);
@@ -59,6 +66,10 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
     latestEvent?.status === "PREVIEWED" &&
     latestEvent.customer_consent_status === "ACCEPTED" &&
     (latestEvent.admin_approval_status || "PENDING") === "PENDING";
+  const canGenerateSchedulePreview =
+    latestEvent?.status === "PREVIEWED" &&
+    latestEvent.customer_consent_status === "ACCEPTED" &&
+    latestEvent.admin_approval_status === "APPROVED";
 
   async function runPreview() {
     setBusy(true);
@@ -105,6 +116,30 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
     }
   }
 
+  async function generateSchedulePreview() {
+    setScheduleBusy(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      const event = await generateProductRecontractSchedulePreview(amendment.id);
+      const rows = await listProductRecontractEvents(amendment.id);
+      if (rows.length > 0) {
+        setEvents(rows);
+        setScheduleLines(rows[0]?.schedule_preview_lines || event.schedule_preview_lines || []);
+      } else {
+        setScheduleLines(event.schedule_preview_lines || []);
+      }
+      if ((event.schedule_preview_lines || []).length === 0) {
+        setScheduleLines(await getProductRecontractSchedulePreview(amendment.id));
+      }
+      setSaveMessage("Future EMI schedule preview generated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Schedule preview generation failed.");
+    } finally {
+      setScheduleBusy(false);
+    }
+  }
+
   return (
     <DetailPanel
       title="Product recontract preview"
@@ -114,6 +149,7 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
         <p className="text-sm text-amber-800 dark:text-amber-200">
           Saving a preview snapshot does not change the contract, EMI schedule, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
         </p>
+        <p className="text-sm text-amber-800 dark:text-amber-200">This creates preview lines only. Actual EMI records are not changed.</p>
         <div className="flex flex-wrap gap-3">
           <ActionButton variant="outline" onClick={() => void runPreview()} disabled={busy || saving}>
             {busy ? "Previewing..." : "Preview financial product change"}
@@ -121,6 +157,11 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
           <ActionButton variant="outline" onClick={() => void saveSnapshot()} disabled={busy || saving}>
             {saving ? "Saving..." : "Save preview snapshot"}
           </ActionButton>
+          {canGenerateSchedulePreview ? (
+            <ActionButton variant="outline" onClick={() => void generateSchedulePreview()} disabled={scheduleBusy || busy || saving}>
+              {scheduleBusy ? "Generating..." : "Generate future EMI schedule preview"}
+            </ActionButton>
+          ) : null}
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {saveMessage ? <p className="text-sm text-emerald-700 dark:text-emerald-300">{saveMessage}</p> : null}
@@ -205,6 +246,37 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
                 {latestEvent.admin_approval_note ? ` · ${latestEvent.admin_approval_note}` : ""}
               </div>
             )}
+          </div>
+        ) : null}
+        {scheduleLines && scheduleLines.length > 0 ? (
+          <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-3">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">Future EMI schedule preview lines</div>
+            <div className="overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="p-2">Line no</th>
+                    <th className="p-2">Original due date</th>
+                    <th className="p-2">Original amount</th>
+                    <th className="p-2">Proposed due date</th>
+                    <th className="p-2">Proposed amount</th>
+                    <th className="p-2">Adjustment type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scheduleLines.map((line) => (
+                    <tr key={line.id} className="border-t border-border">
+                      <td className="p-2">{line.line_no}</td>
+                      <td className="p-2">{line.original_due_date || "—"}</td>
+                      <td className="p-2">{line.original_amount || "—"}</td>
+                      <td className="p-2">{line.proposed_due_date || "—"}</td>
+                      <td className="p-2">{line.proposed_amount || "—"}</td>
+                      <td className="p-2">{line.adjustment_type}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : null}
       </div>

@@ -1,6 +1,6 @@
 # Contract Amendment Product Recontract Preview
 
-Status: implemented on `update`. Phase 6A preview snapshot persistence, Phase 6B customer consent, and Phase 6C admin approval/rejection for customer-accepted saved preview snapshots are implemented.
+Status: implemented on `update`. Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin approval/rejection, and Phase 6D future EMI schedule preview lines are implemented.
 
 This phase adds an admin-only preview for financial product recontract requests. It does not execute the recontract.
 
@@ -58,3 +58,12 @@ POST /api/v1/admin/contract-amendments/{id}/product-recontract/admin-decision/
 Admin approval/rejection is a decision record only. It stores approval status, actor, timestamp, note, and an approval snapshot on `ContractRecontractEvent`. It does not mutate subscription product, total amount, monthly amount, tenure, EMI rows, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records.
 
 True execution remains future work. Future EMI schedule update, accounting/reconciliation integration, execution endpoint, and printable addendum generation are not part of Phase 6C.
+
+Phase 6D adds a backend-generated, preview-only future EMI schedule line model and endpoint:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
+GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
+```
+
+It runs only for latest saved `PREVIEWED` event with customer consent `ACCEPTED` and admin approval `APPROVED`. It persists `ContractRecontractScheduleLine` rows as audit evidence only. Actual `Emi` rows, `Subscription` terms, payments, receipts, accounting, and reconciliation are not mutated.

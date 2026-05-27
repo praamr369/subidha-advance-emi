@@ -148,6 +148,22 @@ const productRecontractEventFixture = {
   admin_approved_at: null,
   admin_approval_note: "",
   admin_approval_snapshot: {},
+  schedule_preview_lines: [
+    {
+      id: 9001,
+      event: 77,
+      line_no: 1,
+      original_emi: 301,
+      original_due_date: "2026-03-01",
+      original_amount: "2000.00",
+      proposed_due_date: "2026-03-01",
+      proposed_amount: "2625.00",
+      proposed_status: "PREVIEW_ONLY",
+      adjustment_type: "EXISTING_PENDING_REPLACEMENT",
+      source_record_mutation: false,
+      metadata: {},
+    },
+  ],
 };
 
 const latestProductRecontractPreviewSummary = {
@@ -182,6 +198,7 @@ const latestProductRecontractPreviewSummary = {
   admin_approval_note: "",
   admin_approval_snapshot: {},
   source_record_mutation: false,
+  schedule_preview_lines: productRecontractEventFixture.schedule_preview_lines,
 };
 
 const approvedProductChangeWithSavedPreviewFixture = {
@@ -304,6 +321,10 @@ async function mockAmendments(page: Page, role: "customer" | "partner" | "admin"
         });
         return;
       }
+      if (/\/contract-amendments\/1\/product-recontract\/schedule-preview\/?$/.test(url.pathname)) {
+        await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(productRecontractEventFixture) });
+        return;
+      }
       if (/\/contract-amendments\/1\/product-recontract-preview\/?$/.test(url.pathname)) {
         await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(productRecontractPreviewFixture) });
         return;
@@ -327,6 +348,10 @@ async function mockAmendments(page: Page, role: "customer" | "partner" | "admin"
 
     if (/\/contract-amendments\/1\/product-recontract-events\/?$/.test(url.pathname)) {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(eventRows) });
+      return;
+    }
+    if (/\/contract-amendments\/1\/product-recontract\/schedule-preview\/?$/.test(url.pathname)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(productRecontractEventFixture.schedule_preview_lines) });
       return;
     }
 
@@ -481,6 +506,24 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByRole("button", { name: /Execute recontract|Apply product change|Update contract|Recalculate EMI now/i })).toHaveCount(0);
   });
 
+  test("admin can generate future EMI schedule preview lines after accepted and approved", async ({ page }) => {
+    const approvedAndAccepted = {
+      ...approvedProductChangeWithAcceptedPreviewFixture,
+      latest_product_recontract_preview: {
+        ...approvedProductChangeWithAcceptedPreviewFixture.latest_product_recontract_preview,
+        admin_approval_status: "APPROVED",
+      },
+    };
+    await mockAmendments(page, "admin", approvedAndAccepted);
+    await page.goto("/admin/contract-amendments/1");
+
+    await expect(page.getByText("This creates preview lines only. Actual EMI records are not changed.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Generate future EMI schedule preview" })).toBeVisible();
+    await page.getByRole("button", { name: "Generate future EMI schedule preview" }).click();
+    await expect(page.getByText("Future EMI schedule preview generated.")).toBeVisible();
+    await expect(page.getByText("Future EMI schedule preview lines")).toBeVisible();
+  });
+
   test("admin can click approve recontract preview for future execution", async ({ page }) => {
     await mockAmendments(page, "admin", approvedProductChangeWithAcceptedPreviewFixture);
     await page.goto("/admin/contract-amendments/1");
@@ -585,6 +628,7 @@ test.describe("customer and partner amendment implementation visibility", () => 
     await expect(page.getByText("25000.00")).toBeVisible();
     await expect(page.getByRole("button", { name: "Accept proposed recontract terms" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Reject proposed recontract terms" })).toBeVisible();
+    await expect(page.getByText("Future EMI schedule preview lines (read-only)")).toBeVisible();
     await expect(page.getByRole("button", { name: /Execute|Apply|Update contract|Recalculate/i })).toHaveCount(0);
   });
 
