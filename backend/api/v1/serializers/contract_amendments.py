@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from reconciliation.models import ReconciliationEvidence
 from subscriptions.models import (
     ContractAmendment,
     ContractRecontractEvent,
@@ -102,10 +103,13 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
             return summary
         serialized = ContractRecontractEventSerializer(event).data
         for key in (
+            "workflow_flags",
             "executed",
             "executed_at",
             "executed_by",
             "execution_status",
+            "execution_ready",
+            "execution_block_reason",
             "execution_snapshot",
             "accounting_bridge_posting_id",
             "journal_entry_id",
@@ -113,6 +117,8 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
             "reconciliation_run_id",
             "reconciliation_evidence_ids",
             "schedule_line_ids",
+            "old_monthly_amount",
+            "new_monthly_amount",
         ):
             summary[key] = serialized.get(key)
         return summary
@@ -208,15 +214,20 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
     new_product_name = serializers.CharField(source="new_product.name", read_only=True, allow_null=True)
     old_product_code = serializers.CharField(source="old_product.product_code", read_only=True, allow_null=True)
     new_product_code = serializers.CharField(source="new_product.product_code", read_only=True, allow_null=True)
+    old_monthly_amount = serializers.SerializerMethodField()
+    new_monthly_amount = serializers.SerializerMethodField()
     created_by_display = serializers.CharField(source="created_by.username", read_only=True, allow_null=True)
     customer_consented_by_display = serializers.CharField(source="customer_consented_by.username", read_only=True, allow_null=True)
     admin_approved_by_display = serializers.CharField(source="admin_approved_by.username", read_only=True, allow_null=True)
     schedule_preview_lines = serializers.SerializerMethodField()
     latest_financial_impact_preview = serializers.SerializerMethodField()
+    workflow_flags = serializers.SerializerMethodField()
     executed = serializers.SerializerMethodField()
     executed_at = serializers.SerializerMethodField()
     executed_by = serializers.SerializerMethodField()
     execution_status = serializers.SerializerMethodField()
+    execution_ready = serializers.SerializerMethodField()
+    execution_block_reason = serializers.SerializerMethodField()
     execution_snapshot = serializers.SerializerMethodField()
     accounting_bridge_posting_id = serializers.SerializerMethodField()
     journal_entry_id = serializers.SerializerMethodField()
@@ -227,6 +238,12 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
 
     def _execution_metadata(self, obj):
         return obj.metadata if isinstance(obj.metadata, dict) else {}
+
+    def get_old_monthly_amount(self, obj):
+        return str(obj.current_monthly_amount)
+
+    def get_new_monthly_amount(self, obj):
+        return str(obj.proposed_monthly_amount)
 
     def get_schedule_preview_lines(self, obj):
         lines = getattr(obj, "schedule_preview_lines", None)
@@ -252,6 +269,82 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
 
     def get_execution_status(self, obj):
         return self._execution_metadata(obj).get("execution_status") or "NOT_EXECUTED"
+
+    def get_accounting_bridge_posting_id(self, obj):
+        metadata = self._execution_metadata(obj)
+        return metadata.get("accounting_bridge_posting_id") or metadata.get("accounting_posting_bridge_id")
+
+    def get_journal_entry_id(self, obj):
+        metadata = self._execution_metadata(obj)
+        return metadata.get("journal_entry_id") or metadata.get("accounting_posting_journal_entry_id")
+
+    def get_reconciliation_item_id(self, obj):
+        metadata = self._execution_metadata(obj)
+        return metadata.get("reconciliation_item_id") or metadata.get("reconciliation_record_id")
+
+    def get_reconciliation_run_id(self, obj):
+        return self._execution_metadata(obj).get("reconciliation_run_id")
+
+    def get_reconciliation_evidence_ids(self, obj):
+        metadata = self._execution_metadata(obj)
+        ids = metadata.get("reconciliation_evidence_ids") or []
+        if ids:
+            return ids
+        item_id = self.get_reconciliation_item_id(obj)
+        if not item_id:
+            return []
+        return list(ReconciliationEvidence.objects.filter(item_id=item_id).order_by("id").values_list("id", flat=True))
+
+    def get_schedule_line_ids(self, obj):
+        metadata = self._execution_metadata(obj)
+        ids = metadata.get("schedule_line_ids") or []
+        if ids:
+            return ids
+        lines = getattr(obj, "schedule_preview_lines", None)
+        if lines is None:
+            return []
+        return list(lines.all().order_by("line_no", "id").values_list("id", flat=True))
+
+    def get_workflow_flags(self, obj):
+        accounting_posted = bool(self.get_accounting_bridge_posting_id(obj) and self.get_journal_entry_id(obj))
+        reconciliation_linked = bool(
+            self.get_reconciliation_item_id(obj)
+            and self.get_reconciliation_run_id(obj)
+            and self.get_reconciliation_evidence_ids(obj)
+        )
+        return {
+            "previewed": obj.status == ContractRecontractEvent.Status.PREVIEWED,
+            "customer_consented": obj.customer_consent_status == ContractRecontractEvent.CustomerConsentStatus.ACCEPTED,
+            "admin_approved": obj.admin_approval_status == ContractRecontractEvent.AdminApprovalStatus.APPROVED,
+            "schedule_preview_generated": bool(self.get_schedule_line_ids(obj)),
+            "financial_impact_previewed": self.get_latest_financial_impact_preview(obj) is not None,
+            "accounting_posted": accounting_posted,
+            "reconciliation_linked": reconciliation_linked,
+            "executed": self.get_executed(obj),
+        }
+
+    def get_execution_ready(self, obj):
+        return self.get_execution_block_reason(obj) == ""
+
+    def get_execution_block_reason(self, obj):
+        flags = self.get_workflow_flags(obj)
+        if flags["executed"]:
+            return "Product recontract has already been executed."
+        if obj.status != ContractRecontractEvent.Status.PREVIEWED:
+            return "Latest recontract event must be PREVIEWED."
+        if not flags["customer_consented"]:
+            return "Customer consent must be ACCEPTED."
+        if not flags["admin_approved"]:
+            return "Admin approval must be APPROVED."
+        if not flags["schedule_preview_generated"]:
+            return "Schedule preview lines must exist."
+        if not flags["financial_impact_previewed"]:
+            return "Financial impact preview must exist."
+        if not flags["accounting_posted"]:
+            return "Accounting bridge posting and posted journal references must exist."
+        if not flags["reconciliation_linked"]:
+            return "Reconciliation item, run, and evidence references must exist."
+        return ""
 
     def get_execution_snapshot(self, obj):
         metadata = self._execution_metadata(obj)
@@ -285,24 +378,6 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
             },
         }
 
-    def get_accounting_bridge_posting_id(self, obj):
-        return self._execution_metadata(obj).get("accounting_bridge_posting_id")
-
-    def get_journal_entry_id(self, obj):
-        return self._execution_metadata(obj).get("journal_entry_id")
-
-    def get_reconciliation_item_id(self, obj):
-        return self._execution_metadata(obj).get("reconciliation_item_id")
-
-    def get_reconciliation_run_id(self, obj):
-        return self._execution_metadata(obj).get("reconciliation_run_id")
-
-    def get_reconciliation_evidence_ids(self, obj):
-        return self._execution_metadata(obj).get("reconciliation_evidence_ids") or []
-
-    def get_schedule_line_ids(self, obj):
-        return self._execution_metadata(obj).get("schedule_line_ids") or []
-
     class Meta:
         model = ContractRecontractEvent
         fields = [
@@ -318,6 +393,8 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
             "new_product_code",
             "old_contract_total",
             "new_contract_total",
+            "old_monthly_amount",
+            "new_monthly_amount",
             "price_difference",
             "amount_already_paid",
             "old_remaining_balance",
@@ -349,10 +426,13 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
             "admin_approval_snapshot",
             "schedule_preview_lines",
             "latest_financial_impact_preview",
+            "workflow_flags",
             "executed",
             "executed_at",
             "executed_by",
             "execution_status",
+            "execution_ready",
+            "execution_block_reason",
             "execution_snapshot",
             "accounting_bridge_posting_id",
             "journal_entry_id",
