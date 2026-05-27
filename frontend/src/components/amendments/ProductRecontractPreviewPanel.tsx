@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import ActionButton from "@/components/ui/ActionButton";
 import { DetailPanel } from "@/components/ui/operations";
 import {
+  executeProductRecontract,
   generateProductRecontractFinancialImpactPreview,
   getProductRecontractFinancialImpactPreview,
   generateProductRecontractSchedulePreview,
@@ -19,6 +20,10 @@ import {
 } from "@/services/amendmentPreviews";
 import type { AmendmentRecord } from "@/services/amendments";
 
+const EXECUTION_CONFIRMATION = "EXECUTE RECONTRACT";
+const EXECUTION_WARNING =
+  "This will update the subscription product, contract amount, monthly EMI, tenure, and pending EMI schedule. Historical payments, receipts, paid EMIs, accounting postings, reconciliation evidence, settlement/day-close, lucky ID, batch, waiver/draw, stock, delivery, commission, payout, rent/lease demand, and deposit records will remain unchanged.";
+
 function valueOrDash(value?: string | number | null) {
   return value === undefined || value === null || value === "" ? "—" : String(value);
 }
@@ -29,6 +34,142 @@ function MoneyRow({ label, value }: { label: string; value?: string | number | n
       <div className="text-xs font-semibold uppercase text-muted-foreground">{label}</div>
       <div className="mt-1 text-sm font-medium">{valueOrDash(value)}</div>
     </div>
+  );
+}
+
+function ChecklistRow({ label, complete }: { label: string; complete: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-3 text-sm">
+      <span>{label}</span>
+      <span className={complete ? "font-semibold text-emerald-700 dark:text-emerald-300" : "font-semibold text-amber-700 dark:text-amber-300"}>
+        {complete ? "Ready" : "Missing"}
+      </span>
+    </div>
+  );
+}
+
+function hasExecutionEvidence(event: ContractRecontractEvent | undefined, financialPreview: ContractRecontractFinancialImpactPreview | null) {
+  if (!event) return false;
+  return (
+    event.customer_consent_status === "ACCEPTED" &&
+    event.admin_approval_status === "APPROVED" &&
+    (event.schedule_preview_lines || []).length > 0 &&
+    Boolean(financialPreview) &&
+    Boolean(event.accounting_bridge_posting_id) &&
+    Boolean(event.journal_entry_id) &&
+    Boolean(event.reconciliation_item_id) &&
+    Boolean(event.reconciliation_run_id) &&
+    (event.reconciliation_evidence_ids || []).length > 0 &&
+    (event.schedule_line_ids || []).length > 0 &&
+    !event.executed
+  );
+}
+
+function ExecutionSummary({ event }: { event: ContractRecontractEvent }) {
+  const before = event.execution_snapshot?.before_subscription || {};
+  const after = event.execution_snapshot?.after_subscription || {};
+  return (
+    <div className="space-y-3 rounded-2xl border border-emerald-300 bg-emerald-50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/30">
+      <div className="font-semibold text-emerald-900 dark:text-emerald-100">Execution status: {event.execution_status || "EXECUTED"}</div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <MoneyRow label="Executed at" value={event.executed_at} />
+        <MoneyRow label="Executed by" value={event.executed_by} />
+        <MoneyRow label="Old product" value={event.old_product_name || (before.product_id ? `#${before.product_id}` : "—")} />
+        <MoneyRow label="New product" value={event.new_product_name || (after.product_id ? `#${after.product_id}` : "—")} />
+        <MoneyRow label="Old total" value={typeof before.total_amount === "string" ? before.total_amount : event.old_contract_total} />
+        <MoneyRow label="New total" value={typeof after.total_amount === "string" ? after.total_amount : event.new_contract_total} />
+        <MoneyRow label="Old monthly EMI" value={typeof before.monthly_amount === "string" ? before.monthly_amount : event.current_monthly_amount} />
+        <MoneyRow label="New monthly EMI" value={typeof after.monthly_amount === "string" ? after.monthly_amount : event.proposed_monthly_amount} />
+        <MoneyRow label="Schedule line ids" value={(event.schedule_line_ids || []).join(", ")} />
+        <MoneyRow label="Accounting bridge id" value={event.accounting_bridge_posting_id} />
+        <MoneyRow label="Journal entry id" value={event.journal_entry_id} />
+        <MoneyRow label="Reconciliation item id" value={event.reconciliation_item_id} />
+        <MoneyRow label="Reconciliation run id" value={event.reconciliation_run_id} />
+      </div>
+      <p className="text-muted-foreground">No rollback or reversal action is available in this phase.</p>
+    </div>
+  );
+}
+
+function ExecutionPanel({
+  event,
+  financialPreview,
+  onExecuted,
+}: {
+  event: ContractRecontractEvent | undefined;
+  financialPreview: ContractRecontractFinancialImpactPreview | null;
+  onExecuted: (event: ContractRecontractEvent) => void;
+}) {
+  const [confirmation, setConfirmation] = useState("");
+  const [executing, setExecuting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!event) return null;
+
+  const checklist = [
+    { label: "Customer consent accepted", complete: event.customer_consent_status === "ACCEPTED" },
+    { label: "Admin approval approved", complete: event.admin_approval_status === "APPROVED" },
+    { label: "Schedule preview generated", complete: (event.schedule_preview_lines || []).length > 0 && (event.schedule_line_ids || []).length > 0 },
+    { label: "Accounting posting exists", complete: Boolean(event.accounting_bridge_posting_id) && Boolean(event.journal_entry_id) },
+    { label: "Reconciliation bridge exists", complete: Boolean(event.reconciliation_item_id) && Boolean(event.reconciliation_run_id) && (event.reconciliation_evidence_ids || []).length > 0 },
+    { label: "No previous execution", complete: !event.executed },
+  ];
+  const ready = hasExecutionEvidence(event, financialPreview);
+
+  if (event.executed) {
+    return (
+      <DetailPanel title="Product recontract execution" description="Read-only execution evidence returned by backend.">
+        <ExecutionSummary event={event} />
+      </DetailPanel>
+    );
+  }
+
+  if (!ready) return null;
+
+  async function runExecution() {
+    setExecuting(true);
+    setError(null);
+    try {
+      const executedEvent = await executeProductRecontract(event.amendment_id);
+      onExecuted(executedEvent);
+      setConfirmation("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Product recontract execution failed.");
+    } finally {
+      setExecuting(false);
+    }
+  }
+
+  return (
+    <DetailPanel title="Product recontract execution" description="Admin-only final execution after all backend evidence exists.">
+      <div className="space-y-4">
+        <p className="rounded-2xl border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100">
+          {EXECUTION_WARNING}
+        </p>
+        <div className="grid gap-2 md:grid-cols-2">
+          {checklist.map((item) => (
+            <ChecklistRow key={item.label} label={item.label} complete={item.complete} />
+          ))}
+        </div>
+        <label className="block text-sm font-medium">
+          Type {EXECUTION_CONFIRMATION} to enable execution
+          <input
+            className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm"
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            placeholder={EXECUTION_CONFIRMATION}
+          />
+        </label>
+        <ActionButton
+          variant="outline"
+          onClick={() => void runExecution()}
+          disabled={executing || confirmation !== EXECUTION_CONFIRMATION}
+        >
+          {executing ? "Executing..." : "Execute approved recontract"}
+        </ActionButton>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      </div>
+    </DetailPanel>
   );
 }
 
@@ -81,13 +222,15 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
   const canGenerateSchedulePreview =
     latestEvent?.status === "PREVIEWED" &&
     latestEvent.customer_consent_status === "ACCEPTED" &&
-    latestEvent.admin_approval_status === "APPROVED";
+    latestEvent.admin_approval_status === "APPROVED" &&
+    !latestEvent.executed;
   const hasSchedulePreviewLines = Boolean((latestEvent?.schedule_preview_lines || scheduleLines || []).length > 0);
   const canGenerateFinancialImpactPreview =
     latestEvent?.status === "PREVIEWED" &&
     latestEvent.customer_consent_status === "ACCEPTED" &&
     latestEvent.admin_approval_status === "APPROVED" &&
-    hasSchedulePreviewLines;
+    hasSchedulePreviewLines &&
+    !latestEvent.executed;
   const latestFinancialImpactPreview = financialPreviews[0] || latestEvent?.latest_financial_impact_preview || null;
 
   async function runPreview() {
@@ -175,10 +318,15 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
     }
   }
 
+  function handleExecuted(event: ContractRecontractEvent) {
+    setEvents((current) => [event, ...current.filter((row) => row.id !== event.id)]);
+    setSaveMessage("Product recontract executed.");
+  }
+
   return (
     <DetailPanel
       title="Product recontract preview"
-      description="Backend-calculated preview only. This does not execute product change or financial recalculation."
+      description="Backend-calculated preview and controlled admin execution workflow."
     >
       <div className="space-y-4">
         <p className="text-sm text-amber-800 dark:text-amber-200">
@@ -186,10 +334,10 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
         </p>
         <p className="text-sm text-amber-800 dark:text-amber-200">This creates preview lines only. Actual EMI records are not changed.</p>
         <div className="flex flex-wrap gap-3">
-          <ActionButton variant="outline" onClick={() => void runPreview()} disabled={busy || saving}>
+          <ActionButton variant="outline" onClick={() => void runPreview()} disabled={busy || saving || Boolean(latestEvent?.executed)}>
             {busy ? "Previewing..." : "Preview financial product change"}
           </ActionButton>
-          <ActionButton variant="outline" onClick={() => void saveSnapshot()} disabled={busy || saving}>
+          <ActionButton variant="outline" onClick={() => void saveSnapshot()} disabled={busy || saving || Boolean(latestEvent?.executed)}>
             {saving ? "Saving..." : "Save preview snapshot"}
           </ActionButton>
           {canGenerateSchedulePreview ? (
@@ -357,6 +505,7 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
             ) : null}
           </div>
         ) : null}
+        <ExecutionPanel event={latestEvent} financialPreview={latestFinancialImpactPreview} onExecuted={handleExecuted} />
       </div>
     </DetailPanel>
   );
