@@ -137,12 +137,13 @@ function ExecutionPanel({
   }
 
   if (!ready) return null;
+  const eventForExecution = event;
 
   async function runExecution() {
     setExecuting(true);
     setError(null);
     try {
-      const executedEvent = await executeProductRecontract(event.amendment_id);
+      const executedEvent = await executeProductRecontract(eventForExecution.amendment_id);
       onExecuted(executedEvent);
       setConfirmation("");
     } catch (err) {

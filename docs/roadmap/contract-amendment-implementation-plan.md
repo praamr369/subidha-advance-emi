@@ -230,17 +230,39 @@ Implemented behavior:
 
 No new backend mutation logic was added. No rollback or reversal behavior was added.
 
+### Phase 6G — Printable recontract addendum and ledger statement
+
+Status: **Implemented**
+
+Implemented behavior:
+
+- admin print route `/admin/contract-amendments/{id}/recontract-addendum/print`
+- customer read-only print route `/customer/contract-amendments/{id}/recontract-addendum/print`
+- route builders `buildAdminProductRecontractAddendumPrintRoute(id)` and `buildCustomerProductRecontractAddendumPrintRoute(id)`
+- admin/customer amendment detail links shown only when latest product recontract evidence has `executed=true`
+- branded Product Recontract Addendum using Business Setup print branding fallback behavior
+- old/new product, total, EMI, tenure, paid amount, remaining balance, and effective date display
+- pending EMI schedule impact from approved schedule preview lines
+- accounting bridge/journal reference display with the statement that accounting evidence was created before execution
+- reconciliation run/item/evidence display with the statement that reconciliation evidence was linked before execution
+- customer-facing ledger statement showing previous contract total, payments already received, preserved paid amount, new contract total, new remaining balance, and future EMI payable
+- protection statements confirming historical payments, receipts, paid EMI rows, lucky ID, batch, waiver/draw, settlement/day-close, stock/delivery, commission/payout, and rent/lease demand/deposit records remain unchanged
+- signature blocks and audit footer
+
+Phase 6G is printable addendum only. It reuses executed recontract evidence and existing amendment detail read payloads. No source records mutate. No backend mutation behavior, execution logic, rollback, or reversal was added.
+
+Historical payments and receipts remain unchanged. The ledger statement explicitly does not create payment, receipt, refund, or settlement.
+
 ## Deferred phases
 
-### Phase 6G — Printable recontract addendum and ledger statement
+### Phase 6H — Admin recontract evidence export
 
 Status: **Deferred**
 
 Recommended scope:
 
-- printable recontract addendum showing old terms, new terms, consent, approval, accounting reference, reconciliation reference, and execution timestamp
-- customer ledger/account statement view for recontract adjustments
 - admin audit export surface for recontract evidence
+- export filters by execution date, product, batch, customer, accounting evidence, and reconciliation evidence
 
 ### Future controlled reversal workflow
 

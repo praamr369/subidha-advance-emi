@@ -47,6 +47,7 @@ Implemented chain:
 8. Phase 6F.4 — backend execution after evidence verification.
 9. Phase 6F.5 — admin typed execution UI.
 10. Phase 6F.6 — RC hardening, executed-state visibility, read-only reporting, and post-execution blockers.
+11. Phase 6G — printable recontract addendum and customer-facing ledger statement.
 
 ## Product recontract endpoints
 
@@ -136,6 +137,15 @@ Subscription lifecycle pages must not expose apply/execute actions. They may lin
 
 Current subscription/contract print views should use current executed subscription truth. Historical pre-recontract values remain in recontract event metadata.
 
-Printable recontract addendum remains future Phase 6G.
+Phase 6G adds printable recontract addendum routes:
+
+```text
+/admin/contract-amendments/{id}/recontract-addendum/print
+/customer/contract-amendments/{id}/recontract-addendum/print
+```
+
+The addendum is visible only after executed recontract evidence exists. It uses the existing admin/customer amendment detail payload and prints old/new product terms, old/new totals, old/new EMI, preserved paid amount, new remaining balance, pending EMI schedule impact, accounting evidence, reconciliation evidence, protection statements, signatures, and audit footer.
+
+Phase 6G is printable addendum only. It does not mutate source records. Historical payments and receipts remain unchanged. Reversal/rollback remains a future controlled workflow and is not exposed.
 
 Rollback/reversal remains a future controlled workflow and is not exposed.

@@ -161,6 +161,14 @@ export function buildAdminSubscriptionContractPrintRoute(id: number | string): s
   return `${ROUTES.admin.subscriptions}/${id}/contract/print`;
 }
 
+export function buildAdminProductRecontractAddendumPrintRoute(id: number | string): string {
+  return `${ROUTES.admin.contractAmendments}/${id}/recontract-addendum/print`;
+}
+
+export function buildCustomerProductRecontractAddendumPrintRoute(id: number | string): string {
+  return `${ROUTES.customer.contractAmendments}/${id}/recontract-addendum/print`;
+}
+
 export function buildAdminRentLeaseContractPrintRoute(id: number | string): string {
   return `${ADMIN_RENT_LEASE_CONTRACTS_ROUTE}/${id}/contract/print`;
 }

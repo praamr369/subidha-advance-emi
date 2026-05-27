@@ -204,7 +204,7 @@ test.describe("customer executed product recontract visibility", () => {
 
     await expect(page.getByText("Product recontract executed")).toBeVisible();
     await expect(page.getByText("This recontract updated future contract terms after approval. Previous payments and receipts remain unchanged.")).toBeVisible();
-    await expect(page.getByText("EXECUTED")).toBeVisible();
+    await expect(page.getByText("EXECUTED", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Product recontract preview consent")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Execute approved recontract" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Apply product change|Update contract|Recalculate EMI now/i })).toHaveCount(0);

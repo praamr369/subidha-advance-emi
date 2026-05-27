@@ -10,6 +10,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
 import { DetailPanel } from "@/components/ui/operations";
+import { buildAdminProductRecontractAddendumPrintRoute } from "@/lib/route-builders";
 import {
   amendmentContractTypeLabel,
   amendmentTypeLabel,
@@ -70,6 +71,10 @@ function implementationLabel(row: AmendmentRecord, busy: string | null) {
   if (busy === "implement") return "Implementing...";
   if (row.amendment_type === "PRODUCT_CHANGE") return "Implement approved same-price product reference correction";
   return "Implement approved non-financial correction";
+}
+
+function hasExecutedProductRecontract(row: AmendmentRecord) {
+  return row.amendment_type === "PRODUCT_CHANGE" && row.latest_product_recontract_preview?.executed === true;
 }
 
 function ProductChangePreview({ row }: { row: AmendmentRecord }) {
@@ -225,6 +230,13 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
               <DetailPanel title="Request reason" description="Submitted reason."><p className="text-sm text-muted-foreground">{row.reason}</p></DetailPanel>
             </div>
             <ProductChangePreview row={row} />
+            {hasExecutedProductRecontract(row) ? (
+              <DetailPanel title="Recontract addendum" description="Printable read-only customer addendum generated from executed recontract evidence.">
+                <ActionButton href={buildAdminProductRecontractAddendumPrintRoute(row.id)} variant="outline">
+                  Recontract Addendum / Print
+                </ActionButton>
+              </DetailPanel>
+            ) : null}
             <ProductRecontractPreviewPanel amendment={row} />
             <ProductRecontractConsentStatusPanel row={row} />
             <div className="grid gap-4 lg:grid-cols-3">

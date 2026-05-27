@@ -148,6 +148,7 @@ Document-specific terms are selected by route:
 | Ledger Account Statement | `/admin/accounting/ledger/[accountId]/statement/print` | `GET /accounting/reports/general-ledger/?account_id=:accountId&start_date=&end_date=` | Accounting Books finance-account card action `Ledger Statement PDF / Print` using linked chart account id | `buildAdminLedgerStatementPrintRoute(accountId, params)` |
 | Finance Account Statement | `/admin/finance/accounts/[id]/statement/print` | `GET /accounting/finance-accounts/:id/` and `GET /accounting/reports/cashbook/?finance_account_id=:id&start_date=&end_date=` | Accounting Books finance-account card action `Finance Account Statement PDF / Print` | `buildAdminFinanceAccountStatementPrintRoute(id, params)` |
 | Customer Account Statement | `/admin/customers/[id]/statement/print` | `GET /admin/customers/:id/`, `GET /admin/subscriptions/?customer=:id`, `GET /admin/payments/?customer=:id` | Customer detail `Customer Account Statement PDF / Print` | `buildAdminCustomerAccountStatementPrintRoute(id, params)` |
+| Product Recontract Addendum | `/admin/contract-amendments/[id]/recontract-addendum/print` and `/customer/contract-amendments/[id]/recontract-addendum/print` | `GET /admin/contract-amendments/:id/` or `GET /customer/contract-amendments/:id/` | Amendment detail `Recontract Addendum / Print` only when latest recontract evidence is executed | `buildAdminProductRecontractAddendumPrintRoute(id)`, `buildCustomerProductRecontractAddendumPrintRoute(id)` |
 
 ## Accounting Phase 4A evidence-document rules
 
@@ -224,6 +225,16 @@ The print page does **not** calculate opening balance, closing balance, running 
 
 `/admin/customers/:id/statement/print` is a read-only customer account summary/evidence document. It uses existing customer, subscriptions, and payments read APIs only. It does **not** calculate running balance or total outstanding until a backend customer statement ledger exists. Direct-sale and rent/lease totals are deferred and must not be inferred in this print view. Full route notes are recorded in `docs/frontend/customer-account-statement-print.md`.
 
+## Phase 6G product recontract addendum
+
+`/admin/contract-amendments/:id/recontract-addendum/print` and `/customer/contract-amendments/:id/recontract-addendum/print` are printable evidence documents for executed product recontract amendments only.
+
+The addendum uses the existing amendment detail payload and `latest_product_recontract_preview` execution evidence. It shows business print branding, amendment/subscription/customer references, customer consent timestamp, admin approval timestamp, execution timestamp, old/new product and financial terms, pending EMI schedule preview line impact, accounting bridge/journal references, reconciliation run/item/evidence references, a customer-facing ledger statement, protection statements, signatures, and audit footer.
+
+Phase 6G is print/document only. It adds no backend mutation behavior, no execution logic, and no rollback/reversal behavior. It does not mutate subscription, EMI, payment, receipt, accounting, reconciliation, settlement, day-close, inventory, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records.
+
+Historical payments and receipts remain unchanged. The customer ledger section is display-only and explicitly does not create payment, receipt, refund, or settlement.
+
 ## Phase 3 financial/audit route QA results
 
 Audited Phase 3 routes:
@@ -271,6 +282,7 @@ frontend/tests/e2e/cashier_day_close_print_smoke.spec.ts
 frontend/tests/e2e/reconciliation_report_print_smoke.spec.ts
 frontend/tests/e2e/accounting_journal_ledger_print_smoke.spec.ts
 frontend/tests/e2e/customer_account_statement_print_smoke.spec.ts
+frontend/tests/e2e/contract_recontract_addendum_print.spec.ts
 ```
 
 These tests use mocked API responses and do not depend on live shop data. They verify business identity, document titles, references, key backend-provided figures, warnings/watermarks, signatures, audit footer, print toolbar screen behavior, toolbar hiding under print media, screen-only navigation hiding under print media, absence of dashboard chrome, and deterministic operational entry-point links.

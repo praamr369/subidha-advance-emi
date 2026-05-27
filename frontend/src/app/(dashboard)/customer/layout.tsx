@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 
-import DashboardShell from "@/components/layout/DashboardShell";
-import RoleGuard from "@/components/guards/RoleGuard";
+import CustomerShellRouter from "@/components/layout/CustomerShellRouter";
 
 export default function CustomerLayout({ children }: { children: ReactNode }) {
-  return <RoleGuard allowedRoles={["CUSTOMER"]}><DashboardShell>{children}</DashboardShell></RoleGuard>;
+  return <CustomerShellRouter>{children}</CustomerShellRouter>;
 }

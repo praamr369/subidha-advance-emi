@@ -43,6 +43,7 @@ export type ProductRecontractPreviewSummary = ContractRecontractExecutionFields 
   price_difference?: string;
   amount_already_paid?: string;
   old_remaining_balance?: string;
+  new_remaining_balance?: string;
   proposed_new_remaining_balance?: string;
   current_tenure_months?: number;
   preview_tenure_months?: number;

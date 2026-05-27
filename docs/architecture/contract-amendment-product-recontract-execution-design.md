@@ -124,7 +124,19 @@ No rollback/reversal button or endpoint is exposed in this phase.
 
 Execution refreshes `Subscription.product_snapshot` and `Subscription.pricing_snapshot` to the current executed contract truth. Current contract print views should use current subscription fields/snapshots.
 
-Historical pre-recontract values remain in `ContractRecontractEvent.metadata.before_subscription`. A printable recontract addendum is future Phase 6G.
+Historical pre-recontract values remain in `ContractRecontractEvent.metadata.before_subscription`.
+
+Phase 6G adds a printable Product Recontract Addendum and customer-facing ledger statement for executed recontracts. The print route uses existing executed recontract evidence from the amendment detail payload:
+
+- old/new product snapshots and contract terms
+- customer consent and admin approval timestamps
+- execution timestamp and actor reference
+- approved pending EMI schedule preview lines
+- accounting bridge and journal references
+- reconciliation run/item/evidence references
+- preservation/protection statements
+
+Phase 6G is document-only. It does not create, execute, reverse, rollback, settle, reconcile, post accounting, collect payment, issue receipts, move stock, alter delivery, alter waiver/draw, alter commission/payout, or mutate rent/lease demand or deposit records.
 
 ## 10. Preserved records
 
@@ -146,6 +158,6 @@ Execution does not mutate:
 
 ## 11. Future controlled workflows
 
-Printable recontract addendum remains future Phase 6G.
+Printable recontract addendum is implemented in Phase 6G as a read-only evidence document.
 
 Rollback/reversal remains a separate future controlled workflow requiring explicit accounting, reconciliation, audit, and admin approval design. It is not exposed in Phase 6F.6.

@@ -9,6 +9,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import ActionButton from "@/components/ui/ActionButton";
 import { DetailPanel } from "@/components/ui/operations";
+import { buildCustomerProductRecontractAddendumPrintRoute } from "@/lib/route-builders";
 import {
   amendmentContractTypeLabel,
   amendmentTypeLabel,
@@ -90,6 +91,10 @@ function ProductRecontractExecutedSummary({ preview }: { preview?: ProductRecont
       </div>
     </DetailPanel>
   );
+}
+
+function hasExecutedProductRecontract(row: AmendmentRecord) {
+  return row.amendment_type === "PRODUCT_CHANGE" && row.latest_product_recontract_preview?.executed === true;
 }
 
 function ProductRecontractCustomerConsentPanel({
@@ -322,6 +327,13 @@ export default function CustomerAmendmentDetail({ id }: { id: number }) {
                 </dl>
               </DetailPanel>
             </div>
+            {hasExecutedProductRecontract(row) ? (
+              <DetailPanel title="Recontract addendum" description="Printable read-only addendum generated from your executed recontract evidence.">
+                <ActionButton href={buildCustomerProductRecontractAddendumPrintRoute(row.id)} variant="outline">
+                  Recontract Addendum / Print
+                </ActionButton>
+              </DetailPanel>
+            ) : null}
             <ProductRecontractExecutedSummary preview={row.latest_product_recontract_preview} />
             <ProductRecontractCustomerConsentPanel preview={row.latest_product_recontract_preview} onConsent={recordConsent} />
             <DetailPanel title="Reason" description="Submitted reason.">
