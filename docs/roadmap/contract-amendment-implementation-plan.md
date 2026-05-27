@@ -1,10 +1,10 @@
 # Contract Amendment Implementation Plan
 
-Status: **Implemented through Phase 6F.3 on `update`; final product recontract source mutation remains blocked**
+Status: **Implemented through Phase 6F.4 backend execution on `update`; frontend execution UI remains deferred.**
 
 ## Principle
 
-Implement one controlled phase at a time. Do not move to final source mutation until accounting and reconciliation evidence are both durable, linked, and tested.
+Implement one controlled phase at a time. Final source mutation is allowed only after accounting and reconciliation evidence are both durable, linked, and verified in the execution transaction.
 
 ## Implemented phases
 
@@ -41,7 +41,7 @@ Implemented behavior:
 
 - Updates only `Subscription.product`.
 - Requires admin approval.
-- Blocks different-price target products from source mutation.
+- Blocks different-price target products from same-price source mutation.
 
 ### Product recontract preview
 
@@ -128,7 +128,7 @@ Implemented behavior:
 - uses existing `AccountingBridgePosting` / `JournalEntry` bridge
 - stores bridge and journal references on recontract event metadata
 - rejects duplicate accounting posting
-- keeps final source mutation blocked
+- creates prerequisite accounting evidence only
 
 No subscription, EMI, payment, receipt, finance account balance, settlement/day-close, inventory, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records are mutated.
 
@@ -147,27 +147,56 @@ Implemented behavior:
 - links recontract event, financial impact preview, accounting bridge posting, posted journal entry, expected amount, and posted amount
 - blocks on variance between expected and posted amount
 - rejects duplicate reconciliation bridge evidence
-- keeps final source mutation blocked
+- creates prerequisite reconciliation evidence only
 
 No subscription, EMI, payment, receipt, finance account balance, settlement/day-close, inventory, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records are mutated.
 
+### Phase 6F.4 — Final backend execution with evidence verification
+
+Status: **Implemented**
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/
+```
+
+Implemented behavior:
+
+- runs inside `transaction.atomic()`
+- locks amendment, event, subscription, schedule preview lines, pending EMIs, accounting evidence, and reconciliation item where practical
+- verifies posted accounting bridge amount equals expected financial impact amount
+- verifies reconciliation bridge evidence exists, is linked, is matched, and has zero variance
+- mutates only approved subscription and pending EMI fields from preview lines
+- records execution in `ContractRecontractEvent.metadata` because the existing status enum has no `EXECUTED`
+- emits `CONTRACT_RECONTRACT_EXECUTED` audit metadata through `CONTRACT_AMENDMENT_IMPLEMENTED`
+
+Mutated fields only:
+
+- `Subscription.product`
+- `Subscription.total_amount`
+- `Subscription.monthly_amount`
+- `Subscription.tenure_months`
+- pending `Emi.amount`
+- pending `Emi.due_date`
+- `ContractRecontractEvent.metadata`
+
+Preserved records:
+
+- historical payments
+- receipts
+- paid/waived/cancelled EMI rows
+- accounting postings and journals
+- reconciliation evidence
+- settlement/day-close records
+- finance account balances
+- lucky ID and batch
+- waiver/lucky draw records
+- inventory/stock and delivery records
+- commission/payout records
+- rent/lease demand and deposit records
+
 ## Deferred phases
 
-### Phase 6F.4 — Final product recontract source mutation with evidence verification
-
-Status: **Deferred**
-
-Only after Phase 6F.2 and Phase 6F.3 evidence exists and tests pass:
-
-- run inside one transaction
-- lock amendment, event, subscription, financial preview, schedule preview lines, accounting evidence, reconciliation evidence, and pending EMIs
-- verify posted accounting bridge amount equals expected amount
-- verify reconciliation bridge evidence exists and is linked
-- mutate only approved subscription and pending EMI fields from preview lines
-- preserve all historical payments, receipts, paid EMIs, waivers, draw evidence, settlement/day-close records, inventory records, delivery records, commission/payout records, rent/lease demand records, and deposit records
-- mark immutable completion snapshot
-
-### Phase 6F.5 — RC hardening
+### Phase 6F.5 — RC hardening and UI readiness
 
 Status: **Deferred**
 
@@ -180,8 +209,8 @@ Required before production rollout:
 - customer ledger/account-statement tests
 - printable addendum tests
 - audit export checks
-- frontend read-only evidence display tests
+- frontend typed-confirmation execution UI, if approved
 
 ## Frontend rule
 
-Admin may show accounting and reconciliation evidence read-only. Do not add final source-mutation controls until Phase 6F.4 is implemented and backend readiness is explicit.
+No broad frontend execution button is added in Phase 6F.4. Admin may show accounting/reconciliation/execution evidence read-only. Any future execution UI must show all gates and require typed confirmation.
