@@ -190,3 +190,10 @@ export async function recordProductRecontractAdminDecision(
     body: { decision, note },
   });
 }
+
+export async function executeProductRecontract(amendmentId: number): Promise<ContractRecontractEvent> {
+  return apiFetch<ContractRecontractEvent>(`/admin/contract-amendments/${amendmentId}/product-recontract/execute/`, {
+    method: "POST",
+    body: {},
+  });
+}
