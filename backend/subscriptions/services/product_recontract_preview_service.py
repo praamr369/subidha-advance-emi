@@ -27,6 +27,7 @@ from subscriptions.models import (
 )
 from subscriptions.services.audit_service import log_audit
 _PREVIEW_ALLOWED_STATUSES = {"REQUESTED", "UNDER_REVIEW", "APPROVED"}
+_RECONTRACT_AMENDMENT_TYPES = {"PRODUCT_CHANGE", "PRODUCT_UPGRADE"}
 _EXECUTION_BLOCKED_MESSAGE = (
     "Product recontract execution requires accounting and reconciliation posting integration and is not enabled yet."
 )
@@ -38,6 +39,10 @@ _PREVIEW_WARNINGS = [
     "Accounting and reconciliation are not posted by this preview.",
     "Final execution requires a later approved financial implementation phase.",
 ]
+
+
+def is_product_recontract_amendment(amendment: ContractAmendment) -> bool:
+    return amendment.amendment_type in _RECONTRACT_AMENDMENT_TYPES
 
 
 def _q2(value: Decimal | int | str | None) -> Decimal:
@@ -342,8 +347,8 @@ def _preview_tenure(values: dict, current_tenure: int, explicit_tenure_months: i
 
 
 def preview_product_recontract(*, amendment: ContractAmendment, preview_tenure_months: int | None = None, effective_date=None) -> dict:
-    if amendment.amendment_type != "PRODUCT_CHANGE":
-        raise ValidationError({"detail": "Product recontract preview is supported only for PRODUCT_CHANGE amendments."})
+    if not is_product_recontract_amendment(amendment):
+        raise ValidationError({"detail": "Product recontract preview is supported only for product change/upgrade amendments."})
     if amendment.status not in _PREVIEW_ALLOWED_STATUSES:
         raise ValidationError({"detail": "Product recontract preview requires REQUESTED, UNDER_REVIEW, or APPROVED status."})
     if _event_is_executed(_latest_event(amendment)):
