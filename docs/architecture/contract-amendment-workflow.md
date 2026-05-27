@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin decision recording, Phase 6D schedule preview-line persistence, and Phase 6E financial impact preview evidence are implemented on `update`. Phase 6F exposes a guarded admin endpoint but returns a controlled 400 until real accounting and reconciliation posting integration exists.
+Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin decision recording, Phase 6D schedule preview-line persistence, Phase 6E financial impact preview evidence, and Phase 6F.2 accounting posting evidence are implemented on `update`. Recontract execution remains blocked until durable reconciliation integration and final source-mutation orchestration are implemented.
 
 ## Scope
 
@@ -51,7 +51,7 @@ DOWNGRADE_CREDIT_REQUIRED
 SAME_PRICE_REFERENCE_CORRECTION
 ```
 
-The preview does not mutate source records. Accounting and reconciliation posting are future work.
+The preview does not mutate source records.
 
 ## Phase 6A — Product recontract preview snapshot persistence
 
@@ -118,6 +118,20 @@ GET  /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-
 
 This creates additive evidence (`ContractRecontractFinancialImpactPreview`) only. No journal posting occurs. No finance account balances are mutated. No reconciliation items or settlements are created. Execution remains future work.
 
+## Phase 6F.2 — Durable accounting posting evidence only
+
+Admin can create durable accounting posting evidence for a financially approved product recontract adjustment:
+
+```text
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/accounting-posting/
+```
+
+This posts a real `JournalEntry` through the accounting bridge and links it with `AccountingBridgePosting` using purpose `CONTRACT_RECONTRACT_ACCOUNTING_ADJUSTMENT`. It is accounting evidence only. It does not execute the product change, mutate `Subscription.product`, change contract total/monthly EMI/tenure, rewrite EMI rows, create payments, create receipts, create settlement allocations, create reconciliation items, or touch inventory, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
+
+The endpoint is admin-only. Customer, partner, cashier, and vendor roles cannot call it. A second posting call for the same recontract event is rejected to avoid duplicate journals.
+
+Reconciliation integration remains Phase 6F.3. Final recontract execution remains blocked.
+
 ## Phase 6F — Product recontract execution endpoint blocked
 
 Admin endpoint:
@@ -145,7 +159,7 @@ No source mutation occurs. It does not change `Subscription.product`, `Subscript
 
 ## Product recontract execution design
 
-Current system supports preview, customer consent, admin decision evidence, schedule preview evidence, financial impact preview evidence, and a blocked execution endpoint for financial product change. Real execution is intentionally deferred until product recontract accounting posting and reconciliation posting/queue integration are implemented.
+Current system supports preview, customer consent, admin decision evidence, schedule preview evidence, financial impact preview evidence, durable accounting posting evidence, and a blocked execution endpoint for financial product change. Real execution is intentionally deferred until reconciliation posting/queue integration and final source mutation orchestration are implemented.
 
 The future execution design is documented in:
 
@@ -171,7 +185,8 @@ POST /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
 GET  /api/v1/admin/contract-amendments/{id}/product-recontract/schedule-preview/
 POST /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
 GET  /api/v1/admin/contract-amendments/{id}/product-recontract/financial-impact-preview/
-POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/   # blocked until accounting/reconciliation posting integration
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/accounting-posting/   # accounting evidence only
+POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/              # blocked until reconciliation/final execution integration
 GET  /api/v1/admin/contract-amendments/{id}/product-recontract-events/
 ```
 
@@ -191,6 +206,6 @@ POST /api/v1/admin/contracts/amendments/{id}/apply/
 
 ## Deferred phases
 
-True product recontract execution requires later phases covering price difference execution rules, paid amount allocation, receipt/payment treatment, durable accounting entries, durable reconciliation evidence or queue items, printable addendum, and audit trail. The current execute endpoint is blocked to prevent contract/EMI mutation without accounting and reconciliation truth.
+True product recontract execution requires later phases covering reconciliation lifecycle evidence or queue items, printable addendum, final subscription/pending-EMI mutation, and audit trail. The current execute endpoint is blocked to prevent contract/EMI mutation without complete accounting and reconciliation truth.
 
 Phase 5 lucky ID / batch work must wait until financial product-change semantics are settled.
