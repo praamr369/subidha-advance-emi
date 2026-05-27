@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Implemented through Phase 6F.4 backend execution on `update`; frontend execution UI remains deferred.**
+Status: **Implemented through Phase 6F.4 backend execution hardening on `update`; frontend execution UI remains deferred.**
 
 ## Principle
 
@@ -153,7 +153,7 @@ No subscription, EMI, payment, receipt, finance account balance, settlement/day-
 
 ### Phase 6F.4 — Final backend execution with evidence verification
 
-Status: **Implemented**
+Status: **Implemented and hardened**
 
 ```text
 POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/
@@ -164,9 +164,12 @@ Implemented behavior:
 - runs inside `transaction.atomic()`
 - locks amendment, event, subscription, schedule preview lines, pending EMIs, accounting evidence, and reconciliation item where practical
 - verifies posted accounting bridge amount equals expected financial impact amount
-- verifies reconciliation bridge evidence exists, is linked, is matched, and has zero variance
+- verifies reconciliation bridge evidence exists, is linked, is matched, complete, and has zero variance
 - mutates only approved subscription and pending EMI fields from preview lines
+- refreshes `Subscription.product_snapshot` and `Subscription.pricing_snapshot` to the executed authoritative state
+- preserves prior product/pricing snapshots inside `ContractRecontractEvent.metadata.before_subscription`
 - records execution in `ContractRecontractEvent.metadata` because the existing status enum has no `EXECUTED`
+- exposes explicit serializer fields for execution state and evidence references
 - emits `CONTRACT_RECONTRACT_EXECUTED` audit metadata through `CONTRACT_AMENDMENT_IMPLEMENTED`
 
 Mutated fields only:
@@ -175,6 +178,8 @@ Mutated fields only:
 - `Subscription.total_amount`
 - `Subscription.monthly_amount`
 - `Subscription.tenure_months`
+- `Subscription.product_snapshot`
+- `Subscription.pricing_snapshot`
 - pending `Emi.amount`
 - pending `Emi.due_date`
 - `ContractRecontractEvent.metadata`
@@ -202,9 +207,9 @@ Status: **Deferred**
 
 Required before production rollout:
 
-- failure injection tests
+- failure injection tests beyond current stale-evidence and atomic rollback tests
 - period/posting-lock tests
-- duplicate/idempotency tests
+- duplicate/idempotency tests under concurrency
 - operational conflict tests
 - customer ledger/account-statement tests
 - printable addendum tests
@@ -213,4 +218,4 @@ Required before production rollout:
 
 ## Frontend rule
 
-No broad frontend execution button is added in Phase 6F.4. Admin may show accounting/reconciliation/execution evidence read-only. Any future execution UI must show all gates and require typed confirmation.
+No frontend execution button is added in Phase 6F.4 hardening. Admin may show accounting/reconciliation/execution evidence read-only. Any future execution UI must show all gates and require typed confirmation.
