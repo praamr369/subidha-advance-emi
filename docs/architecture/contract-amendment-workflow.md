@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin decision recording, Phase 6D schedule preview-line persistence, Phase 6E financial impact preview evidence, Phase 6F.2 accounting posting evidence, and Phase 6F.3 reconciliation bridge evidence are implemented on `update`. Final recontract execution remains blocked.
+Status: Phase 1 request/review, Phase 2 UI, Phase 3 customer corrections, Phase 4 same-price product reference correction, product recontract preview, Phase 6A preview snapshot persistence, Phase 6B customer consent, Phase 6C admin decision recording, Phase 6D schedule preview-line persistence, Phase 6E financial impact preview evidence, Phase 6F.2 accounting posting evidence, Phase 6F.3 reconciliation bridge evidence, and Phase 6F.4 backend execution are implemented on `update`.
 
 ## Scope
 
@@ -31,7 +31,7 @@ The existing `PRODUCT_CHANGE` enum remains for compatibility, but current implem
 
 It can update only `Subscription.product` when the target product base price equals the locked contract total. It does not recalculate price, EMI, tenure, payment, receipt, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
 
-Different-price target products are blocked from implementation with a financial recontract message.
+Different-price target products are handled by the product recontract workflow.
 
 ## Product recontract preview
 
@@ -100,7 +100,7 @@ This creates additive evidence (`ContractRecontractFinancialImpactPreview`) only
 POST /api/v1/admin/contract-amendments/{id}/product-recontract/accounting-posting/
 ```
 
-This posts a real `JournalEntry` through the accounting bridge and links it with `AccountingBridgePosting` using purpose `CONTRACT_RECONTRACT_ACCOUNTING_ADJUSTMENT`. It is accounting evidence only. It does not execute the product change, mutate subscription terms, rewrite EMI rows, create payments, create receipts, create settlement allocations, or touch inventory, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
+This posts a real `JournalEntry` through the accounting bridge and links it with `AccountingBridgePosting` using purpose `CONTRACT_RECONTRACT_ACCOUNTING_ADJUSTMENT`. It is prerequisite accounting evidence only. It does not execute the product change, mutate subscription terms, rewrite EMI rows, create payments, create receipts, create settlement allocations, or touch inventory, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.
 
 ## Phase 6F.3 — Durable reconciliation bridge evidence only
 
@@ -112,15 +112,25 @@ This creates `ReconciliationRun`, `ReconciliationItem`, `ReconciliationEvidence`
 
 The expected amount must equal the posted journal amount. Variance returns a controlled error.
 
-Phase 6F.3 does not execute the product change, update EMI rows, create payments, create receipts, mutate settlement/day-close records, or close reconciliation items as cash evidence.
-
-## Phase 6F — Product recontract execution endpoint blocked
+## Phase 6F.4 — Final backend execution after evidence verification
 
 ```text
 POST /api/v1/admin/contract-amendments/{id}/product-recontract/execute/
 ```
 
-The endpoint is present for route stability and gate testing, but execution is not enabled. It validates gates and row-locks the amendment/event/subscription/pending EMI path, then returns controlled 400 before any source mutation.
+The endpoint is admin-only and executes only after all preview, consent, approval, accounting, and reconciliation evidence gates pass.
+
+Execution mutates only:
+
+- `Subscription.product`
+- `Subscription.total_amount`
+- `Subscription.monthly_amount`
+- `Subscription.tenure_months`
+- pending `Emi.amount`
+- pending `Emi.due_date`
+- `ContractRecontractEvent.metadata` execution snapshot
+
+Execution does not mutate historical payments, receipts, paid/waived/cancelled EMI rows, accounting postings, reconciliation evidence, settlement/day-close records, lucky ID, batch, waiver/lucky draw, inventory, delivery, commission, payout, rent/lease demand, or deposit records.
 
 ## Admin API inventory
 
@@ -146,4 +156,4 @@ GET  /api/v1/admin/contract-amendments/{id}/product-recontract-events/
 
 ## Deferred phases
 
-Final product recontract execution requires Phase 6F.4: execute inside one transaction, verify accounting and reconciliation bridge evidence, then mutate only approved subscription and pending EMI rows from preview lines. The current execute endpoint stays blocked to prevent contract/EMI mutation without complete accounting and reconciliation truth.
+Frontend execution UI, typed confirmation, printable addendum, customer ledger statement, and RC failure-injection hardening remain deferred after backend Phase 6F.4.
