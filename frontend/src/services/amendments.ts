@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api";
 import type {
   ContractRecontractEvent,
+  ContractRecontractExecutionFields,
   ContractRecontractFinancialImpactPreview,
   ContractRecontractScheduleLine,
 } from "@/services/amendmentPreviews";
@@ -27,7 +28,7 @@ export type AmendmentType =
 
 export type ProductRecontractConsentStatus = "PENDING" | "ACCEPTED" | "REJECTED";
 
-export type ProductRecontractPreviewSummary = {
+export type ProductRecontractPreviewSummary = ContractRecontractExecutionFields & {
   id: number;
   status: string;
   impact_type: string;
