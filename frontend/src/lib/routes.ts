@@ -77,6 +77,7 @@ export const ROUTES = {
     auditEvents: "/admin/audit/events",
 
     collections: "/admin/collections",
+    collectionControlCenter: "/admin/collections/control-center",
     outstandings: "/admin/outstandings",
     leads: "/admin/leads",
     supportRequests: "/admin/support-requests",
@@ -323,6 +324,7 @@ export const ROUTES = {
     billing: "/cashier/billing",
     billingDirectSaleWorkspace: "/cashier/billing/direct-sale",
     collect: "/cashier/collect",
+    collectionControlCenter: "/cashier/collections/control-center",
     payments: "/cashier/payments",
     notifications: "/cashier/notifications",
     dayClose: "/cashier/day-close",
