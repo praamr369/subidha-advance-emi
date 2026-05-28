@@ -8,6 +8,7 @@ from api.v1.views.cashier import (
     CashierPendingDirectSales,
     CashierSearchDirectSaleView,
 )
+from api.v1.views.collection_control_center import CashierCollectionControlCenterView
 from api.v1.views.contract_references import (
     CashierReceivablesSearchView,
     UnifiedReceivablePreviewView,
@@ -40,6 +41,11 @@ from api.v1.views.cashier_day_close import (
 )
 
 urlpatterns = [
+    path(
+        "collections/control-center/",
+        CashierCollectionControlCenterView.as_view(),
+        name="cashier-collections-control-center",
+    ),
     path(
         "customers/<int:pk>/operational-summary/",
         CustomerOperationalSummaryView.as_view(),
