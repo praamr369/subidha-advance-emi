@@ -64,6 +64,15 @@ export type ProductRecontractPreviewSummary = ContractRecontractExecutionFields 
   source_record_mutation?: boolean;
   schedule_preview_lines?: ContractRecontractScheduleLine[];
   latest_financial_impact_preview?: ContractRecontractFinancialImpactPreview | null;
+  executed?: boolean;
+  executed_at?: string | null;
+  execution_status?: string | null;
+  accounting_bridge_posting_id?: number | null;
+  journal_entry_id?: number | null;
+  reconciliation_item_id?: number | null;
+  reconciliation_run_id?: number | null;
+  reconciliation_evidence_ids?: number[];
+  workflow_flags?: Record<string, boolean>;
 };
 
 export const AMENDMENT_STATUSES: AmendmentStatus[] = ["REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED"];
@@ -253,8 +262,12 @@ export async function getPartnerAmendment(id: number): Promise<AmendmentRecord> 
   return apiFetch<AmendmentRecord>(`/partner/contract-amendments/${id}/`);
 }
 
-export async function listAdminAmendments(filters: { status?: string; contractType?: string } = {}): Promise<AmendmentRecord[]> {
-  const query = queryString({ status: filters.status, contract_type: filters.contractType });
+export async function listAdminAmendments(filters: { status?: string; contractType?: string; customer?: string | number } = {}): Promise<AmendmentRecord[]> {
+  const query = queryString({
+    status: filters.status,
+    contract_type: filters.contractType,
+    customer: filters.customer === undefined || filters.customer === null ? undefined : String(filters.customer),
+  });
   return normalizeList(await apiFetch<unknown>(`/admin/contract-amendments/${query}`));
 }
 
