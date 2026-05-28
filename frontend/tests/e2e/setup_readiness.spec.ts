@@ -233,10 +233,29 @@ test.describe("admin setup readiness center", () => {
   });
 });
 
-test.describe("non-admin setup readiness navigation", () => {
-  test("customer navigation does not expose Setup Readiness", async ({ page }) => {
-    test.use({ storageState: authStatePath("customer") });
+test.describe("customer setup readiness navigation", () => {
+  test.use({ storageState: authStatePath("customer") });
+
+  test("does not expose Setup Readiness", async ({ page }) => {
     await page.goto("/customer");
+    await expect(page.getByRole("link", { name: "Setup Readiness", exact: true })).toHaveCount(0);
+  });
+});
+
+test.describe("partner setup readiness navigation", () => {
+  test.use({ storageState: authStatePath("partner") });
+
+  test("does not expose Setup Readiness", async ({ page }) => {
+    await page.goto("/partner");
+    await expect(page.getByRole("link", { name: "Setup Readiness", exact: true })).toHaveCount(0);
+  });
+});
+
+test.describe("cashier setup readiness navigation", () => {
+  test.use({ storageState: authStatePath("cashier") });
+
+  test("does not expose Setup Readiness", async ({ page }) => {
+    await page.goto("/cashier");
     await expect(page.getByRole("link", { name: "Setup Readiness", exact: true })).toHaveCount(0);
   });
 });
