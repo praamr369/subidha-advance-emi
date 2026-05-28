@@ -276,6 +276,10 @@ export function buildAdminBillingReceiptPrintRoute(id: number | string): string 
   return `${ROUTES.admin.billingReceipts}/${id}/print`;
 }
 
+export function buildAdminCrmCustomerDetailRoute(id: number | string): string {
+  return `${ROUTES.admin.crmCustomerDetail}/${id}`;
+}
+
 export function buildAdminCrmPartyRoute(id: number | string): string {
   return `${ROUTES.admin.crmParties}/${id}`;
 }
