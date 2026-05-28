@@ -1,8 +1,24 @@
 # Subidha Print Document Design System
 
-Status: **PHASE 5A BUSINESS SETUP PRINT BRANDING IMPLEMENTED ON `update` BRANCH**
+Status: **PHASE 7G PRINT / DOCUMENT FINAL QA ON `update` BRANCH**
 
 This document records the branded print/PDF document system for SUBIDHA CORE. Print pages are evidence documents, not posting engines. They are intentionally read-only and payload-driven. They display backend-provided records and must not mutate financial, stock, delivery, subscription, EMI, waiver, lucky draw, rent/lease deposit, billing, refund, possession, return-inspection, commission, payout, cancellation, reversal, vendor payable, purchase, inventory valuation, cashier settlement, payment, receipt, reconciliation, allocation, money movement, journal, finance account, source lifecycle, or accounting records.
+
+## Phase 7G final QA rules
+
+All print routes must remain branded, print-safe, role-safe, and backend-payload-driven.
+
+Hard rules:
+
+- Print pages must not post payment, generate receipt, create journal entry, reconcile, reverse, execute, roll back, move stock, allocate settlement, change EMI schedule, change rent/lease demand, mutate deposit/refund state, or update source business records.
+- Financial values must come from backend payloads only.
+- Missing optional financial values must render as `—`, not `₹0.00`.
+- Real backend zero values such as `0`, `"0"`, or `"0.00"` may render as `₹0.00`.
+- Unsafe statuses must show a visible watermark/warning when the route exposes an unsafe backend status.
+- `PrintToolbar` is visible on screen and hidden in print media.
+- `.document-screen-only`, dashboard chrome, sidebar/topbar, `nav`, operational actions, and `[data-print-hidden]` are hidden in print media.
+- Customer print routes use customer-scoped APIs and must not expose other customers' documents.
+- Product recontract addendum is available only when latest product recontract evidence is executed.
 
 ## Shared frontend primitives
 
@@ -34,6 +50,8 @@ frontend/src/lib/documents/formatters.ts
 ```
 
 The formatter layer centralizes INR display, Indian date/date-time display, safe fallbacks, normalized status labels, unsafe status labels, unsafe status watermarks, unsafe warning messages, and positive amount checks.
+
+`formatDocumentMoney(value)` is intentionally conservative for Phase 7G: missing/empty/non-numeric values return `—`. Use backend-provided numeric/string values only. If the backend exposes a real zero, it renders as `₹0.00`.
 
 Shared unsafe statuses include:
 
@@ -235,117 +253,56 @@ Phase 6G is print/document only. It adds no backend mutation behavior, no execut
 
 Historical payments and receipts remain unchanged. The customer ledger section is display-only and explicitly does not create payment, receipt, refund, or settlement.
 
-## Phase 3 financial/audit route QA results
+## Phase 7G audit checklist
 
-Audited Phase 3 routes:
+The following routes were audited for Phase 7G:
 
-```text
-/admin/purchases/:id/bill/print
-/admin/vendors/payments/:id/voucher/print
-/admin/settlements/day-closes/:id/print
-/admin/reconciliation/reports/:id/print
+- `/admin/billing/direct-sale/[id]/print`
+- `/admin/billing/receipts/[id]/print`
+- `/admin/deliveries/direct-sale-cases/[caseId]/print`
+- `/admin/subscriptions/[id]/contract/print`
+- `/admin/rent-lease/contracts/[id]/contract/print`
+- `/admin/contract-amendments/[id]/recontract-addendum/print`
+- `/customer/contract-amendments/[id]/recontract-addendum/print`
+- `/admin/accounting/journals/[id]/print`
+- `/admin/accounting/ledger/[accountId]/statement/print`
+- `/admin/finance/accounts/[id]/statement/print`
+- `/admin/customers/[id]/statement/print`
+
+Audit result:
+
+- shared branding is provided by `DocumentHeader` and Business Setup print settings.
+- print toolbar is hidden in print media.
+- dashboard chrome is hidden by print shell bypass and print CSS.
+- `.document-screen-only` content is hidden in print media.
+- unsafe statuses are supported by shared watermark/warning helpers and route-specific guards where backend status is exposed.
+- signature blocks and audit footers are present on audited routes.
+- terms blocks are present where route context requires them.
+- missing optional fields use safe text or money fallbacks.
+- product recontract addendum is guarded to executed product recontract evidence only.
+
+## Validation commands
+
+Frontend:
+
+```bash
+cd frontend
+npm run typecheck
+npm run lint
+npm run build
+npm run check:routes
+npx playwright test tests/e2e/document_print_smoke.spec.ts --project=chromium-smoke --timeout=180000
+npx playwright test tests/e2e/subscription_contract_print_smoke.spec.ts --project=chromium-smoke --timeout=180000
+npx playwright test tests/e2e/rent_lease_contract_print_smoke.spec.ts --project=chromium-smoke --timeout=180000
+npx playwright test tests/e2e/accounting_journal_ledger_print_smoke.spec.ts --project=chromium-smoke --timeout=180000
+npx playwright test tests/e2e/customer_account_statement_print_smoke.spec.ts --project=chromium-smoke --timeout=180000
+npx playwright test tests/e2e/contract_recontract_addendum_print.spec.ts --project=chromium-smoke --timeout=180000
 ```
 
-Confirmed:
+Backend is not required for Phase 7G unless backend serializers/settings are changed.
 
-- All four routes call read APIs only.
-- No print route calls mutation endpoints.
-- No route recalculates financial truth.
-- Print toolbar is screen-only and hidden during print media.
-- Screen-only back links are hidden during print media.
-- Dashboard shell/sidebar/topbar/operational actions are hidden during print media.
-- Audit footer and signature blocks remain printable.
-- White print background and explicit borders keep documents readable when browser background graphics are disabled.
+Do not run:
 
-## Global financial and audit safety rules
-
-1. Print pages are read-only.
-2. Browser print is allowed; application mutation is not.
-3. No frontend recalculation of financial truth.
-4. No fake totals, tax values, payment references, receipt references, report references, source references, cashier counts, reconciliation counts, variance, debit/credit totals, ledger balances, running balances, journal status, ledger state, finance account state, or accounting state.
-5. Missing optional display values must use safe fallbacks such as `—`.
-6. Unsafe states must not visually appear as normal active/paid/settled/reconciled/posted records.
-7. Outstanding balances, variance, exceptions, unsafe statuses, backend-exposed ledger balances, and inactive finance account state must remain visible when backend payloads expose them.
-8. Print views must not settle payments, close receivables/payables, post accounting, generate receipts/vouchers, reconcile items, approve/reject/reopen records, post/void/reverse journals, move stock, mutate finance accounts, mutate money movements, mutate cash counters, or mutate operational records.
-9. Business Setup print branding settings are presentation-only and must not override backend record truth, unsafe status warnings, payment state, ledger balances, contract state, delivery state, or audit state.
-
-## Deterministic test coverage
-
-Current print smoke coverage:
-
-```text
-frontend/tests/e2e/document_print_smoke.spec.ts
-frontend/tests/e2e/subscription_contract_print_smoke.spec.ts
-frontend/tests/e2e/rent_lease_contract_print_smoke.spec.ts
-frontend/tests/e2e/purchase_vendor_document_print_smoke.spec.ts
-frontend/tests/e2e/cashier_day_close_print_smoke.spec.ts
-frontend/tests/e2e/reconciliation_report_print_smoke.spec.ts
-frontend/tests/e2e/accounting_journal_ledger_print_smoke.spec.ts
-frontend/tests/e2e/customer_account_statement_print_smoke.spec.ts
-frontend/tests/e2e/contract_recontract_addendum_print.spec.ts
+```bash
+bash scripts/run-release-candidate.sh
 ```
-
-These tests use mocked API responses and do not depend on live shop data. They verify business identity, document titles, references, key backend-provided figures, warnings/watermarks, signatures, audit footer, print toolbar screen behavior, toolbar hiding under print media, screen-only navigation hiding under print media, absence of dashboard chrome, and deterministic operational entry-point links.
-
-Phase 4A added:
-
-- Journal Entry Voucher print route smoke.
-- Ledger Account Statement print route smoke.
-- Journal register print-link smoke.
-- Accounting Books ledger statement print-link smoke.
-
-Phase 4B added:
-
-- Finance Account Statement print route smoke.
-- Inactive finance account warning smoke.
-- Accounting Books finance account statement print-link smoke.
-
-Phase 4C added:
-
-- Customer Account Statement print route smoke.
-- Customer detail account statement print-link smoke.
-- Customer statement safety assertions confirming no frontend running-balance generation.
-
-Phase 5A requires local validation for:
-
-- Business Setup Print & PDF Branding page load.
-- Admin edit/save of print settings.
-- Logo upload/change/remove validation.
-- Dynamic print header/terms/footer rendering with mocked print settings.
-- Static fallback behavior when the settings API fails.
-
-Phase 6H adds admin recontract evidence reporting and keeps print behavior gated:
-
-- Product Recontract Report is admin-only and read-only.
-- No mutation, reversal, rollback, posting, reconciliation creation, or execution shortcut is exposed from the report.
-- Addendum print links appear only for executed product recontract rows.
-- Admin and customer addendum print routes remain clean print-document surfaces with dashboard chrome hidden under print media.
-- Historical payments, receipts, paid EMIs, accounting, reconciliation, day-close, lucky ID, batch, waiver/draw, inventory, delivery, commission, payout, rent/lease demand, and deposit records remain immutable.
-
-## Deferred document types
-
-The following templates remain deferred until their existing route/data contracts are confirmed and wired safely:
-
-- Subscription/rent/lease delivery challans beyond direct-sale delivery cases.
-- Return inspection customer copy.
-- Deposit refund advice.
-- Purchase return / debit note customer-vendor copy.
-- Vendor quote request / vendor quote comparison copy.
-- Profit & Loss print report.
-- Balance Sheet print report.
-- Trial Balance print report.
-
-The following finance account statement fields remain display-deferred until backend report contracts expose them directly:
-
-- opening balance.
-- reconciliation status.
-- cash counter identity.
-
-The following customer account statement fields remain display-deferred until backend statement/ledger contracts expose them directly:
-
-- backend customer ledger rows.
-- backend total outstanding.
-- backend direct-sale receivable rows.
-- backend rent/lease due rows.
-- backend running balance.
-- backend customer account health/risk state.
