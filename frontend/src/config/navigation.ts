@@ -159,318 +159,77 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
   ADMIN: buildAdminNavigationGroups(),
 
   PARTNER: [
-    {
-      title: "Dashboard",
-      icon: "dashboard",
-      items: [
-        {
-          label: "Dashboard",
-          href: ROUTES.partner.dashboard,
-          icon: "dashboard",
-        },
-      ],
-    },
-    {
-      title: "My Customers",
-      icon: "customers",
-      items: [
-        {
-          label: "My Customers",
-          href: ROUTES.partner.customers,
-          icon: "customers",
-        },
-      ],
-    },
-    {
-      title: "Contract Amendments",
-      icon: "subscriptions",
-      items: [
-        {
-          label: "Customer amendment requests",
-          href: ROUTES.partner.contractAmendments,
-          icon: "subscriptions",
-        },
-      ],
-    },
-    {
-      title: "Leads",
-      icon: "leads",
-      items: [
-        {
-          label: "Leads",
-          href: ROUTES.partner.subscriptionRequests,
-          icon: "leads",
-        },
-      ],
-    },
-    {
-      title: "Commissions",
-      icon: "collections",
-      items: [
-        {
-          label: "Commissions",
-          href: ROUTES.partner.commissions,
-          icon: "commissions",
-        },
-      ],
-    },
-    {
-      title: "Payouts",
-      icon: "payoutBatches",
-      items: [
-        {
-          label: "Payouts",
-          href: ROUTES.partner.payouts,
-          icon: "payoutBatches",
-        },
-      ],
-    },
-    {
-      title: "Statements",
-      icon: "reports",
-      items: [
-        {
-          label: "Statements",
-          href: ROUTES.partner.reports,
-          icon: "reports",
-        },
-      ],
-    },
-    {
-      title: "Support",
-      icon: "support",
-      items: [
-        {
-          label: "Support",
-          href: ROUTES.partner.notifications,
-          icon: "support",
-        },
-      ],
-    },
-    {
-      title: "Profile",
-      icon: "profile",
-      items: [
-        {
-          label: "Profile",
-          href: ROUTES.partner.dashboard,
-          icon: "profile",
-        },
-      ],
-    },
+    { title: "Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: ROUTES.partner.dashboard, icon: "dashboard" }] },
+    { title: "My Customers", icon: "customers", items: [{ label: "My Customers", href: ROUTES.partner.customers, icon: "customers" }] },
+    { title: "Contract Amendments", icon: "subscriptions", items: [{ label: "Customer amendment requests", href: ROUTES.partner.contractAmendments, icon: "subscriptions" }] },
+    { title: "Leads", icon: "leads", items: [{ label: "Leads", href: ROUTES.partner.subscriptionRequests, icon: "leads" }] },
+    { title: "Commissions", icon: "collections", items: [{ label: "Commissions", href: ROUTES.partner.commissions, icon: "commissions" }] },
+    { title: "Payouts", icon: "payoutBatches", items: [{ label: "Payouts", href: ROUTES.partner.payouts, icon: "payoutBatches" }] },
+    { title: "Statements", icon: "reports", items: [{ label: "Statements", href: ROUTES.partner.reports, icon: "reports" }] },
+    { title: "Support", icon: "support", items: [{ label: "Support", href: ROUTES.partner.notifications, icon: "support" }] },
+    { title: "Profile", icon: "profile", items: [{ label: "Profile", href: ROUTES.partner.dashboard, icon: "profile" }] },
   ],
 
   CUSTOMER: [
-    {
-      title: "Dashboard",
-      icon: "home",
-      items: [
-        {
-          label: "Dashboard",
-          href: ROUTES.customer.dashboard,
-          icon: "home",
-        },
-      ],
-    },
+    { title: "Dashboard", icon: "home", items: [{ label: "Dashboard", href: ROUTES.customer.dashboard, icon: "home" }] },
     {
       title: "My Contracts",
       icon: "subscriptions",
       items: [
-        {
-          label: "My Contracts",
-          href: ROUTES.customer.subscriptions,
-          icon: "subscriptions",
-        },
-        {
-          label: "My amendment requests",
-          href: ROUTES.customer.contractAmendments,
-          icon: "subscriptions",
-        },
+        { label: "My Contracts", href: ROUTES.customer.subscriptions, icon: "subscriptions" },
+        { label: "My amendment requests", href: ROUTES.customer.contractAmendments, icon: "subscriptions" },
       ],
     },
-    {
-      title: "Payments & Receipts",
-      icon: "payments",
-      items: [
-        {
-          label: "Payments & Receipts",
-          href: ROUTES.customer.payments,
-          icon: "payments",
-        },
-      ],
-    },
-    {
-      title: "Delivery",
-      icon: "deliveries",
-      items: [
-        {
-          label: "Delivery",
-          href: ROUTES.customer.deliveries,
-          icon: "deliveries",
-        },
-      ],
-    },
+    { title: "Payments & Receipts", icon: "payments", items: [{ label: "Payments & Receipts", href: ROUTES.customer.payments, icon: "payments" }] },
+    { title: "Delivery", icon: "deliveries", items: [{ label: "Delivery", href: ROUTES.customer.deliveries, icon: "deliveries" }] },
     {
       title: "Support",
       icon: "support",
       items: [
-        {
-          label: "Support",
-          href: ROUTES.customer.support,
-          icon: "support",
-        },
-        {
-          label: "Returns / Service",
-          href: ROUTES.customer.support,
-          icon: "serviceDesk",
-        },
-        {
-          label: "Lucky Draw",
-          href: ROUTES.customer.subscriptions,
-          icon: "luckyDraws",
-        },
-        {
-          label: "Notifications",
-          href: ROUTES.customer.notifications,
-          icon: "reminders",
-        },
+        { label: "Support", href: ROUTES.customer.support, icon: "support" },
+        { label: "Returns / Service", href: ROUTES.customer.support, icon: "serviceDesk" },
+        { label: "Lucky Draw", href: ROUTES.customer.subscriptions, icon: "luckyDraws" },
+        { label: "Notifications", href: ROUTES.customer.notifications, icon: "reminders" },
       ],
     },
-    {
-      title: "Profile",
-      icon: "profile",
-      items: [
-        {
-          label: "Profile",
-          href: ROUTES.customer.profile,
-          icon: "profile",
-        },
-      ],
-    },
+    { title: "Profile", icon: "profile", items: [{ label: "Profile", href: ROUTES.customer.profile, icon: "profile" }] },
   ],
 
   CASHIER: [
-    {
-      title: "Cashier Dashboard",
-      icon: "dashboard",
-      items: [
-        {
-          label: "Dashboard",
-          href: ROUTES.cashier.dashboard,
-          icon: "dashboard",
-        },
-      ],
-    },
-    {
-      title: "Customer Search",
-      icon: "cashCounter",
-      items: [
-        {
-          label: "Customer Search",
-          href: ROUTES.cashier.collect,
-          icon: "customers",
-        },
-      ],
-    },
+    { title: "Cashier Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: ROUTES.cashier.dashboard, icon: "dashboard" }] },
+    { title: "Customer Search", icon: "cashCounter", items: [{ label: "Customer Search", href: ROUTES.cashier.collect, icon: "customers" }] },
     {
       title: "Collections",
       icon: "collections",
       items: [
-        {
-          label: "Collections",
-          href: `${ROUTES.cashier.collect}?workflow=unified`,
-          icon: "collectPayment",
-        },
-        {
-          label: "Direct-Sale Collection",
-          href: `${ROUTES.cashier.collect}?workflow=direct-sale`,
-          icon: "billing",
-        },
-        {
-          label: "EMI Collection",
-          href: `${ROUTES.cashier.collect}?workflow=emi`,
-          icon: "emis",
-        },
-        {
-          label: "Rent / Lease Collection",
-          href: `${ROUTES.cashier.collect}?workflow=rent-lease`,
-          icon: "collections",
-        },
+        { label: "Collections", href: `${ROUTES.cashier.collect}?workflow=unified`, icon: "collectPayment" },
+        { label: "Collection Control Center", href: ROUTES.cashier.collectionControlCenter, icon: "collections" },
+        { label: "Direct-Sale Collection", href: `${ROUTES.cashier.collect}?workflow=direct-sale`, icon: "billing" },
+        { label: "EMI Collection", href: `${ROUTES.cashier.collect}?workflow=advance-emi`, icon: "emis" },
       ],
     },
     {
       title: "Receipts",
       icon: "payments",
       items: [
-        {
-          label: "Payment History",
-          href: ROUTES.cashier.payments,
-          icon: "payments",
-        },
-        {
-          label: "Cash Closing",
-          href: ROUTES.cashier.payments,
-          icon: "cashCounter",
-        },
+        { label: "Payment History", href: ROUTES.cashier.payments, icon: "payments" },
+        { label: "Cash Closing", href: ROUTES.cashier.dayClose, icon: "cashCounter" },
       ],
     },
-    {
-      title: "Support",
-      icon: "support",
-      items: [
-        {
-          label: "Notifications",
-          href: ROUTES.cashier.notifications,
-          icon: "reminders",
-        },
-      ],
-    },
+    { title: "Support", icon: "support", items: [{ label: "Notifications", href: ROUTES.cashier.notifications, icon: "reminders" }] },
   ],
+
   VENDOR: [
-    {
-      title: "Dashboard",
-      items: [{ label: "Dashboard", href: "/vendor", icon: "dashboard", description: "Vendor operational dashboard." }],
-    },
-    {
-      title: "Quote Requests",
-      items: [{ label: "Quote Requests", href: "/vendor/quotes", icon: "billing", description: "Quote requests and submissions." }],
-    },
-    {
-      title: "Purchase Orders",
-      items: [{ label: "Purchase Orders", href: "/vendor/orders", icon: "procurement", description: "Purchase order visibility." }],
-    },
-    {
-      title: "Ledger",
-      items: [{ label: "Ledger", href: "/vendor/ledger", icon: "accounting", description: "Vendor ledger entries." }],
-    },
-    {
-      title: "Outstanding",
-      items: [{ label: "Outstanding", href: "/vendor/outstanding", icon: "finance", description: "Vendor outstanding balance." }],
-    },
-    {
-      title: "Purchase Returns",
-      items: [{ label: "Purchase Returns", href: "/vendor/purchase-returns", icon: "serviceDesk", description: "Purchase return visibility." }],
-    },
-    {
-      title: "Products",
-      items: [{ label: "Products", href: "/vendor/products", icon: "inventory", description: "Vendor product catalog." }],
-    },
-    {
-      title: "Documents",
-      items: [{ label: "Documents", href: "/vendor/documents", icon: "reports", description: "Vendor documents and uploads." }],
-    },
-    {
-      title: "Support",
-      items: [
-        { label: "Notifications", href: "/vendor/notifications", icon: "reminders", description: "Role-safe vendor alerts." },
-      ],
-    },
-    {
-      title: "Profile",
-      items: [
-        { label: "Profile", href: "/vendor/profile", icon: "crm", description: "Vendor profile and service areas." },
-      ],
-    },
+    { title: "Dashboard", items: [{ label: "Dashboard", href: ROUTES.vendor.dashboard, icon: "dashboard", description: "Vendor operational dashboard." }] },
+    { title: "Quote Requests", items: [{ label: "Quote Requests", href: ROUTES.vendor.quotes, icon: "billing", description: "Quote requests and submissions." }] },
+    { title: "Purchase Orders", items: [{ label: "Purchase Orders", href: ROUTES.vendor.orders, icon: "procurement", description: "Purchase order visibility." }] },
+    { title: "Ledger", items: [{ label: "Ledger", href: ROUTES.vendor.ledger, icon: "accounting", description: "Vendor ledger entries." }] },
+    { title: "Outstanding", items: [{ label: "Outstanding", href: ROUTES.vendor.outstanding, icon: "finance", description: "Vendor outstanding balance." }] },
+    { title: "Purchase Returns", items: [{ label: "Purchase Returns", href: ROUTES.vendor.purchaseReturns, icon: "serviceDesk", description: "Purchase return visibility." }] },
+    { title: "Products", items: [{ label: "Products", href: ROUTES.vendor.products, icon: "inventory", description: "Vendor product catalog." }] },
+    { title: "Documents", items: [{ label: "Documents", href: ROUTES.vendor.documents, icon: "reports", description: "Vendor documents and uploads." }] },
+    { title: "Support", items: [{ label: "Notifications", href: ROUTES.vendor.notifications, icon: "reminders", description: "Role-safe vendor alerts." }] },
+    { title: "Profile", items: [{ label: "Profile", href: ROUTES.vendor.profile, icon: "crm", description: "Vendor profile and service areas." }] },
   ],
 };
 
@@ -484,7 +243,6 @@ export const navigationByRole: Record<NavigationRole, NavItem[]> = {
 
 export function normalizeRole(role: string | null | undefined): NavigationRole {
   const normalized = (role || "").trim().toUpperCase();
-
   switch (normalized) {
     case "ADMIN":
       return "ADMIN";
@@ -505,9 +263,7 @@ export function getNavigationForRole(role: string | null | undefined): NavItem[]
   return navigationByRole[normalizeRole(role)];
 }
 
-export function getNavigationGroupsForRole(
-  role: string | null | undefined
-): NavGroup[] {
+export function getNavigationGroupsForRole(role: string | null | undefined): NavGroup[] {
   return groupedNavigationByRole[normalizeRole(role)];
 }
 
@@ -517,12 +273,4 @@ export function getNavigationGroupsForRole(
 // The exports below were previously defined at the end of this module.
 // They remain here with identical names, but the navigation groups are now
 // business-oriented and role-aligned for daily operations use.
-//
 // ------------------------------------------------------------------------------------
-//
-// NOTE: Keep new exports above this comment.
-//
-// ------------------------------------------------------------------------------------
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const __NAVIGATION_MIGRATION_NOTICE__ = "Navigation registry was reorganized (non-breaking).";
