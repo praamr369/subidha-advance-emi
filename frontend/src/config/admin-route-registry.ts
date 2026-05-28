@@ -218,6 +218,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Finance & Accounting", "Reversal & Return Control", ROUTES.admin.financeReversalControl, "Audited admin pipeline for cancellation, reversal, returns, refunds, and customer-credit decisions."),
   item("Finance & Accounting", "Reversal Reconciliation", ROUTES.admin.financeReversalReconciliation, "Queue for unresolved reversal, refund, stock return, and delivery return links."),
   item("Finance & Accounting", "Collections", ROUTES.admin.collections, "Collections register."),
+  item("Finance & Accounting", "Collection Control Center", ROUTES.admin.collectionControlCenter, "Read-only collection readiness, blocker, and lane posture for admin collection operations."),
   item("Finance & Accounting", "Outstanding Ledger", ROUTES.admin.outstandings, "Unified collectible dues across EMI, rent, lease, direct sale, and standalone invoices."),
   item("Finance & Accounting", "Dues", ROUTES.admin.emisPending, "Due EMI and demand queue."),
   item("Finance & Accounting", "Overdue", ROUTES.admin.emisOverdue, "Overdue queue.", {
