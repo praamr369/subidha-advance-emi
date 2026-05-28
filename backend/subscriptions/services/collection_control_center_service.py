@@ -48,7 +48,7 @@ def _finance_accounts(*, user, cashier_safe: bool) -> tuple[list[dict[str, Any]]
 
     for account in queryset.order_by("kind", "name", "id"):
         readiness = finance_account_readiness(account)
-        chart = account.chart_account
+        chart = getattr(account, "chart_account", None)
         counts["active_count"] += 1
         if readiness.collection_ready:
             counts["ready_count"] += 1
@@ -68,14 +68,18 @@ def _finance_accounts(*, user, cashier_safe: bool) -> tuple[list[dict[str, Any]]
                 "kind": account.kind,
                 "branch_id": account.branch_id,
                 "branch_name": getattr(account.branch, "name", None) if account.branch_id else None,
-                "mapped_chart_account": {
-                    "id": chart.id,
-                    "code": chart.code,
-                    "name": chart.name,
-                    "account_type": chart.account_type,
-                    "is_active": chart.is_active,
-                    "allow_manual_posting": chart.allow_manual_posting,
-                },
+                "mapped_chart_account": (
+                    {
+                        "id": chart.id,
+                        "code": chart.code,
+                        "name": chart.name,
+                        "account_type": chart.account_type,
+                        "is_active": chart.is_active,
+                        "allow_manual_posting": chart.allow_manual_posting,
+                    }
+                    if chart
+                    else None
+                ),
                 "collection_ready": readiness.collection_ready,
                 "collection_blocker_reason": readiness.collection_blocker_reason,
                 "recommended_action": readiness.recommended_action,
