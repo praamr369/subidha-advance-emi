@@ -17,6 +17,7 @@ from api.v1.views.contract_amendments import (
     AdminContractAmendmentProductRecontractFinancialImpactPreviewView,
     AdminContractAmendmentProductRecontractPreviewView,
     AdminContractAmendmentProductRecontractPreviewSaveView,
+    AdminContractAmendmentProductRecontractReportView,
     AdminContractAmendmentProductRecontractSchedulePreviewView,
     AdminContractAmendmentRejectView,
     AdminContractAmendmentReviewView,
@@ -24,6 +25,7 @@ from api.v1.views.contract_amendments import (
 
 urlpatterns = [
     path("contract-amendments/", AdminContractAmendmentListView.as_view()),
+    path("contract-amendments/recontract-report/", AdminContractAmendmentProductRecontractReportView.as_view()),
     path("contract-amendments/<int:pk>/", AdminContractAmendmentDetailView.as_view()),
     path("contract-amendments/<int:pk>/review/", AdminContractAmendmentReviewView.as_view()),
     path("contract-amendments/<int:pk>/approve/", AdminContractAmendmentApproveView.as_view()),

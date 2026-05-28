@@ -93,7 +93,17 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
     "Subscriptions",
     "Contract Amendments",
     ROUTES.admin.contractAmendments,
-    "Admin decision register for customer and partner amendment requests."
+    "Admin decision register for customer and partner amendment requests.",
+    {
+      children: [
+        item(
+          "Subscriptions",
+          "Product Recontract Report",
+          ROUTES.admin.contractAmendmentsRecontractReport,
+          "Admin-only read-only evidence report for product recontract previews, approvals, accounting, reconciliation, and addendum eligibility."
+        ),
+      ],
+    }
   ),
   item("Subscriptions", "Advance EMI", `${ROUTES.admin.subscriptions}?plan_type=EMI&workflow=advance`, "Advance EMI contract workflow.", {
     children: [

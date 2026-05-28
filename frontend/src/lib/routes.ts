@@ -88,6 +88,7 @@ export const ROUTES = {
     subscriptionsRentCreate: "/admin/subscriptions/rent/create",
     subscriptionsLeaseCreate: "/admin/subscriptions/lease/create",
     contractAmendments: "/admin/contract-amendments",
+    contractAmendmentsRecontractReport: "/admin/contract-amendments/recontract-report",
     subscriptionRequests: "/admin/subscription-requests",
     payments: "/admin/payments",
     paymentsCreate: "/admin/payments/create",

@@ -195,6 +195,10 @@ class ContractRecontractExecutionTests(TestCase):
     def _admin_decision_url(self):
         return f"/api/v1/admin/contract-amendments/{self.amendment.id}/product-recontract/admin-decision/"
 
+    def _report_url(self, query=""):
+        suffix = f"?{query}" if query else ""
+        return f"/api/v1/admin/contract-amendments/recontract-report/{suffix}"
+
     def _prepare(self, with_financial_preview=True, with_accounting=True, with_reconciliation=True):
         create_product_recontract_preview_snapshot(amendment=self.amendment, requested_by=self.admin)
         record_product_recontract_customer_consent(amendment=self.amendment, customer_user=self.customer_user, decision="ACCEPTED", note="ok")
@@ -506,6 +510,101 @@ class ContractRecontractExecutionTests(TestCase):
         for user in [self.customer_user, self.partner_user, self.cashier, self.vendor]:
             response = self._post(self._execute_url(), user)
             self.assertEqual(response.status_code, 403, response.data)
+        self.assertEqual(before_counts, self._counts())
+        self.assertEqual(before_state, self._state())
+
+    def test_admin_recontract_report_returns_rows_and_represents_execution_state(self):
+        self._prepare()
+        second_target = Product.objects.create(product_code="P6F4-ALT", name="Alternate", base_price=Decimal("26000.00"), is_active=True)
+        second_amendment = ContractAmendment.objects.create(
+            subscription=self.subscription,
+            contract_type="EMI_SUBSCRIPTION",
+            customer=self.customer,
+            partner=self.partner_user,
+            requested_by=self.customer_user,
+            requested_role="CUSTOMER",
+            amendment_type="PRODUCT_CHANGE",
+            status="APPROVED",
+            requested_values={"approved_product_id": second_target.id},
+            approved_values={"approved_product_id": second_target.id},
+            reason="Phase 6H report non-executed row.",
+            approved_by=self.admin,
+        )
+        create_product_recontract_preview_snapshot(amendment=second_amendment, requested_by=self.admin)
+
+        execute_response = self._post(self._execute_url(), self.admin)
+        self.assertEqual(execute_response.status_code, 200, execute_response.data)
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(self._report_url(), format="json")
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(len(response.data), 2)
+        rows_by_amendment = {row["amendment_id"]: row for row in response.data}
+        executed_row = rows_by_amendment[self.amendment.id]
+        pending_row = rows_by_amendment[second_amendment.id]
+
+        self.assertTrue(executed_row["executed"])
+        self.assertEqual(executed_row["executed_status"], "EXECUTED")
+        self.assertEqual(executed_row["schedule_preview_status"], "GENERATED")
+        self.assertEqual(executed_row["financial_impact_preview_status"], "PREVIEWED")
+        self.assertEqual(executed_row["accounting_posting_status"], "POSTED")
+        self.assertEqual(executed_row["reconciliation_bridge_status"], "LINKED")
+        self.assertIsNotNone(executed_row["journal_entry_id"])
+        self.assertIsNotNone(executed_row["journal_entry_no"])
+        self.assertIsNotNone(executed_row["reconciliation_run_id"])
+        self.assertIsNotNone(executed_row["reconciliation_item_id"])
+        self.assertTrue(executed_row["addendum_print_eligible"])
+        self.assertIsNotNone(executed_row["addendum_print_reference"])
+
+        self.assertFalse(pending_row["executed"])
+        self.assertEqual(pending_row["executed_status"], "NOT_EXECUTED")
+        self.assertEqual(pending_row["accounting_posting_status"], "MISSING")
+        self.assertEqual(pending_row["reconciliation_bridge_status"], "MISSING")
+        self.assertFalse(pending_row["addendum_print_eligible"])
+        self.assertIsNone(pending_row["addendum_print_reference"])
+
+    def test_admin_recontract_report_filters(self):
+        self._prepare(with_accounting=False, with_reconciliation=False)
+        self.client.force_authenticate(self.admin)
+
+        accepted = self.client.get(self._report_url("customer_consent_status=ACCEPTED"), format="json")
+        self.assertEqual(accepted.status_code, 200, accepted.data)
+        self.assertEqual(len(accepted.data), 1)
+        self.assertEqual(accepted.data[0]["customer_consent_status"], "ACCEPTED")
+
+        rejected = self.client.get(self._report_url("customer_consent_status=REJECTED"), format="json")
+        self.assertEqual(rejected.status_code, 200, rejected.data)
+        self.assertEqual(rejected.data, [])
+
+        by_product = self.client.get(self._report_url("product=P6F4-NEW"), format="json")
+        self.assertEqual(by_product.status_code, 200, by_product.data)
+        self.assertEqual(len(by_product.data), 1)
+        self.assertEqual(by_product.data[0]["new_product_code"], "P6F4-NEW")
+
+        by_customer = self.client.get(self._report_url("customer=Phase6F4"), format="json")
+        self.assertEqual(by_customer.status_code, 200, by_customer.data)
+        self.assertEqual(len(by_customer.data), 1)
+        self.assertEqual(by_customer.data[0]["customer_id"], self.customer.id)
+
+        not_executed = self.client.get(self._report_url("executed=false"), format="json")
+        self.assertEqual(not_executed.status_code, 200, not_executed.data)
+        self.assertEqual(len(not_executed.data), 1)
+        self.assertFalse(not_executed.data[0]["executed"])
+
+    def test_recontract_report_is_admin_only_and_read_only(self):
+        self._prepare()
+        before_counts = self._counts()
+        before_state = self._state()
+
+        for user in [self.customer_user, self.partner_user, self.cashier, self.vendor]:
+            self.client.force_authenticate(user)
+            response = self.client.get(self._report_url(), format="json")
+            self.assertEqual(response.status_code, 403, response.data)
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(self._report_url(), format="json")
+        self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(before_counts, self._counts())
         self.assertEqual(before_state, self._state())
 

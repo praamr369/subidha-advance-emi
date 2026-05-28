@@ -27,6 +27,7 @@ export type AmendmentType =
   | "PRODUCT_UPGRADE";
 
 export type ProductRecontractConsentStatus = "PENDING" | "ACCEPTED" | "REJECTED";
+export type ProductRecontractAdminApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type ProductRecontractPreviewSummary = ContractRecontractExecutionFields & {
   id: number;
@@ -55,7 +56,7 @@ export type ProductRecontractPreviewSummary = ContractRecontractExecutionFields 
   customer_consent_status?: ProductRecontractConsentStatus;
   customer_consented_at?: string | null;
   customer_consent_note?: string | null;
-  admin_approval_status?: "PENDING" | "APPROVED" | "REJECTED";
+  admin_approval_status?: ProductRecontractAdminApprovalStatus;
   admin_approved_by?: number | null;
   admin_approved_at?: string | null;
   admin_approval_note?: string | null;
@@ -143,10 +144,67 @@ export type AmendmentCreatePayload = {
   metadata?: Record<string, unknown>;
 };
 
+export type ProductRecontractReportFilters = {
+  executed?: string;
+  customerConsentStatus?: string;
+  adminApprovalStatus?: string;
+  product?: string;
+  customer?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export type ProductRecontractEvidenceStatus = "GENERATED" | "PREVIEWED" | "POSTED" | "LINKED" | "MISSING" | "BLOCKED" | string;
+
+export type ProductRecontractReportRow = {
+  id: number;
+  amendment_id: number;
+  amendment_no?: string | null;
+  subscription_id?: number | null;
+  subscription_number?: string | null;
+  customer_id?: number | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  old_product_id?: number | null;
+  old_product_name?: string | null;
+  old_product_code?: string | null;
+  new_product_id?: number | null;
+  new_product_name?: string | null;
+  new_product_code?: string | null;
+  old_contract_total: string;
+  new_contract_total: string;
+  price_difference: string;
+  customer_consent_status: ProductRecontractConsentStatus;
+  admin_approval_status: ProductRecontractAdminApprovalStatus;
+  schedule_preview_status: ProductRecontractEvidenceStatus;
+  financial_impact_preview_status: ProductRecontractEvidenceStatus;
+  accounting_posting_status: ProductRecontractEvidenceStatus;
+  reconciliation_bridge_status: ProductRecontractEvidenceStatus;
+  executed: boolean;
+  executed_status: "EXECUTED" | "NOT_EXECUTED" | string;
+  executed_at?: string | null;
+  accounting_bridge_posting_id?: number | null;
+  journal_entry_id?: number | null;
+  journal_entry_no?: string | null;
+  reconciliation_item_id?: number | null;
+  reconciliation_run_id?: number | null;
+  addendum_print_eligible?: boolean;
+  addendum_print_reference?: { amendment_id: number; route: string } | null;
+  created_at?: string;
+};
+
 function normalizeList(payload: unknown): AmendmentRecord[] {
   if (Array.isArray(payload)) return payload as AmendmentRecord[];
   if (payload && typeof payload === "object" && Array.isArray((payload as { results?: unknown }).results)) {
     return (payload as { results: AmendmentRecord[] }).results;
+  }
+  return [];
+}
+
+function normalizeReportRows(payload: unknown): ProductRecontractReportRow[] {
+  if (Array.isArray(payload)) return payload as ProductRecontractReportRow[];
+  if (payload && typeof payload === "object" && Array.isArray((payload as { results?: unknown }).results)) {
+    return (payload as { results: ProductRecontractReportRow[] }).results;
   }
   return [];
 }
@@ -198,6 +256,19 @@ export async function getPartnerAmendment(id: number): Promise<AmendmentRecord> 
 export async function listAdminAmendments(filters: { status?: string; contractType?: string } = {}): Promise<AmendmentRecord[]> {
   const query = queryString({ status: filters.status, contract_type: filters.contractType });
   return normalizeList(await apiFetch<unknown>(`/admin/contract-amendments/${query}`));
+}
+
+export async function listAdminProductRecontractReport(filters: ProductRecontractReportFilters = {}): Promise<ProductRecontractReportRow[]> {
+  const query = queryString({
+    executed: filters.executed,
+    customer_consent_status: filters.customerConsentStatus,
+    admin_approval_status: filters.adminApprovalStatus,
+    product: filters.product,
+    customer: filters.customer,
+    date_from: filters.dateFrom,
+    date_to: filters.dateTo,
+  });
+  return normalizeReportRows(await apiFetch<unknown>(`/admin/contract-amendments/recontract-report/${query}`));
 }
 
 export async function getAdminAmendment(id: number): Promise<AmendmentRecord> {

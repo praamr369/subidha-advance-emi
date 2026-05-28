@@ -512,6 +512,7 @@ class ProductRecontractReportRowSerializer(serializers.ModelSerializer):
     new_product_name = serializers.CharField(source="new_product.name", read_only=True, allow_null=True)
     new_product_code = serializers.CharField(source="new_product.product_code", read_only=True, allow_null=True)
     schedule_preview_status = serializers.SerializerMethodField()
+    financial_impact_preview_status = serializers.SerializerMethodField()
     accounting_posting_status = serializers.SerializerMethodField()
     reconciliation_bridge_status = serializers.SerializerMethodField()
     executed = serializers.SerializerMethodField()
@@ -522,6 +523,7 @@ class ProductRecontractReportRowSerializer(serializers.ModelSerializer):
     accounting_bridge_posting_id = serializers.SerializerMethodField()
     reconciliation_item_id = serializers.SerializerMethodField()
     reconciliation_run_id = serializers.SerializerMethodField()
+    addendum_print_eligible = serializers.SerializerMethodField()
     addendum_print_reference = serializers.SerializerMethodField()
 
     def _metadata(self, obj):
@@ -540,6 +542,17 @@ class ProductRecontractReportRowSerializer(serializers.ModelSerializer):
         if line_ids or obj.schedule_preview_lines.filter(proposed_status=ContractRecontractScheduleLine.ProposedStatus.PREVIEW_ONLY).exists():
             return "GENERATED"
         return "MISSING"
+
+    def get_financial_impact_preview_status(self, obj):
+        latest = obj.financial_impact_previews.order_by("-created_at", "-id").first()
+        if not latest:
+            return "MISSING"
+        if (
+            latest.accounting_preview_status == ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED
+            and latest.reconciliation_preview_status == ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED
+        ):
+            return "PREVIEWED"
+        return "BLOCKED"
 
     def get_accounting_bridge_posting_id(self, obj):
         metadata = self._metadata(obj)
@@ -590,6 +603,9 @@ class ProductRecontractReportRowSerializer(serializers.ModelSerializer):
     def get_executed_at(self, obj):
         return self._metadata(obj).get("executed_at")
 
+    def get_addendum_print_eligible(self, obj):
+        return self.get_executed(obj)
+
     def get_addendum_print_reference(self, obj):
         if not self.get_executed(obj):
             return None
@@ -621,6 +637,7 @@ class ProductRecontractReportRowSerializer(serializers.ModelSerializer):
             "customer_consent_status",
             "admin_approval_status",
             "schedule_preview_status",
+            "financial_impact_preview_status",
             "accounting_posting_status",
             "reconciliation_bridge_status",
             "executed",
@@ -631,6 +648,7 @@ class ProductRecontractReportRowSerializer(serializers.ModelSerializer):
             "journal_entry_no",
             "reconciliation_item_id",
             "reconciliation_run_id",
+            "addendum_print_eligible",
             "addendum_print_reference",
             "created_at",
         ]

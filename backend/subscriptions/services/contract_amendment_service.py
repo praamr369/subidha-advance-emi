@@ -356,6 +356,15 @@ def create_amendment(*, subscription: Subscription | None = None, rent_lease_con
         raise ValidationError({"requested_role": "Only CUSTOMER or PARTNER can request amendments."})
     if not reason or not reason.strip():
         raise ValidationError({"reason": "Amendment reason is required."})
+    if (
+        contract_type == "EMI_SUBSCRIPTION"
+        and subscription
+        and not rent_lease_contract
+        and subscription.plan_type in {PlanType.RENT, PlanType.LEASE}
+    ):
+        contract_type = "RENT_LEASE"
+        rent_lease_contract = subscription
+        subscription = None
     source = _source_for(contract_type=contract_type, subscription=subscription, rent_lease_contract=rent_lease_contract)
     if source.status not in _AMENDABLE_STATUSES:
         raise ValidationError(f"Cannot request an amendment on a contract in status '{source.status}'.")
@@ -428,7 +437,23 @@ def reject_amendment(*, amendment: ContractAmendment, rejected_by, rejection_rea
 
 @transaction.atomic
 def apply_amendment(*, amendment: ContractAmendment, applied_by) -> ContractAmendment:
-    return implement_approved_amendment(amendment=amendment, implemented_by=applied_by)
+    implemented = implement_approved_amendment(amendment=amendment, implemented_by=applied_by)
+    implemented.status = "APPLIED"
+    implemented.metadata = {**(implemented.metadata or {}), "legacy_apply_alias": True}
+    implemented.save(update_fields=["status", "metadata", "updated_at"])
+    source = implemented.source_contract()
+    log_audit(
+        action_type=AuditLog.ActionType.CONTRACT_AMENDMENT_APPLIED,
+        instance=source,
+        performed_by=applied_by,
+        metadata={
+            "amendment_id": implemented.pk,
+            "amendment_no": implemented.amendment_no,
+            "amendment_type": implemented.amendment_type,
+            "phase": "LEGACY_APPLY_ALIAS",
+        },
+    )
+    return implemented
 
 
 def _implement_customer_field_amendment(*, locked_amendment: ContractAmendment, implemented_by) -> ContractAmendment:

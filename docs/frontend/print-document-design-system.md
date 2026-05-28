@@ -314,6 +314,14 @@ Phase 5A requires local validation for:
 - Dynamic print header/terms/footer rendering with mocked print settings.
 - Static fallback behavior when the settings API fails.
 
+Phase 6H adds admin recontract evidence reporting and keeps print behavior gated:
+
+- Product Recontract Report is admin-only and read-only.
+- No mutation, reversal, rollback, posting, reconciliation creation, or execution shortcut is exposed from the report.
+- Addendum print links appear only for executed product recontract rows.
+- Admin and customer addendum print routes remain clean print-document surfaces with dashboard chrome hidden under print media.
+- Historical payments, receipts, paid EMIs, accounting, reconciliation, day-close, lucky ID, batch, waiver/draw, inventory, delivery, commission, payout, rent/lease demand, and deposit records remain immutable.
+
 ## Deferred document types
 
 The following templates remain deferred until their existing route/data contracts are confirmed and wired safely:

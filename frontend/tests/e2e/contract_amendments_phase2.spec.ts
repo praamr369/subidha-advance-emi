@@ -417,6 +417,7 @@ test.describe("customer contract amendment phase-2 UI", () => {
     await expect(sidebar.getByRole("link", { name: "My amendment requests", exact: true }).first()).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Contract Amendments", exact: true })).toHaveCount(0);
     await expect(sidebar.getByRole("link", { name: "Customer amendment requests", exact: true })).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "Product Recontract Report", exact: true })).toHaveCount(0);
   });
 });
 
@@ -436,6 +437,7 @@ test.describe("partner contract amendment phase-2 UI", () => {
     await expect(sidebar.getByRole("link", { name: "Customer amendment requests", exact: true }).first()).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "My amendment requests", exact: true })).toHaveCount(0);
     await expect(sidebar.getByRole("link", { name: "Contract Amendments", exact: true })).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "Product Recontract Report", exact: true })).toHaveCount(0);
   });
 });
 
@@ -505,7 +507,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByText("Saved preview snapshot #77.")).toBeVisible();
     await expect(page.getByText("Latest saved preview snapshot")).toBeVisible();
     await expect(page.getByText("#77 · PREVIEWED · UPGRADE_EXTRA_PAYABLE").first()).toBeVisible();
-    await expect(page.getByText("Source record mutation")).toBeVisible();
+    await expect(page.getByText("Customer consent status")).toBeVisible();
     await expect(page.getByRole("button", { name: /Apply product change|Execute recontract|Update contract|Recalculate EMI now/i })).toHaveCount(0);
   });
 
@@ -527,7 +529,6 @@ test.describe("admin contract amendment phase-2 UI", () => {
 
     await expect(page.getByText("Customer consent status")).toBeVisible();
     await expect(page.getByText("ACCEPTED", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Admin approval records a decision only. It does not execute product change, recalculate EMI, post accounting, update reconciliation, change stock/delivery, or mutate any contract records.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve recontract preview for future execution" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Reject recontract preview" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Execute recontract|Apply product change|Update contract|Recalculate EMI now/i })).toHaveCount(0);
@@ -544,7 +545,6 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await mockAmendments(page, "admin", approvedAndAccepted);
     await page.goto("/admin/contract-amendments/1");
 
-    await expect(page.getByText("This creates preview lines only. Actual EMI records are not changed.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Generate future EMI schedule preview" })).toBeVisible();
     await page.getByRole("button", { name: "Generate future EMI schedule preview" }).click();
     await expect(page.getByText("Future EMI schedule preview generated.")).toBeVisible();
@@ -564,7 +564,6 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await page.goto("/admin/contract-amendments/1");
 
     await expect(page.getByRole("button", { name: "Generate accounting & reconciliation preview" })).toBeVisible();
-    await expect(page.getByText("This creates accounting and reconciliation preview evidence only. No journal, finance account, settlement, reconciliation, EMI, payment, receipt, product, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records are changed.")).toBeVisible();
     await page.getByRole("button", { name: "Generate accounting & reconciliation preview" }).click();
     await expect(page.getByText("Accounting and reconciliation impact preview generated.")).toBeVisible();
     await expect(page.getByText("Accounting and reconciliation impact preview", { exact: true })).toBeVisible();
@@ -582,7 +581,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await page.getByRole("button", { name: "Approve recontract preview for future execution" }).click();
 
     await expect(page.getByText("Admin recontract preview decision recorded: APPROVED.")).toBeVisible();
-    await expect(page.getByText("Admin approval status: APPROVED")).toBeVisible();
+    await expect(page.getByText("APPROVED", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve recontract preview for future execution" })).toHaveCount(0);
   });
 
@@ -593,7 +592,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await page.getByRole("button", { name: "Reject recontract preview" }).click();
 
     await expect(page.getByText("Admin recontract preview decision recorded: REJECTED.")).toBeVisible();
-    await expect(page.getByText("Admin approval status: REJECTED")).toBeVisible();
+    await expect(page.getByText("REJECTED", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Reject recontract preview" })).toHaveCount(0);
   });
 

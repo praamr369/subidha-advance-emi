@@ -214,7 +214,7 @@ Implemented behavior:
 - exposes read-only execution summary
 - no customer, partner, cashier, or vendor execution control
 
-### Phase 6F.6 — RC hardening, reporting, and executed-state visibility
+### Phase 6F.6 — RC hardening and executed-state visibility
 
 Status: **Implemented**
 
@@ -255,14 +255,25 @@ Historical payments and receipts remain unchanged. The ledger statement explicit
 
 ## Deferred phases
 
-### Phase 6H — Admin recontract evidence export
+### Phase 6H — Product recontract evidence reporting and RC hardening
 
-Status: **Deferred**
+Status: **Implemented**
 
-Recommended scope:
+Implemented behavior:
 
-- admin audit export surface for recontract evidence
-- export filters by execution date, product, batch, customer, accounting evidence, and reconciliation evidence
+- admin route `/admin/contract-amendments/recontract-report`
+- admin-only read endpoint `GET /api/v1/admin/contract-amendments/recontract-report/`
+- report rows for amendment, subscription, customer, old/new product, contract totals, price difference, customer consent, admin approval, schedule preview, financial impact preview, accounting bridge, reconciliation bridge, execution state, execution timestamp, journal entry, reconciliation run/item, and addendum print eligibility
+- safe filters for execution state, customer consent, admin approval, product, customer search, and created date range
+- KPI strip for total previews, customer accepted, admin approved, accounting posted, reconciliation linked, executed, and blockers
+- evidence status badges and amendment detail links
+- addendum print links only for executed rows
+- loading, error, empty, and filtered-empty states
+- customer/partner navigation remains free of the admin report link
+
+Phase 6H is read-only reporting and release-candidate hardening only. No mutation, reversal, rollback, posting shortcut, reconciliation shortcut, or execution shortcut was added. Product recontract execution gates remain unchanged.
+
+Historical payments, receipts, paid EMIs, accounting, reconciliation, day-close, lucky ID, batch, waiver/draw, inventory, delivery, commission, payout, rent/lease demand, and deposit records remain immutable from this phase.
 
 ### Future controlled reversal workflow
 

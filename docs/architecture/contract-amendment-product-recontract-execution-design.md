@@ -161,3 +161,17 @@ Execution does not mutate:
 Printable recontract addendum is implemented in Phase 6G as a read-only evidence document.
 
 Rollback/reversal remains a separate future controlled workflow requiring explicit accounting, reconciliation, audit, and admin approval design. It is not exposed in Phase 6F.6.
+
+## 12. Phase 6H evidence reporting and RC hardening
+
+Phase 6H adds an admin-only Product Recontract Report:
+
+```text
+GET /api/v1/admin/contract-amendments/recontract-report/
+```
+
+The report is read-only. It returns persisted recontract evidence rows with amendment, subscription, customer, old/new product, contract totals, price difference, consent/approval states, schedule preview status, financial impact preview status, accounting bridge status, reconciliation bridge status, execution state, execution timestamp, journal entry reference, reconciliation run/item references, and executed-only addendum print eligibility.
+
+Phase 6H does not add mutation, reversal, rollback, or execution shortcut behavior. It does not change product recontract execution rules and does not weaken evidence gates. Customer, partner, cashier, and vendor roles cannot access the report.
+
+Addendum print remains available only after execution. Historical payments, receipts, paid EMIs, accounting, reconciliation, settlement/day-close, lucky ID, batch, waiver/draw, inventory, delivery, commission, payout, rent/lease demand, and deposit records remain immutable from the reporting surface.

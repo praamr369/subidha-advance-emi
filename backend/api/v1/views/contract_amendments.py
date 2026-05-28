@@ -4,6 +4,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounting.models import AccountingBridgePosting
 from api.v1.permissions import IsAdmin, IsCustomer, IsPartner
 from api.v1.serializers.contract_amendments import (
     ContractAmendmentApproveSerializer,
@@ -14,12 +15,15 @@ from api.v1.serializers.contract_amendments import (
     ContractRecontractEventSerializer,
     ContractRecontractFinancialImpactPreviewSerializer,
     ContractRecontractScheduleLineSerializer,
+    ProductRecontractReportRowSerializer,
     ProductRecontractAdminDecisionSerializer,
     ProductRecontractCustomerConsentSerializer,
     ProductRecontractPreviewRequestSerializer,
     ProductRecontractPreviewSerializer,
 )
+from reconciliation.models import ReconciliationEvidence
 from subscriptions.models import ContractAmendment, ContractRecontractEvent, Subscription
+from subscriptions.services.product_recontract_accounting_service import POSTING_PURPOSE
 from subscriptions.services.contract_amendment_service import (
     approve_amendment,
     create_amendment,
@@ -63,6 +67,21 @@ def _amendment_queryset():
         "approved_by",
         "implemented_by",
     ).order_by("-created_at", "-id")
+
+
+def _metadata_int(value):
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _recontract_event_is_executed(event: ContractRecontractEvent | None):
+    if event is None or not isinstance(event.metadata, dict):
+        return False
+    return bool(event.metadata.get("execution_performed") is True or event.metadata.get("execution_status") == "EXECUTED")
 
 
 class CustomerContractAmendmentListCreateView(APIView):
@@ -128,6 +147,13 @@ class CustomerContractAmendmentProductRecontractConsentView(APIView):
         amendment = _amendment_queryset().filter(pk=pk, customer=customer).first()
         if not amendment:
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        latest_event = (
+            ContractRecontractEvent.objects.filter(amendment=amendment)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if _recontract_event_is_executed(latest_event):
+            return Response({"detail": "Product recontract has already been executed."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = ProductRecontractCustomerConsentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -205,6 +231,91 @@ class AdminContractAmendmentListView(APIView):
         if contract_type:
             queryset = queryset.filter(contract_type=contract_type)
         return Response(ContractAmendmentSerializer(queryset, many=True).data, status=status.HTTP_200_OK)
+
+
+class AdminContractAmendmentProductRecontractReportView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        queryset = (
+            ContractRecontractEvent.objects.select_related(
+                "amendment",
+                "amendment__customer",
+                "subscription",
+                "old_product",
+                "new_product",
+            )
+            .prefetch_related("schedule_preview_lines", "financial_impact_previews")
+            .order_by("-created_at", "-id")
+        )
+
+        executed = request.query_params.get("executed")
+        customer_consent_status = request.query_params.get("customer_consent_status")
+        admin_approval_status = request.query_params.get("admin_approval_status")
+        product = request.query_params.get("product")
+        customer = request.query_params.get("customer")
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+
+        if customer_consent_status:
+            queryset = queryset.filter(customer_consent_status=customer_consent_status.strip().upper())
+        if admin_approval_status:
+            queryset = queryset.filter(admin_approval_status=admin_approval_status.strip().upper())
+        if product:
+            product_value = product.strip()
+            product_filter = Q(old_product__name__icontains=product_value) | Q(old_product__product_code__icontains=product_value)
+            product_filter |= Q(new_product__name__icontains=product_value) | Q(new_product__product_code__icontains=product_value)
+            if product_value.isdigit():
+                product_filter |= Q(old_product_id=int(product_value)) | Q(new_product_id=int(product_value))
+            queryset = queryset.filter(product_filter)
+        if customer:
+            customer_value = customer.strip()
+            customer_filter = Q(amendment__customer__name__icontains=customer_value) | Q(amendment__customer__phone__icontains=customer_value)
+            if customer_value.isdigit():
+                customer_filter |= Q(amendment__customer_id=int(customer_value))
+            queryset = queryset.filter(customer_filter)
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+
+        events = list(queryset)
+        if executed:
+            normalized = executed.strip().lower()
+            if normalized in {"true", "1", "yes", "executed"}:
+                events = [event for event in events if _recontract_event_is_executed(event)]
+            elif normalized in {"false", "0", "no", "not_executed"}:
+                events = [event for event in events if not _recontract_event_is_executed(event)]
+        bridge_by_event_id = {
+            int(bridge.source_id): bridge
+            for bridge in AccountingBridgePosting.objects.select_related("journal_entry").filter(
+                source_model="ContractRecontractEvent",
+                source_id__in=[str(event.id) for event in events],
+                purpose=POSTING_PURPOSE,
+            )
+            if str(bridge.source_id).isdigit()
+        }
+        item_ids = []
+        for event in events:
+            if not isinstance(event.metadata, dict):
+                continue
+            item_id = _metadata_int(event.metadata.get("reconciliation_item_id") or event.metadata.get("reconciliation_record_id"))
+            if item_id:
+                item_ids.append(item_id)
+        evidence_by_item_id = {}
+        if item_ids:
+            for item_id, evidence_id in ReconciliationEvidence.objects.filter(item_id__in=item_ids).values_list("item_id", "id"):
+                evidence_by_item_id.setdefault(item_id, []).append(evidence_id)
+
+        serializer = ProductRecontractReportRowSerializer(
+            events,
+            many=True,
+            context={
+                "accounting_bridges": bridge_by_event_id,
+                "reconciliation_evidence_ids": evidence_by_item_id,
+            },
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class AdminContractAmendmentDetailView(APIView):
@@ -344,6 +455,13 @@ class AdminContractAmendmentProductRecontractDecisionView(APIView):
         amendment = _amendment_queryset().filter(pk=pk).first()
         if not amendment:
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
+        latest_event = (
+            ContractRecontractEvent.objects.filter(amendment=amendment)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if _recontract_event_is_executed(latest_event):
+            return Response({"detail": "Product recontract has already been executed."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = ProductRecontractAdminDecisionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
