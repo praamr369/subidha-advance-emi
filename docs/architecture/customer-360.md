@@ -2,7 +2,7 @@
 
 Branch: `update`
 
-Status: **Phase 7E.1 implemented**
+Status: **Phase 7F amendment/recontract visibility implemented**
 
 ## Purpose
 
@@ -76,7 +76,7 @@ The route may link to or use existing approved workflows only:
 - open product recontract addendum print only when the backend reports executed/eligible
 - open the existing recontract report filtered by customer
 
-The cockpit must not add fake buttons such as `Generate receipt`, `Post journal`, `Reconcile now`, `Collect rent/lease`, `Execute approved recontract`, `Apply product change`, `Recalculate EMI now`, `Create accounting posting`, or `Create reconciliation bridge` unless those workflows already exist as approved backend endpoints and route builders and the page is explicitly scoped for that workflow.
+The cockpit must not add fake buttons such as `Generate receipt`, `Post journal`, `Reconcile now`, `Collect rent/lease`, `Execute approved recontract`, `Apply product change`, `Update contract`, `Recalculate EMI now`, `Create accounting posting`, `Create reconciliation bridge`, `Approve recontract preview for future execution`, `Reject recontract preview`, `Save preview snapshot`, `Generate future EMI schedule preview`, or `Generate accounting & reconciliation preview`.
 
 ## Financial posture rules
 
@@ -144,13 +144,26 @@ The panel shows:
 - amendment type
 - contract type
 - requested role
+- requested date
+- approved date when exposed
 - linked subscription or rent/lease reference
 - customer consent status for product recontract when available
 - admin approval status when available
 - accounting evidence status when available
 - reconciliation evidence status when available
+- implemented/executed state
 - executed status
 - executed timestamp when available
+
+For product recontract evidence, the panel shows the backend-provided status chain only when recontract data exists:
+
+- preview saved
+- customer consent
+- admin approval
+- schedule preview
+- accounting posted
+- reconciliation linked
+- executed
 
 The panel links only to:
 
@@ -241,11 +254,15 @@ Frontend tests should cover:
 - subscription link is visible
 - payment/receipt sections handle empty data
 - amendment/recontract panel renders mocked amendment rows
+- latest amendment status is visible
+- requested and approved dates are visible when exposed
+- product recontract status chain is visible when recontract data exists
+- customer consent, admin approval, schedule preview, accounting posted, reconciliation linked, and executed state are visible when exposed
 - executed recontract row shows addendum print link
 - non-executed rows do not show addendum print link
 - empty amendment state is shown
 - amendment/recontract error state keeps the customer profile available
-- no fake receipt, posting, recontract execution, accounting bridge, reconciliation bridge, or rent collection action is visible
+- no fake receipt, posting, recontract execution, preview generation, approval/rejection, accounting bridge, reconciliation bridge, or rent collection action is visible
 - partial operational-profile failure shows a warning instead of breaking the page
 
 Backend tests should cover:
