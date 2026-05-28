@@ -12,10 +12,10 @@ import { FormSection, KpiCard, QuickActionGrid, WorkflowCard } from "@/component
 import {
   getAdminCollectionControlCenter,
   getCashierCollectionControlCenter,
+  type CollectionControlCenterRole,
   type CollectionControlFinanceAccount,
   type CollectionControlPayload,
   type CollectionControlRecentPayment,
-  type CollectionControlRole,
 } from "@/services/collection-control-center";
 
 function money(value: string | number | null | undefined): string {
@@ -170,7 +170,7 @@ function RecentCollections({ rows }: { rows: CollectionControlRecentPayment[] })
   );
 }
 
-export default function CollectionControlCenterView({ role }: { role: CollectionControlRole }) {
+export default function CollectionControlCenterView({ role }: { role: CollectionControlCenterRole }) {
   const [payload, setPayload] = useState<CollectionControlPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -233,17 +233,22 @@ export default function CollectionControlCenterView({ role }: { role: Collection
             <FormSection title="Collection lanes" description="Buttons only navigate to real implemented collection routes. Deferred lanes do not expose fake actions.">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {lanes.map((lane) => (
-                  <WorkflowCard key={lane.key} title={lane.label} description={lane.description || ""}>
-                    {lane.enabled && lane.route ? (
-                      <Link href={lane.route} className="mt-4 inline-flex rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold">
-                        Open lane
-                      </Link>
-                    ) : (
-                      <div className="mt-4 rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
-                        Deferred — endpoint not exposed for collection action yet.
-                      </div>
-                    )}
-                  </WorkflowCard>
+                  <WorkflowCard
+                    key={lane.key}
+                    title={lane.label}
+                    description={lane.description || ""}
+                    action={
+                      lane.enabled && lane.route ? (
+                        <Link href={lane.route} className="inline-flex rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold">
+                          Open lane
+                        </Link>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+                          Deferred — endpoint not exposed for collection action yet.
+                        </div>
+                      )
+                    }
+                  />
                 ))}
               </div>
             </FormSection>
