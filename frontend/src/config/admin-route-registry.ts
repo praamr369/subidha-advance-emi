@@ -178,12 +178,11 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Vendors & Procurement", "Vendor Products", ROUTES.admin.vendorsProducts, "Browse vendor catalogs by selecting a supplier."),
   item("Vendors & Procurement", "Vendor Quotes", ROUTES.admin.vendorsQuotes, "Vendor quote requests and decisions."),
   item("Vendors & Procurement", "Vendor Sourcing", ROUTES.admin.vendorsSourcing, "Read-only sourcing suggestions based on location and score."),
-  item("Vendors & Procurement", "Online Sourcing", ROUTES.admin.vendorsSourcing, "Same sourcing workspace — prioritises enquiries routed from online intents."),
   item(
     "Vendors & Procurement",
     "Online Enquiries",
     ROUTES.admin.onlineEnquiries,
-    "Customer purchase intents for fulfilment sourcing, RFQs, and vendor selection.",
+    "Customer purchase intents for fulfilment sourcing, RFQs, and vendor selection."
   ),
   item("Vendors & Procurement", "Purchase Orders", ROUTES.admin.purchaseOrders, "Purchase order register."),
   item("Vendors & Procurement", "Purchase Bills", ROUTES.admin.purchaseBills, "Purchase bill register."),
