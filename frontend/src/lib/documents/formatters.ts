@@ -16,21 +16,20 @@ const UNSAFE_DOCUMENT_STATUS_LABELS: Record<string, string> = {
 };
 
 export function formatDocumentMoney(value: string | number | null | undefined): string {
-  const numeric = Number(value ?? 0);
-  const safeValue = Number.isFinite(numeric) ? numeric : 0;
+  if (value === null || value === undefined || value === "") return "—";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "—";
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 2,
     minimumFractionDigits: 2,
-  }).format(safeValue);
+  }).format(numeric);
 }
 
 export function formatOptionalDocumentMoney(value: string | number | null | undefined, fallback = "—"): string {
-  if (value === null || value === undefined || value === "") return fallback;
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return fallback;
-  return formatDocumentMoney(numeric);
+  const formatted = formatDocumentMoney(value);
+  return formatted === "—" ? fallback : formatted;
 }
 
 export function formatDocumentDate(value: string | Date | null | undefined): string {
