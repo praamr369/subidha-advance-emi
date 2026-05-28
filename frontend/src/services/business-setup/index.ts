@@ -74,6 +74,62 @@ export type SetupChecklist = {
   counts?: Record<string, unknown>;
 };
 
+export type SetupReadinessStatus = "READY" | "NEEDS_SETUP" | "BLOCKED" | string;
+
+export type SetupReadinessSection = {
+  key: string;
+  title: string;
+  status: SetupReadinessStatus;
+  blockers: string[];
+  warnings: string[];
+  recommended_action: string;
+  target_route: string;
+  why_this_matters: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type SetupReadinessFinanceAccount = {
+  id: number;
+  name: string;
+  kind: string;
+  branch?: string | null;
+  mapped_chart_account?: {
+    id: number;
+    code: string;
+    name: string;
+    account_type: string;
+    allow_manual_posting?: boolean;
+    is_active?: boolean;
+  } | null;
+  posting_ready: boolean;
+  collection_ready: boolean;
+  blocker_reason?: string | null;
+  recommended_action?: string | null;
+};
+
+export type SetupLaunchChecklistItem = {
+  key: string;
+  label: string;
+  ready: boolean;
+  source_section: string;
+};
+
+export type SetupReadinessPayload = {
+  summary: {
+    overall_status: SetupReadinessStatus;
+    ready_count: number;
+    warning_count: number;
+    blocker_count: number;
+    next_recommended_action?: string;
+    next_target_route?: string;
+  };
+  sections: SetupReadinessSection[];
+  finance_accounts: SetupReadinessFinanceAccount[];
+  launch_checklist: SetupLaunchChecklistItem[];
+  read_only?: boolean;
+  mutation_policy?: string;
+};
+
 export type DocumentNumberingSequence = {
   key: string;
   name: string;
@@ -126,6 +182,10 @@ export async function saveDocumentPrintSettings(payload: Partial<DocumentPrintSe
 
 export async function getSetupChecklist(): Promise<SetupChecklist> {
   return apiFetch<SetupChecklist>("/admin/business-setup/checklist/");
+}
+
+export async function getSetupReadiness(): Promise<SetupReadinessPayload> {
+  return apiFetch<SetupReadinessPayload>("/admin/setup/readiness/");
 }
 
 export async function getDocumentNumberingState(): Promise<DocumentNumberingState> {
