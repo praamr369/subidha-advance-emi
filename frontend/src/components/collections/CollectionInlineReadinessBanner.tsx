@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 
@@ -35,13 +36,30 @@ function controlCenterFallback(role: CollectionControlCenterRole): string {
   return role === "cashier" ? "/cashier/collections/control-center" : "/admin/collections/control-center";
 }
 
+type InlineCollectionWorkflow = "advance-emi" | "direct-sale" | "unified" | "subscription";
+
+function normalizeWorkflow(value: string | null | undefined): InlineCollectionWorkflow {
+  const token = String(value || "").trim().toLowerCase();
+  if (token === "direct-sale") return "direct-sale";
+  if (token === "unified") return "unified";
+  if (token === "subscription") return "subscription";
+  return "advance-emi";
+}
+
+function workflowTitle(workflow: InlineCollectionWorkflow): string {
+  if (workflow === "direct-sale") return "Direct-sale collection readiness";
+  if (workflow === "unified") return "Unified collection readiness";
+  return "Advance EMI collection readiness";
+}
+
 export default function CollectionInlineReadinessBanner({
   role,
   workflow,
 }: {
   role: CollectionControlCenterRole;
-  workflow?: "advance-emi" | "direct-sale" | "unified" | "subscription";
+  workflow?: InlineCollectionWorkflow;
 }) {
+  const searchParams = useSearchParams();
   const [payload, setPayload] = useState<CollectionControlPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,11 +94,8 @@ export default function CollectionInlineReadinessBanner({
   const summary = payload?.summary;
   const hasBlockers = blockedAccounts.length > 0;
   const controlCenterHref = payload?.route_hints.collection_center || controlCenterFallback(role);
-  const workflowLabel = workflow === "direct-sale"
-    ? "Direct-sale collection readiness"
-    : workflow === "unified"
-      ? "Unified collection readiness"
-      : "Advance EMI collection readiness";
+  const activeWorkflow = workflow ?? normalizeWorkflow(searchParams.get("workflow"));
+  const workflowLabel = workflowTitle(activeWorkflow);
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm" aria-label="Collection readiness">
@@ -184,7 +199,7 @@ export default function CollectionInlineReadinessBanner({
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <div className="font-semibold">Finance account blocker guidance</div>
               <div className="mt-1 text-amber-900">
-                Blocked finance accounts stay disabled in collection selectors. Do not remap silently; fix the COA/finance mapping first.
+                This collection may fail until blocked finance account mappings are fixed. Blocked finance accounts stay disabled in collection selectors. Do not remap silently; fix the COA/finance mapping first.
               </div>
               <div className="mt-3 space-y-2">
                 {blockedAccounts.slice(0, 3).map((account) => (
