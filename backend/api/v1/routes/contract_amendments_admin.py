@@ -6,11 +6,13 @@ from api.v1.views.contract_recontract_accounting import (
 from api.v1.views.contract_recontract_reconciliation import (
     AdminContractAmendmentProductRecontractReconciliationBridgeView,
 )
+from api.v1.views.contract_amendments_admin_list import (
+    AdminContractAmendmentFilteredListView,
+)
 from api.v1.views.contract_amendments import (
     AdminContractAmendmentApproveView,
     AdminContractAmendmentDetailView,
     AdminContractAmendmentImplementView,
-    AdminContractAmendmentListView,
     AdminContractAmendmentProductRecontractDecisionView,
     AdminContractAmendmentProductRecontractExecuteView,
     AdminContractAmendmentProductRecontractEventListView,
@@ -24,7 +26,7 @@ from api.v1.views.contract_amendments import (
 )
 
 urlpatterns = [
-    path("contract-amendments/", AdminContractAmendmentListView.as_view()),
+    path("contract-amendments/", AdminContractAmendmentFilteredListView.as_view()),
     path("contract-amendments/recontract-report/", AdminContractAmendmentProductRecontractReportView.as_view()),
     path("contract-amendments/<int:pk>/", AdminContractAmendmentDetailView.as_view()),
     path("contract-amendments/<int:pk>/review/", AdminContractAmendmentReviewView.as_view()),
