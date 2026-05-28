@@ -172,12 +172,14 @@ const amendmentRows = [
     amendment_type: "PRODUCT_CHANGE",
     status: "APPROVED",
     reason: "Upgrade product.",
+    approved_at: "2026-05-24T12:00:00Z",
     latest_product_recontract_preview: {
       id: 7001,
       status: "PREVIEWED",
       impact_type: "UPGRADE_EXTRA_PAYABLE",
       customer_consent_status: "ACCEPTED",
       admin_approval_status: "APPROVED",
+      schedule_preview_lines: [{ id: 1 }],
       accounting_bridge_posting_id: 8001,
       journal_entry_id: 8101,
       reconciliation_item_id: 8201,
@@ -277,6 +279,16 @@ test("Customer 360 shows amendment and executed recontract status with addendum 
   await expect(page.getByText("Contract Amendments & Recontracts")).toBeVisible();
   await expect(page.getByText("AMD-901")).toBeVisible();
   await expect(page.getByText("Product change")).toBeVisible();
+  await expect(page.getByText("Requested date").first()).toBeVisible();
+  await expect(page.getByText("Approved date").first()).toBeVisible();
+  await expect(page.getByText("Product recontract status chain")).toBeVisible();
+  await expect(page.getByText("Preview saved")).toBeVisible();
+  await expect(page.getByText("Customer consent")).toBeVisible();
+  await expect(page.getByText("Admin approval")).toBeVisible();
+  await expect(page.getByText("Schedule preview")).toBeVisible();
+  await expect(page.getByText("Accounting posted")).toBeVisible();
+  await expect(page.getByText("Reconciliation linked")).toBeVisible();
+  await expect(page.getByText("Executed").first()).toBeVisible();
   await expect(page.getByText("ACCEPTED")).toBeVisible();
   await expect(page.getByText("POSTED")).toBeVisible();
   await expect(page.getByText("LINKED")).toBeVisible();
@@ -291,11 +303,24 @@ test("Customer 360 shows amendment and executed recontract status with addendum 
   await expect(page.getByText("AMD-902")).toBeVisible();
   await expect(page.getByRole("link", { name: /Recontract addendum \/ print/i })).toHaveCount(1);
 
-  await expect(page.getByRole("button", { name: /Execute approved recontract/i })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Apply product change/i })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Recalculate EMI now/i })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Create accounting posting/i })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Create reconciliation bridge/i })).toHaveCount(0);
+  const forbiddenActions = [
+    /Execute approved recontract/i,
+    /Apply product change/i,
+    /Update contract/i,
+    /Recalculate EMI now/i,
+    /Create accounting posting/i,
+    /Create reconciliation bridge/i,
+    /Approve recontract preview for future execution/i,
+    /Reject recontract preview/i,
+    /Save preview snapshot/i,
+    /Generate future EMI schedule preview/i,
+    /Generate accounting & reconciliation preview/i,
+  ];
+
+  for (const actionName of forbiddenActions) {
+    await expect(page.getByRole("button", { name: actionName })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: actionName })).toHaveCount(0);
+  }
 });
 
 test("Customer 360 amendment panel shows empty state", async ({ page }) => {
