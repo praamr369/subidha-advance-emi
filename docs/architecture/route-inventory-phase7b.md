@@ -2,7 +2,7 @@
 
 Branch: `update`
 
-Status: **Implemented as a static route-checker hardening pass**
+Status: **Implemented as a static route-checker hardening pass; Phase 7H role-navigation stabilization noted**
 
 Date: 2026-05-28
 
@@ -11,6 +11,23 @@ Date: 2026-05-28
 Phase 7B refreshes the route inventory/checking workflow after recent route additions, including Phase 7C Setup Readiness and the product recontract/addendum workflow.
 
 This phase is frontend/static-analysis only. No backend endpoints, models, serializers, financial services, payment flows, accounting services, reconciliation services, inventory services, delivery services, commission/payout services, amendment execution services, or recontract services were changed.
+
+## Phase 7H release-stabilization note
+
+Phase 7H is release stabilization and role-specific polish. It does not introduce new financial behavior.
+
+Targeted Phase 7H navigation fixes:
+
+- Admin route constants now expose `/admin/collections/control-center` as `ROUTES.admin.collectionControlCenter`.
+- Cashier route constants now expose `/cashier/collections/control-center` as `ROUTES.cashier.collectionControlCenter`.
+- Admin navigation includes the real **Collection Control Center** under Finance & Accounting.
+- Cashier navigation includes the real **Collection Control Center** under Collections.
+- Cashier navigation no longer exposes a fake/deferred `Rent / Lease Collection` shortcut because rent/lease collection remains visibility-only until an approved endpoint exists.
+- Cashier `Cash Closing` now points to `/cashier/day-close` instead of payment history.
+
+No route family was deleted. Compatibility routes remain preserved.
+
+Full RC validation is required before merge/deploy.
 
 ## Existing route tooling found
 
@@ -33,6 +50,9 @@ Phase 7B kept the same script names and hardened the existing checker instead of
 ```text
 frontend/scripts/check-routes.mjs
 frontend/src/lib/route-builders.ts
+frontend/src/lib/routes.ts
+frontend/src/config/admin-route-registry.ts
+frontend/src/config/navigation.ts
 docs/architecture/route-inventory-phase7b.md
 ```
 
@@ -44,6 +64,8 @@ docs/architecture/route-inventory-phase7b.md
 2. Compatibility route stubs that must continue to exist.
 3. Recently added required routes:
    - `/admin/setup/readiness`
+   - `/admin/collections/control-center`
+   - `/cashier/collections/control-center`
    - `/admin/contract-amendments`
    - `/admin/contract-amendments/[id]`
    - `/admin/contract-amendments/recontract-report`
@@ -101,21 +123,19 @@ buildCustomerProductRecontractAddendumPrintRoute(id)
 
 ## Known deferred route-builder warning
 
-`buildAdminFinanceAccountStatementPrintRoute()` still targets:
+`buildAdminFinanceAccountStatementPrintRoute()` targets:
 
 ```text
 /admin/finance/accounts/[financeAccountId]/statement/print
 ```
 
-The page is not currently present in the observed App Router tree, and no primary navigation exposes it. Phase 7B treats it as a warning/deferred builder, not a hard failure, to avoid inventing a fake print page or deleting a potentially planned compatibility builder.
+The finance-account statement print page exists at:
 
-Future safe options:
+```text
+/admin/finance/accounts/[id]/statement/print
+```
 
-| Option | Classification | Notes |
-|---|---|---|
-| Add the real finance-account statement print page | migrate then keep | Only if there is a real payload/service contract. |
-| Redirect builder to an existing canonical finance/accounting statement route | fix now only if confirmed | Requires confirming an existing implemented route and API contract. |
-| Remove the builder | defer | Do not remove until usage search confirms it is unused. |
+The checker should treat `[financeAccountId]` and `[id]` as equivalent dynamic route segments. Do not add a duplicate print route for this.
 
 ## Print route check
 
@@ -153,28 +173,9 @@ docs/operations/frontend-route-inventory.md
 
 Because this implementation was applied through the GitHub connector, the npm scripts were not executed here. The checker and generator are ready for local execution on branch `update`.
 
-## Required Phase 7B route checks
-
-The hardened checker explicitly covers these requested recent route families:
-
-```text
-/admin/setup/readiness
-/admin/contract-amendments/recontract-report
-/admin/contract-amendments/:id/recontract-addendum/print
-/customer/contract-amendments/:id/recontract-addendum/print
-/admin/contract-amendments
-/admin/contract-amendments/:id
-/customer/contract-amendments
-/customer/contract-amendments/:id
-/partner/contract-amendments
-/partner/contract-amendments/:id
-```
-
-The checker normalizes App Router dynamic segments such as `[id]` and `[caseId]` into route patterns for comparison.
-
 ## Backend impact
 
-No backend files changed in Phase 7B.
+No backend files changed in Phase 7B or the Phase 7H role-navigation stabilization note.
 
 No endpoints were added, removed, renamed, or altered.
 
@@ -217,7 +218,7 @@ recontract records
 
 Auditability improves by making route and navigation drift detectable before release.
 
-No audit records are created or mutated because this is static route tooling only.
+No audit records are created or mutated because this is static route/navigation tooling only.
 
 ## Daily shop usability impact
 
@@ -225,17 +226,15 @@ Admin navigation and route builders are less likely to drift away from real impl
 
 The checker protects staff-facing navigation from stale or wrong-role links.
 
+Cashier users now receive a real collection-readiness route and no fake rent/lease collection shortcut.
+
 ## Future rent/lease compatibility
 
 Preserved.
 
-No rent/lease route family was removed. Existing rent/lease print route-builder coverage remains in the checker:
+No rent/lease route family was removed. Existing rent/lease visibility, subscription, delivery, return, deposit, and print routes remain intact.
 
-```text
-/admin/rent-lease/contracts/[id]/contract/print
-```
-
-Future route additions should update `requiredRoutes` or `builderRoutes` in `frontend/scripts/check-routes.mjs` when the route is operationally important or used by route builders.
+Rent/lease collection remains deferred until a real approved collection endpoint exists.
 
 ## Validation commands
 
@@ -253,30 +252,4 @@ npm run typecheck
 npm run lint
 ```
 
-Do not run:
-
-```bash
-bash scripts/run-release-candidate.sh
-```
-
-## Expected result
-
-`npm run check:routes` should fail on:
-
-- route collisions
-- missing compatibility routes
-- missing required recent routes
-- route constants pointing to missing pages, except documented allow-list items
-- admin/role navigation pointing to missing pages
-- exact duplicate visible nav entries
-- customer/partner/cashier/vendor links pointing to wrong role prefixes
-- required route builders targeting missing pages
-- obvious print route dashboard shell contamination
-
-It may warn on:
-
-```text
-buildAdminFinanceAccountStatementPrintRoute
-```
-
-until that deferred builder is either implemented, redirected to a confirmed real route, or removed after usage review.
+Full Phase 7H RC validation still requires the full backend, frontend, Playwright, and release-candidate command set from the phase brief.
