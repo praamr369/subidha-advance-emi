@@ -2,6 +2,16 @@ import { ROUTES } from "@/lib/routes";
 
 export type AdminReconciliationView = "subscriptions" | "payments";
 
+export type ContractAmendmentReportParams = {
+  executed?: string | null;
+  customer_consent_status?: string | null;
+  admin_approval_status?: string | null;
+  product?: string | number | null;
+  customer?: string | number | null;
+  date_from?: string | null;
+  date_to?: string | null;
+};
+
 type QueryParamPrimitive = string | number | boolean | null | undefined;
 
 const ADMIN_RENT_LEASE_CONTRACTS_ROUTE = "/admin/rent-lease/contracts";
@@ -151,6 +161,22 @@ export function buildAdminBillingInvoicesRoute(params: Omit<AdminBillingRoutePar
 
 export function buildAdminBillingReceiptsRoute(params: Pick<AdminBillingRouteParams, "payment" | "billing_invoice" | "direct_sale" | "subscription" | "customer" | "source_type"> = {}): string {
   return buildRouteWithQuery(ROUTES.admin.billingReceipts, params);
+}
+
+export function buildAdminContractAmendmentRoute(id: number | string): string {
+  return `${ROUTES.admin.contractAmendments}/${id}`;
+}
+
+export function buildAdminRecontractReportRoute(params: ContractAmendmentReportParams = {}): string {
+  return buildRouteWithQuery(ROUTES.admin.contractAmendmentsRecontractReport, params);
+}
+
+export function buildCustomerContractAmendmentRoute(id: number | string): string {
+  return `${ROUTES.customer.contractAmendments}/${id}`;
+}
+
+export function buildPartnerContractAmendmentRoute(id: number | string): string {
+  return `${ROUTES.partner.contractAmendments}/${id}`;
 }
 
 export function buildAdminSubscriptionRoute(id: number | string): string {
