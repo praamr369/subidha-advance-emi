@@ -246,6 +246,7 @@ export const ROUTES = {
     settingsRoles: "/admin/settings/roles",
     settingsRolesPermissions: "/admin/settings/roles-permissions",
     settingsBusinessSetup: "/admin/settings/business-setup",
+    setupReadiness: "/admin/setup/readiness",
     settingsBusinessSetupProfile: "/admin/settings/business-setup/profile",
     settingsBusinessSetupBranches: "/admin/settings/business-setup/branches",
     settingsBusinessSetupFinanceAccounts: "/admin/settings/business-setup/finance-accounts",
