@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -175,7 +175,7 @@ export default function CollectionControlCenterView({ role }: { role: Collection
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       setPayload(role === "cashier" ? await getCashierCollectionControlCenter() : await getAdminCollectionControlCenter());
@@ -186,11 +186,11 @@ export default function CollectionControlCenterView({ role }: { role: Collection
     } finally {
       setLoading(false);
     }
-  }
+  }, [role]);
 
   useEffect(() => {
     void load();
-  }, [role]);
+  }, [load]);
 
   const title = role === "cashier" ? "Cashier Collection Control Center" : "Collection Control Center";
   const breadcrumbs = role === "cashier"

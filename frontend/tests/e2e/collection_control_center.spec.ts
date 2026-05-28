@@ -150,7 +150,7 @@ test.describe("admin collection control center", () => {
     await expect(page.getByText("Blocked Cash Desk")).toBeVisible();
     await expect(page.getByText("Mapped chart account is a group/control account")).toBeVisible();
     await expect(page.getByRole("link", { name: "Open Accounting Setup" })).toHaveAttribute("href", "/admin/accounting/setup");
-    await expect(page.getByText("Direct-sale collection")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Direct-sale collection" })).toBeVisible();
     await expect(page.getByText("Rent/lease collection")).toBeVisible();
     await expect(page.getByText("Deferred — endpoint not exposed for collection action yet.")).toBeVisible();
     await expect(page.getByText("Not exposed").first()).toBeVisible();
@@ -162,11 +162,11 @@ test.describe("admin collection control center", () => {
 
     await page.goto("/admin/finance/collect?workflow=advance-emi");
 
-    await expect(page.getByLabel("Collection readiness")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Collection readiness" })).toBeVisible();
     await expect(page.getByText("Advance EMI collection readiness")).toBeVisible();
     await expect(page.getByText("Blocked Cash Desk")).toBeVisible();
     await expect(page.getByText("Mapped chart account is a group/control account")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Accounting setup" })).toHaveAttribute("href", "/admin/accounting/setup");
+    await expect(page.getByRole("link", { name: "Accounting setup", exact: true })).toHaveAttribute("href", "/admin/accounting/setup");
     await expect(page.getByText("Receipt posture: Not exposed · Reconciliation posture: Not exposed")).toBeVisible();
     await expect(page.getByRole("link", { name: /Collect rent/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Collect rent/i })).toHaveCount(0);
@@ -178,7 +178,7 @@ test.describe("admin collection control center", () => {
 
     await page.goto("/admin/finance/collect?workflow=direct-sale");
 
-    await expect(page.getByLabel("Collection readiness")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Collection readiness" })).toBeVisible();
     await expect(page.getByText("Direct sale due")).toBeVisible();
     await expect(page.getByText("Finance account blocker guidance")).toBeVisible();
     await expect(page.getByRole("link", { name: "Open control center" })).toHaveAttribute("href", "/admin/collections/control-center");
@@ -204,7 +204,7 @@ test.describe("cashier collection control center", () => {
 
     await page.goto("/cashier/collect");
 
-    await expect(page.getByLabel("Collection readiness")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Collection readiness" })).toBeVisible();
     await expect(page.getByText("Advance EMI collection readiness")).toBeVisible();
     await expect(page.getByText("Blocked Cash Desk")).toBeVisible();
     await expect(page.getByText("Ask admin to fix accounting setup.")).toBeVisible();

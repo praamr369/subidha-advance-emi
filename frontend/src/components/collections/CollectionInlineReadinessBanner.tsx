@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -64,7 +64,7 @@ export default function CollectionInlineReadinessBanner({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const next = role === "cashier"
@@ -78,13 +78,11 @@ export default function CollectionInlineReadinessBanner({
     } finally {
       setLoading(false);
     }
-  }
+  }, [role]);
 
   useEffect(() => {
     void load();
-    // role is stable per mounted collection page.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
+  }, [load]);
 
   const blockedAccounts = useMemo(
     () => (payload?.finance_account_readiness.accounts ?? []).filter((account) => !account.collection_ready),
