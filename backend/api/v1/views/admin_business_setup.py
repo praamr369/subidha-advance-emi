@@ -188,8 +188,6 @@ class BusinessSetupResetExecuteView(APIView):
         dry_run = bool(serializer.validated_data["dry_run"])
         confirm = bool(serializer.validated_data["confirm"])
 
-        # Extra safety: only the admin that will be preserved may execute the reset.
-        # This prevents an admin from accidentally deleting the login they intend to keep.
         if (request.user.username or "").strip() != preserve_username:
             return Response(
                 {"detail": "Reset can only be executed by the preserved admin username."},
@@ -474,8 +472,6 @@ class AdminSetupReadinessView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        if not _sandbox_enabled():
-            return Response({"detail": "Local sandbox tools are disabled in this environment."}, status=status.HTTP_403_FORBIDDEN)
         return Response(get_setup_readiness(), status=status.HTTP_200_OK)
 
 
