@@ -56,6 +56,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Staff & Business Setup", "Expense Claims", ROUTES.admin.hrExpenses, "Approve or reject employee expense claims."),
   item("Staff & Business Setup", "Staff Documents", ROUTES.admin.hrStaffDocuments, "Manage staff KYC and agreement documents."),
   item("Staff & Business Setup", "Roles & Permissions", ROUTES.admin.settingsRolesPermissions, "Role setup and access control."),
+  item("Staff & Business Setup", "Setup Readiness", ROUTES.admin.setupReadiness, "Admin-only read-only business readiness center for master data, finance accounts, collections, documents, and recontract gates."),
   item("Staff & Business Setup", "Branches", ROUTES.admin.branches, "Branch configuration."),
   item("Staff & Business Setup", "Counters / Cash Desks", ROUTES.admin.counters, "Cash counter and desk configuration."),
 
