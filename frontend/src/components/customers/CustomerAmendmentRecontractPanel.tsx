@@ -56,6 +56,31 @@ function toErrorMessage(error: unknown): string {
   return "Could not load amendment/recontract activity.";
 }
 
+function statusFromBoolean(value: boolean): string {
+  return value ? "YES" : "NO";
+}
+
+function getWorkflowSteps(amendment: AmendmentRecord, recontract: ProductRecontractReportRow | null) {
+  const preview = amendment.latest_product_recontract_preview;
+  const hasRecontractEvidence = Boolean(preview || recontract);
+  if (!hasRecontractEvidence) return [];
+
+  const executed = Boolean(recontract?.executed || preview?.executed);
+  const scheduleStatus = recontract?.schedule_preview_status ?? (preview?.schedule_preview_lines?.length ? "GENERATED" : "MISSING");
+  const accountingStatus = recontract?.accounting_posting_status ?? (preview?.accounting_bridge_posting_id && preview?.journal_entry_id ? "POSTED" : "MISSING");
+  const reconciliationStatus = recontract?.reconciliation_bridge_status ?? (preview?.reconciliation_item_id && preview?.reconciliation_run_id && (preview?.reconciliation_evidence_ids?.length ?? 0) > 0 ? "LINKED" : "MISSING");
+
+  return [
+    { label: "Preview saved", status: statusFromBoolean(hasRecontractEvidence) },
+    { label: "Customer consent", status: recontract?.customer_consent_status ?? preview?.customer_consent_status ?? "Not exposed" },
+    { label: "Admin approval", status: recontract?.admin_approval_status ?? preview?.admin_approval_status ?? "Not exposed" },
+    { label: "Schedule preview", status: scheduleStatus },
+    { label: "Accounting posted", status: accountingStatus },
+    { label: "Reconciliation linked", status: reconciliationStatus },
+    { label: "Executed", status: executed ? "EXECUTED" : "NOT_EXECUTED" },
+  ];
+}
+
 export default function CustomerAmendmentRecontractPanel({
   customerId: explicitCustomerId,
 }: {
@@ -118,9 +143,6 @@ export default function CustomerAmendmentRecontractPanel({
     [amendments],
   );
   const latestAmendment = amendments[0] ?? null;
-  const latestRecontract = latestAmendment
-    ? recontractForAmendment(latestAmendment, recontractRows)
-    : recontractRows[0] ?? null;
   const visibleAmendments = amendments.slice(0, 6);
 
   return (
@@ -199,6 +221,8 @@ export default function CustomerAmendmentRecontractPanel({
             const reconciliationStatus = recontract?.reconciliation_bridge_status ?? (preview?.reconciliation_item_id && preview?.reconciliation_run_id && (preview?.reconciliation_evidence_ids?.length ?? 0) > 0 ? "LINKED" : "MISSING");
             const customerConsent = recontract?.customer_consent_status ?? preview?.customer_consent_status ?? null;
             const adminApproval = recontract?.admin_approval_status ?? preview?.admin_approval_status ?? null;
+            const workflowSteps = getWorkflowSteps(amendment, recontract);
+            const implementedOrExecutedAt = amendment.implemented_at ?? amendment.applied_at ?? executedAt;
 
             return (
               <div key={amendment.id} className="rounded-xl border border-border bg-background px-4 py-3">
@@ -240,6 +264,14 @@ export default function CustomerAmendmentRecontractPanel({
 
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                   <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Requested date</div>
+                    <div className="mt-1 text-xs font-medium text-foreground">{formatDateTime(amendment.created_at)}</div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Approved date</div>
+                    <div className="mt-1 text-xs font-medium text-foreground">{formatDateTime(amendment.approved_at)}</div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Customer consent</div>
                     <div className="mt-1 text-xs font-medium text-foreground">{evidenceLabel(customerConsent)}</div>
                   </div>
@@ -247,6 +279,13 @@ export default function CustomerAmendmentRecontractPanel({
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Admin approval</div>
                     <div className="mt-1 text-xs font-medium text-foreground">{evidenceLabel(adminApproval)}</div>
                   </div>
+                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Implemented / executed</div>
+                    <div className="mt-1 text-xs font-medium text-foreground">{formatDateTime(implementedOrExecutedAt)}</div>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Accounting evidence</div>
                     <div className="mt-1 text-xs font-medium text-foreground">{evidenceStatus(accountingStatus)}</div>
@@ -260,6 +299,22 @@ export default function CustomerAmendmentRecontractPanel({
                     <div className="mt-1 text-xs font-medium text-foreground">{formatDateTime(executedAt)}</div>
                   </div>
                 </div>
+
+                {workflowSteps.length > 0 ? (
+                  <div className="mt-3 rounded-xl border border-border bg-muted/20 px-3 py-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Product recontract status chain
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                      {workflowSteps.map((step) => (
+                        <div key={`${amendment.id}-${step.label}`} className="rounded-lg border border-border bg-background px-3 py-2">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{step.label}</div>
+                          <div className="mt-1 text-xs font-medium text-foreground">{evidenceLabel(step.status)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             );
           })}
