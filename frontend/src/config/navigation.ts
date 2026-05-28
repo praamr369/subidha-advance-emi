@@ -116,9 +116,20 @@ function inferAdminBadgeSource(item: AdminRouteRegistryItem): string | undefined
   return item.badgeSource;
 }
 
+function isSuppressedAdminWorkflowRoute(label: string, href: string): boolean {
+  const normalizedLabel = label.trim().toLowerCase();
+  const pathname = href.split("?")[0] ?? href;
+  return (
+    (normalizedLabel === "security deposits" && pathname === ROUTES.admin.financeDeposits) ||
+    (normalizedLabel === "possession / handover" && pathname === ROUTES.admin.deliveries) ||
+    (normalizedLabel === "return inspections" && pathname === ROUTES.admin.serviceDeskReturns)
+  );
+}
+
 function isSecondaryWorkflowRoute(label: string, href: string): boolean {
   const normalizedLabel = label.trim().toLowerCase();
   const pathname = href.split("?")[0] ?? href;
+  if (isSuppressedAdminWorkflowRoute(label, href)) return true;
   if (/^create\s/.test(normalizedLabel)) return true;
   if (/^edit\s/.test(normalizedLabel)) return true;
   if (normalizedLabel.includes(" detail")) return true;
