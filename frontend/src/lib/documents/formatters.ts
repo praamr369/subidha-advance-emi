@@ -26,6 +26,13 @@ export function formatDocumentMoney(value: string | number | null | undefined): 
   }).format(safeValue);
 }
 
+export function formatOptionalDocumentMoney(value: string | number | null | undefined, fallback = "—"): string {
+  if (value === null || value === undefined || value === "") return fallback;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return formatDocumentMoney(numeric);
+}
+
 export function formatDocumentDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const parsed = value instanceof Date ? value : new Date(value);
