@@ -36,6 +36,10 @@ const requiredRoutes = [
 ];
 
 const builderRoutes = [
+  ["buildAdminContractAmendmentRoute", "/admin/contract-amendments/[id]", true],
+  ["buildAdminRecontractReportRoute", "/admin/contract-amendments/recontract-report", true],
+  ["buildCustomerContractAmendmentRoute", "/customer/contract-amendments/[id]", true],
+  ["buildPartnerContractAmendmentRoute", "/partner/contract-amendments/[id]", true],
   ["buildAdminSubscriptionRoute", "/admin/subscriptions/[id]", true],
   ["buildAdminSubscriptionContractPrintRoute", "/admin/subscriptions/[id]/contract/print", true],
   ["buildAdminProductRecontractAddendumPrintRoute", "/admin/contract-amendments/[id]/recontract-addendum/print", true],
