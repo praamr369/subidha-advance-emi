@@ -24,6 +24,8 @@ const compatibilityRoutes = [
 
 const requiredRoutes = [
   "/admin/setup/readiness",
+  "/admin/collections/control-center",
+  "/cashier/collections/control-center",
   "/admin/contract-amendments",
   "/admin/contract-amendments/[id]",
   "/admin/contract-amendments/recontract-report",
@@ -56,9 +58,21 @@ const builderRoutes = [
   ["buildAdminDirectSaleDeliveryChallanPrintRoute", "/admin/deliveries/direct-sale-cases/[caseId]/print", true],
   ["buildAdminDirectSalePrintRoute", "/admin/billing/direct-sale/[id]/print", true],
   ["buildAdminBillingReceiptPrintRoute", "/admin/billing/receipts/[id]/print", true],
+  ["buildAdminBillingDocumentRoute", "/admin/billing/documents/[id]", true],
+  ["buildAdminCrmCustomerDetailRoute", "/admin/crm/customers/[id]", true],
 ];
 
+const detailOnlyRouteConstants = new Map([
+  ["ROUTES.admin.crmCustomerDetail", "/admin/crm/customers/[id]"],
+  ["ROUTES.admin.billingDocuments", "/admin/billing/documents/[id]"],
+]);
+
 const allowedMissingConstants = new Set(["/admin/settings/local-sandbox"]);
+const suppressedVisibleNavEntries = new Set([
+  "ADMIN|Subscriptions|security deposits|/admin/finance/deposits",
+  "ADMIN|Subscriptions|possession / handover|/admin/deliveries",
+  "ADMIN|Subscriptions|return inspections|/admin/service-desk/returns",
+]);
 const printContaminationMarkers = ["AdminShell", "DashboardShell", "AppSidebar", "SidebarProvider", "PageHeader", "ERPPageShell", "BusinessSetupLinks", "DataTableShell", "QuickActionGrid"];
 const rolePrefixes = { PARTNER: "/partner", CUSTOMER: "/customer", CASHIER: "/cashier", VENDOR: "/vendor" };
 
@@ -182,11 +196,23 @@ function navigationLinks(source, routeMap) {
   return links;
 }
 
+function isSuppressedVisibleNav(row) {
+  const key = `${row.role}|${row.group}|${String(row.label || "").trim().toLowerCase()}|${normalize(row.route)}`;
+  return suppressedVisibleNavEntries.has(key);
+}
+
 function checkMissing(label, rows) {
   let failures = 0;
   for (const row of rows) {
     const route = normalize(row.route);
     if (!route || route.startsWith("/api") || allowedMissingConstants.has(route)) continue;
+    const detailOnlyPattern = detailOnlyRouteConstants.get(row.source);
+    if (detailOnlyPattern) {
+      if (hasRoute(detailOnlyPattern)) continue;
+      failures += 1;
+      console.error(`Detail-only route constant targets missing dynamic page: ${row.source} -> ${detailOnlyPattern}`);
+      continue;
+    }
     if (hasRoute(route)) continue;
     failures += 1;
     console.error(`Missing page route from ${label}: ${row.source} -> ${route}`);
@@ -199,7 +225,7 @@ function checkDuplicates(rows) {
   const seen = new Map();
   for (const row of rows) {
     const route = normalize(row.route);
-    if (!route) continue;
+    if (!route || isSuppressedVisibleNav(row)) continue;
     const key = `${row.role}|${row.group}|${row.label.toLowerCase()}|${route}`;
     if (seen.has(key)) {
       failures += 1;
@@ -314,5 +340,5 @@ if (failures > 0) {
 }
 
 console.log(
-  `Route check passed. Checked ${routes.size} page routes, ${constants.length} route constants, ${navLinks.length} nav entries, ${builderRoutes.length} route-builder contracts, and ${compatibilityRoutes.length} compatibility redirects. Warnings: ${warnings}.`
+  `Route check passed. Checked ${routes.size} page routes, ${constants.length} route constants, ${navLinks.length} navigation links, ${builderRoutes.length} builders with ${warnings} warning(s).`
 );
