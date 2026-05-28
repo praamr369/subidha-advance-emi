@@ -2,7 +2,7 @@
 
 Branch: `update`
 
-Status: **Phase 7D implemented**
+Status: **Phase 7E inline readiness integrated**
 
 ## Purpose
 
@@ -19,11 +19,22 @@ It centralizes:
 - receipt/reconciliation posture where backend data is available
 - route hints to existing safe collection workflows
 
+Phase 7E also integrates a compact read-only readiness banner directly into the actual collection pages:
+
+```text
+/admin/finance/collect
+/cashier/collect
+```
+
+The inline banner is visibility-only. It does not post money, create receipts, create journals, create reconciliation records, or alter collection form behavior.
+
 ## Frontend routes
 
 ```text
 /admin/collections/control-center
 /cashier/collections/control-center
+/admin/finance/collect
+/cashier/collect
 ```
 
 ## API routes
@@ -33,7 +44,7 @@ GET /api/v1/admin/collections/control-center/
 GET /api/v1/cashier/collections/control-center/
 ```
 
-Both endpoints are read-only.
+Both endpoints are read-only and are reused by the full control-center pages and the compact inline banners.
 
 ## Role behavior
 
@@ -53,6 +64,19 @@ Admin collection lanes navigate only to existing collection routes:
 /admin/payments
 ```
 
+The inline admin banner appears on `/admin/finance/collect` before the existing collection page content and shows:
+
+- ready finance account count
+- blocked finance account count
+- overdue EMI count
+- pending EMI amount
+- direct-sale outstanding amount
+- rent/lease due amount
+- nullable receipt/reconciliation posture as `Not exposed`
+- top finance account blockers and recommended action
+- link to full control center
+- link to accounting setup when exposed by the backend payload
+
 ### Cashier
 
 Cashier receives a cashier-safe payload scoped by branch where branch scoping applies.
@@ -71,9 +95,11 @@ Cashier collection lanes navigate only to existing cashier collection routes:
 /cashier/payments
 ```
 
+The inline cashier banner appears inside `/cashier/collect` before the existing collection workflow and shows the same compact readiness posture without exposing an accounting setup edit link.
+
 ### Customer / partner / vendor
 
-These roles do not receive collection control-center routes or navigation exposure.
+These roles do not receive collection control-center routes, inline collection readiness banners, or navigation exposure.
 
 ## Backend behavior
 
@@ -125,7 +151,9 @@ Blocked finance accounts remain visible for diagnosis. The UI shows the specific
 This account cannot receive payments because it is mapped to a non-posting Chart of Account.
 ```
 
-The control center does not silently remap accounts.
+The control center and inline banners do not silently remap accounts.
+
+Collection selectors on the existing pages still disable blocked finance accounts, and submit handlers still reject selected blocked accounts before calling the existing collection services.
 
 ## Collection lanes
 
@@ -135,6 +163,26 @@ The control center does not silently remap accounts.
 | Direct-sale collection | Enabled | Navigates to the existing direct-sale collection workflow. |
 | Rent/lease collection | Deferred | Shows demand visibility but no fake collection action. |
 | Customer advance | Enabled only through existing page context | Navigates to existing collection page; no new posting endpoint is introduced. |
+
+## Inline readiness rule
+
+Inline readiness banners do not:
+
+- post payment
+- create receipts
+- create journal entries
+- create reconciliation records
+- create settlement records
+- create day-close records
+- create direct-sale collections
+- create EMI collections
+- collect rent/lease demands
+- collect deposits
+- mutate subscriptions, EMIs, demands, invoices, inventory, delivery, commission, payout, lucky draw, Lucky ID, batch, amendment, or recontract records
+- remap finance accounts
+- bypass finance-account posting readiness
+
+The banner only reads the Phase 7D payload and displays blockers earlier in the collection workflow.
 
 ## Read-only rule
 
@@ -158,21 +206,23 @@ All money-changing actions remain in existing approved collection endpoints.
 
 No migration is required.
 
-No existing business records are changed by the control-center read endpoints.
+No existing business records are changed by the control-center read endpoints or inline readiness banners.
 
 ## Financial integrity impact
 
 Financial integrity is preserved.
 
-The control center does not weaken finance account posting-readiness validation. It only displays readiness and route hints. Collection continues through existing backend services that enforce payment and finance account validation.
+The control center and inline banners do not weaken finance account posting-readiness validation. They only display readiness and route hints. Collection continues through existing backend services that enforce payment and finance account validation.
 
 ## Auditability impact
 
-Auditability improves by making collection readiness and finance-account blockers visible before payment collection. The control center itself creates no audit records because it performs no mutation.
+Auditability improves by making collection readiness and finance-account blockers visible before payment collection. The control center itself and inline banners create no audit records because they perform no mutation.
 
 ## Daily shop usability impact
 
 Admin and cashier users can inspect collection readiness, blocked accounts, receivable lane posture, and recent payments from one page before collecting money.
+
+With Phase 7E, the same compact readiness posture appears directly inside the actual collection pages, so staff see blockers before selecting accounts and posting attempts.
 
 Cashiers receive actionable blocker explanations without being exposed to accounting setup edit controls.
 
@@ -180,11 +230,13 @@ Cashiers receive actionable blocker explanations without being exposed to accoun
 
 Rent/lease demand counts and outstanding amounts are visible in the summary.
 
-The rent/lease collection lane remains deferred until a confirmed approved collection endpoint is available. This keeps the future rent/lease workflow compatible without inventing fake actions or bypassing controls.
+The rent/lease collection lane remains deferred until a confirmed approved collection endpoint is available. The inline readiness banner shows rent/lease due posture but does not add a fake rent/lease collection action.
+
+This keeps the future rent/lease workflow compatible without inventing fake actions or bypassing controls.
 
 ## Validation commands
 
-Backend, because backend files changed:
+Backend is not required for Phase 7E because no backend files changed. Existing backend safeguards can still be checked with:
 
 ```bash
 cd backend
