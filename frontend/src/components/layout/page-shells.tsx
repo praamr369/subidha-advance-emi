@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import CollectionInlineReadinessBanner from "@/components/collections/CollectionInlineReadinessBanner";
 import { cn } from "@/lib/utils";
 
 /**
@@ -317,6 +318,7 @@ export function CashierWorkflowShell({
   if (!structured && hasRenderable(children)) {
     return (
       <div className={cn(shellColumn, "pb-24 sm:pb-6", className)}>
+        <CollectionInlineReadinessBanner role="cashier" />
         <section aria-label="Cashier collection workflow" className="min-w-0 space-y-6">
           {children}
         </section>
@@ -326,6 +328,7 @@ export function CashierWorkflowShell({
 
   return (
     <div className={cn(shellColumn, "pb-24 sm:pb-6", className)}>
+      <CollectionInlineReadinessBanner role="cashier" />
       <ShellSlot aria-label="Search">{search}</ShellSlot>
       <ShellSlot aria-label="Results">{results}</ShellSlot>
       <ShellSlot aria-label="Selected item">{selected}</ShellSlot>
@@ -360,68 +363,12 @@ export function AccountingControlShell({
   drawers,
   children,
 }: AccountingControlShellProps) {
-  const primary = primaryRegister ?? children;
-  const structured =
-    hasRenderable(readinessWarnings) ||
-    hasRenderable(primaryRegister) ||
-    hasRenderable(controlPanel) ||
-    hasRenderable(drawers);
+  const structured = hasRenderable(readinessWarnings) || hasRenderable(primaryRegister) || hasRenderable(controlPanel) || hasRenderable(drawers);
 
   if (!structured && hasRenderable(children)) {
     return (
       <div className={cn(shellColumn, className)}>
-        <section aria-label="Accounting controls" className="min-w-0 space-y-6">
-          {children}
-        </section>
-      </div>
-    );
-  }
-
-  const splitControl = hasRenderable(controlPanel);
-
-  return (
-    <div className={cn(shellColumn, className)}>
-      <ShellSlot aria-label="Readiness and warnings">{readinessWarnings}</ShellSlot>
-      {splitControl ? (
-        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(14rem,24rem)] xl:items-start">
-          <section aria-label="Primary register" className="min-w-0 space-y-4">
-            {primary}
-          </section>
-          <aside aria-label="Control panel" className="min-w-0 space-y-4">
-            {controlPanel}
-          </aside>
-        </div>
-      ) : (
-        <section aria-label="Primary register" className="min-w-0 space-y-4">
-          {primary}
-        </section>
-      )}
-      <ShellSlot aria-label="Drawers and auxiliary">{drawers}</ShellSlot>
-    </div>
-  );
-}
-
-// --- Reports / analytics ---
-
-export type ReportPageShellProps = {
-  className?: string;
-  filters?: ReactNode;
-  summary?: ReactNode;
-  chartTable?: ReactNode;
-  exports?: ReactNode;
-  notes?: ReactNode;
-  children?: ReactNode;
-};
-
-export function ReportPageShell({ className, filters, summary, chartTable, exports, notes, children }: ReportPageShellProps) {
-  const body = chartTable ?? children;
-  const structured =
-    hasRenderable(filters) || hasRenderable(summary) || hasRenderable(chartTable) || hasRenderable(exports) || hasRenderable(notes);
-
-  if (!structured && hasRenderable(children)) {
-    return (
-      <div className={cn(shellColumn, className)}>
-        <section aria-label="Report surface" className="min-w-0 space-y-6">
+        <section aria-label="Accounting control" className="min-w-0 space-y-6">
           {children}
         </section>
       </div>
@@ -430,220 +377,16 @@ export function ReportPageShell({ className, filters, summary, chartTable, expor
 
   return (
     <div className={cn(shellColumn, className)}>
-      <ShellSlot aria-label="Report filters">{filters}</ShellSlot>
-      <ShellSlot aria-label="Report summary">{summary}</ShellSlot>
-      <ShellSlot aria-label="Charts and tables">{body}</ShellSlot>
-      <ShellSlot aria-label="Exports">{exports}</ShellSlot>
-      <ShellSlot aria-label="Notes and caveats">{notes}</ShellSlot>
-    </div>
-  );
-}
-
-// --- Customer self-service ---
-
-export type SelfServicePageShellProps = {
-  className?: string;
-  glance?: ReactNode;
-  actions?: ReactNode;
-  records?: ReactNode;
-  support?: ReactNode;
-  children?: ReactNode;
-};
-
-export function SelfServicePageShell({ className, glance, actions, records, support, children }: SelfServicePageShellProps) {
-  const structured = hasRenderable(glance) || hasRenderable(actions) || hasRenderable(records) || hasRenderable(support);
-
-  if (!structured && hasRenderable(children)) {
-    return (
-      <div className={cn(shellColumn, className)}>
-        <section aria-label="Customer self-service" className="min-w-0 space-y-6">
-          {children}
+      <ShellSlot aria-label="Readiness warnings">{readinessWarnings}</ShellSlot>
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,28rem)] xl:items-start">
+        <section aria-label="Primary register" className="min-w-0 space-y-6">
+          {primaryRegister ?? children}
         </section>
+        <aside aria-label="Control panel" className="min-w-0 space-y-6">
+          {controlPanel}
+        </aside>
       </div>
-    );
-  }
-
-  const splitRecords = hasRenderable(records) && hasRenderable(support);
-
-  return (
-    <div className={cn(shellColumn, className)}>
-      <ShellSlot aria-label="At a glance">{glance}</ShellSlot>
-      <ShellSlot aria-label="Actions">{actions}</ShellSlot>
-      {splitRecords ? (
-        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-start">
-          <ShellSlot aria-label="Your records">{records}</ShellSlot>
-          <ShellSlot as="aside" aria-label="Support and secondary">
-            {support}
-          </ShellSlot>
-        </div>
-      ) : (
-        <>
-          <ShellSlot aria-label="Your records">{records}</ShellSlot>
-          <ShellSlot as="aside" aria-label="Support and secondary">
-            {support}
-          </ShellSlot>
-        </>
-      )}
-      {hasRenderable(children) ? <div className="min-w-0 space-y-6">{children}</div> : null}
+      <ShellSlot aria-label="Drawers and overlays">{drawers}</ShellSlot>
     </div>
-  );
-}
-
-// --- Partner / vendor workspace ---
-
-export type PartnerVendorWorkspaceShellProps = {
-  className?: string;
-  posture?: ReactNode;
-  queues?: ReactNode;
-  ledger?: ReactNode;
-  actions?: ReactNode;
-  children?: ReactNode;
-};
-
-export function PartnerVendorWorkspaceShell({
-  className,
-  posture,
-  queues,
-  ledger,
-  actions,
-  children,
-}: PartnerVendorWorkspaceShellProps) {
-  const structured =
-    hasRenderable(posture) || hasRenderable(queues) || hasRenderable(ledger) || hasRenderable(actions);
-
-  if (!structured && hasRenderable(children)) {
-    return (
-      <div className={cn(shellColumn, className)}>
-        <section aria-label="Partner or vendor workspace" className="min-w-0 space-y-6">
-          {children}
-        </section>
-      </div>
-    );
-  }
-
-  const splitLedger = hasRenderable(ledger) && hasRenderable(actions);
-
-  return (
-    <div className={cn(shellColumn, className)}>
-      <ShellSlot aria-label="Scoped posture">{posture}</ShellSlot>
-      <ShellSlot aria-label="Queues">{queues}</ShellSlot>
-      {splitLedger ? (
-        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-start">
-          <ShellSlot aria-label="Ledger and actions">{ledger}</ShellSlot>
-          <ShellSlot as="aside" aria-label="Workspace actions">
-            {actions}
-          </ShellSlot>
-        </div>
-      ) : (
-        <>
-          <ShellSlot aria-label="Ledger and actions">{ledger}</ShellSlot>
-          <ShellSlot as="aside" aria-label="Workspace actions">
-            {actions}
-          </ShellSlot>
-        </>
-      )}
-      {hasRenderable(children) ? <div className="min-w-0 space-y-6">{children}</div> : null}
-    </div>
-  );
-}
-
-// --- Admin operations workspace ---
-
-export type OperationsWorkspaceShellProps = {
-  className?: string;
-  exceptions?: ReactNode;
-  lanes?: ReactNode;
-  operationalActions?: ReactNode;
-  children?: ReactNode;
-};
-
-export function OperationsWorkspaceShell({
-  className,
-  exceptions,
-  lanes,
-  operationalActions,
-  children,
-}: OperationsWorkspaceShellProps) {
-  const structured = hasRenderable(exceptions) || hasRenderable(lanes) || hasRenderable(operationalActions);
-
-  if (!structured && hasRenderable(children)) {
-    return (
-      <div className={cn(shellColumn, className)}>
-        <section aria-label="Operations workspace" className="min-w-0 space-y-6">
-          {children}
-        </section>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn(shellColumn, className)}>
-      <ShellSlot aria-label="Exceptions">{exceptions}</ShellSlot>
-      <ShellSlot aria-label="Work lanes">{lanes}</ShellSlot>
-      <ShellSlot aria-label="Operational actions">{operationalActions}</ShellSlot>
-      {hasRenderable(children) ? <div className="min-w-0 space-y-6">{children}</div> : null}
-    </div>
-  );
-}
-
-// --- Executive dashboard (role home) ---
-
-export type ExecutiveDashboardShellProps = {
-  className?: string;
-  posture?: ReactNode;
-  alerts?: ReactNode;
-  queues?: ReactNode;
-  actions?: ReactNode;
-  children?: ReactNode;
-};
-
-export function ExecutiveDashboardShell({ className, posture, alerts, queues, actions, children }: ExecutiveDashboardShellProps) {
-  const structured = hasRenderable(posture) || hasRenderable(alerts) || hasRenderable(queues) || hasRenderable(actions);
-
-  if (!structured && hasRenderable(children)) {
-    return (
-      <section aria-label="Executive dashboard" className={cn("min-w-0 space-y-8 text-foreground [&_*]:min-w-0 [&_*]:max-w-full", className)}>
-        {children}
-      </section>
-    );
-  }
-
-  return (
-    <div role="region" aria-label="Executive dashboard" className={cn("min-w-0 space-y-8 text-foreground [&_*]:min-w-0 [&_*]:max-w-full", className)}>
-      <ShellSlot aria-label="Posture">{posture}</ShellSlot>
-      <ShellSlot aria-label="Alerts">{alerts}</ShellSlot>
-      <ShellSlot aria-label="Work queues">{queues}</ShellSlot>
-      <ShellSlot aria-label="Actions">{actions}</ShellSlot>
-      {hasRenderable(children) ? <div className="min-w-0 space-y-8">{children}</div> : null}
-    </div>
-  );
-}
-
-// --- Public marketing ---
-
-export type PublicMarketingShellProps = {
-  className?: string;
-  hero?: ReactNode;
-  trust?: ReactNode;
-  sections?: ReactNode;
-  cta?: ReactNode;
-  children?: ReactNode;
-};
-
-export function PublicMarketingShell({ className, hero, trust, sections, cta, children }: PublicMarketingShellProps) {
-  const structured = hasRenderable(hero) || hasRenderable(trust) || hasRenderable(sections) || hasRenderable(cta);
-
-  if (!structured && hasRenderable(children)) {
-    return <main className={cn("min-w-0 text-foreground [&_*]:min-w-0 [&_*]:max-w-full", className)}>{children}</main>;
-  }
-
-  return (
-    <main className={cn("flex min-w-0 flex-col gap-8 text-foreground [&_*]:min-w-0 [&_*]:max-w-full", className)}>
-      <ShellSlot aria-label="Hero">{hero}</ShellSlot>
-      <ShellSlot aria-label="Trust and proof">{trust}</ShellSlot>
-      <ShellSlot aria-label="Content sections">{sections}</ShellSlot>
-      <ShellSlot aria-label="Call to action">{cta}</ShellSlot>
-      {hasRenderable(children) ? <div className="min-w-0 space-y-8">{children}</div> : null}
-    </main>
   );
 }
