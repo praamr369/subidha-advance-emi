@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import ActionButton from "@/components/ui/ActionButton";
 import ChartAccountPostingBadge from "@/components/admin/accounting/ChartAccountPostingBadge";
@@ -38,6 +38,10 @@ function chartLabel(account?: AccountingSetupReadinessChartAccount | null): stri
   return `${account.code} · ${account.name}${parent}`;
 }
 
+function canRepairCollectionMapping(account: AccountingSetupReadinessFinanceAccount): boolean {
+  return Boolean(account.can_auto_create_posting_account && !account.collection_ready);
+}
+
 export default function FinanceAccountMappingPanel({
   financeAccounts,
   chartAccounts,
@@ -52,7 +56,9 @@ export default function FinanceAccountMappingPanel({
   onRepair,
 }: FinanceAccountMappingPanelProps) {
   const postingChartAccounts = chartAccounts.filter((account) => account.is_posting);
+  const repairableAccounts = useMemo(() => financeAccounts.filter(canRepairCollectionMapping), [financeAccounts]);
   const [internalRepairId, setInternalRepairId] = useState<number | null>(null);
+  const [repairingAll, setRepairingAll] = useState(false);
   const [repairError, setRepairError] = useState<string | null>(null);
   const activeRepairId = repairId ?? internalRepairId;
 
@@ -72,6 +78,29 @@ export default function FinanceAccountMappingPanel({
     }
   }
 
+  async function runRepairAll() {
+    if (repairableAccounts.length === 0) return;
+    const accountNames = repairableAccounts.map((account) => account.name).join(", ");
+    const confirmed = globalThis.confirm(
+      `Repair ${repairableAccounts.length} blocked collection mapping(s)?\n\nThis will create or reuse posting leaf ASSET chart accounts and remap these finance accounts: ${accountNames}.\n\nIt will not post payments, create receipts, rewrite historical journals, settlements, reconciliations, or day-close records.`,
+    );
+    if (!confirmed) return;
+
+    setRepairingAll(true);
+    setRepairError(null);
+    try {
+      for (const account of repairableAccounts) {
+        setInternalRepairId(account.id);
+        await updateFinanceAccountMapping(account.id, { auto_create_posting_account: true });
+      }
+      globalThis.location.assign(globalThis.location.href);
+    } catch (err) {
+      setRepairError(err instanceof Error ? err.message : "Failed to repair all collection mappings.");
+      setInternalRepairId(null);
+      setRepairingAll(false);
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -81,7 +110,17 @@ export default function FinanceAccountMappingPanel({
             Collection accounts must map to active posting-enabled leaf ASSET accounts. Repair creates a leaf account below the current group/control COA when needed.
           </div>
         </div>
-        <div className="text-xs text-muted-foreground">Collection accounts only</div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ActionButton
+            size="sm"
+            variant="primary"
+            onClick={() => void runRepairAll()}
+            disabled={saving || repairingAll || repairableAccounts.length === 0 || Boolean(activeRepairId)}
+          >
+            {repairingAll ? "Repairing all..." : `Repair all blocked (${repairableAccounts.length})`}
+          </ActionButton>
+          <div className="text-xs text-muted-foreground">Collection accounts only</div>
+        </div>
       </div>
       {repairError ? <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900">{repairError}</div> : null}
       <div className="mt-3 overflow-x-auto">
@@ -112,7 +151,7 @@ export default function FinanceAccountMappingPanel({
                 const isEditing = editingId === account.id;
                 const isRepairing = activeRepairId === account.id;
                 const blocker = account.blocker_reason || account.collection_blocker_reason || null;
-                const canRepair = Boolean(account.can_auto_create_posting_account && !account.collection_ready);
+                const canRepair = canRepairCollectionMapping(account);
                 return (
                   <tr key={account.id} className="border-t border-border align-top">
                     <td className="px-2 py-2">
@@ -173,11 +212,11 @@ export default function FinanceAccountMappingPanel({
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {canRepair ? (
-                            <ActionButton size="sm" variant="primary" onClick={() => void runRepair(account)} disabled={saving || isRepairing}>
+                            <ActionButton size="sm" variant="primary" onClick={() => void runRepair(account)} disabled={saving || isRepairing || repairingAll}>
                               {isRepairing ? "Repairing..." : "Repair mapping"}
                             </ActionButton>
                           ) : null}
-                          <ActionButton size="sm" variant="secondary" onClick={() => onEdit(account)} disabled={saving || Boolean(activeRepairId)}>
+                          <ActionButton size="sm" variant="secondary" onClick={() => onEdit(account)} disabled={saving || Boolean(activeRepairId) || repairingAll}>
                             Edit Mapping
                           </ActionButton>
                         </div>
