@@ -9,6 +9,7 @@ urlpatterns = [
     path("admin/", include("api.v1.routes.contract_amendments_admin")),
     path("admin/", include("api.v1.routes.admin")),
     path("admin/", include("api.v1.routes.setup_readiness")),
+    path("admin/", include("api.v1.routes.collection_control_center")),
     path("branch-control/", include("api.v1.routes.branch_control")),
     path("accounting/", include("api.v1.routes.accounting")),
     path("inventory/", include("api.v1.routes.inventory")),
