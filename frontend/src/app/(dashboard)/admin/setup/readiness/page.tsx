@@ -216,7 +216,7 @@ export default function AdminSetupReadinessPage() {
   return (
     <ERPPageShell
       title="Setup Readiness"
-      description="Admin-only master data and business readiness center for live shop operations. Checks are read-only and never auto-fix accounting, collection, or historical records."
+      subtitle="Admin-only master data and business readiness center for live shop operations. Checks are read-only and never auto-fix accounting, collection, or historical records."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Business Setup", href: ROUTES.admin.settingsBusinessSetup },
