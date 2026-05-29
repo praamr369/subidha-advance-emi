@@ -55,24 +55,25 @@ This rulebook is the canonical business + technical reference for SUBIDHA CORE. 
 
 ## Architecture Expectations
 
-Use a clean full-stack architecture.
+Use the approved full-stack architecture.
 
 ### Backend
-Preferred stack:
-- Django or FastAPI backend
-- PostgreSQL database
-- JWT authentication
+Approved stack:
+- Django
+- Django REST Framework
+- PostgreSQL
+- JWT auth
 - Service-oriented business logic
 - Clear separation:
   - models
-  - serializers / schemas
+  - serializers
   - services
-  - views / routers
+  - views / routes
   - permissions
   - audit / reconciliation logic
 
 ### Frontend
-Preferred stack:
+Approved stack:
 - Next.js App Router
 - TypeScript
 - Tailwind CSS
@@ -80,6 +81,11 @@ Preferred stack:
 - React Hook Form where forms are complex
 - Zod validation where appropriate
 - Role-based dashboard layouts
+
+### Architecture rules
+- Do not restart architecture.
+- Do not suggest FastAPI or any backend framework replacement unless the owner explicitly approves a breaking architecture migration.
+- Keep `/api/v1` stable.
 
 ### Roles
 Support these roles cleanly:
