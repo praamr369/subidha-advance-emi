@@ -15,6 +15,13 @@ from subscriptions.services.payment_service import record_emi_payment
 from subscriptions.services import contract_reference_service as crs
 
 
+def _payment_collection_idempotency_key(value: str | None) -> str | None:
+    value = (value or "").strip()
+    if not value:
+        return None
+    return f"PAYMENT:{value}"
+
+
 def _fallback_collection_idempotency_key(
     *,
     source_type: str,
@@ -76,6 +83,17 @@ def route_collection(
         emi_id = position.get("emi_id")
         if not emi_id:
             raise ValidationError("No collectible EMI is currently pending.")
+        payment_idempotency_key = _payment_collection_idempotency_key(
+            idempotency_key
+        ) or _fallback_collection_idempotency_key(
+            source_type=source_type,
+            source_id=source_id,
+            amount=amount,
+            payment_method=payment_method,
+            finance_account_id=finance_account_id,
+            reference_no=reference_no,
+            payment_date=payment_date,
+        )
         result = record_emi_payment(
             emi_id=emi_id,
             amount=amount,
@@ -87,18 +105,7 @@ def route_collection(
             branch_id=branch_id,
             cash_counter_id=cash_counter_id,
             finance_account_id=finance_account_id,
-            idempotency_key=(
-                idempotency_key
-                or _fallback_collection_idempotency_key(
-                    source_type=source_type,
-                    source_id=source_id,
-                    amount=amount,
-                    payment_method=payment_method,
-                    finance_account_id=finance_account_id,
-                    reference_no=reference_no,
-                    payment_date=payment_date,
-                )
-            ),
+            idempotency_key=payment_idempotency_key,
             **audit_kwargs,
         )
         return {
