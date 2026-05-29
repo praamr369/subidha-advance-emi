@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Implemented through Phase 8F Deposit/Security Amendment Preview.**
+Status: **Implemented through Phase 8G Amendment Audit Timeline and Decision Sheet Print.**
 
 ## Principle
 
@@ -295,6 +295,18 @@ Implemented behavior:
 - Backend preview endpoint returns current vs requested states without mutating core tables.
 - Frontend read-only UI panel surfaces requested changes, risk analysis for refund/deduction mismatches, accounting, and reconciliation.
 - Blocks explicit execution logic since changes require a dedicated liability, accounting, and reconciliation workflow.
+
+### Phase 8G — Amendment Audit Timeline + Printable Decision Sheet
+
+Status: **Implemented**
+
+Implemented behavior:
+- Exposes `audit_timeline` array and `decision_sheet_summary` payload on backend serializers.
+- Frontend admin UI renders the read-only **Amendment Audit Timeline** panel.
+- Frontend customer/partner UI renders a simplified read-only audit timeline (admin events filtered out).
+- Exposes admin print route `/admin/contract-amendments/{id}/decision-sheet/print`.
+- Branded Contract Amendment Decision Sheet displays the audit timeline context, approval decision, preview evidence block, and protection statement.
+- No mutation logic is executed.
 
 
 ## Deferred phases

@@ -849,7 +849,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
 
     const main = page.locator("#main-content");
     await expect(main.getByRole("heading", { name: "AMD-SMOKE-001" })).toBeVisible();
-    await expect(page.getByText("Only approved whitelisted corrections or same-price product reference corrections can move to implementation.")).toBeVisible();
+    await expect(page.getByText("Read-only timeline of workflow, approval, evidence, and execution milestones.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve decision" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);

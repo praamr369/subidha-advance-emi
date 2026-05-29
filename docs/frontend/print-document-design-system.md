@@ -167,6 +167,7 @@ Document-specific terms are selected by route:
 | Finance Account Statement | `/admin/finance/accounts/[id]/statement/print` | `GET /accounting/finance-accounts/:id/` and `GET /accounting/reports/cashbook/?finance_account_id=:id&start_date=&end_date=` | Accounting Books finance-account card action `Finance Account Statement PDF / Print` | `buildAdminFinanceAccountStatementPrintRoute(id, params)` |
 | Customer Account Statement | `/admin/customers/[id]/statement/print` | `GET /admin/customers/:id/`, `GET /admin/subscriptions/?customer=:id`, `GET /admin/payments/?customer=:id` | Customer detail `Customer Account Statement PDF / Print` | `buildAdminCustomerAccountStatementPrintRoute(id, params)` |
 | Product Recontract Addendum | `/admin/contract-amendments/[id]/recontract-addendum/print` and `/customer/contract-amendments/[id]/recontract-addendum/print` | `GET /admin/contract-amendments/:id/` or `GET /customer/contract-amendments/:id/` | Amendment detail `Recontract Addendum / Print` only when latest recontract evidence is executed | `buildAdminProductRecontractAddendumPrintRoute(id)`, `buildCustomerProductRecontractAddendumPrintRoute(id)` |
+| Contract Amendment Decision Sheet | `/admin/contract-amendments/[id]/decision-sheet/print` | `GET /admin/contract-amendments/:id/` | Amendment detail `Decision Sheet / Print` | — |
 
 ## Accounting Phase 4A evidence-document rules
 
@@ -252,6 +253,15 @@ The addendum uses the existing amendment detail payload and `latest_product_reco
 Phase 6G is print/document only. It adds no backend mutation behavior, no execution logic, and no rollback/reversal behavior. It does not mutate subscription, EMI, payment, receipt, accounting, reconciliation, settlement, day-close, inventory, delivery, commission, payout, waiver, lucky draw, lucky ID, batch, rent/lease demand, or deposit records.
 
 Historical payments and receipts remain unchanged. The customer ledger section is display-only and explicitly does not create payment, receipt, refund, or settlement.
+
+## Phase 8G Printable Amendment Decision Sheet
+
+`/admin/contract-amendments/:id/decision-sheet/print` is a printable evidence document for amendment requests, showing the audit timeline and workflow decision boundaries.
+
+The decision sheet uses the existing amendment detail payload, including `audit_timeline` and `decision_sheet_summary`. It shows business print branding, amendment reference, customer/contract reference, request values, admin decision values, and available preview summaries (such as Lucky ID batch conflicts, Rent/Lease analysis, or Deposit risk checks).
+
+Phase 8G is print/document only. It does not mutate any source records. It explicitly includes the statement:
+> "This document is read-only evidence. It does not create payment, receipt, accounting, reconciliation, stock, delivery, lucky draw, waiver, commission, payout, rent/lease demand, deposit, or contract mutation."
 
 ## Phase 7G audit checklist
 

@@ -195,6 +195,15 @@ export type AmendmentRecord = {
   implementable_fields?: string[];
   latest_product_recontract_preview?: ProductRecontractPreviewSummary | null;
   workflow_capability?: AmendmentWorkflowCapability;
+  audit_timeline?: Array<{
+    event: string;
+    timestamp?: string | null;
+    actor?: string | null;
+    role?: string | null;
+    status?: string | null;
+    note?: string | null;
+  }>;
+  decision_sheet_summary?: Record<string, unknown>;
   applied_at?: string | null;
   metadata?: Record<string, unknown>;
   created_at?: string;

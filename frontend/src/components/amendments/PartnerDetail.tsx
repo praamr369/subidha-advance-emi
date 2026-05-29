@@ -20,8 +20,42 @@ function sourceLabel(row: AmendmentRecord) {
     : row.subscription_number || `Subscription #${row.subscription ?? "—"}`;
 }
 
-function Timeline({ status }: { status: string }) {
-  return <div className="grid gap-2 md:grid-cols-4">{["REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED"].map((step) => <div key={step} className={`rounded-2xl border p-3 text-sm ${step === status ? "border-primary bg-primary/10" : "border-border bg-muted/20"}`}><div className="font-semibold">{step.replace(/_/g, " ")}</div><div className="mt-1 text-xs text-muted-foreground">{step === status ? "Current state" : "Workflow step"}</div></div>)}</div>;
+function AuditTimeline({ row }: { row: AmendmentRecord }) {
+  if (!row.audit_timeline || row.audit_timeline.length === 0) {
+    return <div className="text-sm text-muted-foreground">No timeline events recorded.</div>;
+  }
+  
+  const filteredEvents = row.audit_timeline.filter(
+    (item) => !["Accounting bridge posted", "Reconciliation evidence linked"].includes(item.event)
+  );
+
+  return (
+    <div className="space-y-4">
+      {filteredEvents.map((item, idx) => (
+        <div key={idx} className="flex gap-4">
+          <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted">
+            {item.status === "COMPLETED" ? (
+              <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : item.status === "BLOCKED" ? (
+              <svg className="h-4 w-4 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <div className="h-2 w-2 rounded-full bg-primary" />
+            )}
+          </div>
+          <div>
+            <div className="font-medium text-sm">{item.event}</div>
+            <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-0.5">
+              {item.timestamp ? <span>{new Date(item.timestamp).toLocaleString()}</span> : null}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function PartnerAmendmentDetail({ id }: { id: number }) {
@@ -50,7 +84,7 @@ export default function PartnerAmendmentDetail({ id }: { id: number }) {
         {loading ? <ERPLoadingState label="Loading amendment..." /> : null}
         {!loading && error ? <ERPErrorState title="Unable to load amendment" description={error} onRetry={() => void load()} /> : null}
         {!loading && !error && row ? <>
-          <DetailPanel title="Status timeline" description="Partner can monitor only; admin decides review outcome."><Timeline status={row.status} /></DetailPanel>
+          <DetailPanel title="Amendment Audit Timeline" description="Read-only timeline of workflow milestones."><AuditTimeline row={row} /></DetailPanel>
           <div className="grid gap-4 lg:grid-cols-2">
             <DetailPanel title="Request summary" description="Linked contract and customer context."><dl className="grid gap-3 text-sm"><div><dt className="text-muted-foreground">Status</dt><dd><ERPStatusBadge status={row.status} /></dd></div><div><dt className="text-muted-foreground">Customer</dt><dd>{row.customer_name || "—"}</dd></div><div><dt className="text-muted-foreground">Contract</dt><dd>{amendmentContractTypeLabel(row.contract_type)} · {sourceLabel(row)}</dd></div><div><dt className="text-muted-foreground">Type</dt><dd>{amendmentTypeLabel(row.amendment_type)}</dd></div></dl></DetailPanel>
             <DetailPanel title="Admin decision" description="Decision record only."><dl className="grid gap-3 text-sm"><div><dt className="text-muted-foreground">Approved by</dt><dd>{row.approved_by_username || "—"}</dd></div><div><dt className="text-muted-foreground">Admin note</dt><dd>{row.admin_note || "—"}</dd></div><div><dt className="text-muted-foreground">Rejection reason</dt><dd>{row.rejection_reason || "—"}</dd></div></dl></DetailPanel>

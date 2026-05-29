@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: **Implemented through Phase 8F Deposit/Security Amendment Preview.**
+Status: **Implemented through Phase 8G Amendment Audit Timeline and Decision Sheet Print.**
 
 ## Scope
 
@@ -153,3 +153,16 @@ The addendum is visible only after executed recontract evidence exists. It uses 
 Phase 6G is printable addendum only. It does not mutate source records. Historical payments and receipts remain unchanged. Reversal/rollback remains a future controlled workflow and is not exposed.
 
 Rollback/reversal remains a future controlled workflow and is not exposed.
+
+## Phase 8G Printable Amendment Decision Sheet
+
+Admin amendment detail screens include a read-only **Amendment Audit Timeline** showing key workflow milestones with statuses, actors, and notes.
+Customer and partner detail screens show a simplified, safe subset of this timeline, filtering out backend-specific reconciliation or accounting events.
+
+The printable route is available for all amendments regardless of status:
+```text
+/admin/contract-amendments/{id}/decision-sheet/print
+```
+
+The decision sheet aggregates request details, timeline context, admin decision values, and any available preview evidence (Lucky ID batch, Rent/Lease, Deposit/Security, Product Recontract) without running mutations. It explicitly displays the core protection statement:
+> "This document is read-only evidence. It does not create payment, receipt, accounting, reconciliation, stock, delivery, lucky draw, waiver, commission, payout, rent/lease demand, deposit, or contract mutation."

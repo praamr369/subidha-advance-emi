@@ -28,6 +28,8 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
     implementable_fields = serializers.SerializerMethodField()
     latest_product_recontract_preview = serializers.SerializerMethodField()
     workflow_capability = serializers.SerializerMethodField()
+    audit_timeline = serializers.SerializerMethodField()
+    decision_sheet_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = ContractAmendment
@@ -75,12 +77,205 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
             "implementable_fields",
             "latest_product_recontract_preview",
             "workflow_capability",
+            "audit_timeline",
+            "decision_sheet_summary",
             "applied_at",
             "metadata",
             "created_at",
             "updated_at",
         ]
         read_only_fields = fields
+
+    def get_audit_timeline(self, obj):
+        timeline = []
+        timeline.append({
+            "event": "Request created",
+            "timestamp": obj.created_at,
+            "actor": obj.requested_by.username if obj.requested_by else None,
+            "role": obj.requested_role,
+            "status": "COMPLETED",
+        })
+        
+        capability = self.get_workflow_capability(obj)
+        category = capability["category"]
+        
+        if obj.status == "REQUESTED":
+            timeline.append({
+                "event": "Under review",
+                "timestamp": None,
+                "actor": None,
+                "role": "ADMIN",
+                "status": "PENDING",
+            })
+        elif obj.status in {"UNDER_REVIEW", "APPROVED", "REJECTED", "IMPLEMENTED", "APPLIED", "CANCELLED"}:
+            timeline.append({
+                "event": "Under review",
+                "timestamp": None,
+                "actor": None,
+                "role": "ADMIN",
+                "status": "COMPLETED",
+            })
+
+        if obj.status == "APPROVED":
+            timeline.append({
+                "event": "Admin decision: Approved",
+                "timestamp": obj.approved_at,
+                "actor": obj.approved_by.username if obj.approved_by else None,
+                "role": "ADMIN",
+                "status": "COMPLETED",
+            })
+        elif obj.status == "REJECTED":
+            timeline.append({
+                "event": "Admin decision: Rejected",
+                "timestamp": obj.updated_at,
+                "actor": None,
+                "role": "ADMIN",
+                "status": "COMPLETED",
+                "note": getattr(obj, "rejection_reason", None)
+            })
+        
+        if category == "PRODUCT_RECONTRACT":
+            preview = self.get_latest_product_recontract_preview(obj)
+            if preview:
+                if preview.get("status") == "PREVIEWED":
+                    timeline.append({
+                        "event": "Product recontract preview saved",
+                        "timestamp": preview.get("created_at"),
+                        "actor": None,
+                        "role": "SYSTEM",
+                        "status": "COMPLETED",
+                    })
+                
+                consent = preview.get("customer_consent_status")
+                if consent == "ACCEPTED":
+                    timeline.append({
+                        "event": "Customer consent accepted",
+                        "timestamp": preview.get("customer_consented_at"),
+                        "actor": preview.get("customer_consented_by_display") or "CUSTOMER",
+                        "role": "CUSTOMER",
+                        "status": "COMPLETED",
+                    })
+                elif consent == "REJECTED":
+                    timeline.append({
+                        "event": "Customer consent rejected",
+                        "timestamp": preview.get("customer_consented_at"),
+                        "actor": preview.get("customer_consented_by_display") or "CUSTOMER",
+                        "role": "CUSTOMER",
+                        "status": "COMPLETED",
+                    })
+                    
+                admin_appr = preview.get("admin_approval_status")
+                if admin_appr == "APPROVED":
+                    timeline.append({
+                        "event": "Recontract admin approval",
+                        "timestamp": preview.get("admin_approved_at"),
+                        "actor": preview.get("admin_approved_by_display"),
+                        "role": "ADMIN",
+                        "status": "COMPLETED",
+                    })
+                elif admin_appr == "REJECTED":
+                    timeline.append({
+                        "event": "Recontract admin rejection",
+                        "timestamp": preview.get("admin_approved_at"),
+                        "actor": preview.get("admin_approved_by_display"),
+                        "role": "ADMIN",
+                        "status": "COMPLETED",
+                    })
+                    
+                flags = preview.get("workflow_flags") or {}
+                if flags.get("accounting_posted"):
+                    timeline.append({
+                        "event": "Accounting bridge posted",
+                        "timestamp": None,
+                        "actor": "SYSTEM",
+                        "role": "SYSTEM",
+                        "status": "COMPLETED",
+                    })
+                if flags.get("reconciliation_linked"):
+                    timeline.append({
+                        "event": "Reconciliation evidence linked",
+                        "timestamp": None,
+                        "actor": "SYSTEM",
+                        "role": "SYSTEM",
+                        "status": "COMPLETED",
+                    })
+                if preview.get("executed"):
+                    timeline.append({
+                        "event": "Recontract executed",
+                        "timestamp": preview.get("executed_at"),
+                        "actor": preview.get("executed_by") or "SYSTEM",
+                        "role": "SYSTEM",
+                        "status": "COMPLETED",
+                    })
+
+        if category in {"LUCKY_ID_BATCH_PREVIEW", "RENT_LEASE_PREVIEW", "DEPOSIT_SECURITY_PREVIEW"}:
+            timeline.append({
+                "event": f"{category.replace('_', ' ').title()}",
+                "timestamp": None,
+                "actor": "SYSTEM",
+                "role": "SYSTEM",
+                "status": "COMPLETED",
+                "note": "Preview-only workflow"
+            })
+            if capability.get("blocked_reason"):
+                timeline.append({
+                    "event": "Workflow blocked",
+                    "timestamp": None,
+                    "actor": "SYSTEM",
+                    "role": "SYSTEM",
+                    "status": "BLOCKED",
+                    "note": capability["blocked_reason"]
+                })
+        
+        if obj.status in {"IMPLEMENTED", "APPLIED"}:
+            timeline.append({
+                "event": "Implementation executed",
+                "timestamp": obj.implemented_at,
+                "actor": obj.implemented_by.username if obj.implemented_by else None,
+                "role": "ADMIN",
+                "status": "COMPLETED",
+            })
+            
+        return timeline
+
+    def get_decision_sheet_summary(self, obj):
+        capability = self.get_workflow_capability(obj)
+        category = capability["category"]
+        
+        summary = {
+            "workflow_category": category,
+            "blocked_reason": capability.get("blocked_reason"),
+            "product_recontract_evidence": None,
+            "lucky_batch_preview": None,
+            "rent_lease_preview": None,
+            "deposit_security_preview": None,
+        }
+        
+        if category == "PRODUCT_RECONTRACT":
+            summary["product_recontract_evidence"] = self.get_latest_product_recontract_preview(obj)
+            
+        elif category == "LUCKY_ID_BATCH_PREVIEW":
+            from subscriptions.services.lucky_batch_preview_service import preview_lucky_id_batch_amendment
+            try:
+                summary["lucky_batch_preview"] = preview_lucky_id_batch_amendment(obj)
+            except Exception as e:
+                summary["lucky_batch_preview"] = {"error": str(e)}
+                
+        elif category == "RENT_LEASE_PREVIEW":
+            from subscriptions.services.rent_lease_preview_service import preview_rent_lease_amendment
+            try:
+                summary["rent_lease_preview"] = preview_rent_lease_amendment(obj)
+            except Exception as e:
+                summary["rent_lease_preview"] = {"error": str(e)}
+                
+        elif category == "DEPOSIT_SECURITY_PREVIEW":
+            from subscriptions.services.deposit_security_preview_service import preview_deposit_security_amendment
+            try:
+                summary["deposit_security_preview"] = preview_deposit_security_amendment(obj)
+            except Exception as e:
+                summary["deposit_security_preview"] = {"error": str(e)}
+                
+        return summary
 
     def get_is_implementable(self, obj):
         return phase3_implementation_metadata(obj)["is_implementable"]
