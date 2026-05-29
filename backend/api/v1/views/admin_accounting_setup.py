@@ -164,10 +164,76 @@ def _ensure_collection_posting_child(finance_account: FinanceAccount) -> ChartOf
     )
 
 
+def _repair_active_collection_finance_accounts(*, actor=None) -> list[dict]:
+    """
+    Post-apply safety pass for Apply Suggested Default.
+
+    Default setup preserves group/control COA rows for review. Active real settlement
+    finance accounts must still point at posting leaf ASSET accounts before they can
+    receive collections, so this pass creates/reuses those leaves and remaps only the
+    active collection finance accounts.
+    """
+
+    repaired: list[dict] = []
+    accounts = (
+        FinanceAccount.objects.select_related("chart_account", "chart_account__parent")
+        .select_for_update()
+        .filter(is_active=True, is_real_settlement_account=True)
+        .order_by("kind", "name", "id")
+    )
+    with transaction.atomic():
+        for account in accounts:
+            current = getattr(account, "chart_account", None)
+            if chart_account_allowed_for_collection(current, kind=account.kind):
+                continue
+            if current is None or not current.is_active or current.account_type != ChartOfAccountType.ASSET:
+                repaired.append(
+                    {
+                        "finance_account_id": account.id,
+                        "finance_account_name": account.name,
+                        "status": "SKIPPED",
+                        "reason": "Finance account is not mapped to an active ASSET group/control account.",
+                    }
+                )
+                continue
+            target_chart = _ensure_collection_posting_child(account)
+            old_chart_account_id = account.chart_account_id
+            try:
+                updated = AccountingMasterUpdateService.update_finance_account(
+                    account=account,
+                    payload={"chart_account": target_chart},
+                    actor=actor,
+                )
+            except DjangoValidationError as exc:
+                repaired.append(
+                    {
+                        "finance_account_id": account.id,
+                        "finance_account_name": account.name,
+                        "status": "SKIPPED",
+                        "reason": exc.message_dict,
+                    }
+                )
+                continue
+            readiness = finance_account_readiness(updated)
+            repaired.append(
+                {
+                    "finance_account_id": updated.id,
+                    "finance_account_name": updated.name,
+                    "old_chart_account_id": old_chart_account_id,
+                    "new_chart_account_id": updated.chart_account_id,
+                    "collection_ready": readiness.collection_ready,
+                    "status": "REPAIRED" if readiness.collection_ready else "STILL_BLOCKED",
+                }
+            )
+    return repaired
+
+
 class AccountingSetupReadinessView(_AdminBase):
     def get(self, request):
         finance_accounts = list(
-            FinanceAccount.objects.select_related("chart_account", "chart_account__parent", "branch").order_by("kind", "name", "id")
+            FinanceAccount.objects.select_related("chart_account", "chart_account__parent", "branch")
+            .filter(is_active=True, is_real_settlement_account=True)
+            .order_by("kind", "name", "id")
         )
         chart_accounts = list(
             ChartOfAccount.objects.select_related("parent").prefetch_related("children").order_by("code", "id")
@@ -276,6 +342,7 @@ class AccountingSetupDefaultsApplyView(_AdminBase):
         if not serializer.validated_data.get("confirm"):
             raise serializers.ValidationError({"confirm": "Confirm must be true to apply defaults."})
         payload = apply_accounting_setup_defaults(performed_by=request.user)
+        payload["collection_account_repairs"] = _repair_active_collection_finance_accounts(actor=request.user)
         return Response(payload, status=status.HTTP_200_OK)
 
 
