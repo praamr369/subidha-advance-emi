@@ -12,6 +12,7 @@ export type PaymentCollectionPayload = {
   cash_counter_id?: number;
   reference_no?: string;
   notes?: string;
+  idempotency_key?: string;
 };
 
 export type PaymentCollectPayload = PaymentCollectionPayload;
@@ -257,9 +258,7 @@ const EMPTY_PAYMENT_REGISTER_SUMMARY: PaymentRegisterSummary = {
   net_collected_amount: "0.00",
 };
 
-function toArray<T>(
-  payload: T[] | PaginatedResponse<T> | null | undefined
-): T[] {
+function toArray<T>(payload: T[] | PaginatedResponse<T> | null | undefined): T[] {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload.results)) return payload.results;
@@ -629,32 +628,9 @@ export async function getAdminPaymentRegister(params?: {
     } as RequestInit
   );
 
-  const rawRows = Array.isArray(payload?.results) ? payload.results : [];
-
+  const rows = Array.isArray(payload?.results) ? payload.results : [];
   return {
-    results: rawRows.map(normalizePaymentRegisterRow),
+    results: rows.map(normalizePaymentRegisterRow),
     summary: normalizePaymentRegisterSummary(payload?.summary),
   };
-}
-
-export async function getAdminPaymentRegisterSummary(params?: {
-  q?: string;
-  method?: string;
-  reversalState?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  subscription?: number | string;
-  customer?: number | string;
-  batch?: number | string;
-  partner?: number | string;
-  emi?: number | string;
-}): Promise<PaymentRegisterSummary> {
-  const payload = await request<Partial<PaymentRegisterSummary>>(
-    `/admin/payments/summary/${buildPaymentRegisterQuery(params ?? {})}`,
-    {
-      method: "GET",
-    } as RequestInit
-  );
-
-  return normalizePaymentRegisterSummary(payload ?? EMPTY_PAYMENT_REGISTER_SUMMARY);
 }
