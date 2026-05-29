@@ -280,39 +280,24 @@ def ensure_contract_reference_for_subscription(
                         getattr(lucky, "display_number", None)
                         or getattr(lucky, "lucky_number", "")
                         or ""
-                    ).strip().upper()
+                    )
                 ),
                 partner_snapshot=_partner_snapshot(getattr(subscription, "partner", None)),
                 source_created_at=getattr(subscription, "created_at", None),
                 metadata={
-                    "source_model": "Subscription",
-                    "source_id": subscription.id,
-                    "subscription_number": subscription.subscription_number,
-                    "contract_reference": subscription.contract_reference,
-                    "customer_id": subscription.customer_id,
+                    "subscription_id": subscription.id,
+                    "plan_type": subscription.plan_type,
+                    "customer_id": customer.id,
                     "product_id": subscription.product_id,
-                    "partner_id": subscription.partner_id,
-                    "batch_id": subscription.batch_id,
-                    "lucky_id": subscription.lucky_id_id,
-                    "lucky_number": getattr(lucky, "lucky_number", None),
                 },
             )
         except IntegrityError:
             continue
 
-    raise ValueError("Unable to allocate a unique contract reference number.")
+    raise ValueError("Unable to allocate a unique subscription contract reference.")
 
 
-def ensure_contract_reference_for_direct_sale(direct_sale) -> ContractReference:
-    from billing.models import DirectSale
-
-    sale = (
-        DirectSale.objects.select_related("customer")
-        .prefetch_related("lines", "billing_invoices")
-        .filter(pk=direct_sale.pk)
-        .first()
-        or direct_sale
-    )
+def ensure_contract_reference_for_direct_sale(sale) -> ContractReference:
     existing = ContractReference.objects.filter(
         contract_type=ContractReferenceType.DIRECT_SALE,
         direct_sale=sale,
@@ -320,16 +305,14 @@ def ensure_contract_reference_for_direct_sale(direct_sale) -> ContractReference:
     if existing:
         return existing
 
-    invoice = sale.billing_invoices.order_by("-id").first()
     customer = getattr(sale, "customer", None)
-    scope_key = _direct_sale_sequence_scope(sale)
+    if customer is None:
+        raise ValueError("Direct sale must be linked to a customer before reference generation.")
 
+    scope_key = _direct_sale_sequence_scope(sale)
     for _attempt in range(5):
         sequence_number = _issue_sequence_number(scope_key)
-        reference_no = _build_direct_sale_reference_no(
-            sale=sale,
-            sequence_number=sequence_number,
-        )
+        reference_no = _build_direct_sale_reference_no(sale=sale, sequence_number=sequence_number)
         try:
             return ContractReference.objects.create(
                 reference_no=reference_no,
@@ -337,26 +320,14 @@ def ensure_contract_reference_for_direct_sale(direct_sale) -> ContractReference:
                 contract_type=ContractReferenceType.DIRECT_SALE,
                 customer=customer,
                 direct_sale=sale,
-                invoice=invoice,
-                phone_snapshot=(
-                    getattr(customer, "phone", "")
-                    or getattr(sale, "customer_phone_snapshot", "")
-                    or ""
-                ),
-                customer_name_snapshot=(
-                    getattr(customer, "name", "")
-                    or getattr(sale, "customer_name_snapshot", "")
-                    or ""
-                ),
-                kyc_reference_snapshot=_customer_code_snapshot(customer) if customer else None,
+                phone_snapshot=getattr(customer, "phone", "") or "",
+                customer_name_snapshot=getattr(customer, "name", "") or "",
+                kyc_reference_snapshot=_customer_code_snapshot(customer),
                 product_summary_snapshot=_direct_sale_product_summary(sale),
-                source_created_at=getattr(sale, "created_at", None),
+                source_created_at=getattr(sale, "created_at", None) or getattr(sale, "sale_date", None),
                 metadata={
-                    "source_model": "DirectSale",
-                    "source_id": sale.id,
-                    "sale_no": sale.sale_no,
-                    "invoice_id": getattr(invoice, "id", None),
-                    "invoice_no": getattr(invoice, "document_no", None),
+                    "direct_sale_id": sale.id,
+                    "sale_no": getattr(sale, "sale_no", ""),
                     "customer_id": sale.customer_id,
                     "branch_id": sale.branch_id,
                 },
@@ -941,6 +912,7 @@ def collect_unified_receivable(
             cash_counter_id=cash_counter_id,
             note=note,
             contract_reference_id=contract_reference_id,
+            idempotency_key=idem or None,
         )
         status_code = 201 if result.get("created", True) else 200
         return result, status_code
@@ -1039,13 +1011,10 @@ def preview_unified_receivable_allocation(
             outstanding = _money(row["outstanding_amount"])
             if remaining <= MONEY_ZERO:
                 break
-            allocated = outstanding if outstanding <= remaining else remaining
+            allocated = min(outstanding, remaining)
             allocations.append(
                 {
-                    "target_type": "EMI",
-                    "target_id": row["emi_id"],
-                    "month_no": row["month_no"],
-                    "due_date": row["due_date"],
+                    **row,
                     "allocated_amount": _money_string(allocated),
                 }
             )
@@ -1055,70 +1024,35 @@ def preview_unified_receivable_allocation(
             "source_type": source_type,
             "source_id": source_id,
             "requested_amount": _money_string(requested_amount),
-            "pending_dues": pending_emis,
-            "allocation_preview": allocations,
-            "unallocated_amount": _money_string(remaining),
-            "overpayment_warning": bool(remaining > MONEY_ZERO),
-            "mutates_data": False,
+            "allocations": allocations,
+            "unallocated_amount": _money_string(max(remaining, MONEY_ZERO)),
+            "overpayment_warning": remaining > MONEY_ZERO,
         }
 
     if source_type == ContractReferenceType.DIRECT_SALE:
-        from billing.models import DirectSale
-
+        try:
+            from billing.models import DirectSale
+        except Exception:
+            raise ValidationError({"source_type": "Direct-sale collection is unavailable."})
         sale = DirectSale.objects.filter(pk=source_id).first()
         if not sale:
             raise ValidationError({"source_id": "Direct sale was not found."})
-
         position = direct_sale_receivable_position(sale)
         outstanding = _money(position.get("due_amount"))
-        allocated = requested_amount if requested_amount <= outstanding else outstanding
-        remaining = requested_amount - allocated
+        allocated = min(requested_amount, outstanding)
         return {
             "source_type": source_type,
             "source_id": source_id,
             "requested_amount": _money_string(requested_amount),
-            "pending_dues": [
+            "allocations": [
                 {
-                    "target_type": "DIRECT_SALE",
-                    "target_id": sale.id,
-                    "status": position.get("status"),
+                    "direct_sale_id": sale.id,
                     "outstanding_amount": _money_string(outstanding),
-                }
-            ],
-            "allocation_preview": [
-                {
-                    "target_type": "DIRECT_SALE",
-                    "target_id": sale.id,
                     "allocated_amount": _money_string(allocated),
                 }
             ],
-            "unallocated_amount": _money_string(remaining),
-            "overpayment_warning": bool(remaining > MONEY_ZERO),
-            "mutates_data": False,
-        }
-
-    if source_type in {ContractReferenceType.RENT, ContractReferenceType.LEASE}:
-        subscription = Subscription.objects.filter(pk=source_id).first()
-        if not subscription:
-            raise ValidationError({"source_id": "Subscription was not found."})
-        position = rent_lease_receivable_position(subscription)
-        return {
-            "source_type": source_type,
-            "source_id": source_id,
-            "requested_amount": _money_string(requested_amount),
-            "pending_dues": [
-                {
-                    "target_type": "RENT_LEASE_DEMAND",
-                    "target_id": position.get("demand_id"),
-                    "demand_type": position.get("demand_type"),
-                    "outstanding_amount": _money_string(position.get("due_amount")),
-                }
-            ],
-            "allocation_preview": [],
-            "unallocated_amount": _money_string(requested_amount),
-            "overpayment_warning": True,
-            "disabled_reason": RENT_LEASE_DISABLED_REASON,
-            "mutates_data": False,
+            "unallocated_amount": _money_string(max(requested_amount - allocated, MONEY_ZERO)),
+            "overpayment_warning": requested_amount > outstanding,
         }
 
     raise ValidationError({"source_type": f"Unsupported source type: {source_type}."})
