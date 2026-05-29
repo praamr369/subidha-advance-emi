@@ -15,6 +15,29 @@ from subscriptions.services.payment_service import record_emi_payment
 from subscriptions.services import contract_reference_service as crs
 
 
+def _fallback_collection_idempotency_key(
+    *,
+    source_type: str,
+    source_id: int,
+    amount,
+    payment_method: str,
+    finance_account_id: int,
+    reference_no: str | None,
+    payment_date,
+) -> str:
+    return "ROUTED-COLLECTION:" + "|".join(
+        [
+            (source_type or "").strip().upper(),
+            str(source_id),
+            str(amount),
+            (payment_method or "").strip().upper(),
+            str(finance_account_id),
+            (reference_no or "").strip(),
+            str(payment_date or ""),
+        ]
+    )
+
+
 def route_collection(
     *,
     source_type: str,
@@ -29,6 +52,7 @@ def route_collection(
     cash_counter_id: int | None = None,
     note: str | None = None,
     contract_reference_id: int | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     """Dispatch unified collection to the correct posting service."""
     source_type = (source_type or "").strip().upper()
@@ -63,6 +87,18 @@ def route_collection(
             branch_id=branch_id,
             cash_counter_id=cash_counter_id,
             finance_account_id=finance_account_id,
+            idempotency_key=(
+                idempotency_key
+                or _fallback_collection_idempotency_key(
+                    source_type=source_type,
+                    source_id=source_id,
+                    amount=amount,
+                    payment_method=payment_method,
+                    finance_account_id=finance_account_id,
+                    reference_no=reference_no,
+                    payment_date=payment_date,
+                )
+            ),
             **audit_kwargs,
         )
         return {
