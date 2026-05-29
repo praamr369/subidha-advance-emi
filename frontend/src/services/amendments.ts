@@ -31,7 +31,7 @@ export type ProductRecontractConsentStatus = "PENDING" | "ACCEPTED" | "REJECTED"
 export type ProductRecontractAdminApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type AmendmentWorkflowCapability = {
-  category: "NON_FINANCIAL" | "SAME_PRICE_PRODUCT_REFERENCE" | "PRODUCT_RECONTRACT" | "LUCKY_ID_BATCH_PREVIEW" | "RENT_LEASE_PREVIEW" | "BLOCKED";
+  category: "NON_FINANCIAL" | "SAME_PRICE_PRODUCT_REFERENCE" | "PRODUCT_RECONTRACT" | "LUCKY_ID_BATCH_PREVIEW" | "RENT_LEASE_PREVIEW" | "DEPOSIT_SECURITY_PREVIEW" | "BLOCKED";
   can_review: boolean;
   can_approve_decision: boolean;
   can_reject_decision: boolean;
@@ -108,6 +108,29 @@ export type LuckyBatchPreview = {
   waiver_winner_risk: string;
   lifecycle_blocker_reason: string;
   execution_supported: boolean;
+};
+
+export type DepositSecurityPreview = {
+  amendment_id: number;
+  amendment_type: AmendmentType;
+  amendment_status: AmendmentStatus;
+  current_contract_id: number;
+  current_contract_reference?: string | null;
+  customer_id?: number | null;
+  customer_name?: string | null;
+  current_deposit_amount: string;
+  requested_deposit_amount?: string | null;
+  current_deposit_status: string;
+  deposit_received_amount: string;
+  deposit_refunded_amount: string;
+  deposit_deducted_amount: string;
+  liability_impact_category: string;
+  refund_deduction_risk: string;
+  accounting_impact_category: string;
+  reconciliation_impact_category: string;
+  possession_handover_risk: string;
+  execution_supported: boolean;
+  blocker_reasons: string[];
 };
 
 export const AMENDMENT_STATUSES: AmendmentStatus[] = ["REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED"];
@@ -326,6 +349,10 @@ export async function getAdminAmendment(id: number): Promise<AmendmentRecord> {
 
 export async function getAdminLuckyBatchPreview(id: number): Promise<LuckyBatchPreview> {
   return apiFetch<LuckyBatchPreview>(`/admin/contract-amendments/${id}/lucky-batch-preview/`);
+}
+
+export async function getAdminDepositSecurityPreview(id: number): Promise<DepositSecurityPreview> {
+  return apiFetch<DepositSecurityPreview>(`/admin/contract-amendments/${id}/deposit-security-preview/`);
 }
 
 export async function reviewAdminAmendment(id: number, adminNote = ""): Promise<AmendmentRecord> {

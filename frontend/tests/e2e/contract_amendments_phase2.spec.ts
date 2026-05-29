@@ -143,6 +143,46 @@ const blockedProductChangeFixture = {
   },
 };
 
+const depositSecurityPreviewFixture = {
+  ...amendmentFixture,
+  amendment_type: "DEPOSIT_ADJUSTMENT",
+  workflow_capability: {
+    category: "DEPOSIT_SECURITY_PREVIEW",
+    can_review: false,
+    can_approve_decision: false,
+    can_reject_decision: false,
+    can_execute_directly: false,
+    requires_recontract_workflow: false,
+    requires_customer_consent: false,
+    requires_accounting_bridge: false,
+    requires_reconciliation_bridge: false,
+    blocked_reason: "Execution is not enabled yet.",
+  },
+};
+
+const depositSecurityPreviewResponseFixture = {
+  amendment_id: 1,
+  amendment_type: "DEPOSIT_ADJUSTMENT",
+  amendment_status: "REQUESTED",
+  current_contract_id: 1001,
+  current_contract_reference: "SUB-SMOKE-001",
+  customer_id: 501,
+  customer_name: "Smoke Customer",
+  current_deposit_amount: "5000.00",
+  requested_deposit_amount: "2000.00",
+  current_deposit_status: "HELD",
+  deposit_received_amount: "5000.00",
+  deposit_refunded_amount: "0.00",
+  deposit_deducted_amount: "0.00",
+  liability_impact_category: "Modifies core security deposit liability balance.",
+  refund_deduction_risk: "May create mismatches if deposit is already received, refunded, or deducted.",
+  accounting_impact_category: "Requires general ledger re-posting for deposit liability.",
+  reconciliation_impact_category: "Requires reconciliation bridge update.",
+  possession_handover_risk: "None",
+  execution_supported: false,
+  blocker_reasons: ["Execution is not enabled yet. Deposit/security amendments require a dedicated liability, refund/deduction, accounting, and reconciliation workflow."],
+};
+
 const productRecontractPreviewFixture = {
   preview_status: "READY",
   impact_type: "UPGRADE_EXTRA_PAYABLE",
@@ -469,6 +509,10 @@ async function mockAmendments(page: Page, role: "customer" | "partner" | "admin"
         });
         return;
       }
+      if (/\/contract-amendments\/1\/deposit-security-preview\/?$/.test(url.pathname)) {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(depositSecurityPreviewResponseFixture) });
+        return;
+      }
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture) });
       return;
     }
@@ -488,6 +532,10 @@ async function mockAmendments(page: Page, role: "customer" | "partner" | "admin"
     }
     if (/\/contract-amendments\/1\/product-recontract\/financial-impact-preview\/?$/.test(url.pathname)) {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([financialImpactPreviewFixture]) });
+      return;
+    }
+    if (/\/contract-amendments\/1\/deposit-security-preview\/?$/.test(url.pathname)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(depositSecurityPreviewResponseFixture) });
       return;
     }
 
@@ -576,6 +624,20 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(main.getByRole("heading", { name: "AMD-SMOKE-001" })).toBeVisible();
     await expect(page.getByText("Only whitelisted non-financial corrections can be implemented in Phase 3.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toBeVisible();
+  });
+
+  test("admin amendment detail shows Deposit Security Preview panel", async ({ page }) => {
+    await mockAmendments(page, "admin", depositSecurityPreviewFixture);
+    await page.goto("/admin/contract-amendments/1");
+
+    await expect(page.getByText("Deposit / Security Amendment Preview")).toBeVisible();
+    await expect(page.getByText("Execution is not enabled yet.").first()).toBeVisible();
+    await expect(page.getByText("Requested: 2000.00")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
+    // Ensure product recontract/rent-lease/lucky-batch panels are unaffected/hidden
+    await expect(page.getByText("Product reference correction preview")).toHaveCount(0);
+    await expect(page.getByText("Rent / Lease Amendment Preview")).toHaveCount(0);
+    await expect(page.getByText("Lucky ID / Batch Amendment Preview")).toHaveCount(0);
   });
 
   test("admin amendment detail shows same-price product reference correction for approved product change", async ({ page }) => {
@@ -844,6 +906,14 @@ test.describe("customer and partner amendment implementation visibility", () => 
     await expect(page.getByRole("button", { name: "Approve recontract preview for future execution" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Reject recontract preview" })).toHaveCount(0);
   });
+
+  test("customer detail never shows implementation action for deposit security preview", async ({ page }) => {
+    await mockAmendments(page, "customer", depositSecurityPreviewFixture);
+    await page.goto("/customer/contract-amendments/1");
+
+    await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
+  });
 });
 
 test.describe("partner amendment implementation visibility", () => {
@@ -861,5 +931,13 @@ test.describe("partner amendment implementation visibility", () => {
     await expect(page.getByRole("button", { name: "Reject proposed recontract terms" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Approve recontract preview for future execution" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Reject recontract preview" })).toHaveCount(0);
+  });
+
+  test("partner detail never shows implementation action for deposit security preview", async ({ page }) => {
+    await mockAmendments(page, "partner", depositSecurityPreviewFixture);
+    await page.goto("/partner/contract-amendments/1");
+
+    await expect(page.getByRole("button", { name: "Implement approved non-financial correction" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
   });
 });

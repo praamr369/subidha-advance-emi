@@ -590,7 +590,13 @@ def get_workflow_capability(amendment: ContractAmendment) -> dict:
         capability["blocked_reason"] = "Lucky ID and Batch changes require dedicated preview workflow (future phase)."
         return capability
 
-    if amendment.contract_type == "RENT_LEASE" or amendment.amendment_type in {"DEPOSIT_ADJUSTMENT", "RENT_AMOUNT_CHANGE", "LEASE_TERM_CHANGE"}:
+    if amendment.amendment_type == "DEPOSIT_ADJUSTMENT":
+        capability["category"] = "DEPOSIT_SECURITY_PREVIEW"
+        capability["requires_preview"] = True
+        capability["blocked_reason"] = "Execution is not enabled yet. Deposit/security amendments require a dedicated liability, refund/deduction, accounting, and reconciliation workflow."
+        return capability
+
+    if amendment.contract_type == "RENT_LEASE" or amendment.amendment_type in {"RENT_AMOUNT_CHANGE", "LEASE_TERM_CHANGE"}:
         capability["category"] = "RENT_LEASE_PREVIEW"
         capability["requires_preview"] = True
         capability["blocked_reason"] = "Execution is deferred until rent/lease accounting and reconciliation workflow exists."

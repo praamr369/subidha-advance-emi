@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Implemented through Phase 8A UI De-duplication on `update`.**
+Status: **Implemented through Phase 8F Deposit/Security Amendment Preview.**
 
 ## Principle
 
@@ -285,6 +285,16 @@ Implemented behavior:
 - Backend preview endpoint returns current vs requested states without mutating core tables.
 - Frontend read-only UI panel surfaces requested changes, and risk analysis for demand schedule, deposits, accounting, and reconciliation.
 - Blocks explicit execution logic since changes require a dedicated accounting and reconciliation workflow.
+
+### Phase 8F — Deposit / Security Amendment Preview-Only Workflow
+
+Status: **Implemented**
+
+Implemented behavior:
+- Extends workflow capabilities: Deposit adjustments are classified as `DEPOSIT_SECURITY_PREVIEW`.
+- Backend preview endpoint returns current vs requested states without mutating core tables.
+- Frontend read-only UI panel surfaces requested changes, risk analysis for refund/deduction mismatches, accounting, and reconciliation.
+- Blocks explicit execution logic since changes require a dedicated liability, accounting, and reconciliation workflow.
 
 
 ## Deferred phases

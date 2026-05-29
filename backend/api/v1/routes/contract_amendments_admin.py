@@ -25,6 +25,7 @@ from api.v1.views.contract_amendments import (
     AdminContractAmendmentReviewView,
     AdminContractAmendmentLuckyBatchPreviewView,
     AdminContractAmendmentRentLeasePreviewView,
+    AdminContractAmendmentDepositSecurityPreviewView,
 )
 
 urlpatterns = [
@@ -46,4 +47,5 @@ urlpatterns = [
     path("contract-amendments/<int:pk>/product-recontract-events/", AdminContractAmendmentProductRecontractEventListView.as_view()),
     path("contract-amendments/<int:pk>/lucky-batch-preview/", AdminContractAmendmentLuckyBatchPreviewView.as_view()),
     path("contract-amendments/<int:pk>/rent-lease-preview/", AdminContractAmendmentRentLeasePreviewView.as_view()),
+    path("contract-amendments/<int:pk>/deposit-security-preview/", AdminContractAmendmentDepositSecurityPreviewView.as_view()),
 ]
