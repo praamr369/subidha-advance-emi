@@ -110,7 +110,8 @@ function ProductRecontractCustomerConsentPanel({
 
   if (!preview || preview.executed) return null;
   const status = preview.customer_consent_status || "PENDING";
-  const canDecide = status === "PENDING";
+  const nextAction = preview.progress?.next_required_action;
+  const canDecide = nextAction === "Waiting for customer consent" || status === "PENDING";
 
   async function submit(decision: Exclude<ProductRecontractConsentStatus, "PENDING">) {
     setBusy(decision);
@@ -247,6 +248,7 @@ export default function CustomerAmendmentDetail({ id }: { id: number }) {
                     customer_consent_status: event.customer_consent_status,
                     customer_consented_at: event.customer_consented_at,
                     customer_consent_note: event.customer_consent_note,
+                    progress: event.progress,
                   }
                 : current.latest_product_recontract_preview,
             }

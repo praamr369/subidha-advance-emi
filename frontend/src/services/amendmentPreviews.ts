@@ -39,6 +39,20 @@ export type ContractRecontractWorkflowFlags = {
   executed?: boolean;
 };
 
+export type ProductRecontractProgress = {
+  preview_saved: boolean;
+  customer_consent_status: "PENDING" | "ACCEPTED" | "REJECTED" | string | null;
+  admin_approval_status: "PENDING" | "APPROVED" | "REJECTED" | string | null;
+  schedule_preview_ready: boolean;
+  financial_impact_preview_ready: boolean;
+  accounting_bridge_ready: boolean;
+  reconciliation_bridge_ready: boolean;
+  execution_ready: boolean;
+  executed: boolean;
+  blocked_reason: string;
+  next_required_action: string;
+};
+
 export type ContractRecontractExecutionSnapshot = {
   before_subscription?: Record<string, unknown>;
   after_subscription?: Record<string, unknown>;
@@ -113,6 +127,7 @@ export type ContractRecontractEvent = ContractRecontractExecutionFields & {
   admin_approval_snapshot?: Record<string, unknown>;
   schedule_preview_lines?: ContractRecontractScheduleLine[];
   latest_financial_impact_preview?: ContractRecontractFinancialImpactPreview | null;
+  progress?: ProductRecontractProgress;
   metadata?: Record<string, unknown>;
 };
 

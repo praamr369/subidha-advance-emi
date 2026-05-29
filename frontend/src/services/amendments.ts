@@ -4,6 +4,7 @@ import type {
   ContractRecontractExecutionFields,
   ContractRecontractFinancialImpactPreview,
   ContractRecontractScheduleLine,
+  ProductRecontractProgress,
 } from "@/services/amendmentPreviews";
 
 export type AmendmentContractType = "EMI_SUBSCRIPTION" | "RENT_LEASE";
@@ -86,6 +87,7 @@ export type ProductRecontractPreviewSummary = ContractRecontractExecutionFields 
   reconciliation_run_id?: number | null;
   reconciliation_evidence_ids?: number[];
   workflow_flags?: Record<string, boolean>;
+  progress?: ProductRecontractProgress;
 };
 
 export const AMENDMENT_STATUSES: AmendmentStatus[] = ["REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED"];

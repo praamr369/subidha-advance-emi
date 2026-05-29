@@ -107,6 +107,19 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
             .first()
         )
         if not event:
+            summary["progress"] = {
+                "preview_saved": False,
+                "customer_consent_status": None,
+                "admin_approval_status": None,
+                "schedule_preview_ready": False,
+                "financial_impact_preview_ready": False,
+                "accounting_bridge_ready": False,
+                "reconciliation_bridge_ready": False,
+                "execution_ready": False,
+                "executed": False,
+                "blocked_reason": "Preview snapshot not saved.",
+                "next_required_action": "Save preview snapshot",
+            }
             return summary
         serialized = ContractRecontractEventSerializer(event).data
         for key in (
@@ -126,6 +139,7 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
             "schedule_line_ids",
             "old_monthly_amount",
             "new_monthly_amount",
+            "progress",
         ):
             summary[key] = serialized.get(key)
         return summary
@@ -242,6 +256,7 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
     reconciliation_run_id = serializers.SerializerMethodField()
     reconciliation_evidence_ids = serializers.SerializerMethodField()
     schedule_line_ids = serializers.SerializerMethodField()
+    progress = serializers.SerializerMethodField()
 
     def _execution_metadata(self, obj):
         return obj.metadata if isinstance(obj.metadata, dict) else {}
@@ -385,6 +400,40 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
             },
         }
 
+    def get_progress(self, obj):
+        flags = self.get_workflow_flags(obj)
+        executed = flags["executed"]
+        execution_ready = self.get_execution_ready(obj)
+
+        progress = {
+            "preview_saved": flags["previewed"],
+            "customer_consent_status": obj.customer_consent_status,
+            "admin_approval_status": obj.admin_approval_status,
+            "schedule_preview_ready": flags["schedule_preview_generated"],
+            "financial_impact_preview_ready": flags["financial_impact_previewed"],
+            "accounting_bridge_ready": flags["accounting_posted"],
+            "reconciliation_bridge_ready": flags["reconciliation_linked"],
+            "execution_ready": execution_ready,
+            "executed": executed,
+            "blocked_reason": self.get_execution_block_reason(obj),
+            "next_required_action": "UNKNOWN",
+        }
+
+        if executed:
+            progress["next_required_action"] = "Recontract executed"
+        elif execution_ready:
+            progress["next_required_action"] = "Execute approved recontract"
+        elif not flags["customer_consented"]:
+            progress["next_required_action"] = "Waiting for customer consent"
+        elif not flags["admin_approved"]:
+            progress["next_required_action"] = "Waiting for admin approval"
+        elif not flags["schedule_preview_generated"]:
+            progress["next_required_action"] = "Generate schedule preview"
+        elif not flags["financial_impact_previewed"] or not flags["accounting_posted"] or not flags["reconciliation_linked"]:
+            progress["next_required_action"] = "Generate accounting/reconciliation preview"
+
+        return progress
+
     class Meta:
         model = ContractRecontractEvent
         fields = [
@@ -447,6 +496,7 @@ class ContractRecontractEventSerializer(serializers.ModelSerializer):
             "reconciliation_run_id",
             "reconciliation_evidence_ids",
             "schedule_line_ids",
+            "progress",
             "metadata",
         ]
         read_only_fields = fields
