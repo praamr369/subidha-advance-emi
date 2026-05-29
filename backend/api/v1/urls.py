@@ -1,11 +1,13 @@
 from django.urls import path, include
 
 from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
+from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
 
 urlpatterns = [
     path("health/", PublicApiHealthView.as_view()),
     path("health/deep/", PublicApiDeepHealthView.as_view()),
     path("auth/", include("api.v1.routes.auth")),
+    path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/", include("api.v1.routes.contract_amendments_admin")),
     path("admin/", include("api.v1.routes.admin")),
     path("admin/", include("api.v1.routes.setup_readiness")),
