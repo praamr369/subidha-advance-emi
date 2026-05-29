@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from decimal import Decimal, InvalidOperation
 from typing import Optional
@@ -38,6 +39,8 @@ from subscriptions.models import (
     ReconciliationStatus,
     Subscription,
     SubscriptionStatus,
+    UnifiedCollectionIdempotency,
+    UnifiedCollectionIdempotencyStatus,
 )
 from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.commission_service import (
@@ -84,6 +87,50 @@ def _safe_enum_value(value):
     return getattr(value, "value", value)
 
 
+def _is_payment_reversed(payment: Payment) -> bool:
+    metadata = getattr(payment, "allocation_metadata", {}) or {}
+    reversal = metadata.get("reversal") or {}
+    return bool(reversal.get("is_reversed"))
+
+
+def _payment_idempotency_fingerprint(
+    *,
+    emi_id: int,
+    amount: Decimal,
+    method: str,
+    reference_no: Optional[str],
+    payment_date,
+    branch_id: Optional[int],
+    cash_counter_id: Optional[int],
+    finance_account_id: Optional[int],
+) -> str:
+    date_value = payment_date.isoformat() if hasattr(payment_date, "isoformat") else str(payment_date)
+    raw = "|".join(
+        [
+            str(emi_id),
+            f"{Decimal(str(amount)):.2f}",
+            (method or "").strip().upper(),
+            reference_no or "",
+            date_value,
+            str(branch_id or ""),
+            str(cash_counter_id or ""),
+            str(finance_account_id or ""),
+        ]
+    )
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _existing_payment_result(payment: Payment) -> dict:
+    return {
+        "payment": payment,
+        "emi": payment.emi,
+        "subscription": payment.subscription,
+        "finance_account": getattr(payment, "finance_account", None),
+        "reconciliation": getattr(payment, "reconciliation", None),
+        "created": False,
+    }
+
+
 def _assert_payment_write_allowed(subscription: Subscription, emi: Emi):
     subscription_status = _safe_enum_value(getattr(subscription, "status", None))
     emi_status = _safe_enum_value(getattr(emi, "status", None))
@@ -116,7 +163,7 @@ def _find_existing_reference(reference_no: Optional[str]) -> Optional[Payment]:
         return None
 
     return (
-        Payment.objects.select_related("emi", "subscription", "customer")
+        Payment.objects.select_related("emi", "subscription", "customer", "finance_account")
         .filter(reference_no=reference_no)
         .first()
     )
@@ -243,7 +290,6 @@ def _refresh_subscription_status(subscription: Subscription):
         emi_statuses=statuses,
         is_winner=is_winner,
     )
-
     if current_status != next_status:
         subscription.status = next_status
         subscription.save(update_fields=["status"])
@@ -425,6 +471,7 @@ def record_emi_payment(
     contract_reference_id: int | None = None,
     unified_collection_source_type: str | None = None,
     unified_collection_source_id: int | None = None,
+    idempotency_key: Optional[str] = None,
 ):
     """
     Canonical payment collection entrypoint.
@@ -434,28 +481,73 @@ def record_emi_payment(
       reference_no, collected_by, payment_date, allocation_metadata
     - Payment model does NOT support: note/notes/status
     - Reversal is tracked through allocation_metadata + ledger compensation
+    - Unreferenced cash collection requires a service/API idempotency key
+      so retries cannot duplicate payment, ledger, commission, reconciliation,
+      accounting, or billing side effects.
     """
     amount = _normalize_amount(amount)
     method = (_normalize_text(method) or "CASH").upper()
     reference_no = _normalize_text(reference_no)
     note = _normalize_text(note)  # accepted for API compatibility, not persisted
+    idempotency_key = _normalize_text(idempotency_key)
     payment_date = payment_date or timezone.now().date()
+
+    if method == "CASH" and not reference_no and not idempotency_key:
+        raise ValueError("idempotency_key is required for cash payments without a reference number.")
 
     existing = _find_existing_reference(reference_no)
     if existing:
-        if existing.emi_id != emi_id or Decimal(str(existing.amount)) != amount:
+        if _is_payment_reversed(existing):
+            raise ValueError("Existing payment for this reference number has been reversed and cannot be reused.")
+        if existing.emi_id != emi_id or Decimal(str(existing.amount)) != amount or existing.method != method:
             raise ValueError(
                 "A payment with this reference number already exists with different details."
             )
 
-        return {
-            "payment": existing,
-            "emi": existing.emi,
-            "subscription": existing.subscription,
-            "finance_account": getattr(existing, "finance_account", None),
-            "reconciliation": getattr(existing, "reconciliation", None),
-            "created": False,
-        }
+        return _existing_payment_result(existing)
+
+    idem_row = None
+    if idempotency_key:
+        fingerprint = _payment_idempotency_fingerprint(
+            emi_id=emi_id,
+            amount=amount,
+            method=method,
+            reference_no=reference_no,
+            payment_date=payment_date,
+            branch_id=branch_id,
+            cash_counter_id=cash_counter_id,
+            finance_account_id=finance_account_id,
+        )
+        idem_row = (
+            UnifiedCollectionIdempotency.objects.select_for_update()
+            .filter(user_id=getattr(collected_by, "id", None), key=idempotency_key)
+            .first()
+        )
+        if idem_row:
+            if idem_row.fingerprint != fingerprint:
+                raise ValueError("Idempotency key was reused with different payment details.")
+            if idem_row.status == UnifiedCollectionIdempotencyStatus.COMPLETED:
+                payment_id = (idem_row.response_body or {}).get("payment_id")
+                payment = (
+                    Payment.objects.select_related("emi", "subscription", "customer", "finance_account")
+                    .filter(pk=payment_id)
+                    .first()
+                )
+                if payment is None:
+                    raise ValueError("Existing idempotent payment record could not be found.")
+                if _is_payment_reversed(payment):
+                    raise ValueError("Existing payment for this idempotency key has been reversed and cannot be reused.")
+                return _existing_payment_result(payment)
+            raise ValueError("A payment request with this idempotency key is already in progress.")
+
+        idem_row = UnifiedCollectionIdempotency.objects.create(
+            user=collected_by,
+            key=idempotency_key,
+            fingerprint=fingerprint,
+            status=UnifiedCollectionIdempotencyStatus.PENDING,
+            response_body={},
+            response_status=201,
+        )
 
     emi = (
         Emi.objects.select_for_update()
@@ -505,6 +597,7 @@ def record_emi_payment(
             "collection_mode": "DIRECT",
             "finance_account_id": finance_account.id,
             "finance_chart_account_id": finance_account.chart_account_id,
+            "idempotency_key": idempotency_key,
             "posting_side": {
                 "debit": finance_account.chart_account.code,
                 "credit": "ACCOUNTS_RECEIVABLE",
@@ -523,6 +616,7 @@ def record_emi_payment(
         allocation_context={
             "method": method,
             "reference_no": reference_no,
+            "idempotency_key": idempotency_key,
             "note_accepted_but_not_persisted": note,
         },
     )
@@ -541,6 +635,7 @@ def record_emi_payment(
             "amount": str(amount),
             "method": method,
             "reference_no": reference_no,
+            "idempotency_key": idempotency_key,
             **(
                 {
                     "contract_reference_id": contract_reference_id,
@@ -567,8 +662,9 @@ def record_emi_payment(
             "amount": str(amount),
             "method": method,
             "reference_no": reference_no,
+            "idempotency_key": idempotency_key,
         },
-        idempotency_key=reference_no,
+        idempotency_key=idempotency_key or reference_no,
     )
     append_business_event(
         event_type=BusinessEventType.EMI_PAID,
@@ -583,7 +679,9 @@ def record_emi_payment(
             "emi_id": emi.id,
             "month_no": emi.month_no,
             "amount": str(amount),
+            "idempotency_key": idempotency_key,
         },
+        idempotency_key=(f"{idempotency_key}:EMI_PAID" if idempotency_key else None),
     )
 
     create_commission_for_payment(
@@ -633,6 +731,19 @@ def record_emi_payment(
         amount_str=str(amount),
     )
 
+    if idem_row is not None:
+        idem_row.status = UnifiedCollectionIdempotencyStatus.COMPLETED
+        idem_row.response_status = 201
+        idem_row.response_body = {
+            "payment_id": payment.id,
+            "emi_id": emi.id,
+            "subscription_id": subscription.id,
+            "amount": str(amount),
+            "method": method,
+            "reference_no": reference_no,
+        }
+        idem_row.save(update_fields=["status", "response_status", "response_body", "updated_at"])
+
     return {
         "payment": payment,
         "emi": emi,
@@ -661,6 +772,7 @@ def collect_payment_for_admin(
     branch_id: Optional[int] = None,
     cash_counter_id: Optional[int] = None,
     finance_account_id: Optional[int] = None,
+    idempotency_key: Optional[str] = None,
 ):
     """
     Backward-compatible admin wrapper.
@@ -698,6 +810,7 @@ def collect_payment_for_admin(
         branch_id=branch_id,
         cash_counter_id=cash_counter_id,
         finance_account_id=finance_account_id,
+        idempotency_key=idempotency_key,
     )
 
 
