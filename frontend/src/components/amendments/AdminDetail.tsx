@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import AmendmentSafetyNotice from "@/components/amendments/SafetyNotice";
 import ProductRecontractPreviewPanel from "@/components/amendments/ProductRecontractPreviewPanel";
+import LuckyBatchPreviewPanel from "@/components/amendments/LuckyBatchPreviewPanel";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
@@ -242,6 +243,9 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
                 <ProductRecontractPreviewPanel amendment={row} />
                 <ProductRecontractConsentStatusPanel row={row} />
               </>
+            ) : null}
+            {row.workflow_capability?.category === "LUCKY_ID_BATCH_PREVIEW" ? (
+              <LuckyBatchPreviewPanel amendment={row} />
             ) : null}
             <div className="grid gap-4 lg:grid-cols-3">
               <DetailPanel title="Old values" description="Source snapshot."><pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.old_values || row.previous_values)}</pre></DetailPanel>

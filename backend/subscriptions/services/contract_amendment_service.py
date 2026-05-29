@@ -586,6 +586,7 @@ def get_workflow_capability(amendment: ContractAmendment) -> dict:
 
     if amendment.amendment_type in {"LUCKY_ID_CHANGE", "BATCH_CHANGE"}:
         capability["category"] = "LUCKY_ID_BATCH_PREVIEW"
+        capability["requires_preview"] = True
         capability["blocked_reason"] = "Lucky ID and Batch changes require dedicated preview workflow (future phase)."
         return capability
 

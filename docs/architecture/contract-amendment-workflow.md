@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: **Implemented through Phase 8A UI De-duplication on `update`.**
+Status: **Implemented through Phase 8D UI De-duplication and Preview.**
 
 ## Scope
 

@@ -266,6 +266,16 @@ Implemented behavior:
 - Maintains strict customer/partner read-only behavior.
 - Retains existing backend compatibility.
 
+### Phase 8D — Lucky ID / Batch Amendment Preview-Only Workflow
+
+Status: **Implemented**
+
+Implemented behavior:
+- Extends workflow capabilities: Lucky ID and Batch changes are classified as `LUCKY_ID_BATCH_PREVIEW`.
+- Backend preview endpoint returns current vs requested states without mutating core tables.
+- Frontend read-only UI panel surfaces requested changes, availability checks, conflicts, and block reasons.
+- Blocks explicit execution logic since changes impact draw eligibility and audit workflows.
+
 ## Deferred phases
 
 ### Phase 6H — Product recontract evidence reporting and RC hardening

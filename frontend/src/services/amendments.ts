@@ -36,6 +36,7 @@ export type AmendmentWorkflowCapability = {
   can_approve_decision: boolean;
   can_reject_decision: boolean;
   can_execute_directly: boolean;
+  requires_preview?: boolean;
   requires_recontract_workflow: boolean;
   requires_customer_consent: boolean;
   requires_accounting_bridge: boolean;
@@ -88,6 +89,25 @@ export type ProductRecontractPreviewSummary = ContractRecontractExecutionFields 
   reconciliation_evidence_ids?: number[];
   workflow_flags?: Record<string, boolean>;
   progress?: ProductRecontractProgress;
+};
+
+export type LuckyBatchPreview = {
+  current_subscription_id: number;
+  current_contract_reference?: string | null;
+  current_batch_id?: number | null;
+  current_batch_code?: string | null;
+  current_lucky_id?: number | null;
+  current_lucky_number?: number | null;
+  requested_batch_id?: number | null;
+  requested_batch_code?: string | null;
+  requested_lucky_id?: number | null;
+  requested_lucky_number?: number | null;
+  availability_status: string;
+  ownership_conflict_status: string;
+  draw_status_risk: string;
+  waiver_winner_risk: string;
+  lifecycle_blocker_reason: string;
+  execution_supported: boolean;
 };
 
 export const AMENDMENT_STATUSES: AmendmentStatus[] = ["REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED"];
@@ -302,6 +322,10 @@ export async function listAdminProductRecontractReport(filters: ProductRecontrac
 
 export async function getAdminAmendment(id: number): Promise<AmendmentRecord> {
   return apiFetch<AmendmentRecord>(`/admin/contract-amendments/${id}/`);
+}
+
+export async function getAdminLuckyBatchPreview(id: number): Promise<LuckyBatchPreview> {
+  return apiFetch<LuckyBatchPreview>(`/admin/contract-amendments/${id}/lucky-batch-preview/`);
 }
 
 export async function reviewAdminAmendment(id: number, adminNote = ""): Promise<AmendmentRecord> {
