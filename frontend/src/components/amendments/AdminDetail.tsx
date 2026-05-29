@@ -74,7 +74,7 @@ function implementationLabel(row: AmendmentRecord, busy: string | null) {
 }
 
 function hasExecutedProductRecontract(row: AmendmentRecord) {
-  return row.amendment_type === "PRODUCT_CHANGE" && row.latest_product_recontract_preview?.executed === true;
+  return row.workflow_capability?.category === "PRODUCT_RECONTRACT" && row.latest_product_recontract_preview?.executed === true;
 }
 
 function ProductChangePreview({ row }: { row: AmendmentRecord }) {
@@ -229,16 +229,20 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
               </DetailPanel>
               <DetailPanel title="Request reason" description="Submitted reason."><p className="text-sm text-muted-foreground">{row.reason}</p></DetailPanel>
             </div>
-            <ProductChangePreview row={row} />
-            {hasExecutedProductRecontract(row) ? (
-              <DetailPanel title="Recontract addendum" description="Printable read-only customer addendum generated from executed recontract evidence.">
-                <ActionButton href={buildAdminProductRecontractAddendumPrintRoute(row.id)} variant="outline">
-                  Recontract Addendum / Print
-                </ActionButton>
-              </DetailPanel>
+            {row.workflow_capability?.category === "SAME_PRICE_PRODUCT_REFERENCE" ? <ProductChangePreview row={row} /> : null}
+            {row.workflow_capability?.category === "PRODUCT_RECONTRACT" ? (
+              <>
+                {hasExecutedProductRecontract(row) ? (
+                  <DetailPanel title="Recontract addendum" description="Printable read-only customer addendum generated from executed recontract evidence.">
+                    <ActionButton href={buildAdminProductRecontractAddendumPrintRoute(row.id)} variant="outline">
+                      Recontract Addendum / Print
+                    </ActionButton>
+                  </DetailPanel>
+                ) : null}
+                <ProductRecontractPreviewPanel amendment={row} />
+                <ProductRecontractConsentStatusPanel row={row} />
+              </>
             ) : null}
-            <ProductRecontractPreviewPanel amendment={row} />
-            <ProductRecontractConsentStatusPanel row={row} />
             <div className="grid gap-4 lg:grid-cols-3">
               <DetailPanel title="Old values" description="Source snapshot."><pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.old_values || row.previous_values)}</pre></DetailPanel>
               <DetailPanel title="Requested values" description="Requested change."><pre className="max-h-80 overflow-auto rounded-xl bg-muted p-3 text-xs">{safeJson(row.requested_values || row.new_values)}</pre></DetailPanel>
@@ -247,7 +251,9 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
             </div>
             <DetailPanel title="Admin decision controls" description="Review, approve, or reject only.">
               <label className="block text-sm font-medium">Admin note<textarea className="mt-2 min-h-24 w-full rounded-xl border border-border bg-background p-3 text-sm" value={adminNote} onChange={(event) => setAdminNote(event.target.value)} /></label>
-              <label className="mt-4 block text-sm font-medium">Approved decision values JSON<textarea className="mt-2 min-h-32 w-full rounded-xl border border-border bg-background p-3 font-mono text-sm" value={approvedJson} onChange={(event) => setApprovedJson(event.target.value)} /></label>
+              {row.workflow_capability?.category !== "PRODUCT_RECONTRACT" ? (
+                <label className="mt-4 block text-sm font-medium">Approved decision values JSON<textarea className="mt-2 min-h-32 w-full rounded-xl border border-border bg-background p-3 font-mono text-sm" value={approvedJson} onChange={(event) => setApprovedJson(event.target.value)} /></label>
+              ) : null}
               <label className="mt-4 block text-sm font-medium">Rejection reason<input className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} placeholder="Required for rejection" /></label>
               <div className="mt-4 flex flex-wrap gap-3">
                 <ActionButton onClick={() => void run("review")} disabled={Boolean(busy) || row.status !== "REQUESTED"}>{busy === "review" ? "Reviewing..." : "Mark under review"}</ActionButton>
@@ -255,13 +261,21 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
                 <ActionButton variant="outline" onClick={() => void run("reject")} disabled={Boolean(busy) || !["REQUESTED", "UNDER_REVIEW"].includes(row.status)}>{busy === "reject" ? "Rejecting..." : "Reject decision"}</ActionButton>
               </div>
             </DetailPanel>
-            <DetailPanel title="Guarded implementation" description="Admin-only implementation after approval.">
-              <div className="space-y-3">
-                <p className="text-sm text-amber-800 dark:text-amber-200">{implementationWarning(row)}</p>
-                {row.implementation_block_reason ? <p className="text-sm text-muted-foreground">{row.implementation_block_reason}</p> : null}
-                {canShowImplementationAction(row) ? <ActionButton variant="outline" onClick={() => void run("implement")} disabled={Boolean(busy)}>{implementationLabel(row, busy)}</ActionButton> : null}
-              </div>
-            </DetailPanel>
+            {row.workflow_capability?.can_execute_directly ? (
+              <DetailPanel title="Guarded implementation" description="Admin-only implementation after approval.">
+                <div className="space-y-3">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">{implementationWarning(row)}</p>
+                  {row.implementation_block_reason ? <p className="text-sm text-muted-foreground">{row.implementation_block_reason}</p> : null}
+                  {canShowImplementationAction(row) ? <ActionButton variant="outline" onClick={() => void run("implement")} disabled={Boolean(busy)}>{implementationLabel(row, busy)}</ActionButton> : null}
+                </div>
+              </DetailPanel>
+            ) : row.workflow_capability && ["LUCKY_ID_BATCH_PREVIEW", "RENT_LEASE_PREVIEW", "BLOCKED"].includes(row.workflow_capability.category) ? (
+              <DetailPanel title="Blocked / future workflow" description="This amendment type requires a future workflow phase.">
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">{row.workflow_capability.blocked_reason}</p>
+                </div>
+              </DetailPanel>
+            ) : null}
           </>
         ) : null}
       </div>

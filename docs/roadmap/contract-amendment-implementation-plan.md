@@ -1,6 +1,6 @@
 # Contract Amendment Implementation Plan
 
-Status: **Implemented through Phase 6F.6 RC hardening on `update`.**
+Status: **Implemented through Phase 8A UI De-duplication on `update`.**
 
 ## Principle
 
@@ -252,6 +252,19 @@ Implemented behavior:
 Phase 6G is printable addendum only. It reuses executed recontract evidence and existing amendment detail read payloads. No source records mutate. No backend mutation behavior, execution logic, rollback, or reversal was added.
 
 Historical payments and receipts remain unchanged. The ledger statement explicitly does not create payment, receipt, refund, or settlement.
+
+### Phase 8A — Contract Amendment Workflow Stabilization Audit and UI De-duplication
+
+Status: **Implemented**
+
+Implemented behavior:
+- Introduces `workflow_capability` on backend serializers.
+- Evaluates capability matrix based on amendment type (PRODUCT_RECONTRACT, SAME_PRICE_PRODUCT_REFERENCE, NON_FINANCIAL, LUCKY_ID_BATCH_PREVIEW, RENT_LEASE_PREVIEW, BLOCKED).
+- Admin UI conditionally renders type-specific workflow sections (Decision, Product recontract, Direct guarded implementation, Blocked/future workflow).
+- Removes generic JSON operator UI for product recontract.
+- Ensures legacy apply endpoint gracefully rejects blocked amendments without a 500 error.
+- Maintains strict customer/partner read-only behavior.
+- Retains existing backend compatibility.
 
 ## Deferred phases
 

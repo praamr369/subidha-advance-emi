@@ -551,3 +551,54 @@ def implement_approved_amendment(*, amendment: ContractAmendment, implemented_by
     if locked_amendment.amendment_type == "PRODUCT_CHANGE":
         return _implement_product_change(locked_amendment=locked_amendment, implemented_by=implemented_by)
     return _implement_customer_field_amendment(locked_amendment=locked_amendment, implemented_by=implemented_by)
+
+
+def get_workflow_capability(amendment: ContractAmendment) -> dict:
+    capability = {
+        "category": "BLOCKED",
+        "can_review": amendment.status == "REQUESTED",
+        "can_approve_decision": amendment.status in {"REQUESTED", "UNDER_REVIEW"},
+        "can_reject_decision": amendment.status in {"REQUESTED", "UNDER_REVIEW"},
+        "can_execute_directly": False,
+        "requires_recontract_workflow": False,
+        "requires_customer_consent": False,
+        "requires_accounting_bridge": False,
+        "requires_reconciliation_bridge": False,
+        "blocked_reason": ""
+    }
+
+    if amendment.amendment_type in {"PRODUCT_CHANGE", "PRODUCT_UPGRADE"}:
+        meta = phase3_implementation_metadata(amendment)
+        if meta["is_implementable"] and amendment.amendment_type == "PRODUCT_CHANGE":
+            capability["category"] = "SAME_PRICE_PRODUCT_REFERENCE"
+            capability["can_execute_directly"] = True
+            return capability
+
+        capability["category"] = "PRODUCT_RECONTRACT"
+        capability["requires_recontract_workflow"] = True
+        capability["requires_customer_consent"] = True
+        capability["requires_accounting_bridge"] = True
+        capability["requires_reconciliation_bridge"] = True
+        capability["blocked_reason"] = "Product upgrade/downgrade must use product recontract workflow."
+        return capability
+
+    if amendment.amendment_type in {"LUCKY_ID_CHANGE", "BATCH_CHANGE"}:
+        capability["category"] = "LUCKY_ID_BATCH_PREVIEW"
+        capability["blocked_reason"] = "Lucky ID and Batch changes require dedicated preview workflow (future phase)."
+        return capability
+
+    if amendment.contract_type == "RENT_LEASE" or amendment.amendment_type in {"DEPOSIT_ADJUSTMENT", "RENT_AMOUNT_CHANGE", "LEASE_TERM_CHANGE"}:
+        capability["category"] = "RENT_LEASE_PREVIEW"
+        capability["blocked_reason"] = "Rent/lease amendments require dedicated preview workflow (future phase)."
+        return capability
+
+    meta = phase3_implementation_metadata(amendment)
+    if meta["is_implementable"]:
+        capability["category"] = "NON_FINANCIAL"
+        capability["can_execute_directly"] = True
+    else:
+        capability["category"] = "BLOCKED"
+        capability["blocked_reason"] = meta["implementation_block_reason"]
+
+    return capability
+

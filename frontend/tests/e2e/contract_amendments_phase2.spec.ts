@@ -45,6 +45,18 @@ const amendmentFixture = {
   implementation_block_reason: "Implementation requires APPROVED status.",
   implementable_fields: [],
   applied_at: null,
+  workflow_capability: {
+    category: "BLOCKED",
+    can_review: true,
+    can_approve_decision: true,
+    can_reject_decision: true,
+    can_execute_directly: false,
+    requires_recontract_workflow: false,
+    requires_customer_consent: false,
+    requires_accounting_bridge: false,
+    requires_reconciliation_bridge: false,
+    blocked_reason: "Implementation requires APPROVED status.",
+  },
   metadata: { ui_phase: "PHASE_2_REQUEST_ONLY" },
   created_at: "2026-05-26T10:00:00Z",
   updated_at: null,
@@ -57,6 +69,18 @@ const approvedSafeAmendmentFixture = {
   is_implementable: true,
   implementation_block_reason: "",
   implementable_fields: ["address", "city"],
+  workflow_capability: {
+    category: "NON_FINANCIAL",
+    can_review: false,
+    can_approve_decision: false,
+    can_reject_decision: false,
+    can_execute_directly: true,
+    requires_recontract_workflow: false,
+    requires_customer_consent: false,
+    requires_accounting_bridge: false,
+    requires_reconciliation_bridge: false,
+    blocked_reason: "",
+  },
 };
 
 const approvedProductChangeFixture = {
@@ -69,12 +93,36 @@ const approvedProductChangeFixture = {
   is_implementable: true,
   implementation_block_reason: "",
   implementable_fields: ["product"],
+  workflow_capability: {
+    category: "SAME_PRICE_PRODUCT_REFERENCE",
+    can_review: false,
+    can_approve_decision: false,
+    can_reject_decision: false,
+    can_execute_directly: true,
+    requires_recontract_workflow: false,
+    requires_customer_consent: false,
+    requires_accounting_bridge: false,
+    requires_reconciliation_bridge: false,
+    blocked_reason: "",
+  },
 };
 
 const blockedProductChangeFixture = {
   ...approvedProductChangeFixture,
   is_implementable: false,
   implementation_block_reason: "Financial product change requires contract repricing preview and reconciliation and is not implemented in this phase.",
+  workflow_capability: {
+    category: "PRODUCT_RECONTRACT",
+    can_review: false,
+    can_approve_decision: false,
+    can_reject_decision: false,
+    can_execute_directly: false,
+    requires_recontract_workflow: true,
+    requires_customer_consent: true,
+    requires_accounting_bridge: true,
+    requires_reconciliation_bridge: true,
+    blocked_reason: "Product upgrade/downgrade must use product recontract workflow.",
+  },
 };
 
 const productRecontractPreviewFixture = {

@@ -9,7 +9,7 @@ from subscriptions.models import (
     Subscription,
 )
 from subscriptions.models_contract_amendment import PHASE1_AMENDMENT_TYPES, PHASE1_STATUSES
-from subscriptions.services.contract_amendment_service import phase3_implementation_metadata
+from subscriptions.services.contract_amendment_service import get_workflow_capability, phase3_implementation_metadata
 from subscriptions.services.product_recontract_preview_service import latest_product_recontract_preview_summary
 
 PRODUCT_RECONTRACT_AMENDMENT_TYPES = {"PRODUCT_CHANGE", "PRODUCT_UPGRADE"}
@@ -27,6 +27,7 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
     implementation_block_reason = serializers.SerializerMethodField()
     implementable_fields = serializers.SerializerMethodField()
     latest_product_recontract_preview = serializers.SerializerMethodField()
+    workflow_capability = serializers.SerializerMethodField()
 
     class Meta:
         model = ContractAmendment
@@ -73,6 +74,7 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
             "implementation_block_reason",
             "implementable_fields",
             "latest_product_recontract_preview",
+            "workflow_capability",
             "applied_at",
             "metadata",
             "created_at",
@@ -88,6 +90,9 @@ class ContractAmendmentSerializer(serializers.ModelSerializer):
 
     def get_implementable_fields(self, obj):
         return phase3_implementation_metadata(obj)["implementable_fields"]
+
+    def get_workflow_capability(self, obj):
+        return get_workflow_capability(obj)
 
     def get_latest_product_recontract_preview(self, obj):
         if obj.amendment_type not in PRODUCT_RECONTRACT_AMENDMENT_TYPES:

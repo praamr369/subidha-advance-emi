@@ -29,6 +29,19 @@ export type AmendmentType =
 export type ProductRecontractConsentStatus = "PENDING" | "ACCEPTED" | "REJECTED";
 export type ProductRecontractAdminApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
+export type AmendmentWorkflowCapability = {
+  category: "NON_FINANCIAL" | "SAME_PRICE_PRODUCT_REFERENCE" | "PRODUCT_RECONTRACT" | "LUCKY_ID_BATCH_PREVIEW" | "RENT_LEASE_PREVIEW" | "BLOCKED";
+  can_review: boolean;
+  can_approve_decision: boolean;
+  can_reject_decision: boolean;
+  can_execute_directly: boolean;
+  requires_recontract_workflow: boolean;
+  requires_customer_consent: boolean;
+  requires_accounting_bridge: boolean;
+  requires_reconciliation_bridge: boolean;
+  blocked_reason: string;
+};
+
 export type ProductRecontractPreviewSummary = ContractRecontractExecutionFields & {
   id: number;
   status: string;
@@ -136,6 +149,7 @@ export type AmendmentRecord = {
   implementation_block_reason?: string;
   implementable_fields?: string[];
   latest_product_recontract_preview?: ProductRecontractPreviewSummary | null;
+  workflow_capability?: AmendmentWorkflowCapability;
   applied_at?: string | null;
   metadata?: Record<string, unknown>;
   created_at?: string;

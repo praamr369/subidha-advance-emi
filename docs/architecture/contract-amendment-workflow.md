@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: **Implemented through Phase 6F.6 RC hardening on `update`.**
+Status: **Implemented through Phase 8A UI De-duplication on `update`.**
 
 ## Scope
 
@@ -121,7 +121,11 @@ After execution, the following actions are blocked/read-only:
 
 ## UI rules
 
-Admin amendment detail may show executed-state evidence and typed execution controls only before execution and only when all evidence exists.
+Admin amendment detail renders type-specific workflow sections based on backend `workflow_capability`:
+- **Decision section**: Mark under review, Approve decision, Reject decision. (Generic Approved decision values JSON is hidden for product recontract).
+- **Product recontract section**: Shows preview status, consent, approval, schedule/financial preview, execution status, and addendum print link only for product upgrade/downgrade/financial product change.
+- **Direct guarded implementation section**: Shows only when backend capability allows direct execution (e.g. same-price product reference correction, non-financial correction).
+- **Blocked / future workflow section**: Shows explanation for blocked amendments (Lucky ID, batch, rent/lease, deposit) without exposing fake execution buttons.
 
 Customer amendment detail may show only a safe read-only executed summary:
 
