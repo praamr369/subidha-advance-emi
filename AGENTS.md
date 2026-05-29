@@ -25,6 +25,16 @@ All changes must preserve backward compatibility for current Lucky Plan EMI data
 
 ---
 
+## Canonical project rulebook
+
+Before changing backend, frontend, workflows, financial logic, UI routes, models, serializers, services, tests, or deployment behavior, read:
+
+`docs/SUBIDHA_CORE_PROJECT_RULEBOOK.md`
+
+This rulebook is the canonical business + technical reference for SUBIDHA CORE. It defines business invariants, financial controls, audit rules, backend/frontend boundaries, role rules, upgrade rules, deletion rules, and release checks.
+
+---
+
 ## Core Product Rules
 
 1. One customer may have multiple subscriptions.
@@ -206,6 +216,24 @@ When making changes:
 
 ---
 
+## Required change review summary
+
+For every completed change, include this summary:
+
+- Existing data impact
+- Financial integrity impact
+- Auditability impact
+- Daily shop usability impact
+- Future rent/lease compatibility impact
+- API contract impact
+- Migration impact
+- Test coverage
+- Role/permission impact
+- Reconciliation/accounting impact
+- Rollback/deployment notes
+
+---
+
 ## Testing Expectations
 
 For backend changes, include:
@@ -258,5 +286,3 @@ For major tasks:
 3. implement in production-ready form
 4. preserve backward compatibility
 5. explain tradeoffs clearly
-
-Act as a senior full-stack engineer and system architect for a real retail-financial workflow.
