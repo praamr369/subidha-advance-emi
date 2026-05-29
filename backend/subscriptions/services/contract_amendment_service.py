@@ -550,6 +550,8 @@ def implement_approved_amendment(*, amendment: ContractAmendment, implemented_by
         raise ValidationError({"detail": f"Cannot implement amendment in status '{locked_amendment.status}'. Must be APPROVED."})
     if locked_amendment.amendment_type == "PRODUCT_CHANGE":
         return _implement_product_change(locked_amendment=locked_amendment, implemented_by=implemented_by)
+    if locked_amendment.amendment_type == "PRODUCT_UPGRADE":
+        raise ValidationError({"detail": "Product upgrade/downgrade must use the product recontract workflow instead of direct implementation."})
     return _implement_customer_field_amendment(locked_amendment=locked_amendment, implemented_by=implemented_by)
 
 

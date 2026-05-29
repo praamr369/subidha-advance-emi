@@ -269,10 +269,11 @@ export default function AdminAmendmentDetail({ id }: { id: number }) {
                   {canShowImplementationAction(row) ? <ActionButton variant="outline" onClick={() => void run("implement")} disabled={Boolean(busy)}>{implementationLabel(row, busy)}</ActionButton> : null}
                 </div>
               </DetailPanel>
-            ) : row.workflow_capability && ["LUCKY_ID_BATCH_PREVIEW", "RENT_LEASE_PREVIEW", "BLOCKED"].includes(row.workflow_capability.category) ? (
+            ) : row.workflow_capability && !row.workflow_capability.can_execute_directly ? (
               <DetailPanel title="Blocked / future workflow" description="This amendment type requires a future workflow phase.">
                 <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">{row.workflow_capability.blocked_reason}</p>
+                  {row.workflow_capability.blocked_reason ? <p className="text-sm text-muted-foreground">{row.workflow_capability.blocked_reason}</p> : null}
+                  {row.implementation_block_reason ? <p className="text-sm text-muted-foreground">{row.implementation_block_reason}</p> : null}
                 </div>
               </DetailPanel>
             ) : null}

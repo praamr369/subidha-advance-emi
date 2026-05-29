@@ -142,7 +142,7 @@ class ContractAmendmentPhase4ProductChangeTests(TestCase):
         response = self.client.post(f"/api/v1/admin/contracts/amendments/{amendment.id}/apply/", {}, format="json")
 
         self.assertEqual(response.status_code, 400, response.data)
-        self.assertIn("same-price product reference corrections", str(response.data))
+        self.assertIn("product recontract workflow", str(response.data))
         amendment.refresh_from_db()
         self.assertEqual(amendment.status, "APPROVED")
         self.assertIsNone(amendment.implemented_at)
@@ -269,6 +269,6 @@ class ContractAmendmentPhase4ProductChangeTests(TestCase):
         missing_response = self.client.post(f"/api/v1/admin/contract-amendments/{missing_target.id}/product-recontract-preview/", {}, format="json")
 
         self.assertEqual(unsupported_response.status_code, 400, unsupported_response.data)
-        self.assertIn("product_change", str(unsupported_response.data).lower())
+        self.assertIn("product change", str(unsupported_response.data).lower())
         self.assertEqual(missing_response.status_code, 400, missing_response.data)
         self.assertIn("approved_product_id", str(missing_response.data).lower())
