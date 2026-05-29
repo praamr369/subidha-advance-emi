@@ -2,7 +2,16 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from subscriptions.models import Commission, FinancialLedger, LedgerEntryType, Payment
+from accounting.models import JournalEntryGroup
+from subscriptions.models import (
+    Commission,
+    FinancialLedger,
+    LedgerEntryType,
+    Payment,
+    PaymentReconciliation,
+    UnifiedCollectionIdempotency,
+    UnifiedCollectionIdempotencyStatus,
+)
 from subscriptions.services.payment_service import (
     record_emi_payment,
     reverse_payment_for_admin,
@@ -123,6 +132,96 @@ class PaymentServiceTests(TestCase):
                 reference_no="TEST-REF-003",
             )
 
+    def test_record_partial_cash_payment_without_reference_requires_idempotency_key(self):
+        with self.assertRaisesMessage(
+            ValueError,
+            "idempotency_key is required for cash payments without a reference number.",
+        ):
+            record_emi_payment(
+                emi_id=self.emi.id,
+                amount=Decimal("400.00"),
+                collected_by=self.admin,
+                method="CASH",
+                finance_account_id=self.finance_account.id,
+            )
+
+    def test_record_partial_cash_payment_idempotency_reuses_payment_without_duplicate_side_effects(self):
+        idem_key = "test-partial-cash-idem-001"
+        first = record_emi_payment(
+            emi_id=self.emi.id,
+            amount=Decimal("400.00"),
+            collected_by=self.admin,
+            method="CASH",
+            finance_account_id=self.finance_account.id,
+            idempotency_key=idem_key,
+        )
+        payment = first["payment"]
+
+        counts_after_first = {
+            "payments": Payment.objects.count(),
+            "ledgers": FinancialLedger.objects.filter(payment=payment).count(),
+            "emi_ledgers": FinancialLedger.objects.filter(
+                emi=self.emi,
+                entry_type=LedgerEntryType.EMI_PAYMENT,
+            ).count(),
+            "commissions": Commission.objects.count(),
+            "reconciliations": PaymentReconciliation.objects.count(),
+            "journal_groups": JournalEntryGroup.objects.count(),
+        }
+
+        second = record_emi_payment(
+            emi_id=self.emi.id,
+            amount=Decimal("400.00"),
+            collected_by=self.admin,
+            method="CASH",
+            finance_account_id=self.finance_account.id,
+            idempotency_key=idem_key,
+        )
+
+        self.assertTrue(first["created"])
+        self.assertFalse(second["created"])
+        self.assertEqual(payment.id, second["payment"].id)
+        self.assertEqual(Payment.objects.count(), counts_after_first["payments"])
+        self.assertEqual(FinancialLedger.objects.filter(payment=payment).count(), counts_after_first["ledgers"])
+        self.assertEqual(
+            FinancialLedger.objects.filter(
+                emi=self.emi,
+                entry_type=LedgerEntryType.EMI_PAYMENT,
+            ).count(),
+            counts_after_first["emi_ledgers"],
+        )
+        self.assertEqual(Commission.objects.count(), counts_after_first["commissions"])
+        self.assertEqual(PaymentReconciliation.objects.count(), counts_after_first["reconciliations"])
+        self.assertEqual(JournalEntryGroup.objects.count(), counts_after_first["journal_groups"])
+
+        idem_row = UnifiedCollectionIdempotency.objects.get(user=self.admin, key=idem_key)
+        self.assertEqual(idem_row.status, UnifiedCollectionIdempotencyStatus.COMPLETED)
+        self.assertEqual(idem_row.response_body["payment_id"], payment.id)
+
+    def test_record_payment_same_idempotency_key_with_different_payload_fails(self):
+        idem_key = "test-partial-cash-idem-conflict"
+        record_emi_payment(
+            emi_id=self.emi.id,
+            amount=Decimal("400.00"),
+            collected_by=self.admin,
+            method="CASH",
+            finance_account_id=self.finance_account.id,
+            idempotency_key=idem_key,
+        )
+
+        with self.assertRaisesMessage(
+            ValueError,
+            "Idempotency key was reused with different payment details.",
+        ):
+            record_emi_payment(
+                emi_id=self.emi.id,
+                amount=Decimal("500.00"),
+                collected_by=self.admin,
+                method="CASH",
+                finance_account_id=self.finance_account.id,
+                idempotency_key=idem_key,
+            )
+
     def test_record_payment_on_paid_emi_fails(self):
         record_emi_payment(
             emi_id=self.emi.id,
@@ -146,8 +245,8 @@ class PaymentServiceTests(TestCase):
         self.assertIn(
             str(ctx.exception),
             {
-            "This EMI is already fully paid.",
-            "Cannot collect payment for a completed subscription.",
+                "This EMI is already fully paid.",
+                "Cannot collect payment for a completed subscription.",
             },
         )
 
