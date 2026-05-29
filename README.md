@@ -92,7 +92,8 @@ The system is built to support:
 - Cashier dashboard
 - Partner dashboard
 - Customer dashboard
-
+- Staff dashboard
+- Vendor dashboard
 ---
 
 ## Key Principles
