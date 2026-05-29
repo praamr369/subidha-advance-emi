@@ -47,7 +47,7 @@ The system is built to support:
 ## Project Goals
 
 - Stable daily operations for local business use
-- Role-based workflows for admin, cashier, partner, and customer
+- Role-based workflows for admin, cashier, partner, vendor,staff and customer
 - Clear backend and frontend separation
 - Additive improvements only
 - Backward compatibility for future furniture rental / lease support
