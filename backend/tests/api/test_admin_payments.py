@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from subscriptions.models import FinancialLedger, LedgerEntryType, Payment
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -127,6 +128,56 @@ class AdminPaymentApiTests(APITestCase):
             msg=f"Unexpected duplicate collect response: {second.status_code} {second.data}",
         )
         self.assertFalse(second.data["created"])
+
+    def test_admin_cash_partial_without_reference_requires_idempotency_key(self):
+        response = self.client.post(
+            "/api/v1/admin/payments/collect/",
+            {
+                "emi": self.emi.id,
+                "amount": "400.00",
+                "payment_method": "CASH",
+                "finance_account_id": self.cash_finance.id,
+                "payment_date": "2026-03-17",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("idempotency_key", response.data)
+
+    def test_admin_cash_partial_double_submit_returns_existing_payment(self):
+        payload = {
+            "emi": self.emi.id,
+            "amount": "400.00",
+            "payment_method": "CASH",
+            "finance_account_id": self.cash_finance.id,
+            "payment_date": "2026-03-17",
+            "idempotency_key": "admin-api-cash-double-submit-001",
+        }
+        first = self.client.post("/api/v1/admin/payments/collect/", payload, format="json")
+        second = self.client.post("/api/v1/admin/payments/collect/", payload, format="json")
+
+        self.assertEqual(
+            first.status_code,
+            status.HTTP_201_CREATED,
+            msg=f"Unexpected first collect response: {first.status_code} {first.data}",
+        )
+        self.assertEqual(
+            second.status_code,
+            status.HTTP_200_OK,
+            msg=f"Unexpected duplicate collect response: {second.status_code} {second.data}",
+        )
+        self.assertTrue(first.data["created"])
+        self.assertFalse(second.data["created"])
+        self.assertEqual(first.data["payment"]["id"], second.data["payment"]["id"])
+        self.assertEqual(Payment.objects.count(), 1)
+        self.assertEqual(
+            FinancialLedger.objects.filter(
+                payment_id=first.data["payment"]["id"],
+                entry_type=LedgerEntryType.EMI_PAYMENT,
+            ).count(),
+            1,
+        )
 
     def test_admin_payment_reverse_success(self):
         collect = self.client.post(
