@@ -97,7 +97,7 @@ The system must remain suitable for today’s Lucky Plan EMI business and future
 | Rent/lease demand | `RentLeaseBillingDemand`, `RentLeaseDepositTransaction` | `backend/subscriptions/models.py` | Monthly/security deposit demand and transaction tracking. | Rent/lease receivable, deposit liability/refund. | Transaction type and reason history. | Admin/cashier rent/lease collection surfaces. | Core rent/lease billing. |
 | Delivery | `SubscriptionDelivery` | `backend/subscriptions/models.py` | Subscription delivery lifecycle. | Indirect stock/fulfillment impact. | Status timestamps and actor links. | Admin deliveries, print documents. | Supports rent/lease handover/return with explicit rules. |
 | Direct sale | `DirectSale`, `DirectSaleLine`, billing invoice/receipt models | `backend/billing/models.py` | Retail sale, invoice, receipt, cancellation/return/exchange. | Direct receivable/revenue/stock/accounting. | Status immutability and source links. | Admin billing, cashier direct sale collection, print. | Separate from EMI contracts. |
-| Accounting | `ChartOfAccount`, `FinanceAccount`, `FinanceAccountCoaMapping`, `AccountingPostingProfile`, `JournalEntry`, `JournalLine`, `SettlementAllocation` | `backend/accounting/models.py` | COA, real money channels, posting profiles, journals. | Accounting truth. | Posted records and mappings must be guarded. | Admin accounting/finance setup. | Required for deposits, rent income, lease income, payouts. |
+| Accounting / reconciliation | `ChartOfAccount`, `FinanceAccount`, `FinanceAccountCoaMapping`, `AccountingPostingProfile`, `JournalEntry`, `JournalLine`, `MoneyMovement`, `ReconciliationItem`; settlement allocation / settlement mapping is a future or needs-confirmation concept, with no exact `SettlementAllocation` model confirmed in current code inspection. | `backend/accounting/models.py`, `backend/reconciliation/models.py` | COA, real money channels, posting profiles, journals, money movement, reconciliation exceptions, and future/confirmed settlement mapping concepts. | Accounting truth and settlement visibility. | Posted records, mappings, and exceptions must be guarded. | Admin accounting/finance setup and reconciliation views. | Required for deposits, rent income, lease income, payouts, and future settlement mapping. |
 | Inventory | `StockLocation`, `InventoryItem`, `StockMovement`, purchase/adjustment models | `backend/inventory/models.py` | Stock master, physical and soft-hold movement ledger. | Inventory asset and COGS implications. | Movement history required. | Admin inventory/delivery/direct sale. | Required for rent/lease handover/return condition. |
 | Amendment | `ContractAmendment` | `backend/subscriptions/models.py` | Request/review/approved values/implementation metadata. | High-risk changes blocked unless service supports them. | Review and implementation audit required. | Admin/customer/partner amendment pages. | Supports EMI and rent/lease contract types. |
 | Branch/staff | `Branch`, `CashCounter` | `backend/branch_control/models.py` | Branch/counter assignment and access. | Payment collection location. | Staff access and counter evidence. | Admin setup, cashier flows. | Needed for rent/lease locations. |
@@ -110,7 +110,7 @@ The system must remain suitable for today’s Lucky Plan EMI business and future
 - Views/viewsets must remain thin: permission check, serializer validation, service call, response.
 - Serializers validate input/output shape; they must not silently perform financial side effects unless the existing flow explicitly does that.
 - Use `transaction.atomic` for subscription creation, payment collection, payment reversal, waiver application, amendment implementation, payout settlement, reconciliation state changes, direct sale posting, inventory movement, delivery lifecycle changes, and business reset.
-- Use `select_for_update` where race conditions affect money, EMI status, Lucky ID assignment, batch slot count, stock quantity, commission payout, or settlement allocation.
+- Use `select_for_update` where race conditions affect money, EMI status, Lucky ID assignment, batch slot count, stock quantity, commission payout, or confirmed settlement/payment allocation records.
 - Admin-only operations must remain admin-only. Cashier, partner, and customer endpoints must never leak admin data.
 - Audit logging and business events must be linked to source records.
 
@@ -339,7 +339,9 @@ Definitions:
 - `FinanceAccountCoaMapping`: purpose-specific mapping from finance channel to COA purpose.
 - `AccountingPostingProfile`: system-only posting role such as receivable/income/commission payable/waiver loss.
 - `JournalEntry`/`JournalLine`: accounting posting record.
-- `SettlementAllocation`: settlement mapping where present.
+- `MoneyMovement`: confirmed accounting-side money movement record where present in `backend/accounting/models.py`.
+- `ReconciliationItem`: confirmed reconciliation exception/review record in `backend/reconciliation/models.py`.
+- Settlement allocation / settlement mapping: future or needs-confirmation concept; no exact `SettlementAllocation` model confirmed in current code inspection.
 
 Rules:
 
@@ -436,7 +438,7 @@ Rules:
 | Cashier | Collection and receipt workspace. | Search due items, collect allowed payments, view receipts/day close/counter scope. | Admin setup, destructive config, unsafe reversal unless allowed endpoint exists. | Branch/counter/customer collection data. | Must use finance account/counter controls. |
 | Partner | Own/customer-assigned business. | View own customers/subscriptions/collections/commission, create approved requests if enabled. | Admin data, global finance setup, other partner data. | Own scope only. | No privacy leakage. |
 | Customer | Self-service account. | View own contracts, EMIs, payments, support, profile. | Internal data, admin/cashier actions. | Own records only. | No cross-customer access. |
-| Public | Trust and lead generation. | Public product, winner, policy, lead/request pages. | Private account data. | Public-safe only. | Mask customer private data. |
+| Public | Trust and lead generation. | Public product, winner, policy, lead/request pages only. | Private account data. | Public-safe only. | Mask customer private data. |
 
 ## 25. Smart form rules
 
