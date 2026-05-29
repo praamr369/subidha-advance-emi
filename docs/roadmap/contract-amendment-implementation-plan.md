@@ -276,6 +276,17 @@ Implemented behavior:
 - Frontend read-only UI panel surfaces requested changes, availability checks, conflicts, and block reasons.
 - Blocks explicit execution logic since changes impact draw eligibility and audit workflows.
 
+### Phase 8E — Rent / Lease Amendment Preview-Only Workflow
+
+Status: **Implemented**
+
+Implemented behavior:
+- Extends workflow capabilities: Rent/Lease amendments are classified as `RENT_LEASE_PREVIEW`.
+- Backend preview endpoint returns current vs requested states without mutating core tables.
+- Frontend read-only UI panel surfaces requested changes, and risk analysis for demand schedule, deposits, accounting, and reconciliation.
+- Blocks explicit execution logic since changes require a dedicated accounting and reconciliation workflow.
+
+
 ## Deferred phases
 
 ### Phase 6H — Product recontract evidence reporting and RC hardening

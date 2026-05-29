@@ -592,7 +592,8 @@ def get_workflow_capability(amendment: ContractAmendment) -> dict:
 
     if amendment.contract_type == "RENT_LEASE" or amendment.amendment_type in {"DEPOSIT_ADJUSTMENT", "RENT_AMOUNT_CHANGE", "LEASE_TERM_CHANGE"}:
         capability["category"] = "RENT_LEASE_PREVIEW"
-        capability["blocked_reason"] = "Rent/lease amendments require dedicated preview workflow (future phase)."
+        capability["requires_preview"] = True
+        capability["blocked_reason"] = "Execution is deferred until rent/lease accounting and reconciliation workflow exists."
         return capability
 
     meta = phase3_implementation_metadata(amendment)

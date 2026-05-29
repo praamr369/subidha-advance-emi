@@ -1,6 +1,6 @@
 # Contract Amendment Workflow
 
-Status: **Implemented through Phase 8D UI De-duplication and Preview.**
+Status: **Implemented through Phase 8E Rent/Lease Amendment Preview.**
 
 ## Scope
 
