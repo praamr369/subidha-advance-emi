@@ -33,6 +33,7 @@ export type PaymentCollectPayload = {
   payment_date: string;
   reference_no?: string;
   notes?: string;
+  idempotency_key?: string;
 };
 
 export type PaymentCollectResponse = {
