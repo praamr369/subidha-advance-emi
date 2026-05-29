@@ -7,7 +7,6 @@ from django.db.models import Sum
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import throttle_classes
 
 from accounts.capabilities import require_capability
 from accounting.models import FinanceAccount
@@ -89,9 +88,9 @@ class IdempotentAdminPaymentCollectSerializer(serializers.Serializer):
         return attrs
 
 
-@throttle_classes([PaymentMutationThrottle])
 class IdempotentAdminPaymentCollectView(APIView):
     permission_classes = [IsAdmin]
+    throttle_classes = [PaymentMutationThrottle]
 
     @require_capability("billing.collect")
     def post(self, request, *args, **kwargs):
