@@ -7,7 +7,7 @@ async function expectSuccessOrControlledFetchError(
   page: Parameters<typeof test>[0]["page"],
   success: () => Promise<void>,
 ) {
-  const failedToFetch = page.getByText("Failed to fetch").first();
+  const failedToFetch = page.getByText("Failed to fetch");
   if (await failedToFetch.isVisible().catch(() => false)) {
     await expect(failedToFetch).toBeVisible();
     await expect(page.getByRole("heading", { name: /Customer Workspace|Admin Dashboard/i })).toBeVisible();
@@ -82,7 +82,7 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await sidebar.getByPlaceholder("Search modules").fill("Partner Payment Requests");
     await expect(sidebar.getByRole("link", { name: "Partner Payment Requests", exact: true })).toBeVisible();
     await sidebar.getByPlaceholder("Search modules").clear();
-    const executiveLoadError = page.getByText(/Unable to load executive dashboard|Failed to fetch/i).first();
+    const executiveLoadError = page.getByText(/Unable to load executive dashboard|Failed to fetch/i);
     if (await executiveLoadError.isVisible().catch(() => false)) {
       await expect(executiveLoadError).toBeVisible();
       const adminDashboardHeading = page.getByRole("heading", { name: "Admin Dashboard", exact: true });

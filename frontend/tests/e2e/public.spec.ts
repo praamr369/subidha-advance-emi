@@ -17,8 +17,8 @@ test("public home loads with apply nav, live stats, and latest winner widget", a
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Apply" }).first()).toBeVisible();
   await expect(page.locator(".public-hero-banner").first()).toBeVisible();
-  await expect(page.getByText("Published batches").first()).toBeVisible();
-  await expect(page.getByText("Latest winner").first()).toBeVisible();
+  await expect(page.getByText("Published batches")).toBeVisible();
+  await expect(page.getByText("Latest winner")).toBeVisible();
 });
 
 test("public product enquiry routes into apply and the apply form submits", async ({
@@ -47,14 +47,14 @@ test("public product enquiry routes into apply and the apply form submits", asyn
   await expect(
     page.getByRole("heading", { name: "Products" })
   ).toBeVisible();
-  await expect(page.getByText("Browse the live catalogue").first()).toBeVisible();
+  await expect(page.getByText("Browse the live catalogue")).toBeVisible();
   await expect(page.getByText("Media-ready cards")).toBeVisible();
 
   await page.goto(`/products/${manifest.entities.public.product_id}`);
   await expect(
-    page.getByRole("main").getByText("Base price", { exact: true }).first()
+    page.getByRole("main").getByText("Base price", { exact: true })
   ).toBeVisible();
-  await expect(page.getByText("Product code").first()).toBeVisible();
+  await expect(page.getByText("Product code")).toBeVisible();
   await page.getByRole("link", { name: /^Enquire$/ }).first().click();
   await expect(page).toHaveURL(/\/apply\?/);
   await expect(page.getByText("Selected Product Context")).toBeVisible();
@@ -76,8 +76,8 @@ test("public product detail keeps enquiry workflow and catalogue facts visible",
   const manifest = readSmokeManifest();
 
   await page.goto(`/products/${manifest.entities.public.product_id}`);
-  await expect(page.getByText("Product code").first()).toBeVisible();
-  await expect(page.getByText("Media state").first()).toBeVisible();
+  await expect(page.getByText("Product code")).toBeVisible();
+  await expect(page.getByText("Media state")).toBeVisible();
   await expect(page.getByRole("link", { name: /^Enquire$/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /^Contact$/ }).first()).toBeVisible();
 });
@@ -112,7 +112,7 @@ test("latest winner section shows a truthful live or empty state", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByText("Latest winner").first()).toBeVisible();
+  await expect(page.getByText("Latest winner")).toBeVisible();
   await expect(page.locator("body")).toContainText(
     /No winner published yet|Latest published draw result/i
   );

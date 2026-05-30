@@ -120,7 +120,7 @@ test("admin finance control center renders operational settlement and transfer s
   await expect(
     page.getByRole("heading", { name: "Finance Control Center" })
   ).toBeVisible();
-  if (await page.getByText("Failed to fetch").first().isVisible().catch(() => false)) {
+  if (await page.getByText("Failed to fetch").isVisible().catch(() => false)) {
     await expect(page.getByText(/Unable to load finance control center/i)).toBeVisible();
   } else {
     await expect(page.getByText("Operational settlement posture")).toBeVisible();
@@ -651,7 +651,7 @@ test("admin payment create search uses q query contract and returns results", as
   );
   await page.getByRole("button", { name: "Search" }).click();
 
-  const failedToFetch = page.getByText("Failed to fetch").first();
+  const failedToFetch = page.getByText("Failed to fetch");
   if (await failedToFetch.isVisible().catch(() => false)) {
     await expect(page.locator("body")).toContainText(/Failed to fetch|Unable to load/i);
     return;
@@ -712,7 +712,7 @@ test("admin customer detail handoff preserves subscription-create customer prefi
     await expect(page.getByRole("heading", { name: /Customer #/i })).toBeVisible();
   }
 
-  if (await page.getByText("Failed to fetch").first().isVisible().catch(() => false)) {
+  if (await page.getByText("Failed to fetch").isVisible().catch(() => false)) {
     await expect(page.locator("body")).toContainText(/Unable to load customer detail|Failed to fetch/i);
     return;
   }

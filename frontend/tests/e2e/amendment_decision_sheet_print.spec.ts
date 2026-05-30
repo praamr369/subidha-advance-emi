@@ -34,7 +34,7 @@ const mockAmendment = {
 };
 
 async function mockApis(page: Page) {
-  await page.route("**/api/v1/admin/contract-amendments/99/?", async (route) => {
+  await page.route("**/api/v1/admin/contract-amendments/99/**", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockAmendment) });
   });
   await page.route("**/api/v1/admin/business-profile/**", async (route) => {
@@ -49,8 +49,8 @@ test.describe("admin amendment decision sheet print", () => {
     await mockApis(page);
     await page.goto("/admin/contract-amendments/99/decision-sheet/print");
 
-    await expect(page.getByText("CONTRACT AMENDMENT DECISION SHEET")).toBeVisible();
-    await expect(page.getByText("AMD-DECISION-001")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "CONTRACT AMENDMENT DECISION SHEET" })).toBeVisible();
+    await expect(page.locator("header").getByText("AMD-DECISION-001")).toBeVisible();
     await expect(page.getByText("This document is read-only evidence. It does not create payment, receipt, accounting, reconciliation, stock, delivery, lucky draw, waiver, commission, payout, rent/lease demand, deposit, or contract mutation.")).toBeVisible();
 
     await page.emulateMedia({ media: "print" });

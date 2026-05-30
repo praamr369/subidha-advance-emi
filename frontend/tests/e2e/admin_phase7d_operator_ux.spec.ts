@@ -5,7 +5,7 @@ import { authStatePath } from "./helpers/smoke-data";
 test.use({ storageState: authStatePath("admin") });
 
 async function expectSuccessOrControlledFetchError(page: Parameters<typeof test>[0]["page"], success: () => Promise<void>) {
-  const failedToFetch = page.getByText("Failed to fetch").first();
+  const failedToFetch = page.getByText("Failed to fetch");
   if (await failedToFetch.isVisible().catch(() => false)) {
     await expect(failedToFetch).toBeVisible();
     await expect(page.getByRole("heading", { name: /Admin Dashboard|Business Intelligence|Staff Register/i })).toBeVisible();
@@ -69,8 +69,8 @@ test("bi charts show read-only report links", async ({ page }) => {
 
   await page.goto("/admin/bi/cashflow");
   await expect(page.locator("h1", { hasText: "Cashflow Dashboard" })).toBeVisible();
-  if (await page.getByText("Failed to fetch").first().isVisible().catch(() => false)) {
-    await expect(page.getByText("Failed to fetch").first()).toBeVisible();
+  if (await page.getByText("Failed to fetch").isVisible().catch(() => false)) {
+    await expect(page.getByText("Failed to fetch")).toBeVisible();
   } else {
     await expect(page.getByText(/Financial mutation: disabled/i)).toBeVisible();
     await expect(page.getByRole("link", { name: /Take Action/i })).toHaveCount(0);
@@ -101,7 +101,7 @@ test("staff register and payroll setup render hardening controls", async ({ page
   await page.getByLabel("Department").fill("Operations");
   await page.getByLabel("Role / title").fill("Supervisor");
   await page.getByRole("button", { name: "Save Profile" }).click();
-  const failedToFetch = page.getByText("Failed to fetch").first();
+  const failedToFetch = page.getByText("Failed to fetch");
   if (await failedToFetch.isVisible().catch(() => false)) {
     await expect(failedToFetch).toBeVisible();
     await expect(page.getByText(/Unable to load staff/i)).toBeVisible();
@@ -127,7 +127,7 @@ test("staff register and payroll setup render hardening controls", async ({ page
 
   await page.goto("/admin/hr/payroll");
   await expect(page.getByRole("heading", { name: /salary \/ payroll/i })).toBeVisible();
-  if (await page.getByText("Failed to fetch").first().isVisible().catch(() => false)) {
+  if (await page.getByText("Failed to fetch").isVisible().catch(() => false)) {
     await expect(page.getByText(/Payroll unavailable/i)).toBeVisible();
   } else {
     await expect(page.getByText(/Payroll Setup \(Staff Master\)/i)).toBeVisible();

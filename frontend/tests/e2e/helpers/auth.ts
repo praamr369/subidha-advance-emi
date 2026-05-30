@@ -3,7 +3,7 @@ import { expect, type Page } from "@playwright/test";
 import { FRONTEND_BASE_URL, type RoleCredentials } from "./smoke-data";
 
 export async function expectLoginScreen(page: Page): Promise<void> {
-  await expect(page.locator("#username")).toBeVisible();
+  await expect(page.locator("#identifier, #username")).toBeVisible();
   await expect(page.locator("#password")).toBeVisible();
   await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
 }
@@ -15,7 +15,7 @@ export async function loginWithCredentials(
   await page.goto("/login");
   await page.waitForLoadState("networkidle");
   await expectLoginScreen(page);
-  await page.locator("#username").fill(credentials.username);
+  await page.locator("#identifier, #username").fill(credentials.username);
   await page.locator("#password").fill(credentials.password);
   await page.getByRole("button", { name: /^sign in$/i }).click();
   await expect(page).toHaveURL(new RegExp(`${escapeForUrl(credentials.dashboard)}(?:\\?.*)?$`));

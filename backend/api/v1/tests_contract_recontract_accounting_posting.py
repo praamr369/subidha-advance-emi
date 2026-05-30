@@ -408,5 +408,5 @@ class ContractRecontractAccountingPostingTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400, response.data)
-        self.assertIn("not enabled yet", response.data["detail"])
+        self.assertIn("reconciliation bridge evidence", str(response.data["detail"]).lower())
         self._assert_source_preserved(before_state, before_non_accounting)

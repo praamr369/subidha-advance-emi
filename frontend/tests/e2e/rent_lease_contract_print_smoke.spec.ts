@@ -129,17 +129,17 @@ test("rent lease contract print route renders branded agreement", async ({ page 
 
   await page.goto("/admin/rent-lease/contracts/802/contract/print");
 
-  await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
+  await expect(page.getByText("Subidha Furniture")).toBeVisible();
   await expect(page.getByText("RENT / LEASE AGREEMENT")).toBeVisible();
-  await expect(page.getByText("SUB/LEASE/2026/0001").first()).toBeVisible();
-  await expect(page.getByText("Lease Contract Customer").first()).toBeVisible();
-  await expect(page.getByText("Subidha Lease Recliner").first()).toBeVisible();
-  await expect(page.getByText("LEASE-RECLINER-01").first()).toBeVisible();
-  await expect(page.getByText("RL-ASN-000802").first()).toBeVisible();
-  await expect(page.getByText("Monthly Lease").first()).toBeVisible();
-  await expect(page.getByText("Security Deposit").first()).toBeVisible();
-  await expect(page.getByText("Refundable Deposit").first()).toBeVisible();
-  await expect(page.getByText("Outstanding / Balance").first()).toBeVisible();
+  await expect(page.getByText("SUB/LEASE/2026/0001")).toBeVisible();
+  await expect(page.getByText("Lease Contract Customer")).toBeVisible();
+  await expect(page.getByText("Subidha Lease Recliner")).toBeVisible();
+  await expect(page.getByText("LEASE-RECLINER-01")).toBeVisible();
+  await expect(page.getByText("RL-ASN-000802")).toBeVisible();
+  await expect(page.getByText("Monthly Lease")).toBeVisible();
+  await expect(page.getByText("Security Deposit")).toBeVisible();
+  await expect(page.getByText("Refundable Deposit")).toBeVisible();
+  await expect(page.getByText("Outstanding / Balance")).toBeVisible();
   await expect(page.getByText("Deposit Liability / Refund Note")).toBeVisible();
   await expect(page.getByText("Security deposit refund, deduction, withholding, and final refund status must be processed only through backend")).toBeVisible();
   await expect(page.getByText("deduction values are displayed only from backend contract records")).toBeVisible();

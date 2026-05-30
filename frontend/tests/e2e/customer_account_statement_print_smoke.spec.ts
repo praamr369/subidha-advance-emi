@@ -126,21 +126,21 @@ test("customer account statement print route renders read-only customer evidence
 
   await page.goto("/admin/customers/501/statement/print?start_date=2026-05-01&end_date=2026-05-24");
 
-  await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
+  await expect(page.getByText("Subidha Furniture")).toBeVisible();
   await expect(page.getByText("CUSTOMER ACCOUNT STATEMENT")).toBeVisible();
-  await expect(page.getByText("Smoke Statement Customer").first()).toBeVisible();
-  await expect(page.getByText("9876543210").first()).toBeVisible();
-  await expect(page.getByText("12 Market Road").first()).toBeVisible();
-  await expect(page.getByText("CUST-501").first()).toBeVisible();
+  await expect(page.getByText("Smoke Statement Customer")).toBeVisible();
+  await expect(page.getByText("9876543210")).toBeVisible();
+  await expect(page.getByText("12 Market Road")).toBeVisible();
+  await expect(page.getByText("CUST-501")).toBeVisible();
   await expect(page.getByText("Subscription / Contract Section")).toBeVisible();
-  await expect(page.getByText("SUB-STMT-901").first()).toBeVisible();
+  await expect(page.getByText("SUB-STMT-901")).toBeVisible();
   await expect(page.getByText("Dining Set")).toBeVisible();
   await expect(page.getByText("Payment / Receipt Section")).toBeVisible();
   await expect(page.getByText("PAY-STMT-701")).toBeVisible();
   await expect(page.getByText("RCPT-STMT-701")).toBeVisible();
-  await expect(page.getByText(/₹2,000\.00/).first()).toBeVisible();
+  await expect(page.getByText(/₹2,000\.00/)).toBeVisible();
   await expect(page.getByText("Backend-Reported Total Paid")).toBeVisible();
-  await expect(page.getByText(/₹6,000\.00/).first()).toBeVisible();
+  await expect(page.getByText(/₹6,000\.00/)).toBeVisible();
   await expect(page.getByText("This document does not calculate running balance.")).toBeVisible();
   await expect(page.getByText("Direct-sale/rent-lease totals are not inferred.")).toBeVisible();
   await expect(page.getByText(/^Running Balance$/i)).toHaveCount(0);

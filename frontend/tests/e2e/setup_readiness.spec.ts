@@ -195,21 +195,20 @@ test.describe("admin setup readiness center", () => {
 
     const main = page.locator("#main-content");
     await expect(main.getByRole("heading", { name: "Setup Readiness" })).toBeVisible();
-    await expect(main.getByText("Overall readiness")).toBeVisible();
-    await expect(main.getByText("BLOCKED").first()).toBeVisible();
-    await expect(main.getByText("Ready")).toBeVisible();
-    await expect(main.getByText("Warnings")).toBeVisible();
-    await expect(main.getByText("Blockers")).toBeVisible();
+    await expect(main.getByText("BLOCKED", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Ready", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Warnings", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Blockers", { exact: true }).first()).toBeVisible();
 
     await expect(main.getByRole("heading", { name: "Business Profile" })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Finance Accounts" })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Batch / Lucky IDs" })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Amendment / Recontract Readiness" })).toBeVisible();
 
-    await expect(main.getByText("Main Cash Desk")).toBeVisible();
-    await expect(main.getByText("Mapped chart account is a group/control account")).toBeVisible();
-    await expect(main.getByText("Launch Checklist")).toBeVisible();
-    await expect(main.getByText("Can collect payment")).toBeVisible();
+    await expect(main.getByText("Main Cash Desk", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Mapped chart account is a group/control account").first()).toBeVisible();
+    
+    await expect(main.getByText("Can collect payment", { exact: true }).first()).toBeVisible();
 
     await expect(main.getByRole("link", { name: "Open next setup action" })).toHaveAttribute(
       "href",

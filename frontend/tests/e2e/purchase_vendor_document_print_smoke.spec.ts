@@ -156,12 +156,12 @@ test("purchase bill print route renders branded vendor bill with unsafe status g
 
   await page.goto("/admin/purchases/301/bill/print");
 
-  await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
+  await expect(page.getByText("Subidha Furniture")).toBeVisible();
   await expect(page.getByText("PURCHASE BILL / VENDOR BILL")).toBeVisible();
-  await expect(page.getByText("VB-PRINT-301").first()).toBeVisible();
-  await expect(page.getByText("CANCELLED").first()).toBeVisible();
+  await expect(page.getByText("VB-PRINT-301")).toBeVisible();
+  await expect(page.getByText("CANCELLED")).toBeVisible();
   await expect(page.getByText("This purchase bill is CANCELLED")).toBeVisible();
-  await expect(page.getByText("Print Vendor Industries").first()).toBeVisible();
+  await expect(page.getByText("Print Vendor Industries")).toBeVisible();
   await expect(page.getByText("Premium Wood Panel")).toBeVisible();
   await expect(page.getByText("RAW-WOOD-001")).toBeVisible();
   await expect(page.getByText("Grand Total")).toBeVisible();
@@ -181,13 +181,13 @@ test("vendor payment voucher print route renders branded payment voucher", async
 
   await page.goto("/admin/vendors/payments/401/voucher/print");
 
-  await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
+  await expect(page.getByText("Subidha Furniture")).toBeVisible();
   await expect(page.getByText("VENDOR PAYMENT VOUCHER")).toBeVisible();
-  await expect(page.getByText("VPAY-PRINT-401").first()).toBeVisible();
-  await expect(page.getByText("Print Vendor Industries").first()).toBeVisible();
-  await expect(page.getByText("Main Bank Account").first()).toBeVisible();
-  await expect(page.getByText("UTR-VPAY-401").first()).toBeVisible();
-  await expect(page.getByText("VB-PRINT-301").first()).toBeVisible();
+  await expect(page.getByText("VPAY-PRINT-401")).toBeVisible();
+  await expect(page.getByText("Print Vendor Industries")).toBeVisible();
+  await expect(page.getByText("Main Bank Account")).toBeVisible();
+  await expect(page.getByText("UTR-VPAY-401")).toBeVisible();
+  await expect(page.getByText("VB-PRINT-301")).toBeVisible();
   await expect(page.getByText("Paid Amount")).toBeVisible();
   await expect(page.getByText("Payable Balance After Payment")).toBeVisible();
   await expect(page.getByText("Vendor Receiver Signature")).toBeVisible();
@@ -204,7 +204,7 @@ test("vendor bills list exposes purchase bill print link", async ({ page }) => {
 
   await page.goto("/admin/purchases/bills");
 
-  await expect(page.getByText("VB-PRINT-301").first()).toBeVisible();
+  await expect(page.getByText("VB-PRINT-301")).toBeVisible();
   const printLink = page.getByRole("link", { name: "Purchase Bill PDF / Print" }).first();
   await expect(printLink).toBeVisible();
   await expect(printLink).toHaveAttribute("href", "/admin/purchases/301/bill/print");
@@ -215,7 +215,7 @@ test("vendor payments list exposes voucher print link", async ({ page }) => {
 
   await page.goto("/admin/purchases/vendor-payments");
 
-  await expect(page.getByText("VPAY-PRINT-401").first()).toBeVisible();
+  await expect(page.getByText("VPAY-PRINT-401")).toBeVisible();
   const printLink = page.getByRole("link", { name: "Vendor Payment Voucher PDF / Print" }).first();
   await expect(printLink).toBeVisible();
   await expect(printLink).toHaveAttribute("href", "/admin/vendors/payments/401/voucher/print");

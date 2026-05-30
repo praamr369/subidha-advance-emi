@@ -153,7 +153,7 @@ test.describe("admin collection control center", () => {
     await expect(page.getByRole("heading", { name: "Direct-sale collection" })).toBeVisible();
     await expect(page.getByText("Rent/lease collection")).toBeVisible();
     await expect(page.getByText("Deferred — endpoint not exposed for collection action yet.")).toBeVisible();
-    await expect(page.getByText("Not exposed").first()).toBeVisible();
+    await expect(page.getByText("Not exposed")).toBeVisible();
   });
 
   test("shows compact inline readiness inside admin collection page without fake rent lease action", async ({ page }) => {

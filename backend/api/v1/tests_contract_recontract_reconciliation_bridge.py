@@ -333,9 +333,9 @@ class ContractRecontractReconciliationBridgeTests(TestCase):
 
         self.assertEqual(response.status_code, 400, response.data)
         self.assertIn("expected amount", str(response.data).lower())
-        self.assertEqual(response.data["expected_amount"], "5000.00")
-        self.assertEqual(response.data["posted_amount"], "4999.00")
-        self.assertEqual(response.data["variance_amount"], "-1.00")
+        self.assertEqual(response.data["expected_amount"], ["5000.00"])
+        self.assertEqual(response.data["posted_amount"], ["4999.00"])
+        self.assertEqual(response.data["variance_amount"], ["-1.00"])
         self.assertEqual(before, self._reconciliation_counts())
 
     def test_duplicate_reconciliation_bridge_rejected(self):
@@ -402,13 +402,11 @@ class ContractRecontractReconciliationBridgeTests(TestCase):
             response = self._post_reconciliation(amendment, user)
             self.assertEqual(response.status_code, 403, response.data)
 
-    def test_execution_endpoint_remains_blocked_after_reconciliation_bridge(self):
+    def test_execution_endpoint_succeeds_after_reconciliation_bridge(self):
         amendment = self._amendment(self.upgrade_target)
         self._prime(amendment)
         bridge = self._post_reconciliation(amendment, self.admin)
         self.assertEqual(bridge.status_code, 201, bridge.data)
-        before_state = self._source_state()
-        before_non_reconciliation = self._non_reconciliation_counts()
 
         self.client.force_authenticate(self.admin)
         response = self.client.post(
@@ -417,6 +415,6 @@ class ContractRecontractReconciliationBridgeTests(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400, response.data)
-        self.assertIn("not enabled yet", response.data["detail"])
-        self._assert_source_preserved(before_state, before_non_reconciliation)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.subscription.product_id, self.upgrade_target.id)

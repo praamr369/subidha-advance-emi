@@ -17,7 +17,7 @@ async function waitForCashierPendingQueueSettled(
     .or(page.getByText("Customer summary"))
     .or(page.getByText("No pending Advance EMIs"))
     .or(page.getByRole("button", { name: /Advance EMI Month \d+/i }))
-    .or(page.getByText("Failed to fetch").first());
+    .or(page.getByText("Failed to fetch"));
   // Error state renders title + description; OR matches both — use first for strict visibility.
   await expect(terminal.first()).toBeVisible({ timeout: 60_000 });
 }
@@ -27,7 +27,7 @@ async function expectCashierSuccessOrControlledFetchError(
   success: () => Promise<void>,
 ) {
   await waitForCashierPendingQueueSettled(page);
-  const failedToFetch = page.getByText("Failed to fetch").first();
+  const failedToFetch = page.getByText("Failed to fetch");
   if (await failedToFetch.isVisible().catch(() => false)) {
     await expect(failedToFetch).toBeVisible();
     const collectPaymentHeading = page.getByRole("heading", { name: "Collect Payment", exact: true });
@@ -72,7 +72,7 @@ test.describe.serial("cashier smoke", () => {
     await expectCashierSuccessOrControlledFetchError(page, async () => {
       await expect(page.getByText("Customer summary")).toBeVisible();
       await expect(
-        page.getByText(manifest.entities.cashier.customer_name).first()
+        page.getByText(manifest.entities.cashier.customer_name)
       ).toBeVisible();
     });
 
@@ -90,7 +90,7 @@ test.describe.serial("cashier smoke", () => {
       page.getByText("Searching collectible EMI rows...")
     ).toBeHidden({ timeout: 60_000 });
 
-    const failedToFetchAfterSubscriptionSearch = page.getByText("Failed to fetch").first();
+    const failedToFetchAfterSubscriptionSearch = page.getByText("Failed to fetch");
     if (await failedToFetchAfterSubscriptionSearch.isVisible().catch(() => false)) {
       await expect(failedToFetchAfterSubscriptionSearch).toBeVisible();
       await expect(page.getByRole("heading", { name: /Collect Payment|Collect/i }).first()).toBeVisible();
@@ -113,7 +113,7 @@ test.describe.serial("cashier smoke", () => {
 
       const subscriptionMatchPattern = new RegExp(subscriptionMarkers.join("|"), "i");
 
-      const subscriptionMatchText = page.getByText(subscriptionMatchPattern).first();
+      const subscriptionMatchText = page.getByText(subscriptionMatchPattern);
 
       let subscriptionResultRow = page
         .getByRole("button")
@@ -173,7 +173,7 @@ test.describe.serial("cashier smoke", () => {
       .click();
 
     await waitForCashierPendingQueueSettled(page);
-    const failedToFetch = page.getByText("Failed to fetch").first();
+    const failedToFetch = page.getByText("Failed to fetch");
     if (await failedToFetch.isVisible().catch(() => false)) {
       await expect(failedToFetch).toBeVisible();
       await expect(page.getByText(/Unable to load pending EMI records/i)).toBeVisible();
@@ -205,7 +205,7 @@ test.describe.serial("cashier smoke", () => {
       .filter({ has: page.locator("#cashier-payment-search") })
       .getByRole("button", { name: "Search" })
       .click();
-    await expect(page.getByText(`#${paymentId}`, { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(`#${paymentId}`, { exact: true })).toBeVisible();
   });
 
   test("cashier can collect unapplied advance with a finance account", async ({
@@ -224,7 +224,7 @@ test.describe.serial("cashier smoke", () => {
       .click();
 
     await waitForCashierPendingQueueSettled(page);
-    const failedToFetch = page.getByText("Failed to fetch").first();
+    const failedToFetch = page.getByText("Failed to fetch");
     if (await failedToFetch.isVisible().catch(() => false)) {
       await expect(failedToFetch).toBeVisible();
       await expect(page.getByText(/Unable to load pending EMI records/i)).toBeVisible();

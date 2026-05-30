@@ -631,7 +631,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await page.goto("/admin/contract-amendments/1");
 
     await expect(page.getByText("Deposit / Security Amendment Preview")).toBeVisible();
-    await expect(page.getByText("Execution is not enabled yet.").first()).toBeVisible();
+    await expect(page.getByText("Execution is not enabled yet.", { exact: true })).toBeVisible();
     await expect(page.getByText("Requested: 2000.00")).toBeVisible();
     await expect(page.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
     // Ensure product recontract/rent-lease/lucky-batch panels are unaffected/hidden
@@ -658,11 +658,11 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await expect(page.getByRole("button", { name: "Preview financial product change" })).toBeVisible();
     await page.getByRole("button", { name: "Preview financial product change" }).click();
 
-    await expect(page.getByText("UPGRADE_EXTRA_PAYABLE").first()).toBeVisible();
-    await expect(page.getByText("20000.00", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("25000.00", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("UPGRADE_EXTRA_PAYABLE")).toBeVisible();
+    await expect(page.getByText("20000.00", { exact: true })).toBeVisible();
+    await expect(page.getByText("25000.00", { exact: true })).toBeVisible();
     await expect(page.getByText("5000.00", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("4000.00", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("4000.00", { exact: true })).toBeVisible();
     await expect(page.getByText("21000.00", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Saving a preview snapshot does not change the contract, EMI schedule, payments, receipts, accounting, reconciliation, stock, delivery, commission, payout, waiver, lucky ID, batch, rent/lease demand, or deposit records.")).toBeVisible();
     await expect(page.getByRole("button", { name: /Apply change|Execute|Update contract|Implement amendment/i })).toHaveCount(0);
@@ -677,7 +677,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
 
     await expect(page.getByText("Saved preview snapshot #77.")).toBeVisible();
     await expect(page.getByText("Latest saved preview snapshot")).toBeVisible();
-    await expect(page.getByText("#77 · PREVIEWED · UPGRADE_EXTRA_PAYABLE").first()).toBeVisible();
+    await expect(page.getByText("#77 · PREVIEWED · UPGRADE_EXTRA_PAYABLE")).toBeVisible();
     await expect(page.getByText("Customer consent status")).toBeVisible();
     await expect(page.getByRole("button", { name: /Apply product change|Execute recontract|Update contract|Recalculate EMI now/i })).toHaveCount(0);
   });
@@ -763,7 +763,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await page.getByRole("button", { name: "Approve recontract preview for future execution" }).click();
 
     await expect(page.getByText("Admin recontract preview decision recorded: APPROVED.")).toBeVisible();
-    await expect(page.getByText("APPROVED", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("APPROVED", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve recontract preview for future execution" })).toHaveCount(0);
   });
 
@@ -774,7 +774,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
     await page.getByRole("button", { name: "Reject recontract preview" }).click();
 
     await expect(page.getByText("Admin recontract preview decision recorded: REJECTED.")).toBeVisible();
-    await expect(page.getByText("REJECTED", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("REJECTED", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Reject recontract preview" })).toHaveCount(0);
   });
 
@@ -828,7 +828,7 @@ test.describe("admin contract amendment phase-2 UI", () => {
 
     const main = page.locator("#main-content");
     await expect(main.getByText("PRODUCT UPGRADE", { exact: true })).toBeVisible();
-    await expect(main.getByText("Approved").first()).toBeVisible();
+    await expect(main.getByText("Approved", { exact: true })).toBeVisible();
     await expect(main.getByText(/Approved 26 May 2026/)).toBeVisible();
     await expect(
       main.getByText(

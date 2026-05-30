@@ -217,15 +217,15 @@ test.describe("admin product recontract addendum print", () => {
     await mockAmendmentApis(page, "admin");
     await page.goto("/admin/contract-amendments/1/recontract-addendum/print");
 
-    await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
+    await expect(page.getByText("Subidha Furniture")).toBeVisible();
     await expect(page.getByText("PRODUCT RECONTRACT ADDENDUM")).toBeVisible();
-    await expect(page.getByText("AMD-ADDENDUM-001").first()).toBeVisible();
-    await expect(page.getByText("SUB-ADDENDUM-001").first()).toBeVisible();
-    await expect(page.getByText("Smoke Customer").first()).toBeVisible();
+    await expect(page.getByText("AMD-ADDENDUM-001")).toBeVisible();
+    await expect(page.getByText("SUB-ADDENDUM-001")).toBeVisible();
+    await expect(page.getByText("Smoke Customer")).toBeVisible();
     await expect(page.getByText("Old Sofa / SOFA-OLD")).toBeVisible();
     await expect(page.getByText("New Sofa / SOFA-NEW")).toBeVisible();
-    await expect(page.getByText("Old Contract Total").first()).toBeVisible();
-    await expect(page.getByText("New Contract Total").first()).toBeVisible();
+    await expect(page.getByText("Old Contract Total")).toBeVisible();
+    await expect(page.getByText("New Contract Total")).toBeVisible();
     await expect(page.getByText("Old Monthly EMI")).toBeVisible();
     await expect(page.getByText("New Monthly EMI")).toBeVisible();
     await expect(page.getByText("Historical payments unchanged.")).toBeVisible();

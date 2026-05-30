@@ -105,7 +105,7 @@ test.describe("admin readiness banner", () => {
     await page.goto("/admin/settings/business-setup/checklist");
     await expect(page.getByRole("heading", { name: "Business setup checklist" })).toBeVisible();
     await expect(
-      page.locator("#main-content").getByText("Document Numbering").first()
+      page.locator("#main-content").getByText("Document Numbering")
     ).toBeVisible();
     await expect(
       page.locator("#main-content").getByText("Invoice numbering readiness", { exact: true })

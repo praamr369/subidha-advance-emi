@@ -383,7 +383,7 @@ test("admin Customer 360 loads operational cockpit sections and real route links
   await expect(page.getByRole("heading", { name: "Customer 360 Smoke" })).toBeVisible();
   await expect(page.getByText("Profile Overview")).toBeVisible();
   await expect(page.getByText("Operational Finance Summary")).toBeVisible();
-  await expect(page.getByText("Contracts")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Contracts", exact: true })).toBeVisible();
   await expect(page.getByText("Advance EMI / Lucky IDs")).toBeVisible();
   await expect(page.getByText("Rent / Lease")).toBeVisible();
   await expect(page.getByText("Active Linked Subscriptions")).toBeVisible();
@@ -391,7 +391,7 @@ test("admin Customer 360 loads operational cockpit sections and real route links
   await expect(page.getByText("Direct Sale History")).toBeVisible();
   await expect(page.getByText("Receipts & Documents")).toBeVisible();
 
-  await expect(page.getByRole("link", { name: "Open Subscription" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Open Subscription", exact: true })).toHaveAttribute(
     "href",
     "/admin/subscriptions/601",
   );
@@ -405,7 +405,7 @@ test("admin Customer 360 loads operational cockpit sections and real route links
   );
 
   await expect(page.getByText("RCPT-360")).toBeVisible();
-  await expect(page.getByText("INV-360")).toBeVisible();
+  await expect(page.getByText("INV-360", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("AADHAAR")).toBeVisible();
   await expect(page.getByText("Smoke Partner")).toBeVisible();
 
@@ -432,6 +432,6 @@ test("admin Customer 360 handles partial operational profile failure without fak
   ).toBeVisible();
   await expect(page.getByText("Active Linked Subscriptions")).toBeVisible();
   await expect(page.getByText("Payment History")).toBeVisible();
-  await expect(page.getByText("SUB-601")).toBeVisible();
+  await expect(page.getByText("SUB-601").first()).toBeVisible();
   await expect(page.getByText("PAY-360-001")).toBeVisible();
 });

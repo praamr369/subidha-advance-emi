@@ -108,10 +108,10 @@ test("reconciliation report print route renders branded unreconciled report", as
 
   await page.goto("/admin/reconciliation/reports/301/print");
 
-  await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
+  await expect(page.getByText("Subidha Furniture")).toBeVisible();
   await expect(page.getByText("RECONCILIATION REPORT")).toBeVisible();
-  await expect(page.getByText("RUN-9001").first()).toBeVisible();
-  await expect(page.getByText("COMPLETED").first()).toBeVisible();
+  await expect(page.getByText("RUN-9001")).toBeVisible();
+  await expect(page.getByText("COMPLETED")).toBeVisible();
   await expect(page.getByText("UNRECONCILED")).toBeVisible();
   await expect(page.getByText("This reconciliation report has open exceptions")).toBeVisible();
   await expect(page.getByText("Expected Amount")).toBeVisible();
@@ -135,7 +135,7 @@ test("reconciliation run history exposes report print link", async ({ page }) =>
 
   await page.goto("/admin/reconciliation/runs");
 
-  await expect(page.getByText("#9001").first()).toBeVisible();
+  await expect(page.getByText("#9001")).toBeVisible();
   const printLink = page.getByRole("link", { name: "Reconciliation Report PDF / Print" }).first();
   await expect(printLink).toBeVisible();
   await expect(printLink).toHaveAttribute("href", "/admin/reconciliation/reports/301/print");
@@ -146,7 +146,7 @@ test("reconciliation run detail exposes report print action", async ({ page }) =
 
   await page.goto("/admin/reconciliation/runs/301");
 
-  await expect(page.getByText("Reconciliation Run #9001").first()).toBeVisible();
+  await expect(page.getByText("Reconciliation Run #9001")).toBeVisible();
   const printLink = page.getByRole("link", { name: "Reconciliation Report PDF / Print" }).first();
   await expect(printLink).toBeVisible();
   await expect(printLink).toHaveAttribute("href", "/admin/reconciliation/reports/301/print");

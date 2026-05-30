@@ -89,6 +89,28 @@ const completeReadyEvent = {
   reconciliation_run_id: 504 as number | null,
   reconciliation_evidence_ids: [601, 602, 603, 604, 605],
   schedule_line_ids: [9001],
+  progress: {
+    preview_saved: true,
+    customer_consent_status: "ACCEPTED",
+    admin_approval_status: "APPROVED",
+    schedule_preview_ready: true,
+    accounting_bridge_ready: true,
+    reconciliation_bridge_ready: true,
+    execution_ready: true,
+    executed: false,
+    next_required_action: "Execute approved recontract",
+    blocked_reason: "",
+  },
+  workflow_flags: {
+    previewed: true,
+    customer_consented: true,
+    admin_approved: true,
+    schedule_preview_generated: true,
+    financial_impact_previewed: true,
+    accounting_posted: true,
+    reconciliation_linked: true,
+    executed: false,
+  }
 };
 
 type RecontractEventFixture = typeof completeReadyEvent;
@@ -101,6 +123,28 @@ const incompleteEvent: RecontractEventFixture = {
   reconciliation_run_id: null,
   reconciliation_evidence_ids: [],
   schedule_line_ids: [],
+  progress: {
+    preview_saved: true,
+    customer_consent_status: "ACCEPTED",
+    admin_approval_status: "APPROVED",
+    schedule_preview_ready: false,
+    accounting_bridge_ready: false,
+    reconciliation_bridge_ready: false,
+    execution_ready: false,
+    executed: false,
+    next_required_action: "Generate schedule preview",
+    blocked_reason: "Schedule preview lines must exist.",
+  },
+  workflow_flags: {
+    previewed: true,
+    customer_consented: true,
+    admin_approved: true,
+    schedule_preview_generated: false,
+    financial_impact_previewed: false,
+    accounting_posted: false,
+    reconciliation_linked: false,
+    executed: false,
+  }
 };
 
 const executedEvent: RecontractEventFixture = {
@@ -121,6 +165,28 @@ const executedEvent: RecontractEventFixture = {
       reconciliation_mutated_by_execution: false,
     },
   },
+  progress: {
+    preview_saved: true,
+    customer_consent_status: "ACCEPTED",
+    admin_approval_status: "APPROVED",
+    schedule_preview_ready: true,
+    accounting_bridge_ready: true,
+    reconciliation_bridge_ready: true,
+    execution_ready: false,
+    executed: true,
+    next_required_action: "Recontract executed",
+    blocked_reason: "Product recontract has already been executed.",
+  },
+  workflow_flags: {
+    previewed: true,
+    customer_consented: true,
+    admin_approved: true,
+    schedule_preview_generated: true,
+    financial_impact_previewed: true,
+    accounting_posted: true,
+    reconciliation_linked: true,
+    executed: true,
+  }
 };
 
 function amendmentFor(event: RecontractEventFixture) {
@@ -211,6 +277,8 @@ function amendmentFor(event: RecontractEventFixture) {
       reconciliation_run_id: event.reconciliation_run_id,
       reconciliation_evidence_ids: event.reconciliation_evidence_ids,
       schedule_line_ids: event.schedule_line_ids,
+      progress: event.progress,
+      workflow_flags: event.workflow_flags,
     },
     applied_at: null,
     metadata: {},

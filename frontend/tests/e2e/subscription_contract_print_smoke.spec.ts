@@ -149,16 +149,16 @@ test("subscription contract print route renders branded Lucky Plan agreement", a
 
   await page.goto("/admin/subscriptions/801/contract/print");
 
-  await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
+  await expect(page.getByText("Subidha Furniture")).toBeVisible();
   await expect(page.getByText("LUCKY PLAN AGREEMENT / SUBSCRIPTION CONTRACT")).toBeVisible();
-  await expect(page.getByText("SUB-PRINT-801").first()).toBeVisible();
-  await expect(page.getByText("Lucky Contract Customer").first()).toBeVisible();
-  await expect(page.getByText("Subidha Lucky Sofa").first()).toBeVisible();
-  await expect(page.getByText("LUCKY-SOFA-01").first()).toBeVisible();
-  await expect(page.getByText("15 months").first()).toBeVisible();
-  await expect(page.getByText("Monthly EMI").first()).toBeVisible();
-  await expect(page.getByText("Contract Price").first()).toBeVisible();
-  await expect(page.getByText("Outstanding / Balance").first()).toBeVisible();
+  await expect(page.getByText("SUB-PRINT-801")).toBeVisible();
+  await expect(page.getByText("Lucky Contract Customer")).toBeVisible();
+  await expect(page.getByText("Subidha Lucky Sofa")).toBeVisible();
+  await expect(page.getByText("LUCKY-SOFA-01")).toBeVisible();
+  await expect(page.getByText("15 months")).toBeVisible();
+  await expect(page.getByText("Monthly EMI")).toBeVisible();
+  await expect(page.getByText("Contract Price")).toBeVisible();
+  await expect(page.getByText("Outstanding / Balance")).toBeVisible();
   await expect(page.getByText("No winner benefit is recorded")).toBeVisible();
   await expect(page.getByText("Future EMI waiver is shown only from backend waiver records")).toBeVisible();
   await expect(page.getByText("Pay monthly EMI dues as per the backend contract record")).toBeVisible();

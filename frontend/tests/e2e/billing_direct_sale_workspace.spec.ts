@@ -45,7 +45,7 @@ test("admin direct-sale workspace routes share the create-bill flow", async ({ p
     await expect(page.getByText("Current tax mode: GST Unregistered (Commercial Invoice / Non-GST)")).toBeVisible();
   }
   await page.getByLabel("Search Product").fill(productName);
-  const failedProductFetch = page.getByText("Failed to fetch").first();
+  const failedProductFetch = page.getByText("Failed to fetch");
   if (await failedProductFetch.isVisible().catch(() => false)) {
     await expect(failedProductFetch).toBeVisible();
   } else {
@@ -278,7 +278,7 @@ test("direct-sale submit surfaces 400, 404, and 500 api errors clearly", async (
   await routeCreate(400, { customer: ["Existing customer mode requires selecting a registered customer."] });
   await page.getByRole("button", { name: "Create Direct Sale" }).first().click();
   await expect(page.getByText("Direct sale could not be created. Please fix the highlighted fields.")).toBeVisible();
-  await expect(page.getByText(/customer:/i).first()).toBeVisible();
+  await expect(page.getByText(/customer:/i)).toBeVisible();
 
   await routeCreate(400, {
     detail: "Direct sale invoice numbering is not configured. Complete Admin Settings -> Document Numbering.",
