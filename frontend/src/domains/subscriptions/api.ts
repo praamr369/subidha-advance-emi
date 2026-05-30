@@ -15,7 +15,7 @@ import {
 import type {
   AdminSubscription,
   Batch,
-  Customer,
+  SubscriptionCustomerOption,
   Emi,
   LuckyId,
   Partner,
@@ -26,7 +26,7 @@ import type {
 
 export async function fetchSubscriptionListData(): Promise<{
   subscriptions: AdminSubscription[];
-  customers: Customer[];
+  customers: SubscriptionCustomerOption[];
   products: Product[];
   batches: Batch[];
   partners: Partner[];
@@ -47,7 +47,7 @@ export async function fetchSubscriptionListData(): Promise<{
   return {
     subscriptions: (subscriptionPage.results || []) as AdminSubscription[],
     customers: Array.isArray(customerPage.results)
-      ? (customerPage.results as Customer[])
+      ? (customerPage.results as SubscriptionCustomerOption[])
       : [],
     products: products as Product[],
     batches: batches as Batch[],
@@ -60,8 +60,8 @@ export async function fetchAvailableLuckyIds(batchId: string): Promise<LuckyId[]
   return (await listAvailableLuckyIds(batchId)) as LuckyId[];
 }
 
-export async function searchCustomers(query: string): Promise<Customer[]> {
-  return (await searchCustomersByDomain(query)) as Customer[];
+export async function searchCustomers(query: string): Promise<SubscriptionCustomerOption[]> {
+  return (await searchCustomersByDomain(query)) as SubscriptionCustomerOption[];
 }
 
 export async function createSubscription(
@@ -75,7 +75,7 @@ export async function createSubscription(
 
 export async function fetchSubscriptionDetailData(id: string): Promise<{
   subscription: SubscriptionDetail;
-  customers: Customer[];
+  customers: SubscriptionCustomerOption[];
   products: Product[];
   batches: Batch[];
   partners: Partner[];
@@ -119,7 +119,7 @@ export async function fetchSubscriptionDetailData(id: string): Promise<{
   return {
     subscription: subscription as SubscriptionDetail,
     customers: Array.isArray(customerPage.results)
-      ? (customerPage.results as Customer[])
+      ? (customerPage.results as SubscriptionCustomerOption[])
       : [],
     products: products as Product[],
     batches: batches as Batch[],
