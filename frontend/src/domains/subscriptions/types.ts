@@ -19,11 +19,11 @@ export type SubscriptionDetail = AdminSubscription & {
   created_at?: string;
 };
 
-export type Customer = {
+export type SubscriptionCustomerOption = {
   id: number;
   name: string;
   phone: string;
-  kyc_status: string;
+  kyc_status?: string;
 };
 
 export type Product = {
