@@ -17,6 +17,7 @@ class PaymentCollectionService:
         payment_date=None,
         branch_id: int | None = None,
         cash_counter_id: int | None = None,
+        idempotency_key: str | None = None,
     ):
         return record_emi_payment(
             emi_id=emi_id,
@@ -29,4 +30,5 @@ class PaymentCollectionService:
             payment_date=payment_date,
             branch_id=branch_id,
             cash_counter_id=cash_counter_id,
+            idempotency_key=idempotency_key,
         )
