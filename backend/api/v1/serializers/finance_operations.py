@@ -18,6 +18,7 @@ class CashierPaymentCollectionSerializer(serializers.Serializer):
     cash_counter_id = serializers.IntegerField(required=False, min_value=1)
     reference_no = serializers.CharField(required=False, allow_blank=True, max_length=100)
     note = serializers.CharField(required=False, allow_blank=True)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=160)
 
     def validate_amount(self, value):
         if _money(value) <= Decimal("0.00"):
