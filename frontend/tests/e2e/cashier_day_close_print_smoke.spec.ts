@@ -85,7 +85,7 @@ test("cashier day close print route renders branded unbalanced report", async ({
   await expect(page.getByText("Subidha Furniture")).toBeVisible();
   await expect(page.getByText("CASHIER DAY CLOSE REPORT")).toBeVisible();
   await expect(page.getByText("CDC-PRINT-901")).toBeVisible();
-  await expect(page.getByText("UNBALANCED")).toBeVisible();
+  await expect(page.getByText("UNBALANCED", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("cashier.print")).toBeVisible();
   await expect(page.getByText("Asansol Main Branch")).toBeVisible();
   await expect(page.getByText("Main Cash Counter")).toBeVisible();
