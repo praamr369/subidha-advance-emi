@@ -222,6 +222,37 @@ class PaymentServiceTests(TestCase):
                 idempotency_key=idem_key,
             )
 
+    def test_record_payment_reversed_idempotency_key_cannot_be_reused(self):
+        idem_key = "test-reversed-idem-001"
+        result = record_emi_payment(
+            emi_id=self.emi.id,
+            amount=Decimal("400.00"),
+            collected_by=self.admin,
+            method="CASH",
+            finance_account_id=self.finance_account.id,
+            idempotency_key=idem_key,
+        )
+        payment = result["payment"]
+
+        reverse_payment_for_admin(
+            payment_id=payment.id,
+            reversed_by=self.admin,
+            reason="test reversal",
+        )
+
+        with self.assertRaisesMessage(
+            ValueError,
+            "Existing payment for this idempotency key has been reversed and cannot be reused.",
+        ):
+            record_emi_payment(
+                emi_id=self.emi.id,
+                amount=Decimal("400.00"),
+                collected_by=self.admin,
+                method="CASH",
+                finance_account_id=self.finance_account.id,
+                idempotency_key=idem_key,
+            )
+
     def test_record_payment_on_paid_emi_fails(self):
         record_emi_payment(
             emi_id=self.emi.id,

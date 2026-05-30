@@ -10,7 +10,12 @@ import SearchSelect from "@/components/ui/SearchSelect";
 import WizardShell from "@/components/ui/WizardShell";
 
 import { createSubscription, searchCustomers } from "@/domains/subscriptions/api";
-import type { AdminSubscription, CreateForm, Customer, TableRow } from "@/domains/subscriptions/types";
+import type {
+  AdminSubscription,
+  CreateForm,
+  SubscriptionCustomerOption,
+  TableRow,
+} from "@/domains/subscriptions/types";
 import { useAvailableLuckyIds, useSubscriptionListData } from "@/domains/subscriptions/hooks";
 import { formatCurrency, parseApiError } from "@/domains/subscriptions/utils";
 
@@ -173,7 +178,7 @@ export default function AdminSubscriptionsPage() {
     }
   }, [form.customer, partners, subscriptions]);
 
-  async function customerSearchFn(q: string): Promise<Customer[]> {
+  async function customerSearchFn(q: string): Promise<SubscriptionCustomerOption[]> {
     return searchCustomers(q);
   }
 
@@ -436,7 +441,7 @@ export default function AdminSubscriptionsPage() {
         <form onSubmit={handleCreateSubscription} style={{ display: "grid", gap: 12 }}>
           {step === 1 ? (
             <>
-              <SearchSelect<Customer>
+              <SearchSelect<SubscriptionCustomerOption>
                 label="Search Customer"
                 value={form.customer}
                 onChange={(value) => setForm((prev) => ({ ...prev, customer: value }))}

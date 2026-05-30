@@ -248,16 +248,6 @@ type RawPaymentRegisterResponse = {
   summary?: Partial<PaymentRegisterSummary>;
 };
 
-const EMPTY_PAYMENT_REGISTER_SUMMARY: PaymentRegisterSummary = {
-  visible_payments: 0,
-  gross_amount: "0.00",
-  active_payments: 0,
-  active_amount: "0.00",
-  reversed_payments: 0,
-  reversed_amount: "0.00",
-  net_collected_amount: "0.00",
-};
-
 export function buildPaymentCollectionIdempotencyKey(): string {
   const randomUUID = globalThis.crypto?.randomUUID?.();
   if (randomUUID) return `client-payment:${randomUUID}`;

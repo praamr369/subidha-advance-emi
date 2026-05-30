@@ -742,7 +742,7 @@ def record_emi_payment(
             "method": method,
             "reference_no": reference_no,
         }
-        idem_row.save(update_fields=["status", "response_status", "response_body", "updated_at"])
+        idem_row.save(update_fields=["status", "response_status", "response_body"])
 
     return {
         "payment": payment,

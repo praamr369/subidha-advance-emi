@@ -470,3 +470,7 @@ class CashierCollectDirectSale(APIView):
             },
             status=status.HTTP_201_CREATED if result.get("created", True) else status.HTTP_200_OK,
         )
+
+
+# Backward-compatible alias kept for route imports that still reference the older name.
+CashierCollectDirectSalePayment = CashierCollectDirectSale
