@@ -177,6 +177,7 @@ class CashierCollectPayment(APIView):
                 note=validated.get("note") or None,
                 branch_id=validated.get("branch_id"),
                 cash_counter_id=validated.get("cash_counter_id"),
+                idempotency_key=validated.get("idempotency_key") or None,
             )
         except ValueError as exc:
             return Response(
@@ -364,22 +365,20 @@ class CashierSearchDirectSaleView(APIView):
             search_filter = Q(customer_phone_snapshot__icontains=query) | Q(customer__phone__icontains=query)
         elif mode == "sale":
             search_filter = Q(sale_no__icontains=query)
-            if query.isdigit():
-                search_filter |= Q(id=int(query))
         elif mode == "customer":
             search_filter = Q(customer_name_snapshot__icontains=query) | Q(customer__name__icontains=query)
         else:
             search_filter = (
                 Q(sale_no__icontains=query)
-                | Q(customer_name_snapshot__icontains=query)
                 | Q(customer_phone_snapshot__icontains=query)
-                | Q(customer__name__icontains=query)
                 | Q(customer__phone__icontains=query)
+                | Q(customer_name_snapshot__icontains=query)
+                | Q(customer__name__icontains=query)
+                | Q(billing_invoices__document_no__icontains=query)
+                | Q(billing_invoices__source_reference__icontains=query)
             )
-            if query.isdigit():
-                search_filter |= Q(id=int(query))
 
-        rows = list(queryset.filter(search_filter).distinct()[:30])
+        rows = list(queryset.filter(search_filter).distinct()[:20])
         return Response(
             {
                 "count": len(rows),
@@ -389,123 +388,85 @@ class CashierSearchDirectSaleView(APIView):
         )
 
 
-class CashierCollectDirectSalePayment(APIView):
+class CashierCollectDirectSale(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
 
     @require_capability("billing.collect")
     def post(self, request, *args, **kwargs):
-        data = request.data or {}
-        direct_sale_id = data.get("direct_sale_id")
-        amount_raw = data.get("amount")
-        branch_id = data.get("branch_id")
-        cash_counter_id = data.get("cash_counter_id")
-        finance_account_id = data.get("finance_account_id")
-        reference_no = (data.get("reference_no") or "").strip()
-        note = (data.get("note") or data.get("notes") or "").strip()
-
-        if direct_sale_id in (None, ""):
-            return Response(
-                {"detail": "direct_sale_id is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         try:
-            direct_sale_id = int(direct_sale_id)
-        except (TypeError, ValueError):
-            return Response(
-                {"detail": "direct_sale_id must be a valid integer."},
-                status=status.HTTP_400_BAD_REQUEST,
+            direct_sale_id = _parse_optional_int(
+                request.data.get("direct_sale_id"),
+                field_name="direct_sale_id",
             )
-
-        if amount_raw in (None, ""):
-            return Response(
-                {"detail": "amount is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            amount = _parse_amount(amount_raw)
-            resolved_branch_id = _parse_optional_int(branch_id, field_name="branch_id")
-            resolved_cash_counter_id = _parse_optional_int(
-                cash_counter_id,
-                field_name="cash_counter_id",
-            )
-            resolved_finance_account_id = _parse_optional_int(
-                finance_account_id,
+            amount = _parse_amount(request.data.get("amount"))
+            finance_account_id = _parse_optional_int(
+                request.data.get("finance_account_id"),
                 field_name="finance_account_id",
             )
-        except ValueError as exc:
-            return Response(
-                _value_error_payload(exc),
-                status=status.HTTP_400_BAD_REQUEST,
+            branch_id = _parse_optional_int(
+                request.data.get("branch_id"),
+                field_name="branch_id",
             )
-
-        try:
+            cash_counter_id = _parse_optional_int(
+                request.data.get("cash_counter_id"),
+                field_name="cash_counter_id",
+            )
+            if direct_sale_id is None:
+                raise ValueError("direct_sale_id is required.")
             result = collect_direct_sale_payment(
                 direct_sale_id=direct_sale_id,
                 amount=amount,
                 collected_by=request.user,
-                branch_id=resolved_branch_id,
-                cash_counter_id=resolved_cash_counter_id,
-                finance_account_id=resolved_finance_account_id,
-                reference_no=reference_no or None,
-                notes=note or None,
+                receipt_date=timezone.localdate(),
+                finance_account_id=finance_account_id,
+                branch_id=branch_id,
+                cash_counter_id=cash_counter_id,
+                reference_no=(request.data.get("reference_no") or "").strip() or None,
+                notes=(request.data.get("note") or "").strip(),
             )
         except ValueError as exc:
-            return Response(
-                _value_error_payload(exc),
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        except Exception as exc:
-            return Response(
-                {"detail": f"Direct-sale collection failed: {str(exc)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            return Response(_value_error_payload(exc), status=status.HTTP_400_BAD_REQUEST)
 
         receipt = result["receipt"]
-        sale = result["direct_sale"]
+        direct_sale = result["direct_sale"]
         invoice = result["invoice"]
 
         return Response(
             {
-                "message": (
-                    "Direct-sale collection posted successfully."
-                    if result["created"]
-                    else "Duplicate collection reference detected; existing retail receipt returned."
-                ),
-                "created": result["created"],
+                "message": "Direct-sale payment collected successfully.",
+                "created": result.get("created", True),
                 "receipt": {
                     "id": receipt.id,
-                    "receipt_no": receipt.receipt_no,
-                    "receipt_type": receipt.receipt_type,
-                    "status": receipt.status,
-                    "receipt_date": receipt.receipt_date,
+                    "receipt_no": getattr(receipt, "receipt_no", None),
+                    "receipt_type": getattr(receipt, "receipt_type", None),
+                    "status": getattr(receipt, "status", None),
+                    "receipt_date": getattr(receipt, "receipt_date", None),
                     "amount": str(receipt.amount),
-                    "finance_account_id": receipt.finance_account_id,
-                    "branch_id": receipt.branch_id,
-                    "cash_counter_id": receipt.cash_counter_id,
-                    "source_reference": receipt.source_reference,
+                    "finance_account_id": getattr(receipt, "finance_account_id", None),
+                    "branch_id": getattr(receipt, "branch_id", None),
+                    "cash_counter_id": getattr(receipt, "cash_counter_id", None),
+                    "source_reference": getattr(receipt, "source_reference", None),
                 },
                 "direct_sale": {
-                    "id": sale.id,
-                    "sale_no": sale.sale_no,
-                    "status": sale.status,
-                    "grand_total": str(sale.grand_total),
-                    "received_total": str(sale.received_total),
-                    "balance_total": str(sale.balance_total),
-                    "branch_id": sale.branch_id,
-                    "cash_counter_id": sale.cash_counter_id,
-                    "finance_account_id": sale.finance_account_id,
+                    "id": direct_sale.id,
+                    "sale_no": getattr(direct_sale, "sale_no", None),
+                    "status": getattr(direct_sale, "status", None),
+                    "grand_total": str(direct_sale.grand_total),
+                    "received_total": str(direct_sale.received_total),
+                    "balance_total": str(direct_sale.balance_total),
+                    "branch_id": getattr(direct_sale, "branch_id", None),
+                    "cash_counter_id": getattr(direct_sale, "cash_counter_id", None),
+                    "finance_account_id": getattr(direct_sale, "finance_account_id", None),
                 },
                 "invoice": {
                     "id": invoice.id,
-                    "document_no": invoice.document_no,
-                    "status": invoice.status,
+                    "document_no": getattr(invoice, "document_no", None),
+                    "status": getattr(invoice, "status", None),
                     "received_total": str(invoice.received_total),
                     "balance_total": str(invoice.balance_total),
                 },
-                "outstanding_before": str(result["outstanding_before"]),
-                "outstanding_after": str(result["outstanding_after"]),
+                "outstanding_before": str(result.get("outstanding_before")),
+                "outstanding_after": str(result.get("outstanding_after")),
             },
-            status=status.HTTP_201_CREATED if result["created"] else status.HTTP_200_OK,
+            status=status.HTTP_201_CREATED if result.get("created", True) else status.HTTP_200_OK,
         )
