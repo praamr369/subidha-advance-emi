@@ -1,6 +1,11 @@
 import { toArray } from "@/lib/api";
 import { apiClient } from "@/services/api/client";
 import { request } from "@/services/api";
+import {
+  listCustomers as listCustomerPage,
+  searchCustomers as searchCustomerRecords,
+  type CustomerRecord,
+} from "@/services/customers";
 import type { Customer } from "@/domains/customers/types";
 
 export type CustomerImportPreviewRow = {
@@ -74,14 +79,45 @@ export type OtpDeliveryReadinessResponse = {
   admin_visibility: OtpDeliveryAdminVisibility;
 };
 
-export async function listCustomers(): Promise<Customer[]> {
-  const payload = await apiClient<unknown>("/admin/customers/");
-  return toArray<Customer>(payload);
+export type CustomerListResponse = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Customer[];
+};
+
+function toCustomer(row: CustomerRecord): Customer {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    email: row.email ?? null,
+    address: row.address ?? null,
+    city: row.city ?? null,
+    kyc_status: row.kyc_status,
+    status: row.status,
+    created_at: row.created_at ?? null,
+  };
+}
+
+export async function listCustomers(): Promise<CustomerListResponse> {
+  const page = await listCustomerPage();
+  return {
+    count: page.count,
+    next: page.next,
+    previous: page.previous,
+    results: page.results.map(toCustomer),
+  };
+}
+
+export async function listCustomerRows(): Promise<Customer[]> {
+  const page = await listCustomers();
+  return page.results;
 }
 
 export async function searchCustomers(query: string): Promise<Customer[]> {
-  const payload = await apiClient<unknown>(`/admin/customers/search/?q=${encodeURIComponent(query)}`);
-  return toArray<Customer>(payload);
+  const rows = await searchCustomerRecords(query);
+  return rows.map(toCustomer);
 }
 
 export async function previewCustomerImport(file: File): Promise<CustomerImportPreviewResponse> {
@@ -134,4 +170,13 @@ export async function submitCustomerKycDecision(
       body: JSON.stringify(payload),
     }
   );
+}
+
+/**
+ * Legacy raw fetch kept for rare callers that need the unnormalized endpoint payload.
+ * Normal customer screens should use listCustomers() or listCustomerRows().
+ */
+export async function listCustomersRaw(): Promise<Customer[]> {
+  const payload = await apiClient<unknown>("/admin/customers/");
+  return toArray<Customer>(payload);
 }
