@@ -258,9 +258,7 @@ const EMPTY_PAYMENT_REGISTER_SUMMARY: PaymentRegisterSummary = {
   net_collected_amount: "0.00",
 };
 
-const paymentCollectionIdempotencyKeys = new Map<string, string>();
-
-function buildClientCollectionKey(): string {
+export function buildPaymentCollectionIdempotencyKey(): string {
   const randomUUID = globalThis.crypto?.randomUUID?.();
   if (randomUUID) return `client-payment:${randomUUID}`;
   return `client-payment:${Date.now()}:${Math.random().toString(36).slice(2)}`;
@@ -273,26 +271,9 @@ function normalizeCollectionPayload(
     return payload;
   }
 
-  const signature = JSON.stringify({
-    emi: payload.emi,
-    amount: payload.amount,
-    payment_method: payload.payment_method,
-    payment_date: payload.payment_date,
-    finance_account_id: payload.finance_account_id,
-    branch_id: payload.branch_id ?? null,
-    cash_counter_id: payload.cash_counter_id ?? null,
-    reference_no: payload.reference_no?.trim() || null,
-  });
-
-  let key = paymentCollectionIdempotencyKeys.get(signature);
-  if (!key) {
-    key = buildClientCollectionKey();
-    paymentCollectionIdempotencyKeys.set(signature, key);
-  }
-
   return {
     ...payload,
-    idempotency_key: key,
+    idempotency_key: buildPaymentCollectionIdempotencyKey(),
   };
 }
 
