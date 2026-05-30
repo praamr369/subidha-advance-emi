@@ -47,7 +47,7 @@ test("public product enquiry routes into apply and the apply form submits", asyn
   await expect(
     page.getByRole("heading", { name: "Products" })
   ).toBeVisible();
-  await expect(page.getByText("Browse the live catalogue")).toBeVisible();
+  await expect(page.getByText("Browse the live catalogue sourced from production product records.", { exact: true })).toBeVisible();
   await expect(page.getByText("Media-ready cards")).toBeVisible();
 
   await page.goto(`/products/${manifest.entities.public.product_id}`);
