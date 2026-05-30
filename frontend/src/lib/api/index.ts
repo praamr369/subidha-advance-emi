@@ -85,6 +85,62 @@ function buildApiUrl(path: string): string {
   return `${base}${normalizedPath}`;
 }
 
+function buildPaymentCollectionIdempotencyKey(): string {
+  const randomUUID = globalThis.crypto?.randomUUID?.();
+  if (randomUUID) return `client-payment:${randomUUID}`;
+  return `client-payment:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+function isPaymentCollectionMutation(path: string, method: string | undefined): boolean {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const normalizedMethod = (method || "GET").toUpperCase();
+  if (normalizedMethod !== "POST") return false;
+  return (
+    normalizedPath.endsWith("/admin/payments/collect/") ||
+    normalizedPath.endsWith("/cashier/collect-payment/")
+  );
+}
+
+function withPaymentCollectionIdempotency(
+  path: string,
+  method: string | undefined,
+  body: ApiFetchBody
+): ApiFetchBody {
+  if (!isPaymentCollectionMutation(path, method)) return body;
+  if (body == null) return body;
+
+  if (typeof body === "string" && looksLikeJsonString(body)) {
+    try {
+      const parsed = JSON.parse(body) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const record = parsed as Record<string, unknown>;
+        if (typeof record.idempotency_key === "string" && record.idempotency_key.trim()) {
+          return body;
+        }
+        return JSON.stringify({
+          ...record,
+          idempotency_key: buildPaymentCollectionIdempotencyKey(),
+        });
+      }
+    } catch {
+      return body;
+    }
+  }
+
+  if (typeof body === "object" && body !== null && !isBodyInitLike(body) && !Array.isArray(body)) {
+    const record = body as Record<string, unknown>;
+    if (typeof record.idempotency_key === "string" && record.idempotency_key.trim()) {
+      return body;
+    }
+    return {
+      ...record,
+      idempotency_key: buildPaymentCollectionIdempotencyKey(),
+    };
+  }
+
+  return body;
+}
+
 type ParsedResponseBody = {
   body: unknown;
   rawText: string;
@@ -343,7 +399,11 @@ async function apiFetchInternal<T>(
   token: string | null | undefined,
   alreadyRetried: boolean
 ): Promise<T> {
-  const originalBody = options.body;
+  const originalBody = withPaymentCollectionIdempotency(
+    path,
+    options.method,
+    options.body
+  );
 
   const headers: Record<string, string> = {
     ...normalizeHeaders(options.headers),
@@ -404,6 +464,7 @@ async function apiFetchInternal<T>(
           path,
           {
             ...options,
+            body: originalBody,
             headers: normalizeHeaders(options.headers),
           },
           refreshedAccessToken,
