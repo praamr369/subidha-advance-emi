@@ -36,6 +36,8 @@ export type AdminDashboardResponse = {
   };
   collections?: {
     today_transaction_count: number;
+    today_active_transaction_count?: number;
+    today_reversed_transaction_count?: number;
     today_active_payments: number;
     today_reversed_payments: number;
     today_gross_amount: string;
@@ -129,6 +131,8 @@ type AdminDashboardPayload = {
   };
   collections?: {
     today_transaction_count?: number;
+    today_active_transaction_count?: number;
+    today_reversed_transaction_count?: number;
     today_active_payments?: number;
     today_reversed_payments?: number;
     today_gross_amount?: string | number;
@@ -396,6 +400,16 @@ export async function getAdminDashboard(): Promise<AdminDashboardResponse> {
       today_transaction_count: toNumber(
         dashboard.collections?.today_transaction_count
       ),
+      today_active_transaction_count:
+        dashboard.collections?.today_active_transaction_count === null ||
+        dashboard.collections?.today_active_transaction_count === undefined
+          ? undefined
+          : toNumber(dashboard.collections.today_active_transaction_count),
+      today_reversed_transaction_count:
+        dashboard.collections?.today_reversed_transaction_count === null ||
+        dashboard.collections?.today_reversed_transaction_count === undefined
+          ? undefined
+          : toNumber(dashboard.collections.today_reversed_transaction_count),
       today_active_payments: toNumber(
         dashboard.collections?.today_active_payments
       ),

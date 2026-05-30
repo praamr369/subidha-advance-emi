@@ -175,8 +175,13 @@ class CashierDashboardView(APIView):
                 "total_pending_amount": dashboard.summary["total_pending_amount"],
                 "today_total_collected": metrics["today_total_collected"],
                 "today_transaction_count": metrics["today_transaction_count"],
+                "today_active_transaction_count": metrics["today_active_transaction_count"],
+                "today_reversed_transaction_count": metrics["today_reversed_transaction_count"],
                 "today_cash_total": metrics["today_cash_total"],
                 "today_digital_total": metrics["today_digital_total"],
+                "today_gross_amount": metrics["today_gross_amount"],
+                "today_reversed_amount": metrics["today_reversed_amount"],
+                "today_net_amount": metrics["today_net_amount"],
                 "today_transactions": PaymentSerializer(
                     dashboard.payment_rows,
                     many=True,

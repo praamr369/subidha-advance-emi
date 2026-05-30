@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from django.db.models import Q, QuerySet, Sum
+from django.db.models import Count, Exists, OuterRef, Q, QuerySet, Sum
+
+from reconciliation.models import FinancialSourceLifecycleEvent
+from reconciliation.services.financial_source_lifecycle_event_service import (
+    INVALIDATING_EVENT_TYPES,
+)
+from subscriptions.models import OperationalCancellation
 
 
 INACTIVE_SUBSCRIPTION_STATUSES = {
@@ -95,6 +101,68 @@ def is_payment_active_collection(payment) -> bool:
     metadata = getattr(payment, "allocation_metadata", None) or {}
     reversal = metadata.get("reversal") or {}
     return not bool(reversal.get("is_reversed"))
+
+
+def filter_active_payments(queryset: QuerySet) -> QuerySet:
+    """
+    Return payment rows that remain active after excluding explicit reversals
+    and lifecycle invalidations.
+
+    This helper is read-only and is intended for operational summaries.
+    It keeps historical rows available on detail pages while ensuring KPIs
+    use active/net payment truth.
+    """
+    active_queryset = queryset.exclude(allocation_metadata__reversal__is_reversed=True)
+    active_queryset = active_queryset.annotate(
+        _has_operational_cancellation=Exists(
+            OperationalCancellation.objects.filter(
+                source_type=OperationalCancellation.SourceType.EMI_PAYMENT,
+                source_id=OuterRef("pk"),
+            )
+        ),
+        _has_lifecycle_invalidation=Exists(
+            FinancialSourceLifecycleEvent.objects.filter(
+                source_type=FinancialSourceLifecycleEvent.SourceType.EMI_PAYMENT,
+                source_id=OuterRef("pk"),
+                event_type__in=INVALIDATING_EVENT_TYPES,
+                event_status=FinancialSourceLifecycleEvent.EventStatus.ACTIVE,
+            )
+        ),
+    )
+    return active_queryset.filter(
+        _has_operational_cancellation=False,
+        _has_lifecycle_invalidation=False,
+    )
+
+
+def get_payment_collection_totals(queryset: QuerySet) -> dict[str, Decimal | int]:
+    """
+    Compute gross, reversed, and active payment totals for operational summaries.
+
+    Gross = raw rows in the queryset.
+    Active = rows that are not explicitly reversed/invalidated.
+    Reversed = gross - active within the filtered queryset.
+    """
+    gross = queryset.aggregate(total=Sum("amount"), count=Count("id"))
+    active_queryset = filter_active_payments(queryset)
+    active = active_queryset.aggregate(total=Sum("amount"), count=Count("id"))
+
+    gross_amount = Decimal(str(gross.get("total") or "0.00")).quantize(Decimal("0.01"))
+    active_amount = Decimal(str(active.get("total") or "0.00")).quantize(Decimal("0.01"))
+    gross_count = int(gross.get("count") or 0)
+    active_count = int(active.get("count") or 0)
+
+    reversed_amount = (gross_amount - active_amount).quantize(Decimal("0.01"))
+    reversed_count = max(gross_count - active_count, 0)
+
+    return {
+        "gross_amount": gross_amount,
+        "gross_count": gross_count,
+        "active_amount": active_amount,
+        "active_count": active_count,
+        "reversed_amount": reversed_amount,
+        "reversed_count": reversed_count,
+    }
 
 
 def is_receipt_active_collection(receipt) -> bool:

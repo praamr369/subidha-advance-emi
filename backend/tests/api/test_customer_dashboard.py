@@ -288,6 +288,9 @@ class CustomerDashboardApiTests(APITestCase):
         self.assertEqual(payment_response.data["total_paid_amount"], "400.00")
         self.assertEqual(payment_response.data["recorded_amount_total"], "1000.00")
         self.assertEqual(payment_response.data["reversed_amount_total"], "600.00")
+        self.assertEqual(payment_response.data["active_payment_count"], 1)
+        self.assertEqual(payment_response.data["reversed_payment_count"], 1)
+        self.assertTrue(any(row["is_reversed"] for row in payment_response.data["results"]))
 
         self.assertEqual(
             dashboard_response.status_code,

@@ -10,6 +10,7 @@ from subscriptions.services.lucky_draw_service import (
     create_lucky_draw_commit,
     reveal_and_execute_draw,
 )
+from subscriptions.services.payment_service import reverse_payment_for_admin
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -62,6 +63,7 @@ class AdminDashboardApiTests(APITestCase):
             monthly_amount=Decimal("600.00"),
             tenure_months=6,
         )
+        self.subscription = subscription
         emi = create_emi(
             subscription=subscription,
             month_no=1,
@@ -90,6 +92,11 @@ class AdminDashboardApiTests(APITestCase):
         self.assertEqual(response.data["collections"]["today_transaction_count"], 1)
         self.assertEqual(response.data["collections"]["today_active_payments"], 1)
         self.assertEqual(response.data["collections"]["today_reversed_payments"], 0)
+        self.assertEqual(response.data["collections"]["today_active_transaction_count"], 1)
+        self.assertEqual(response.data["collections"]["today_reversed_transaction_count"], 0)
+        self.assertEqual(response.data["collections"]["today_gross_amount"], "600.00")
+        self.assertEqual(response.data["collections"]["today_reversed_amount"], "0.00")
+        self.assertEqual(response.data["collections"]["today_net_amount"], "600.00")
         self.assertEqual(len(response.data["recent_activity"]), 1)
         self.assertEqual(response.data["recent_activity"][0]["kind"], "PAYMENT")
         self.assertTrue(
@@ -98,6 +105,68 @@ class AdminDashboardApiTests(APITestCase):
             )
         )
         self.assertEqual(response.data["operations"]["open_batches"], 1)
+
+    def test_admin_dashboard_exposes_gross_reversed_and_net_collection_split(self):
+        customer = create_customer_profile(
+            user=create_customer_user(
+                username="dashboard_split_customer",
+                phone="7304000009",
+            ),
+            name="Dashboard Split Customer",
+            phone="7304000009",
+        )
+        product = create_product(
+            name="Dashboard Split Product",
+            product_code="DASH-SPLIT-001",
+            base_price=Decimal("1000.00"),
+        )
+        batch = create_batch(
+            batch_code="DASHSPLIT2026",
+            duration_months=2,
+            total_slots=100,
+            draw_day=5,
+            start_date=date(2026, 3, 1),
+            status="OPEN",
+        )
+        lucky_id = create_lucky_id(batch=batch, lucky_number=9)
+        subscription = create_subscription(
+            customer=customer,
+            product=product,
+            batch=batch,
+            lucky_id=lucky_id,
+            total_amount=Decimal("1000.00"),
+            monthly_amount=Decimal("500.00"),
+            tenure_months=2,
+        )
+        extra_emi = create_emi(
+            subscription=subscription,
+            month_no=1,
+            amount=Decimal("400.00"),
+            due_date=timezone.localdate(),
+        )
+        extra_payment = record_emi_payment(
+            emi_id=extra_emi.id,
+            amount=Decimal("400.00"),
+            collected_by=self.admin,
+            method="CASH",
+            reference_no="DASH-API-002",
+            payment_date=timezone.localdate(),
+        )["payment"]
+        reverse_payment_for_admin(
+            payment_id=extra_payment.id,
+            reversed_by=self.admin,
+            reason="admin dashboard regression test",
+        )
+
+        response = self.client.get("/api/v1/admin/dashboard/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["collections"]["today_transaction_count"], 2)
+        self.assertEqual(response.data["collections"]["today_active_transaction_count"], 1)
+        self.assertEqual(response.data["collections"]["today_reversed_transaction_count"], 1)
+        self.assertEqual(response.data["collections"]["today_gross_amount"], "1000.00")
+        self.assertEqual(response.data["collections"]["today_reversed_amount"], "400.00")
+        self.assertEqual(response.data["collections"]["today_net_amount"], "600.00")
 
     def test_admin_dashboard_counts_completed_winner_in_won_subscriptions(self):
         winner_user = create_customer_user(

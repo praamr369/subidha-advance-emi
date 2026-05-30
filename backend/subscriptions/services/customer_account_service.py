@@ -27,6 +27,7 @@ from subscriptions.services.winner_state_service import get_subscription_winner_
 from core.services.operational_visibility import (
     direct_sale_active_q,
     invoice_active_q,
+    get_payment_collection_totals,
     is_subscription_active_receivable,
     is_subscription_history_only,
     is_payment_active_collection,
@@ -199,18 +200,9 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         .filter(customer=customer)
         .order_by("-payment_date", "-id")
     )
-    active_payment_qs = [payment for payment in payment_qs if is_payment_active_collection(payment)]
-    reversed_payment_qs = [payment for payment in payment_qs if not is_payment_active_collection(payment)]
-    payment_totals = payment_qs.aggregate(
-        total_count=Count("id"),
-        reversed_count=Count(
-            "id",
-            filter=Q(allocation_metadata__reversal__is_reversed=True),
-        ),
-        total_amount=Sum("amount"),
-    )
-    active_payment_amount = sum((payment.amount or Decimal("0.00")) for payment in active_payment_qs)
-    reversed_payment_amount = sum((payment.amount or Decimal("0.00")) for payment in reversed_payment_qs)
+    payment_totals = get_payment_collection_totals(payment_qs)
+    active_payment_amount = payment_totals["active_amount"]
+    reversed_payment_amount = payment_totals["reversed_amount"]
 
     receipt_qs = (
         ReceiptDocument.objects.select_related("finance_account", "billing_invoice")
@@ -614,12 +606,14 @@ def build_customer_operational_profile(customer: Customer) -> dict[str, object]:
         },
         "payments": {
             "summary": {
-                "total_count": payment_totals["total_count"] or 0,
-                "active_count": len(active_payment_qs),
-                "reversed_count": payment_totals["reversed_count"] or 0,
-                "total_amount": _money(payment_totals["total_amount"]),
+                "total_count": payment_totals["gross_count"],
+                "active_count": payment_totals["active_count"],
+                "reversed_count": payment_totals["reversed_count"],
+                "total_amount": _money(payment_totals["gross_amount"]),
                 "active_collected_amount": _money(active_payment_amount),
                 "reversed_payment_amount": _money(reversed_payment_amount),
+                "recorded_amount_total": _money(payment_totals["gross_amount"]),
+                "gross_collected_amount": _money(payment_totals["gross_amount"]),
             },
             "rows": recent_payments,
         },

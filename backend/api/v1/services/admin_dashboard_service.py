@@ -81,7 +81,7 @@ def build_admin_dashboard(*, actor_user=None):
     # 3️⃣ Financial Metrics
     # ------------------------------
     total_revenue = canonical_summary["total_paid_amount"]
-    today_collection = canonical_metrics["collections"]["today_net_amount"]
+    today_collections = canonical_metrics["collections"]
 
     today_payment_queryset = Payment.objects.select_related(
         "customer",
@@ -89,23 +89,6 @@ def build_admin_dashboard(*, actor_user=None):
         "subscription__batch",
         "subscription__lucky_id",
     ).filter(payment_date=today)
-
-    today_reversed_queryset = today_payment_queryset.filter(
-        allocation_metadata__reversal__is_reversed=True
-    )
-    today_active_queryset = today_payment_queryset.exclude(
-        allocation_metadata__reversal__is_reversed=True
-    )
-
-    today_gross_amount = (
-        today_payment_queryset.aggregate(total=Sum("amount"))["total"] or 0
-    )
-    today_reversed_amount = (
-        today_reversed_queryset.aggregate(total=Sum("amount"))["total"] or 0
-    )
-    today_net_amount = (
-        today_active_queryset.aggregate(total=Sum("amount"))["total"] or 0
-    )
 
     total_outstanding = canonical_summary["outstanding_amount"]
 
@@ -242,7 +225,7 @@ def build_admin_dashboard(*, actor_user=None):
         # 💰 Financial Layer
         "financial": {
             "total_revenue": total_revenue,
-            "today_collection": today_collection,
+            "today_collection": today_collections["today_net_amount"],
             "total_outstanding": total_outstanding,
         },
         "summary": canonical_summary,
@@ -323,12 +306,14 @@ def build_admin_dashboard(*, actor_user=None):
 
         # ⚙️ Daily ops layer
         "collections": {
-            "today_transaction_count": today_payment_queryset.count(),
-            "today_active_payments": today_active_queryset.count(),
-            "today_reversed_payments": today_reversed_queryset.count(),
-            "today_gross_amount": str(today_gross_amount),
-            "today_reversed_amount": str(today_reversed_amount),
-            "today_net_amount": str(today_net_amount),
+            "today_transaction_count": today_collections["today_transaction_count"],
+            "today_active_transaction_count": today_collections["today_active_transaction_count"],
+            "today_reversed_transaction_count": today_collections["today_reversed_transaction_count"],
+            "today_active_payments": today_collections["today_active_payments"],
+            "today_reversed_payments": today_collections["today_reversed_payments"],
+            "today_gross_amount": today_collections["today_gross_amount"],
+            "today_reversed_amount": today_collections["today_reversed_amount"],
+            "today_net_amount": today_collections["today_net_amount"],
         },
 
         "recent_activity": recent_activity,

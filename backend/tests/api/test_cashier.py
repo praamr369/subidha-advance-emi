@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 from accounts.models import UserRole
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from subscriptions.models import SubscriptionStatus
+from subscriptions.services.payment_service import record_emi_payment, reverse_payment_for_admin
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -105,6 +106,53 @@ class CashierApiTests(APITestCase):
             status.HTTP_200_OK,
             msg=f"Unexpected cashier dashboard response: {response.status_code} {response.data}",
         )
+
+    def test_cashier_dashboard_excludes_reversed_payments_from_active_totals(self):
+        today = timezone.localdate()
+        active_emi = create_emi(
+            subscription=self.subscription,
+            month_no=3,
+            amount=Decimal("250.00"),
+            due_date=today,
+        )
+        reversed_emi = create_emi(
+            subscription=self.subscription,
+            month_no=4,
+            amount=Decimal("150.00"),
+            due_date=today,
+        )
+        record_emi_payment(
+            emi_id=active_emi.id,
+            amount=Decimal("250.00"),
+            collected_by=self.cashier,
+            method="CASH",
+            reference_no="CASH-DASH-ACTIVE-001",
+            payment_date=today,
+        )
+        reversed_payment = record_emi_payment(
+            emi_id=reversed_emi.id,
+            amount=Decimal("150.00"),
+            collected_by=self.cashier,
+            method="CASH",
+            reference_no="CASH-DASH-REVERSED-001",
+            payment_date=today,
+        )["payment"]
+        reverse_payment_for_admin(
+            payment_id=reversed_payment.id,
+            reversed_by=self.admin,
+            reason="cashier dashboard regression test",
+        )
+
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get("/api/v1/cashier/dashboard/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["today_transaction_count"], 2)
+        self.assertEqual(response.data["today_active_transaction_count"], 1)
+        self.assertEqual(response.data["today_reversed_transaction_count"], 1)
+        self.assertEqual(response.data["today_total_collected"], "250.00")
+        self.assertEqual(response.data["today_cash_total"], "250.00")
+        self.assertEqual(response.data["today_digital_total"], "0.00")
 
     def test_cashier_pending_emis_lookup_success(self):
         self.client.force_authenticate(user=self.admin)

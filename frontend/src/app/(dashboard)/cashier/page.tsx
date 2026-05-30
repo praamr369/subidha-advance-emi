@@ -257,9 +257,11 @@ export default function CashierDashboardPage() {
     8
   );
   const winnerRows = winnerItems?.results ?? [];
+  const todayActiveTransactionCount =
+    legacy?.today_active_transaction_count ?? legacy?.today_transaction_count ?? 0;
   const averageTicketValue =
-    legacy && legacy.today_transaction_count > 0
-      ? money(Number(legacy.today_total_collected) / legacy.today_transaction_count)
+    legacy && todayActiveTransactionCount > 0
+      ? money(Number(legacy.today_total_collected) / todayActiveTransactionCount)
       : "₹0.00";
 
   return (
@@ -297,7 +299,7 @@ export default function CashierDashboardPage() {
               },
               {
                 label: "Receipts Today",
-                value: String(legacy.today_transaction_count),
+                value: String(todayActiveTransactionCount),
               },
               {
                 label: "Cash Today",
@@ -375,7 +377,7 @@ export default function CashierDashboardPage() {
                   {
                     label: "Collected today",
                     value: money(legacy.today_total_collected),
-                    helper: `${legacy.today_transaction_count} receipt(s)`,
+                    helper: `${todayActiveTransactionCount} receipt(s)`,
                   },
                   {
                     label: "Cash today",

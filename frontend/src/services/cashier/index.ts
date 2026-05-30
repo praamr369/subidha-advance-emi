@@ -50,8 +50,13 @@ export type CashierDashboardResponse = {
   total_pending_amount: string;
   today_total_collected: string;
   today_transaction_count: number;
+  today_active_transaction_count?: number;
+  today_reversed_transaction_count?: number;
   today_cash_total: string;
   today_digital_total: string;
+  today_gross_amount?: string;
+  today_reversed_amount?: string;
+  today_net_amount?: string;
   today_transactions: CashierTransaction[];
 };
 
@@ -683,8 +688,31 @@ export async function getCashierDashboard(): Promise<CashierDashboardResponse> {
     total_pending_amount: toMoneyString(payload.total_pending_amount),
     today_total_collected: toMoneyString(payload.today_total_collected),
     today_transaction_count: toNumber(payload.today_transaction_count),
+    today_active_transaction_count:
+      payload.today_active_transaction_count === null ||
+      payload.today_active_transaction_count === undefined
+        ? undefined
+        : toNumber(payload.today_active_transaction_count),
+    today_reversed_transaction_count:
+      payload.today_reversed_transaction_count === null ||
+      payload.today_reversed_transaction_count === undefined
+        ? undefined
+        : toNumber(payload.today_reversed_transaction_count),
     today_cash_total: toMoneyString(payload.today_cash_total),
     today_digital_total: toMoneyString(payload.today_digital_total),
+    today_gross_amount:
+      payload.today_gross_amount === null || payload.today_gross_amount === undefined
+        ? undefined
+        : toMoneyString(payload.today_gross_amount),
+    today_reversed_amount:
+      payload.today_reversed_amount === null ||
+      payload.today_reversed_amount === undefined
+        ? undefined
+        : toMoneyString(payload.today_reversed_amount),
+    today_net_amount:
+      payload.today_net_amount === null || payload.today_net_amount === undefined
+        ? undefined
+        : toMoneyString(payload.today_net_amount),
     today_transactions: rawTransactions.map((item) =>
       normalizeTransaction(item as Record<string, unknown>)
     ),

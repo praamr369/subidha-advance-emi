@@ -30,6 +30,7 @@ from subscriptions.services.dashboard_scopes import (
 )
 from subscriptions.services.financial_health_service import system_financial_health
 from subscriptions.services.risk_service import evaluate_all_active_subscriptions
+from core.services.operational_visibility import get_payment_collection_totals
 from subscriptions.services.subscription_financial_service import (
     build_customer_dashboard_summary,
     build_reconciliation_attention_payload,
@@ -493,12 +494,7 @@ def get_dashboard_summary(
     if isinstance(scope, AdminScope):
         today = timezone.localdate()
         today_payment_queryset = _payment_queryset().filter(payment_date=today)
-        today_reversed_queryset = today_payment_queryset.filter(
-            allocation_metadata__reversal__is_reversed=True
-        )
-        today_active_queryset = today_payment_queryset.exclude(
-            allocation_metadata__reversal__is_reversed=True
-        )
+        today_payment_totals = get_payment_collection_totals(today_payment_queryset)
         batch_surface = _build_admin_batch_surface(today)
         risk_stats = evaluate_all_active_subscriptions()
         total_active = queryset.filter(status=SubscriptionStatus.ACTIVE).count()
@@ -518,18 +514,14 @@ def get_dashboard_summary(
             "total_monthly_value": _money(aggregates["total_monthly_value"]),
             "total_waived_value": _money(aggregates["total_waived_value"]),
             "collections": {
-                "today_transaction_count": today_payment_queryset.count(),
-                "today_active_payments": today_active_queryset.count(),
-                "today_reversed_payments": today_reversed_queryset.count(),
-                "today_gross_amount": _money(
-                    today_payment_queryset.aggregate(total=Sum("amount"))["total"]
-                ),
-                "today_reversed_amount": _money(
-                    today_reversed_queryset.aggregate(total=Sum("amount"))["total"]
-                ),
-                "today_net_amount": _money(
-                    today_active_queryset.aggregate(total=Sum("amount"))["total"]
-                ),
+                "today_transaction_count": today_payment_totals["gross_count"],
+                "today_active_transaction_count": today_payment_totals["active_count"],
+                "today_reversed_transaction_count": today_payment_totals["reversed_count"],
+                "today_active_payments": today_payment_totals["active_count"],
+                "today_reversed_payments": today_payment_totals["reversed_count"],
+                "today_gross_amount": _money(today_payment_totals["gross_amount"]),
+                "today_reversed_amount": _money(today_payment_totals["reversed_amount"]),
+                "today_net_amount": _money(today_payment_totals["active_amount"]),
             },
             "operations": {
                 "due_today_emis": Emi.objects.filter(
@@ -657,21 +649,25 @@ def get_dashboard_summary(
     elif isinstance(scope, CashierScope):
         today = timezone.localdate()
         today_payments = _cashier_visible_payments_queryset().filter(created_at__date=today)
+        today_payment_totals = get_payment_collection_totals(today_payments)
         metrics = {
-            "today_total_collected": _money(
-                today_payments.aggregate(total=Sum("amount"))["total"]
-            ),
-            "today_transaction_count": today_payments.count(),
+            "today_total_collected": _money(today_payment_totals["active_amount"]),
+            "today_transaction_count": today_payment_totals["gross_count"],
+            "today_active_transaction_count": today_payment_totals["active_count"],
+            "today_reversed_transaction_count": today_payment_totals["reversed_count"],
             "today_cash_total": _money(
-                today_payments.filter(method="CASH").aggregate(total=Sum("amount"))[
-                    "total"
+                get_payment_collection_totals(today_payments.filter(method="CASH"))[
+                    "active_amount"
                 ]
             ),
             "today_digital_total": _money(
-                today_payments.exclude(method="CASH").aggregate(total=Sum("amount"))[
-                    "total"
+                get_payment_collection_totals(today_payments.exclude(method="CASH"))[
+                    "active_amount"
                 ]
             ),
+            "today_gross_amount": _money(today_payment_totals["gross_amount"]),
+            "today_reversed_amount": _money(today_payment_totals["reversed_amount"]),
+            "today_net_amount": _money(today_payment_totals["active_amount"]),
         }
         payment_rows = list(
             _apply_date_window_to_queryset(

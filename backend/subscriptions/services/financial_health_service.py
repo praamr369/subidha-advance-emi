@@ -7,6 +7,7 @@ from subscriptions.models import (
     EmiStatus,
     SubscriptionStatus,
 )
+from core.services.operational_visibility import filter_active_payments
 
 
 def system_financial_health():
@@ -16,7 +17,8 @@ def system_financial_health():
     # =============================
 
     total_paid = (
-        Payment.objects.aggregate(total=Sum("amount"))["total"] or 0
+        filter_active_payments(Payment.objects.all()).aggregate(total=Sum("amount"))["total"]
+        or 0
     )
 
     total_waived = (

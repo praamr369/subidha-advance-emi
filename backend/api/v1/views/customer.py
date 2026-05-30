@@ -57,6 +57,7 @@ from subscriptions.services.delivery_service import (
     get_subscription_delivery_prefetch,
 )
 from subscriptions.services.document_pdf_service import render_delivery_handover_pdf
+from core.services.operational_visibility import get_payment_collection_totals
 from subscriptions.services.subscription_financial_service import (
     get_subscription_detail_queryset,
 )
@@ -293,24 +294,16 @@ class CustomerPaymentListView(APIView):
         if method:
             payments = payments.filter(method=method)
 
-        recorded_total = payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
-        reversed_payments = payments.filter(
-            allocation_metadata__reversal__is_reversed=True
-        )
-        total_amount = (
-            payments.exclude(allocation_metadata__reversal__is_reversed=True).aggregate(
-                total=Sum("amount")
-            )["total"]
-            or MONEY_ZERO
-        )
-        reversed_total = reversed_payments.aggregate(total=Sum("amount"))["total"] or MONEY_ZERO
+        collection_totals = get_payment_collection_totals(payments)
 
         return Response(
             {
                 "count": payments.count(),
-                "total_paid_amount": _money_string(total_amount),
-                "recorded_amount_total": _money_string(recorded_total),
-                "reversed_amount_total": _money_string(reversed_total),
+                "total_paid_amount": _money_string(collection_totals["active_amount"]),
+                "recorded_amount_total": _money_string(collection_totals["gross_amount"]),
+                "reversed_amount_total": _money_string(collection_totals["reversed_amount"]),
+                "active_payment_count": collection_totals["active_count"],
+                "reversed_payment_count": collection_totals["reversed_count"],
                 "results": PaymentSerializer(payments, many=True).data,
             }
         )

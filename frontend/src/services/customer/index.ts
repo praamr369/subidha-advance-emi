@@ -225,6 +225,10 @@ export type CustomerPayment = {
 export type CustomerPaymentListResponse = {
   count: number;
   total_paid_amount: number | string;
+  recorded_amount_total?: number | string;
+  reversed_amount_total?: number | string;
+  active_payment_count?: number;
+  reversed_payment_count?: number;
   results: CustomerPayment[];
 };
 
@@ -801,6 +805,25 @@ function normalizePaymentListResponse(
   return {
     count: toNumber(root.count, 0),
     total_paid_amount: toMoneyString(root.total_paid_amount, "0.00"),
+    recorded_amount_total:
+      root.recorded_amount_total === null ||
+      root.recorded_amount_total === undefined
+        ? undefined
+        : toMoneyString(root.recorded_amount_total, "0.00"),
+    reversed_amount_total:
+      root.reversed_amount_total === null ||
+      root.reversed_amount_total === undefined
+        ? undefined
+        : toMoneyString(root.reversed_amount_total, "0.00"),
+    active_payment_count:
+      root.active_payment_count === null || root.active_payment_count === undefined
+        ? undefined
+        : toNumber(root.active_payment_count),
+    reversed_payment_count:
+      root.reversed_payment_count === null ||
+      root.reversed_payment_count === undefined
+        ? undefined
+        : toNumber(root.reversed_payment_count),
     results: toArray(root.results).map(normalizeCustomerPayment),
   };
 }
