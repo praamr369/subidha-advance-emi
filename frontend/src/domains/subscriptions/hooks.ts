@@ -8,7 +8,7 @@ import {
 import type {
   AdminSubscription,
   Batch,
-  Customer,
+  SubscriptionCustomerOption,
   Emi,
   LuckyId,
   Partner,
@@ -20,7 +20,7 @@ import { parseApiError } from "@/domains/subscriptions/utils";
 
 export function useSubscriptionListData() {
   const [subscriptions, setSubscriptions] = useState<AdminSubscription[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<SubscriptionCustomerOption[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -99,7 +99,7 @@ export function useAvailableLuckyIds(batchId: string) {
 
 export function useSubscriptionDetailData(id: string) {
   const [subscription, setSubscription] = useState<SubscriptionDetail | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<SubscriptionCustomerOption[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
