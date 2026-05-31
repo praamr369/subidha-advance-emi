@@ -7,13 +7,30 @@ from subscriptions.models_business_setup import (
     PolicyPage,
     PolicyStatus,
 )
-from subscriptions.services.policy_governance_service import render_policy_content
+from subscriptions.services.policy_governance_service import (
+    policy_coverage_group_for_slug,
+    policy_governance_category_for_slug,
+    policy_is_internal_only,
+    policy_is_public_visible,
+    policy_visibility_for_slug,
+    render_policy_content,
+)
 
 
 class PolicyPageAdminSerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source="created_by.username", read_only=True)
     updated_by_username = serializers.CharField(source="updated_by.username", read_only=True)
     published_by_username = serializers.CharField(source="published_by.username", read_only=True)
+    visibility = serializers.SerializerMethodField()
+    governance_category = serializers.SerializerMethodField()
+    coverage_group = serializers.SerializerMethodField()
+    public_visible = serializers.SerializerMethodField()
+    internal_only = serializers.SerializerMethodField()
+    public_ready = serializers.SerializerMethodField()
+    internal_ready = serializers.SerializerMethodField()
+    requires_legal_review = serializers.SerializerMethodField()
+    review_due_date = serializers.SerializerMethodField()
+    last_published_at = serializers.DateTimeField(source="published_at", read_only=True)
 
     class Meta:
         model = PolicyPage
@@ -22,6 +39,15 @@ class PolicyPageAdminSerializer(serializers.ModelSerializer):
             "slug",
             "version",
             "category",
+            "governance_category",
+            "coverage_group",
+            "visibility",
+            "public_visible",
+            "internal_only",
+            "public_ready",
+            "internal_ready",
+            "requires_legal_review",
+            "review_due_date",
             "title",
             "summary",
             "content",
@@ -29,6 +55,7 @@ class PolicyPageAdminSerializer(serializers.ModelSerializer):
             "effective_date",
             "last_reviewed_at",
             "published_at",
+            "last_published_at",
             "published_by",
             "published_by_username",
             "created_by",
@@ -42,12 +69,49 @@ class PolicyPageAdminSerializer(serializers.ModelSerializer):
             "id",
             "version",
             "published_at",
+            "last_published_at",
             "published_by",
             "created_by",
             "updated_by",
             "created_at",
             "updated_at",
+            "visibility",
+            "governance_category",
+            "coverage_group",
+            "public_visible",
+            "internal_only",
+            "public_ready",
+            "internal_ready",
+            "requires_legal_review",
+            "review_due_date",
         )
+
+    def get_visibility(self, obj: PolicyPage) -> str:
+        return policy_visibility_for_slug(obj.slug)
+
+    def get_governance_category(self, obj: PolicyPage) -> str:
+        return policy_governance_category_for_slug(obj.slug, obj.category)
+
+    def get_coverage_group(self, obj: PolicyPage) -> str:
+        return policy_coverage_group_for_slug(obj.slug)
+
+    def get_public_visible(self, obj: PolicyPage) -> bool:
+        return policy_is_public_visible(obj)
+
+    def get_internal_only(self, obj: PolicyPage) -> bool:
+        return policy_is_internal_only(obj)
+
+    def get_public_ready(self, obj: PolicyPage) -> bool:
+        return policy_is_public_visible(obj)
+
+    def get_internal_ready(self, obj: PolicyPage) -> bool:
+        return bool(policy_is_internal_only(obj) and obj.status == PolicyStatus.PUBLISHED)
+
+    def get_requires_legal_review(self, obj: PolicyPage) -> bool:
+        return True
+
+    def get_review_due_date(self, obj: PolicyPage):
+        return None
 
     def validate_slug(self, value: str) -> str:
         cleaned = (value or "").strip().lower()
