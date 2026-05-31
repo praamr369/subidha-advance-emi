@@ -3,7 +3,13 @@ from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.models import (
+    ChartOfAccount,
+    ChartOfAccountType,
+    FinanceAccount,
+    FinanceAccountKind,
+    SYSTEM_LEDGER_POSTING_PROFILE_NAME,
+)
 from subscriptions.models import EmiStatus, Payment
 from tests.helpers import (
     create_admin_user,
@@ -43,6 +49,8 @@ class CollectionControlCenterApiTests(APITestCase):
         self.assertIn("finance_account_readiness", response.data)
         self.assertIn("collection_lanes", response.data)
         self.assertGreaterEqual(response.data["summary"]["pending_emi_count"], 1)
+        self.assertIsNone(response.data["summary"]["pending_receipt_count"])
+        self.assertIsNone(response.data["summary"]["unreconciled_collection_count"])
 
     def test_cashier_collection_control_center_returns_cashier_safe_payload(self):
         self.client.force_authenticate(self.cashier)
@@ -64,7 +72,7 @@ class CollectionControlCenterApiTests(APITestCase):
         after = Payment.objects.count()
         self.assertEqual(before, after)
 
-    def test_blocked_finance_account_appears_in_summary(self):
+    def test_blocked_finance_account_appears_in_operational_section(self):
         group_account = ChartOfAccount.objects.create(
             code="CCC-GROUP",
             name="Blocked Collection Group",
@@ -83,8 +91,46 @@ class CollectionControlCenterApiTests(APITestCase):
         self.client.force_authenticate(self.admin)
         response = self.client.get("/api/v1/admin/collections/control-center/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        rows = response.data["finance_account_readiness"]["accounts"]
+        rows = response.data["finance_account_readiness"]["operational_collection_accounts"]
         blocked = [row for row in rows if row["name"] == "Blocked Cash Desk"]
         self.assertEqual(len(blocked), 1)
         self.assertFalse(blocked[0]["collection_ready"])
+        self.assertFalse(blocked[0]["selectable_for_collection"])
         self.assertIn("group/control account", blocked[0]["collection_blocker_reason"])
+
+    def test_system_posting_profile_is_diagnostic_not_selectable(self):
+        chart = ChartOfAccount.objects.create(
+            code="CCC-SYS-POST",
+            name="System Posting Ledger",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        FinanceAccount.objects.create(
+            name=SYSTEM_LEDGER_POSTING_PROFILE_NAME,
+            kind=FinanceAccountKind.BANK,
+            chart_account=chart,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=False,
+        )
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/v1/admin/collections/control-center/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        operational_rows = response.data["finance_account_readiness"]["operational_collection_accounts"]
+        diagnostic_rows = response.data["finance_account_readiness"]["diagnostic_system_accounts"]
+        self.assertFalse(any(row["name"] == SYSTEM_LEDGER_POSTING_PROFILE_NAME for row in operational_rows))
+        diagnostic = [row for row in diagnostic_rows if row["name"] == SYSTEM_LEDGER_POSTING_PROFILE_NAME]
+        self.assertEqual(len(diagnostic), 1)
+        self.assertTrue(diagnostic[0]["diagnostic_only"])
+        self.assertFalse(diagnostic[0]["selectable_for_collection"])
+        self.assertIn("diagnostic only", diagnostic[0]["collection_blocker_reason"])
+
+    def test_rent_lease_lane_remains_deferred(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/v1/admin/collections/control-center/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        lane = next(item for item in response.data["collection_lanes"] if item["key"] == "rent_lease")
+        self.assertFalse(lane["enabled"])
+        self.assertIsNone(lane["route"])
