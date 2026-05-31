@@ -100,7 +100,6 @@ export type AccountingSetupReadinessPayload = {
   };
 };
 
-/** Canonical accounting master + readiness payload (GET /admin/accounting/setup/status/). */
 export type AccountingSetupStatusPayload = {
   status?: string;
   warnings_count?: number;
@@ -153,6 +152,131 @@ export type CollectionRepairPreviewPayload = {
   summary: Record<string, number>;
 };
 
+const SYSTEM_PROFILE_BLOCKER = "System posting profile diagnostic only; not a customer collection destination.";
+const BLOCKED_PROFILE_ACTION = "Run Accounting Setup defaults or map the required posting accounts before marking this workflow ready.";
+
+const PROFILE_ROWS: Array<{ key: string; label: string; debit: string[]; credit: string[]; implemented: boolean; deferred?: string }> = [
+  { key: "emi_collection", label: "EMI Collection", debit: ["CUSTOMER_RECEIVABLE"], credit: ["EMI_INCOME"], implemented: true },
+  { key: "direct_sale_collection", label: "Direct Sale Collection", debit: ["CUSTOMER_RECEIVABLE"], credit: ["DIRECT_SALE_INCOME"], implemented: true },
+  { key: "customer_advance", label: "Customer Advance", debit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], credit: ["CUSTOMER_ADVANCE_UNEARNED_REVENUE"], implemented: true },
+  { key: "rent_lease_collection", label: "Rent / Lease Collection", debit: ["CUSTOMER_RECEIVABLE"], credit: ["RENT_INCOME", "LEASE_INCOME"], implemented: false, deferred: "Rent/lease collection remains deferred until an approved backend collection route exists." },
+  { key: "security_deposit", label: "Security Deposit", debit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], credit: ["SECURITY_DEPOSIT_LIABILITY"], implemented: false, deferred: "Security deposit collection is diagnostic until backend collection execution is enabled." },
+  { key: "refund_customer_credit", label: "Refund / Customer Credit", debit: ["CUSTOMER_RECEIVABLE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
+  { key: "commission_payout", label: "Commission Payout", debit: ["COMMISSION_EXPENSE"], credit: ["COMMISSION_PAYABLE"], implemented: true },
+  { key: "vendor_payment", label: "Vendor Payment", debit: ["ACCOUNTS_PAYABLE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
+  { key: "purchase_inventory", label: "Purchase / Inventory", debit: ["INVENTORY_ASSET"], credit: ["ACCOUNTS_PAYABLE"], implemented: true },
+  { key: "reconciliation_clearing", label: "Reconciliation Clearing", debit: ["CUSTOMER_RECEIVABLE"], credit: ["CUSTOMER_RECEIVABLE"], implemented: true },
+];
+
+function normalizeFinanceAccount(account: AccountingSetupReadinessFinanceAccount): AccountingSetupReadinessFinanceAccount {
+  return {
+    ...account,
+    operational_collection_account: account.diagnostic_only ? false : true,
+    selectable_for_collection: Boolean(account.selectable_for_collection ?? account.is_selectable_collection_account ?? account.collection_ready),
+    is_selectable_collection_account: Boolean(account.selectable_for_collection ?? account.is_selectable_collection_account ?? account.collection_ready),
+  };
+}
+
+function chartIsPostingLeaf(account: AccountingSetupReadinessChartAccount): boolean {
+  return Boolean(account.is_posting || account.is_posting_ready || account.allowed_for_collection);
+}
+
+function chartIsGroupControl(account: AccountingSetupReadinessChartAccount): boolean {
+  return Boolean(account.is_group_control || !account.allow_manual_posting || !chartIsPostingLeaf(account));
+}
+
+function buildCoaHealth(chartAccounts: AccountingSetupReadinessChartAccount[]): AccountingSetupMatrixPayload["chart_of_accounts_health"] {
+  const groupControl = chartAccounts.filter(chartIsGroupControl);
+  const postingLeaf = chartAccounts.filter(chartIsPostingLeaf);
+  const missingLeafAssets = chartAccounts.filter((account) => (account.account_type || account.type) === "ASSET" && !chartIsPostingLeaf(account));
+  const inactiveOrNonPosting = chartAccounts.filter((account) => account.is_active === false || !chartIsPostingLeaf(account));
+  return {
+    group_control_accounts: groupControl,
+    posting_leaf_accounts: postingLeaf,
+    missing_posting_leaf_accounts: missingLeafAssets,
+    inactive_or_non_posting_blockers: inactiveOrNonPosting,
+    counts: {
+      group_control_count: groupControl.length,
+      posting_leaf_count: postingLeaf.length,
+      missing_posting_leaf_count: missingLeafAssets.length,
+      inactive_or_non_posting_count: inactiveOrNonPosting.length,
+    },
+  };
+}
+
+function buildProfileReadiness(): PostingProfileReadinessItem[] {
+  return PROFILE_ROWS.map((row) => ({
+    key: row.key,
+    label: row.label,
+    status: row.implemented ? "BLOCKED" : "DEFERRED",
+    required_debit_account: row.debit,
+    required_credit_account: row.credit,
+    configured_debit_account: [],
+    configured_credit_account: [],
+    blockers: [row.deferred || "Required posting profile mapping is not exposed by the current readiness endpoint."],
+    recommended_action: row.deferred || BLOCKED_PROFILE_ACTION,
+    recommended_actions: [row.deferred || BLOCKED_PROFILE_ACTION],
+    implemented: row.implemented,
+  }));
+}
+
+function buildMatrixFromReadiness(payload: AccountingSetupReadinessPayload): AccountingSetupMatrixPayload {
+  const financeAccounts = (payload.finance_accounts ?? []).map(normalizeFinanceAccount);
+  const operational = financeAccounts.filter((account) => !account.diagnostic_only && !account.system_posting_profile);
+  const diagnostic: AccountingSetupReadinessFinanceAccount[] = [
+    {
+      id: -1,
+      name: "Ledger posting profiles (system)",
+      code: "SYSTEM-POSTING-PROFILES",
+      kind: "SYSTEM",
+      mapped_chart_account: null,
+      diagnostic_only: true,
+      system_posting_profile: true,
+      operational_collection_account: false,
+      collection_ready: false,
+      selectable_for_collection: false,
+      is_selectable_collection_account: false,
+      collection_blocker_reason: SYSTEM_PROFILE_BLOCKER,
+      recommended_action: "Review this row in System Posting Profiles, not in customer collection selectors.",
+      account_role: "system_posting_profile",
+    },
+  ];
+  const coaHealth = buildCoaHealth(payload.chart_accounts ?? []);
+  return {
+    modules: [],
+    finance_accounts: financeAccounts,
+    operational_collection_accounts: operational,
+    diagnostic_system_accounts: diagnostic,
+    chart_accounts: payload.chart_accounts ?? [],
+    chart_of_accounts_health: coaHealth,
+    posting_profiles: diagnostic.map((account) => ({
+      key: account.code || "system_posting_profiles",
+      label: account.name,
+      diagnostic_only: true,
+      selectable_for_collection: false,
+      collection_ready: false,
+      collection_blocker_reason: SYSTEM_PROFILE_BLOCKER,
+      status: "BLOCKED",
+    })),
+    posting_profile_readiness: buildProfileReadiness(),
+    collection_requirements: [],
+    operator_copy: {
+      finance_accounts: "Finance Accounts are where money is received or paid.",
+      posting_profiles: "Posting Profiles decide which ledger accounts are debited and credited.",
+      chart_of_accounts: "Chart of Accounts is the ledger structure.",
+      system_profiles: "System posting profiles are diagnostic only and cannot receive customer collections.",
+      blocked_collection: "Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account.",
+    },
+    not_exposed_label: "Not exposed",
+    summary: {
+      ...payload.summary,
+      selectable_collection_accounts_count: operational.filter((account) => account.selectable_for_collection).length,
+      operational_collection_accounts_count: operational.length,
+      diagnostic_system_accounts_count: diagnostic.length,
+    },
+  };
+}
+
 export async function getAccountingSetupStatus(): Promise<AccountingSetupStatusPayload> {
   return request<AccountingSetupStatusPayload>("/admin/accounting/setup/status/");
 }
@@ -162,7 +286,8 @@ export async function getAccountingSetupReadiness(): Promise<AccountingSetupRead
 }
 
 export async function getAccountingSetupMatrix(): Promise<AccountingSetupMatrixPayload> {
-  return request<AccountingSetupMatrixPayload>("/admin/accounting/setup/matrix/");
+  const payload = await getAccountingSetupReadiness();
+  return buildMatrixFromReadiness(payload);
 }
 
 export async function postAccountingSetupBootstrap(dryRun = false) {
