@@ -11,6 +11,7 @@ from accounting.services.finance_account_readiness import (
     chart_account_allowed_for_collection,
     finance_account_readiness,
 )
+from accounting.services.accounting_setup_matrix_service import build_accounting_setup_matrix
 from accounting.services.accounting_setup_service import AccountingSetupService
 from accounting.services.accounting_setup_status import get_admin_accounting_setup_status
 from accounting.services.master_edit_service import AccountingMasterUpdateService
@@ -35,6 +36,11 @@ class _AdminBase(APIView):
 class AccountingSetupStatusView(_AdminBase):
     def get(self, request):
         return Response(get_admin_accounting_setup_status())
+
+
+class AccountingSetupMatrixView(_AdminBase):
+    def get(self, request):
+        return Response(build_accounting_setup_matrix(), status=status.HTTP_200_OK)
 
 
 class AccountingSetupBootstrapSerializer(serializers.Serializer):
