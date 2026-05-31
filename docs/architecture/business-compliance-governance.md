@@ -2,7 +2,7 @@
 
 Branch: `update`
 
-Status: **Phase BC-1 business compliance templates and readiness implemented**
+Status: **Phase BC-2 compliance review workflow and admin evidence UI implemented**
 
 ## Purpose
 
@@ -21,9 +21,11 @@ Business Compliance = actual shop identity, registration evidence, premises proo
 Do not fake GST registration.
 Do not fake Udyam/MSME registration.
 Do not mark missing documents as verified.
+Do not approve seeded checklist rows without real evidence files.
 Do not expose private files publicly.
 Do not create public downloadable ownership/rental/bank/PAN/GST files.
 Seeded checklist rows do not make readiness complete.
+Public summary exposure requires separate summary approval after document approval.
 ```
 
 ## Admin routes
@@ -40,16 +42,93 @@ Admin APIs:
 GET  /api/v1/admin/settings/business-compliance/templates/
 POST /api/v1/admin/settings/business-compliance/seed-rows/
 GET  /api/v1/admin/settings/business-compliance/readiness/
+GET  /api/v1/admin/settings/business-compliance/documents/
+POST /api/v1/admin/settings/business-compliance/documents/
+GET  /api/v1/admin/settings/business-compliance/documents/:id/
+PATCH /api/v1/admin/settings/business-compliance/documents/:id/
+POST /api/v1/admin/settings/business-compliance/documents/:id/submit-review/
+POST /api/v1/admin/settings/business-compliance/documents/:id/approve/
+POST /api/v1/admin/settings/business-compliance/documents/:id/reject/
+POST /api/v1/admin/settings/business-compliance/documents/:id/expire/
+POST /api/v1/admin/settings/business-compliance/documents/:id/approve-public-summary/
+POST /api/v1/admin/settings/business-compliance/documents/:id/revoke-public-summary/
+GET  /api/v1/admin/public-site/business-compliance/summary/
+```
+
+Compatibility document list/detail routes remain:
+
+```text
 GET  /api/v1/admin/public-site/business-compliance/documents/
 POST /api/v1/admin/public-site/business-compliance/documents/
 PATCH /api/v1/admin/public-site/business-compliance/documents/:id/
-GET  /api/v1/admin/public-site/business-compliance/summary/
 ```
 
 Public API:
 
 ```text
 GET /api/v1/public/business-compliance/summary/
+```
+
+## Review-state model
+
+BC-2 adds an additive table:
+
+```text
+business_compliance_document_review_states
+```
+
+It stores workflow state without replacing the existing `BusinessComplianceDocument` row.
+
+Fields include:
+
+```text
+review_status
+reviewed_at
+rejected_reason
+expires_at
+approved_public_summary
+public_summary_approved_at
+public_summary_approved_by
+source_template_key
+evidence_uploaded_at
+last_action_reason
+```
+
+Existing BC-1 compliance documents are backfilled by migration `0079_backfill_business_compliance_review_state.py`.
+
+## Review workflow
+
+Valid review statuses:
+
+```text
+PENDING
+UNDER_REVIEW
+APPROVED
+REJECTED
+EXPIRED
+```
+
+Service-layer actions:
+
+```text
+update_document_metadata
+mark_under_review
+approve_document
+reject_document
+expire_document
+approve_public_summary
+revoke_public_summary
+```
+
+Approval rules:
+
+```text
+Approval requires a real evidence file.
+Seeded empty rows cannot be approved.
+Reject requires a reason.
+Expire/deactivate requires a reason.
+Replacing evidence resets review status to PENDING and revokes public summary approval.
+Changing public summary or visibility revokes public summary approval.
 ```
 
 ## Template catalog
@@ -117,6 +196,7 @@ skips optional templates
 creates empty metadata rows only
 sets public_visibility = PRIVATE
 sets verification_status = PENDING
+creates review_status = PENDING
 attaches no fake file
 sets no verified/approved status
 is idempotent
@@ -125,20 +205,6 @@ never overwrites existing matching rows
 
 A seeded row is an operator checklist placeholder, not evidence.
 
-## Verification/status mapping
-
-Existing stored statuses are reused:
-
-```text
-PENDING      -> Pending review
-VERIFIED     -> Approved / verified
-REJECTED     -> Rejected
-NOT_PROVIDED -> Not provided
-inactive row -> Expired display state
-```
-
-No migration was required for BC-1.
-
 ## Public/private exposure
 
 Private files are never public-downloadable by default.
@@ -146,9 +212,12 @@ Private files are never public-downloadable by default.
 The public summary API exposes only rows where:
 
 ```text
+is_active = true
 public_visibility = PUBLIC_SUMMARY_ONLY
 verification_status = VERIFIED
-is_active = true
+review_status = APPROVED
+approved_public_summary = true
+public_summary is not empty
 ```
 
 It does not expose file URLs.
@@ -159,7 +228,7 @@ GST/Udyam public text must remain honest:
 Not provided / will be updated after registration.
 ```
 
-unless actual verified evidence/status exists.
+unless actual approved evidence/status exists.
 
 ## Readiness behavior
 
@@ -180,6 +249,10 @@ missing_required_count
 pending_review_count
 approved_required_count
 required_count
+rejected_count
+expired_count
+missing_file_count
+public_summary_pending_count
 recommended_missing_count
 required_checks
 recommended_checks
@@ -191,10 +264,11 @@ Readiness is `BLOCKED` when:
 
 ```text
 active business profile is missing
-required premises proof is missing/unapproved
-required business address proof is missing/unapproved
-required PAN/tax proof is missing/unapproved
-required bank proof is missing/unapproved
+required premises proof is missing/unapproved/missing file
+required business address proof is missing/unapproved/missing file
+required PAN/tax proof is missing/unapproved/missing file
+required bank proof is missing/unapproved/missing file
+any active compliance row has no evidence file
 ```
 
 Readiness warns when:
@@ -204,13 +278,16 @@ GST evidence is missing/unapproved
 Udyam/MSME evidence is missing/unapproved
 shop/trade license evidence is missing/unapproved
 any compliance rows are pending review
+any compliance rows are rejected
+any compliance rows are expired/deactivated
+any public summary waits for separate summary approval
 ```
 
-Readiness can be `READY` only when required evidence is approved and no warning remains.
+Readiness can be `READY` only when required evidence is approved and warning conditions are clear.
 
 ## Setup Readiness integration
 
-Setup Readiness now includes:
+Setup Readiness includes:
 
 ```text
 business_compliance
@@ -224,27 +301,54 @@ can_complete_business_compliance
 
 Setup Readiness remains read-only. It does not seed rows, upload files, approve documents, or mutate financial records.
 
+BC-2 metadata exposed inside Setup Readiness:
+
+```text
+missing_required_count
+pending_review_count
+approved_required_count
+required_count
+recommended_missing_count
+rejected_count
+expired_count
+missing_file_count
+public_summary_pending_count
+required_checks
+recommended_checks
+```
+
 ## Frontend behavior
 
 The Business Compliance page shows:
 
 ```text
-compliance status cards
+compliance review status cards
 required/recommended/optional template checklist
 seed required/recommended rows action
+safe add-row form with optional evidence file upload
 human document type labels
-safe add-row form defaults
-private/public-summary warning copy
-document register with status, visibility, summary state, review state, and expiry placeholder
+document register with evidence, review status, public summary state, reviewer, and actions
+row-level evidence upload/replace
+submit review action
+approve evidence action
+reject with reason action
+expire/deactivate with reason action
+approve public summary action
+revoke public summary action
+document review detail panel
 public summary preview
-link to Policy Governance without mixing policy templates and compliance rows
+links to Setup Readiness and Policy Governance
 ```
+
+The page does not expose a manual `VERIFIED` status dropdown.
 
 ## Existing data impact
 
-No existing compliance rows are overwritten by default.
+Existing compliance rows are preserved.
 
-No existing files are exposed publicly.
+Existing files are not exposed publicly.
+
+Existing BC-1 rows receive additive review-state rows through migration `0079`.
 
 No existing business profile data is modified.
 
@@ -256,16 +360,31 @@ No payment, receipt, journal, settlement, reconciliation, invoice, subscription,
 
 ## Auditability impact
 
-Seed row creation records an audit event when rows are created.
-
-Document create/update/review paths continue to record actor fields through existing model fields:
+Audit events are recorded for:
 
 ```text
-uploaded_by
-reviewed_by
-verified_at
-created_at
-updated_at
+seed rows
+metadata update
+evidence upload/replace
+submit review
+approve evidence
+reject evidence
+expire/deactivate evidence
+approve public summary
+revoke public summary
+```
+
+Audit metadata includes:
+
+```text
+document_id
+document_type
+old_status
+new_status
+actor
+reason
+changed fields
+approved_public_summary
 ```
 
 ## Future rent/lease compatibility
@@ -279,6 +398,7 @@ business-address-proof
 security/deposit-related public policy separation
 private proof handling
 approved public summary control
+expiry/deactivation history
 ```
 
 Future tenant/asset proof or branch-specific compliance can be added as new templates without changing old documents.
