@@ -14,6 +14,11 @@ from api.v1.serializers.policy_site import (
     PolicySeedActionSerializer,
 )
 from subscriptions.models_business_setup import BusinessComplianceDocument, PolicyPage
+from subscriptions.services.business_compliance_governance_service import (
+    build_business_compliance_readiness,
+    list_business_compliance_templates,
+    seed_business_compliance_rows,
+)
 from subscriptions.services.policy_governance_service import (
     archive_policy_page,
     build_policy_coverage_matrix,
@@ -133,9 +138,25 @@ class AdminPolicySeedDefaultsView(_AdminPolicyBase):
         return Response(result)
 
 
+class AdminBusinessComplianceTemplateListView(_AdminPolicyBase):
+    def get(self, request):
+        templates = list_business_compliance_templates()
+        return Response({"count": len(templates), "results": templates})
+
+
+class AdminBusinessComplianceSeedRowsView(_AdminPolicyBase):
+    def post(self, request):
+        return Response(seed_business_compliance_rows(performed_by=request.user))
+
+
+class AdminBusinessComplianceReadinessView(_AdminPolicyBase):
+    def get(self, request):
+        return Response(build_business_compliance_readiness())
+
+
 class AdminBusinessComplianceDocumentListCreateView(_AdminPolicyBase):
     def get(self, request):
-        queryset = BusinessComplianceDocument.objects.all().order_by("-created_at", "-id")
+        queryset = BusinessComplianceDocument.objects.all().order_by("document_type", "-created_at", "-id")
         serializer = BusinessComplianceDocumentAdminSerializer(queryset, many=True)
         return Response({"count": len(serializer.data), "results": serializer.data})
 
