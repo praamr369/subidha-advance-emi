@@ -7,6 +7,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountCoaMapping
+from accounting.services.collection_mapping_repair_service import (
+    CONFIRM_COLLECTION_MAPPING_REPAIR,
+    execute_collection_mapping_repairs,
+    preview_collection_mapping_repairs,
+)
 from accounting.services.finance_account_readiness import (
     chart_account_allowed_for_collection,
     finance_account_readiness,
@@ -172,51 +177,69 @@ def _ensure_collection_posting_child(finance_account: FinanceAccount) -> ChartOf
 
 def _repair_active_collection_finance_accounts(*, actor=None) -> list[dict]:
     """
-    Post-apply safety pass for Apply Suggested Default.
+    Explicit repair helper for active real settlement accounts.
 
-    Default setup preserves group/control COA rows for review. Active real settlement
-    finance accounts must still point at posting leaf ASSET accounts before they can
-    receive collections, so this pass creates/reuses those leaves and remaps only the
-    active collection finance accounts.
+    Lock only FinanceAccount rows. Related chart-account rows are loaded after the
+    lock is acquired so PostgreSQL never applies FOR UPDATE to nullable outer joins.
     """
 
     repaired: list[dict] = []
-    accounts = (
-        FinanceAccount.objects.select_related("chart_account", "chart_account__parent")
-        .select_for_update()
-        .filter(is_active=True, is_real_settlement_account=True)
-        .order_by("kind", "name", "id")
-    )
     with transaction.atomic():
+        locked_ids = list(
+            FinanceAccount.objects.select_for_update()
+            .filter(is_active=True, is_real_settlement_account=True)
+            .order_by("kind", "name", "id")
+            .values_list("id", flat=True)
+        )
+        accounts = (
+            FinanceAccount.objects.select_related("chart_account", "chart_account__parent")
+            .prefetch_related("chart_account__children")
+            .filter(id__in=locked_ids)
+            .order_by("kind", "name", "id")
+        )
         for account in accounts:
             current = getattr(account, "chart_account", None)
             if chart_account_allowed_for_collection(current, kind=account.kind):
+                repaired.append(
+                    {
+                        "finance_account_id": account.id,
+                        "finance_account_name": account.name,
+                        "previous_chart_account": _chart_account_payload(current),
+                        "repaired_chart_account": _chart_account_payload(current),
+                        "status": "SKIPPED",
+                        "reason": "Already collection-ready.",
+                    }
+                )
                 continue
             if current is None or not current.is_active or current.account_type != ChartOfAccountType.ASSET:
                 repaired.append(
                     {
                         "finance_account_id": account.id,
                         "finance_account_name": account.name,
-                        "status": "SKIPPED",
+                        "previous_chart_account": _chart_account_payload(current),
+                        "repaired_chart_account": None,
+                        "status": "FAILED",
                         "reason": "Finance account is not mapped to an active ASSET group/control account.",
                     }
                 )
                 continue
-            target_chart = _ensure_collection_posting_child(account)
-            old_chart_account_id = account.chart_account_id
+            old_chart_account = current
             try:
+                target_chart = _ensure_collection_posting_child(account)
                 updated = AccountingMasterUpdateService.update_finance_account(
                     account=account,
                     payload={"chart_account": target_chart},
                     actor=actor,
                 )
-            except DjangoValidationError as exc:
+            except (DjangoValidationError, serializers.ValidationError) as exc:
                 repaired.append(
                     {
                         "finance_account_id": account.id,
                         "finance_account_name": account.name,
-                        "status": "SKIPPED",
-                        "reason": exc.message_dict,
+                        "previous_chart_account": _chart_account_payload(old_chart_account),
+                        "repaired_chart_account": None,
+                        "status": "FAILED",
+                        "reason": getattr(exc, "message_dict", None) or getattr(exc, "detail", None) or str(exc),
                     }
                 )
                 continue
@@ -225,10 +248,11 @@ def _repair_active_collection_finance_accounts(*, actor=None) -> list[dict]:
                 {
                     "finance_account_id": updated.id,
                     "finance_account_name": updated.name,
-                    "old_chart_account_id": old_chart_account_id,
-                    "new_chart_account_id": updated.chart_account_id,
+                    "previous_chart_account": _chart_account_payload(old_chart_account),
+                    "repaired_chart_account": _chart_account_payload(updated.chart_account),
                     "collection_ready": readiness.collection_ready,
-                    "status": "REPAIRED" if readiness.collection_ready else "STILL_BLOCKED",
+                    "status": "REPAIRED" if readiness.collection_ready else "FAILED",
+                    "reason": None if readiness.collection_ready else readiness.collection_blocker_reason,
                 }
             )
     return repaired
@@ -348,7 +372,12 @@ class AccountingSetupDefaultsApplyView(_AdminBase):
         if not serializer.validated_data.get("confirm"):
             raise serializers.ValidationError({"confirm": "Confirm must be true to apply defaults."})
         payload = apply_accounting_setup_defaults(performed_by=request.user)
-        payload["collection_account_repairs"] = _repair_active_collection_finance_accounts(actor=request.user)
+        payload["collection_account_repairs"] = []
+        payload["collection_account_repair_preview"] = preview_collection_mapping_repairs()
+        payload["collection_account_repair_note"] = (
+            "Suggested defaults were applied. Blocked collection mappings are not repaired automatically; "
+            f"preview and confirm {CONFIRM_COLLECTION_MAPPING_REPAIR} before remapping finance accounts."
+        )
         return Response(payload, status=status.HTTP_200_OK)
 
 
@@ -471,21 +500,40 @@ class AccountingMappingSuggestionsView(_AdminBase):
             {
                 "suggestions": AccountingSetupService.create_default_mappings(actor=request.user, dry_run=True).__dict__,
                 "repair_preview": AccountingSetupService.repair_suggested_mappings(actor=request.user, dry_run=True),
+                "collection_repair_preview": preview_collection_mapping_repairs(),
                 "warnings": warnings,
             }
         )
 
 
 class AccountingRepairSuggestedMappingsSerializer(serializers.Serializer):
-    dry_run = serializers.BooleanField(required=False, default=False)
+    dry_run = serializers.BooleanField(required=False, default=True)
+    finance_account_id = serializers.IntegerField(min_value=1, required=False)
+    confirmation_text = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 class AccountingRepairSuggestedMappingsView(_AdminBase):
+    def get(self, request):
+        finance_account_id = request.query_params.get("finance_account_id")
+        return Response(
+            preview_collection_mapping_repairs(
+                finance_account_id=int(finance_account_id) if finance_account_id else None,
+            ),
+            status=status.HTTP_200_OK,
+        )
+
     def post(self, request):
         serializer = AccountingRepairSuggestedMappingsSerializer(data=request.data or {})
         serializer.is_valid(raise_exception=True)
-        payload = AccountingSetupService.repair_suggested_mappings(
+        finance_account_id = serializer.validated_data.get("finance_account_id")
+        if serializer.validated_data.get("dry_run", True):
+            return Response(
+                preview_collection_mapping_repairs(finance_account_id=finance_account_id),
+                status=status.HTTP_200_OK,
+            )
+        payload = execute_collection_mapping_repairs(
             actor=request.user,
-            dry_run=serializer.validated_data["dry_run"],
+            confirmation_text=serializer.validated_data.get("confirmation_text", ""),
+            finance_account_id=finance_account_id,
         )
         return Response(payload, status=status.HTTP_200_OK)
