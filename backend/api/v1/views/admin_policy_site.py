@@ -16,6 +16,7 @@ from api.v1.serializers.policy_site import (
 from subscriptions.models_business_setup import BusinessComplianceDocument, PolicyPage
 from subscriptions.services.policy_governance_service import (
     archive_policy_page,
+    build_policy_coverage_matrix,
     create_draft_from_policy,
     create_policy_page,
     get_latest_policy_by_slug,
@@ -53,14 +54,16 @@ class AdminPolicyPageListCreateView(_AdminPolicyBase):
         serializer.is_valid(raise_exception=True)
 
         try:
-            policy = create_policy_page(
-                payload=serializer.validated_data,
-                performed_by=request.user,
-            )
+            policy = create_policy_page(payload=serializer.validated_data, performed_by=request.user)
         except ValueError as error:
             raise ValidationError({"detail": str(error)})
 
         return Response(PolicyPageAdminSerializer(policy).data, status=status.HTTP_201_CREATED)
+
+
+class AdminPolicyCoverageView(_AdminPolicyBase):
+    def get(self, request):
+        return Response(build_policy_coverage_matrix())
 
 
 class AdminPolicyPageDetailView(_AdminPolicyBase):
@@ -74,11 +77,7 @@ class AdminPolicyPageDetailView(_AdminPolicyBase):
         serializer.is_valid(raise_exception=True)
 
         try:
-            updated = update_policy_page(
-                policy=policy,
-                payload=serializer.validated_data,
-                performed_by=request.user,
-            )
+            updated = update_policy_page(policy=policy, payload=serializer.validated_data, performed_by=request.user)
         except ValueError as error:
             raise ValidationError({"detail": str(error)})
 
@@ -129,9 +128,7 @@ class AdminPolicySeedDefaultsView(_AdminPolicyBase):
 
         result = seed_default_policy_pages(
             performed_by=request.user,
-            overwrite_existing_drafts=serializer.validated_data.get(
-                "overwrite_existing_drafts", False
-            ),
+            overwrite_existing_drafts=serializer.validated_data.get("overwrite_existing_drafts", False),
         )
         return Response(result)
 
@@ -146,10 +143,7 @@ class AdminBusinessComplianceDocumentListCreateView(_AdminPolicyBase):
         serializer = BusinessComplianceDocumentAdminSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         document = serializer.save(uploaded_by=request.user)
-        return Response(
-            BusinessComplianceDocumentAdminSerializer(document).data,
-            status=status.HTTP_201_CREATED,
-        )
+        return Response(BusinessComplianceDocumentAdminSerializer(document).data, status=status.HTTP_201_CREATED)
 
 
 class AdminBusinessComplianceDocumentDetailView(_AdminPolicyBase):
@@ -159,11 +153,7 @@ class AdminBusinessComplianceDocumentDetailView(_AdminPolicyBase):
 
     def patch(self, request, pk: int):
         document = get_object_or_404(BusinessComplianceDocument, pk=pk)
-        serializer = BusinessComplianceDocumentAdminSerializer(
-            instance=document,
-            data=request.data,
-            partial=True,
-        )
+        serializer = BusinessComplianceDocumentAdminSerializer(instance=document, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         updated = serializer.save(reviewed_by=request.user)
         return Response(BusinessComplianceDocumentAdminSerializer(updated).data)
