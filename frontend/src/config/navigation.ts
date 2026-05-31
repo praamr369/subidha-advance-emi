@@ -1,5 +1,4 @@
 import { ROUTES } from "@/lib/routes";
-import { ADMIN_ROUTE_TREE, type AdminRouteRegistryItem } from "@/config/admin-route-registry";
 
 export type NavigationRole = "ADMIN" | "PARTNER" | "CUSTOMER" | "CASHIER" | "VENDOR";
 
@@ -67,107 +66,117 @@ function flattenGroups(groups: NavGroup[]): NavItem[] {
   return groups.flatMap((group) => flattenItems(group.items));
 }
 
-function iconForGroup(group: string): NavIconKey {
-  const key = group.toLowerCase();
-  if (key.includes("command")) return "dashboard";
-  if (key.includes("crm") || key.includes("customer")) return "crm";
-  if (key.includes("sales")) return "billing";
-  if (key.includes("subscription") || key.includes("contract")) return "subscriptions";
-  if (key.includes("partner")) return "partners";
-  if (key.includes("billing")) return "finance";
-  if (key.includes("finance")) return "finance";
-  if (key.includes("product") || key.includes("inventory")) return "inventory";
-  if (key.includes("manufacturing") || key.includes("quality") || key.includes("maintenance")) return "manufacturing";
-  if (key.includes("delivery")) return "deliveries";
-  if (key.includes("lucky")) return "luckyDraws";
-  if (key.includes("staff") || key.includes("setup") || key.includes("admin")) return "settings";
-  return "operations";
+function adminParentModule(
+  label: string,
+  href: string,
+  icon: NavIconKey,
+  description: string,
+  badgeSource?: string,
+): NavItem {
+  return { label, href, icon, description, badgeSource };
 }
 
-function normalizeAdminGroupTitle(title: string): string {
-  const key = title.toLowerCase();
-  if (key.includes("command")) return "Command Center";
-  if (key.includes("sales")) return "Sales & Contracts";
-  if (key.includes("subscription")) return "Sales & Contracts";
-  if (key.includes("collection")) return "Collections";
-  if (key.includes("finance")) return "Billing & Finance";
-  if (key.includes("delivery")) return "Delivery & Service";
-  if (key.includes("return") || key.includes("reversal")) return "Returns & Reversals";
-  if (key.includes("inventory") || key.includes("product")) return "Inventory";
-  if (key.includes("lucky")) return "Lucky Plan";
-  if (key.includes("crm") || key.includes("partner")) return "CRM & Partners";
-  if (key.includes("report") || key.includes("audit")) return "Reports & Audit";
-  if (key.includes("setup") || key.includes("staff") || key.includes("setting")) return "Settings";
-  return title;
-}
-
-function inferAdminBadgeSource(item: AdminRouteRegistryItem): string | undefined {
-  const href = item.href.toLowerCase();
-  const label = item.label.toLowerCase();
-  if (href.includes("/outstandings")) return "admin.badges.outstanding_count";
-  if (href.includes("/overdue")) return "admin.badges.overdue_count";
-  if (href.includes("/deliver")) return "admin.badges.pending_delivery_count";
-  if (label.includes("return") || label.includes("reversal")) return "admin.badges.pending_reversal_count";
-  if (label.includes("refund")) return "admin.badges.pending_refund_count";
-  if (href.includes("/support") || href.includes("/service-desk")) return "admin.badges.open_support_ticket_count";
-  if (label.includes("low stock")) return "admin.badges.low_stock_count";
-  if (href.includes("/draw") || href.includes("/batch")) return "admin.badges.pending_draw_count";
-  if (href.includes("/reconciliation")) return "admin.badges.unreconciled_count";
-  return item.badgeSource;
-}
-
-function isSuppressedAdminWorkflowRoute(label: string, href: string): boolean {
-  const normalizedLabel = label.trim().toLowerCase();
-  const pathname = href.split("?")[0] ?? href;
-  return (
-    (normalizedLabel === "security deposits" && pathname === ROUTES.admin.financeDeposits) ||
-    (normalizedLabel === "possession / handover" && pathname === ROUTES.admin.deliveries) ||
-    (normalizedLabel === "return inspections" && pathname === ROUTES.admin.serviceDeskReturns)
-  );
-}
-
-function isSecondaryWorkflowRoute(label: string, href: string): boolean {
-  const normalizedLabel = label.trim().toLowerCase();
-  const pathname = href.split("?")[0] ?? href;
-  if (isSuppressedAdminWorkflowRoute(label, href)) return true;
-  if (/^create\s/.test(normalizedLabel)) return true;
-  if (/^edit\s/.test(normalizedLabel)) return true;
-  if (normalizedLabel.includes(" detail")) return true;
-  if (pathname.includes("/create")) return true;
-  if (pathname.includes("/edit")) return true;
-  if (pathname.includes("/[") || /\/\d+(\/|$)/.test(pathname)) return true;
-  return false;
-}
-
-function buildAdminNavigationGroups(): NavGroup[] {
-  const grouped = new Map<string, NavItem[]>();
-  const toNavItem = (row: AdminRouteRegistryItem): NavItem => ({
-    label: row.label,
-    href: row.href,
-    icon: iconForGroup(row.group),
-    disabled: row.status === "deferred",
-    description: row.description,
-    badgeSource: inferAdminBadgeSource(row),
-    children: row.children
-      ?.filter((child) => !isSecondaryWorkflowRoute(child.label, child.href))
-      .map(toNavItem),
-  });
-
-  ADMIN_ROUTE_TREE.forEach((row) => {
-    if (isSecondaryWorkflowRoute(row.label, row.href)) return;
-    const groupTitle = normalizeAdminGroupTitle(row.group);
-    if (!grouped.has(groupTitle)) grouped.set(groupTitle, []);
-    grouped.get(groupTitle)!.push(toNavItem(row));
-  });
-  return Array.from(grouped.entries()).map(([title, items]) => ({
-    title,
-    icon: iconForGroup(title),
-    items,
-  }));
-}
+export const ADMIN_PARENT_NAVIGATION: NavGroup[] = [
+  {
+    title: "ERP Modules",
+    icon: "dashboard",
+    items: [
+      adminParentModule(
+        "Command Center",
+        ROUTES.admin.dashboard,
+        "dashboard",
+        "Daily dashboard, today's work, operations command center, BI, alerts, and global search.",
+      ),
+      adminParentModule(
+        "Sales & Contracts",
+        ROUTES.admin.salesWorkspace,
+        "billing",
+        "Sales workspace for invoices, receipts, customer contracts, and handoff controls.",
+      ),
+      adminParentModule(
+        "Subscription EMI",
+        ROUTES.admin.subscriptions,
+        "subscriptions",
+        "Advance EMI cockpit for batches, Lucky IDs, EMI schedules, payments, draws, waivers, and amendments.",
+        "queue.subscription_requests_pending",
+      ),
+      adminParentModule(
+        "Rent / Lease",
+        ROUTES.admin.rentLease,
+        "subscriptions",
+        "Rent and lease cockpit for contracts, deposits, monthly demands, possession, inspections, and returns.",
+      ),
+      adminParentModule(
+        "Direct Sale",
+        ROUTES.admin.billingDirectSaleWorkspace,
+        "billing",
+        "Direct-sale billing cockpit for retail sale, invoice, receipt, collection, delivery, and return workflows.",
+      ),
+      adminParentModule(
+        "Accounting & Finance",
+        ROUTES.admin.accounting,
+        "accounting",
+        "Finance cockpit for accounting setup, collections, journals, reconciliation, reports, GST, ITR, payables, and payouts.",
+        "admin.badges.unreconciled_count",
+      ),
+      adminParentModule(
+        "Inventory",
+        ROUTES.admin.inventory,
+        "inventory",
+        "Inventory cockpit for stock, locations, adjustments, purchase needs, returns, quality holds, and stock ledger.",
+        "admin.badges.low_stock_count",
+      ),
+      adminParentModule(
+        "Manufacturing",
+        ROUTES.admin.manufacturing,
+        "manufacturing",
+        "Manufacturing cockpit for BOMs, production jobs, production consumption/output, and costing.",
+      ),
+      adminParentModule(
+        "CRM / Parties",
+        ROUTES.admin.crmWorkspace,
+        "crm",
+        "Party cockpit for customers, vendors, partners, interactions, KYC, leads, and customer 360.",
+        "admin.badges.open_support_ticket_count",
+      ),
+      adminParentModule(
+        "HR & Staff",
+        ROUTES.admin.hr,
+        "payroll",
+        "HR cockpit for staff, roles, attendance, salary, payroll, expenses, and permissions.",
+      ),
+      adminParentModule(
+        "Service Desk",
+        ROUTES.admin.serviceDesk,
+        "serviceDesk",
+        "Service cockpit for cases, support tickets, returns, damaged returns, and follow-up controls.",
+        "admin.badges.open_support_ticket_count",
+      ),
+      adminParentModule(
+        "Delivery & Operations",
+        ROUTES.admin.deliveries,
+        "deliveries",
+        "Delivery cockpit for delivery cases, handover, documents, return logistics, and operational dispatch.",
+        "admin.badges.pending_delivery_count",
+      ),
+      adminParentModule(
+        "Reports & Analysis",
+        ROUTES.admin.reports,
+        "reports",
+        "Reports cockpit for BI, accounting reports, operational reports, and reconciliation analysis.",
+      ),
+      adminParentModule(
+        "Settings",
+        ROUTES.admin.settings,
+        "settings",
+        "Settings cockpit for setup readiness, business profile, branding, branches, counters, accounting setup, and backups.",
+      ),
+    ],
+  },
+];
 
 export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
-  ADMIN: buildAdminNavigationGroups(),
+  ADMIN: ADMIN_PARENT_NAVIGATION,
 
   PARTNER: [
     { title: "Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: ROUTES.partner.dashboard, icon: "dashboard" }] },
