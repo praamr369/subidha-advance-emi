@@ -3,12 +3,15 @@ from __future__ import annotations
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.policy_site import (
     BusinessComplianceDocumentAdminSerializer,
+    ComplianceApproveActionSerializer,
+    ComplianceReasonActionSerializer,
     PolicyPageAdminSerializer,
     PolicyPublishActionSerializer,
     PolicySeedActionSerializer,
@@ -18,6 +21,16 @@ from subscriptions.services.business_compliance_governance_service import (
     build_business_compliance_readiness,
     list_business_compliance_templates,
     seed_business_compliance_rows,
+)
+from subscriptions.services.business_compliance_review_actions import (
+    approve_document as approve_compliance_document,
+    approve_public_summary,
+    expire_document,
+    get_review_state,
+    mark_under_review,
+    reject_document,
+    revoke_public_summary,
+    update_document_metadata,
 )
 from subscriptions.services.policy_governance_service import (
     archive_policy_page,
@@ -155,6 +168,8 @@ class AdminBusinessComplianceReadinessView(_AdminPolicyBase):
 
 
 class AdminBusinessComplianceDocumentListCreateView(_AdminPolicyBase):
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+
     def get(self, request):
         queryset = BusinessComplianceDocument.objects.all().order_by("document_type", "-created_at", "-id")
         serializer = BusinessComplianceDocumentAdminSerializer(queryset, many=True)
@@ -164,10 +179,15 @@ class AdminBusinessComplianceDocumentListCreateView(_AdminPolicyBase):
         serializer = BusinessComplianceDocumentAdminSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         document = serializer.save(uploaded_by=request.user)
+        get_review_state(document)
+        if document.file:
+            update_document_metadata(document=document, payload={"file": document.file}, performed_by=request.user)
         return Response(BusinessComplianceDocumentAdminSerializer(document).data, status=status.HTTP_201_CREATED)
 
 
 class AdminBusinessComplianceDocumentDetailView(_AdminPolicyBase):
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+
     def get(self, request, pk: int):
         document = get_object_or_404(BusinessComplianceDocument, pk=pk)
         return Response(BusinessComplianceDocumentAdminSerializer(document).data)
@@ -176,8 +196,86 @@ class AdminBusinessComplianceDocumentDetailView(_AdminPolicyBase):
         document = get_object_or_404(BusinessComplianceDocument, pk=pk)
         serializer = BusinessComplianceDocumentAdminSerializer(instance=document, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        updated = serializer.save(reviewed_by=request.user)
+        payload = dict(serializer.validated_data)
+        if "expires_at" in request.data:
+            payload["expires_at"] = request.data.get("expires_at") or None
+        try:
+            updated = update_document_metadata(document=document, payload=payload, performed_by=request.user)
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
         return Response(BusinessComplianceDocumentAdminSerializer(updated).data)
+
+
+class _AdminBusinessComplianceDocumentActionBase(_AdminPolicyBase):
+    def get_document(self, pk: int) -> BusinessComplianceDocument:
+        return get_object_or_404(BusinessComplianceDocument, pk=pk)
+
+    def serialize(self, document: BusinessComplianceDocument) -> Response:
+        return Response(BusinessComplianceDocumentAdminSerializer(document).data)
+
+
+class AdminBusinessComplianceDocumentSubmitReviewView(_AdminBusinessComplianceDocumentActionBase):
+    def post(self, request, pk: int):
+        document = self.get_document(pk)
+        updated = mark_under_review(document, performed_by=request.user)
+        return self.serialize(updated)
+
+
+class AdminBusinessComplianceDocumentApproveView(_AdminBusinessComplianceDocumentActionBase):
+    def post(self, request, pk: int):
+        document = self.get_document(pk)
+        serializer = ComplianceApproveActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            updated = approve_compliance_document(
+                document,
+                performed_by=request.user,
+                public_summary_approved_flag=serializer.validated_data.get("public_summary_approved", False),
+            )
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+        return self.serialize(updated)
+
+
+class AdminBusinessComplianceDocumentRejectView(_AdminBusinessComplianceDocumentActionBase):
+    def post(self, request, pk: int):
+        document = self.get_document(pk)
+        serializer = ComplianceReasonActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            updated = reject_document(document, performed_by=request.user, reason=serializer.validated_data["reason"])
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+        return self.serialize(updated)
+
+
+class AdminBusinessComplianceDocumentExpireView(_AdminBusinessComplianceDocumentActionBase):
+    def post(self, request, pk: int):
+        document = self.get_document(pk)
+        serializer = ComplianceReasonActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            updated = expire_document(document, performed_by=request.user, reason=serializer.validated_data["reason"])
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+        return self.serialize(updated)
+
+
+class AdminBusinessComplianceDocumentApprovePublicSummaryView(_AdminBusinessComplianceDocumentActionBase):
+    def post(self, request, pk: int):
+        document = self.get_document(pk)
+        try:
+            updated = approve_public_summary(document, performed_by=request.user)
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+        return self.serialize(updated)
+
+
+class AdminBusinessComplianceDocumentRevokePublicSummaryView(_AdminBusinessComplianceDocumentActionBase):
+    def post(self, request, pk: int):
+        document = self.get_document(pk)
+        updated = revoke_public_summary(document, performed_by=request.user)
+        return self.serialize(updated)
 
 
 class AdminBusinessComplianceSummaryView(_AdminPolicyBase):
