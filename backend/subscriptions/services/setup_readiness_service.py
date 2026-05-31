@@ -8,7 +8,6 @@ from accounting.models import (
     AccountingPostingProfile,
     BusinessTaxProfile,
     ChartOfAccount,
-    DocumentSequence,
     FinanceAccount,
     FinanceAccountCoaMapping,
     FinanceAccountMappingPurpose,
@@ -20,10 +19,8 @@ from branch_control.models import Branch, BranchStatus, CashCounter
 from subscriptions.models import Batch, ContractAmendment, ContractRecontractEvent, LuckyId, Product
 from subscriptions.models_business_setup import BusinessProfile
 from subscriptions.models_document_print_settings import DocumentPrintSettings
-from subscriptions.services.document_numbering_service import (
-    get_document_numbering_state,
-    required_numbering_keys_for_checklist,
-)
+from subscriptions.services.document_numbering_service import get_document_numbering_state, required_numbering_keys_for_checklist
+from subscriptions.services.policy_governance_service import build_policy_coverage_matrix
 
 ReadinessStatus = str
 
@@ -80,15 +77,7 @@ def _document_numbering_ready() -> tuple[bool, dict[str, Any]]:
 
 def _finance_account_rows() -> tuple[list[dict[str, Any]], dict[str, int]]:
     rows: list[dict[str, Any]] = []
-    counts = {
-        "total": 0,
-        "active": 0,
-        "ready": 0,
-        "blocked": 0,
-        "cash_ready": 0,
-        "bank_ready": 0,
-        "upi_ready": 0,
-    }
+    counts = {"total": 0, "active": 0, "ready": 0, "blocked": 0, "cash_ready": 0, "bank_ready": 0, "upi_ready": 0}
     accounts = FinanceAccount.objects.select_related("chart_account", "branch").order_by("kind", "name", "id")
     for account in accounts:
         counts["total"] += 1
@@ -133,13 +122,50 @@ def _finance_account_rows() -> tuple[list[dict[str, Any]], dict[str, int]]:
     return rows, counts
 
 
-def get_setup_readiness() -> dict[str, Any]:
-    """Return an admin-only, read-only business setup readiness payload.
+def _policy_governance_section() -> dict[str, Any]:
+    coverage = build_policy_coverage_matrix()
+    rows = coverage["results"]
+    public_missing = sum(1 for row in rows if row["visibility"] == "PUBLIC" and row["status"] == "MISSING")
+    public_not_published = sum(1 for row in rows if row["visibility"] == "PUBLIC" and row["status"] != "PUBLISHED")
+    internal_missing = sum(1 for row in rows if row["visibility"] == "INTERNAL" and row["status"] == "MISSING")
+    internal_draft = sum(1 for row in rows if row["visibility"] == "INTERNAL" and row["status"] == "DRAFT")
 
-    This function intentionally performs only ORM reads and simple in-memory
-    classification. It must not call posting, payment, reconciliation, reset,
-    snapshot-import, or auto-repair services.
-    """
+    blockers: list[str] = []
+    warnings: list[str] = []
+    if public_missing:
+        blockers.append(f"{public_missing} required public policy template(s) are missing.")
+    if public_not_published:
+        blockers.append(f"{public_not_published} required public policy template(s) are not published.")
+    if internal_missing:
+        warnings.append(f"{internal_missing} internal governance policy template(s) are missing.")
+    if internal_draft:
+        warnings.append(f"{internal_draft} internal governance policy template(s) are still draft.")
+
+    return _section(
+        key="policy_governance",
+        title="Policy Governance",
+        status=_status_from(blockers, warnings),
+        blockers=blockers,
+        warnings=warnings,
+        recommended_action=(
+            "Seed missing templates, review policy text, publish required public policies, and approve/internalize governance policies before launch."
+        ),
+        target_route="/admin/settings/policies",
+        why_this_matters=(
+            "Public launch must not expose draft/internal policies. Customer-facing policies require publication, while internal governance policies support audit and controls."
+        ),
+        metadata={
+            "coverage_summary": coverage["summary"],
+            "public_missing_count": public_missing,
+            "public_not_published_count": public_not_published,
+            "internal_missing_count": internal_missing,
+            "internal_draft_count": internal_draft,
+        },
+    )
+
+
+def get_setup_readiness() -> dict[str, Any]:
+    """Return an admin-only, read-only business setup readiness payload."""
 
     User = get_user_model()
 
@@ -196,11 +222,7 @@ def get_setup_readiness() -> dict[str, Any]:
             title="Business Profile",
             status="READY" if active_business_profile else "BLOCKED",
             blockers=[] if active_business_profile else ["Active business profile is missing."],
-            recommended_action=(
-                "Review legal name, trade name, address, phone, email, and invoice defaults."
-                if active_business_profile
-                else "Configure the active business profile before live billing or customer onboarding."
-            ),
+            recommended_action="Review legal name, trade name, address, phone, email, and invoice defaults." if active_business_profile else "Configure the active business profile before live billing or customer onboarding.",
             target_route="/admin/settings/business-setup/profile",
             why_this_matters="Receipts, contracts, invoices, statements, public business data, and audit documents need a reliable business identity.",
             metadata={"configured": bool(active_business_profile)},
@@ -209,25 +231,18 @@ def get_setup_readiness() -> dict[str, Any]:
             key="print_branding",
             title="Print Branding",
             status="READY" if active_print_settings and (active_print_settings.business_name or active_print_settings.print_phone or active_print_settings.print_address) else "NEEDS_SETUP",
-            warnings=[]
-            if active_print_settings and (active_print_settings.business_name or active_print_settings.print_phone or active_print_settings.print_address)
-            else ["Print branding is using fallback or incomplete display details."],
+            warnings=[] if active_print_settings and (active_print_settings.business_name or active_print_settings.print_phone or active_print_settings.print_address) else ["Print branding is using fallback or incomplete display details."],
             recommended_action="Set print business name, phone/address, logo preference, signature labels, and print density.",
             target_route="/admin/settings/business-setup/print-branding",
             why_this_matters="Browser/PDF documents are evidence documents. Branding must not override backend truth, but it must be clear for customers and auditors.",
             metadata={"configured": bool(active_print_settings), "logo_present": bool(getattr(active_print_settings, "business_logo", None))},
         ),
+        _policy_governance_section(),
         _section(
             key="chart_of_accounts",
             title="Chart of Accounts",
             status="READY" if active_chart_accounts.exists() and not required_coa_missing else "BLOCKED",
-            blockers=[]
-            if active_chart_accounts.exists() and not required_coa_missing
-            else [
-                "Required chart of accounts are missing."
-                if required_coa_missing
-                else "No active chart of accounts exists."
-            ],
+            blockers=[] if active_chart_accounts.exists() and not required_coa_missing else ["Required chart of accounts are missing." if required_coa_missing else "No active chart of accounts exists."],
             recommended_action="Open Chart of Accounts or Accounting Setup and create/repair required system ledger accounts.",
             target_route="/admin/accounting/chart-of-accounts",
             why_this_matters="Financial workflows need stable ledger accounts before payments, receivables, income, credits, waivers, and journals can be posted safely.",
@@ -237,15 +252,7 @@ def get_setup_readiness() -> dict[str, Any]:
             key="finance_accounts",
             title="Finance Accounts",
             status="READY" if active_finance_accounts.exists() and ready_collection_account_exists and finance_counts["blocked"] == 0 else "BLOCKED",
-            blockers=(
-                []
-                if active_finance_accounts.exists() and ready_collection_account_exists and finance_counts["blocked"] == 0
-                else [
-                    "No active finance accounts exist."
-                    if not active_finance_accounts.exists()
-                    else "One or more finance accounts are not posting-ready for collection."
-                ]
-            ),
+            blockers=[] if active_finance_accounts.exists() and ready_collection_account_exists and finance_counts["blocked"] == 0 else ["No active finance accounts exist." if not active_finance_accounts.exists() else "One or more finance accounts are not posting-ready for collection."],
             recommended_action="Map every active cash, bank, and UPI finance account to an active posting-enabled ASSET chart account.",
             target_route="/admin/accounting/setup",
             why_this_matters="Collections must resolve to real settlement accounts and posting-ready chart accounts. The readiness center reports blockers only; it does not remap accounts.",
@@ -255,14 +262,7 @@ def get_setup_readiness() -> dict[str, Any]:
             key="branch_cash_counter",
             title="Branch / Cash Counter",
             status="READY" if primary_branch_exists and active_counters.exists() else "BLOCKED",
-            blockers=(
-                []
-                if primary_branch_exists and active_counters.exists()
-                else [
-                    *( [] if primary_branch_exists else ["No active primary branch is configured."] ),
-                    *( [] if active_counters.exists() else ["No active cash counter is configured."] ),
-                ]
-            ),
+            blockers=[] if primary_branch_exists and active_counters.exists() else [*([] if primary_branch_exists else ["No active primary branch is configured."]), *([] if active_counters.exists() else ["No active cash counter is configured."])],
             recommended_action="Create an active primary branch and at least one active cash counter mapped to a finance account.",
             target_route="/admin/settings/business-setup/cash-desks",
             why_this_matters="Daily collections, cashier handover, settlement, and day-close need an operational branch and counter context.",
@@ -302,9 +302,7 @@ def get_setup_readiness() -> dict[str, Any]:
             key="payment_collection",
             title="Payment Collection Readiness",
             status="READY" if ready_collection_account_exists and collection_mappings.exists() else "BLOCKED",
-            blockers=[]
-            if ready_collection_account_exists and collection_mappings.exists()
-            else ["Collection cannot run safely until at least one posting-ready finance account and collection mapping exist."],
+            blockers=[] if ready_collection_account_exists and collection_mappings.exists() else ["Collection cannot run safely until at least one posting-ready finance account and collection mapping exist."],
             recommended_action="Review finance accounts, cash/bank/UPI mappings, and collection counters before accepting payment.",
             target_route="/admin/finance/collect",
             why_this_matters="Payment collection must post to the correct finance account and preserve receipt, ledger, settlement, and reconciliation evidence.",
@@ -325,32 +323,21 @@ def get_setup_readiness() -> dict[str, Any]:
             key="accounting_reconciliation",
             title="Accounting / Reconciliation",
             status="READY" if not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0 else "BLOCKED",
-            blockers=[]
-            if not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0
-            else ["Accounting/reconciliation setup is incomplete for controlled posting and matching."],
+            blockers=[] if not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0 else ["Accounting/reconciliation setup is incomplete for controlled posting and matching."],
             recommended_action="Resolve missing COA codes, posting profiles, and finance-account mappings before financial workflows go live.",
             target_route="/admin/accounting/setup",
             why_this_matters="Accounting and reconciliation gates protect payment integrity, day close, recontract execution, reversal, and settlement evidence.",
-            metadata={
-                "missing_required_coa_codes": required_coa_missing,
-                "missing_required_mappings": required_mappings_missing,
-                "posting_profiles_count": posting_profiles_count,
-            },
+            metadata={"missing_required_coa_codes": required_coa_missing, "missing_required_mappings": required_mappings_missing, "posting_profiles_count": posting_profiles_count},
         ),
         _section(
             key="amendment_recontract",
             title="Amendment / Recontract Readiness",
             status="READY" if not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0 and numbering_ready else "BLOCKED",
-            blockers=[]
-            if not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0 and numbering_ready
-            else ["Product recontract needs accounting, reconciliation, and document evidence readiness before live execution."],
+            blockers=[] if not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0 and numbering_ready else ["Product recontract needs accounting, reconciliation, and document evidence readiness before live execution."],
             recommended_action="Verify contract amendment, product recontract, addendum print, accounting, and reconciliation readiness before approving live recontracts.",
             target_route="/admin/contract-amendments",
             why_this_matters="Product recontract changes future contract terms only after evidence gates. Setup readiness prevents half-configured financial amendments.",
-            metadata={
-                "amendments": ContractAmendment.objects.count(),
-                "recontract_events": ContractRecontractEvent.objects.count(),
-            },
+            metadata={"amendments": ContractAmendment.objects.count(), "recontract_events": ContractRecontractEvent.objects.count()},
         ),
     ]
 
@@ -359,66 +346,19 @@ def get_setup_readiness() -> dict[str, Any]:
     blocker_count = sum(1 for section in sections if section["status"] == "BLOCKED")
     overall_status = "BLOCKED" if blocker_count else ("NEEDS_SETUP" if warning_count else "READY")
 
-    next_section = next((section for section in sections if section["status"] == "BLOCKED"), None) or next(
-        (section for section in sections if section["status"] == "NEEDS_SETUP"),
-        None,
-    )
+    next_section = next((section for section in sections if section["status"] == "BLOCKED"), None) or next((section for section in sections if section["status"] == "NEEDS_SETUP"), None)
 
     launch_checklist = [
-        {
-            "key": "can_create_customer",
-            "label": "Can create customer",
-            "ready": bool(active_business_profile and admin_users.exists()),
-            "source_section": "business_profile",
-        },
-        {
-            "key": "can_create_product",
-            "label": "Can create product",
-            "ready": bool(active_business_profile and active_chart_accounts.exists()),
-            "source_section": "product_catalog",
-        },
-        {
-            "key": "can_create_batch_lucky_ids",
-            "label": "Can create batch / Lucky IDs",
-            "ready": bool(active_products.exists() and batches.exists() and lucky_ids.exists()),
-            "source_section": "batch_lucky_ids",
-        },
-        {
-            "key": "can_collect_payment",
-            "label": "Can collect payment",
-            "ready": bool(ready_collection_account_exists and active_counters.exists() and collection_mappings.exists()),
-            "source_section": "payment_collection",
-        },
-        {
-            "key": "can_issue_receipt",
-            "label": "Can issue receipt",
-            "ready": bool(numbering_ready and active_print_settings),
-            "source_section": "document_templates",
-        },
-        {
-            "key": "can_print_documents",
-            "label": "Can print documents",
-            "ready": bool(active_business_profile and active_print_settings),
-            "source_section": "print_branding",
-        },
-        {
-            "key": "can_reconcile",
-            "label": "Can reconcile",
-            "ready": bool(not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0),
-            "source_section": "accounting_reconciliation",
-        },
-        {
-            "key": "can_day_close",
-            "label": "Can day-close",
-            "ready": bool(active_counters.exists() and ready_collection_account_exists),
-            "source_section": "branch_cash_counter",
-        },
-        {
-            "key": "can_handle_amendment_recontract",
-            "label": "Can handle amendment/recontract",
-            "ready": bool(not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0 and numbering_ready),
-            "source_section": "amendment_recontract",
-        },
+        {"key": "can_create_customer", "label": "Can create customer", "ready": bool(active_business_profile and admin_users.exists()), "source_section": "business_profile"},
+        {"key": "can_create_product", "label": "Can create product", "ready": bool(active_business_profile and active_chart_accounts.exists()), "source_section": "product_catalog"},
+        {"key": "can_create_batch_lucky_ids", "label": "Can create batch / Lucky IDs", "ready": bool(active_products.exists() and batches.exists() and lucky_ids.exists()), "source_section": "batch_lucky_ids"},
+        {"key": "can_collect_payment", "label": "Can collect payment", "ready": bool(ready_collection_account_exists and active_counters.exists() and collection_mappings.exists()), "source_section": "payment_collection"},
+        {"key": "can_issue_receipt", "label": "Can issue receipt", "ready": bool(numbering_ready and active_print_settings), "source_section": "document_templates"},
+        {"key": "can_print_documents", "label": "Can print documents", "ready": bool(active_business_profile and active_print_settings), "source_section": "print_branding"},
+        {"key": "can_publish_public_policies", "label": "Can publish public policies", "ready": next((section for section in sections if section["key"] == "policy_governance"), {}).get("status") == "READY", "source_section": "policy_governance"},
+        {"key": "can_reconcile", "label": "Can reconcile", "ready": bool(not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0), "source_section": "accounting_reconciliation"},
+        {"key": "can_day_close", "label": "Can day-close", "ready": bool(active_counters.exists() and ready_collection_account_exists), "source_section": "branch_cash_counter"},
+        {"key": "can_handle_amendment_recontract", "label": "Can handle amendment/recontract", "ready": bool(not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0 and numbering_ready), "source_section": "amendment_recontract"},
     ]
 
     return {
