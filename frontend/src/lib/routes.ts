@@ -83,6 +83,7 @@ export const ROUTES = {
     supportRequests: "/admin/support-requests",
     customers: "/admin/customers",
     deliveries: "/admin/deliveries",
+    rentLease: "/admin/rent-lease",
     subscriptions: "/admin/subscriptions",
     subscriptionsCreate: "/admin/subscriptions/create",
     subscriptionsAdvanceEmiCreate: "/admin/subscriptions/advance-emi/create",
