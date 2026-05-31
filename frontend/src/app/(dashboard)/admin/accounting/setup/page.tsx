@@ -2,20 +2,24 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import FinanceAccountMappingPanel from "@/components/admin/accounting/FinanceAccountMappingPanel";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import FinanceAccountMappingPanel from "@/components/admin/accounting/FinanceAccountMappingPanel";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
-import { SetupChecklistPageShell } from "@/components/layout/page-shells";
 import { ROUTES } from "@/lib/routes";
 import {
+  executeCollectionMappingRepair,
+  getAccountingSetupMatrix,
   getAccountingSetupReadiness,
-  getFinanceAccountMappings,
-  patchFinanceAccountMapping,
+  getCollectionRepairPreview,
   updateFinanceAccountMapping,
+  type AccountingSetupMatrixPayload,
+  type AccountingSetupReadinessChartAccount,
   type AccountingSetupReadinessFinanceAccount,
   type AccountingSetupReadinessPayload,
+  type CollectionRepairPreviewPayload,
+  type PostingProfileReadinessItem,
 } from "@/services/accounting-setup";
 import {
   applyAccountingSetupDefaults,
@@ -25,73 +29,135 @@ import {
   type AccountingSetupHealthResponse,
 } from "@/services/accounting";
 
-type MappingRow = {
-  id: number;
-  finance_account_kind?: string;
-  finance_account_is_real_settlement_account?: boolean;
-  finance_account_name?: string;
-  purpose?: string;
-  chart_account_code?: string;
-  chart_account_name?: string;
-  chart_account_type?: string;
-  is_active?: boolean;
-  is_default?: boolean;
-  notes?: string;
-};
+const REPAIR_CONFIRMATION_TEXT = "REPAIR COLLECTION MAPPINGS";
+const HISTORICAL_REPAIR_NOTE = "This will not post payments, create receipts, rewrite journals, settlements, reconciliations, or day-close records.";
 
-const PURPOSE_LABELS: Record<string, string> = {
-  CASH_COLLECTION: "Cash Desk Collection",
-  UPI_COLLECTION: "UPI Collection",
-  BANK_COLLECTION: "Bank Collection",
-  PAYMENT_GATEWAY_COLLECTION: "Gateway Settlement Collection",
-  CUSTOMER_RECEIVABLE: "Customer Receivable",
-  SECURITY_DEPOSIT_LIABILITY: "Security Deposit Liability",
-  CUSTOMER_ADVANCE_UNEARNED_REVENUE: "Customer Advance / Unearned Revenue",
-  EMI_INCOME: "Advance EMI Collection",
-  RENT_INCOME: "Rent Income",
-  LEASE_INCOME: "Lease Income",
-  DIRECT_SALE_INCOME: "Direct Sale Income",
-  DELIVERY_CHARGES_INCOME: "Delivery Charges Income",
-  WAIVER_LOSS: "Waiver / Loss",
-  COMMISSION_PAYABLE: "Partner Commission Payable",
-  COMMISSION_EXPENSE: "Commission Expense",
-  DAMAGE_RECOVERY: "Damage Recovery",
-  DELIVERY_EXPENSE: "Delivery Expense",
-  SALARY_EXPENSE: "Salary Expense",
-  INVENTORY_ASSET: "Inventory Asset",
-};
+function cx(...values: Array<string | false | null | undefined>) {
+  return values.filter(Boolean).join(" ");
+}
+
+function statusClass(status: string | undefined | null): string {
+  const normalized = (status || "").toUpperCase();
+  if (normalized === "READY" || normalized === "OK") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (normalized === "PARTIAL" || normalized === "WARNING") return "border-amber-200 bg-amber-50 text-amber-950";
+  if (normalized === "DEFERRED") return "border-blue-200 bg-blue-50 text-blue-900";
+  return "border-red-200 bg-red-50 text-red-900";
+}
+
+function accountLabel(account?: AccountingSetupReadinessChartAccount | null): string {
+  if (!account) return "Not configured";
+  return `${account.code} · ${account.name}`;
+}
+
+function isSelectable(account: AccountingSetupReadinessFinanceAccount): boolean {
+  return Boolean(account.selectable_for_collection || account.is_selectable_collection_account || account.collection_ready);
+}
+
+function firstBlocker(item: PostingProfileReadinessItem): string {
+  return item.blockers?.[0] || item.recommended_action || "Ready.";
+}
+
+function RepairDialog({
+  open,
+  targets,
+  preview,
+  repairing,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  targets: AccountingSetupReadinessFinanceAccount[];
+  preview: CollectionRepairPreviewPayload | null;
+  repairing: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!open) return null;
+
+  const targetIds = new Set(targets.map((account) => account.id));
+  const previewRows = (preview?.repairable_accounts ?? preview?.blocked_accounts ?? preview?.accounts ?? []).filter((row) =>
+    targetIds.size === 0 ? true : targetIds.has(Number(row.finance_account_id)),
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="repair-mapping-title">
+      <div className="w-full max-w-3xl rounded-2xl border border-border bg-card p-5 shadow-2xl">
+        <div id="repair-mapping-title" className="text-lg font-semibold text-foreground">Repair blocked collection mappings?</div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Repair creates or reuses a posting leaf account and remaps this finance account only.
+        </p>
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-950">
+          {HISTORICAL_REPAIR_NOTE}
+        </div>
+        <div className="mt-4 max-h-[45vh] overflow-y-auto rounded-xl border border-border bg-muted/20 p-3">
+          {targets.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No repairable accounts selected.</div>
+          ) : (
+            <div className="space-y-3">
+              {targets.map((account) => {
+                const previewRow = previewRows.find((row) => Number(row.finance_account_id) === account.id);
+                const suggested = (previewRow?.suggested_posting_chart_account as Record<string, unknown> | undefined) ?? account.suggested_chart_account;
+                const suggestedLabel = suggested
+                  ? `${String(suggested.code ?? "")}${suggested.code ? " · " : ""}${String(suggested.name ?? "Posting leaf account")}`
+                  : accountLabel(account.suggested_chart_account);
+                return (
+                  <div key={account.id} className="rounded-xl border border-border bg-background p-3 text-sm">
+                    <div className="font-semibold text-foreground">{account.name}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Current: {accountLabel(account.mapped_chart_account)}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Suggested: {suggestedLabel || "Posting leaf account"}</div>
+                    <div className="mt-1 text-xs text-amber-800">
+                      {account.collection_blocker_reason || account.blocker_reason || "Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account."}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="mt-4 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
+          Confirmation phrase used by backend: <span className="font-semibold text-foreground">{REPAIR_CONFIRMATION_TEXT}</span>
+        </div>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <ActionButton variant="ghost" onClick={onClose} disabled={repairing}>Cancel</ActionButton>
+          <ActionButton variant="primary" onClick={onConfirm} disabled={repairing || targets.length === 0}>
+            {repairing ? "Repairing..." : "Repair mappings"}
+          </ActionButton>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminAccountingSetupPage() {
   const [health, setHealth] = useState<AccountingSetupHealthResponse | null>(null);
   const [readiness, setReadiness] = useState<AccountingSetupReadinessPayload | null>(null);
-  const [mappings, setMappings] = useState<MappingRow[]>([]);
+  const [matrix, setMatrix] = useState<AccountingSetupMatrixPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-  const [defaultsPreview, setDefaultsPreview] = useState<AccountingSetupDefaultsPreviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<MappingRow | null>(null);
-  const [editingFinanceAccount, setEditingFinanceAccount] =
-    useState<AccountingSetupReadinessFinanceAccount | null>(null);
-  const [selectedChartAccountId, setSelectedChartAccountId] = useState("");
-  const [editNotes, setEditNotes] = useState("");
-  const [editDefault, setEditDefault] = useState(false);
-  const [editActive, setEditActive] = useState(true);
+  const [defaultsPreview, setDefaultsPreview] = useState<AccountingSetupDefaultsPreviewResponse | null>(null);
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [applyResultNote, setApplyResultNote] = useState<string | null>(null);
+  const [editingFinanceAccount, setEditingFinanceAccount] = useState<AccountingSetupReadinessFinanceAccount | null>(null);
+  const [selectedChartAccountId, setSelectedChartAccountId] = useState("");
+  const [repairDialogOpen, setRepairDialogOpen] = useState(false);
+  const [repairTargets, setRepairTargets] = useState<AccountingSetupReadinessFinanceAccount[]>([]);
+  const [repairPreview, setRepairPreview] = useState<CollectionRepairPreviewPayload | null>(null);
+  const [repairing, setRepairing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [healthRes, mappingRes, readinessRes] = await Promise.all([
+      const [healthRes, readinessRes, matrixRes] = await Promise.all([
         getAccountingSetupHealth(),
-        getFinanceAccountMappings() as Promise<{ results?: MappingRow[] }>,
         getAccountingSetupReadiness(),
+        getAccountingSetupMatrix(),
       ]);
       setHealth(healthRes);
-      setMappings(mappingRes.results ?? []);
       setReadiness(readinessRes);
+      setMatrix(matrixRes);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load accounting setup.");
     } finally {
@@ -103,9 +169,20 @@ export default function AdminAccountingSetupPage() {
     void load();
   }, [load]);
 
+  const businessFinanceAccounts = useMemo(() => {
+    if (matrix?.operational_collection_accounts) return matrix.operational_collection_accounts;
+    return (readiness?.finance_accounts ?? []).filter((account) => !account.diagnostic_only && !account.system_posting_profile);
+  }, [matrix?.operational_collection_accounts, readiness?.finance_accounts]);
+
+  const chartAccounts = matrix?.chart_accounts ?? readiness?.chart_accounts ?? [];
+  const postingProfileReadiness = matrix?.posting_profile_readiness ?? [];
+  const diagnosticAccounts = matrix?.diagnostic_system_accounts ?? [];
+  const coaHealth = matrix?.chart_of_accounts_health;
+  const repairableAccounts = businessFinanceAccounts.filter((account) => !isSelectable(account) && account.can_auto_create_posting_account);
+
   const blockers = health?.blockers ?? [];
   const warnings = health?.warnings ?? [];
-  const displayStatus = health?.status ?? "BLOCKED";
+  const displayStatus = health?.status ?? matrix?.summary ? "READY" : "BLOCKED";
 
   const previewDefaults = useCallback(async () => {
     setPreviewing(true);
@@ -122,9 +199,7 @@ export default function AdminAccountingSetupPage() {
 
   const openApplyDefaultsDialog = useCallback(async () => {
     setError(null);
-    if (!defaultsPreview) {
-      await previewDefaults();
-    }
+    if (!defaultsPreview) await previewDefaults();
     setApplyDialogOpen(true);
   }, [defaultsPreview, previewDefaults]);
 
@@ -147,42 +222,6 @@ export default function AdminAccountingSetupPage() {
     }
   }, [load]);
 
-  const steps = useMemo(
-    () => [
-      "Step 1: Business finance accounts",
-      "Step 2: Chart of Accounts",
-      "Step 3: Canonical mapping and profiles",
-      "Step 4: Review blockers and warnings",
-      "Step 5: Confirm go-live readiness",
-    ],
-    []
-  );
-  const openEdit = useCallback((row: MappingRow) => {
-    setEditing(row);
-    setEditNotes(row.notes ?? "");
-    setEditDefault(Boolean(row.is_default));
-    setEditActive(Boolean(row.is_active));
-  }, []);
-
-  const submitEdit = useCallback(async () => {
-    if (!editing) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await patchFinanceAccountMapping(editing.id, {
-        notes: editNotes,
-        is_default: editDefault,
-        is_active: editActive,
-      });
-      setEditing(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update mapping.");
-    } finally {
-      setSaving(false);
-    }
-  }, [editActive, editDefault, editNotes, editing, load]);
-
   const openFinanceMappingEdit = useCallback((row: AccountingSetupReadinessFinanceAccount) => {
     setEditingFinanceAccount(row);
     setSelectedChartAccountId(row.mapped_chart_account ? String(row.mapped_chart_account.id) : "");
@@ -193,9 +232,7 @@ export default function AdminAccountingSetupPage() {
     setSaving(true);
     setError(null);
     try {
-      await updateFinanceAccountMapping(editingFinanceAccount.id, {
-        chart_account_id: Number(selectedChartAccountId),
-      });
+      await updateFinanceAccountMapping(editingFinanceAccount.id, { chart_account_id: Number(selectedChartAccountId) });
       setEditingFinanceAccount(null);
       setSelectedChartAccountId("");
       await load();
@@ -206,379 +243,273 @@ export default function AdminAccountingSetupPage() {
     }
   }, [editingFinanceAccount, load, selectedChartAccountId]);
 
+  const openRepairDialog = useCallback(async (targets: AccountingSetupReadinessFinanceAccount[]) => {
+    setError(null);
+    setRepairTargets(targets);
+    setRepairDialogOpen(true);
+    try {
+      setRepairPreview(await getCollectionRepairPreview());
+    } catch {
+      setRepairPreview(null);
+    }
+  }, []);
+
+  const confirmRepair = useCallback(async () => {
+    if (repairTargets.length === 0) return;
+    setRepairing(true);
+    setError(null);
+    try {
+      const singleTargetId = repairTargets.length === 1 ? repairTargets[0].id : undefined;
+      await executeCollectionMappingRepair(REPAIR_CONFIRMATION_TEXT, singleTargetId);
+      setRepairDialogOpen(false);
+      setRepairTargets([]);
+      setRepairPreview(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to repair blocked collection mappings.");
+    } finally {
+      setRepairing(false);
+    }
+  }, [load, repairTargets]);
+
   if (loading) {
     return (
-      <PortalPage title="Accounting Setup" subtitle="Simple finance-account to chart-account mapping setup for day-one operations.">
+      <PortalPage title="Accounting Setup" subtitle="Operator-proof setup for finance accounts, posting profiles, and Chart of Accounts health.">
         <LoadingBlock label="Loading accounting setup..." />
       </PortalPage>
     );
   }
 
-  const applyDialog = applyDialogOpen ? (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="apply-defaults-title">
-      <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-5 shadow-xl">
-        <div id="apply-defaults-title" className="text-base font-semibold text-foreground">Apply suggested accounting defaults?</div>
-        <div className="mt-1 text-sm text-muted-foreground">
-          This will create or claim canonical Chart of Accounts, seed default Finance Accounts, and update setup defaults only.
-        </div>
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-          This will not post payments, create receipts, rewrite journals, settlements, reconciliations, or day-close records.
-        </div>
-        <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-          Blocked collection mappings are not silently repaired here. Use the guided repair flow after previewing the affected accounts.
-        </div>
-        {defaultsPreview ? (
-          <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-            <div className="rounded-xl border border-border bg-background p-3">
-              <div className="font-semibold text-foreground">Canonical create</div>
-              <div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.create.length}</div>
-            </div>
-            <div className="rounded-xl border border-border bg-background p-3">
-              <div className="font-semibold text-foreground">Claim existing</div>
-              <div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.claim.length}</div>
-            </div>
-            <div className="rounded-xl border border-border bg-background p-3">
-              <div className="font-semibold text-foreground">Conflicts</div>
-              <div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.conflicts.length}</div>
-            </div>
-          </div>
-        ) : null}
-        <div className="mt-5 flex justify-end gap-2">
-          <ActionButton variant="ghost" onClick={() => setApplyDialogOpen(false)} disabled={saving}>
-            Cancel
-          </ActionButton>
-          <ActionButton variant="primary" onClick={confirmApplyDefaults} disabled={saving}>
-            {saving ? "Applying..." : "Apply suggested defaults"}
-          </ActionButton>
-        </div>
-      </div>
-    </div>
-  ) : null;
-
   return (
     <PortalPage
       title="Accounting Setup"
-      subtitle="Business-friendly setup flow for Finance Accounts and Chart of Accounts mapping."
+      subtitle="Separate money destinations, ledger posting rules, and Chart of Accounts health so operators cannot confuse system profiles with collection accounts."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
         { label: "Setup" },
       ]}
+      actions={[
+        { href: ROUTES.admin.accountingChartOfAccounts, label: "Chart of Accounts", variant: "secondary" },
+        { href: ROUTES.admin.collectionControlCenter, label: "Collection Control", variant: "secondary" },
+      ]}
     >
-      {applyDialog}
-      <SetupChecklistPageShell
-        readiness={
-          <div className="space-y-3">
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
-              <span className="font-semibold text-foreground">Setup posture</span>
-              {": "}
-              Status {displayStatus}
-              {" · "}
-              Canonical missing {health?.canonical_accounts?.missing?.length ?? 0}
-              {" · "}
-              Conflicts {health?.canonical_accounts?.conflicts?.length ?? 0}
-              {" · "}
-              Blockers {blockers.length}
-              {" · "}
-              Warnings {warnings.length}
+      <RepairDialog
+        open={repairDialogOpen}
+        targets={repairTargets}
+        preview={repairPreview}
+        repairing={repairing}
+        onClose={() => {
+          if (repairing) return;
+          setRepairDialogOpen(false);
+          setRepairTargets([]);
+        }}
+        onConfirm={() => void confirmRepair()}
+      />
+
+      {applyDialogOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="apply-defaults-title">
+          <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-5 shadow-xl">
+            <div id="apply-defaults-title" className="text-base font-semibold text-foreground">Apply suggested accounting defaults?</div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              This creates or claims canonical Chart of Accounts, seeds default Finance Accounts, and updates setup defaults only.
             </div>
-            {applyResultNote ? (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 sm:text-sm">
-                {applyResultNote}
-              </div>
-            ) : null}
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
-                <div className="text-sm font-semibold text-foreground">Finance readiness</div>
-                <div className="mt-2 space-y-1">
-                  <div>CASH active: {health?.finance_accounts?.CASH?.active_count ?? 0}</div>
-                  <div>BANK active: {health?.finance_accounts?.BANK?.active_count ?? 0}</div>
-                  <div>UPI active: {health?.finance_accounts?.UPI?.active_count ?? 0}</div>
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+              {HISTORICAL_REPAIR_NOTE}
+            </div>
+            <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+              Blocked collection mappings are not silently repaired here. Use guided repair after reviewing affected accounts.
+            </div>
+            {defaultsPreview ? (
+              <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                <div className="rounded-xl border border-border bg-background p-3">
+                  <div className="font-semibold text-foreground">Canonical create</div>
+                  <div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.create.length}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-background p-3">
+                  <div className="font-semibold text-foreground">Claim existing</div>
+                  <div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.claim.length}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-background p-3">
+                  <div className="font-semibold text-foreground">Conflicts</div>
+                  <div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.conflicts.length}</div>
                 </div>
               </div>
-              <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
-                <div className="text-sm font-semibold text-foreground">Journal integrity</div>
-                <div className="mt-2 space-y-1">
-                  <div>Posted unbalanced: {health?.journals?.posted_unbalanced_count ?? 0}</div>
-                  <div>Posted zero-line: {health?.journals?.posted_zero_line_count ?? 0}</div>
-                  <div>Lines to inactive COA: {health?.journals?.lines_to_inactive_accounts ?? 0}</div>
-                </div>
-              </div>
-            </div>
-            {readiness ? (
-              <div
-                className={[
-                  "rounded-lg border px-3 py-2 text-xs sm:text-sm",
-                  readiness.summary.blockers_count > 0
-                    ? "border-red-200 bg-red-50 text-red-900"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-900",
-                ].join(" ")}
-              >
-                <span className="font-semibold">Finance Readiness Banner</span>
-                {": "}
-                Cash ready {readiness.summary.cash_accounts_ready_count}
-                {" · "}Bank ready {readiness.summary.bank_accounts_ready_count}
-                {" · "}UPI ready {readiness.summary.upi_accounts_ready_count}
-                {" · "}Blocked {readiness.summary.blockers_count}
-              </div>
             ) : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <ActionButton variant="ghost" onClick={() => setApplyDialogOpen(false)} disabled={saving}>Cancel</ActionButton>
+              <ActionButton variant="primary" onClick={confirmApplyDefaults} disabled={saving}>{saving ? "Applying..." : "Apply suggested defaults"}</ActionButton>
+            </div>
           </div>
-        }
-        blockers={
-          error ? (
-            <ErrorState title="Accounting setup failed" description={error} onRetry={() => void load()} />
-          ) : blockers.length > 0 ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        </div>
+      ) : null}
+
+      <div className="space-y-6">
+        {error ? <ErrorState title="Accounting setup failed" description={error} onRetry={() => void load()} /> : null}
+
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Operator-proof accounting setup</div>
+              <h2 className="mt-1 text-xl font-semibold text-foreground">Status {displayStatus}</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
+                Finance Accounts are where money is received or paid. Posting Profiles decide which ledger accounts are debited and credited. Chart of Accounts is the ledger structure.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton variant="secondary" onClick={previewDefaults} disabled={previewing}>{previewing ? "Previewing..." : "Preview Suggested Default"}</ActionButton>
+              <ActionButton variant="primary" onClick={openApplyDefaultsDialog} disabled={saving || previewing}>{saving ? "Applying..." : "Apply Suggested Default"}</ActionButton>
+              <ActionButton variant="secondary" onClick={() => void openRepairDialog(repairableAccounts)} disabled={repairableAccounts.length === 0 || repairing}>Repair blocked collection mappings</ActionButton>
+              <ActionButton variant="ghost" onClick={() => void load()}>Refresh</ActionButton>
+            </div>
+          </div>
+          {applyResultNote ? <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{applyResultNote}</div> : null}
+          {blockers.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">
               <div className="font-semibold">Go-live blockers</div>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-                {blockers.map((b) => (
-                  <li key={b}>{b}</li>
-                ))}
+                {blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
               </ul>
             </div>
-          ) : null
-        }
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <ActionButton variant="secondary" onClick={previewDefaults} disabled={previewing}>
-              {previewing ? "Previewing..." : "Preview Suggested Default"}
-            </ActionButton>
-            <ActionButton variant="primary" onClick={openApplyDefaultsDialog} disabled={saving || previewing}>
-              {saving ? "Applying..." : "Apply Suggested Default"}
-            </ActionButton>
-            <ActionButton variant="secondary" onClick={() => void load()}>
-              Refresh
-            </ActionButton>
+          ) : null}
+          {warnings.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {warnings.length} warning{warnings.length === 1 ? "" : "s"} detected. Review before go-live.
+            </div>
+          ) : null}
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">1. Business Finance Accounts</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cash desks, bank accounts, UPI accounts, and payment gateway accounts are operational money destinations. Ledger posting profiles are excluded from this section.
+            </p>
           </div>
-        }
-        checklist={
-          <>
-            {warnings.length > 0 ? (
-              <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                {warnings.length} warning{warnings.length === 1 ? "" : "s"} detected.
-              </div>
-            ) : null}
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <div className="text-sm font-semibold text-foreground">Guided setup (business-first)</div>
-              <div className="mt-2 grid gap-2 md:grid-cols-2">
-                {steps.map((step) => (
-                  <div
-                    key={step}
-                    className="rounded-xl border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
-                  >
-                    {step}
-                  </div>
-                ))}
+          <FinanceAccountMappingPanel
+            financeAccounts={businessFinanceAccounts}
+            chartAccounts={chartAccounts}
+            saving={saving || repairing}
+            editingId={editingFinanceAccount?.id ?? null}
+            repairId={repairing && repairTargets.length === 1 ? repairTargets[0].id : null}
+            selectedChartAccountId={selectedChartAccountId}
+            onEdit={openFinanceMappingEdit}
+            onCancelEdit={() => {
+              setEditingFinanceAccount(null);
+              setSelectedChartAccountId("");
+            }}
+            onChartAccountChange={setSelectedChartAccountId}
+            onSave={() => void submitFinanceMappingEdit()}
+            onRepair={(account) => void openRepairDialog([account])}
+            onRepairAll={(accounts) => void openRepairDialog(accounts)}
+          />
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">2. System Posting Profiles</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              System posting profiles are diagnostic only and cannot receive customer collections. They decide which ledger accounts are debited and credited.
+            </p>
+          </div>
+          {diagnosticAccounts.length > 0 ? (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+              <div className="font-semibold">Ledger posting profiles (system)</div>
+              <div className="mt-1">Diagnostic only. Not selectable for customer collections.</div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {diagnosticAccounts.map((account) => <span key={account.id} className="rounded-full border border-blue-200 bg-white px-2 py-1">{account.name}</span>)}
               </div>
             </div>
-          </>
-        }
-        evidence={
-          <>
-            {readiness ? (
-              <>
-                <div className="rounded-2xl border border-border bg-card p-4">
-                  <div className="text-sm font-semibold text-foreground">Why blocked?</div>
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Payment collection can only post into active Finance Accounts mapped to active, posting-enabled leaf ASSET chart accounts.
-                    Group/control Chart of Accounts remain visible for setup review but cannot receive collections.
+          ) : null}
+          <div className="grid gap-4 lg:grid-cols-2">
+            {postingProfileReadiness.map((item) => (
+              <article key={item.key} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">{item.label}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.key}</p>
                   </div>
-                  <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-                    Suggested Default Setup preview is review-only here. It does not silently apply mappings or rewrite historical payments, receipts, journals, settlements, reconciliations, or day-close records.
+                  <span className={cx("rounded-full border px-2 py-1 text-xs font-semibold", statusClass(item.status))}>{item.status}</span>
+                </div>
+                <div className="mt-3 grid gap-3 text-xs md:grid-cols-2">
+                  <div className="rounded-xl border border-border bg-muted/20 p-3">
+                    <div className="font-semibold text-foreground">Debit account</div>
+                    <div className="mt-1 text-muted-foreground">Required: {item.required_debit_account.join(", ") || "Not configured"}</div>
+                    <div className="mt-1 text-foreground">{item.configured_debit_account.map(accountLabel).join(", ") || "Not configured"}</div>
                   </div>
-                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
-                    Repair creates or reuses a posting leaf account and remaps this finance account only. Blocked from collection selectors until COA mapping is posting-ready.
+                  <div className="rounded-xl border border-border bg-muted/20 p-3">
+                    <div className="font-semibold text-foreground">Credit account</div>
+                    <div className="mt-1 text-muted-foreground">Required: {item.required_credit_account.join(", ") || "Not configured"}</div>
+                    <div className="mt-1 text-foreground">{item.configured_credit_account.map(accountLabel).join(", ") || "Not configured"}</div>
                   </div>
                 </div>
-                <FinanceAccountMappingPanel
-                  financeAccounts={readiness.finance_accounts}
-                  chartAccounts={readiness.chart_accounts}
-                  saving={saving}
-                  editingId={editingFinanceAccount?.id ?? null}
-                  selectedChartAccountId={selectedChartAccountId}
-                  onEdit={openFinanceMappingEdit}
-                  onCancelEdit={() => {
-                    setEditingFinanceAccount(null);
-                    setSelectedChartAccountId("");
-                  }}
-                  onChartAccountChange={setSelectedChartAccountId}
-                  onSave={() => void submitFinanceMappingEdit()}
-                />
-              </>
-            ) : null}
+                <div className="mt-3 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
+                  {firstBlocker(item)}
+                </div>
+                {!item.implemented ? <div className="mt-2 text-xs font-medium text-blue-800">Deferred workflow. Do not create fake collection action.</div> : null}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">3. Chart of Accounts Health</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Chart of Accounts is the ledger structure. Collection accounts must point to active posting-enabled leaf ASSET accounts, not group/control accounts.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
             <div className="rounded-2xl border border-border bg-card p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-foreground">Finance Account Mapping Table</div>
-                <div className="text-xs text-muted-foreground">Manual collection + system-only profiles</div>
-              </div>
-              {defaultsPreview ? (
-                <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-                  <div className="font-semibold text-foreground">Preview (latest)</div>
-                  <div className="mt-1">
-                    Canonical create: {defaultsPreview.canonical_accounts.create.length}
-                    {" · "}Claim: {defaultsPreview.canonical_accounts.claim.length}
-                    {" · "}Conflicts: {defaultsPreview.canonical_accounts.conflicts.length}
-                  </div>
-                </div>
-              ) : null}
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Group/control accounts</div>
+              <div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.group_control_count ?? 0}</div>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posting leaf accounts</div>
+              <div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.posting_leaf_count ?? 0}</div>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Missing leaf assets</div>
+              <div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.missing_posting_leaf_count ?? 0}</div>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inactive/non-posting</div>
+              <div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.inactive_or_non_posting_count ?? 0}</div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="text-sm font-semibold text-foreground">COA blockers</div>
+            {(coaHealth?.inactive_or_non_posting_blockers ?? []).length === 0 ? (
+              <div className="mt-2 text-sm text-emerald-700">No inactive/non-posting blockers exposed.</div>
+            ) : (
               <div className="mt-3 overflow-x-auto">
                 <table className="min-w-full text-left text-xs">
                   <thead className="text-muted-foreground">
                     <tr>
-                      <th className="px-2 py-2">Finance account / profile</th>
-                      <th className="px-2 py-2">Used For</th>
-                      <th className="px-2 py-2">Mapped Chart Account</th>
-                      <th className="px-2 py-2">Account Type</th>
-                      <th className="px-2 py-2">Manual vs System-only</th>
-                      <th className="px-2 py-2">Status</th>
-                      <th className="px-2 py-2">Warning</th>
-                      <th className="px-2 py-2">Edit</th>
+                      <th className="px-2 py-2">Code</th>
+                      <th className="px-2 py-2">Name</th>
+                      <th className="px-2 py-2">Type</th>
+                      <th className="px-2 py-2">Issue</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {mappings.length === 0 && (health?.posting_profiles?.mapped?.length ?? 0) === 0 ? (
-                      <tr>
-                        <td className="px-2 py-3 text-muted-foreground" colSpan={8}>
-                          No mappings found yet.
+                    {(coaHealth?.inactive_or_non_posting_blockers ?? []).slice(0, 12).map((account) => (
+                      <tr key={`${account.id}-${account.code}`} className="border-t border-border">
+                        <td className="px-2 py-2 font-medium text-foreground">{account.code}</td>
+                        <td className="px-2 py-2">{account.name}</td>
+                        <td className="px-2 py-2">{account.account_type || account.type}</td>
+                        <td className="px-2 py-2 text-amber-700">
+                          {!account.is_active ? "Inactive" : account.is_group_control ? "Group/control or non-posting" : "Not collection-ready"}
                         </td>
                       </tr>
-                    ) : (
-                      <>
-                        {mappings.map((row) => {
-                          const manualPurposes = new Set([
-                            "CASH_COLLECTION",
-                            "BANK_COLLECTION",
-                            "UPI_COLLECTION",
-                            "PAYMENT_GATEWAY_COLLECTION",
-                          ]);
-                          const isSystemOnly = !manualPurposes.has(row.purpose || "");
-                          const statusLabel = row.is_active ? (row.is_default ? "Default" : "Active") : "Inactive";
-                          const kind = (row.finance_account_kind || "").toUpperCase();
-                          const financeActiveCount =
-                            kind === "CASH" || kind === "BANK" || kind === "UPI"
-                              ? health?.finance_accounts?.[kind as "CASH" | "BANK" | "UPI"]?.active_count ?? 0
-                              : 0;
-                          const warningText = isSystemOnly
-                            ? "System/control accounts are diagnostic only and cannot receive customer collections."
-                            : financeActiveCount === 0
-                              ? "No active finance account for this kind."
-                              : row.chart_account_type && row.chart_account_type !== "ASSET"
-                                ? "Manual collection must map to an ASSET chart account."
-                                : "—";
-
-                          return (
-                            <tr key={`map-${row.id}`} className="border-t border-border">
-                              <td className="px-2 py-2">
-                                <div className="font-medium text-foreground">{row.finance_account_name || "—"}</div>
-                                <div className="text-[11px] text-muted-foreground">{row.finance_account_kind || "—"}</div>
-                              </td>
-                              <td className="px-2 py-2">{PURPOSE_LABELS[row.purpose || ""] || row.purpose || "—"}</td>
-                              <td className="px-2 py-2">
-                                <div className="font-medium text-foreground">
-                                  {row.chart_account_code ? `${row.chart_account_code} · ` : ""}
-                                  {row.chart_account_name || "—"}
-                                </div>
-                              </td>
-                              <td className="px-2 py-2">{row.chart_account_type || "—"}</td>
-                              <td className="px-2 py-2">{isSystemOnly ? "System-only" : "Manual"}</td>
-                              <td className="px-2 py-2">{statusLabel}</td>
-                              <td className="px-2 py-2 text-amber-700">{warningText}</td>
-                              <td className="px-2 py-2">
-                                <ActionButton size="sm" variant="ghost" onClick={() => openEdit(row)}>
-                                  Advanced Edit
-                                </ActionButton>
-                              </td>
-                            </tr>
-                          );
-                        })}
-
-                        {(health?.posting_profiles?.mapped ?? []).map((row) => (
-                          <tr key={`prof-${row.id ?? row.key}`} className="border-t border-border">
-                            <td className="px-2 py-2">
-                              <div className="font-medium text-foreground">{row.label || row.key}</div>
-                              <div className="text-[11px] text-muted-foreground">{row.key}</div>
-                            </td>
-                            <td className="px-2 py-2">System posting profile</td>
-                            <td className="px-2 py-2">
-                              <div className="font-medium text-foreground">
-                                {row.chart_account_code ? `${row.chart_account_code} · ` : ""}
-                                {row.chart_account_name || "—"}
-                              </div>
-                            </td>
-                            <td className="px-2 py-2">—</td>
-                            <td className="px-2 py-2">System-only</td>
-                            <td className="px-2 py-2">Active</td>
-                            <td className="px-2 py-2 text-amber-700">
-                              {row.chart_account_is_legacy ? "Profile mapped to a legacy COA row." : "System/control accounts are diagnostic only and cannot receive customer collections."}
-                            </td>
-                            <td className="px-2 py-2">
-                              <span className="text-[11px] text-muted-foreground">Managed by defaults</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <div className="text-sm font-semibold text-foreground">Warnings</div>
-              {warnings.length === 0 ? (
-                <div className="mt-2 text-xs text-emerald-700">No warnings. Accounting setup is ready.</div>
-              ) : (
-                <ul className="mt-2 space-y-2 text-xs text-amber-700">
-                  {warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            {editing ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-xl">
-                  <div className="text-base font-semibold text-foreground">Advanced Edit (Accountant / Agency)</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Update default status, active status, and notes without changing financial posting logic.
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs">
-                      <div className="font-semibold text-foreground">{editing.finance_account_name || "Finance Account"}</div>
-                      <div className="text-muted-foreground">{PURPOSE_LABELS[editing.purpose || ""] || editing.purpose || "Purpose"}</div>
-                    </div>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={editDefault} onChange={(e) => setEditDefault(e.target.checked)} />
-                      Default mapping for this purpose
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={editActive} onChange={(e) => setEditActive(e.target.checked)} />
-                      Mapping active
-                    </label>
-                    <label className="block text-sm">
-                      Notes
-                      <textarea
-                        value={editNotes}
-                        onChange={(e) => setEditNotes(e.target.value)}
-                        className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                        rows={3}
-                      />
-                    </label>
-                  </div>
-                  <div className="mt-4 flex justify-end gap-2">
-                    <ActionButton variant="ghost" onClick={() => setEditing(null)}>
-                      Cancel
-                    </ActionButton>
-                    <ActionButton variant="primary" onClick={submitEdit} disabled={saving}>
-                      {saving ? "Saving..." : "Save"}
-                    </ActionButton>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </>
-        }
-      />
+            )}
+          </div>
+        </section>
+      </div>
     </PortalPage>
   );
 }
