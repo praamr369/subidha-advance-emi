@@ -16,14 +16,19 @@ import {
   type CollectionControlPayload,
 } from "@/services/collection-control-center";
 
+function hasMetricValue(value: string | number | null | undefined): value is string | number {
+  return value !== null && value !== undefined && value !== "";
+}
+
 function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
+  if (!hasMetricValue(value)) return "Not exposed";
+  return `₹${Number(value).toFixed(2)}`;
 }
 
 function accountBlocker(account: CollectionControlFinanceAccount): string {
   return (
     account.collection_blocker_reason ||
-    "This account cannot receive payments because it is mapped to a non-posting Chart of Account."
+    "Blocked from collection selectors until COA mapping is posting-ready."
   );
 }
 
@@ -184,7 +189,7 @@ export default function CollectionInlineReadinessBanner({
               <div className="mt-1 text-sm font-semibold text-foreground">{money(summary.direct_sale_outstanding_amount)}</div>
             </div>
             <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Rent/lease due</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Rent / lease due</div>
               <div className="mt-1 text-sm font-semibold text-foreground">{money(summary.rent_lease_due_amount)}</div>
             </div>
           </div>
@@ -197,7 +202,7 @@ export default function CollectionInlineReadinessBanner({
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <div className="font-semibold">Finance account blocker guidance</div>
               <div className="mt-1 text-amber-900">
-                This collection may fail until blocked finance account mappings are fixed. Blocked finance accounts stay disabled in collection selectors. Do not remap silently; fix the COA/finance mapping first.
+                Blocked from collection selectors until COA mapping is posting-ready. System or control accounts are diagnostic only and cannot receive customer collections.
               </div>
               <div className="mt-3 space-y-2">
                 {blockedAccounts.slice(0, 3).map((account) => (
