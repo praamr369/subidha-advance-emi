@@ -76,12 +76,23 @@ export default function AdminAmendmentList({
     <ERPPageShell
       eyebrow="Admin amendments"
       title="Contract Amendments"
-      subtitle="Admin review register for customer and partner amendment requests."
+      subtitle="Admin review register for customer and partner amendment requests. Customer and partner requests will appear here after submission."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Contract Amendments" }]}
       statusBadge={{ label: "Decision only", tone: "warning" }}
     >
       <div className="space-y-5">
         <AmendmentSafetyNotice />
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-card p-4">
+          <ActionButton href="/admin/contract-amendments/new" variant="primary">
+            Create amendment
+          </ActionButton>
+          <ActionButton href="/admin/contract-amendments" variant="outline">
+            View all statuses
+          </ActionButton>
+          <ActionButton href="/admin/contract-amendments/recontract-report" variant="outline">
+            Open Recontract Report
+          </ActionButton>
+        </div>
         <MetricStrip
           items={[
             { label: "Total", value: String(rows.length) },
@@ -89,6 +100,7 @@ export default function AdminAmendmentList({
             { label: "Under review", value: String(rows.filter((r) => r.status === "UNDER_REVIEW").length) },
             { label: "Approved", value: String(rows.filter((r) => r.status === "APPROVED").length) },
             { label: "Rejected", value: String(rows.filter((r) => r.status === "REJECTED").length) },
+            { label: "Cancelled", value: String(rows.filter((r) => r.status === "CANCELLED").length) },
           ]}
         />
         <DetailPanel title="Filters" description="Filter amendment requests without changing source contracts.">
@@ -127,10 +139,28 @@ export default function AdminAmendmentList({
           <ERPErrorState title="Unable to load amendments" description={error} onRetry={() => void load()} />
         ) : null}
         {!loading && !error && rows.length === 0 ? (
-          <ERPEmptyState title="No amendments found" description="No amendment requests match the current filters." />
+          <DetailPanel title="No amendments found" description="No amendment requests match the current filters. Create an admin-side request, clear filters, or open the recontract report.">
+            <div className="grid gap-3 md:grid-cols-3">
+              <Link href="/admin/contract-amendments/new" className="rounded-2xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
+                <div className="text-sm font-semibold text-foreground">Create amendment</div>
+                <div className="mt-1 text-xs text-muted-foreground">Admin can create a request on behalf of a customer or partner when backend validation allows it.</div>
+              </Link>
+              <Link href="/admin/contract-amendments" className="rounded-2xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
+                <div className="text-sm font-semibold text-foreground">View all statuses</div>
+                <div className="mt-1 text-xs text-muted-foreground">Clear filters and see requested, under-review, approved, rejected, and cancelled records.</div>
+              </Link>
+              <Link href="/admin/contract-amendments/recontract-report" className="rounded-2xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
+                <div className="text-sm font-semibold text-foreground">Open Recontract Report</div>
+                <div className="mt-1 text-xs text-muted-foreground">Approved product upgrade/downgrade amendments with saved previews will appear there.</div>
+              </Link>
+            </div>
+            <div className="mt-4 rounded-xl border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+              Customer and partner amendment requests will appear here after submission. No fake rows are generated.
+            </div>
+          </DetailPanel>
         ) : null}
         {!loading && !error && rows.length > 0 ? (
-          <DetailPanel title="Amendment register" description="Open a request to review, approve, or reject.">
+          <DetailPanel title="Amendment register" description="Open a request to review, approve, reject, cancel/archive, preview, or execute only evidence-gated safe workflows.">
             <div className="grid gap-3">
               {rows.map((row) => (
                 <Link
@@ -147,9 +177,10 @@ export default function AdminAmendmentList({
                     </div>
                     <ERPStatusBadge status={row.status} />
                   </div>
-                  <div className="mt-3 grid gap-2 text-sm md:grid-cols-4">
+                  <div className="mt-3 grid gap-2 text-sm md:grid-cols-5">
                     <span>{amendmentContractTypeLabel(row.contract_type)}</span>
                     <span>{amendmentTypeLabel(row.amendment_type)}</span>
+                    <span>{row.workflow_capability?.category ?? "—"}</span>
                     <span>{row.requested_role}</span>
                     <span>{dateLabel(row.created_at)}</span>
                   </div>
