@@ -22,13 +22,14 @@ function hasMetricValue(value: string | number | null | undefined): value is str
 
 function money(value: string | number | null | undefined): string {
   if (!hasMetricValue(value)) return "Not exposed";
-  return `₹${Number(value).toFixed(2)}`;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? `₹${parsed.toFixed(2)}` : "Not exposed";
 }
 
 function accountBlocker(account: CollectionControlFinanceAccount): string {
   return (
     account.collection_blocker_reason ||
-    "Blocked from collection selectors until COA mapping is posting-ready."
+    "Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account."
   );
 }
 
@@ -89,9 +90,13 @@ export default function CollectionInlineReadinessBanner({
     void load();
   }, [load]);
 
+  const operationalAccounts = useMemo(
+    () => payload?.finance_account_readiness.operational_collection_accounts ?? payload?.finance_account_readiness.accounts ?? [],
+    [payload?.finance_account_readiness.accounts, payload?.finance_account_readiness.operational_collection_accounts],
+  );
   const blockedAccounts = useMemo(
-    () => (payload?.finance_account_readiness.accounts ?? []).filter((account) => !account.collection_ready),
-    [payload?.finance_account_readiness.accounts],
+    () => operationalAccounts.filter((account) => !(account.selectable_for_collection || account.is_selectable_collection_account || account.collection_ready)),
+    [operationalAccounts],
   );
   const counts = payload?.finance_account_readiness.counts;
   const summary = payload?.summary;
@@ -167,7 +172,7 @@ export default function CollectionInlineReadinessBanner({
           <div className="grid gap-2 md:grid-cols-4 xl:grid-cols-6">
             <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ready accounts</div>
-              <div className="mt-1 text-sm font-semibold text-foreground">{counts.ready_count}</div>
+              <div className="mt-1 text-sm font-semibold text-foreground">{counts.selectable_count ?? counts.ready_count}</div>
             </div>
             <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Blocked accounts</div>
@@ -202,7 +207,7 @@ export default function CollectionInlineReadinessBanner({
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <div className="font-semibold">Finance account blocker guidance</div>
               <div className="mt-1 text-amber-900">
-                Blocked from collection selectors until COA mapping is posting-ready. System or control accounts are diagnostic only and cannot receive customer collections.
+                Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account. System posting profiles are diagnostic only and cannot receive customer collections.
               </div>
               <div className="mt-3 space-y-2">
                 {blockedAccounts.slice(0, 3).map((account) => (
