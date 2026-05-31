@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Q
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -101,9 +102,9 @@ class PartnerContractAmendmentWithdrawView(APIView):
 
     def post(self, request, pk: int):
         amendment = _amendment_queryset().filter(pk=pk).filter(
-            serializers.models.Q(partner=request.user)
-            | serializers.models.Q(subscription__partner=request.user)
-            | serializers.models.Q(rent_lease_contract__partner=request.user)
+            Q(partner=request.user)
+            | Q(subscription__partner=request.user)
+            | Q(rent_lease_contract__partner=request.user)
         ).first()
         if not amendment:
             return Response({"detail": "Amendment not found."}, status=status.HTTP_404_NOT_FOUND)
