@@ -7,6 +7,10 @@ from subscriptions.models_business_setup import (
     PolicyPage,
     PolicyStatus,
 )
+from subscriptions.services.business_compliance_governance_service import (
+    compliance_status_for_document,
+    is_publicly_downloadable,
+)
 from subscriptions.services.policy_governance_service import (
     policy_coverage_group_for_slug,
     policy_governance_category_for_slug,
@@ -176,6 +180,14 @@ class PolicySeedActionSerializer(serializers.Serializer):
 class BusinessComplianceDocumentAdminSerializer(serializers.ModelSerializer):
     uploaded_by_username = serializers.CharField(source="uploaded_by.username", read_only=True)
     reviewed_by_username = serializers.CharField(source="reviewed_by.username", read_only=True)
+    status = serializers.SerializerMethodField()
+    visibility = serializers.CharField(source="public_visibility", read_only=True)
+    internal_notes = serializers.CharField(source="notes", read_only=True)
+    reviewed_at = serializers.DateTimeField(source="verified_at", read_only=True)
+    expires_at = serializers.SerializerMethodField()
+    is_publicly_downloadable = serializers.SerializerMethodField()
+    has_file = serializers.SerializerMethodField()
+    public_summary_ready = serializers.SerializerMethodField()
 
     class Meta:
         model = BusinessComplianceDocument
@@ -185,14 +197,22 @@ class BusinessComplianceDocumentAdminSerializer(serializers.ModelSerializer):
             "title",
             "file",
             "public_visibility",
+            "visibility",
             "verification_status",
+            "status",
             "public_summary",
             "notes",
+            "internal_notes",
             "uploaded_by",
             "uploaded_by_username",
             "reviewed_by",
             "reviewed_by_username",
             "verified_at",
+            "reviewed_at",
+            "expires_at",
+            "is_publicly_downloadable",
+            "has_file",
+            "public_summary_ready",
             "is_active",
             "created_at",
             "updated_at",
@@ -202,12 +222,34 @@ class BusinessComplianceDocumentAdminSerializer(serializers.ModelSerializer):
             "uploaded_by",
             "reviewed_by",
             "verified_at",
+            "reviewed_at",
+            "expires_at",
+            "is_publicly_downloadable",
+            "has_file",
+            "public_summary_ready",
             "created_at",
             "updated_at",
         )
 
+    def get_status(self, obj: BusinessComplianceDocument) -> str:
+        return compliance_status_for_document(obj)
+
+    def get_expires_at(self, obj: BusinessComplianceDocument):
+        return None
+
+    def get_is_publicly_downloadable(self, obj: BusinessComplianceDocument) -> bool:
+        return is_publicly_downloadable(obj)
+
+    def get_has_file(self, obj: BusinessComplianceDocument) -> bool:
+        return bool(obj.file)
+
+    def get_public_summary_ready(self, obj: BusinessComplianceDocument) -> bool:
+        return bool(obj.public_summary and obj.public_visibility == "PUBLIC_SUMMARY_ONLY" and obj.verification_status == "VERIFIED")
+
 
 class BusinessComplianceDocumentPublicSerializer(serializers.ModelSerializer):
+    is_publicly_downloadable = serializers.SerializerMethodField()
+
     class Meta:
         model = BusinessComplianceDocument
         fields = (
@@ -216,4 +258,8 @@ class BusinessComplianceDocumentPublicSerializer(serializers.ModelSerializer):
             "verification_status",
             "public_summary",
             "verified_at",
+            "is_publicly_downloadable",
         )
+
+    def get_is_publicly_downloadable(self, obj: BusinessComplianceDocument) -> bool:
+        return False
