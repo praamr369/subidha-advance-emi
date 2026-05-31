@@ -133,7 +133,7 @@ export type DepositSecurityPreview = {
   blocker_reasons: string[];
 };
 
-export const AMENDMENT_STATUSES: AmendmentStatus[] = ["REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED"];
+export const AMENDMENT_STATUSES: AmendmentStatus[] = ["REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "CANCELLED"];
 export const AMENDMENT_TYPES: Array<{ value: AmendmentType; label: string }> = [
   { value: "ADDRESS_CHANGE", label: "Address change" },
   { value: "CONTACT_CORRECTION", label: "Contact correction" },
@@ -219,6 +219,8 @@ export type AmendmentCreatePayload = {
   reason: string;
   effective_date?: string | null;
   metadata?: Record<string, unknown>;
+  requested_role?: AmendmentRequesterRole;
+  admin_note?: string;
 };
 
 export type ProductRecontractReportFilters = {
@@ -232,7 +234,6 @@ export type ProductRecontractReportFilters = {
 };
 
 export type ProductRecontractEvidenceStatus = "GENERATED" | "PREVIEWED" | "POSTED" | "LINKED" | "MISSING" | "BLOCKED" | string;
-
 export type ProductRecontractReportRow = {
   id: number;
   amendment_id: number;
@@ -307,6 +308,10 @@ export async function getCustomerAmendment(id: number): Promise<AmendmentRecord>
   return apiFetch<AmendmentRecord>(`/customer/contract-amendments/${id}/`);
 }
 
+export async function withdrawCustomerAmendment(id: number, reason: string): Promise<AmendmentRecord> {
+  return apiFetch<AmendmentRecord>(`/customer/contract-amendments/${id}/withdraw/`, { method: "POST", body: { reason } });
+}
+
 export async function consentProductRecontractPreview(
   amendmentId: number,
   decision: Exclude<ProductRecontractConsentStatus, "PENDING">,
@@ -330,13 +335,29 @@ export async function getPartnerAmendment(id: number): Promise<AmendmentRecord> 
   return apiFetch<AmendmentRecord>(`/partner/contract-amendments/${id}/`);
 }
 
-export async function listAdminAmendments(filters: { status?: string; contractType?: string; customer?: string | number } = {}): Promise<AmendmentRecord[]> {
+export async function withdrawPartnerAmendment(id: number, reason: string): Promise<AmendmentRecord> {
+  return apiFetch<AmendmentRecord>(`/partner/contract-amendments/${id}/withdraw/`, { method: "POST", body: { reason } });
+}
+
+export async function listAdminAmendments(filters: { status?: string; contractType?: string; customer?: string | number; amendmentType?: string; partner?: string | number; source?: string | number; search?: string } = {}): Promise<AmendmentRecord[]> {
   const query = queryString({
     status: filters.status,
     contract_type: filters.contractType,
+    amendment_type: filters.amendmentType,
     customer: filters.customer === undefined || filters.customer === null ? undefined : String(filters.customer),
+    partner: filters.partner === undefined || filters.partner === null ? undefined : String(filters.partner),
+    source: filters.source === undefined || filters.source === null ? undefined : String(filters.source),
+    search: filters.search,
   });
   return normalizeList(await apiFetch<unknown>(`/admin/contract-amendments/${query}`));
+}
+
+export async function createAdminAmendment(payload: AmendmentCreatePayload): Promise<AmendmentRecord> {
+  return apiFetch<AmendmentRecord>("/admin/contract-amendments/create/", { method: "POST", body: payload });
+}
+
+export async function lifecycleAdminAmendment(id: number, payload: { reason: string; action?: "CANCELLED" | "ARCHIVED" | "VOIDED" }): Promise<AmendmentRecord> {
+  return apiFetch<AmendmentRecord>(`/admin/contract-amendments/${id}/lifecycle/`, { method: "POST", body: payload });
 }
 
 export async function listAdminProductRecontractReport(filters: ProductRecontractReportFilters = {}): Promise<ProductRecontractReportRow[]> {
