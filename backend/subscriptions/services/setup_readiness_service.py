@@ -19,6 +19,7 @@ from branch_control.models import Branch, BranchStatus, CashCounter
 from subscriptions.models import Batch, ContractAmendment, ContractRecontractEvent, LuckyId, Product
 from subscriptions.models_business_setup import BusinessProfile
 from subscriptions.models_document_print_settings import DocumentPrintSettings
+from subscriptions.services.business_compliance_governance_service import build_business_compliance_readiness
 from subscriptions.services.document_numbering_service import get_document_numbering_state, required_numbering_keys_for_checklist
 from subscriptions.services.policy_governance_service import build_policy_coverage_matrix
 
@@ -147,19 +148,40 @@ def _policy_governance_section() -> dict[str, Any]:
         status=_status_from(blockers, warnings),
         blockers=blockers,
         warnings=warnings,
-        recommended_action=(
-            "Seed missing templates, review policy text, publish required public policies, and approve/internalize governance policies before launch."
-        ),
+        recommended_action="Seed missing templates, review policy text, publish required public policies, and approve/internalize governance policies before launch.",
         target_route="/admin/settings/policies",
-        why_this_matters=(
-            "Public launch must not expose draft/internal policies. Customer-facing policies require publication, while internal governance policies support audit and controls."
-        ),
+        why_this_matters="Public launch must not expose draft/internal policies. Customer-facing policies require publication, while internal governance policies support audit and controls.",
         metadata={
             "coverage_summary": coverage["summary"],
             "public_missing_count": public_missing,
             "public_not_published_count": public_not_published,
             "internal_missing_count": internal_missing,
             "internal_draft_count": internal_draft,
+        },
+    )
+
+
+def _business_compliance_section() -> dict[str, Any]:
+    readiness = build_business_compliance_readiness()
+    return _section(
+        key="business_compliance",
+        title="Business Compliance",
+        status=readiness["status"],
+        blockers=readiness["blockers"],
+        warnings=readiness["warnings"],
+        recommended_action="Complete business profile, seed compliance checklist rows, upload real evidence, and verify required proof documents before launch.",
+        target_route=readiness["route_hint"],
+        why_this_matters="Shop identity, premises proof, tax identity, bank proof, and public-safe compliance summaries protect customer trust without exposing private documents.",
+        metadata={
+            "missing_required_count": readiness["missing_required_count"],
+            "pending_review_count": readiness["pending_review_count"],
+            "approved_required_count": readiness["approved_required_count"],
+            "required_count": readiness["required_count"],
+            "recommended_missing_count": readiness["recommended_missing_count"],
+            "route_hint": readiness["route_hint"],
+            "privacy_rule": readiness["privacy_rule"],
+            "required_checks": readiness["required_checks"],
+            "recommended_checks": readiness["recommended_checks"],
         },
     )
 
@@ -237,6 +259,7 @@ def get_setup_readiness() -> dict[str, Any]:
             why_this_matters="Browser/PDF documents are evidence documents. Branding must not override backend truth, but it must be clear for customers and auditors.",
             metadata={"configured": bool(active_print_settings), "logo_present": bool(getattr(active_print_settings, "business_logo", None))},
         ),
+        _business_compliance_section(),
         _policy_governance_section(),
         _section(
             key="chart_of_accounts",
@@ -347,6 +370,7 @@ def get_setup_readiness() -> dict[str, Any]:
     overall_status = "BLOCKED" if blocker_count else ("NEEDS_SETUP" if warning_count else "READY")
 
     next_section = next((section for section in sections if section["status"] == "BLOCKED"), None) or next((section for section in sections if section["status"] == "NEEDS_SETUP"), None)
+    business_compliance_ready = next((section for section in sections if section["key"] == "business_compliance"), {}).get("status") in {"READY", "NEEDS_SETUP"}
 
     launch_checklist = [
         {"key": "can_create_customer", "label": "Can create customer", "ready": bool(active_business_profile and admin_users.exists()), "source_section": "business_profile"},
@@ -355,6 +379,7 @@ def get_setup_readiness() -> dict[str, Any]:
         {"key": "can_collect_payment", "label": "Can collect payment", "ready": bool(ready_collection_account_exists and active_counters.exists() and collection_mappings.exists()), "source_section": "payment_collection"},
         {"key": "can_issue_receipt", "label": "Can issue receipt", "ready": bool(numbering_ready and active_print_settings), "source_section": "document_templates"},
         {"key": "can_print_documents", "label": "Can print documents", "ready": bool(active_business_profile and active_print_settings), "source_section": "print_branding"},
+        {"key": "can_complete_business_compliance", "label": "Can complete business compliance", "ready": bool(business_compliance_ready), "source_section": "business_compliance"},
         {"key": "can_publish_public_policies", "label": "Can publish public policies", "ready": next((section for section in sections if section["key"] == "policy_governance"), {}).get("status") == "READY", "source_section": "policy_governance"},
         {"key": "can_reconcile", "label": "Can reconcile", "ready": bool(not required_coa_missing and not required_mappings_missing and posting_profiles_count > 0), "source_section": "accounting_reconciliation"},
         {"key": "can_day_close", "label": "Can day-close", "ready": bool(active_counters.exists() and ready_collection_account_exists), "source_section": "branch_cash_counter"},
@@ -374,5 +399,5 @@ def get_setup_readiness() -> dict[str, Any]:
         "finance_accounts": finance_rows,
         "launch_checklist": launch_checklist,
         "read_only": True,
-        "mutation_policy": "Read-only readiness check. No auto-fix, silent remap, payment posting, reconciliation, or historical record mutation is performed.",
+        "mutation_policy": "Read-only readiness check. No auto-fix, silent remap, payment posting, reconciliation, policy seeding, compliance row seeding, or historical record mutation is performed.",
     }
