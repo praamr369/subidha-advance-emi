@@ -79,6 +79,8 @@ def _preview_for_account(account: FinanceAccount) -> dict[str, Any]:
         "blocker_reason": readiness.collection_blocker_reason,
         "risk_note": HISTORICAL_MUTATION_NOTE,
         "historical_mutation": False,
+        "diagnostic_only": readiness.diagnostic_only,
+        "selectable_for_collection": readiness.selectable_for_collection,
     }
     if readiness.collection_ready:
         return {
@@ -87,6 +89,14 @@ def _preview_for_account(account: FinanceAccount) -> dict[str, Any]:
             "repair_action_type": "NOT_REPAIRABLE",
             "suggested_posting_chart_account": _chart_payload(current),
             "reason": "Already collection-ready.",
+        }
+    if readiness.diagnostic_only:
+        return {
+            **base,
+            "repairable": False,
+            "repair_action_type": "NOT_REPAIRABLE",
+            "suggested_posting_chart_account": None,
+            "reason": readiness.collection_blocker_reason,
         }
     if current is None:
         return {
@@ -129,13 +139,17 @@ def _preview_for_account(account: FinanceAccount) -> dict[str, Any]:
     }
 
 
-def preview_collection_mapping_repairs(*, finance_account_id: int | None = None) -> dict[str, Any]:
-    queryset = (
+def _collection_repair_queryset():
+    return (
         FinanceAccount.objects.select_related("chart_account", "chart_account__parent", "branch")
         .prefetch_related("chart_account__children")
         .filter(is_active=True, is_real_settlement_account=True)
         .order_by("kind", "name", "id")
     )
+
+
+def preview_collection_mapping_repairs(*, finance_account_id: int | None = None) -> dict[str, Any]:
+    queryset = _collection_repair_queryset()
     if finance_account_id is not None:
         queryset = queryset.filter(pk=finance_account_id)
     rows = [_preview_for_account(account) for account in queryset]
@@ -184,15 +198,17 @@ def _create_leaf_posting_account(parent: ChartOfAccount) -> ChartOfAccount:
 def execute_collection_mapping_repairs(*, actor, confirmation_text: str, finance_account_id: int | None = None) -> dict[str, Any]:
     if (confirmation_text or "").strip().upper() != CONFIRM_COLLECTION_MAPPING_REPAIR:
         raise serializers.ValidationError({"confirmation_text": f"Type {CONFIRM_COLLECTION_MAPPING_REPAIR} to repair mappings."})
-    queryset = (
-        FinanceAccount.objects.select_related("chart_account", "chart_account__parent", "branch")
-        .select_for_update()
-        .prefetch_related("chart_account__children")
+
+    lock_queryset = (
+        FinanceAccount.objects.select_for_update()
         .filter(is_active=True, is_real_settlement_account=True)
         .order_by("kind", "name", "id")
+        .values_list("id", flat=True)
     )
     if finance_account_id is not None:
-        queryset = queryset.filter(pk=finance_account_id)
+        lock_queryset = lock_queryset.filter(pk=finance_account_id)
+    locked_ids = list(lock_queryset)
+    queryset = _collection_repair_queryset().filter(id__in=locked_ids)
 
     results: list[dict[str, Any]] = []
     for account in queryset:
@@ -233,11 +249,12 @@ def execute_collection_mapping_repairs(*, actor, confirmation_text: str, finance
             results.append(
                 {
                     **preview,
-                    "status": "repaired" if readiness.collection_ready else "failed",
+                    "status": "repaired" if readiness.selectable_for_collection else "failed",
                     "old_chart_account_id": old_chart_id,
                     "new_chart_account_id": updated.chart_account_id,
                     "collection_ready": readiness.collection_ready,
-                    "reason": None if readiness.collection_ready else readiness.collection_blocker_reason,
+                    "selectable_for_collection": readiness.selectable_for_collection,
+                    "reason": None if readiness.selectable_for_collection else readiness.collection_blocker_reason,
                 }
             )
         except (DjangoValidationError, serializers.ValidationError) as exc:
