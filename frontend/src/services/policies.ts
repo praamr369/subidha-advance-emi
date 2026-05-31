@@ -1,12 +1,22 @@
 import { apiFetch } from "@/lib/api";
 
-export type PolicyStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+export type PolicyStatus = "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED";
+export type PolicyVisibility = "PUBLIC" | "INTERNAL";
 
 export type AdminPolicyPage = {
   id: number;
   slug: string;
   version: number;
   category: string;
+  governance_category?: string;
+  coverage_group?: string;
+  visibility?: PolicyVisibility;
+  public_visible?: boolean;
+  internal_only?: boolean;
+  public_ready?: boolean;
+  internal_ready?: boolean;
+  requires_legal_review?: boolean;
+  review_due_date?: string | null;
   title: string;
   summary: string;
   content: string;
@@ -14,6 +24,7 @@ export type AdminPolicyPage = {
   effective_date?: string | null;
   last_reviewed_at?: string | null;
   published_at?: string | null;
+  last_published_at?: string | null;
   published_by_username?: string;
   created_by_username?: string;
   updated_by_username?: string;
@@ -41,6 +52,44 @@ export type PolicyUpdatePayload = Partial<
     "slug" | "category" | "title" | "summary" | "content" | "status" | "effective_date" | "last_reviewed_at"
   >
 >;
+
+export type PolicyCoverageRow = {
+  required_policy_key: string;
+  label: string;
+  coverage_group: string;
+  category: string;
+  stored_category?: string;
+  visibility: PolicyVisibility;
+  status: PolicyStatus | "MISSING";
+  policy_id?: number | null;
+  slug: string;
+  public_ready: boolean;
+  internal_ready: boolean;
+  blocker_reason?: string;
+  recommended_action?: string;
+  requires_legal_review?: boolean;
+  requires_admin_acceptance?: boolean;
+};
+
+export type PolicyCoverageGroup = {
+  group: string;
+  items: PolicyCoverageRow[];
+};
+
+export type PolicyCoverageMatrix = {
+  summary: {
+    required_count: number;
+    missing_count: number;
+    public_required_count: number;
+    public_published_count: number;
+    public_draft_count: number;
+    internal_required_count: number;
+    internal_ready_count: number;
+    internal_draft_count: number;
+  };
+  groups: PolicyCoverageGroup[];
+  results: PolicyCoverageRow[];
+};
 
 export type ComplianceDocument = {
   id: number;
@@ -95,6 +144,10 @@ export async function listAdminPolicies(params?: {
 
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return apiFetch<AdminPolicyPageListResponse>(`/admin/public-site/policies/${suffix}`);
+}
+
+export async function getAdminPolicyCoverage(): Promise<PolicyCoverageMatrix> {
+  return apiFetch<PolicyCoverageMatrix>("/admin/settings/policies/coverage/");
 }
 
 export async function getAdminPolicyBySlug(slug: string): Promise<AdminPolicyPage | null> {
