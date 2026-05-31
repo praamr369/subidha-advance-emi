@@ -12,8 +12,8 @@ const payload = {
     pending_emi_amount: "3000.00",
     direct_sale_outstanding_count: 1,
     direct_sale_outstanding_amount: "4500.00",
-    rent_lease_due_count: 1,
-    rent_lease_due_amount: "900.00",
+    rent_lease_due_count: null,
+    rent_lease_due_amount: null,
     blocked_finance_account_count: 1,
     ready_finance_account_count: 2,
     pending_receipt_count: null,
@@ -70,7 +70,8 @@ const payload = {
   collection_lanes: [
     { key: "advance_emi", label: "Advance EMI collection", enabled: true, route: "/admin/finance/collect?workflow=advance-emi", description: "Existing EMI endpoint." },
     { key: "direct_sale", label: "Direct-sale collection", enabled: true, route: "/admin/finance/collect?workflow=direct-sale", description: "Existing direct-sale endpoint." },
-    { key: "rent_lease", label: "Rent/lease collection", enabled: false, route: null, description: "Deferred until endpoint is confirmed." },
+    { key: "rent_lease", label: "rentlease collection", enabled: false, route: null, description: "Deferred until endpoint is confirmed." },
+    { key: "customer_advance", label: "Customer advance", enabled: true, route: "/admin/finance/collect?workflow=advance-emi", description: "Existing advance collection path." },
   ],
   route_hints: {
     collection_center: "/admin/collections/control-center",
@@ -141,7 +142,7 @@ async function mockCollectionPageDependencies(page: Page) {
 test.describe("admin collection control center", () => {
   test.use({ storageState: authStatePath("admin") });
 
-  test("shows readiness banner, blocked account, lanes, and no fake rent lease action", async ({ page }) => {
+  test("shows readiness banner, active lanes, deferred rent lease lane, and blockers", async ({ page }) => {
     await mockAdmin(page);
     await page.goto("/admin/collections/control-center");
 
@@ -149,11 +150,18 @@ test.describe("admin collection control center", () => {
     await expect(page.getByText("Finance account blockers need attention")).toBeVisible();
     await expect(page.getByText("Blocked Cash Desk")).toBeVisible();
     await expect(page.getByText("Mapped chart account is a group/control account")).toBeVisible();
+    await expect(page.getByText("Blocked from collection selectors until COA mapping is posting-ready.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Open Accounting Setup" })).toHaveAttribute("href", "/admin/accounting/setup");
+    await expect(page.getByRole("heading", { name: "Advance EMI collection" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Direct-sale collection" })).toBeVisible();
-    await expect(page.getByText("Rent/lease collection")).toBeVisible();
-    await expect(page.getByText("Deferred — endpoint not exposed for collection action yet.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Customer advance" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Rent / Lease collection" })).toBeVisible();
+    await expect(page.getByText("Deferred — backend collection endpoint is not enabled yet.")).toBeVisible();
+    await expect(page.getByText("Rent/lease collection")).toHaveCount(0);
+    await expect(page.getByText("Rent / lease due")).toBeVisible();
     await expect(page.getByText("Not exposed")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Collect rent/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Collect rent/i })).toHaveCount(0);
   });
 
   test("shows compact inline readiness inside admin collection page without fake rent lease action", async ({ page }) => {
@@ -166,13 +174,14 @@ test.describe("admin collection control center", () => {
     await expect(page.getByText("Advance EMI collection readiness")).toBeVisible();
     await expect(page.getByText("Blocked Cash Desk")).toBeVisible();
     await expect(page.getByText("Mapped chart account is a group/control account")).toBeVisible();
+    await expect(page.getByText("Blocked from collection selectors until COA mapping is posting-ready.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Accounting setup", exact: true })).toHaveAttribute("href", "/admin/accounting/setup");
     await expect(page.getByText("Receipt posture: Not exposed · Reconciliation posture: Not exposed")).toBeVisible();
     await expect(page.getByRole("link", { name: /Collect rent/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Collect rent/i })).toHaveCount(0);
   });
 
-  test("shows inline readiness before admin direct-sale collection workflow", async ({ page }) => {
+  test("shows direct-sale inline readiness without fake rent lease zero", async ({ page }) => {
     await mockAdmin(page);
     await mockCollectionPageDependencies(page);
 
@@ -180,6 +189,10 @@ test.describe("admin collection control center", () => {
 
     await expect(page.getByRole("region", { name: "Collection readiness" })).toBeVisible();
     await expect(page.getByText("Direct sale due")).toBeVisible();
+    await expect(page.getByText("Rent / lease due")).toBeVisible();
+    await expect(page.getByText("Not exposed")).toBeVisible();
+    await expect(page.getByText("Rent/lease due")).toHaveCount(0);
+    await expect(page.getByText("₹0.00")).toHaveCount(0);
     await expect(page.getByText("Finance account blocker guidance")).toBeVisible();
     await expect(page.getByRole("link", { name: "Open control center" })).toHaveAttribute("href", "/admin/collections/control-center");
   });
