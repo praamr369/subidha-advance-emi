@@ -22,6 +22,9 @@ from subscriptions.services.business_compliance_governance_service import (
     list_business_compliance_templates,
     seed_business_compliance_rows,
 )
+from subscriptions.services.business_compliance_public_summary_service import (
+    get_public_business_compliance_summary,
+)
 from subscriptions.services.business_compliance_review_actions import (
     approve_document as approve_compliance_document,
     approve_public_summary,
@@ -38,7 +41,6 @@ from subscriptions.services.policy_governance_service import (
     create_draft_from_policy,
     create_policy_page,
     get_latest_policy_by_slug,
-    get_public_business_compliance_summary,
     publish_policy_page,
     seed_default_policy_pages,
     update_policy_page,
