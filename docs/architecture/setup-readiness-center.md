@@ -2,7 +2,7 @@
 
 Branch: `update`
 
-Status: **Phase 7C implemented**
+Status: **Read-only setup readiness with operator-proof finance account guidance**
 
 ## Purpose
 
@@ -65,7 +65,7 @@ The API returns these sections:
 | `business_profile` | Active legal/trade/contact business identity exists. |
 | `print_branding` | Print/PDF display identity and signature/branding settings are configured. |
 | `chart_of_accounts` | Required active COA/system ledgers exist. |
-| `finance_accounts` | Active cash/bank/UPI finance accounts are mapped to posting-ready asset accounts. |
+| `finance_accounts` | Active operational cash/bank/UPI finance accounts are mapped to posting-ready asset accounts. |
 | `branch_cash_counter` | Active primary branch and active collection counter exist. |
 | `staff_roles` | Admin/cashier staffing and role separation readiness. |
 | `product_catalog` | Active products exist for sale/EMI/rent/lease workflows. |
@@ -85,17 +85,49 @@ The API returns these sections:
 
 ## Finance account readiness
 
-Finance account readiness uses the same posting-readiness rule as collection flows:
+Finance account readiness follows the same posting-readiness rule as collection flows.
 
-- finance account must be active
-- kind must be suitable for collection (`CASH`, `BANK`, or `UPI`)
-- mapped chart account must exist
-- mapped chart account must be active
-- mapped chart account must be an `ASSET`
-- mapped chart account must allow manual posting
-- mapped chart account must be a leaf/posting account, not a group/control account
+An operational finance account is collection-ready only when:
 
-The readiness center reports blockers and recommended actions. It does not auto-create posting child accounts and does not silently remap accounts.
+- finance account is active
+- finance account is a real settlement/collection account
+- kind is suitable for collection (`CASH`, `BANK`, or `UPI`)
+- mapped chart account exists
+- mapped chart account is active
+- mapped chart account is an `ASSET`
+- mapped chart account allows manual posting
+- mapped chart account is a leaf/posting account, not a group/control account
+
+Blocked copy:
+
+```text
+Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account.
+```
+
+System posting profiles are diagnostic only and cannot receive customer collections.
+
+```text
+Ledger posting profiles (system)
+```
+
+This row belongs in Accounting Setup diagnostics, not collection selectors.
+
+```text
+diagnostic_only = true
+selectable_for_collection = false
+```
+
+## Multiple account support
+
+Multiple active finance accounts are valid:
+
+```text
+multiple CASH accounts
+multiple BANK accounts
+multiple UPI accounts
+```
+
+Setup health may warn that multiple active accounts exist, but it must not block live readiness solely because more than one account of a kind exists. Each account is evaluated independently.
 
 ## Launch checklist
 
@@ -117,7 +149,7 @@ Items are marked ready only when the backend readiness payload supports them.
 
 No existing business data is changed.
 
-No migration is required for Phase 7C.
+No migration is required.
 
 ## Financial integrity impact
 
