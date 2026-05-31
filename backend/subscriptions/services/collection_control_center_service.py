@@ -14,13 +14,16 @@ from core.services.operational_visibility import invoice_active_q
 from subscriptions.models import Emi, EmiStatus, Payment, RentLeaseBillingDemand, RentLeaseDemandStatus
 
 MONEY_ZERO = Decimal("0.00")
+NOT_EXPOSED = "Not exposed"
 
 
 def _money(value) -> str:
+    if value is None:
+        return NOT_EXPOSED
     try:
-        return f"{Decimal(str(value or MONEY_ZERO)):.2f}"
+        return f"{Decimal(str(value)):.2f}"
     except Exception:
-        return "0.00"
+        return NOT_EXPOSED
 
 
 def _sum(queryset, field: str) -> Decimal:
@@ -31,7 +34,7 @@ def _branch_scope(queryset, *, user, field_name: str):
     return scope_queryset_to_user_branches(queryset, user=user, field_name=field_name)
 
 
-def _finance_accounts(*, user, cashier_safe: bool) -> tuple[list[dict[str, Any]], dict[str, int]]:
+def _finance_accounts(*, user, cashier_safe: bool) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
     queryset = FinanceAccount.objects.select_related("chart_account", "branch").filter(is_active=True)
     if cashier_safe:
         queryset = _branch_scope(queryset, user=user, field_name="branch_id")
@@ -43,15 +46,21 @@ def _finance_accounts(*, user, cashier_safe: bool) -> tuple[list[dict[str, Any]]
         "cash_ready_count": 0,
         "bank_ready_count": 0,
         "upi_ready_count": 0,
+        "diagnostic_count": 0,
+        "selectable_count": 0,
     }
-    rows: list[dict[str, Any]] = []
+    operational_rows: list[dict[str, Any]] = []
+    diagnostic_rows: list[dict[str, Any]] = []
 
     for account in queryset.order_by("kind", "name", "id"):
         readiness = finance_account_readiness(account)
         chart = getattr(account, "chart_account", None)
         counts["active_count"] += 1
-        if readiness.collection_ready:
+        if readiness.diagnostic_only:
+            counts["diagnostic_count"] += 1
+        elif readiness.selectable_for_collection:
             counts["ready_count"] += 1
+            counts["selectable_count"] += 1
             if account.kind == "CASH":
                 counts["cash_ready_count"] += 1
             elif account.kind == "BANK":
@@ -61,32 +70,39 @@ def _finance_accounts(*, user, cashier_safe: bool) -> tuple[list[dict[str, Any]]
         else:
             counts["blocked_count"] += 1
 
-        rows.append(
-            {
-                "id": account.id,
-                "name": account.name,
-                "kind": account.kind,
-                "branch_id": account.branch_id,
-                "branch_name": getattr(account.branch, "name", None) if account.branch_id else None,
-                "mapped_chart_account": (
-                    {
-                        "id": chart.id,
-                        "code": chart.code,
-                        "name": chart.name,
-                        "account_type": chart.account_type,
-                        "is_active": chart.is_active,
-                        "allow_manual_posting": chart.allow_manual_posting,
-                    }
-                    if chart
-                    else None
-                ),
-                "collection_ready": readiness.collection_ready,
-                "collection_blocker_reason": readiness.collection_blocker_reason,
-                "recommended_action": readiness.recommended_action,
-            }
-        )
+        row = {
+            "id": account.id,
+            "name": account.name,
+            "kind": account.kind,
+            "branch_id": account.branch_id,
+            "branch_name": getattr(account.branch, "name", None) if account.branch_id else None,
+            "mapped_chart_account": (
+                {
+                    "id": chart.id,
+                    "code": chart.code,
+                    "name": chart.name,
+                    "account_type": chart.account_type,
+                    "is_active": chart.is_active,
+                    "allow_manual_posting": chart.allow_manual_posting,
+                }
+                if chart
+                else None
+            ),
+            "operational_collection_account": readiness.operational_collection_account,
+            "system_posting_profile": readiness.system_posting_profile,
+            "diagnostic_only": readiness.diagnostic_only,
+            "collection_ready": readiness.collection_ready,
+            "selectable_for_collection": readiness.selectable_for_collection,
+            "is_selectable_collection_account": readiness.selectable_for_collection,
+            "collection_blocker_reason": readiness.collection_blocker_reason,
+            "recommended_action": readiness.recommended_action,
+        }
+        if readiness.diagnostic_only:
+            diagnostic_rows.append(row)
+        else:
+            operational_rows.append(row)
 
-    return rows, counts
+    return operational_rows, diagnostic_rows, counts
 
 
 def _recent_payments(*, user, cashier_safe: bool) -> list[dict[str, Any]]:
@@ -139,7 +155,7 @@ def build_collection_control_center_payload(*, user, role: str) -> dict[str, Any
     if cashier_safe:
         rent_lease = _branch_scope(rent_lease, user=user, field_name="subscription__branch_id")
 
-    accounts, account_counts = _finance_accounts(user=user, cashier_safe=cashier_safe)
+    operational_accounts, diagnostic_accounts, account_counts = _finance_accounts(user=user, cashier_safe=cashier_safe)
     rent_lease_due = max(_sum(rent_lease, "amount") - _sum(rent_lease, "collected_amount"), MONEY_ZERO)
 
     routes = (
@@ -165,6 +181,7 @@ def build_collection_control_center_payload(*, user, role: str) -> dict[str, Any
     return {
         "role": "cashier" if cashier_safe else "admin",
         "read_only": True,
+        "not_exposed_label": NOT_EXPOSED,
         "summary": {
             "due_today_count": emis.filter(due_date=today).count(),
             "overdue_count": emis.filter(due_date__lt=today).count(),
@@ -179,7 +196,12 @@ def build_collection_control_center_payload(*, user, role: str) -> dict[str, Any
             "pending_receipt_count": None,
             "unreconciled_collection_count": None,
         },
-        "finance_account_readiness": {"counts": account_counts, "accounts": accounts},
+        "finance_account_readiness": {
+            "counts": account_counts,
+            "accounts": operational_accounts,
+            "operational_collection_accounts": operational_accounts,
+            "diagnostic_system_accounts": diagnostic_accounts,
+        },
         "collection_lanes": [
             {"key": "advance_emi", "label": "Advance EMI collection", "enabled": True, "route": routes["advance_emi_collect"]},
             {"key": "direct_sale", "label": "Direct-sale collection", "enabled": True, "route": routes["direct_sale_collect"]},
