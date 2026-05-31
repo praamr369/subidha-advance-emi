@@ -182,7 +182,7 @@ export default function AdminAccountingSetupPage() {
 
   const blockers = health?.blockers ?? [];
   const warnings = health?.warnings ?? [];
-  const displayStatus = health?.status ?? matrix?.summary ? "READY" : "BLOCKED";
+  const displayStatus = health?.status ?? (matrix ? "READY" : "BLOCKED");
 
   const previewDefaults = useCallback(async () => {
     setPreviewing(true);
