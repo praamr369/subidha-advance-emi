@@ -28,6 +28,10 @@ function money(value: string | number | null | undefined): string {
   return `₹${Number(value).toFixed(2)}`;
 }
 
+function metric(value: string | number | null | undefined): string | number {
+  return hasMetricValue(value) ? value : "Not exposed";
+}
+
 function formatDate(value?: string | null): string {
   if (!value) return "—";
   const parsed = Date.parse(value);
@@ -45,10 +49,11 @@ function isDeferredLane(lane: CollectionControlLane): boolean {
 }
 
 function accountBlocker(account: CollectionControlFinanceAccount): string {
-  return (
-    account.collection_blocker_reason ||
-    "Blocked from collection selectors until COA mapping is posting-ready."
-  );
+  return account.collection_blocker_reason || "Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account.";
+}
+
+function isSelectable(account: CollectionControlFinanceAccount): boolean {
+  return Boolean(account.selectable_for_collection || account.is_selectable_collection_account);
 }
 
 function FinanceReadinessBanner({ payload }: { payload: CollectionControlPayload }) {
@@ -68,7 +73,7 @@ function FinanceReadinessBanner({ payload }: { payload: CollectionControlPayload
             {blocked ? "Finance account blockers need attention" : "Finance accounts ready for collection"}
           </h2>
           <p className="mt-2 max-w-3xl text-sm opacity-90">
-            Collection still uses existing approved endpoints. Blocked accounts are visible as operational blockers and stay unavailable in collection selectors.
+            Operational Finance Accounts are where money is received or paid. System posting profiles are diagnostic only and cannot receive customer collections.
           </p>
         </div>
         {payload.role === "admin" && payload.route_hints.accounting_setup ? (
@@ -84,14 +89,18 @@ function FinanceReadinessBanner({ payload }: { payload: CollectionControlPayload
           </div>
         )}
       </div>
-      <div className="mt-5 grid gap-3 md:grid-cols-4">
+      <div className="mt-5 grid gap-3 md:grid-cols-5">
         <div className="rounded-xl border border-current/20 bg-white/60 p-4">
-          <div className="text-xs font-medium uppercase tracking-wide">Ready accounts</div>
-          <div className="mt-1 text-2xl font-semibold">{counts.ready_count}</div>
+          <div className="text-xs font-medium uppercase tracking-wide">Selectable</div>
+          <div className="mt-1 text-2xl font-semibold">{counts.selectable_count ?? counts.ready_count}</div>
         </div>
         <div className="rounded-xl border border-current/20 bg-white/60 p-4">
-          <div className="text-xs font-medium uppercase tracking-wide">Blocked accounts</div>
+          <div className="text-xs font-medium uppercase tracking-wide">Blocked</div>
           <div className="mt-1 text-2xl font-semibold">{counts.blocked_count}</div>
+        </div>
+        <div className="rounded-xl border border-current/20 bg-white/60 p-4">
+          <div className="text-xs font-medium uppercase tracking-wide">Diagnostic</div>
+          <div className="mt-1 text-2xl font-semibold">{counts.diagnostic_count ?? 0}</div>
         </div>
         <div className="rounded-xl border border-current/20 bg-white/60 p-4">
           <div className="text-xs font-medium uppercase tracking-wide">Cash ready</div>
@@ -107,55 +116,92 @@ function FinanceReadinessBanner({ payload }: { payload: CollectionControlPayload
 }
 
 function FinanceAccountTable({ payload }: { payload: CollectionControlPayload }) {
-  const accounts = payload.finance_account_readiness.accounts;
+  const operationalAccounts = payload.finance_account_readiness.operational_collection_accounts ?? payload.finance_account_readiness.accounts;
+  const diagnosticAccounts = payload.finance_account_readiness.diagnostic_system_accounts ?? [];
   return (
-    <FormSection
-      title="Finance account selector readiness"
-      description="Blocked rows remain visible for diagnosis but should be disabled in collection selectors."
-    >
-      {accounts.length === 0 ? (
-        <EmptyState title="No active finance accounts" description="No active cash, bank, or UPI finance accounts are available for collection." />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-[920px] w-full text-left text-sm">
-            <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="px-3 py-3">Account</th>
-                <th className="px-3 py-3">Kind</th>
-                <th className="px-3 py-3">Mapped COA</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3">Blocker / guidance</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {accounts.map((account) => (
-                <tr key={account.id} className={account.collection_ready ? "" : "bg-amber-50/40"}>
-                  <td className="px-3 py-3 font-medium text-foreground">{account.name}</td>
-                  <td className="px-3 py-3 text-muted-foreground">{account.kind}</td>
-                  <td className="px-3 py-3 text-muted-foreground">
-                    {account.mapped_chart_account
-                      ? `${account.mapped_chart_account.code} — ${account.mapped_chart_account.name}`
-                      : "Not mapped"}
-                  </td>
-                  <td className="px-3 py-3">
-                    <StatusBadge status={account.collection_ready ? "READY" : "BLOCKED"} label={account.collection_ready ? "Ready" : "Blocked"} />
-                  </td>
-                  <td className="px-3 py-3 text-muted-foreground">
-                    {account.collection_ready ? "Can receive payments." : accountBlocker(account)}
-                    {!account.collection_ready ? (
-                      <div className="mt-1 text-xs">Blocked from collection selectors until COA mapping is posting-ready. System or control accounts are diagnostic only and cannot receive customer collections.</div>
-                    ) : null}
-                    {!account.collection_ready && account.recommended_action ? (
-                      <div className="mt-1 text-xs">{account.recommended_action}</div>
-                    ) : null}
-                  </td>
+    <div className="space-y-4">
+      <FormSection
+        title="Operational collection accounts"
+        description="Only these Finance Accounts can become selectable in collection screens. They must map to active posting-enabled leaf ASSET accounts."
+      >
+        {operationalAccounts.length === 0 ? (
+          <EmptyState title="No operational collection accounts" description="No active cash, bank, or UPI collection accounts are available." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-[920px] w-full text-left text-sm">
+              <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-3">Account</th>
+                  <th className="px-3 py-3">Kind</th>
+                  <th className="px-3 py-3">Mapped COA</th>
+                  <th className="px-3 py-3">Selector status</th>
+                  <th className="px-3 py-3">Blocker / guidance</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </FormSection>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {operationalAccounts.map((account) => (
+                  <tr key={account.id} className={isSelectable(account) ? "" : "bg-amber-50/40"}>
+                    <td className="px-3 py-3 font-medium text-foreground">{account.name}</td>
+                    <td className="px-3 py-3 text-muted-foreground">{account.kind}</td>
+                    <td className="px-3 py-3 text-muted-foreground">
+                      {account.mapped_chart_account
+                        ? `${account.mapped_chart_account.code} — ${account.mapped_chart_account.name}`
+                        : "Not mapped"}
+                    </td>
+                    <td className="px-3 py-3">
+                      <StatusBadge status={isSelectable(account) ? "READY" : "BLOCKED"} label={isSelectable(account) ? "Selectable" : "Blocked"} />
+                    </td>
+                    <td className="px-3 py-3 text-muted-foreground">
+                      {isSelectable(account) ? "Can receive payments." : accountBlocker(account)}
+                      {!isSelectable(account) ? (
+                        <div className="mt-1 text-xs">Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account.</div>
+                      ) : null}
+                      {!isSelectable(account) && account.recommended_action ? (
+                        <div className="mt-1 text-xs">{account.recommended_action}</div>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </FormSection>
+
+      {diagnosticAccounts.length > 0 ? (
+        <FormSection
+          title="Diagnostic system posting profiles"
+          description="These rows explain system ledger setup only. They are never collection destinations and must not appear in collection selectors."
+        >
+          <div className="overflow-x-auto">
+            <table className="min-w-[760px] w-full text-left text-sm">
+              <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-3">System profile</th>
+                  <th className="px-3 py-3">Kind</th>
+                  <th className="px-3 py-3">Mapped COA</th>
+                  <th className="px-3 py-3">Selector status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {diagnosticAccounts.map((account) => (
+                  <tr key={account.id} className="bg-slate-50/60">
+                    <td className="px-3 py-3 font-medium text-foreground">{account.name}</td>
+                    <td className="px-3 py-3 text-muted-foreground">{account.kind}</td>
+                    <td className="px-3 py-3 text-muted-foreground">
+                      {account.mapped_chart_account
+                        ? `${account.mapped_chart_account.code} — ${account.mapped_chart_account.name}`
+                        : "Not mapped"}
+                    </td>
+                    <td className="px-3 py-3 text-muted-foreground">System posting profile diagnostic only; not a customer collection destination.</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </FormSection>
+      ) : null}
+    </div>
   );
 }
 
@@ -240,12 +286,12 @@ export default function CollectionControlCenterView({ role }: { role: Collection
             <FinanceReadinessBanner payload={payload} />
 
             <QuickActionGrid>
-              <KpiCard label="Due today" value={summary.due_today_count} helper="Pending EMI rows due today" />
-              <KpiCard label="Overdue" value={summary.overdue_count} helper="Pending EMI rows past due date" />
-              <KpiCard label="Pending EMI amount" value={money(summary.pending_emi_amount)} helper={`${summary.pending_emi_count} pending rows`} />
-              <KpiCard label="Direct-sale outstanding" value={money(summary.direct_sale_outstanding_amount)} helper={`${summary.direct_sale_outstanding_count} invoiced balances`} />
-              <KpiCard label="Rent / lease due" value={money(summary.rent_lease_due_amount)} helper={hasMetricValue(summary.rent_lease_due_count) ? `${summary.rent_lease_due_count} demand rows` : "Not exposed by backend"} />
-              <KpiCard label="Blocked accounts" value={summary.blocked_finance_account_count} helper="Finance accounts not collection-ready" />
+              <KpiCard label="Due today" value={metric(summary.due_today_count)} helper="Pending EMI rows due today" />
+              <KpiCard label="Overdue" value={metric(summary.overdue_count)} helper="Pending EMI rows past due date" />
+              <KpiCard label="Pending EMI amount" value={money(summary.pending_emi_amount)} helper={`${metric(summary.pending_emi_count)} pending rows`} />
+              <KpiCard label="Direct-sale outstanding" value={money(summary.direct_sale_outstanding_amount)} helper={`${metric(summary.direct_sale_outstanding_count)} invoiced balances`} />
+              <KpiCard label="Rent / lease due" value={money(summary.rent_lease_due_amount)} helper={hasMetricValue(summary.rent_lease_due_count) ? `${summary.rent_lease_due_count} demand rows` : "Not exposed"} />
+              <KpiCard label="Blocked accounts" value={metric(summary.blocked_finance_account_count)} helper="Operational accounts not collection-ready" />
             </QuickActionGrid>
 
             <FormSection title="Collection lanes" description="Buttons only navigate to real implemented collection routes. Deferred lanes do not expose fake actions.">
@@ -279,12 +325,12 @@ export default function CollectionControlCenterView({ role }: { role: Collection
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pending receipts</div>
-                  <div className="mt-2 text-2xl font-semibold text-foreground">{summary.pending_receipt_count ?? "Not exposed"}</div>
+                  <div className="mt-2 text-2xl font-semibold text-foreground">{metric(summary.pending_receipt_count)}</div>
                   <p className="mt-1 text-sm text-muted-foreground">Shown only when receipt status is available from backend.</p>
                 </div>
                 <div className="rounded-2xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unreconciled collections</div>
-                  <div className="mt-2 text-2xl font-semibold text-foreground">{summary.unreconciled_collection_count ?? "Not exposed"}</div>
+                  <div className="mt-2 text-2xl font-semibold text-foreground">{metric(summary.unreconciled_collection_count)}</div>
                   <p className="mt-1 text-sm text-muted-foreground">Shown only when reconciliation status is available from backend.</p>
                 </div>
               </div>
