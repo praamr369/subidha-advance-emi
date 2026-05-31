@@ -2,9 +2,85 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { authStatePath } from "./helpers/smoke-data";
 
+const operationalAccounts = [
+  {
+    id: 1,
+    name: "Main Cash Desk",
+    kind: "CASH",
+    branch_id: 1,
+    branch_name: "Main Branch",
+    mapped_chart_account: {
+      id: 11,
+      code: "CASH-001",
+      name: "Cash in Hand",
+      account_type: "ASSET",
+      is_active: true,
+      allow_manual_posting: true,
+    },
+    operational_collection_account: true,
+    diagnostic_only: false,
+    system_posting_profile: false,
+    collection_ready: true,
+    selectable_for_collection: true,
+    is_selectable_collection_account: true,
+    collection_blocker_reason: null,
+    recommended_action: null,
+  },
+  {
+    id: 2,
+    name: "Blocked Cash Desk",
+    kind: "CASH",
+    branch_id: 1,
+    branch_name: "Main Branch",
+    mapped_chart_account: {
+      id: 12,
+      code: "CASH-GROUP",
+      name: "Cash Group",
+      account_type: "ASSET",
+      is_active: true,
+      allow_manual_posting: false,
+    },
+    operational_collection_account: true,
+    diagnostic_only: false,
+    system_posting_profile: false,
+    collection_ready: false,
+    selectable_for_collection: false,
+    is_selectable_collection_account: false,
+    collection_blocker_reason: "Mapped chart account is a group/control account, not a posting account.",
+    recommended_action: "Choose a posting-enabled leaf ASSET chart account in Accounting Setup.",
+  },
+];
+
+const diagnosticAccounts = [
+  {
+    id: 99,
+    name: "Ledger posting profiles (system)",
+    kind: "SYSTEM",
+    branch_id: null,
+    branch_name: null,
+    mapped_chart_account: {
+      id: 19,
+      code: "SYS-POST",
+      name: "System Posting Ledger",
+      account_type: "ASSET",
+      is_active: true,
+      allow_manual_posting: true,
+    },
+    operational_collection_account: false,
+    diagnostic_only: true,
+    system_posting_profile: true,
+    collection_ready: false,
+    selectable_for_collection: false,
+    is_selectable_collection_account: false,
+    collection_blocker_reason: "System posting profile diagnostic only; not a customer collection destination.",
+    recommended_action: "Review this row in System Posting Profiles, not in customer collection selectors.",
+  },
+];
+
 const payload = {
   role: "admin",
   read_only: true,
+  not_exposed_label: "Not exposed",
   summary: {
     due_today_count: 2,
     overdue_count: 1,
@@ -22,50 +98,17 @@ const payload = {
   finance_account_readiness: {
     counts: {
       active_count: 3,
-      ready_count: 2,
+      ready_count: 1,
       blocked_count: 1,
       cash_ready_count: 1,
-      bank_ready_count: 1,
+      bank_ready_count: 0,
       upi_ready_count: 0,
+      diagnostic_count: 1,
+      selectable_count: 1,
     },
-    accounts: [
-      {
-        id: 1,
-        name: "Main Cash Desk",
-        kind: "CASH",
-        branch_id: 1,
-        branch_name: "Main Branch",
-        mapped_chart_account: {
-          id: 11,
-          code: "CASH-001",
-          name: "Cash in Hand",
-          account_type: "ASSET",
-          is_active: true,
-          allow_manual_posting: true,
-        },
-        collection_ready: true,
-        collection_blocker_reason: null,
-        recommended_action: null,
-      },
-      {
-        id: 2,
-        name: "Blocked Cash Desk",
-        kind: "CASH",
-        branch_id: 1,
-        branch_name: "Main Branch",
-        mapped_chart_account: {
-          id: 12,
-          code: "CASH-GROUP",
-          name: "Cash Group",
-          account_type: "ASSET",
-          is_active: true,
-          allow_manual_posting: false,
-        },
-        collection_ready: false,
-        collection_blocker_reason: "Mapped chart account is a group/control account, not a posting account.",
-        recommended_action: "Choose a posting-enabled leaf ASSET chart account in Accounting Setup.",
-      },
-    ],
+    accounts: operationalAccounts,
+    operational_collection_accounts: operationalAccounts,
+    diagnostic_system_accounts: diagnosticAccounts,
   },
   collection_lanes: [
     { key: "advance_emi", label: "Advance EMI collection", enabled: true, route: "/admin/finance/collect?workflow=advance-emi", description: "Existing EMI endpoint." },
@@ -142,15 +185,19 @@ async function mockCollectionPageDependencies(page: Page) {
 test.describe("admin collection control center", () => {
   test.use({ storageState: authStatePath("admin") });
 
-  test("shows readiness banner, active lanes, deferred rent lease lane, and blockers", async ({ page }) => {
+  test("shows operational accounts, diagnostic profiles, deferred rent lease, and blockers", async ({ page }) => {
     await mockAdmin(page);
     await page.goto("/admin/collections/control-center");
 
     await expect(page.getByRole("heading", { name: "Collection Control Center" })).toBeVisible();
     await expect(page.getByText("Finance account blockers need attention")).toBeVisible();
+    await expect(page.getByText("Operational collection accounts")).toBeVisible();
+    await expect(page.getByText("Diagnostic system posting profiles")).toBeVisible();
     await expect(page.getByText("Blocked Cash Desk")).toBeVisible();
     await expect(page.getByText("Mapped chart account is a group/control account")).toBeVisible();
-    await expect(page.getByText("Blocked from collection selectors until COA mapping is posting-ready.")).toBeVisible();
+    await expect(page.getByText("Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account.").first()).toBeVisible();
+    await expect(page.getByText("Ledger posting profiles (system)")).toBeVisible();
+    await expect(page.getByText("System posting profile diagnostic only; not a customer collection destination.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Open Accounting Setup" })).toHaveAttribute("href", "/admin/accounting/setup");
     await expect(page.getByRole("heading", { name: "Advance EMI collection" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Direct-sale collection" })).toBeVisible();
@@ -174,7 +221,7 @@ test.describe("admin collection control center", () => {
     await expect(page.getByText("Advance EMI collection readiness")).toBeVisible();
     await expect(page.getByText("Blocked Cash Desk")).toBeVisible();
     await expect(page.getByText("Mapped chart account is a group/control account")).toBeVisible();
-    await expect(page.getByText("Blocked from collection selectors until COA mapping is posting-ready.")).toBeVisible();
+    await expect(page.getByText("Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Accounting setup", exact: true })).toHaveAttribute("href", "/admin/accounting/setup");
     await expect(page.getByText("Receipt posture: Not exposed · Reconciliation posture: Not exposed")).toBeVisible();
     await expect(page.getByRole("link", { name: /Collect rent/i })).toHaveCount(0);
@@ -209,6 +256,7 @@ test.describe("cashier collection control center", () => {
     await expect(page.getByText("Ask admin to fix accounting setup")).toBeVisible();
     await expect(page.getByRole("link", { name: "Open Accounting Setup" })).toHaveCount(0);
     await expect(page.getByText("Blocked Cash Desk")).toBeVisible();
+    await expect(page.getByText("Ledger posting profiles (system)")).toBeVisible();
   });
 
   test("shows compact inline readiness inside cashier collection page without accounting setup edit action", async ({ page }) => {
