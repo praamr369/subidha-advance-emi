@@ -287,7 +287,9 @@ def preview_accounting_setup_defaults() -> dict[str, Any]:
     manual_review: list[str] = []
     for kind, snapshot in finance_dupes.items():
         if snapshot["active_count"] > 1:
-            manual_review.append(f"Multiple active {kind} finance accounts detected.")
+            manual_review.append(
+                f"Multiple active {kind} finance accounts detected; defaults will preserve all active accounts."
+            )
     if canonical["conflicts"]:
         manual_review.append("Canonical COA conflicts detected (code/system_code mismatches).")
 
@@ -385,69 +387,29 @@ def _finance_account_has_posted_usage(finance_account: FinanceAccount) -> bool:
 
 def _deactivate_duplicate_finance_accounts_if_safe(*, kind: str) -> list[dict[str, Any]]:
     """
-    Deterministic duplicate handling (only in Apply Suggested Default):
-    - Keep the default-named finance account active.
-    - Deactivate other active finance accounts of the same kind only if they appear unused (no posted journal lines).
-    - If unsure, do not change and surface manual-review.
-    """
+    Compatibility-named no-op.
 
-    plan = _default_finance_account_plan()
-    keep_name = plan[kind]["name"] if kind in plan else None
-    if not keep_name:
-        return []
+    Multiple active CASH/BANK/UPI finance accounts are valid. Apply Suggested Default must not deactivate,
+    remap, or otherwise mutate independent operational settlement accounts.
+    """
 
     active = list(
         FinanceAccount.objects.filter(
             kind=kind,
             is_active=True,
             is_real_settlement_account=True,
-        )
-        .select_related("chart_account")
-        .order_by("id")
+        ).order_by("id")
     )
     if len(active) <= 1:
         return []
-
-    keep = None
-    for row in active:
-        if (row.name or "").strip().lower() == keep_name.strip().lower():
-            keep = row
-            break
-    if keep is None:
-        return [
-            {
-                "kind": kind,
-                "status": "MANUAL_REVIEW_REQUIRED",
-                "reason": f'No deterministic keep-candidate found (expected "{keep_name}").',
-                "active_finance_account_ids": [r.id for r in active],
-            }
-        ]
-
-    deactivated: list[dict[str, Any]] = []
-    for row in active:
-        if row.id == keep.id:
-            continue
-        if (row.name or "").strip().lower().startswith("default test "):
-            continue
-        if _finance_account_has_posted_usage(row):
-            return [
-                {
-                    "kind": kind,
-                    "status": "MANUAL_REVIEW_REQUIRED",
-                    "reason": "Duplicate active finance account has posted usage; refusing to deactivate automatically.",
-                    "active_finance_account_ids": [r.id for r in active],
-                    "keep_finance_account_id": keep.id,
-                }
-            ]
-        FinanceAccount.objects.filter(pk=row.pk).update(is_active=False)
-        deactivated.append(
-            {
-                "id": row.id,
-                "name": row.name,
-                "kind": row.kind,
-            }
-        )
-    return [{"kind": kind, "status": "DEACTIVATED_UNUSED_DUPLICATES", "rows": deactivated, "kept_id": keep.id}]
+    return [
+        {
+            "kind": kind,
+            "status": "PRESERVED_MULTIPLE_ACTIVE_ACCOUNTS",
+            "reason": "Multiple active finance accounts are supported and evaluated independently; defaults did not deactivate or remap them.",
+            "active_finance_account_ids": [row.id for row in active],
+        }
+    ]
 
 
 def _ensure_collection_mappings(
@@ -541,8 +503,6 @@ def _ensure_collection_mappings(
                 mapping.save()
                 updated.append({"id": mapping.id, "purpose": purpose})
 
-    # Ensure every active settlement finance account has at least one active collection mapping.
-    # This keeps validation strict while preventing false "unmapped finance account" failures after fresh setup.
     for account in FinanceAccount.objects.filter(is_active=True, is_real_settlement_account=True).select_related("chart_account"):
         if account.kind == FinanceAccountKind.CASH:
             purpose = FinanceAccountMappingPurpose.CASH_COLLECTION
@@ -578,8 +538,6 @@ def _ensure_collection_mappings(
         )
         created.append({"id": mapping.id, "purpose": purpose, "finance_account_id": account.id})
 
-    # Enforce "single default per purpose" by deactivating extra defaults only if created by defaults and unused.
-    # If ambiguous, leave intact for manual review (health will report).
     return {"created": created, "updated": updated}
 
 
@@ -590,6 +548,7 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
     - Never deletes anything.
     - Never rewrites historical journals.
     - Marks legacy COA-* duplicates via metadata only.
+    - Preserves multiple active operational finance accounts.
     """
 
     canonical_results: dict[str, dict[str, Any]] = {}
@@ -640,7 +599,6 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
             "conflicts": canonical_conflicts,
         }
 
-    # Ledger anchor (compatibility for current mapping tables/guards)
     ledger_anchor = _ensure_ledger_anchor_finance_account(bank_chart=chart_accounts["BANK_COLLECTION"])
 
     finance_plan = _default_finance_account_plan()
@@ -658,7 +616,6 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
     for kind in (FinanceAccountKind.CASH, FinanceAccountKind.BANK, FinanceAccountKind.UPI):
         duplicate_actions.extend(_deactivate_duplicate_finance_accounts_if_safe(kind=kind))
 
-    # Posting profiles (system-only)
     profiles_created: list[dict[str, Any]] = []
     profiles_updated: list[dict[str, Any]] = []
     for spec in SYSTEM_POSTING_PROFILE_ACCOUNTS:
@@ -689,7 +646,6 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
                 profile.save()
                 profiles_updated.append({"id": profile.id, "key": profile.key})
 
-    # Finance account ↔ COA mappings (compat)
     mappings_result = _ensure_collection_mappings(
         performed_by=performed_by,
         finance_accounts=finance_accounts,
@@ -697,7 +653,6 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
         ledger_anchor=ledger_anchor,
     )
 
-    # Mark legacy duplicates (metadata only; do not deactivate)
     legacy_marked: list[dict[str, Any]] = []
     for cand in _legacy_duplicate_candidates():
         ChartOfAccount.objects.filter(pk=cand["id"]).update(
