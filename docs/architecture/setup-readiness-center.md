@@ -2,13 +2,13 @@
 
 Branch: `update`
 
-Status: **Read-only setup readiness with operator-proof finance account guidance**
+Status: **Read-only setup readiness with operator-proof finance and policy governance guidance**
 
 ## Purpose
 
 The Setup Readiness Center gives admin users one guided place to verify whether SUBIDHA CORE is ready for live shop operation.
 
-It focuses on the master data and control setup needed before daily workflows such as customer onboarding, product registration, batch/Lucky ID creation, payment collection, receipt printing, reconciliation, day close, and product recontract execution.
+It focuses on the master data and control setup needed before daily workflows such as customer onboarding, product registration, batch/Lucky ID creation, payment collection, receipt printing, reconciliation, day close, policy publication, and product recontract execution.
 
 ## Routes
 
@@ -46,6 +46,8 @@ It does not:
 - create finance accounts
 - remap finance accounts
 - repair accounting setup
+- seed policies
+- publish policies
 - post payments
 - issue receipts
 - post journal entries
@@ -64,6 +66,7 @@ The API returns these sections:
 |---|---|
 | `business_profile` | Active legal/trade/contact business identity exists. |
 | `print_branding` | Print/PDF display identity and signature/branding settings are configured. |
+| `policy_governance` | Required public/internal policies exist and have the correct lifecycle state. |
 | `chart_of_accounts` | Required active COA/system ledgers exist. |
 | `finance_accounts` | Active operational cash/bank/UPI finance accounts are mapped to posting-ready asset accounts. |
 | `branch_cash_counter` | Active primary branch and active collection counter exist. |
@@ -82,6 +85,38 @@ The API returns these sections:
 | `READY` | Minimum operational criteria are satisfied for that section. |
 | `NEEDS_SETUP` | Optional or important setup is incomplete but does not always block live operation. |
 | `BLOCKED` | Live operation would be unsafe or likely fail until setup is completed. |
+
+## Policy governance readiness
+
+Policy Governance readiness uses the coverage matrix from:
+
+```text
+GET /api/v1/admin/settings/policies/coverage/
+```
+
+It blocks readiness when:
+
+```text
+required public policies are missing
+required public policies exist only as DRAFT or ARCHIVED
+```
+
+It warns when:
+
+```text
+internal governance policies are missing
+internal governance policies are still DRAFT
+```
+
+Readiness copy must stay honest:
+
+```text
+Seeded policies remain DRAFT.
+DRAFT is not public.
+INTERNAL is never public.
+Public launch requires published public policies.
+Internal governance policies support audit/control but do not replace legal review.
+```
 
 ## Finance account readiness
 
@@ -139,6 +174,7 @@ The frontend renders a backend-supported checklist:
 - Can collect payment
 - Can issue receipt
 - Can print documents
+- Can publish public policies
 - Can reconcile
 - Can day-close
 - Can handle amendment/recontract
@@ -149,13 +185,13 @@ Items are marked ready only when the backend readiness payload supports them.
 
 No existing business data is changed.
 
-No migration is required.
+No migration is required for this readiness update.
 
 ## Financial integrity impact
 
 Financial controls remain enforced.
 
-The readiness center reports configuration blockers but does not weaken collection, posting, receipt, reconciliation, day-close, or product recontract gates.
+The readiness center reports configuration blockers but does not weaken collection, posting, receipt, reconciliation, day-close, policy lifecycle, or product recontract gates.
 
 ## Auditability impact
 
@@ -171,6 +207,6 @@ The page links to real implemented setup routes only. Fake action buttons are no
 
 ## Future rent/lease compatibility
 
-The readiness model is reusable for rent/lease expansion because it treats business profile, print branding, finance accounts, deposits, accounting/reconciliation readiness, products, delivery, and document controls as shared setup foundations.
+The readiness model is reusable for rent/lease expansion because it treats business profile, print branding, policies, finance accounts, deposits, accounting/reconciliation readiness, products, delivery, and document controls as shared setup foundations.
 
 Future rent/lease-specific readiness can add sections without changing existing EMI setup truth.
