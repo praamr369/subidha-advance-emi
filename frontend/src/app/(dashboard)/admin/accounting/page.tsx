@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Repeat2,
   Scale,
+  ScrollText,
   Settings2,
   ShieldCheck,
   ShoppingCart,
@@ -145,6 +146,15 @@ const MODULE_GROUPS: AccountingModuleGroup[] = [
         implemented: true,
         readOnly: true,
         setupGate: true,
+      },
+      {
+        key: "receivables",
+        title: "Receivables",
+        description: "Review unified unpaid dues and outstanding customer balances before collection follow-up.",
+        route: ROUTES.admin.outstandings,
+        icon: Receipt,
+        implemented: true,
+        readOnly: true,
       },
       {
         key: "direct_sale_receivables",
