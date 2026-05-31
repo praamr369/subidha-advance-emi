@@ -38,7 +38,7 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await resetAdminDashboardClientState(page);
   });
 
-  test("admin dashboard shows canonical sidebar groups and action workspace buckets", async ({ page }) => {
+  test("admin dashboard shows parent-only ERP sidebar modules", async ({ page }) => {
     await page.goto("/admin");
     const sidebar = page.getByRole("complementary");
     await expectSuccessOrControlledFetchError(page, async () => {
@@ -46,42 +46,47 @@ test.describe("admin dashboard phase-3 smoke", () => {
         page.getByRole("heading", { name: /Daily Operator Dashboard|Executive Dashboard|Admin Dashboard/i })
       ).toBeVisible();
     });
-    // Sidebar group titles also appear in dashboard KPI surfaces; scope to the sidebar to avoid strict-mode collisions.
-    await expect(sidebar.getByRole("button", { name: "Command Center", exact: true })).toBeVisible();
-    await expect(sidebar.getByRole("button", { name: /CRM|CRM & Partners/ })).toBeVisible();
-    await expect(sidebar.getByRole("button", { name: /Sales|Sales & Contracts/ })).toBeVisible();
-    await expect(sidebar.getByRole("button", { name: /Inventory|Product & Inventory/ })).toBeVisible();
-    await expect(sidebar.getByRole("button", { name: /Delivery & Service|Delivery & Returns/ })).toBeVisible();
-    await expect(sidebar.getByRole("button", { name: /Billing & Finance|Finance & Accounting/ })).toBeVisible();
-    await expect(sidebar.getByRole("button", { name: /Staff & Business Setup|Settings/, exact: false })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Operations Command Center", exact: true })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Subscription Workflows", exact: true })).toBeVisible();
 
-    await sidebar.getByRole("button", { name: "Expand Advance EMI" }).click();
-    await expect(sidebar.getByRole("link", { name: "Batch Register", exact: true })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Lucky ID Register", exact: true })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Lucky Draws", exact: true })).toBeVisible();
+    const expectedParentModules = [
+      "Command Center",
+      "Sales & Contracts",
+      "Subscription EMI",
+      "Rent / Lease",
+      "Direct Sale",
+      "Accounting & Finance",
+      "Inventory",
+      "Manufacturing",
+      "CRM / Parties",
+      "HR & Staff",
+      "Service Desk",
+      "Delivery & Operations",
+      "Reports & Analysis",
+      "Settings",
+    ];
 
-    await sidebar.getByRole("button", { name: "Expand Rent" }).click();
-    const rentRegister = sidebar.getByRole("link", { name: "Rent Contract Register", exact: true });
-    await expect(rentRegister).toBeVisible();
-    const rentNested = rentRegister.locator("xpath=ancestor::div[contains(@class,'border-l')][1]");
-    await expect(rentNested.getByRole("link", { name: "Lucky ID Register", exact: true })).toHaveCount(0);
-    await expect(rentNested.getByRole("link", { name: "Lucky Draws", exact: true })).toHaveCount(0);
+    for (const label of expectedParentModules) {
+      await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
+    }
 
-    await sidebar.getByRole("button", { name: "Expand Lease" }).click();
-    const leaseRegister = sidebar.getByRole("link", { name: "Lease Contract Register", exact: true });
-    await expect(leaseRegister).toBeVisible();
-    const leaseNested = leaseRegister.locator("xpath=ancestor::div[contains(@class,'border-l')][1]");
-    await expect(leaseNested.getByRole("link", { name: "Lucky ID Register", exact: true })).toHaveCount(0);
-    await expect(leaseNested.getByRole("link", { name: "Lucky Draws", exact: true })).toHaveCount(0);
+    const forbiddenSidebarItems = [
+      "Batch Register",
+      "Lucky ID Register",
+      "EMI Schedule / EMI Register",
+      "Winners",
+      "Waiver / Loss Report",
+      "Security Deposits",
+      "Delivery Requests",
+    ];
 
-    await sidebar.getByRole("button", { name: "Expand Partner Operations" }).click();
-    await expect(sidebar.getByRole("link", { name: "Partner Payment Requests", exact: true })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Partner Collections", exact: true })).toBeVisible();
-    await sidebar.getByPlaceholder("Search modules").fill("Partner Payment Requests");
-    await expect(sidebar.getByRole("link", { name: "Partner Payment Requests", exact: true })).toBeVisible();
-    await sidebar.getByPlaceholder("Search modules").clear();
+    for (const label of forbiddenSidebarItems) {
+      await expect(sidebar.getByRole("link", { name: label, exact: true })).toHaveCount(0);
+    }
+
+    await expect(sidebar.getByRole("link", { name: "Accounting & Finance", exact: true })).toHaveAttribute("href", "/admin/accounting");
+    await expect(sidebar.getByRole("link", { name: "Subscription EMI", exact: true })).toHaveAttribute("href", "/admin/subscriptions");
+    await expect(sidebar.getByRole("link", { name: "Direct Sale", exact: true })).toHaveAttribute("href", "/admin/billing/direct-sale");
+    await expect(sidebar.getByRole("link", { name: "Settings", exact: true })).toHaveAttribute("href", "/admin/settings");
+
     const executiveLoadError = page.getByText(/Unable to load executive dashboard|Failed to fetch/i);
     if (await executiveLoadError.isVisible().catch(() => false)) {
       await expect(executiveLoadError).toBeVisible();
@@ -100,7 +105,7 @@ test.describe("admin dashboard phase-3 smoke", () => {
     }
   });
 
-  test("admin command palette opens with Ctrl+K and searches nested workflow entries", async ({ page }) => {
+  test("admin command palette opens with Ctrl+K and searches hidden workflow entries", async ({ page }) => {
     await page.goto("/admin");
     const trigger = page.getByLabel("Open command palette (Ctrl+K)");
     await expect(trigger).toBeVisible();
@@ -114,5 +119,7 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await expect(dialog.getByRole("link", { name: /Direct Sales/i })).toBeVisible();
     await page.getByPlaceholder("Search operations, registers, workflows…").fill("Create Direct Sale Invoice");
     await expect(dialog.getByRole("button", { name: /Create Direct Sale Invoice/i })).toBeVisible();
+    await page.getByPlaceholder("Search operations, registers, workflows…").fill("Batch Register");
+    await expect(dialog.getByRole("link", { name: "Batch Register", exact: true })).toBeVisible();
   });
 });
