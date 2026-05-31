@@ -36,7 +36,8 @@ function chartLabel(account?: AccountingSetupReadinessChartAccount | null): stri
   return `${account.code} · ${account.name}${parent}`;
 }
 
-function isPostingChartAccount(account: AccountingSetupReadinessChartAccount): boolean {
+function isPostingChartAccount(account?: AccountingSetupReadinessChartAccount | null): boolean {
+  if (!account) return false;
   return Boolean(account.is_posting || account.is_posting_ready || account.allowed_for_collection);
 }
 
@@ -153,7 +154,7 @@ export default function FinanceAccountMappingPanel({
                       )}
                     </td>
                     <td className="max-w-[260px] px-2 py-2">
-                      <div className={isPostingChartAccount(suggested as AccountingSetupReadinessChartAccount) ? "text-emerald-700" : "text-muted-foreground"}>{chartLabel(suggested)}</div>
+                      <div className={isPostingChartAccount(suggested) ? "text-emerald-700" : "text-muted-foreground"}>{chartLabel(suggested)}</div>
                       {canRepair ? (
                         <div className="mt-1 text-[11px] text-muted-foreground">
                           Repair creates or reuses a posting leaf account and remaps this finance account only.
