@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement } from "react";
 import { Bookmark, Command as CommandIcon, CornerDownLeft, History, Search, Star, X } from "lucide-react";
 
+import { ADMIN_ROUTE_REGISTRY } from "@/config/admin-route-registry";
 import { getNavigationGroupsForRole, type NavGroup, type NavigationRole } from "@/config/navigation";
 import { workflowsForRole, type WorkflowDefinition, type WorkflowId } from "@/config/workflows";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
@@ -79,6 +80,30 @@ function flattenNav(groups: NavGroup[]): PaletteItem[] {
 
 function normalizeQuery(value: string) {
   return value.trim().toLowerCase();
+}
+
+function isConcreteHref(href: string): boolean {
+  return Boolean(href.trim()) && !href.includes("[") && !href.includes("]");
+}
+
+function adminRegistryPaletteItems(): PaletteItem[] {
+  return ADMIN_ROUTE_REGISTRY.filter((row) => row.status !== "deferred" && isConcreteHref(row.href)).map((row) => ({
+    kind: "nav",
+    label: row.label,
+    description: row.description || row.group,
+    href: row.href,
+    groupTitle: row.group,
+  }));
+}
+
+function uniqueByKindHrefLabel(items: PaletteItem[]): PaletteItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = `${item.kind}:${item.href}:${item.label.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function wrapPaletteRowHover(params: {
@@ -169,6 +194,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
 
   const navGroups = useMemo(() => getNavigationGroupsForRole(role), [role]);
   const navItems = useMemo(() => flattenNav(navGroups), [navGroups]);
+  const registryItems = useMemo<PaletteItem[]>(() => (role === "ADMIN" ? adminRegistryPaletteItems() : []), [role]);
   const workflows = useMemo(() => workflowsForRole(role), [role]);
 
   const workflowItems = useMemo<PaletteItem[]>(
@@ -185,7 +211,8 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
   );
 
   const allItems = useMemo(() => [...workflowItems, ...navItems], [navItems, workflowItems]);
-  const indexByHref = useMemo(() => new Map(allItems.map((item) => [item.href, item])), [allItems]);
+  const indexItems = useMemo(() => uniqueByKindHrefLabel([...allItems, ...registryItems]), [allItems, registryItems]);
+  const indexByHref = useMemo(() => new Map(indexItems.map((item) => [item.href, item])), [indexItems]);
 
   useEffect(() => {
     if (!open) return;
@@ -241,6 +268,16 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
       return haystack.includes(normalized);
     });
   }, [allItems, normalized]);
+  const registryMatches = useMemo(() => {
+    if (!normalized) return [];
+    const visibleKeys = new Set(matches.map((item) => `${item.href}:${item.label.toLowerCase()}`));
+    return registryItems.filter((item) => {
+      const key = `${item.href}:${item.label.toLowerCase()}`;
+      if (visibleKeys.has(key)) return false;
+      const haystack = `${item.label} ${item.description} ${item.href} ${item.kind === "nav" ? item.groupTitle : ""}`.toLowerCase();
+      return haystack.includes(normalized);
+    });
+  }, [matches, normalized, registryItems]);
   const globalMatches = useMemo<PaletteItem[]>(
     () =>
       globalResults.map((result) => ({
@@ -255,8 +292,8 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
   );
   const displayedMatches = useMemo(() => {
     if (!normalized) return matches;
-    return [...(canSearchGlobal ? globalMatches : []), ...matches];
-  }, [canSearchGlobal, globalMatches, matches, normalized]);
+    return uniqueByKindHrefLabel([...(canSearchGlobal ? globalMatches : []), ...matches, ...registryMatches]);
+  }, [canSearchGlobal, globalMatches, matches, normalized, registryMatches]);
 
   const favoriteItems = useMemo(
     () =>
@@ -373,7 +410,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
       trigger: linkTrigger,
     });
     return (
-      <div key={`${item.kind}:${item.href}`} className="flex items-start gap-2">
+      <div key={`${item.kind}:${item.href}:${item.label}`} className="flex items-start gap-2">
         {linkRow}
         {sessionId ? (
           <button
