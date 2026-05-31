@@ -10,6 +10,7 @@ class SubscriptionsConfig(AppConfig):
         import subscriptions.models_business_setup  # noqa
         import subscriptions.models_document_print_settings  # noqa
         import subscriptions.models_contract_amendment  # noqa
+        import subscriptions.models_business_compliance_review  # noqa
 
     def ready(self):
         import subscriptions.signals  # noqa
