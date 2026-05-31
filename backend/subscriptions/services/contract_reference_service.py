@@ -306,8 +306,14 @@ def ensure_contract_reference_for_direct_sale(sale) -> ContractReference:
         return existing
 
     customer = getattr(sale, "customer", None)
-    if customer is None:
-        raise ValueError("Direct sale must be linked to a customer before reference generation.")
+    customer_name_snapshot = (
+        getattr(sale, "customer_name_snapshot", "") or getattr(customer, "name", "") or ""
+    ).strip()
+    customer_phone_snapshot = (
+        getattr(sale, "customer_phone_snapshot", "") or getattr(customer, "phone", "") or ""
+    ).strip()
+    kyc_reference_snapshot = _customer_code_snapshot(customer) if customer is not None else None
+    customer_id = getattr(customer, "id", None)
 
     scope_key = _direct_sale_sequence_scope(sale)
     for _attempt in range(5):
@@ -320,15 +326,15 @@ def ensure_contract_reference_for_direct_sale(sale) -> ContractReference:
                 contract_type=ContractReferenceType.DIRECT_SALE,
                 customer=customer,
                 direct_sale=sale,
-                phone_snapshot=getattr(customer, "phone", "") or "",
-                customer_name_snapshot=getattr(customer, "name", "") or "",
-                kyc_reference_snapshot=_customer_code_snapshot(customer),
+                phone_snapshot=customer_phone_snapshot,
+                customer_name_snapshot=customer_name_snapshot,
+                kyc_reference_snapshot=kyc_reference_snapshot,
                 product_summary_snapshot=_direct_sale_product_summary(sale),
                 source_created_at=getattr(sale, "created_at", None) or getattr(sale, "sale_date", None),
                 metadata={
                     "direct_sale_id": sale.id,
                     "sale_no": getattr(sale, "sale_no", ""),
-                    "customer_id": sale.customer_id,
+                    "customer_id": customer_id,
                     "branch_id": sale.branch_id,
                 },
             )

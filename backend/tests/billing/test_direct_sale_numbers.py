@@ -26,6 +26,7 @@ from billing.services.billing_service import (
     _ensure_direct_sale_sequence,
     create_direct_sale,
 )
+from subscriptions.models import ContractReference, ContractReferenceType
 from subscriptions.services.contract_number_service import assign_direct_sale_number
 
 
@@ -97,6 +98,20 @@ class DirectSaleNumberAssignmentTests(TestCase):
         )
         with self.assertRaises(ValidationError):
             dup.full_clean()
+
+    def test_customerless_direct_sale_still_gets_contract_reference(self):
+        """Walk-in direct sales keep working without a linked customer."""
+        sale = create_direct_sale(payload=_minimal_payload(), created_by=self.admin)
+
+        reference = ContractReference.objects.get(
+            contract_type=ContractReferenceType.DIRECT_SALE,
+            direct_sale=sale,
+        )
+
+        self.assertIsNone(reference.customer)
+        self.assertEqual(reference.customer_name_snapshot, "Walk-In Customer")
+        self.assertEqual(reference.phone_snapshot, "")
+        self.assertEqual(reference.metadata["customer_id"], None)
 
 
 # ---------------------------------------------------------------------------
