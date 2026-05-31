@@ -36,6 +36,8 @@ class AdminSetupReadinessApiTests(APITestCase):
             {
                 "business_profile",
                 "print_branding",
+                "business_compliance",
+                "policy_governance",
                 "chart_of_accounts",
                 "finance_accounts",
                 "branch_cash_counter",
@@ -49,6 +51,10 @@ class AdminSetupReadinessApiTests(APITestCase):
             },
             section_keys,
         )
+
+        checklist_keys = {row["key"] for row in response.data["launch_checklist"]}
+        self.assertIn("can_complete_business_compliance", checklist_keys)
+        self.assertIn("can_publish_public_policies", checklist_keys)
 
     def test_finance_account_blocker_appears_for_non_posting_coa(self):
         self.client.force_authenticate(self.admin)
