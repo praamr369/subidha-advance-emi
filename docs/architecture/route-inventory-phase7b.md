@@ -1,87 +1,89 @@
-# Phase 7B Generated Route Inventory Refresh + Route Checker Hardening
+# Route Inventory, Checker, and Parent-Only Admin Sidebar
 
 Branch: `update`
 
-Status: **Implemented as a static route-checker hardening pass; Phase 7H role-navigation stabilization noted**
+Status: **Implemented as static route-checker hardening with Phase 9D parent-only sidebar rules**
 
-Date: 2026-05-28
+Last updated: 2026-05-31
 
 ## Scope
 
-Phase 7B refreshes the route inventory/checking workflow after recent route additions, including Phase 7C Setup Readiness and the product recontract/addendum workflow.
+This document records the frontend route inventory/checking workflow and the Phase 9D admin navigation model.
 
-This phase is frontend/static-analysis only. No backend endpoints, models, serializers, financial services, payment flows, accounting services, reconciliation services, inventory services, delivery services, commission/payout services, amendment execution services, or recontract services were changed.
+This is a frontend/static-analysis and documentation area. No backend endpoints, models, serializers, financial services, payment flows, accounting services, reconciliation services, inventory services, delivery services, commission/payout services, amendment execution services, recontract services, or auth services are changed by the route checker or sidebar model.
 
-## Phase 7H release-stabilization note
+## Phase 9D parent-only admin sidebar
 
-Phase 7H is release stabilization and role-specific polish. It does not introduce new financial behavior.
+Admin sidebar navigation is now parent-module-only. The sidebar must show the major ERP modules, not every child register or workflow.
 
-Targeted Phase 7H navigation fixes:
-
-- Admin route constants now expose `/admin/collections/control-center` as `ROUTES.admin.collectionControlCenter`.
-- Cashier route constants now expose `/cashier/collections/control-center` as `ROUTES.cashier.collectionControlCenter`.
-- Admin navigation includes the real **Collection Control Center** under Finance & Accounting.
-- Cashier navigation includes the real **Collection Control Center** under Collections.
-- Cashier navigation no longer exposes a fake/deferred `Rent / Lease Collection` shortcut because rent/lease collection remains visibility-only until an approved endpoint exists.
-- Cashier `Cash Closing` now points to `/cashier/day-close` instead of payment history.
-
-No route family was deleted. Compatibility routes remain preserved.
-
-Full RC validation is required before merge/deploy.
-
-## Existing route tooling found
-
-`frontend/package.json` already exposes:
+Visible admin sidebar modules:
 
 ```text
-npm run inventory:routes
-npm run check:routes
+Command Center              -> /admin
+Sales & Contracts           -> /admin/sales
+Subscription EMI            -> /admin/subscriptions
+Rent / Lease                -> /admin/rent-lease
+Direct Sale                 -> /admin/billing/direct-sale
+Accounting & Finance        -> /admin/accounting
+Inventory                   -> /admin/inventory
+Manufacturing               -> /admin/manufacturing
+CRM / Parties               -> /admin/crm
+HR & Staff                  -> /admin/hr
+Service Desk                -> /admin/service-desk
+Delivery & Operations       -> /admin/deliveries
+Reports & Analysis          -> /admin/reports
+Settings                    -> /admin/settings
 ```
 
-Before Phase 7B:
+The full `admin-route-registry.ts` remains preserved for route inventory, hover metadata, command-palette discovery, and deep-link validation. It is not the source of visible sidebar expansion.
 
-- `inventory:routes` generated `docs/operations/frontend-route-inventory.md` from `frontend/src/app/**/page.tsx`.
-- `check:routes` checked only App Router route collisions and a small compatibility-route list.
+Child workflows must live inside module cockpit pages through icon cards, sections, tabs, filters, breadcrumbs, command search, and quick actions.
 
-Phase 7B kept the same script names and hardened the existing checker instead of adding a second checker.
-
-## Files changed
+Examples of child workflows that must not leak back into the admin sidebar:
 
 ```text
-frontend/scripts/check-routes.mjs
-frontend/src/lib/route-builders.ts
-frontend/src/lib/routes.ts
-frontend/src/config/admin-route-registry.ts
-frontend/src/config/navigation.ts
-docs/architecture/route-inventory-phase7b.md
+Batch Register
+Lucky ID Register
+EMI Schedule / EMI Register
+Winners
+Waiver / Loss Report
+Rent Monthly Demands
+Security Deposits
+Delivery Requests
 ```
 
-## Checker hardening added
+## Route preservation rule
 
-`frontend/scripts/check-routes.mjs` now checks:
+No App Router page route is deleted for this navigation cleanup. Compatibility routes remain preserved. The parent-only sidebar is a visibility change, not a routing deletion.
+
+The new Phase 9D parent route is:
+
+```text
+/admin/rent-lease
+```
+
+It is a lightweight rent/lease cockpit linking only to existing real child routes: rent/lease contract filters, create rent, create lease, deposits, demand register filters, delivery/handover, return inspections, and delivery documents.
+
+## Command-palette/deep-link rule
+
+Because the visible sidebar is now parent-only, admin child routes remain discoverable through the command palette. The command palette merges admin route registry entries for ADMIN searches while keeping customer, partner, cashier, and vendor command surfaces role-scoped.
+
+## Checker hardening
+
+`frontend/scripts/check-routes.mjs` checks:
 
 1. App Router page collisions.
 2. Compatibility route stubs that must continue to exist.
-3. Recently added required routes:
-   - `/admin/setup/readiness`
-   - `/admin/collections/control-center`
-   - `/cashier/collections/control-center`
-   - `/admin/contract-amendments`
-   - `/admin/contract-amendments/[id]`
-   - `/admin/contract-amendments/recontract-report`
-   - `/admin/contract-amendments/[id]/recontract-addendum/print`
-   - `/customer/contract-amendments`
-   - `/customer/contract-amendments/[id]`
-   - `/customer/contract-amendments/[id]/recontract-addendum/print`
-   - `/partner/contract-amendments`
-   - `/partner/contract-amendments/[id]`
+3. Required routes including `/admin/rent-lease`, setup readiness, collection control centers, and amendment print/detail routes.
 4. Route constants in `frontend/src/lib/routes.ts` that point to missing pages.
-5. Admin route registry entries in `frontend/src/config/admin-route-registry.ts` that point to missing pages.
-6. Partner/customer/cashier/vendor navigation entries in `frontend/src/config/navigation.ts` that point to missing pages.
-7. Duplicate visible navigation entries with the same role/group/label/path tuple.
+5. Full admin route registry entries in `frontend/src/config/admin-route-registry.ts` that point to missing pages.
+6. Visible navigation entries in `frontend/src/config/navigation.ts` that point to missing pages.
+7. Duplicate visible navigation entries.
 8. Wrong-role navigation exposure for non-admin roles.
-9. Route-builder contracts in `frontend/src/lib/route-builders.ts`.
-10. Print-route contamination markers for obvious dashboard/page-shell imports.
+9. Admin sidebar parent module completeness.
+10. Admin sidebar child-workflow leakage.
+11. Route-builder contracts in `frontend/src/lib/route-builders.ts`.
+12. Print-route contamination markers for obvious dashboard/page-shell imports.
 
 ## Compatibility routes retained
 
@@ -103,61 +105,9 @@ The checker still expects these compatibility routes to exist:
 
 These are intentionally retained. They should not be deleted until compatibility usage is measured and a migration decision is made.
 
-## Route-builder hardening
-
-Added explicit route builders:
-
-```text
-buildAdminContractAmendmentRoute(id)
-buildAdminRecontractReportRoute(params)
-buildCustomerContractAmendmentRoute(id)
-buildPartnerContractAmendmentRoute(id)
-```
-
-Existing recontract addendum route builders are preserved:
-
-```text
-buildAdminProductRecontractAddendumPrintRoute(id)
-buildCustomerProductRecontractAddendumPrintRoute(id)
-```
-
-## Known deferred route-builder warning
-
-`buildAdminFinanceAccountStatementPrintRoute()` targets:
-
-```text
-/admin/finance/accounts/[financeAccountId]/statement/print
-```
-
-The finance-account statement print page exists at:
-
-```text
-/admin/finance/accounts/[id]/statement/print
-```
-
-The checker should treat `[financeAccountId]` and `[id]` as equivalent dynamic route segments. Do not add a duplicate print route for this.
-
-## Print route check
-
-The checker scans all App Router routes ending in `/print` and fails if the route file itself imports obvious dashboard/page-shell contamination markers such as:
-
-```text
-AdminShell
-DashboardShell
-AppSidebar
-SidebarProvider
-PageHeader
-ERPPageShell
-BusinessSetupLinks
-DataTableShell
-QuickActionGrid
-```
-
-This is intentionally conservative. It does not parse CSS print media or component internals; it catches obvious route-level contamination only.
-
 ## Inventory refresh command
 
-Run locally:
+Run locally after adding, removing, or moving page routes:
 
 ```bash
 cd ~/Desktop/subidha-lucky-plan/frontend
@@ -171,13 +121,13 @@ npm run check:routes
 docs/operations/frontend-route-inventory.md
 ```
 
-Because this implementation was applied through the GitHub connector, the npm scripts were not executed here. The checker and generator are ready for local execution on branch `update`.
+If Phase 9D was applied through the GitHub connector, the generated inventory may need a local regeneration pass before merge/release.
 
 ## Backend impact
 
-No backend files changed in Phase 7B or the Phase 7H role-navigation stabilization note.
+No backend files are expected to change for this phase.
 
-No endpoints were added, removed, renamed, or altered.
+No endpoints are added, removed, renamed, or altered by the parent-only sidebar.
 
 ## Existing data impact
 
@@ -216,40 +166,4 @@ recontract records
 
 ## Auditability impact
 
-Auditability improves by making route and navigation drift detectable before release.
-
-No audit records are created or mutated because this is static route/navigation tooling only.
-
-## Daily shop usability impact
-
-Admin navigation and route builders are less likely to drift away from real implemented pages.
-
-The checker protects staff-facing navigation from stale or wrong-role links.
-
-Cashier users now receive a real collection-readiness route and no fake rent/lease collection shortcut.
-
-## Future rent/lease compatibility
-
-Preserved.
-
-No rent/lease route family was removed. Existing rent/lease visibility, subscription, delivery, return, deposit, and print routes remain intact.
-
-Rent/lease collection remains deferred until a real approved collection endpoint exists.
-
-## Validation commands
-
-Run:
-
-```bash
-cd ~/Desktop/subidha-lucky-plan
-git checkout update
-git pull --ff-only origin update
-
-cd frontend
-npm run inventory:routes
-npm run check:routes
-npm run typecheck
-npm run lint
-```
-
-Full Phase 7H RC validation still requires the full backend, frontend, Playwright, and release-candidate command set from the phase brief.
+Auditability is preserved because the route registry, route checker, compatibility routes, and deep-link surfaces remain explicit. Child workflows move from sidebar visibility into module cockpit pages and command search; audit-controlled underlying workflows are unchanged.
