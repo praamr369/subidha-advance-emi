@@ -148,15 +148,11 @@ def _coa_snapshot() -> dict[str, Any]:
     total = ChartOfAccount.objects.count()
     legacy_count = ChartOfAccount.objects.filter(is_legacy=True).count()
 
-    # Duplicate normalized names (active rows only)
-    names = list(
-        ChartOfAccount.objects.filter(is_active=True).values_list("name", flat=True)
-    )
+    names = list(ChartOfAccount.objects.filter(is_active=True).values_list("name", flat=True))
     normalized = [_norm_name(n) for n in names if _norm_name(n)]
     counts = Counter(normalized)
     duplicate_names = [name for name, c in counts.items() if c > 1][:50]
 
-    # System code conflicts for canonical catalog keys
     system_code_conflicts: list[dict[str, Any]] = []
     for key, spec in CANONICAL_CHART_ACCOUNT_BY_KEY.items():
         by_code = ChartOfAccount.objects.filter(code__iexact=spec.code).first()
@@ -246,7 +242,7 @@ def get_accounting_setup_health() -> dict[str, Any]:
         if snapshot["active_count"] == 0:
             blockers.append(f"Missing active {kind} FinanceAccount.")
         if snapshot["active_count"] > 1:
-            blockers.append(f"Multiple active {kind} FinanceAccounts configured.")
+            warnings.append(f"Multiple active {kind} FinanceAccounts configured; each account is evaluated independently.")
         if snapshot["linked_to_inactive_coa_ids"]:
             blockers.append(f"{kind} FinanceAccount linked to inactive ChartOfAccount.")
 
