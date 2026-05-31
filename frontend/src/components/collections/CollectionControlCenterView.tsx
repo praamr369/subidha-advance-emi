@@ -14,12 +14,18 @@ import {
   getCashierCollectionControlCenter,
   type CollectionControlCenterRole,
   type CollectionControlFinanceAccount,
+  type CollectionControlLane,
   type CollectionControlPayload,
   type CollectionControlRecentPayment,
 } from "@/services/collection-control-center";
 
+function hasMetricValue(value: string | number | null | undefined): value is string | number {
+  return value !== null && value !== undefined && value !== "";
+}
+
 function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
+  if (!hasMetricValue(value)) return "Not exposed";
+  return `₹${Number(value).toFixed(2)}`;
 }
 
 function formatDate(value?: string | null): string {
@@ -29,10 +35,19 @@ function formatDate(value?: string | null): string {
   return new Date(parsed).toLocaleDateString();
 }
 
+function laneTitle(lane: CollectionControlLane): string {
+  if (lane.key === "rent_lease") return "Rent / Lease collection";
+  return lane.label;
+}
+
+function isDeferredLane(lane: CollectionControlLane): boolean {
+  return lane.key === "rent_lease" || !lane.enabled || !lane.route;
+}
+
 function accountBlocker(account: CollectionControlFinanceAccount): string {
   return (
     account.collection_blocker_reason ||
-    "This account cannot receive payments because it is mapped to a non-posting Chart of Account."
+    "Blocked from collection selectors until COA mapping is posting-ready."
   );
 }
 
@@ -53,7 +68,7 @@ function FinanceReadinessBanner({ payload }: { payload: CollectionControlPayload
             {blocked ? "Finance account blockers need attention" : "Finance accounts ready for collection"}
           </h2>
           <p className="mt-2 max-w-3xl text-sm opacity-90">
-            Collection still uses existing approved endpoints. Blocked accounts are shown as operational blockers and cannot be used to bypass posting-readiness rules.
+            Collection still uses existing approved endpoints. Blocked accounts are visible as operational blockers and stay unavailable in collection selectors.
           </p>
         </div>
         {payload.role === "admin" && payload.route_hints.accounting_setup ? (
@@ -127,6 +142,9 @@ function FinanceAccountTable({ payload }: { payload: CollectionControlPayload })
                   </td>
                   <td className="px-3 py-3 text-muted-foreground">
                     {account.collection_ready ? "Can receive payments." : accountBlocker(account)}
+                    {!account.collection_ready ? (
+                      <div className="mt-1 text-xs">Blocked from collection selectors until COA mapping is posting-ready. System or control accounts are diagnostic only and cannot receive customer collections.</div>
+                    ) : null}
                     {!account.collection_ready && account.recommended_action ? (
                       <div className="mt-1 text-xs">{account.recommended_action}</div>
                     ) : null}
@@ -226,30 +244,34 @@ export default function CollectionControlCenterView({ role }: { role: Collection
               <KpiCard label="Overdue" value={summary.overdue_count} helper="Pending EMI rows past due date" />
               <KpiCard label="Pending EMI amount" value={money(summary.pending_emi_amount)} helper={`${summary.pending_emi_count} pending rows`} />
               <KpiCard label="Direct-sale outstanding" value={money(summary.direct_sale_outstanding_amount)} helper={`${summary.direct_sale_outstanding_count} invoiced balances`} />
-              <KpiCard label="Rent/lease due" value={money(summary.rent_lease_due_amount)} helper={`${summary.rent_lease_due_count} demand rows`} />
+              <KpiCard label="Rent / lease due" value={money(summary.rent_lease_due_amount)} helper={hasMetricValue(summary.rent_lease_due_count) ? `${summary.rent_lease_due_count} demand rows` : "Not exposed by backend"} />
               <KpiCard label="Blocked accounts" value={summary.blocked_finance_account_count} helper="Finance accounts not collection-ready" />
             </QuickActionGrid>
 
             <FormSection title="Collection lanes" description="Buttons only navigate to real implemented collection routes. Deferred lanes do not expose fake actions.">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {lanes.map((lane) => (
-                  <WorkflowCard
-                    key={lane.key}
-                    title={lane.label}
-                    description={lane.description || ""}
-                    action={
-                      lane.enabled && lane.route ? (
-                        <Link href={lane.route} className="inline-flex rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold">
-                          Open lane
-                        </Link>
-                      ) : (
-                        <div className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
-                          Deferred — endpoint not exposed for collection action yet.
-                        </div>
-                      )
-                    }
-                  />
-                ))}
+                {lanes.map((lane) => {
+                  const deferred = isDeferredLane(lane);
+                  return (
+                    <div key={lane.key} className={deferred ? "rounded-2xl border border-dashed border-amber-300 bg-amber-50/70 p-1" : ""}>
+                      <WorkflowCard
+                        title={laneTitle(lane)}
+                        description={deferred && lane.key === "rent_lease" ? "Collection action deferred until the backend endpoint is enabled." : lane.description || ""}
+                        action={
+                          !deferred && lane.route ? (
+                            <Link href={lane.route} className="inline-flex rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold">
+                              Open lane
+                            </Link>
+                          ) : (
+                            <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+                              Deferred — backend collection endpoint is not enabled yet.
+                            </div>
+                          )
+                        }
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </FormSection>
 
