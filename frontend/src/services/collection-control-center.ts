@@ -31,7 +31,12 @@ export type CollectionControlFinanceAccount = {
     is_active: boolean;
     allow_manual_posting: boolean;
   } | null;
+  operational_collection_account?: boolean;
+  system_posting_profile?: boolean;
+  diagnostic_only?: boolean;
   collection_ready: boolean;
+  selectable_for_collection?: boolean;
+  is_selectable_collection_account?: boolean;
   collection_blocker_reason?: string | null;
   recommended_action?: string | null;
 };
@@ -61,6 +66,7 @@ export type CollectionControlRecentPayment = {
 export type CollectionControlPayload = {
   role: CollectionControlCenterRole;
   read_only: boolean;
+  not_exposed_label?: string;
   summary: CollectionControlSummary;
   finance_account_readiness: {
     counts: {
@@ -70,8 +76,12 @@ export type CollectionControlPayload = {
       cash_ready_count: number;
       bank_ready_count: number;
       upi_ready_count: number;
+      diagnostic_count?: number;
+      selectable_count?: number;
     };
     accounts: CollectionControlFinanceAccount[];
+    operational_collection_accounts?: CollectionControlFinanceAccount[];
+    diagnostic_system_accounts?: CollectionControlFinanceAccount[];
   };
   collection_lanes: CollectionControlLane[];
   route_hints: Record<string, string | null | undefined>;
