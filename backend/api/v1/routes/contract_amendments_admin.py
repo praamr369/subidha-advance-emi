@@ -9,6 +9,10 @@ from api.v1.views.contract_recontract_reconciliation import (
 from api.v1.views.contract_amendments_admin_list import (
     AdminContractAmendmentFilteredListView,
 )
+from api.v1.views.contract_amendment_lifecycle import (
+    AdminContractAmendmentCreateView,
+    AdminContractAmendmentLifecycleView,
+)
 from api.v1.views.contract_amendments import (
     AdminContractAmendmentApproveView,
     AdminContractAmendmentDetailView,
@@ -30,8 +34,10 @@ from api.v1.views.contract_amendments import (
 
 urlpatterns = [
     path("contract-amendments/", AdminContractAmendmentFilteredListView.as_view()),
+    path("contract-amendments/create/", AdminContractAmendmentCreateView.as_view()),
     path("contract-amendments/recontract-report/", AdminContractAmendmentProductRecontractReportView.as_view()),
     path("contract-amendments/<int:pk>/", AdminContractAmendmentDetailView.as_view()),
+    path("contract-amendments/<int:pk>/lifecycle/", AdminContractAmendmentLifecycleView.as_view()),
     path("contract-amendments/<int:pk>/review/", AdminContractAmendmentReviewView.as_view()),
     path("contract-amendments/<int:pk>/approve/", AdminContractAmendmentApproveView.as_view()),
     path("contract-amendments/<int:pk>/reject/", AdminContractAmendmentRejectView.as_view()),
