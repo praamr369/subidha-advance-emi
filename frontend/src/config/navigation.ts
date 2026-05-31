@@ -66,118 +66,35 @@ function flattenGroups(groups: NavGroup[]): NavItem[] {
   return groups.flatMap((group) => flattenItems(group.items));
 }
 
-function adminParentModule(
-  label: string,
-  href: string,
-  icon: NavIconKey,
-  description: string,
-  badgeSource?: string,
-): NavItem {
+function adminParentModule(label: string, href: string, icon: NavIconKey, description: string, badgeSource?: string): NavItem {
   return { label, href, icon, description, badgeSource };
 }
 
 export const ADMIN_PARENT_NAVIGATION: NavGroup[] = [
   {
-    title: "ERP Modules",
+    title: "Command Center",
     icon: "dashboard",
     items: [
-      adminParentModule(
-        "Command Center",
-        ROUTES.admin.dashboard,
-        "dashboard",
-        "Daily dashboard, today's work, operations command center, BI, alerts, and global search.",
-      ),
-      adminParentModule(
-        "Sales & Contracts",
-        ROUTES.admin.salesWorkspace,
-        "billing",
-        "Sales workspace for invoices, receipts, customer contracts, and handoff controls.",
-      ),
-      adminParentModule(
-        "Subscription EMI",
-        ROUTES.admin.subscriptions,
-        "subscriptions",
-        "Advance EMI cockpit for batches, Lucky IDs, EMI schedules, payments, draws, waivers, and amendments.",
-        "queue.subscription_requests_pending",
-      ),
-      adminParentModule(
-        "Rent / Lease",
-        ROUTES.admin.rentLease,
-        "subscriptions",
-        "Rent and lease cockpit for contracts, deposits, monthly demands, possession, inspections, and returns.",
-      ),
-      adminParentModule(
-        "Direct Sale",
-        ROUTES.admin.billingDirectSaleWorkspace,
-        "billing",
-        "Direct-sale billing cockpit for retail sale, invoice, receipt, collection, delivery, and return workflows.",
-      ),
-      adminParentModule(
-        "Accounting & Finance",
-        ROUTES.admin.accounting,
-        "accounting",
-        "Finance cockpit for accounting setup, collections, journals, reconciliation, reports, GST, ITR, payables, and payouts.",
-        "admin.badges.unreconciled_count",
-      ),
-      adminParentModule(
-        "Inventory",
-        ROUTES.admin.inventory,
-        "inventory",
-        "Inventory cockpit for stock, locations, adjustments, purchase needs, returns, quality holds, and stock ledger.",
-        "admin.badges.low_stock_count",
-      ),
-      adminParentModule(
-        "Manufacturing",
-        ROUTES.admin.manufacturing,
-        "manufacturing",
-        "Manufacturing cockpit for BOMs, production jobs, production consumption/output, and costing.",
-      ),
-      adminParentModule(
-        "CRM / Parties",
-        ROUTES.admin.crmWorkspace,
-        "crm",
-        "Party cockpit for customers, vendors, partners, interactions, KYC, leads, and customer 360.",
-        "admin.badges.open_support_ticket_count",
-      ),
-      adminParentModule(
-        "HR & Staff",
-        ROUTES.admin.hr,
-        "payroll",
-        "HR cockpit for staff, roles, attendance, salary, payroll, expenses, and permissions.",
-      ),
-      adminParentModule(
-        "Service Desk",
-        ROUTES.admin.serviceDesk,
-        "serviceDesk",
-        "Service cockpit for cases, support tickets, returns, damaged returns, and follow-up controls.",
-        "admin.badges.open_support_ticket_count",
-      ),
-      adminParentModule(
-        "Delivery & Operations",
-        ROUTES.admin.deliveries,
-        "deliveries",
-        "Delivery cockpit for delivery cases, handover, documents, return logistics, and operational dispatch.",
-        "admin.badges.pending_delivery_count",
-      ),
-      adminParentModule(
-        "Reports & Analysis",
-        ROUTES.admin.reports,
-        "reports",
-        "Reports cockpit for BI, accounting reports, operational reports, and reconciliation analysis.",
-      ),
-      adminParentModule(
-        "Settings",
-        ROUTES.admin.settings,
-        "settings",
-        "Settings cockpit for setup readiness, business profile, branding, branches, counters, accounting setup, and backups.",
-      ),
+      adminParentModule("Command Center", ROUTES.admin.dashboard, "dashboard", "Daily dashboard, today's work, operations command center, BI, alerts, and global search."),
+      adminParentModule("Sales & Contracts", ROUTES.admin.salesWorkspace, "billing", "Sales workspace for invoices, receipts, customer contracts, and handoff controls."),
+      adminParentModule("Subscription EMI", ROUTES.admin.subscriptions, "subscriptions", "Advance EMI cockpit for batches, Lucky IDs, EMI schedules, payments, draws, waivers, and amendments.", "queue.subscription_requests_pending"),
+      adminParentModule("Rent / Lease", ROUTES.admin.rentLease, "subscriptions", "Rent and lease cockpit for contracts, deposits, monthly demands, possession, inspections, and returns."),
+      adminParentModule("Direct Sale", ROUTES.admin.billingDirectSaleWorkspace, "billing", "Direct-sale billing cockpit for retail sale, invoice, receipt, collection, delivery, and return workflows."),
+      adminParentModule("Accounting & Finance", ROUTES.admin.accounting, "accounting", "Finance cockpit for accounting setup, collections, journals, reconciliation, reports, GST, ITR, payables, and payouts.", "admin.badges.unreconciled_count"),
+      adminParentModule("Inventory", ROUTES.admin.inventory, "inventory", "Inventory cockpit for stock, locations, adjustments, purchase needs, returns, quality holds, and stock ledger.", "admin.badges.low_stock_count"),
+      adminParentModule("Manufacturing", ROUTES.admin.manufacturing, "manufacturing", "Manufacturing cockpit for BOMs, production jobs, production consumption/output, and costing."),
+      adminParentModule("CRM / Parties", ROUTES.admin.crmWorkspace, "crm", "Party cockpit for customers, vendors, partners, interactions, KYC, leads, and customer 360.", "admin.badges.open_support_ticket_count"),
+      adminParentModule("HR & Staff", ROUTES.admin.hr, "payroll", "HR cockpit for staff, roles, attendance, salary, payroll, expenses, and permissions."),
+      adminParentModule("Service Desk", ROUTES.admin.serviceDesk, "serviceDesk", "Service cockpit for cases, support tickets, returns, damaged returns, and follow-up controls.", "admin.badges.open_support_ticket_count"),
+      adminParentModule("Delivery & Operations", ROUTES.admin.deliveries, "deliveries", "Delivery cockpit for delivery cases, handover, documents, return logistics, and operational dispatch.", "admin.badges.pending_delivery_count"),
+      adminParentModule("Reports & Analysis", ROUTES.admin.reports, "reports", "Reports cockpit for BI, accounting reports, operational reports, and reconciliation analysis."),
+      adminParentModule("Settings", ROUTES.admin.settings, "settings", "Settings cockpit for setup readiness, business profile, branding, branches, counters, accounting setup, and backups."),
     ],
   },
 ];
 
 export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
   ADMIN: ADMIN_PARENT_NAVIGATION,
-
   PARTNER: [
     { title: "Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: ROUTES.partner.dashboard, icon: "dashboard" }] },
     { title: "My Customers", icon: "customers", items: [{ label: "My Customers", href: ROUTES.partner.customers, icon: "customers" }] },
@@ -189,7 +106,6 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
     { title: "Support", icon: "support", items: [{ label: "Support", href: ROUTES.partner.notifications, icon: "support" }] },
     { title: "Profile", icon: "profile", items: [{ label: "Profile", href: ROUTES.partner.dashboard, icon: "profile" }] },
   ],
-
   CUSTOMER: [
     { title: "Dashboard", icon: "home", items: [{ label: "Dashboard", href: ROUTES.customer.dashboard, icon: "home" }] },
     {
@@ -214,7 +130,6 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
     },
     { title: "Profile", icon: "profile", items: [{ label: "Profile", href: ROUTES.customer.profile, icon: "profile" }] },
   ],
-
   CASHIER: [
     { title: "Cashier Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: ROUTES.cashier.dashboard, icon: "dashboard" }] },
     { title: "Customer Search", icon: "cashCounter", items: [{ label: "Customer Search", href: ROUTES.cashier.collect, icon: "customers" }] },
@@ -238,7 +153,6 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
     },
     { title: "Support", icon: "support", items: [{ label: "Notifications", href: ROUTES.cashier.notifications, icon: "reminders" }] },
   ],
-
   VENDOR: [
     { title: "Dashboard", items: [{ label: "Dashboard", href: ROUTES.vendor.dashboard, icon: "dashboard", description: "Vendor operational dashboard." }] },
     { title: "Quote Requests", items: [{ label: "Quote Requests", href: ROUTES.vendor.quotes, icon: "billing", description: "Quote requests and submissions." }] },
