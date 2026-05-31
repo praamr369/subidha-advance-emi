@@ -9,15 +9,16 @@ from api.v1.serializers.policy_site import (
     PolicyPagePublicListSerializer,
     PolicyPagePublicSerializer,
 )
-from subscriptions.services.policy_governance_service import (
+from subscriptions.services.business_compliance_public_summary_service import (
     get_public_business_compliance_summary,
+)
+from subscriptions.services.policy_governance_service import (
     get_public_published_policy,
     list_public_published_policies,
 )
 
 
 class PublicPolicyPageListView(APIView):
-    authentication_classes = []
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -27,7 +28,6 @@ class PublicPolicyPageListView(APIView):
 
 
 class PublicPolicyPageDetailView(APIView):
-    authentication_classes = []
     permission_classes = [AllowAny]
 
     def get(self, request, slug: str):
@@ -38,7 +38,6 @@ class PublicPolicyPageDetailView(APIView):
 
 
 class PublicBusinessComplianceSummaryView(APIView):
-    authentication_classes = []
     permission_classes = [AllowAny]
 
     def get(self, request):
