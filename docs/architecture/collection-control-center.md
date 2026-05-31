@@ -2,24 +2,25 @@
 
 Branch: `update`
 
-Status: **Phase 7E inline readiness integrated**
+Status: **Operator-proof finance account readiness integrated**
 
 ## Purpose
 
-The Collection Control Center gives admin and cashier users a read-only operational view of collection readiness before they use the existing payment collection workflows.
+The Collection Control Center gives admin and cashier users a read-only operational view of collection readiness before they use existing payment collection workflows.
 
 It centralizes:
 
 - EMI due posture
 - direct-sale outstanding posture
 - rent/lease demand visibility
-- finance account collection readiness
+- operational finance account collection readiness
+- diagnostic/system posting profile visibility
 - blocked finance account reasons
 - recent collection visibility
 - receipt/reconciliation posture where backend data is available
 - route hints to existing safe collection workflows
 
-Phase 7E also integrates a compact read-only readiness banner directly into the actual collection pages:
+Inline readiness banners reuse the same read-only payload inside:
 
 ```text
 /admin/finance/collect
@@ -46,6 +47,69 @@ GET /api/v1/cashier/collections/control-center/
 
 Both endpoints are read-only and are reused by the full control-center pages and the compact inline banners.
 
+## Finance account readiness separation
+
+The control-center payload separates:
+
+```text
+operational_collection_accounts
+diagnostic_system_accounts
+```
+
+### Operational collection accounts
+
+Operational collection accounts are real money destinations:
+
+```text
+cash desks
+bank accounts
+UPI accounts
+payment gateway settlement accounts
+```
+
+These are eligible for collection selectors only when:
+
+- finance account is active
+- finance account is not diagnostic-only
+- mapped COA exists
+- mapped COA is active
+- mapped COA allows manual posting
+- mapped COA is a leaf/non-control account
+- mapped COA account type is `ASSET`
+- finance account kind is compatible with the collection method
+
+Blocked copy:
+
+```text
+Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account.
+```
+
+### Diagnostic system posting profiles
+
+System posting profile rows are not money destinations.
+
+```text
+Ledger posting profiles (system)
+```
+
+These must remain:
+
+```text
+diagnostic_only = true
+system_posting_profile = true
+operational_collection_account = false
+collection_ready = false
+selectable_for_collection = false
+```
+
+Operator copy:
+
+```text
+System posting profile diagnostic only; not a customer collection destination.
+```
+
+The control center may display diagnostic rows in a separate diagnostic section, but existing collection selectors must never include them as selectable accounts.
+
 ## Role behavior
 
 ### Admin
@@ -64,16 +128,16 @@ Admin collection lanes navigate only to existing collection routes:
 /admin/payments
 ```
 
-The inline admin banner appears on `/admin/finance/collect` before the existing collection page content and shows:
+The inline admin banner shows:
 
-- ready finance account count
-- blocked finance account count
+- ready/selectable finance account count
+- blocked operational account count
 - overdue EMI count
 - pending EMI amount
 - direct-sale outstanding amount
 - rent/lease due amount
 - nullable receipt/reconciliation posture as `Not exposed`
-- top finance account blockers and recommended action
+- top operational finance account blockers and recommended action
 - link to full control center
 - link to accounting setup when exposed by the backend payload
 
@@ -95,32 +159,11 @@ Cashier collection lanes navigate only to existing cashier collection routes:
 /cashier/payments
 ```
 
-The inline cashier banner appears inside `/cashier/collect` before the existing collection workflow and shows the same compact readiness posture without exposing an accounting setup edit link.
-
 ### Customer / partner / vendor
 
 These roles do not receive collection control-center routes, inline collection readiness banners, or navigation exposure.
 
-## Backend behavior
-
-The control-center service reads existing operational data and returns a summary payload.
-
-It reports:
-
-- `due_today_count`
-- `overdue_count`
-- `pending_emi_count`
-- `pending_emi_amount`
-- `direct_sale_outstanding_count`
-- `direct_sale_outstanding_amount`
-- `rent_lease_due_count`
-- `rent_lease_due_amount`
-- `blocked_finance_account_count`
-- `ready_finance_account_count`
-- finance account readiness rows
-- collection lanes
-- route hints
-- recent subscription payment rows
+## Unknown metrics
 
 Receipt and reconciliation values remain nullable when no authoritative backend value is exposed:
 
@@ -129,31 +172,13 @@ pending_receipt_count = null
 unreconciled_collection_count = null
 ```
 
-The UI displays these as `Not exposed` instead of inventing values.
-
-## Finance account readiness behavior
-
-Finance account readiness uses the existing finance-account readiness service.
-
-A finance account is collection-ready only when:
-
-- the finance account is active
-- the finance account kind is valid for collection
-- a chart account is mapped
-- the chart account is active
-- the chart account is an asset account
-- the chart account allows manual posting
-- the chart account is a leaf/posting account, not a group/control account
-
-Blocked finance accounts remain visible for diagnosis. The UI shows the specific blocker, for example:
+The UI displays these as:
 
 ```text
-This account cannot receive payments because it is mapped to a non-posting Chart of Account.
+Not exposed
 ```
 
-The control center and inline banners do not silently remap accounts.
-
-Collection selectors on the existing pages still disable blocked finance accounts, and submit handlers still reject selected blocked accounts before calling the existing collection services.
+It must not render unknown values as `₹0.00` or infer fake counts.
 
 ## Collection lanes
 
@@ -164,9 +189,9 @@ Collection selectors on the existing pages still disable blocked finance account
 | Rent/lease collection | Deferred | Shows demand visibility but no fake collection action. |
 | Customer advance | Enabled only through existing page context | Navigates to existing collection page; no new posting endpoint is introduced. |
 
-## Inline readiness rule
+## Read-only rule
 
-Inline readiness banners do not:
+The control-center endpoints and inline banners do not:
 
 - post payment
 - create receipts
@@ -181,24 +206,6 @@ Inline readiness banners do not:
 - mutate subscriptions, EMIs, demands, invoices, inventory, delivery, commission, payout, lucky draw, Lucky ID, batch, amendment, or recontract records
 - remap finance accounts
 - bypass finance-account posting readiness
-
-The banner only reads the Phase 7D payload and displays blockers earlier in the collection workflow.
-
-## Read-only rule
-
-The control-center endpoints do not:
-
-- post payment
-- create receipts
-- create journal entries
-- create reconciliation records
-- create settlement records
-- day-close records
-- create direct-sale collections
-- create EMI collections
-- collect rent/lease demands
-- collect deposits
-- mutate subscriptions, EMIs, demands, invoices, inventory, delivery, commission, payout, lucky draw, Lucky ID, batch, amendment, or recontract records
 
 All money-changing actions remain in existing approved collection endpoints.
 
@@ -222,8 +229,6 @@ Auditability improves by making collection readiness and finance-account blocker
 
 Admin and cashier users can inspect collection readiness, blocked accounts, receivable lane posture, and recent payments from one page before collecting money.
 
-With Phase 7E, the same compact readiness posture appears directly inside the actual collection pages, so staff see blockers before selecting accounts and posting attempts.
-
 Cashiers receive actionable blocker explanations without being exposed to accounting setup edit controls.
 
 ## Future rent/lease compatibility
@@ -235,8 +240,6 @@ The rent/lease collection lane remains deferred until a confirmed approved colle
 This keeps the future rent/lease workflow compatible without inventing fake actions or bypassing controls.
 
 ## Validation commands
-
-Backend is not required for Phase 7E because no backend files changed. Existing backend safeguards can still be checked with:
 
 ```bash
 cd backend
@@ -256,10 +259,4 @@ npm run lint
 npm run build
 npm run check:routes
 npx playwright test tests/e2e/collection_control_center.spec.ts --project=chromium-smoke --timeout=180000
-```
-
-Do not run:
-
-```bash
-bash scripts/run-release-candidate.sh
 ```
