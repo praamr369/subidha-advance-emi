@@ -26,6 +26,7 @@ const requiredRoutes = [
   "/admin/setup/readiness",
   "/admin/collections/control-center",
   "/cashier/collections/control-center",
+  "/admin/rent-lease",
   "/admin/contract-amendments",
   "/admin/contract-amendments/[id]",
   "/admin/contract-amendments/recontract-report",
@@ -36,6 +37,34 @@ const requiredRoutes = [
   "/partner/contract-amendments",
   "/partner/contract-amendments/[id]",
 ];
+
+const requiredAdminSidebarParents = [
+  ["Command Center", "/admin"],
+  ["Sales & Contracts", "/admin/sales"],
+  ["Subscription EMI", "/admin/subscriptions"],
+  ["Rent / Lease", "/admin/rent-lease"],
+  ["Direct Sale", "/admin/billing/direct-sale"],
+  ["Accounting & Finance", "/admin/accounting"],
+  ["Inventory", "/admin/inventory"],
+  ["Manufacturing", "/admin/manufacturing"],
+  ["CRM / Parties", "/admin/crm"],
+  ["HR & Staff", "/admin/hr"],
+  ["Service Desk", "/admin/service-desk"],
+  ["Delivery & Operations", "/admin/deliveries"],
+  ["Reports & Analysis", "/admin/reports"],
+  ["Settings", "/admin/settings"],
+];
+
+const forbiddenAdminSidebarLabels = new Set([
+  "Batch Register",
+  "Lucky ID Register",
+  "EMI Schedule / EMI Register",
+  "Winners",
+  "Waiver / Loss Report",
+  "Rent Monthly Demands",
+  "Security Deposits",
+  "Delivery Requests",
+]);
 
 const builderRoutes = [
   ["buildAdminContractAmendmentRoute", "/admin/contract-amendments/[id]", true],
@@ -68,11 +97,7 @@ const detailOnlyRouteConstants = new Map([
 ]);
 
 const allowedMissingConstants = new Set(["/admin/settings/local-sandbox"]);
-const suppressedVisibleNavEntries = new Set([
-  "ADMIN|Subscriptions|security deposits|/admin/finance/deposits",
-  "ADMIN|Subscriptions|possession / handover|/admin/deliveries",
-  "ADMIN|Subscriptions|return inspections|/admin/service-desk/returns",
-]);
+const suppressedVisibleNavEntries = new Set([]);
 const printContaminationMarkers = ["AdminShell", "DashboardShell", "AppSidebar", "SidebarProvider", "PageHeader", "ERPPageShell", "BusinessSetupLinks", "DataTableShell", "QuickActionGrid"];
 const rolePrefixes = { PARTNER: "/partner", CUSTOMER: "/customer", CASHIER: "/cashier", VENDOR: "/vendor" };
 
@@ -174,6 +199,16 @@ function adminRegistryLinks(source, routeMap) {
   return links;
 }
 
+function adminVisibleNavigationLinks(source, routeMap) {
+  const links = [];
+  const regex = /adminParentModule\(\s*"([^"]+)"\s*,\s*([^,]+)\s*,/gs;
+  for (const match of source.matchAll(regex)) {
+    const route = resolveExpression(match[2], routeMap);
+    if (route) links.push({ role: "ADMIN", group: "ERP Modules", label: match[1], route, source: "navigation.ts" });
+  }
+  return links;
+}
+
 function navigationLinks(source, routeMap) {
   const roles = [
     ["PARTNER", "  PARTNER: [", "\n\n  CUSTOMER:"],
@@ -249,6 +284,22 @@ function checkWrongRole(rows) {
   return failures;
 }
 
+function checkAdminSidebarParents(rows) {
+  let failures = 0;
+  const byLabel = new Map(rows.map((row) => [row.label, normalize(row.route)]));
+  for (const [label, route] of requiredAdminSidebarParents) {
+    if (byLabel.get(label) === normalize(route)) continue;
+    failures += 1;
+    console.error(`Missing admin parent sidebar module: ${label} -> ${route}`);
+  }
+  for (const row of rows) {
+    if (!forbiddenAdminSidebarLabels.has(row.label)) continue;
+    failures += 1;
+    console.error(`Child workflow leaked into admin sidebar: ${row.label} -> ${row.route}`);
+  }
+  return failures;
+}
+
 function checkBuilders(source) {
   let failures = 0;
   let warnings = 0;
@@ -318,16 +369,20 @@ for (const route of requiredRoutes) {
 
 const routesSource = read(routesFile);
 const routeBuildersSource = read(routeBuildersFile);
+const navigationSource = read(navigationFile);
 const routeMap = routeMapFromRoutesTs(routesSource);
 const constants = routeConstants(routesSource, routeMap);
-const adminLinks = adminRegistryLinks(read(adminRegistryFile), routeMap);
-const roleLinks = navigationLinks(read(navigationFile), routeMap);
-const navLinks = [...adminLinks, ...roleLinks];
+const adminRegistry = adminRegistryLinks(read(adminRegistryFile), routeMap);
+const adminVisibleLinks = adminVisibleNavigationLinks(navigationSource, routeMap);
+const roleLinks = navigationLinks(navigationSource, routeMap);
+const visibleNavLinks = [...adminVisibleLinks, ...roleLinks];
 
 failures += checkMissing("route constants", constants);
-failures += checkMissing("navigation", navLinks);
-failures += checkDuplicates(navLinks);
-failures += checkWrongRole(roleLinks);
+failures += checkMissing("admin route registry", adminRegistry);
+failures += checkMissing("visible navigation", visibleNavLinks);
+failures += checkDuplicates(visibleNavLinks);
+failures += checkWrongRole(visibleNavLinks);
+failures += checkAdminSidebarParents(adminVisibleLinks);
 
 const builderResult = checkBuilders(routeBuildersSource);
 failures += builderResult.failures;
@@ -340,5 +395,5 @@ if (failures > 0) {
 }
 
 console.log(
-  `Route check passed. Checked ${routes.size} page routes, ${constants.length} route constants, ${navLinks.length} navigation links, ${builderRoutes.length} builders with ${warnings} warning(s).`
+  `Route check passed. Checked ${routes.size} page routes, ${constants.length} route constants, ${adminRegistry.length} admin registry links, ${visibleNavLinks.length} visible navigation links, ${builderRoutes.length} builders with ${warnings} warning(s).`
 );
