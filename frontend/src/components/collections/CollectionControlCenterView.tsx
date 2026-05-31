@@ -25,7 +25,8 @@ function hasMetricValue(value: string | number | null | undefined): value is str
 
 function money(value: string | number | null | undefined): string {
   if (!hasMetricValue(value)) return "Not exposed";
-  return `₹${Number(value).toFixed(2)}`;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? `₹${parsed.toFixed(2)}` : "Not exposed";
 }
 
 function metric(value: string | number | null | undefined): string | number {
