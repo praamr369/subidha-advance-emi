@@ -27,29 +27,11 @@ from subscriptions.services.policy_coverage_catalog import (
     get_policy_coverage_specs,
     get_policy_spec_by_slug,
     group_specs,
-    public_policy_slugs,
+    internal_policy_slugs,
 )
 
-
-_POLICY_EDITABLE_FIELDS = {
-    "slug",
-    "category",
-    "title",
-    "summary",
-    "content",
-    "effective_date",
-    "last_reviewed_at",
-    "status",
-}
-
-_POLICY_LOCKED_PUBLISHED_FIELDS = {
-    "slug",
-    "category",
-    "title",
-    "summary",
-    "content",
-    "effective_date",
-}
+_POLICY_EDITABLE_FIELDS = {"slug", "category", "title", "summary", "content", "effective_date", "last_reviewed_at", "status"}
+_POLICY_LOCKED_PUBLISHED_FIELDS = {"slug", "category", "title", "summary", "content", "effective_date"}
 
 
 @dataclass
@@ -93,10 +75,8 @@ def _build_business_address(profile: BusinessProfile | None, public_profile: Pub
     public_address = _clean_text(getattr(public_profile, "address_text", ""))
     if public_address:
         return public_address
-
     if not profile:
         return "Asansol, West Bengal, India"
-
     parts = [
         _clean_text(profile.address_line_1),
         _clean_text(profile.address_line_2),
@@ -120,20 +100,10 @@ def _resolve_public_status_text(*, has_verified_document: bool, fallback: str) -
 def get_policy_placeholder_context() -> PolicyPlaceholderContext:
     business_profile = BusinessProfile.objects.filter(is_active=True).order_by("-created_at", "-id").first()
     public_profile = PublicBusinessProfile.objects.filter(is_active=True).order_by("-created_at", "-id").first()
-
     website = _clean_text(getattr(business_profile, "website_url", "")) or "subidhafurnitureasansol.com"
-    phone = (
-        _clean_text(getattr(public_profile, "support_phone", ""))
-        or _clean_text(getattr(business_profile, "primary_phone", ""))
-        or "Not provided"
-    )
-    email = (
-        _clean_text(getattr(public_profile, "support_email", ""))
-        or _clean_text(getattr(business_profile, "primary_email", ""))
-        or "Not provided"
-    )
+    phone = _clean_text(getattr(public_profile, "support_phone", "")) or _clean_text(getattr(business_profile, "primary_phone", "")) or "Not provided"
+    email = _clean_text(getattr(public_profile, "support_email", "")) or _clean_text(getattr(business_profile, "primary_email", "")) or "Not provided"
     address = _build_business_address(business_profile, public_profile)
-
     gst_verified_doc = BusinessComplianceDocument.objects.filter(
         document_type=BusinessComplianceDocumentType.GST_CERTIFICATE,
         verification_status=BusinessComplianceDocumentVerificationStatus.VERIFIED,
@@ -144,11 +114,9 @@ def get_policy_placeholder_context() -> PolicyPlaceholderContext:
         verification_status=BusinessComplianceDocumentVerificationStatus.VERIFIED,
         is_active=True,
     ).exists()
-
     gst_fallback = "Not provided / will be updated after registration."
     if _clean_text(getattr(business_profile, "gstin", "")):
         gst_fallback = "GST registration is available. Number is not publicly listed on this page."
-
     return PolicyPlaceholderContext(
         website_url=website,
         business_phone=phone,
@@ -180,11 +148,9 @@ def seed_default_policy_pages(*, performed_by=None, overwrite_existing_drafts: b
     created = 0
     updated = 0
     skipped = 0
-
     for template in get_default_policy_templates():
         slug = template["slug"]
         existing = PolicyPage.objects.filter(slug=slug).order_by("-version", "-id")
-
         if not existing.exists():
             PolicyPage.objects.create(
                 slug=slug,
@@ -199,16 +165,13 @@ def seed_default_policy_pages(*, performed_by=None, overwrite_existing_drafts: b
             )
             created += 1
             continue
-
         if not overwrite_existing_drafts:
             skipped += 1
             continue
-
         draft = existing.filter(status=PolicyStatus.DRAFT).order_by("-version", "-id").first()
         if draft is None:
             skipped += 1
             continue
-
         draft.category = template["category"]
         draft.title = template["title"]
         draft.summary = template.get("summary", "")
@@ -216,7 +179,6 @@ def seed_default_policy_pages(*, performed_by=None, overwrite_existing_drafts: b
         draft.updated_by = performed_by
         draft.save()
         updated += 1
-
     marker = PolicyPage.objects.order_by("-id").first()
     if marker is not None:
         log_audit(
@@ -308,20 +270,19 @@ def get_latest_policy_by_slug(slug: str) -> PolicyPage | None:
 
 def get_public_published_policy(slug: str) -> PolicyPage | None:
     cleaned = slug.strip().lower()
-    if cleaned not in public_policy_slugs():
+    if cleaned in internal_policy_slugs():
         return None
     return PolicyPage.objects.filter(slug=cleaned, status=PolicyStatus.PUBLISHED).order_by("-published_at", "-version", "-id").first()
 
 
 def list_public_published_policies() -> list[PolicyPage]:
-    return list(PolicyPage.objects.filter(status=PolicyStatus.PUBLISHED, slug__in=public_policy_slugs()).order_by("category", "slug", "-version"))
+    return list(PolicyPage.objects.filter(status=PolicyStatus.PUBLISHED).exclude(slug__in=internal_policy_slugs()).order_by("category", "slug", "-version"))
 
 
 def build_policy_coverage_matrix() -> dict[str, Any]:
     latest_by_slug: dict[str, PolicyPage] = {}
     for row in PolicyPage.objects.order_by("slug", "-version", "-id"):
         latest_by_slug.setdefault(row.slug, row)
-
     rows: list[dict[str, Any]] = []
     for spec in get_policy_coverage_specs():
         policy = latest_by_slug.get(spec.slug)
@@ -341,7 +302,6 @@ def build_policy_coverage_matrix() -> dict[str, Any]:
             blocker = ""
             action = "No immediate action."
         rows.append({"required_policy_key": spec.slug, "label": spec.label, "coverage_group": spec.group, "category": spec.category, "stored_category": policy.category if policy else spec.compatible_category, "visibility": spec.visibility, "status": status, "policy_id": policy.id if policy else None, "slug": spec.slug, "public_ready": public_ready, "internal_ready": internal_ready, "blocker_reason": blocker, "recommended_action": action, "requires_legal_review": spec.requires_legal_review, "requires_admin_acceptance": spec.requires_admin_acceptance})
-
     grouped = [{"group": group, "items": [row for row in rows if row["coverage_group"] == group]} for group in group_specs().keys()]
     summary = {
         "required_count": len(rows),
