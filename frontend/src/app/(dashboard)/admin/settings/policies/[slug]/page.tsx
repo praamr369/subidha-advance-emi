@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 
 import PolicyMarkdown from "@/components/public/PolicyMarkdown";
 import PageHeader from "@/components/ui/PageHeader";
@@ -16,9 +16,9 @@ import {
   type AdminPolicyPage,
 } from "@/services/policies";
 
-type Params = {
+type Params = Promise<{
   slug: string;
-};
+}>;
 
 function readableError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -28,6 +28,7 @@ function readableError(error: unknown): string {
 }
 
 export default function AdminPolicySlugEditorPage({ params }: { params: Params }) {
+  const { slug } = use(params);
   const [policy, setPolicy] = useState<AdminPolicyPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -38,7 +39,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
     async function load() {
       try {
         setLoading(true);
-        const payload = await getAdminPolicyBySlug(params.slug);
+        const payload = await getAdminPolicyBySlug(slug);
         setPolicy(payload);
         setError(null);
       } catch (err) {
@@ -48,7 +49,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
       }
     }
     void load();
-  }, [params.slug]);
+  }, [slug]);
 
   const isPublished = useMemo(() => policy?.status === "PUBLISHED", [policy]);
 
@@ -122,7 +123,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Policy editor: ${params.slug}`}
+        title={`Policy editor: ${slug}`}
         description="Admin-only legal policy editor with draft/publish/archive lifecycle."
         actions={
           <>
@@ -164,7 +165,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
         </section>
       ) : !policy ? (
         <section className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
-          No policy found for slug <strong>{params.slug}</strong>.
+          No policy found for slug <strong>{slug}</strong>.
           <div className="mt-3">
             <Link href={ROUTES.admin.settingsPolicies} className="text-primary underline">
               Back to policy list
