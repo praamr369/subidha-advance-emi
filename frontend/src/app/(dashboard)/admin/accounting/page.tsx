@@ -1,121 +1,495 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  ArrowRight,
+  Banknote,
   BookOpenText,
-  BriefcaseBusiness,
   Building2,
+  ClipboardCheck,
+  FileBarChart,
+  FileText,
+  HandCoins,
   Landmark,
+  PackageSearch,
   Receipt,
   ReceiptText,
   RefreshCw,
-  ScrollText,
+  Repeat2,
+  Scale,
+  Settings2,
   ShieldCheck,
+  ShoppingCart,
+  TrendingUp,
+  UsersRound,
   WalletCards,
+  type LucideIcon,
 } from "lucide-react";
 
-import { ControlLaneGrid } from "@/components/admin/control-center/ControlLanes";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
-import StatCard from "@/components/ui/StatCard";
-import { MetricStrip, QueueList } from "@/components/ui/operations";
-import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import { listChartOfAccounts, listFinanceAccounts, listJournalEntries } from "@/services/accounting";
 import {
-  listChartOfAccounts,
-  listExpenses,
-  listFinanceAccounts,
-  listJournalEntries,
-  listMoneyMovements,
-  listSalarySheets,
-  type ExpenseVoucher,
-  type JournalEntry,
-  type MoneyMovement,
-  type SalarySheet,
-} from "@/services/accounting";
+  getAccountingSetupReadiness,
+  getAccountingSetupStatus,
+  type AccountingSetupReadinessPayload,
+  type AccountingSetupStatusPayload,
+} from "@/services/accounting-setup";
 import { getAdminAccountingControlCenter } from "@/services/phase5-control";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
+type ModuleStatus = "READY" | "BLOCKED" | "PARTIAL" | "DEFERRED";
 
-function formatDate(value?: string | null): string {
-  if (!value) return "—";
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+type AccountingModuleDefinition = {
+  key: string;
+  title: string;
+  description: string;
+  route: string | null;
+  icon: LucideIcon;
+  implemented: boolean;
+  readOnly?: boolean;
+  setupGate?: boolean;
+  defaultStatus?: ModuleStatus;
+  deferredReason?: string;
+  recommendedAction?: string;
+};
+
+type AccountingModuleGroup = {
+  title: string;
+  description: string;
+  modules: AccountingModuleDefinition[];
+};
+
+type AccountingControlPayload = {
+  kpis?: Record<string, string>;
+  modules?: unknown[];
+  capabilities?: unknown[];
+};
+
+type CockpitData = {
+  chartAccountsCount: number | null;
+  financeAccountsCount: number | null;
+  draftJournalsCount: number | null;
+  postedMovementsCount: number | null;
+  setupStatus: AccountingSetupStatusPayload | null;
+  setupReadiness: AccountingSetupReadinessPayload | null;
+  controlPayload: AccountingControlPayload | null;
+};
+
+const MODULE_GROUPS: AccountingModuleGroup[] = [
+  {
+    title: "Setup & Master Data",
+    description: "Accounts, finance accounts, setup gates, and readiness before staff handle live money.",
+    modules: [
+      {
+        key: "chart_accounts",
+        title: "Chart of Accounts",
+        description: "Use this to maintain the account structure used by journals, reports, and posting profiles.",
+        route: ROUTES.admin.accountingChartOfAccounts,
+        icon: BookOpenText,
+        implemented: true,
+      },
+      {
+        key: "finance_accounts",
+        title: "Finance Accounts",
+        description: "Use this to check cash, bank, and UPI accounts before collection operations.",
+        route: ROUTES.admin.accountingSetup,
+        icon: Landmark,
+        implemented: true,
+        setupGate: true,
+      },
+      {
+        key: "accounting_setup",
+        title: "Accounting Setup",
+        description: "Fix account mappings and setup blockers before live money operations.",
+        route: ROUTES.admin.accountingSetup,
+        icon: Settings2,
+        implemented: true,
+        setupGate: true,
+      },
+      {
+        key: "setup_readiness",
+        title: "Setup Readiness",
+        description: "Read-only readiness center for business setup, collection gates, and document controls.",
+        route: ROUTES.admin.setupReadiness,
+        icon: ShieldCheck,
+        implemented: true,
+        readOnly: true,
+      },
+    ],
+  },
+  {
+    title: "Collections & Receivables",
+    description: "Customer money intake and receivable review without creating fake rent or lease collection actions.",
+    modules: [
+      {
+        key: "collections",
+        title: "Collections",
+        description: "Use this when receiving customer money through approved collection workflows.",
+        route: ROUTES.admin.collections,
+        icon: HandCoins,
+        implemented: true,
+        setupGate: true,
+      },
+      {
+        key: "collection_control_center",
+        title: "Collection Control Center",
+        description: "Review collection blockers, finance-account readiness, and cashier/admin collection posture.",
+        route: ROUTES.admin.collectionControlCenter,
+        icon: ClipboardCheck,
+        implemented: true,
+        readOnly: true,
+        setupGate: true,
+      },
+      {
+        key: "direct_sale_receivables",
+        title: "Direct-sale Receivables",
+        description: "Use this to review unpaid direct-sale invoices before collection follow-up.",
+        route: ROUTES.admin.billingInvoices,
+        icon: ReceiptText,
+        implemented: true,
+        readOnly: true,
+      },
+      {
+        key: "customer_advances",
+        title: "Customer Advances",
+        description: "Deferred until customer advance liability workflow is enabled end-to-end.",
+        route: null,
+        icon: WalletCards,
+        implemented: false,
+        defaultStatus: "DEFERRED",
+        deferredReason: "Deferred until customer advance liability workflow is enabled.",
+      },
+      {
+        key: "rent_lease_dues",
+        title: "Rent / Lease Dues",
+        description: "Deferred until rent/lease demand collection is enabled as a real backend workflow.",
+        route: null,
+        icon: Building2,
+        implemented: false,
+        defaultStatus: "DEFERRED",
+        deferredReason: "Deferred until rent/lease demand collection is enabled.",
+      },
+      {
+        key: "security_deposits",
+        title: "Security Deposits",
+        description: "Review rent/lease deposit liabilities and refund posture. This is not a fake collection action.",
+        route: ROUTES.admin.financeDeposits,
+        icon: Banknote,
+        implemented: true,
+        readOnly: true,
+        defaultStatus: "PARTIAL",
+      },
+    ],
+  },
+  {
+    title: "Payables & Expenses",
+    description: "Supplier, purchase, employee, and reversal money controls separated from collection posting.",
+    modules: [
+      {
+        key: "vendor_payables",
+        title: "Vendor Payables",
+        description: "Review vendor outstanding balances and payable posture.",
+        route: ROUTES.admin.vendorsOutstanding,
+        icon: UsersRound,
+        implemented: true,
+        readOnly: true,
+      },
+      {
+        key: "purchase_bills",
+        title: "Purchase Bills",
+        description: "Review and manage purchase bills without changing customer collection behavior.",
+        route: ROUTES.admin.accountingPurchaseBills,
+        icon: ShoppingCart,
+        implemented: true,
+      },
+      {
+        key: "expenses",
+        title: "Expenses",
+        description: "Record and review expense vouchers through the accounting register.",
+        route: ROUTES.admin.accountingExpenses,
+        icon: Receipt,
+        implemented: true,
+      },
+      {
+        key: "payroll_accruals",
+        title: "Payroll Accruals",
+        description: "Review salary and payroll posture from the HR payroll workspace.",
+        route: ROUTES.admin.hrPayroll,
+        icon: WalletCards,
+        implemented: true,
+        readOnly: true,
+        defaultStatus: "PARTIAL",
+      },
+      {
+        key: "refunds_returns",
+        title: "Refunds / Returns",
+        description: "Review reversal and return documents; posting remains controlled in the underlying workflow.",
+        route: ROUTES.admin.billingReversals,
+        icon: Repeat2,
+        implemented: true,
+        readOnly: true,
+        defaultStatus: "PARTIAL",
+      },
+    ],
+  },
+  {
+    title: "Books & Posting",
+    description: "Manual journals, money movements, bridge evidence, and inventory accounting controls.",
+    modules: [
+      {
+        key: "manual_journals",
+        title: "Manual Journals",
+        description: "Use this for explicit admin-controlled journal entries only.",
+        route: ROUTES.admin.accountingJournals,
+        icon: ScrollText,
+        implemented: true,
+      },
+      {
+        key: "money_movements",
+        title: "Money Movements",
+        description: "Review cash, bank, and UPI movement books without posting from the cockpit.",
+        route: ROUTES.admin.accountingBooks,
+        icon: Landmark,
+        implemented: true,
+      },
+      {
+        key: "accounting_bridge_runs",
+        title: "Accounting Bridge Runs",
+        description: "Controlled bridge evidence and dry-run/posting visibility for system-generated accounting entries.",
+        route: ROUTES.admin.accountingBridges,
+        icon: Scale,
+        implemented: true,
+        readOnly: true,
+      },
+      {
+        key: "inventory_accounting",
+        title: "Inventory Accounting",
+        description: "Review stock accounting posture through inventory controls and valuation surfaces.",
+        route: ROUTES.admin.inventory,
+        icon: PackageSearch,
+        implemented: true,
+        readOnly: true,
+        defaultStatus: "PARTIAL",
+      },
+    ],
+  },
+  {
+    title: "Reconciliation & Reports",
+    description: "Read-only report and reconciliation surfaces; reports do not recalculate books in the browser.",
+    modules: [
+      {
+        key: "reconciliation",
+        title: "Reconciliation",
+        description: "Review reconciliation queues and exceptions. Resolution remains controlled by existing workflows.",
+        route: ROUTES.admin.financeCanonicalReconciliation,
+        icon: ShieldCheck,
+        implemented: true,
+        readOnly: true,
+      },
+      {
+        key: "trial_balance",
+        title: "Trial Balance",
+        description: "Read-only trial balance report from posted accounting data.",
+        route: ROUTES.admin.accountingTrialBalance,
+        icon: FileBarChart,
+        implemented: true,
+        readOnly: true,
+      },
+      {
+        key: "profit_loss",
+        title: "Profit & Loss",
+        description: "Read-only profit and loss report. It does not mutate ledger data.",
+        route: ROUTES.admin.accountingProfitLoss,
+        icon: TrendingUp,
+        implemented: true,
+        readOnly: true,
+      },
+      {
+        key: "balance_sheet",
+        title: "Balance Sheet",
+        description: "Read-only balance sheet report for accounting review.",
+        route: ROUTES.admin.accountingBalanceSheet,
+        icon: FileText,
+        implemented: true,
+        readOnly: true,
+      },
+      {
+        key: "gst_documents",
+        title: "GST Documents",
+        description: "Review GST tax invoices, credit notes, and debit notes in dedicated document registers.",
+        route: ROUTES.admin.accountingTaxInvoices,
+        icon: ReceiptText,
+        implemented: true,
+        readOnly: true,
+      },
+      {
+        key: "itr_export",
+        title: "ITR Export",
+        description: "Generate and review tax handoff packs from the dedicated export workflow.",
+        route: ROUTES.admin.accountingItrPack,
+        icon: FileText,
+        implemented: true,
+        readOnly: true,
+      },
+    ],
+  },
+];
+
+const STATUS_STYLES: Record<ModuleStatus, string> = {
+  READY: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  BLOCKED: "border-red-200 bg-red-50 text-red-800",
+  PARTIAL: "border-amber-200 bg-amber-50 text-amber-900",
+  DEFERRED: "border-slate-200 bg-slate-100 text-slate-700",
+};
 
 function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return "Failed to load accounting control center.";
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return "Failed to load accounting cockpit.";
+}
+
+function displayMetric(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) return "Not exposed";
+  return String(value);
+}
+
+function compactBlockers(readiness: AccountingSetupReadinessPayload | null): string[] {
+  if (!readiness) return [];
+  return readiness.finance_accounts
+    .filter((account) => !account.collection_ready)
+    .map((account) => {
+      const reason = account.collection_blocker_reason || account.blocker_reason || "Finance account is not collection-ready.";
+      return `${account.name} (${account.kind}): ${reason}`;
+    })
+    .slice(0, 3);
+}
+
+function statusForModule(module: AccountingModuleDefinition, setupBlocked: boolean): ModuleStatus {
+  if (!module.implemented || !module.route) return "DEFERRED";
+  if (module.setupGate && setupBlocked) return "BLOCKED";
+  return module.defaultStatus ?? "READY";
+}
+
+function moduleActionLabel(module: AccountingModuleDefinition, status: ModuleStatus): string {
+  if (!module.implemented || !module.route || status === "DEFERRED") return "Deferred";
+  if (status === "BLOCKED" && module.setupGate) return "Fix setup";
+  if (module.readOnly) return "Open read-only";
+  return "Open";
+}
+
+function ModuleCard({
+  module,
+  setupBlocked,
+  setupBlockers,
+}: {
+  module: AccountingModuleDefinition;
+  setupBlocked: boolean;
+  setupBlockers: string[];
+}) {
+  const status = statusForModule(module, setupBlocked);
+  const Icon = module.icon;
+  const isDeferred = status === "DEFERRED" || !module.implemented || !module.route;
+  const actionHref = status === "BLOCKED" && module.setupGate ? ROUTES.admin.accountingSetup : module.route;
+  const blockers = status === "BLOCKED" ? setupBlockers : [];
+
+  return (
+    <article className="flex min-h-[15rem] flex-col rounded-[1.5rem] border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-muted text-foreground">
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${STATUS_STYLES[status]}`}>
+            {status}
+          </span>
+          {module.readOnly ? (
+            <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-800">
+              Read-only
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 flex-1 space-y-2">
+        <h3 className="text-base font-semibold text-foreground">{module.title}</h3>
+        <p className="text-sm leading-6 text-muted-foreground">{module.description}</p>
+        {blockers.length > 0 ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+            <div className="flex items-center gap-2 font-semibold">
+              <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+              {blockers.length} setup blocker{blockers.length === 1 ? "" : "s"}
+            </div>
+            <p className="mt-1 line-clamp-2">{blockers[0]}</p>
+          </div>
+        ) : null}
+        {module.deferredReason ? (
+          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+            {module.deferredReason}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="mt-4 border-t border-border pt-3">
+        {isDeferred || !actionHref ? (
+          <button
+            type="button"
+            disabled
+            className="inline-flex w-full items-center justify-center rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground"
+          >
+            Deferred
+          </button>
+        ) : (
+          <Link
+            href={actionHref}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
+          >
+            {moduleActionLabel(module, status)}
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        )}
+      </div>
+    </article>
+  );
 }
 
 export default function AdminAccountingPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [chartCount, setChartCount] = useState(0);
-  const [financeCount, setFinanceCount] = useState(0);
-  const [journals, setJournals] = useState<JournalEntry[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseVoucher[]>([]);
-  const [salarySheets, setSalarySheets] = useState<SalarySheet[]>([]);
-  const [moneyMovements, setMoneyMovements] = useState<MoneyMovement[]>([]);
-  const [controlKpis, setControlKpis] = useState<Record<string, string> | null>(null);
+  const [data, setData] = useState<CockpitData | null>(null);
 
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      const [
-        chartAccountsPayload,
-        financeAccountsPayload,
-        journalsPayload,
-        expensesPayload,
-        salaryPayload,
-        moneyPayload,
-        controlPayload,
-      ] = await Promise.all([
+      const [chartAccounts, financeAccounts, draftJournals, controlPayload, setupStatus, setupReadiness] = await Promise.all([
         listChartOfAccounts(),
         listFinanceAccounts(),
-        listJournalEntries(),
-        listExpenses(),
-        listSalarySheets(),
-        listMoneyMovements(),
-        getAdminAccountingControlCenter(),
+        listJournalEntries({ status: "DRAFT" }),
+        getAdminAccountingControlCenter() as Promise<AccountingControlPayload>,
+        getAccountingSetupStatus(),
+        getAccountingSetupReadiness(),
       ]);
 
-      setChartCount(chartAccountsPayload.count);
-      setFinanceCount(financeAccountsPayload.count);
-      setJournals(journalsPayload.results);
-      setExpenses(expensesPayload.results);
-      setSalarySheets(salaryPayload.results);
-      setMoneyMovements(moneyPayload.results);
-      setControlKpis(
-        controlPayload && typeof controlPayload === "object" && "kpis" in controlPayload
-          ? ((controlPayload as { kpis: Record<string, string> }).kpis ?? null)
-          : null
-      );
+      setData({
+        chartAccountsCount: chartAccounts.count,
+        financeAccountsCount: financeAccounts.count,
+        draftJournalsCount: draftJournals.count,
+        postedMovementsCount: null,
+        controlPayload,
+        setupStatus,
+        setupReadiness,
+      });
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
-      if (mode === "initial") {
-        setJournals([]);
-        setExpenses([]);
-        setSalarySheets([]);
-        setMoneyMovements([]);
-      }
+      if (mode === "initial") setData(null);
     } finally {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
@@ -126,67 +500,46 @@ export default function AdminAccountingPage() {
     void loadPage("initial");
   }, []);
 
-  const draftJournalCount = journals.filter((item) => item.status === "DRAFT").length;
-  const approvedExpenseCount = expenses.filter((item) => item.status === "APPROVED").length;
-  const approvedSalaryCount = salarySheets.filter((item) => item.status === "APPROVED").length;
-  const postedMovementCount = moneyMovements.filter((item) => item.status === "POSTED").length;
-  const latestJournal = journals[0];
-  const latestExpense = expenses[0];
-  const latestSalary = salarySheets[0];
-  const latestMovement = moneyMovements[0];
-  const kpiTodayCollection = controlKpis?.today_collection ?? "0.00";
-  const kpiMonthlyCollection = controlKpis?.month_to_date_collection ?? "0.00";
-  const kpiEmiReceivable = controlKpis?.total_receivables ?? "0.00";
-  const kpiOverdue = controlKpis?.overdue_receivables ?? "0";
-  const kpiDepositLiability = controlKpis?.rent_lease_deposit_liability ?? "0.00";
-  const kpiWaiverLoss = controlKpis?.waiver_loss_exposure ?? "0.00";
-  const kpiDirectSale = controlKpis?.direct_sale_revenue ?? "0.00";
-  const kpiUnbalancedWarnings = controlKpis?.unbalanced_journal_warnings ?? "0";
-  const kpiUnmappedWarnings = controlKpis?.unmapped_account_warnings ?? "0";
+  const setupBlockers = useMemo(() => compactBlockers(data?.setupReadiness ?? null), [data?.setupReadiness]);
+  const setupBlockerCount = data?.setupStatus?.setup_health_blockers_count ?? data?.setupReadiness?.summary.blockers_count ?? null;
+  const blockedFinanceAccountsCount = data?.setupReadiness?.summary.blockers_count ?? null;
+  const collectionReadyAccountsCount = data?.setupReadiness
+    ? data.setupReadiness.summary.cash_accounts_ready_count +
+      data.setupReadiness.summary.bank_accounts_ready_count +
+      data.setupReadiness.summary.upi_accounts_ready_count
+    : null;
+  const setupBlocked = Boolean(
+    (setupBlockerCount ?? 0) > 0 ||
+      data?.setupStatus?.setup_health_status === "BLOCKED" ||
+      data?.setupStatus?.status === "BLOCKED"
+  );
+  const backendModuleCount = Array.isArray(data?.controlPayload?.modules)
+    ? data?.controlPayload?.modules?.length ?? 0
+    : Array.isArray(data?.controlPayload?.capabilities)
+      ? data?.controlPayload?.capabilities?.length ?? 0
+      : 0;
 
   return (
     <ERPPageShell
-      eyebrow="Accounting Control"
-      title="Accounting Control Center"
-      subtitle="Phase-1 accounting workspace with separate double-entry books, admin-only posting controls, and no overlap with the EMI payment ledger."
+      eyebrow="Accounting & Finance"
+      title="Accounting & Finance Cockpit"
+      subtitle="Icon-based operator cockpit for accounting setup, collections, books, reconciliation, and reports. This page is navigation/readiness only; it does not post payments, receipts, journals, or reconciliations."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting" },
       ]}
       actions={[
-        {
-          href: ROUTES.admin.accountingJournals,
-          label: "Manual Journals",
-          variant: "primary",
-        },
-        {
-          href: ROUTES.admin.accountingPeriods,
-          label: "Periods",
-          variant: "secondary",
-        },
-        {
-          href: ROUTES.admin.accountingAssets,
-          label: "Assets",
-          variant: "secondary",
-        },
-        {
-          href: ROUTES.admin.accountingGst,
-          label: "GST Docs",
-          variant: "secondary",
-        },
-        {
-          href: ROUTES.admin.accountingItrPack,
-          label: "ITR Pack",
-          variant: "secondary",
-        },
+        { href: ROUTES.admin.accountingSetup, label: "Fix setup", variant: "primary" },
+        { href: ROUTES.admin.collectionControlCenter, label: "Collection Control", variant: "secondary" },
+        { href: ROUTES.admin.setupReadiness, label: "Setup Readiness", variant: "secondary" },
       ]}
       stats={[
-        { label: "Chart Accounts", value: String(chartCount), tone: "info" },
-        { label: "Finance Accounts", value: String(financeCount) },
-        { label: "Draft Journals", value: String(draftJournalCount), tone: draftJournalCount > 0 ? "warning" : "success" },
-        { label: "Posted Movements", value: String(postedMovementCount), tone: "success" },
+        { label: "Chart Accounts", value: displayMetric(data?.chartAccountsCount), tone: "info" },
+        { label: "Finance Accounts", value: displayMetric(data?.financeAccountsCount), tone: setupBlocked ? "warning" : "success" },
+        { label: "Draft Journals", value: displayMetric(data?.draftJournalsCount), tone: (data?.draftJournalsCount ?? 0) > 0 ? "warning" : "success" },
+        { label: "Posted Movements", value: displayMetric(data?.postedMovementsCount), tone: "info" },
       ]}
-      statusBadge={{ label: "Admin Only", tone: "info" }}
+      statusBadge={{ label: setupBlocked ? "Setup blocked" : "Read-only cockpit", tone: setupBlocked ? "warning" : "info" }}
     >
       <div className="space-y-6">
         <div className="flex justify-end">
@@ -196,296 +549,84 @@ export default function AdminAccountingPage() {
             disabled={refreshing || loading}
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" />
             {refreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
 
-        {loading ? <ERPLoadingState label="Loading accounting control center..." /> : null}
+        {loading ? <ERPLoadingState label="Loading accounting and finance cockpit..." /> : null}
 
         {!loading && error ? (
           <ERPErrorState
-            title="Unable to load accounting control center"
+            title="Unable to load accounting cockpit"
             description={error}
             onRetry={() => void loadPage("initial")}
           />
         ) : null}
 
-        {!loading && !error ? (
+        {!loading && !error && data ? (
           <>
-            <ControlLaneGrid
-              title="Accounting control lanes"
-              description="Accounting remains operationally separate from EMI collection. Each lane opens the dedicated admin register for controlled setup, posting, reconciliation, payroll, or compliance work."
-              lanes={[
-                {
-                  title: "Account structure",
-                  description: "Chart of accounts, books, and posting periods for additive ledger governance.",
-                  href: ROUTES.admin.accountingChartOfAccounts,
-                  icon: <BookOpenText className="h-4 w-4" />,
-                  badge: "Setup",
-                },
-                {
-                  title: "Cash / Bank / UPI control",
-                  description: "Finance-account and book review stays separate from cashier collection execution.",
-                  href: ROUTES.admin.accountingBooks,
-                  icon: <Landmark className="h-4 w-4" />,
-                  badge: "Books",
-                },
-                {
-                  title: "Posting & journals",
-                  description: "Manual journals and controlled accounting entries for finance admins.",
-                  href: ROUTES.admin.accountingJournals,
-                  icon: <ScrollText className="h-4 w-4" />,
-                  badge: "Posting",
-                },
-                {
-                  title: "Receivables / payables",
-                  description: "Vendor and procurement registers for payable visibility without merging into collections.",
-                  href: ROUTES.admin.accountingPurchaseBills,
-                  icon: <Receipt className="h-4 w-4" />,
-                  badge: "Ledger",
-                },
-                {
-                  title: "Payroll & staff",
-                  description: "Staff, salary, and expense-claim control lanes remain explicit and auditable.",
-                  href: ROUTES.admin.accountingStaff,
-                  icon: <BriefcaseBusiness className="h-4 w-4" />,
-                  badge: "Workforce",
-                },
-                {
-                  title: "Period / tax / controls",
-                  description: "Periods, GST, exports, and close controls for finance governance.",
-                  href: ROUTES.admin.accountingPeriods,
-                  icon: <ShieldCheck className="h-4 w-4" />,
-                  badge: "Close",
-                },
-                {
-                  title: "Branch-aware setup",
-                  description: "Finance books and branches stay aligned through explicit governance surfaces.",
-                  href: ROUTES.admin.branchReporting,
-                  icon: <Building2 className="h-4 w-4" />,
-                  badge: "Branch",
-                },
-              ]}
-            />
-            <ERPSectionShell title="Readiness posture" description="Operational indicators loaded from the admin accounting control center endpoint. This surface does not recalculate books in the UI.">
-              <MetricStrip
-                items={[
-                  { label: "Today Collection", value: money(kpiTodayCollection) },
-                  { label: "MTD Collection", value: money(kpiMonthlyCollection) },
-                  { label: "Receivable", value: money(kpiEmiReceivable) },
-                  { label: "Overdue", value: String(kpiOverdue) },
-                  { label: "Rent Deposits", value: money(kpiDepositLiability) },
-                  { label: "Waiver Exposure", value: money(kpiWaiverLoss) },
-                  { label: "Direct Sale", value: money(kpiDirectSale) },
-                  { label: "Unbalanced Warn", value: String(kpiUnbalancedWarnings) },
-                  { label: "Unmapped Warn", value: String(kpiUnmappedWarnings) },
-                  { label: "Expense Approvals", value: String(approvedExpenseCount) },
-                  { label: "Salary Approvals", value: String(approvedSalaryCount) },
-                  { label: "Draft Journals", value: String(draftJournalCount) },
-                ]}
-              />
+            {backendModuleCount === 0 ? (
+              <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                No accounting modules exposed by backend. This cockpit is using the checked admin route registry and existing read-only readiness endpoints; deferred modules are not linked.
+              </div>
+            ) : null}
+
+            <ERPSectionShell
+              title="Readiness posture"
+              description="Operational counts are read from backend APIs. Values that are not exposed are shown explicitly instead of fake zeroes."
+            >
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+                {[
+                  ["Chart accounts", displayMetric(data.chartAccountsCount)],
+                  ["Finance accounts", displayMetric(data.financeAccountsCount)],
+                  ["Draft journals", displayMetric(data.draftJournalsCount)],
+                  ["Posted movements", displayMetric(data.postedMovementsCount)],
+                  ["Setup blockers", displayMetric(setupBlockerCount)],
+                  ["Collection-ready accounts", displayMetric(collectionReadyAccountsCount)],
+                  ["Blocked finance accounts", displayMetric(blockedFinanceAccountsCount)],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-2xl border border-border bg-card px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+                    <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
+                  </div>
+                ))}
+              </div>
             </ERPSectionShell>
 
-            <div className="grid gap-4 xl:grid-cols-2">
-              <WorkspaceSection
-                title="Latest register activity"
-                description="The newest rows from each accounting register, sourced directly from the new accounting API."
-              >
-                <div className="grid gap-3 md:grid-cols-2">
-                  <StatCard
-                    label="Latest Journal"
-                    value={latestJournal?.entry_no ?? "No entries"}
-                    subtext={latestJournal ? `${latestJournal.status} • ${formatDate(latestJournal.entry_date)}` : "Manual journals will appear here once created"}
-                    tone={latestJournal?.status === "DRAFT" ? "warning" : "default"}
-                    icon={<BookOpenText className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    label="Latest Expense"
-                    value={latestExpense?.voucher_no ?? "No vouchers"}
-                    subtext={latestExpense ? `${latestExpense.status} • ${money(latestExpense.net_amount)}` : "Expense vouchers will appear here once recorded"}
-                    tone={latestExpense?.status === "APPROVED" ? "warning" : "default"}
-                    icon={<ReceiptText className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    label="Latest Salary Sheet"
-                    value={
-                      latestSalary
-                        ? `${latestSalary.employee_code ?? "EMP"} ${latestSalary.year}-${String(
-                            latestSalary.month
-                          ).padStart(2, "0")}`
-                        : "No salary sheets"
-                    }
-                    subtext={latestSalary ? `${latestSalary.status} • ${money(latestSalary.net_amount)}` : "Salary accrual sheets will appear here once created"}
-                    tone={latestSalary?.status === "APPROVED" ? "warning" : "default"}
-                    icon={<WalletCards className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    label="Latest Movement"
-                    value={latestMovement?.movement_no ?? "No movements"}
-                    subtext={latestMovement ? `${latestMovement.status} • ${money(latestMovement.amount)}` : "Inter-account movements will appear here once created"}
-                    tone={latestMovement?.status === "DRAFT" ? "info" : "default"}
-                    icon={<Landmark className="h-5 w-5" />}
-                  />
+            {setupBlocked ? (
+              <div className="rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950">
+                <div className="flex items-center gap-2 font-semibold">
+                  <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                  Setup blockers must be fixed before live money operations.
                 </div>
-              </WorkspaceSection>
+                <p className="mt-1 text-red-900">
+                  Blocked/system accounts are diagnostic only; collection-ready accounts require a posting-enabled leaf ASSET chart account.
+                </p>
+              </div>
+            ) : null}
 
-              <WorkspaceSection
-                title="Control lanes"
-                description="Accounting remains operationally separate from EMI collections. Each lane below opens the dedicated admin register for additive setup or posting."
-                contentClassName="grid gap-3 sm:grid-cols-2"
-              >
-                <Link
-                  href={ROUTES.admin.accountingChartOfAccounts}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Chart of accounts and finance accounts
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingVendors}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Vendor register and procurement master data
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingPurchaseBills}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Purchase bills and stock inward drafts
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingExpenses}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Expenses and vendor vouchers
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingStaff}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Staff register and attendance basics
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingSalary}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Salary accruals and salary payments
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingAttendance}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Attendance calendar and overtime capture
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingLeave}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Leave requests and payroll period locks
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingExpenseClaims}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Staff expense claims and reimbursements
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingStaffLedger}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Staff payable and reimbursement ledger
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingBooks}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Books and money movements
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingBooksCash}
-                  className="rounded-[1.3rem] border border-slate-200 bg-slate-100 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200"
-                >
-                  Daily cash, bank, UPI, sales, and purchase books
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingTrialBalance}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Trial balance, profit & loss, and balance sheet reports
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingTaxInvoices}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  GST tax invoices, credit notes, and debit notes
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingItrPack}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  ITR export pack generation
-                </Link>
-                <Link
-                  href={ROUTES.admin.accountingBridges}
-                  className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Controlled accounting bridge runs
-                </Link>
-                <Link
-                  href={ROUTES.admin.inventory}
-                  className="rounded-[1.3rem] border border-slate-200 bg-slate-100 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200"
-                >
-                  Inventory stock controls and adjustments
-                </Link>
-                <Link
-                  href={ROUTES.admin.billing}
-                  className="rounded-[1.3rem] border border-slate-200 bg-slate-100 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200"
-                >
-                  Billing invoices, notes, and receipts
-                </Link>
-                <Link
-                  href={ROUTES.admin.reminders}
-                  className="rounded-[1.3rem] border border-slate-200 bg-slate-100 px-4 py-4 text-sm font-medium text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200"
-                >
-                  Reminder queue and follow-up controls
-                </Link>
-              </WorkspaceSection>
-            </div>
-
-            <WorkspaceSection
-              title="Posting watchlist"
-              description="Queues that currently need an admin post action to move from draft or approved state into the accounting books."
-            >
-              {draftJournalCount > 0 || approvedExpenseCount > 0 || approvedSalaryCount > 0 ? (
-                <QueueList
-                  rows={[
-                    {
-                      title: "Journals waiting",
-                      count: String(draftJournalCount),
-                      helper: latestJournal?.entry_no ? `Latest draft ${latestJournal.entry_no}` : "No draft journals",
-                      route: ROUTES.admin.accountingJournals,
-                    },
-                    {
-                      title: "Expenses waiting",
-                      count: String(approvedExpenseCount),
-                      helper: latestExpense?.voucher_no ? `Latest voucher ${latestExpense.voucher_no}` : "No approved vouchers",
-                      route: ROUTES.admin.accountingExpenses,
-                    },
-                    {
-                      title: "Salary waiting",
-                      count: String(approvedSalaryCount),
-                      helper: latestSalary?.employee_code ? `Latest sheet ${latestSalary.employee_code}` : "No approved salary sheets",
-                      route: ROUTES.admin.accountingSalary,
-                    },
-                  ]}
-                />
-              ) : (
-                <ERPEmptyState
-                  title="No accounting rows are waiting for admin posting"
-                  description="Draft journals and approved vouchers/salary sheets will surface here once the accounting registers start receiving transactions."
-                />
-              )}
-            </WorkspaceSection>
+            {MODULE_GROUPS.length === 0 ? (
+              <ERPEmptyState
+                title="No accounting modules exposed by backend."
+                description="The cockpit cannot render module cards until a capability list or local route-safe module map is available."
+              />
+            ) : (
+              MODULE_GROUPS.map((group) => (
+                <ERPSectionShell key={group.title} title={group.title} description={group.description}>
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {group.modules.map((module) => (
+                      <ModuleCard
+                        key={module.key}
+                        module={module}
+                        setupBlocked={setupBlocked}
+                        setupBlockers={setupBlockers.length > 0 ? setupBlockers : ["Accounting setup readiness is blocked."]}
+                      />
+                    ))}
+                  </div>
+                </ERPSectionShell>
+              ))
+            )}
           </>
         ) : null}
       </div>
