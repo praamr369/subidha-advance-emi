@@ -21,6 +21,15 @@ from subscriptions.models_business_setup import (
 )
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.default_policy_templates import get_default_policy_templates
+from subscriptions.services.policy_coverage_catalog import (
+    INTERNAL,
+    PUBLIC,
+    get_policy_coverage_specs,
+    get_policy_spec_by_slug,
+    group_specs,
+    internal_policy_slugs,
+    public_policy_slugs,
+)
 
 
 _POLICY_EDITABLE_FIELDS = {
@@ -56,6 +65,29 @@ class PolicyPlaceholderContext:
 
 def _clean_text(value: str | None) -> str:
     return (value or "").strip()
+
+
+def policy_visibility_for_slug(slug: str) -> str:
+    spec = get_policy_spec_by_slug(slug)
+    return spec.visibility if spec else PUBLIC
+
+
+def policy_governance_category_for_slug(slug: str, fallback: str | None = None) -> str:
+    spec = get_policy_spec_by_slug(slug)
+    return spec.category if spec else (fallback or "GENERAL")
+
+
+def policy_coverage_group_for_slug(slug: str) -> str:
+    spec = get_policy_spec_by_slug(slug)
+    return spec.group if spec else "Public Legal"
+
+
+def policy_is_public_visible(policy: PolicyPage) -> bool:
+    return bool(policy.status == PolicyStatus.PUBLISHED and policy_visibility_for_slug(policy.slug) == PUBLIC)
+
+
+def policy_is_internal_only(policy: PolicyPage) -> bool:
+    return policy_visibility_for_slug(policy.slug) == INTERNAL
 
 
 def _build_business_address(profile: BusinessProfile | None, public_profile: PublicBusinessProfile | None) -> str:
@@ -125,14 +157,8 @@ def get_policy_placeholder_context() -> PolicyPlaceholderContext:
         business_phone=phone,
         business_email=email,
         business_address=address,
-        gst_status_text=_resolve_public_status_text(
-            has_verified_document=gst_verified_doc,
-            fallback=gst_fallback,
-        ),
-        udyam_status_text=_resolve_public_status_text(
-            has_verified_document=udyam_verified_doc,
-            fallback=udyam_fallback,
-        ),
+        gst_status_text=_resolve_public_status_text(has_verified_document=gst_verified_doc, fallback=gst_fallback),
+        udyam_status_text=_resolve_public_status_text(has_verified_document=udyam_verified_doc, fallback=udyam_fallback),
     )
 
 
@@ -173,7 +199,7 @@ def seed_default_policy_pages(*, performed_by=None, overwrite_existing_drafts: b
                 title=template["title"],
                 summary=template.get("summary", ""),
                 content=template.get("content", ""),
-                status=template.get("default_status", PolicyStatus.DRAFT),
+                status=PolicyStatus.DRAFT,
                 created_by=performed_by,
                 updated_by=performed_by,
             )
@@ -189,6 +215,7 @@ def seed_default_policy_pages(*, performed_by=None, overwrite_existing_drafts: b
             skipped += 1
             continue
 
+        # Overwrite is explicit and remains restricted to draft rows only.
         draft.category = template["category"]
         draft.title = template["title"]
         draft.summary = template.get("summary", "")
@@ -203,23 +230,14 @@ def seed_default_policy_pages(*, performed_by=None, overwrite_existing_drafts: b
             action_type=AuditLog.ActionType.PUBLIC_SITE_UPDATED,
             instance=marker,
             performed_by=performed_by,
-            metadata={
-                "event": "POLICY_SEED_DEFAULTS",
-                "created": created,
-                "updated": updated,
-                "skipped": skipped,
-            },
+            metadata={"event": "POLICY_SEED_DEFAULTS", "created": created, "updated": updated, "skipped": skipped},
         )
 
     return {"created": created, "updated": updated, "skipped": skipped}
 
 
 def _next_policy_version(slug: str) -> int:
-    current = (
-        PolicyPage.objects.filter(slug=slug)
-        .aggregate(max_version=Max("version"))
-        .get("max_version")
-    )
+    current = PolicyPage.objects.filter(slug=slug).aggregate(max_version=Max("version")).get("max_version")
     return int(current or 0) + 1
 
 
@@ -249,13 +267,7 @@ def create_policy_page(*, payload: dict[str, Any], performed_by=None) -> PolicyP
         action_type=AuditLog.ActionType.PUBLIC_SITE_UPDATED,
         instance=policy,
         performed_by=performed_by,
-        metadata={
-            "event": "POLICY_CREATED",
-            "policy_id": policy.id,
-            "slug": policy.slug,
-            "version": policy.version,
-            "status": policy.status,
-        },
+        metadata={"event": "POLICY_CREATED", "policy_id": policy.id, "slug": policy.slug, "version": policy.version, "status": policy.status},
     )
     return policy
 
@@ -264,12 +276,8 @@ def create_policy_page(*, payload: dict[str, Any], performed_by=None) -> PolicyP
 def update_policy_page(*, policy: PolicyPage, payload: dict[str, Any], performed_by=None) -> PolicyPage:
     updates = {key: value for key, value in payload.items() if key in _POLICY_EDITABLE_FIELDS}
 
-    if policy.status == PolicyStatus.PUBLISHED and any(
-        key in updates for key in _POLICY_LOCKED_PUBLISHED_FIELDS
-    ):
-        raise ValueError(
-            "Published policies are locked. Create a draft version before editing legal content."
-        )
+    if policy.status == PolicyStatus.PUBLISHED and any(key in updates for key in _POLICY_LOCKED_PUBLISHED_FIELDS):
+        raise ValueError("Published policies are locked. Create a draft version before editing legal content.")
 
     for key, value in updates.items():
         setattr(policy, key, value)
@@ -281,14 +289,7 @@ def update_policy_page(*, policy: PolicyPage, payload: dict[str, Any], performed
         action_type=AuditLog.ActionType.PUBLIC_SITE_UPDATED,
         instance=policy,
         performed_by=performed_by,
-        metadata={
-            "event": "POLICY_UPDATED",
-            "policy_id": policy.id,
-            "slug": policy.slug,
-            "version": policy.version,
-            "status": policy.status,
-            "fields": sorted(list(updates.keys())),
-        },
+        metadata={"event": "POLICY_UPDATED", "policy_id": policy.id, "slug": policy.slug, "version": policy.version, "status": policy.status, "fields": sorted(list(updates.keys()))},
     )
     return policy
 
@@ -312,30 +313,15 @@ def create_draft_from_policy(*, policy: PolicyPage, performed_by=None) -> Policy
         action_type=AuditLog.ActionType.PUBLIC_SITE_UPDATED,
         instance=draft,
         performed_by=performed_by,
-        metadata={
-            "event": "POLICY_DRAFT_CREATED",
-            "policy_id": draft.id,
-            "source_policy_id": policy.id,
-            "slug": draft.slug,
-            "version": draft.version,
-        },
+        metadata={"event": "POLICY_DRAFT_CREATED", "policy_id": draft.id, "source_policy_id": policy.id, "slug": draft.slug, "version": draft.version},
     )
     return draft
 
 
 @transaction.atomic
-def publish_policy_page(
-    *,
-    policy: PolicyPage,
-    performed_by=None,
-    effective_date: date | None = None,
-    review_now: bool = True,
-) -> PolicyPage:
+def publish_policy_page(*, policy: PolicyPage, performed_by=None, effective_date: date | None = None, review_now: bool = True) -> PolicyPage:
     siblings = PolicyPage.objects.select_for_update(of=("self",)).filter(slug=policy.slug)
-    siblings.filter(status=PolicyStatus.PUBLISHED).exclude(pk=policy.pk).update(
-        status=PolicyStatus.ARCHIVED,
-        updated_by=performed_by,
-    )
+    siblings.filter(status=PolicyStatus.PUBLISHED).exclude(pk=policy.pk).update(status=PolicyStatus.ARCHIVED, updated_by=performed_by)
 
     policy.status = PolicyStatus.PUBLISHED
     policy.published_by = performed_by
@@ -350,13 +336,7 @@ def publish_policy_page(
         action_type=AuditLog.ActionType.PUBLIC_SITE_UPDATED,
         instance=policy,
         performed_by=performed_by,
-        metadata={
-            "event": "POLICY_PUBLISHED",
-            "policy_id": policy.id,
-            "slug": policy.slug,
-            "version": policy.version,
-            "effective_date": str(policy.effective_date),
-        },
+        metadata={"event": "POLICY_PUBLISHED", "policy_id": policy.id, "slug": policy.slug, "version": policy.version, "effective_date": str(policy.effective_date)},
     )
     return policy
 
@@ -371,12 +351,7 @@ def archive_policy_page(*, policy: PolicyPage, performed_by=None) -> PolicyPage:
         action_type=AuditLog.ActionType.PUBLIC_SITE_UPDATED,
         instance=policy,
         performed_by=performed_by,
-        metadata={
-            "event": "POLICY_ARCHIVED",
-            "policy_id": policy.id,
-            "slug": policy.slug,
-            "version": policy.version,
-        },
+        metadata={"event": "POLICY_ARCHIVED", "policy_id": policy.id, "slug": policy.slug, "version": policy.version},
     )
     return policy
 
@@ -386,18 +361,80 @@ def get_latest_policy_by_slug(slug: str) -> PolicyPage | None:
 
 
 def get_public_published_policy(slug: str) -> PolicyPage | None:
-    return (
-        PolicyPage.objects.filter(slug=slug, status=PolicyStatus.PUBLISHED)
-        .order_by("-published_at", "-version", "-id")
-        .first()
-    )
+    cleaned = slug.strip().lower()
+    if cleaned not in public_policy_slugs():
+        return None
+    return PolicyPage.objects.filter(slug=cleaned, status=PolicyStatus.PUBLISHED).order_by("-published_at", "-version", "-id").first()
 
 
 def list_public_published_policies() -> list[PolicyPage]:
     return list(
-        PolicyPage.objects.filter(status=PolicyStatus.PUBLISHED)
-        .order_by("category", "slug", "-version")
+        PolicyPage.objects.filter(status=PolicyStatus.PUBLISHED, slug__in=public_policy_slugs()).order_by("category", "slug", "-version")
     )
+
+
+def build_policy_coverage_matrix() -> dict[str, Any]:
+    latest_by_slug = {
+        row.slug: row
+        for row in PolicyPage.objects.order_by("slug", "-version", "-id")
+        if row.slug not in locals().get("latest_by_slug", {})
+    }
+    rows: list[dict[str, Any]] = []
+    for spec in get_policy_coverage_specs():
+        policy = latest_by_slug.get(spec.slug)
+        status = policy.status if policy else "MISSING"
+        public_ready = bool(policy and spec.visibility == PUBLIC and policy.status == PolicyStatus.PUBLISHED)
+        internal_ready = bool(policy and spec.visibility == INTERNAL and policy.status in {PolicyStatus.PUBLISHED})
+        if policy is None:
+            blocker = "Policy template is missing."
+            action = "Seed default templates, then review and publish/approve as required."
+        elif spec.visibility == PUBLIC and policy.status != PolicyStatus.PUBLISHED:
+            blocker = "Public policy exists but is not published."
+            action = "Review legal text and publish only after approval."
+        elif spec.visibility == INTERNAL and policy.status == PolicyStatus.DRAFT:
+            blocker = "Internal governance policy is still draft."
+            action = "Review internally and publish/archive according to governance process."
+        else:
+            blocker = ""
+            action = "No immediate action."
+        rows.append(
+            {
+                "required_policy_key": spec.slug,
+                "label": spec.label,
+                "coverage_group": spec.group,
+                "category": spec.category,
+                "stored_category": policy.category if policy else spec.compatible_category,
+                "visibility": spec.visibility,
+                "status": status,
+                "policy_id": policy.id if policy else None,
+                "slug": spec.slug,
+                "public_ready": public_ready,
+                "internal_ready": internal_ready,
+                "blocker_reason": blocker,
+                "recommended_action": action,
+                "requires_legal_review": spec.requires_legal_review,
+                "requires_admin_acceptance": spec.requires_admin_acceptance,
+            }
+        )
+
+    grouped = [
+        {
+            "group": group,
+            "items": [row for row in rows if row["coverage_group"] == group],
+        }
+        for group in group_specs().keys()
+    ]
+    summary = {
+        "required_count": len(rows),
+        "missing_count": sum(1 for row in rows if row["status"] == "MISSING"),
+        "public_required_count": sum(1 for row in rows if row["visibility"] == PUBLIC),
+        "public_published_count": sum(1 for row in rows if row["public_ready"]),
+        "public_draft_count": sum(1 for row in rows if row["visibility"] == PUBLIC and row["status"] == PolicyStatus.DRAFT),
+        "internal_required_count": sum(1 for row in rows if row["visibility"] == INTERNAL),
+        "internal_ready_count": sum(1 for row in rows if row["internal_ready"]),
+        "internal_draft_count": sum(1 for row in rows if row["visibility"] == INTERNAL and row["status"] == PolicyStatus.DRAFT),
+    }
+    return {"summary": summary, "groups": grouped, "results": rows}
 
 
 def get_public_business_compliance_summary() -> dict[str, Any]:
@@ -410,13 +447,7 @@ def get_public_business_compliance_summary() -> dict[str, Any]:
     ).order_by("document_type", "-created_at", "-id")
 
     documents = [
-        {
-            "document_type": row.document_type,
-            "title": row.title or row.get_document_type_display(),
-            "verification_status": row.verification_status,
-            "public_summary": row.public_summary,
-            "verified_at": row.verified_at,
-        }
+        {"document_type": row.document_type, "title": row.title or row.get_document_type_display(), "verification_status": row.verification_status, "public_summary": row.public_summary, "verified_at": row.verified_at}
         for row in public_docs
     ]
 
@@ -430,8 +461,5 @@ def get_public_business_compliance_summary() -> dict[str, Any]:
         "gst_status_text": context.gst_status_text,
         "udyam_status_text": context.udyam_status_text,
         "public_documents": documents,
-        "private_document_disclaimer": (
-            "Private compliance documents are not publicly downloadable by default. "
-            "Only approved public-safe summaries are shown."
-        ),
+        "private_document_disclaimer": "Private compliance documents are not publicly downloadable by default. Only approved public-safe summaries are shown.",
     }
