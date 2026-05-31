@@ -4,15 +4,18 @@ export type AccountingSetupReadinessChartAccount = {
   id: number;
   code: string;
   name: string;
-  type: string;
+  type?: string;
   account_type?: string;
   is_active?: boolean;
   allow_manual_posting?: boolean;
-  is_posting: boolean;
+  is_posting?: boolean;
+  is_posting_ready?: boolean;
+  is_group_control?: boolean;
   parent?: { id?: number | null; code?: string | null; name?: string | null } | null;
-  allowed_for_cash_collection: boolean;
-  allowed_for_bank_collection: boolean;
-  allowed_for_upi_collection: boolean;
+  allowed_for_cash_collection?: boolean;
+  allowed_for_bank_collection?: boolean;
+  allowed_for_upi_collection?: boolean;
+  allowed_for_collection?: boolean;
 };
 
 export type AccountingSetupReadinessFinanceAccount = {
@@ -24,10 +27,65 @@ export type AccountingSetupReadinessFinanceAccount = {
   mapped_chart_account?: AccountingSetupReadinessChartAccount | null;
   suggested_chart_account?: AccountingSetupReadinessChartAccount | null;
   can_auto_create_posting_account?: boolean;
+  operational_collection_account?: boolean;
+  system_posting_profile?: boolean;
+  diagnostic_only?: boolean;
   collection_ready: boolean;
+  selectable_for_collection?: boolean;
+  is_selectable_collection_account?: boolean;
   blocker_reason?: string | null;
   collection_blocker_reason?: string | null;
   recommended_action?: string | null;
+  account_role?: string;
+};
+
+export type PostingProfileReadinessItem = {
+  key: string;
+  label: string;
+  status: "READY" | "BLOCKED" | "PARTIAL" | "DEFERRED" | string;
+  required_debit_account: string[];
+  required_credit_account: string[];
+  configured_debit_account: AccountingSetupReadinessChartAccount[];
+  configured_credit_account: AccountingSetupReadinessChartAccount[];
+  blockers: string[];
+  recommended_action?: string | null;
+  recommended_actions?: string[];
+  implemented: boolean;
+};
+
+export type AccountingSetupMatrixPayload = {
+  modules: unknown[];
+  finance_accounts: AccountingSetupReadinessFinanceAccount[];
+  operational_collection_accounts: AccountingSetupReadinessFinanceAccount[];
+  diagnostic_system_accounts: AccountingSetupReadinessFinanceAccount[];
+  chart_accounts: AccountingSetupReadinessChartAccount[];
+  chart_of_accounts_health: {
+    group_control_accounts: AccountingSetupReadinessChartAccount[];
+    posting_leaf_accounts: AccountingSetupReadinessChartAccount[];
+    missing_posting_leaf_accounts: AccountingSetupReadinessChartAccount[];
+    inactive_or_non_posting_blockers: AccountingSetupReadinessChartAccount[];
+    counts: Record<string, number>;
+  };
+  posting_profiles: Array<{
+    id?: number;
+    key: string;
+    label: string;
+    description?: string;
+    is_active?: boolean;
+    is_system_only?: boolean;
+    diagnostic_only?: boolean;
+    selectable_for_collection?: boolean;
+    collection_ready?: boolean;
+    collection_blocker_reason?: string | null;
+    chart_account?: AccountingSetupReadinessChartAccount | null;
+    ready?: boolean;
+    status?: string;
+  }>;
+  posting_profile_readiness: PostingProfileReadinessItem[];
+  collection_requirements?: unknown[];
+  operator_copy?: Record<string, string>;
+  not_exposed_label?: string;
+  summary: Record<string, number>;
 };
 
 export type AccountingSetupReadinessPayload = {
@@ -84,12 +142,27 @@ export type AccountingSetupStatusPayload = {
   reconciliation_readiness?: "READY" | "BLOCKED" | string;
 };
 
+export type CollectionRepairPreviewPayload = {
+  dry_run: boolean;
+  historical_mutation: boolean;
+  risk_note: string;
+  confirmation_text_required: string;
+  accounts: Array<Record<string, unknown>>;
+  blocked_accounts: Array<Record<string, unknown>>;
+  repairable_accounts: Array<Record<string, unknown>>;
+  summary: Record<string, number>;
+};
+
 export async function getAccountingSetupStatus(): Promise<AccountingSetupStatusPayload> {
   return request<AccountingSetupStatusPayload>("/admin/accounting/setup/status/");
 }
 
 export async function getAccountingSetupReadiness(): Promise<AccountingSetupReadinessPayload> {
   return request<AccountingSetupReadinessPayload>("/admin/accounting/setup/readiness/");
+}
+
+export async function getAccountingSetupMatrix(): Promise<AccountingSetupMatrixPayload> {
+  return request<AccountingSetupMatrixPayload>("/admin/accounting/setup/matrix/");
 }
 
 export async function postAccountingSetupBootstrap(dryRun = false) {
@@ -131,9 +204,24 @@ export async function getAccountingMappingSuggestions() {
   return request("/admin/accounting/mapping-suggestions/");
 }
 
+export async function getCollectionRepairPreview(): Promise<CollectionRepairPreviewPayload> {
+  return request<CollectionRepairPreviewPayload>("/admin/accounting/mapping-suggestions/repair/");
+}
+
 export async function repairSuggestedMappings(dryRun = false) {
   return request("/admin/accounting/mapping-suggestions/repair/", {
     method: "POST",
     body: JSON.stringify({ dry_run: dryRun }),
+  });
+}
+
+export async function executeCollectionMappingRepair(confirmationText: string, financeAccountId?: number) {
+  return request("/admin/accounting/mapping-suggestions/repair/", {
+    method: "POST",
+    body: JSON.stringify({
+      dry_run: false,
+      confirmation_text: confirmationText,
+      ...(financeAccountId ? { finance_account_id: financeAccountId } : {}),
+    }),
   });
 }
