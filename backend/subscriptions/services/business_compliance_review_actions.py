@@ -38,7 +38,7 @@ def public_summary_approved(document: BusinessComplianceDocument) -> bool:
     return bool(
         document.is_active
         and document.public_visibility == BusinessComplianceDocumentVisibility.PUBLIC_SUMMARY_ONLY
-        and document.public_summary.strip()
+        and (document.public_summary or "").strip()
         and state.review_status == BusinessComplianceReviewStatus.APPROVED
         and state.approved_public_summary
     )
@@ -104,7 +104,7 @@ def update_document_metadata(
             document.file = value
             changed.append("file")
 
-    if "file" in changed and (document.file.name if document.file else "") != old_file_name:
+    if "file" in changed and ((document.file.name if document.file else "") != old_file_name or state.evidence_uploaded_at is None):
         state.evidence_uploaded_at = timezone.now()
         state.review_status = BusinessComplianceReviewStatus.PENDING
         state.approved_public_summary = False
@@ -171,7 +171,7 @@ def approve_document(
     if public_summary_approved_flag:
         if document.public_visibility != BusinessComplianceDocumentVisibility.PUBLIC_SUMMARY_ONLY:
             raise ValueError("Public summary approval requires PUBLIC_SUMMARY_ONLY visibility.")
-        if not document.public_summary.strip():
+        if not (document.public_summary or "").strip():
             raise ValueError("Public summary approval requires non-empty public summary text.")
         state.approved_public_summary = True
         state.public_summary_approved_at = now
@@ -258,7 +258,7 @@ def approve_public_summary(document: BusinessComplianceDocument, performed_by=No
         raise ValueError("Public summary approval requires an approved compliance document.")
     if document.public_visibility != BusinessComplianceDocumentVisibility.PUBLIC_SUMMARY_ONLY:
         raise ValueError("Public summary approval requires PUBLIC_SUMMARY_ONLY visibility.")
-    if not document.public_summary.strip():
+    if not (document.public_summary or "").strip():
         raise ValueError("Public summary approval requires non-empty public summary text.")
     old_status = state.review_status
     state.approved_public_summary = True
