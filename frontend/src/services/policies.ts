@@ -15,7 +15,8 @@ export type ComplianceDocumentType =
   | "OTHER";
 export type ComplianceVisibility = "PRIVATE" | "PUBLIC_SUMMARY_ONLY";
 export type ComplianceVerificationStatus = "PENDING" | "VERIFIED" | "REJECTED" | "NOT_PROVIDED";
-export type ComplianceDisplayStatus = "PENDING" | "APPROVED" | "REJECTED" | "NOT_PROVIDED" | "EXPIRED";
+export type ComplianceReviewStatus = "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED";
+export type ComplianceDisplayStatus = ComplianceReviewStatus | "NOT_PROVIDED";
 
 export type AdminPolicyPage = {
   id: number;
@@ -107,6 +108,7 @@ export type ComplianceDocument = {
   visibility?: ComplianceVisibility;
   verification_status: ComplianceVerificationStatus;
   status?: ComplianceDisplayStatus;
+  review_status?: ComplianceReviewStatus;
   public_summary: string;
   notes: string;
   internal_notes?: string;
@@ -114,7 +116,14 @@ export type ComplianceDocument = {
   reviewed_by_username?: string;
   verified_at?: string | null;
   reviewed_at?: string | null;
+  rejected_reason?: string;
   expires_at?: string | null;
+  source_template_key?: string;
+  evidence_uploaded_at?: string | null;
+  approved_public_summary?: boolean;
+  public_summary_approved_at?: string | null;
+  public_summary_approved_by_username?: string;
+  last_action_reason?: string;
   is_publicly_downloadable?: boolean;
   has_file?: boolean;
   public_summary_ready?: boolean;
@@ -148,6 +157,10 @@ export type ComplianceReadiness = {
   pending_review_count: number;
   approved_required_count: number;
   required_count: number;
+  rejected_count?: number;
+  expired_count?: number;
+  missing_file_count?: number;
+  public_summary_pending_count?: number;
   recommended_missing_count: number;
   required_checks: Array<{ key: string; label: string; ready: boolean }>;
   recommended_checks: Array<{ key: string; label: string; ready: boolean }>;
@@ -174,6 +187,8 @@ export type ComplianceSummary = {
   }>;
   private_document_disclaimer: string;
 };
+
+const BUSINESS_COMPLIANCE_DOCUMENTS_PATH = "/admin/settings/business-compliance/documents/";
 
 export async function listAdminPolicies(params?: { slug?: string; status?: string; category?: string }): Promise<AdminPolicyPageListResponse> {
   const query = new URLSearchParams();
@@ -221,7 +236,11 @@ export async function seedDefaultPolicies(payload?: { overwrite_existing_drafts?
 }
 
 export async function listComplianceDocuments(): Promise<ComplianceDocumentListResponse> {
-  return apiFetch<ComplianceDocumentListResponse>("/admin/public-site/business-compliance/documents/");
+  return apiFetch<ComplianceDocumentListResponse>(BUSINESS_COMPLIANCE_DOCUMENTS_PATH);
+}
+
+export async function getComplianceDocument(id: number): Promise<ComplianceDocument> {
+  return apiFetch<ComplianceDocument>(`${BUSINESS_COMPLIANCE_DOCUMENTS_PATH}${id}/`);
 }
 
 export async function listComplianceTemplates(): Promise<ComplianceTemplateListResponse> {
@@ -241,12 +260,36 @@ export async function seedBusinessComplianceRows(): Promise<{
   return apiFetch("/admin/settings/business-compliance/seed-rows/", { method: "POST", body: {} });
 }
 
-export async function createComplianceDocument(payload: Partial<ComplianceDocument>): Promise<ComplianceDocument> {
-  return apiFetch<ComplianceDocument>("/admin/public-site/business-compliance/documents/", { method: "POST", body: payload });
+export async function createComplianceDocument(payload: Partial<ComplianceDocument> | FormData): Promise<ComplianceDocument> {
+  return apiFetch<ComplianceDocument>(BUSINESS_COMPLIANCE_DOCUMENTS_PATH, { method: "POST", body: payload });
 }
 
-export async function updateComplianceDocument(id: number, payload: Partial<ComplianceDocument>): Promise<ComplianceDocument> {
-  return apiFetch<ComplianceDocument>(`/admin/public-site/business-compliance/documents/${id}/`, { method: "PATCH", body: payload });
+export async function updateComplianceDocument(id: number, payload: Partial<ComplianceDocument> | FormData): Promise<ComplianceDocument> {
+  return apiFetch<ComplianceDocument>(`${BUSINESS_COMPLIANCE_DOCUMENTS_PATH}${id}/`, { method: "PATCH", body: payload });
+}
+
+export async function submitComplianceDocumentForReview(id: number): Promise<ComplianceDocument> {
+  return apiFetch<ComplianceDocument>(`${BUSINESS_COMPLIANCE_DOCUMENTS_PATH}${id}/submit-review/`, { method: "POST", body: {} });
+}
+
+export async function approveComplianceDocument(id: number, payload?: { public_summary_approved?: boolean }): Promise<ComplianceDocument> {
+  return apiFetch<ComplianceDocument>(`${BUSINESS_COMPLIANCE_DOCUMENTS_PATH}${id}/approve/`, { method: "POST", body: payload || {} });
+}
+
+export async function rejectComplianceDocument(id: number, reason: string): Promise<ComplianceDocument> {
+  return apiFetch<ComplianceDocument>(`${BUSINESS_COMPLIANCE_DOCUMENTS_PATH}${id}/reject/`, { method: "POST", body: { reason } });
+}
+
+export async function expireComplianceDocument(id: number, reason: string): Promise<ComplianceDocument> {
+  return apiFetch<ComplianceDocument>(`${BUSINESS_COMPLIANCE_DOCUMENTS_PATH}${id}/expire/`, { method: "POST", body: { reason } });
+}
+
+export async function approveCompliancePublicSummary(id: number): Promise<ComplianceDocument> {
+  return apiFetch<ComplianceDocument>(`${BUSINESS_COMPLIANCE_DOCUMENTS_PATH}${id}/approve-public-summary/`, { method: "POST", body: {} });
+}
+
+export async function revokeCompliancePublicSummary(id: number): Promise<ComplianceDocument> {
+  return apiFetch<ComplianceDocument>(`${BUSINESS_COMPLIANCE_DOCUMENTS_PATH}${id}/revoke-public-summary/`, { method: "POST", body: {} });
 }
 
 export async function getAdminComplianceSummary(): Promise<ComplianceSummary> {
