@@ -18,9 +18,11 @@ from subscriptions.models import BusinessEventType
 from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.contract_reference_service import (
     collect_unified_receivable,
-    preview_unified_receivable_allocation,
     resolve_contract_reference_row,
     search_contract_references,
+)
+from subscriptions.services.rent_lease_collection_workflow_service import (
+    preview_unified_receivable_allocation,
     search_receivables,
 )
 
