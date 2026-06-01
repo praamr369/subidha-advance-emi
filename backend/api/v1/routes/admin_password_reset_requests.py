@@ -19,10 +19,20 @@ from api.v1.views.admin_policy_site import (
     AdminBusinessComplianceSeedRowsView,
     AdminBusinessComplianceTemplateListView,
     AdminPolicyCoverageView,
+    AdminPolicyPageAcceptInternalView,
+    AdminPolicyPageApproveView,
+    AdminPolicyPageRejectView,
+    AdminPolicyPageSubmitReviewView,
+    AdminPolicyPageSyncGovernanceMetadataView,
 )
 
 urlpatterns = [
     path("settings/policies/coverage/", AdminPolicyCoverageView.as_view(), name="admin-policy-coverage"),
+    path("public-site/policies/<int:pk>/submit-review/", AdminPolicyPageSubmitReviewView.as_view(), name="admin-policy-submit-review"),
+    path("public-site/policies/<int:pk>/approve/", AdminPolicyPageApproveView.as_view(), name="admin-policy-approve"),
+    path("public-site/policies/<int:pk>/reject/", AdminPolicyPageRejectView.as_view(), name="admin-policy-reject"),
+    path("public-site/policies/<int:pk>/accept-internal/", AdminPolicyPageAcceptInternalView.as_view(), name="admin-policy-accept-internal"),
+    path("public-site/policies/<int:pk>/sync-governance-metadata/", AdminPolicyPageSyncGovernanceMetadataView.as_view(), name="admin-policy-sync-governance-metadata"),
     path("settings/business-compliance/templates/", AdminBusinessComplianceTemplateListView.as_view(), name="admin-business-compliance-templates"),
     path("settings/business-compliance/seed-rows/", AdminBusinessComplianceSeedRowsView.as_view(), name="admin-business-compliance-seed-rows"),
     path("settings/business-compliance/readiness/", AdminBusinessComplianceReadinessView.as_view(), name="admin-business-compliance-readiness"),
