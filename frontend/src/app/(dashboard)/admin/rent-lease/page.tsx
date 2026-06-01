@@ -56,11 +56,18 @@ const workflowCards: CockpitCard[] = [
     status: "Active",
   },
   {
-    title: "Security Deposits",
-    purpose: "Review held deposits, refund posture, and deduction evidence from the finance register.",
+    title: "Deposit Operations",
+    purpose: "Collect deposits through unified collection and manage deduction/refund posture from source demand records.",
     href: ROUTES.admin.financeDeposits,
     icon: Banknote,
-    status: "Read-only",
+    status: "Active",
+  },
+  {
+    title: "Unified Collection",
+    purpose: "Collect rent/lease deposits and monthly demands through the existing unified collection route.",
+    href: `${ROUTES.admin.financeCollect}?workflow=unified`,
+    icon: ReceiptText,
+    status: "Active",
   },
   {
     title: "Monthly Demands",
@@ -68,6 +75,13 @@ const workflowCards: CockpitCard[] = [
     href: `${ROUTES.admin.emis}?plan_type=RENT`,
     icon: ReceiptText,
     status: "Read-only",
+  },
+  {
+    title: "Account Mapping / Deposit Mapping",
+    purpose: "Configure rent/lease mapping metadata for future posting bridge readiness without auto-posting journals.",
+    href: `${ROUTES.admin.financeDeposits}#accounting-mapping`,
+    icon: ShieldCheck,
+    status: "Setup required",
   },
   {
     title: "Possession / Handover",
@@ -140,11 +154,12 @@ export default function AdminRentLeaseCockpitPage() {
       actions={[
         { href: ROUTES.admin.subscriptionsRentCreate, label: "Create Rent", variant: "primary" },
         { href: ROUTES.admin.subscriptionsLeaseCreate, label: "Create Lease", variant: "secondary" },
-        { href: ROUTES.admin.financeDeposits, label: "Deposits", variant: "secondary" },
+        { href: ROUTES.admin.financeDeposits, label: "Deposit Operations", variant: "secondary" },
+        { href: `${ROUTES.admin.financeCollect}?workflow=unified`, label: "Unified Collection", variant: "secondary" },
       ]}
       stats={[
-        { label: "Rent Workflows", value: "4", tone: "info" },
-        { label: "Lease Workflows", value: "4", tone: "info" },
+        { label: "Source of truth", value: "Demand records", tone: "info" },
+        { label: "Accounting posting", value: "Audit-deferred", tone: "warning" },
         { label: "Lucky IDs", value: "Not used", tone: "success" },
         { label: "Draws", value: "Not used", tone: "success" },
       ]}
@@ -154,10 +169,10 @@ export default function AdminRentLeaseCockpitPage() {
         <div className="rounded-[1.25rem] border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
           <div className="flex items-center gap-2 font-semibold">
             <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-            Rent and lease are separate from Lucky Plan EMI.
+            Rent/lease monthly charges and deposits are source-record workflows.
           </div>
           <p className="mt-1 text-blue-900">
-            This cockpit links only to existing contract, deposit, demand, delivery, and return surfaces. It does not create fake rent/lease collection, refund, or accounting posting actions.
+            Rent/lease monthly charges and deposits are source-record workflows. Accounting posting is audit-deferred until bridge approval. This cockpit links only to existing contract, deposit, demand, delivery, and return surfaces.
           </p>
         </div>
 
