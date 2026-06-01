@@ -286,6 +286,10 @@ export async function getAccountingSetupReadiness(): Promise<AccountingSetupRead
   return request<AccountingSetupReadinessPayload>("/admin/accounting/setup/readiness/");
 }
 
+export async function getAccountingSetupStatus(): Promise<AccountingSetupStatusPayload> {
+  return request<AccountingSetupStatusPayload>("/admin/accounting/setup/status/");
+}
+
 export async function getAccountingSetupMatrix(): Promise<AccountingSetupMatrixPayload> {
   return buildMatrixFromReadiness(await getAccountingSetupReadiness());
 }
