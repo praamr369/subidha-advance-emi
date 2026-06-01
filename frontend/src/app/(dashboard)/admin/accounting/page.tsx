@@ -89,7 +89,7 @@ const MODULE_GROUPS: AccountingModuleGroup[] = [
     description: "Accounts, finance accounts, setup gates, and readiness before staff handle live money.",
     modules: [
       { key: "chart_accounts", title: "Chart of Accounts", description: "Maintain the account structure used by journals, reports, and posting profiles.", route: ROUTES.admin.accountingChartOfAccounts, icon: BookOpenText, implemented: true },
-      { key: "finance_accounts", title: "Finance Accounts", description: "Check and repair cash, bank, and UPI collection accounts before collection operations.", route: ROUTES.admin.accountingChartOfAccounts, icon: Landmark, implemented: true, setupGate: true },
+      { key: "finance_accounts", title: "Finance Accounts", description: "Manage cash, bank, UPI, and payment gateway settlement accounts separately from COA structure.", route: ROUTES.admin.accountingFinanceAccounts, icon: Landmark, implemented: true, setupGate: true },
       { key: "accounting_setup", title: "Accounting Setup", description: "Fix account mappings and setup blockers before live money operations.", route: ROUTES.admin.accountingSetup, icon: Settings2, implemented: true, setupGate: true },
       { key: "setup_readiness", title: "Setup Readiness", description: "Read-only readiness center for business setup, collection gates, and document controls.", route: ROUTES.admin.setupReadiness, icon: ShieldCheck, implemented: true, readOnly: true },
     ],
@@ -253,7 +253,6 @@ export default function AdminAccountingPage() {
 
   const setupBlockers = useMemo(() => compactBlockers(data?.setupReadiness ?? null), [data?.setupReadiness]);
   const setupBlockerCount = data?.setupStatus?.setup_health_blockers_count ?? data?.setupReadiness?.summary.blockers_count ?? null;
-  const blockedFinanceAccountsCount = data?.setupReadiness?.summary.blockers_count ?? null;
   const collectionReadyAccountsCount = data?.setupReadiness ? data.setupReadiness.summary.cash_accounts_ready_count + data.setupReadiness.summary.bank_accounts_ready_count + data.setupReadiness.summary.upi_accounts_ready_count : null;
   const setupBlocked = Boolean((setupBlockerCount ?? 0) > 0 || data?.setupStatus?.setup_health_status === "BLOCKED" || data?.setupStatus?.status === "BLOCKED");
   const backendModuleCount = Array.isArray(data?.controlPayload?.modules) ? data?.controlPayload?.modules?.length ?? 0 : Array.isArray(data?.controlPayload?.capabilities) ? data?.controlPayload?.capabilities?.length ?? 0 : 0;
@@ -264,8 +263,8 @@ export default function AdminAccountingPage() {
       title="Accounting & Finance Cockpit"
       subtitle="Icon-based operator cockpit for accounting setup, collections, books, reconciliation, and reports. Rent/lease accounting bridge status is read from backend readiness and executes only from controlled workspaces."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting" }]}
-      actions={[{ href: ROUTES.admin.accountingChartOfAccounts, label: "Fix finance accounts", variant: "primary" }, { href: ROUTES.admin.collectionControlCenter, label: "Collection Control", variant: "secondary" }, { href: ROUTES.admin.setupReadiness, label: "Setup Readiness", variant: "secondary" }]}
-      stats={[{ label: "Chart Accounts", value: displayMetric(data?.chartAccountsCount), tone: "info" }, { label: "Finance Accounts", value: displayMetric(data?.financeAccountsCount), tone: setupBlocked ? "warning" : "success" }, { label: "Bridge Status", value: displayMetric(data?.accountingReadiness?.status), tone: data?.accountingReadiness?.status === "READY" ? "success" : "warning" }, { label: "Posted Movements", value: displayMetric(data?.postedMovementsCount), tone: "info" }]}
+      actions={[{ href: ROUTES.admin.accountingChartOfAccounts, label: "Chart of Accounts", variant: "secondary" }, { href: ROUTES.admin.accountingFinanceAccounts, label: "Finance Accounts", variant: "primary" }, { href: ROUTES.admin.setupReadiness, label: "Setup Readiness", variant: "secondary" }]}
+      stats={[{ label: "Chart Accounts", value: displayMetric(data?.chartAccountsCount), tone: "info" }, { label: "Finance Accounts", value: displayMetric(data?.financeAccountsCount), tone: setupBlocked ? "warning" : "success" }, { label: "Bridge Status", value: displayMetric(data?.accountingReadiness?.status), tone: data?.accountingReadiness?.status === "READY" ? "success" : "warning" }, { label: "Collection-ready FA", value: displayMetric(collectionReadyAccountsCount), tone: "info" }]}
       statusBadge={{ label: data?.accountingReadiness?.status === "READY" ? "Bridge ready" : setupBlocked ? "Setup blocked" : "Read-only cockpit", tone: data?.accountingReadiness?.status === "READY" ? "success" : setupBlocked ? "warning" : "info" }}
     >
       <div className="space-y-6">
