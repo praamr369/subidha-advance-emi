@@ -17,6 +17,47 @@ export type AccountMappingResponse = {
   guidance: Record<string, string>;
 };
 
+export type BridgePostingLine = {
+  account: { id: number; code: string; name: string; account_type: string };
+  description: string;
+  debit: string;
+  credit: string;
+};
+
+export type BridgePostingPreview = {
+  source_model: string;
+  source_id: string;
+  source_reference: string;
+  event_type: string;
+  amount: string;
+  status: string;
+  postable: boolean;
+  blocked_reason: string;
+  idempotency_key: string;
+  debit_total: string;
+  credit_total: string;
+  lines: BridgePostingLine[];
+  duplicate_posting_protection: string;
+};
+
+export type BridgePostingExecuteResponse = {
+  detail: string;
+  status: string;
+  posting_id?: number | null;
+  journal_entry_id?: number | null;
+  journal_entry_no?: string | null;
+  posted_at?: string | null;
+  preview: BridgePostingPreview;
+};
+
+function postPreview(path: string) {
+  return apiFetch<BridgePostingPreview>(path, { method: "POST" });
+}
+
+function postExecute(path: string) {
+  return apiFetch<BridgePostingExecuteResponse>(path, { method: "POST" });
+}
+
 export function getAccountingReadiness() {
   return apiFetch<AccountingReadiness>("/admin/accounting/readiness/");
 }
@@ -41,4 +82,55 @@ export function getRentLeaseAccountingSummary() {
     posting_bridge: Record<string, number>;
     not_used: { lucky_ids: boolean; draws: boolean };
   }>("/admin/rent-lease/accounting-summary/");
+}
+
+export function previewDepositPosting(id: number | string) {
+  return postPreview(`/admin/finance/deposits/${id}/posting-preview/`);
+}
+
+export function executeDepositPosting(id: number | string) {
+  return postExecute(`/admin/finance/deposits/${id}/posting-execute/`);
+}
+
+export function previewDepositRefundPosting(id: number | string) {
+  return postPreview(`/admin/finance/deposits/${id}/refund-posting-preview/`);
+}
+
+export function executeDepositRefundPosting(id: number | string) {
+  return postExecute(`/admin/finance/deposits/${id}/refund-posting-execute/`);
+}
+
+export function previewDepositDamagePosting(id: number | string) {
+  return postPreview(`/admin/finance/deposits/${id}/damage-posting-preview/`);
+}
+
+export function executeDepositDamagePosting(id: number | string) {
+  return postExecute(`/admin/finance/deposits/${id}/damage-posting-execute/`);
+}
+
+export function previewRentLeaseDemandPosting(id: number | string) {
+  return postPreview(`/admin/rent-lease/demands/${id}/posting-preview/`);
+}
+
+export function executeRentLeaseDemandPosting(id: number | string) {
+  return postExecute(`/admin/rent-lease/demands/${id}/posting-execute/`);
+}
+
+export function listCustomerAdvances() {
+  return apiFetch<{ count: number; results: Array<Record<string, unknown>> }>("/admin/customer-advances/");
+}
+
+export function createCustomerAdvance(input: Record<string, unknown>) {
+  return apiFetch<Record<string, unknown>>("/admin/customer-advances/", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function previewCustomerAdvancePosting(id: number | string) {
+  return postPreview(`/admin/customer-advances/${id}/posting-preview/`);
+}
+
+export function executeCustomerAdvancePosting(id: number | string) {
+  return postExecute(`/admin/customer-advances/${id}/posting-execute/`);
 }
