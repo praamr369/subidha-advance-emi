@@ -17,6 +17,7 @@ import {
   type FinanceAccount,
   type FinanceAccountDetail,
 } from "@/services/accounting";
+import { updateFinanceAccountMapping } from "@/services/accounting-setup";
 
 type FinanceAccountEditDrawerProps = {
   accountId: number | null;
@@ -79,7 +80,9 @@ export default function FinanceAccountEditDrawer({
   const [form, setForm] = useState<FinanceAccountFormState>(emptyForm());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [repairing, setRepairing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const nextAccountId = accountId;
@@ -88,7 +91,9 @@ export default function FinanceAccountEditDrawer({
       setForm(emptyForm());
       setLoading(false);
       setSaving(false);
+      setRepairing(false);
       setError(null);
+      setNotice(null);
       return;
     }
     const resolvedAccountId = nextAccountId;
@@ -98,6 +103,7 @@ export default function FinanceAccountEditDrawer({
     async function loadDetail() {
       setLoading(true);
       setError(null);
+      setNotice(null);
       try {
         const payload = await getFinanceAccount(resolvedAccountId);
         if (cancelled) return;
@@ -130,6 +136,7 @@ export default function FinanceAccountEditDrawer({
     if (!accountId || !detail) return;
     setSaving(true);
     setError(null);
+    setNotice(null);
     try {
       const payload: Partial<FinanceAccount> = {
         name: form.name,
@@ -162,7 +169,36 @@ export default function FinanceAccountEditDrawer({
     }
   }
 
-  const assetChartAccounts = chartAccounts.filter((account) => account.account_type === "ASSET");
+  async function handleAutoRepairCollectionMapping() {
+    if (!accountId) return;
+    setRepairing(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await updateFinanceAccountMapping(accountId, { auto_create_posting_account: true });
+      const refreshed = await getFinanceAccount(accountId);
+      setDetail(refreshed);
+      setForm((current) => ({
+        ...current,
+        chart_account: refreshed.chart_account ? String(refreshed.chart_account) : current.chart_account,
+      }));
+      setNotice("Finance account remapped to a posting-enabled ASSET leaf account. No payments, receipts, journals, settlements, or reconciliation rows were changed.");
+      await onSaved(refreshed);
+    } catch (err) {
+      setError(accountingErrorMessage(err, "Failed to repair collection mapping."));
+    } finally {
+      setRepairing(false);
+    }
+  }
+
+  const assetChartAccounts = chartAccounts.filter((account) => account.account_type === "ASSET" && account.is_active);
+  const canAutoRepair = Boolean(
+    detail &&
+      !detail.collection_ready &&
+      detail.is_active &&
+      detail.chart_account &&
+      detail.mapped_chart_account_type === "ASSET"
+  );
 
   return (
     <DrawerShell
@@ -188,7 +224,7 @@ export default function FinanceAccountEditDrawer({
             <button
               type="button"
               onClick={() => void handleSave()}
-              disabled={loading || saving || !detail}
+              disabled={loading || saving || repairing || !detail}
               className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
             >
               {saving ? "Saving..." : "Save changes"}
@@ -199,6 +235,7 @@ export default function FinanceAccountEditDrawer({
     >
       <div className="space-y-5">
         {error ? <AccountingNotice tone="danger" message={error} /> : null}
+        {notice ? <AccountingNotice tone="success" message={notice} /> : null}
         {loading ? <div className="text-sm text-muted-foreground">Loading finance account detail...</div> : null}
 
         {!loading && detail ? (
@@ -220,7 +257,39 @@ export default function FinanceAccountEditDrawer({
                 <Wallet className="h-3.5 w-3.5" />
                 {detail.kind}
               </span>
+              {detail.collection_ready ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                  Collection ready
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                  Collection mapping needs setup
+                </span>
+              )}
             </div>
+
+            {!detail.collection_ready ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                <div className="font-semibold">Collection selector warning</div>
+                <p className="mt-1">{detail.collection_blocker_reason || "This finance account is not ready for cashier/admin collection selectors."}</p>
+                <p className="mt-1 text-xs text-amber-900">
+                  {detail.recommended_action || "Map this finance account to an active posting-enabled leaf ASSET chart account."}
+                </p>
+                {canAutoRepair ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleAutoRepairCollectionMapping()}
+                    disabled={repairing || saving}
+                    className="mt-3 rounded-xl bg-amber-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-amber-950 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {repairing ? "Repairing..." : "Create posting leaf & remap safely"}
+                  </button>
+                ) : null}
+                <p className="mt-2 text-[11px] text-amber-900">
+                  Repair changes only this finance-account chart mapping and may create a child ASSET posting account. It does not post payments, receipts, journals, settlements, day-close, or reconciliation records.
+                </p>
+              </div>
+            ) : null}
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="text-sm text-muted-foreground">
@@ -228,12 +297,7 @@ export default function FinanceAccountEditDrawer({
                 <input
                   className={accountingFieldClassName()}
                   value={form.name}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                 />
               </label>
 
@@ -243,12 +307,7 @@ export default function FinanceAccountEditDrawer({
                   className={accountingFieldClassName()}
                   value={form.kind}
                   disabled={!isEditable(detail, "kind")}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      kind: event.target.value as FinanceAccount["kind"],
-                    }))
-                  }
+                  onChange={(event) => setForm((current) => ({ ...current, kind: event.target.value as FinanceAccount["kind"] }))}
                 >
                   <option value="CASH">Cash</option>
                   <option value="BANK">Bank</option>
@@ -263,14 +322,9 @@ export default function FinanceAccountEditDrawer({
                   className={accountingFieldClassName()}
                   value={form.chart_account}
                   disabled={!isEditable(detail, "chart_account")}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      chart_account: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setForm((current) => ({ ...current, chart_account: event.target.value }))}
                 >
-                  <option value="">Select asset account</option>
+                  <option value="">Select active asset account</option>
                   {assetChartAccounts.map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.code} · {account.name}
@@ -289,12 +343,7 @@ export default function FinanceAccountEditDrawer({
                   className={accountingFieldClassName()}
                   value={form.opening_balance}
                   disabled={!isEditable(detail, "opening_balance")}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      opening_balance: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setForm((current) => ({ ...current, opening_balance: event.target.value }))}
                 />
                 <FieldLockHint reason={lockReason(detail, "opening_balance")} />
               </label>
@@ -305,12 +354,7 @@ export default function FinanceAccountEditDrawer({
                   maxLength={4}
                   className={accountingFieldClassName()}
                   value={form.bank_last4}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      bank_last4: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setForm((current) => ({ ...current, bank_last4: event.target.value }))}
                 />
               </label>
 
@@ -319,12 +363,7 @@ export default function FinanceAccountEditDrawer({
                 <input
                   className={accountingFieldClassName()}
                   value={form.upi_handle}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      upi_handle: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setForm((current) => ({ ...current, upi_handle: event.target.value }))}
                 />
               </label>
 
@@ -346,12 +385,7 @@ export default function FinanceAccountEditDrawer({
                   rows={4}
                   className={accountingFieldClassName()}
                   value={form.notes}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      notes: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
                 />
               </label>
             </div>
@@ -363,12 +397,7 @@ export default function FinanceAccountEditDrawer({
                   className="mt-1 h-4 w-4 rounded border-border"
                   checked={form.is_active}
                   disabled={!isEditable(detail, "is_active")}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      is_active: event.target.checked,
-                    }))
-                  }
+                  onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))}
                 />
                 <span>
                   <span className="block font-medium">Active</span>
