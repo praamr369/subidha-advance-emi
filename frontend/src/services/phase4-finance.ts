@@ -130,21 +130,44 @@ export async function listAdminFinanceDocuments(subscriptionId?: number | string
   return apiFetch<{ count: number; results: FinanceDocumentRow[] }>(`/admin/documents/${query}`);
 }
 
-export type AdminDepositRow = {
+export type AdminDepositActionPosture = {
+  can_collect?: boolean;
+  can_deduct?: boolean;
+  can_approve_refund?: boolean;
+  can_record_refund?: boolean;
+  disabled_reason?: string | null;
+};
+
+export type AdminDepositLatestTransaction = {
+  transaction_id?: number;
+  transaction_type?: string;
+  amount?: Money;
+  reason?: string;
+  reference_no?: string;
+  payment_method?: string;
+  payment_date?: string | null;
+  created_at?: string | null;
+};
+
+export type AdminDepositRow = AdminDepositActionPosture & {
   demand_id: number;
   reference_key: string;
   subscription_id: number;
   subscription_number: string | null;
   plan_type: string;
   customer_name: string;
+  customer_phone?: string;
   product_name: string;
   deposit_amount: Money;
   collected_amount: Money;
   held_amount: Money;
   refundable_amount: Money;
   deducted_amount: Money;
+  refunded_amount?: Money;
+  refund_status?: string;
   status: string;
   due_date: string;
+  latest_transaction?: AdminDepositLatestTransaction | null;
 };
 
 export async function listAdminDepositRegister(subscriptionId?: number | string) {
@@ -184,16 +207,19 @@ export async function recordAdminDepositRefund(input: {
   });
 }
 
+export type AdminRentLeaseAccountMappingPayload = {
+  mapping: Record<string, unknown> | null;
+  chart_accounts: Array<Record<string, unknown>>;
+  finance_accounts: Array<Record<string, unknown>>;
+  posting_boundary_note?: string;
+};
+
 export async function getAdminRentLeaseAccountMapping() {
-  return apiFetch<{
-    mapping: Record<string, unknown> | null;
-    chart_accounts: Array<Record<string, unknown>>;
-    finance_accounts: Array<Record<string, unknown>>;
-  }>(`/admin/finance/account-mapping/`);
+  return apiFetch<AdminRentLeaseAccountMappingPayload>(`/admin/finance/account-mapping/`);
 }
 
 export async function saveAdminRentLeaseAccountMapping(input: Record<string, unknown>) {
-  return apiFetch<{ detail: string; mapping_id: number }>(`/admin/finance/account-mapping/`, {
+  return apiFetch<{ detail: string; mapping_id: number; posting_boundary_note?: string }>(`/admin/finance/account-mapping/`, {
     method: "POST",
     body: JSON.stringify(input),
   });
