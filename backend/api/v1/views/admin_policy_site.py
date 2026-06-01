@@ -14,6 +14,7 @@ from api.v1.serializers.policy_site import (
     ComplianceReasonActionSerializer,
     PolicyPageAdminSerializer,
     PolicyPublishActionSerializer,
+    PolicyReasonActionSerializer,
     PolicySeedActionSerializer,
 )
 from subscriptions.models_business_setup import BusinessComplianceDocument, PolicyPage
@@ -36,13 +37,18 @@ from subscriptions.services.business_compliance_review_actions import (
     update_document_metadata,
 )
 from subscriptions.services.policy_governance_service import (
+    accept_internal_policy,
+    approve_policy,
     archive_policy_page,
     build_policy_coverage_matrix,
     create_draft_from_policy,
     create_policy_page,
     get_latest_policy_by_slug,
     publish_policy_page,
+    reject_policy,
     seed_default_policy_pages,
+    submit_policy_for_review,
+    sync_policy_governance_metadata_from_catalog,
     update_policy_page,
 )
 
@@ -112,31 +118,90 @@ class AdminPolicyPageBySlugView(_AdminPolicyBase):
         return Response({"policy": PolicyPageAdminSerializer(policy).data})
 
 
-class AdminPolicyPagePublishView(_AdminPolicyBase):
+class _AdminPolicyActionBase(_AdminPolicyBase):
+    def get_policy(self, pk: int) -> PolicyPage:
+        return get_object_or_404(PolicyPage, pk=pk)
+
+    def serialize(self, policy: PolicyPage) -> Response:
+        return Response(PolicyPageAdminSerializer(policy).data)
+
+
+class AdminPolicyPageSubmitReviewView(_AdminPolicyActionBase):
     def post(self, request, pk: int):
-        policy = get_object_or_404(PolicyPage, pk=pk)
+        try:
+            return self.serialize(submit_policy_for_review(self.get_policy(pk), performed_by=request.user))
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+
+
+class AdminPolicyPageApproveView(_AdminPolicyActionBase):
+    def post(self, request, pk: int):
+        try:
+            return self.serialize(approve_policy(self.get_policy(pk), performed_by=request.user))
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+
+
+class AdminPolicyPageRejectView(_AdminPolicyActionBase):
+    def post(self, request, pk: int):
+        serializer = PolicyReasonActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            return self.serialize(reject_policy(self.get_policy(pk), performed_by=request.user, reason=serializer.validated_data["reason"]))
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+
+
+class AdminPolicyPageAcceptInternalView(_AdminPolicyActionBase):
+    def post(self, request, pk: int):
+        try:
+            return self.serialize(accept_internal_policy(self.get_policy(pk), performed_by=request.user))
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+
+
+class AdminPolicyPageSyncGovernanceMetadataView(_AdminPolicyActionBase):
+    def post(self, request, pk: int):
+        try:
+            return self.serialize(sync_policy_governance_metadata_from_catalog(self.get_policy(pk), performed_by=request.user))
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+
+
+class AdminPolicyPagePublishView(_AdminPolicyActionBase):
+    def post(self, request, pk: int):
+        policy = self.get_policy(pk)
         serializer = PolicyPublishActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        published = publish_policy_page(
-            policy=policy,
-            performed_by=request.user,
-            effective_date=serializer.validated_data.get("effective_date"),
-            review_now=serializer.validated_data.get("review_now", True),
-        )
-        return Response(PolicyPageAdminSerializer(published).data)
+        try:
+            published = publish_policy_page(
+                policy=policy,
+                performed_by=request.user,
+                effective_date=serializer.validated_data.get("effective_date"),
+                review_now=serializer.validated_data.get("review_now", True),
+            )
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+        return self.serialize(published)
 
 
-class AdminPolicyPageArchiveView(_AdminPolicyBase):
+class AdminPolicyPageArchiveView(_AdminPolicyActionBase):
     def post(self, request, pk: int):
-        policy = get_object_or_404(PolicyPage, pk=pk)
-        archived = archive_policy_page(policy=policy, performed_by=request.user)
-        return Response(PolicyPageAdminSerializer(archived).data)
+        policy = self.get_policy(pk)
+        serializer = PolicyReasonActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=False)
+        reason = serializer.validated_data.get("reason", "") if serializer.is_valid() else request.data.get("reason", "")
+        try:
+            archived = archive_policy_page(policy=policy, performed_by=request.user, reason=reason)
+        except ValueError as error:
+            raise ValidationError({"detail": str(error)})
+        return self.serialize(archived)
 
 
-class AdminPolicyPageCreateDraftView(_AdminPolicyBase):
+class AdminPolicyPageCreateDraftView(_AdminPolicyActionBase):
     def post(self, request, pk: int):
-        policy = get_object_or_404(PolicyPage, pk=pk)
+        policy = self.get_policy(pk)
         draft = create_draft_from_policy(policy=policy, performed_by=request.user)
         return Response(PolicyPageAdminSerializer(draft).data, status=status.HTTP_201_CREATED)
 
