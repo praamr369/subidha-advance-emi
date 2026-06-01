@@ -21,6 +21,8 @@ import {
 const sectionOrder = [
   "business_profile",
   "print_branding",
+  "business_compliance",
+  "policy_governance",
   "chart_of_accounts",
   "finance_accounts",
   "branch_cash_counter",
@@ -50,6 +52,57 @@ function safeList(values: string[]) {
   );
 }
 
+function numericMetadata(metadata: Record<string, unknown> | undefined, key: string): number | null {
+  const value = metadata?.[key];
+  return typeof value === "number" ? value : null;
+}
+
+function coverageSummary(metadata: Record<string, unknown> | undefined): Record<string, unknown> {
+  const value = metadata?.coverage_summary;
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function SectionMetadataPanel({ section }: { section: SetupReadinessSection }) {
+  if (section.key !== "policy_governance" && section.key !== "business_compliance") return null;
+  const summary = coverageSummary(section.metadata);
+
+  if (section.key === "policy_governance") {
+    const publicRequired = numericMetadata(summary, "public_required_count") ?? 0;
+    const publicPublished = numericMetadata(summary, "public_published_count") ?? 0;
+    const internalRequired = numericMetadata(summary, "internal_required_count") ?? 0;
+    const internalReady = numericMetadata(summary, "internal_ready_count") ?? 0;
+    const metadataMismatch = numericMetadata(summary, "metadata_mismatch_count") ?? numericMetadata(section.metadata, "metadata_mismatch_count") ?? 0;
+    const publicApproved = numericMetadata(summary, "public_approved_count") ?? 0;
+    const publicUnderReview = numericMetadata(summary, "public_under_review_count") ?? 0;
+
+    return (
+      <div className="mt-4 rounded-xl border border-current/20 bg-white/60 p-3 text-sm">
+        <div className="text-xs font-semibold uppercase tracking-wide">PG-2B governance metadata</div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          <div>Public published: {publicPublished}/{publicRequired}</div>
+          <div>Internal ready: {internalReady}/{internalRequired}</div>
+          <div>Metadata mismatch: {metadataMismatch}</div>
+          <div>Public approved but not live: {publicApproved}</div>
+          <div>Public under review: {publicUnderReview}</div>
+          <div>Route: <Link href={ROUTES.admin.settingsPolicies} className="underline">Policy Governance</Link></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-current/20 bg-white/60 p-3 text-sm">
+      <div className="text-xs font-semibold uppercase tracking-wide">BC-2 compliance metadata</div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <div>Missing required: {numericMetadata(section.metadata, "missing_required_count") ?? 0}</div>
+        <div>Missing file: {numericMetadata(section.metadata, "missing_file_count") ?? 0}</div>
+        <div>Pending review: {numericMetadata(section.metadata, "pending_review_count") ?? 0}</div>
+        <div>Public summary pending: {numericMetadata(section.metadata, "public_summary_pending_count") ?? 0}</div>
+      </div>
+    </div>
+  );
+}
+
 function SectionCard({ section }: { section: SetupReadinessSection }) {
   return (
     <article className={`rounded-2xl border p-4 shadow-sm ${statusToneClass(section.status)}`}>
@@ -74,6 +127,8 @@ function SectionCard({ section }: { section: SetupReadinessSection }) {
           {safeList(section.warnings)}
         </div>
       ) : null}
+
+      <SectionMetadataPanel section={section} />
 
       <div className="mt-4 rounded-xl border border-current/20 bg-white/60 p-3 text-sm">
         <div className="font-semibold">Recommended action</div>
@@ -142,16 +197,12 @@ function FinanceReadinessPanel({ accounts }: { accounts: SetupReadinessFinanceAc
                 <td className="px-3 py-3 font-medium text-foreground">{account.name}</td>
                 <td className="px-3 py-3 text-muted-foreground">{account.kind}</td>
                 <td className="px-3 py-3 text-muted-foreground">
-                  {account.mapped_chart_account
-                    ? `${account.mapped_chart_account.code} — ${account.mapped_chart_account.name}`
-                    : "Not mapped"}
+                  {account.mapped_chart_account ? `${account.mapped_chart_account.code} — ${account.mapped_chart_account.name}` : "Not mapped"}
                 </td>
                 <td className="px-3 py-3">
                   <ERPStatusBadge status={account.posting_ready ? "READY" : "BLOCKED"} label={account.posting_ready ? "Ready" : "Blocked"} />
                 </td>
-                <td className="px-3 py-3 text-muted-foreground">
-                  {account.blocker_reason || account.recommended_action || "No blocker."}
-                </td>
+                <td className="px-3 py-3 text-muted-foreground">{account.blocker_reason || account.recommended_action || "No blocker."}</td>
               </tr>
             ))}
           </tbody>
@@ -165,9 +216,7 @@ function LaunchChecklist({ items }: { items: SetupLaunchChecklistItem[] }) {
   return (
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-base font-semibold text-foreground">Launch Checklist</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Items are marked ready only when the backend readiness payload supports them.
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">Items are marked ready only when the backend readiness payload supports them.</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
           <div key={item.key} className="rounded-xl border border-border bg-background px-3 py-3">
@@ -207,33 +256,20 @@ export default function AdminSetupReadinessPage() {
   const orderedSections = useMemo(() => {
     if (!payload) return [];
     const byKey = new Map(payload.sections.map((section) => [section.key, section]));
-    return [
-      ...sectionOrder.flatMap((key) => (byKey.has(key) ? [byKey.get(key)!] : [])),
-      ...payload.sections.filter((section) => !sectionOrder.includes(section.key)),
-    ];
+    return [...sectionOrder.flatMap((key) => (byKey.has(key) ? [byKey.get(key)!] : [])), ...payload.sections.filter((section) => !sectionOrder.includes(section.key))];
   }, [payload]);
 
   return (
     <ERPPageShell
       title="Setup Readiness"
       subtitle="Admin-only master data and business readiness center for live shop operations. Checks are read-only and never auto-fix accounting, collection, or historical records."
-      breadcrumbs={[
-        { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "Business Setup", href: ROUTES.admin.settingsBusinessSetup },
-        { label: "Setup Readiness" },
-      ]}
+      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Business Setup", href: ROUTES.admin.settingsBusinessSetup }, { label: "Setup Readiness" }]}
     >
       <div className="space-y-6">
         <BusinessSetupLinks />
-
         {loading ? <ERPLoadingState label="Loading setup readiness..." /> : null}
-        {!loading && error ? (
-          <ERPErrorState title="Unable to load setup readiness" description={error} onRetry={() => void loadReadiness()} />
-        ) : null}
-        {!loading && !error && !payload ? (
-          <ERPEmptyState title="No readiness payload available" description="The backend returned no setup readiness data." />
-        ) : null}
-
+        {!loading && error ? <ERPErrorState title="Unable to load setup readiness" description={error} onRetry={() => void loadReadiness()} /> : null}
+        {!loading && !error && !payload ? <ERPEmptyState title="No readiness payload available" description="The backend returned no setup readiness data." /> : null}
         {payload ? (
           <>
             <section className={`rounded-2xl border p-5 shadow-sm ${statusToneClass(payload.summary.overall_status)}`}>
@@ -241,48 +277,21 @@ export default function AdminSetupReadinessPage() {
                 <div>
                   <div className="text-sm font-medium uppercase tracking-wide opacity-80">Overall readiness</div>
                   <h1 className="mt-2 text-3xl font-semibold">{payload.summary.overall_status.replace(/_/g, " ")}</h1>
-                  <p className="mt-2 max-w-3xl text-sm opacity-90">
-                    {payload.summary.next_recommended_action || "Review setup sections before live operations."}
-                  </p>
+                  <p className="mt-2 max-w-3xl text-sm opacity-90">{payload.summary.next_recommended_action || "Review setup sections before live operations."}</p>
                   <p className="mt-2 text-xs opacity-80">{payload.mutation_policy}</p>
                 </div>
-                <Link
-                  href={payload.summary.next_target_route || ROUTES.admin.settingsBusinessSetup}
-                  className="inline-flex rounded-xl border border-current/30 bg-white px-3 py-2 text-sm font-semibold shadow-sm transition hover:bg-white/80"
-                >
-                  Open next setup action
-                </Link>
+                <Link href={payload.summary.next_target_route || ROUTES.admin.settingsBusinessSetup} className="inline-flex rounded-xl border border-current/30 bg-white px-3 py-2 text-sm font-semibold shadow-sm transition hover:bg-white/80">Open next setup action</Link>
               </div>
               <div className="mt-5 grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-current/20 bg-white/60 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide">Ready</div>
-                  <div className="mt-1 text-2xl font-semibold">{payload.summary.ready_count}</div>
-                </div>
-                <div className="rounded-xl border border-current/20 bg-white/60 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide">Warnings</div>
-                  <div className="mt-1 text-2xl font-semibold">{payload.summary.warning_count}</div>
-                </div>
-                <div className="rounded-xl border border-current/20 bg-white/60 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide">Blockers</div>
-                  <div className="mt-1 text-2xl font-semibold">{payload.summary.blocker_count}</div>
-                </div>
+                <div className="rounded-xl border border-current/20 bg-white/60 p-4"><div className="text-xs font-medium uppercase tracking-wide">Ready</div><div className="mt-1 text-2xl font-semibold">{payload.summary.ready_count}</div></div>
+                <div className="rounded-xl border border-current/20 bg-white/60 p-4"><div className="text-xs font-medium uppercase tracking-wide">Warnings</div><div className="mt-1 text-2xl font-semibold">{payload.summary.warning_count}</div></div>
+                <div className="rounded-xl border border-current/20 bg-white/60 p-4"><div className="text-xs font-medium uppercase tracking-wide">Blockers</div><div className="mt-1 text-2xl font-semibold">{payload.summary.blocker_count}</div></div>
               </div>
             </section>
-
             <section>
-              <div className="mb-3">
-                <h2 className="text-lg font-semibold text-foreground">Guided Setup Steps</h2>
-                <p className="text-sm text-muted-foreground">
-                  Each card links to a real implemented route. No fake action buttons are exposed.
-                </p>
-              </div>
-              <div className="grid gap-4 xl:grid-cols-2">
-                {orderedSections.map((section) => (
-                  <SectionCard key={section.key} section={section} />
-                ))}
-              </div>
+              <div className="mb-3"><h2 className="text-lg font-semibold text-foreground">Guided Setup Steps</h2><p className="text-sm text-muted-foreground">Each card links to a real implemented route. No fake action buttons are exposed.</p></div>
+              <div className="grid gap-4 xl:grid-cols-2">{orderedSections.map((section) => <SectionCard key={section.key} section={section} />)}</div>
             </section>
-
             <FinanceReadinessPanel accounts={payload.finance_accounts} />
             <LaunchChecklist items={payload.launch_checklist} />
           </>
