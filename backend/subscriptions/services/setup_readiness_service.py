@@ -77,13 +77,27 @@ def _document_numbering_ready() -> tuple[bool, dict[str, Any]]:
 
 
 def _finance_account_rows() -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Return finance account readiness without treating archived accounts as live blockers."""
     rows: list[dict[str, Any]] = []
-    counts = {"total": 0, "active": 0, "ready": 0, "blocked": 0, "cash_ready": 0, "bank_ready": 0, "upi_ready": 0}
+    counts = {
+        "total": 0,
+        "active": 0,
+        "inactive": 0,
+        "ready": 0,
+        "active_blocked": 0,
+        "blocked": 0,
+        "inactive_not_ready": 0,
+        "cash_ready": 0,
+        "bank_ready": 0,
+        "upi_ready": 0,
+    }
     accounts = FinanceAccount.objects.select_related("chart_account", "branch").order_by("kind", "name", "id")
     for account in accounts:
         counts["total"] += 1
         if account.is_active:
             counts["active"] += 1
+        else:
+            counts["inactive"] += 1
         readiness = finance_account_readiness(account)
         if readiness.collection_ready:
             counts["ready"] += 1
@@ -93,14 +107,19 @@ def _finance_account_rows() -> tuple[list[dict[str, Any]], dict[str, int]]:
                 counts["bank_ready"] += 1
             if account.kind == "UPI":
                 counts["upi_ready"] += 1
-        else:
+        elif account.is_active and not readiness.diagnostic_only:
+            counts["active_blocked"] += 1
             counts["blocked"] += 1
+        elif not account.is_active and not readiness.diagnostic_only:
+            counts["inactive_not_ready"] += 1
         chart = getattr(account, "chart_account", None)
         rows.append(
             {
                 "id": account.id,
                 "name": account.name,
                 "kind": account.kind,
+                "is_active": account.is_active,
+                "diagnostic_only": readiness.diagnostic_only,
                 "branch": getattr(account.branch, "name", None) if account.branch_id else None,
                 "mapped_chart_account": (
                     {
@@ -116,8 +135,8 @@ def _finance_account_rows() -> tuple[list[dict[str, Any]], dict[str, int]]:
                 ),
                 "posting_ready": readiness.collection_ready,
                 "collection_ready": readiness.collection_ready,
-                "blocker_reason": readiness.collection_blocker_reason,
-                "recommended_action": readiness.recommended_action,
+                "blocker_reason": readiness.collection_blocker_reason if account.is_active else None,
+                "recommended_action": readiness.recommended_action if account.is_active else "Inactive finance account is ignored by live collection selectors.",
             }
         )
     return rows, counts
@@ -203,7 +222,6 @@ def get_setup_readiness() -> dict[str, Any]:
     required_mappings_missing = AccountingSetupService.missing_required_mapping_purposes()
 
     active_chart_accounts = ChartOfAccount.objects.filter(is_active=True)
-    active_finance_accounts = FinanceAccount.objects.filter(is_active=True)
     collection_mappings = FinanceAccountCoaMapping.objects.filter(
         is_active=True,
         purpose__in=[
@@ -229,6 +247,7 @@ def get_setup_readiness() -> dict[str, Any]:
     numbering_ready, numbering_metadata = _document_numbering_ready()
     finance_rows, finance_counts = _finance_account_rows()
     ready_collection_account_exists = finance_counts["ready"] > 0
+    active_finance_blockers = finance_counts["active_blocked"]
 
     document_terms = []
     if active_print_settings:
@@ -241,6 +260,10 @@ def get_setup_readiness() -> dict[str, Any]:
             active_print_settings.account_statement_terms,
         ]
     document_terms_configured = any((term or "").strip() for term in document_terms)
+
+    finance_warnings = []
+    if active_finance_blockers:
+        finance_warnings.append(f"{active_finance_blockers} active finance account(s) are not collection-ready.")
 
     sections = [
         _section(
@@ -278,11 +301,11 @@ def get_setup_readiness() -> dict[str, Any]:
         _section(
             key="finance_accounts",
             title="Finance Accounts",
-            status="READY" if ready_collection_account_exists and finance_counts["blocked"] == 0 else ("NEEDS_SETUP" if ready_collection_account_exists else "BLOCKED"),
+            status="READY" if ready_collection_account_exists and active_finance_blockers == 0 else ("NEEDS_SETUP" if ready_collection_account_exists else "BLOCKED"),
             blockers=[] if ready_collection_account_exists else ["No collection-ready cash/bank/UPI finance account is mapped to a posting-enabled leaf ASSET account."],
-            warnings=[] if finance_counts["blocked"] == 0 else [f"{finance_counts['blocked']} finance account(s) are active/inactive but not collection-ready."],
-            recommended_action="Map each real cash, bank, and UPI account to a posting-enabled leaf ASSET chart account. Do not use system posting profiles as collection accounts.",
-            target_route="/admin/accounting/setup",
+            warnings=finance_warnings,
+            recommended_action="Map each active real cash, bank, and UPI account to a posting-enabled leaf ASSET chart account. Inactive finance accounts are archived and ignored by live collection selectors.",
+            target_route="/admin/accounting/chart-of-accounts",
             why_this_matters="Cashier/admin collection selectors must show only accounts that can safely post, reconcile, and day-close.",
             metadata=finance_counts,
         ),
@@ -331,7 +354,7 @@ def get_setup_readiness() -> dict[str, Any]:
             title="Payment Collection",
             status="READY" if ready_collection_account_exists else "BLOCKED",
             blockers=[] if ready_collection_account_exists else ["No collection-ready finance account exists for payment posting."],
-            recommended_action="Configure at least one cash/bank/UPI collection account and verify cashier collection selectors.",
+            recommended_action="Configure at least one active cash/bank/UPI collection account and verify cashier collection selectors.",
             target_route="/admin/finance/collect",
             why_this_matters="Customer payment collection must post to valid accounts with receipt and reconciliation traceability.",
             metadata={"collection_ready_accounts": finance_counts["ready"], "collection_mappings": collection_mappings.count()},
