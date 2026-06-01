@@ -21,7 +21,10 @@ from accounting.services.finance_account_readiness import (
 OPERATOR_BLOCKED_COPY = "Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account."
 SYSTEM_DIAGNOSTIC_COPY = "System posting profile diagnostic only; not a customer collection destination."
 LEAF_ASSET_ACTION = "Repair creates or reuses a posting leaf account and remaps this finance account only."
-RENT_LEASE_DEFERRED_COPY = "Rent/lease collection remains deferred until an approved backend collection route exists."
+RENT_LEASE_SOURCE_COLLECTION_COPY = (
+    "Operational source collection is enabled. Accounting posting bridge remains "
+    "audit-deferred until approved."
+)
 NOT_EXPOSED = "Not exposed"
 
 
@@ -57,18 +60,14 @@ POSTING_PROFILE_SPECS: tuple[PostingProfileSpec, ...] = (
     PostingProfileSpec(
         key="rent_lease_collection",
         label="Rent / Lease Collection",
-        debit_keys=("CUSTOMER_RECEIVABLE",),
+        debit_keys=("CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"),
         credit_keys=(FinanceAccountMappingPurpose.RENT_INCOME, FinanceAccountMappingPurpose.LEASE_INCOME),
-        implemented=False,
-        deferred_reason=RENT_LEASE_DEFERRED_COPY,
     ),
     PostingProfileSpec(
         key="security_deposit",
         label="Security Deposit",
         debit_keys=("CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"),
         credit_keys=(FinanceAccountMappingPurpose.SECURITY_DEPOSIT_LIABILITY,),
-        implemented=False,
-        deferred_reason="Security deposit collection is tracked for setup, but collection execution stays backend-controlled.",
     ),
     PostingProfileSpec(
         key="refund_customer_credit",
@@ -282,11 +281,12 @@ def _profile_readiness_item(
         "debit_rows": debit_rows,
         "credit_rows": credit_rows,
         "blockers": blockers,
-        "recommended_action": recommended_actions[0] if recommended_actions else None,
+        "recommended_action": recommended_actions[0] if recommended_actions else (RENT_LEASE_SOURCE_COLLECTION_COPY if spec.key in {"rent_lease_collection", "security_deposit"} else None),
         "recommended_actions": recommended_actions,
         "implemented": spec.implemented,
         "configured_count": configured_count,
         "required_count": total_count,
+        "operator_note": RENT_LEASE_SOURCE_COLLECTION_COPY if spec.key in {"rent_lease_collection", "security_deposit"} else None,
     }
 
 
@@ -393,6 +393,7 @@ def build_accounting_setup_matrix() -> dict[str, Any]:
             "chart_of_accounts": "Chart of Accounts is the ledger structure.",
             "system_profiles": "System posting profiles are diagnostic only and cannot receive customer collections.",
             "blocked_collection": OPERATOR_BLOCKED_COPY,
+            "rent_lease_source_collection": RENT_LEASE_SOURCE_COLLECTION_COPY,
         },
         "not_exposed_label": NOT_EXPOSED,
         "summary": {
