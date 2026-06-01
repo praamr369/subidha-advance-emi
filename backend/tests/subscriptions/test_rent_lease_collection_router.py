@@ -158,7 +158,8 @@ class RentLeaseUnifiedCollectionRouterTests(APITestCase):
         self.assertEqual(demand.status, RentLeaseDemandStatus.PARTIAL)
         self.assertTrue(
             AuditLog.objects.filter(
-                subscription=subscription,
+                model_name="Subscription",
+                object_id=subscription.id,
                 metadata__event="RENT_LEASE_MONTHLY_DEMAND_COLLECTED",
             ).exists()
         )
