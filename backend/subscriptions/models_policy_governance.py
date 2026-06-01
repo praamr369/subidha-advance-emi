@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 
-from subscriptions.models_business_setup import BusinessSetupTimeStampedModel, PolicyPage
+from subscriptions.models_business_setup import BusinessSetupTimeStampedModel, PolicyPage, PolicyStatus
 
 POLICY_STATUS_CHOICES = (
     ("DRAFT", "Draft"),
@@ -73,5 +73,8 @@ class PolicyGovernanceMetadata(BusinessSetupTimeStampedModel):
 
 # PG-2B runtime compatibility: PolicyPage remains the source row, but the
 # allowed lifecycle statuses are extended additively. The companion migration
-# updates the migration state/field definition.
+# updates the migration state/field definition. The source PolicyStatus enum is
+# older, so expose the new values for callers that import PolicyStatus directly.
 PolicyPage._meta.get_field("status").choices = POLICY_STATUS_CHOICES
+PolicyStatus.UNDER_REVIEW = "UNDER_REVIEW"
+PolicyStatus.APPROVED = "APPROVED"
