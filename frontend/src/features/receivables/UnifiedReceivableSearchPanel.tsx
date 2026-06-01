@@ -83,7 +83,6 @@ export default function UnifiedReceivableSearchPanel({
 }: {
   title: string;
   description: string;
-  /** Visible helper under the search field (also linked via aria-describedby). */
   searchHelperText?: string;
   emptyStateDescription?: string;
   query: string;
@@ -158,13 +157,7 @@ export default function UnifiedReceivableSearchPanel({
           <ErrorState
             title="Search failed"
             description={error}
-            onRetry={
-              onRetrySearch
-                ? () => {
-                    onRetrySearch();
-                  }
-                : undefined
-            }
+            onRetry={onRetrySearch ? () => onRetrySearch() : undefined}
           />
         </div>
       ) : null}
@@ -173,10 +166,7 @@ export default function UnifiedReceivableSearchPanel({
         <div className="mt-4">
           <EmptyState
             title="No receivables matched"
-            description={
-              emptyStateDescription ??
-              "Try another phone number, subscription ID, invoice number, or receipt number. Results respect your cashier role scope."
-            }
+            description={emptyStateDescription ?? "Try another phone number, subscription ID, invoice number, or receipt number. Results respect your cashier role scope."}
           />
         </div>
       ) : null}
@@ -189,41 +179,27 @@ export default function UnifiedReceivableSearchPanel({
             const route = row.collection_route?.trim() || "";
             const primaryBadge = row.result_type || "";
             const extras = row.secondary_badges ?? [];
-            const canEmiInline =
-              row.primary_action === "COLLECT_EMI" && Boolean(onAdvanceEmiSelect);
-            const canEmiRoute =
-              row.primary_action === "COLLECT_EMI" && !onAdvanceEmiSelect && Boolean(route);
-            const canDirectRoute =
-              row.primary_action === "COLLECT_DIRECT_SALE" && Boolean(route);
+            const canEmiInline = row.primary_action === "COLLECT_EMI" && Boolean(onAdvanceEmiSelect);
+            const canEmiRoute = row.primary_action === "COLLECT_EMI" && !onAdvanceEmiSelect && Boolean(route);
+            const canDirectRoute = row.primary_action === "COLLECT_DIRECT_SALE" && Boolean(route);
+            const canRentLeaseRoute = row.primary_action === "COLLECT_RENT_LEASE" && Boolean(route);
             const canOpenSaleRoute = row.primary_action === "OPEN_SALE" && Boolean(route);
             const canViewReceiptsRoute = row.primary_action === "VIEW_RECEIPTS" && Boolean(route);
-            const disabledReason =
-              row.reason_if_not_collectible ||
-              row.disabled_reason ||
-              "Collection is not available for this receivable.";
+            const disabledReason = row.reason_if_not_collectible || row.disabled_reason || "Collection is not available for this receivable.";
+            const noAction = !canEmiInline && !canEmiRoute && !canDirectRoute && !canRentLeaseRoute && !canOpenSaleRoute && !canViewReceiptsRoute;
 
             return (
-              <div
-                key={rowKey}
-                className="rounded-2xl border border-border bg-background p-4 shadow-sm"
-              >
+              <div key={rowKey} className="rounded-2xl border border-border bg-background p-4 shadow-sm">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       {primaryBadge ? (
-                        <span
-                          data-testid={`unified-receivable-badge-${primaryBadge}`}
-                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClass(primaryBadge)}`}
-                        >
+                        <span data-testid={`unified-receivable-badge-${primaryBadge}`} className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClass(primaryBadge)}`}>
                           {badgeLabel(primaryBadge)}
                         </span>
                       ) : null}
                       {extras.map((kind) => (
-                        <span
-                          key={kind}
-                          data-testid={`unified-receivable-extra-${kind}`}
-                          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badgeClass(kind)}`}
-                        >
+                        <span key={kind} data-testid={`unified-receivable-extra-${kind}`} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badgeClass(kind)}`}>
                           {badgeLabel(kind)}
                         </span>
                       ))}
@@ -232,116 +208,54 @@ export default function UnifiedReceivableSearchPanel({
                       </span>
                     </div>
                     <div className="mt-2 text-sm text-foreground">
-                      {row.customer_name || "Customer not linked"} ·{" "}
-                      {row.phone_masked || "No phone"}
+                      {row.customer_name || "Customer not linked"} · {row.phone_masked || "No phone"}
                     </div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {row.product_summary || "No product summary"} · Status{" "}
-                      {row.status || "—"}
+                      {row.product_summary || "No product summary"} · Status {row.status || "—"}
                     </div>
-                    {row.source_type === "DIRECT_SALE" ? (
+                    {row.source_type === "DIRECT_SALE" || row.source_type === "RENT" || row.source_type === "LEASE" ? (
                       <div className="mt-1 text-xs text-muted-foreground">
-                        Paid {money(row.paid_amount)} of {money(row.total_amount)} ·{" "}
-                        {row.payment_state || "UNPAID"}
+                        Paid {money(row.paid_amount)} of {money(row.total_amount)} · {row.payment_state || "UNPAID"}
                       </div>
                     ) : null}
                   </div>
                   <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[360px]">
                     <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
-                      <div className="text-[11px] font-semibold uppercase text-muted-foreground">
-                        Due
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-foreground">
-                        {money(row.due_amount)}
-                      </div>
+                      <div className="text-[11px] font-semibold uppercase text-muted-foreground">Due</div>
+                      <div className="mt-1 text-sm font-semibold text-foreground">{money(row.due_amount)}</div>
                     </div>
                     <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                      <div className="text-[11px] font-semibold uppercase text-amber-700">
-                        Overdue
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-amber-900">
-                        {money(row.overdue_amount)}
-                      </div>
+                      <div className="text-[11px] font-semibold uppercase text-amber-700">Overdue</div>
+                      <div className="mt-1 text-sm font-semibold text-amber-900">{money(row.overdue_amount)}</div>
                     </div>
                     <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
-                      <div className="text-[11px] font-semibold uppercase text-muted-foreground">
-                        Next Due
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-foreground">
-                        {formatDate(row.next_due_date)}
-                      </div>
+                      <div className="text-[11px] font-semibold uppercase text-muted-foreground">Next Due</div>
+                      <div className="mt-1 text-sm font-semibold text-foreground">{formatDate(row.next_due_date)}</div>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   {canEmiInline ? (
-                    <button
-                      type="button"
-                      data-testid="unified-receivable-open-emi-flow"
-                      onClick={() => onAdvanceEmiSelect?.(row)}
-                      disabled={actionLoadingKey === loadingKey}
-                      title="Opens the in-page EMI collection workflow using the canonical route from the server."
-                      className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
+                    <button type="button" data-testid="unified-receivable-open-emi-flow" onClick={() => onAdvanceEmiSelect?.(row)} disabled={actionLoadingKey === loadingKey} title="Opens the in-page EMI collection workflow using the canonical route from the server." className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">
                       {actionLoadingKey === loadingKey ? "Loading EMI..." : "Use EMI Flow"}
                     </button>
                   ) : null}
 
-                  {canEmiRoute ? (
-                    <Link
-                      href={route}
-                      data-testid="unified-receivable-open-emi-link"
-                      className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800"
-                    >
-                      Open EMI collection
-                    </Link>
-                  ) : null}
+                  {canEmiRoute ? <Link href={route} data-testid="unified-receivable-open-emi-link" className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800">Open EMI collection</Link> : null}
+                  {canDirectRoute ? <Link href={route} data-testid="unified-receivable-open-direct-sale-link" className="inline-flex h-10 items-center justify-center rounded-xl bg-amber-800 px-4 text-sm font-semibold text-white transition hover:bg-amber-900">Open direct-sale collection</Link> : null}
+                  {canRentLeaseRoute ? <Link href={route} data-testid="unified-receivable-open-rent-lease-link" className="inline-flex h-10 items-center justify-center rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white transition hover:bg-blue-800">Open rent/lease collection</Link> : null}
+                  {canOpenSaleRoute ? <Link href={route} data-testid="unified-receivable-open-sale-link" className="inline-flex h-10 items-center justify-center rounded-xl bg-orange-700 px-4 text-sm font-semibold text-white transition hover:bg-orange-800">Open sale</Link> : null}
+                  {canViewReceiptsRoute ? <Link href={route} data-testid="unified-receivable-open-receipts-link" className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-700 px-4 text-sm font-semibold text-white transition hover:bg-slate-800">View receipts</Link> : null}
 
-                  {canDirectRoute ? (
-                    <Link
-                      href={route}
-                      data-testid="unified-receivable-open-direct-sale-link"
-                      className="inline-flex h-10 items-center justify-center rounded-xl bg-amber-800 px-4 text-sm font-semibold text-white transition hover:bg-amber-900"
-                    >
-                      Open direct-sale collection
-                    </Link>
-                  ) : null}
-                  {canOpenSaleRoute ? (
-                    <Link
-                      href={route}
-                      data-testid="unified-receivable-open-sale-link"
-                      className="inline-flex h-10 items-center justify-center rounded-xl bg-orange-700 px-4 text-sm font-semibold text-white transition hover:bg-orange-800"
-                    >
-                      Open sale
-                    </Link>
-                  ) : null}
-                  {canViewReceiptsRoute ? (
-                    <Link
-                      href={route}
-                      data-testid="unified-receivable-open-receipts-link"
-                      className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-700 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-                    >
-                      View receipts
-                    </Link>
-                  ) : null}
-
-                  {!canEmiInline && !canEmiRoute && !canDirectRoute && !canOpenSaleRoute && !canViewReceiptsRoute ? (
-                    <button
-                      type="button"
-                      disabled
-                      title={disabledReason}
-                      data-testid="unified-receivable-disabled-action"
-                      className="inline-flex h-10 cursor-not-allowed items-center justify-center rounded-xl border border-border bg-muted px-4 text-sm font-semibold text-muted-foreground"
-                    >
+                  {noAction ? (
+                    <button type="button" disabled title={disabledReason} data-testid="unified-receivable-disabled-action" className="inline-flex h-10 cursor-not-allowed items-center justify-center rounded-xl border border-border bg-muted px-4 text-sm font-semibold text-muted-foreground">
                       {disabledActionLabel(row)}
                     </button>
                   ) : null}
                 </div>
 
-                {!canEmiInline && !canEmiRoute && !canDirectRoute && !canOpenSaleRoute && !canViewReceiptsRoute && disabledReason ? (
-                  <div className="mt-2 text-xs text-muted-foreground">{disabledReason}</div>
-                ) : null}
+                {noAction && disabledReason ? <div className="mt-2 text-xs text-muted-foreground">{disabledReason}</div> : null}
               </div>
             );
           })}
