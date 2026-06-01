@@ -101,20 +101,37 @@ class DocumentNumberingSequenceSerializer(serializers.Serializer):
     name = serializers.CharField()
     series_code = serializers.CharField()
     financial_year = serializers.CharField()
+    workflow_group = serializers.CharField(required=False)
+    doc_kind = serializers.CharField(required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    required_for_go_live = serializers.BooleanField(required=False)
     configured = serializers.BooleanField()
     prefix = serializers.CharField()
     next_number = serializers.IntegerField()
     padding = serializers.IntegerField()
     next_number_preview = serializers.CharField(allow_null=True)
     last_issued_number = serializers.CharField(allow_null=True)
+    issued_count = serializers.IntegerField(required=False)
+    max_issued_number = serializers.IntegerField(required=False)
+    min_safe_next_number = serializers.IntegerField(required=False)
+    duplicate_count = serializers.IntegerField(required=False)
     status = serializers.CharField()
+    warnings = serializers.ListField(child=serializers.CharField(), required=False)
+    blockers = serializers.ListField(child=serializers.CharField(), required=False)
+    can_edit_prefix = serializers.BooleanField(required=False)
+    can_edit_next_number = serializers.BooleanField(required=False)
+    can_seed_default = serializers.BooleanField(required=False)
+    default_prefix = serializers.CharField(required=False, allow_blank=True)
+    default_padding = serializers.IntegerField(required=False)
 
 
 class DocumentNumberingStateSerializer(serializers.Serializer):
     financial_year = serializers.CharField()
     sequences = DocumentNumberingSequenceSerializer(many=True)
     checks = serializers.DictField()
+    summary = serializers.DictField(required=False)
     duplicate_issues = serializers.DictField()
+    operator_rules = serializers.ListField(child=serializers.CharField(), required=False)
 
 
 class DocumentNumberingUpdateSerializer(serializers.Serializer):
@@ -126,9 +143,7 @@ class DocumentNumberingUpdateSerializer(serializers.Serializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         if not any(field in attrs for field in ("prefix", "next_number", "padding")):
-            raise serializers.ValidationError(
-                {"detail": "At least one field must be provided: prefix, next_number, or padding."}
-            )
+            raise serializers.ValidationError({"detail": "At least one field must be provided: prefix, next_number, or padding."})
         return attrs
 
 
@@ -188,12 +203,7 @@ class BackupJobCreateSerializer(serializers.Serializer):
 
 class RestorePreviewRequestSerializer(serializers.Serializer):
     restore_type = serializers.ChoiceField(
-        choices=[
-            "FULL_BACKUP_RESTORE_PREVIEW",
-            "SELECTED_SCOPE_RESTORE_PREVIEW",
-            "SETUP_SNAPSHOT_RESTORE_PREVIEW",
-            "LOCAL_SANDBOX_RESTORE_PREVIEW",
-        ],
+        choices=["FULL_BACKUP_RESTORE_PREVIEW", "SELECTED_SCOPE_RESTORE_PREVIEW", "SETUP_SNAPSHOT_RESTORE_PREVIEW", "LOCAL_SANDBOX_RESTORE_PREVIEW"],
         required=False,
         default="FULL_BACKUP_RESTORE_PREVIEW",
     )
