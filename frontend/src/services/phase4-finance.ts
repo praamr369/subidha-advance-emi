@@ -212,6 +212,7 @@ export type AdminRentLeaseAccountMappingPayload = {
   chart_accounts: Array<Record<string, unknown>>;
   finance_accounts: Array<Record<string, unknown>>;
   posting_boundary_note?: string;
+  premade_setup_enabled?: boolean;
 };
 
 export async function getAdminRentLeaseAccountMapping() {
@@ -219,10 +220,14 @@ export async function getAdminRentLeaseAccountMapping() {
 }
 
 export async function saveAdminRentLeaseAccountMapping(input: Record<string, unknown>) {
-  return apiFetch<{ detail: string; mapping_id: number; posting_boundary_note?: string }>(`/admin/finance/account-mapping/`, {
+  return apiFetch<{ detail: string; mapping_id: number } & AdminRentLeaseAccountMappingPayload>(`/admin/finance/account-mapping/`, {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function ensureAdminRentLeasePremadeAccountingSetup() {
+  return saveAdminRentLeaseAccountMapping({ action: "ENSURE_PREMADE" });
 }
 
 export async function regenerateAdminDocument(documentId: number, reason = "") {
@@ -269,34 +274,4 @@ export async function listCustomerReceipts() {
 
 export async function listCustomerDocuments() {
   return apiFetch<{ count: number; results: FinanceDocumentRow[] }>("/customer/documents/");
-}
-
-export async function getCustomerPaymentSchedule() {
-  return apiFetch<{ count: number; results: Array<Record<string, unknown>> }>("/customer/payment-schedule/");
-}
-
-export async function getCustomerAccountStatement(params?: FinanceFilter) {
-  return apiFetch<{
-    summary: Record<string, Money>;
-    payments: Array<Record<string, unknown>>;
-    receipts: Array<Record<string, unknown>>;
-    invoices: Array<Record<string, unknown>>;
-  }>(`/customer/account-statement/${toQuery(params)}`);
-}
-
-export async function getPartnerFinanceSummary() {
-  return apiFetch<{
-    summary: Record<string, unknown>;
-    payment_method_split: Array<{ payment_method: string; count: number; amount: Money }>;
-  }>("/partner/finance/summary/");
-}
-
-export async function listPartnerLinkedCustomerPayments() {
-  return apiFetch<{ count: number; results: Array<Record<string, unknown>> }>(
-    "/partner/linked-customer-payments/"
-  );
-}
-
-export async function listPartnerReceipts() {
-  return apiFetch<{ count: number; results: FinanceReceiptRow[] }>("/partner/receipts/");
 }
