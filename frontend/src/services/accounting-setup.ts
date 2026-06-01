@@ -51,6 +51,7 @@ export type PostingProfileReadinessItem = {
   recommended_action?: string | null;
   recommended_actions?: string[];
   implemented: boolean;
+  operator_note?: string | null;
 };
 
 export type AccountingSetupMatrixPayload = {
@@ -124,6 +125,7 @@ export type CollectionRepairPreviewPayload = {
 };
 
 const SYSTEM_PROFILE_BLOCKER = "System posting profile diagnostic only; not a customer collection destination.";
+const RENT_LEASE_SOURCE_COLLECTION_COPY = "Operational source collection is enabled. Accounting posting bridge remains audit-deferred until approved.";
 
 const ACCOUNT_CODES: Record<string, string[]> = {
   CASH_COLLECTION: ["CASH-1000", "CASH-1000-P"],
@@ -151,8 +153,8 @@ const PROFILE_ROWS = [
   { key: "emi_collection", label: "EMI Collection", debit: ["CUSTOMER_RECEIVABLE"], credit: ["EMI_INCOME", "EMI_COLLECTION_CLEARING"], implemented: true },
   { key: "direct_sale_collection", label: "Direct Sale Collection", debit: ["CUSTOMER_RECEIVABLE"], credit: ["DIRECT_SALE_INCOME"], implemented: true },
   { key: "customer_advance", label: "Customer Advance", debit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], credit: ["CUSTOMER_ADVANCE_UNEARNED_REVENUE"], implemented: true },
-  { key: "rent_lease_collection", label: "Rent / Lease Collection", debit: ["CUSTOMER_RECEIVABLE"], credit: ["RENT_INCOME", "LEASE_INCOME"], implemented: false, deferred: "Rent/lease collection remains deferred until an approved backend collection route exists." },
-  { key: "security_deposit", label: "Security Deposit", debit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], credit: ["SECURITY_DEPOSIT_LIABILITY"], implemented: false, deferred: "Security deposit collection remains diagnostic until backend collection execution is enabled." },
+  { key: "rent_lease_collection", label: "Rent / Lease Collection", debit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], credit: ["RENT_INCOME", "LEASE_INCOME"], implemented: true, operatorNote: RENT_LEASE_SOURCE_COLLECTION_COPY },
+  { key: "security_deposit", label: "Security Deposit", debit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], credit: ["SECURITY_DEPOSIT_LIABILITY"], implemented: true, operatorNote: RENT_LEASE_SOURCE_COLLECTION_COPY },
   { key: "refund_customer_credit", label: "Refund / Customer Credit", debit: ["SALES_RETURNS", "CUSTOMER_RECEIVABLE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
   { key: "commission_payout", label: "Commission Payout", debit: ["COMMISSION_EXPENSE"], credit: ["COMMISSION_PAYABLE"], implemented: true },
   { key: "vendor_payment", label: "Vendor Payment", debit: ["ACCOUNTS_PAYABLE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
@@ -205,12 +207,12 @@ function buildProfileReadiness(accounts: AccountingSetupReadinessChartAccount[])
     const debitMissing = row.debit.filter((_, index) => !debit[index]);
     const creditMissing = row.credit.filter((_, index) => !credit[index]);
     const blockers = [
-      ...("deferred" in row && row.deferred ? [row.deferred] : []),
       ...debitMissing.map((key) => `Debit account ${key} is not configured as posting-ready.`),
       ...creditMissing.map((key) => `Credit account ${key} is not configured as posting-ready.`),
     ];
     const configuredCount = debitAccounts.length + creditAccounts.length;
     const status = !row.implemented ? "DEFERRED" : blockers.length === 0 ? "READY" : configuredCount > 0 ? "PARTIAL" : "BLOCKED";
+    const operatorNote = "operatorNote" in row ? row.operatorNote : null;
     return {
       key: row.key,
       label: row.label,
@@ -220,9 +222,10 @@ function buildProfileReadiness(accounts: AccountingSetupReadinessChartAccount[])
       configured_debit_account: debitAccounts,
       configured_credit_account: creditAccounts,
       blockers,
-      recommended_action: blockers[0] || null,
+      recommended_action: blockers[0] || operatorNote,
       recommended_actions: blockers,
       implemented: row.implemented,
+      operator_note: operatorNote,
     };
   });
 }
@@ -263,6 +266,7 @@ function buildMatrixFromReadiness(payload: AccountingSetupReadinessPayload): Acc
       chart_of_accounts: "Chart of Accounts is the ledger structure.",
       system_profiles: "System posting profiles are diagnostic only and cannot receive customer collections.",
       blocked_collection: "Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account.",
+      rent_lease_source_collection: RENT_LEASE_SOURCE_COLLECTION_COPY,
     },
     not_exposed_label: payload.not_exposed_label ?? "Not exposed",
     summary: {
@@ -276,10 +280,6 @@ function buildMatrixFromReadiness(payload: AccountingSetupReadinessPayload): Acc
       diagnostic_system_accounts_count: diagnostic.length,
     },
   };
-}
-
-export async function getAccountingSetupStatus(): Promise<AccountingSetupStatusPayload> {
-  return request<AccountingSetupStatusPayload>("/admin/accounting/setup/status/");
 }
 
 export async function getAccountingSetupReadiness(): Promise<AccountingSetupReadinessPayload> {
