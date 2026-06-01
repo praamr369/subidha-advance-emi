@@ -24,6 +24,47 @@ const readinessPayload = {
       metadata: { configured: false },
     },
     {
+      key: "business_compliance",
+      title: "Business Compliance",
+      status: "BLOCKED",
+      blockers: ["Required business proof is missing."],
+      warnings: ["Public summary requires separate approval."],
+      recommended_action: "Upload real evidence, submit for review, approve evidence, and approve public-safe summaries separately.",
+      target_route: "/admin/settings/business-compliance",
+      why_this_matters: "Business proof and public-safe compliance summaries protect customer trust without exposing private files.",
+      metadata: {
+        missing_required_count: 2,
+        missing_file_count: 3,
+        pending_review_count: 1,
+        public_summary_pending_count: 1,
+      },
+    },
+    {
+      key: "policy_governance",
+      title: "Policy Governance",
+      status: "BLOCKED",
+      blockers: ["3 required public policy template(s) are not published."],
+      warnings: ["2 internal governance policy template(s) are still draft."],
+      recommended_action: "Review, approve, publish required public policies, and accept internal governance policies.",
+      target_route: "/admin/settings/policies",
+      why_this_matters: "Public launch must not expose draft/internal policies. Customer-facing policies require publication.",
+      metadata: {
+        public_not_published_count: 3,
+        internal_draft_count: 2,
+        coverage_summary: {
+          public_required_count: 12,
+          public_published_count: 9,
+          public_draft_count: 2,
+          public_under_review_count: 1,
+          public_approved_count: 1,
+          internal_required_count: 6,
+          internal_ready_count: 4,
+          internal_draft_count: 2,
+          metadata_mismatch_count: 1,
+        },
+      },
+    },
+    {
       key: "print_branding",
       title: "Print Branding",
       status: "NEEDS_SETUP",
@@ -172,6 +213,8 @@ const readinessPayload = {
     { key: "can_collect_payment", label: "Can collect payment", ready: false, source_section: "payment_collection" },
     { key: "can_issue_receipt", label: "Can issue receipt", ready: false, source_section: "document_templates" },
     { key: "can_print_documents", label: "Can print documents", ready: true, source_section: "print_branding" },
+    { key: "can_complete_business_compliance", label: "Can complete business compliance", ready: false, source_section: "business_compliance" },
+    { key: "can_publish_public_policies", label: "Can publish public policies", ready: false, source_section: "policy_governance" },
     { key: "can_reconcile", label: "Can reconcile", ready: true, source_section: "accounting_reconciliation" },
     { key: "can_day_close", label: "Can day-close", ready: false, source_section: "branch_cash_counter" },
     { key: "can_handle_amendment_recontract", label: "Can handle amendment/recontract", ready: false, source_section: "amendment_recontract" },
@@ -189,7 +232,7 @@ async function mockReadiness(page: Page, payload: unknown = readinessPayload, st
 test.describe("admin setup readiness center", () => {
   test.use({ storageState: authStatePath("admin") });
 
-  test("loads readiness sections, finance blockers, checklist, and real route links", async ({ page }) => {
+  test("loads readiness sections, finance blockers, checklist, policy metadata, and real route links", async ({ page }) => {
     await mockReadiness(page);
     await page.goto("/admin/setup/readiness");
 
@@ -201,19 +244,27 @@ test.describe("admin setup readiness center", () => {
     await expect(main.getByText("Blockers", { exact: true }).first()).toBeVisible();
 
     await expect(main.getByRole("heading", { name: "Business Profile" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Business Compliance" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Policy Governance" })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Finance Accounts" })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Batch / Lucky IDs" })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Amendment / Recontract Readiness" })).toBeVisible();
 
+    await expect(main.getByText("PG-2B governance metadata", { exact: true })).toBeVisible();
+    await expect(main.getByText("Public published: 9/12", { exact: true })).toBeVisible();
+    await expect(main.getByText("Internal ready: 4/6", { exact: true })).toBeVisible();
+    await expect(main.getByText("Metadata mismatch: 1", { exact: true })).toBeVisible();
+    await expect(main.getByRole("link", { name: "Policy Governance" })).toHaveAttribute("href", "/admin/settings/policies");
+
+    await expect(main.getByText("BC-2 compliance metadata", { exact: true })).toBeVisible();
+    await expect(main.getByText("Missing file: 3", { exact: true })).toBeVisible();
+
     await expect(main.getByText("Main Cash Desk", { exact: true }).first()).toBeVisible();
     await expect(main.getByText("Mapped chart account is a group/control account").first()).toBeVisible();
-    
     await expect(main.getByText("Can collect payment", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Can publish public policies", { exact: true }).first()).toBeVisible();
 
-    await expect(main.getByRole("link", { name: "Open next setup action" })).toHaveAttribute(
-      "href",
-      "/admin/settings/business-setup/profile",
-    );
+    await expect(main.getByRole("link", { name: "Open next setup action" })).toHaveAttribute("href", "/admin/settings/business-setup/profile");
     await expect(main.getByRole("link", { name: "Open Accounting Setup" })).toHaveAttribute("href", "/admin/accounting/setup");
     await expect(main.getByRole("button", { name: /auto|fix|repair|remap|post|reconcile/i })).toHaveCount(0);
     await expect(main.getByRole("link", { name: /auto fix|silent remap|post now|reconcile now/i })).toHaveCount(0);
