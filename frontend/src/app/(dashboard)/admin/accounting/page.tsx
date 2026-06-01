@@ -43,6 +43,7 @@ import {
   type AccountingSetupStatusPayload,
 } from "@/services/accounting-setup";
 import { getAdminAccountingControlCenter } from "@/services/phase5-control";
+import { getAccountingReadiness, type AccountingReadiness } from "@/services/rent-lease-accounting-bridge";
 
 type ModuleStatus = "READY" | "BLOCKED" | "PARTIAL" | "DEFERRED";
 
@@ -78,10 +79,9 @@ type CockpitData = {
   postedMovementsCount: number | null;
   setupStatus: AccountingSetupStatusPayload | null;
   setupReadiness: AccountingSetupReadinessPayload | null;
+  accountingReadiness: AccountingReadiness | null;
   controlPayload: AccountingControlPayload | null;
 };
-
-const rentLeaseCollectionRoute = "/admin/finance/collect?workflow=unified";
 
 const MODULE_GROUPS: AccountingModuleGroup[] = [
   {
@@ -102,9 +102,9 @@ const MODULE_GROUPS: AccountingModuleGroup[] = [
       { key: "collection_control_center", title: "Collection Control Center", description: "Review collection blockers, finance-account readiness, and cashier/admin collection posture.", route: ROUTES.admin.collectionControlCenter, icon: ClipboardCheck, implemented: true, readOnly: true, setupGate: true },
       { key: "receivables", title: "Receivables", description: "Review unified unpaid dues and outstanding customer balances before collection follow-up.", route: ROUTES.admin.outstandings, icon: Receipt, implemented: true, readOnly: true },
       { key: "direct_sale_receivables", title: "Direct-sale Receivables", description: "Review unpaid direct-sale invoices before collection follow-up.", route: ROUTES.admin.billingInvoices, icon: ReceiptText, implemented: true, readOnly: true },
-      { key: "customer_advances", title: "Customer Advances", description: "Deferred until customer advance liability workflow is enabled end-to-end.", route: null, icon: WalletCards, implemented: false, defaultStatus: "DEFERRED", deferredReason: "Deferred until customer advance liability workflow is enabled." },
-      { key: "rent_lease_dues", title: "Rent / Lease Dues", description: "Open the unified collection workflow for rent/lease demand and security-deposit source collections. Accounting posting remains audit-deferred.", route: rentLeaseCollectionRoute, icon: Building2, implemented: true, setupGate: true },
-      { key: "security_deposits", title: "Security Deposits", description: "Review rent/lease deposit liabilities and refund posture. Collection uses the unified rent/lease workflow.", route: ROUTES.admin.financeDeposits, icon: Banknote, implemented: true, readOnly: true, defaultStatus: "PARTIAL" },
+      { key: "customer_advances", title: "Customer Advances", description: "Create and post customer advance liability source records through the controlled accounting bridge.", route: "/admin/customer-advances", icon: WalletCards, implemented: true, setupGate: true },
+      { key: "rent_lease_dues", title: "Rent / Lease Dues", description: "Review collected rent/lease source demands and explicitly post the accounting bridge when mapping is ready.", route: "/admin/rent-lease", icon: Building2, implemented: true, setupGate: true },
+      { key: "security_deposits", title: "Security Deposits", description: "Review rent/lease deposit liabilities, refund posture, damage recovery, and explicit posting state.", route: ROUTES.admin.financeDeposits, icon: Banknote, implemented: true, readOnly: true, setupGate: true },
     ],
   },
   {
@@ -170,8 +170,15 @@ function compactBlockers(readiness: AccountingSetupReadinessPayload | null): str
     .slice(0, 3);
 }
 
-function statusForModule(module: AccountingModuleDefinition, setupBlocked: boolean): ModuleStatus {
+function bridgeStatus(readiness: AccountingReadiness | null): ModuleStatus {
+  if (!readiness) return "PARTIAL";
+  if (readiness.status === "READY") return "READY";
+  return "BLOCKED";
+}
+
+function statusForModule(module: AccountingModuleDefinition, setupBlocked: boolean, readiness: AccountingReadiness | null): ModuleStatus {
   if (!module.implemented || !module.route) return "DEFERRED";
+  if (["customer_advances", "rent_lease_dues", "security_deposits"].includes(module.key)) return bridgeStatus(readiness);
   if (module.setupGate && setupBlocked) return "BLOCKED";
   return module.defaultStatus ?? "READY";
 }
@@ -180,15 +187,15 @@ function moduleActionLabel(module: AccountingModuleDefinition, status: ModuleSta
   if (!module.implemented || !module.route || status === "DEFERRED") return "Deferred";
   if (status === "BLOCKED" && module.setupGate) return "Fix setup";
   if (module.readOnly) return "Open read-only";
-  return module.key === "rent_lease_dues" ? "Open rent/lease collection" : "Open";
+  return module.key === "rent_lease_dues" ? "Open rent/lease workspace" : "Open";
 }
 
-function ModuleCard({ module, setupBlocked, setupBlockers }: { module: AccountingModuleDefinition; setupBlocked: boolean; setupBlockers: string[] }) {
-  const status = statusForModule(module, setupBlocked);
+function ModuleCard({ module, setupBlocked, setupBlockers, readiness }: { module: AccountingModuleDefinition; setupBlocked: boolean; setupBlockers: string[]; readiness: AccountingReadiness | null }) {
+  const status = statusForModule(module, setupBlocked, readiness);
   const Icon = module.icon;
   const isDeferred = status === "DEFERRED" || !module.implemented || !module.route;
   const actionHref = status === "BLOCKED" && module.setupGate ? ROUTES.admin.accountingChartOfAccounts : module.route;
-  const blockers = status === "BLOCKED" ? setupBlockers : [];
+  const blockers = status === "BLOCKED" ? (readiness?.blockers?.length ? readiness.blockers : setupBlockers) : [];
 
   return (
     <article className="flex min-h-[15rem] flex-col rounded-[1.5rem] border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
@@ -222,15 +229,16 @@ export default function AdminAccountingPage() {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
     try {
-      const [chartAccounts, financeAccounts, draftJournals, controlPayload, setupStatus, setupReadiness] = await Promise.all([
+      const [chartAccounts, financeAccounts, draftJournals, controlPayload, setupStatus, setupReadiness, accountingReadiness] = await Promise.all([
         listChartOfAccounts(),
         listFinanceAccounts(),
         listJournalEntries({ status: "DRAFT" }),
         getAdminAccountingControlCenter() as Promise<AccountingControlPayload>,
         getAccountingSetupStatus(),
         getAccountingSetupReadiness(),
+        getAccountingReadiness(),
       ]);
-      setData({ chartAccountsCount: chartAccounts.count, financeAccountsCount: financeAccounts.count, draftJournalsCount: draftJournals.count, postedMovementsCount: null, controlPayload, setupStatus, setupReadiness });
+      setData({ chartAccountsCount: chartAccounts.count, financeAccountsCount: financeAccounts.count, draftJournalsCount: draftJournals.count, postedMovementsCount: null, controlPayload, setupStatus, setupReadiness, accountingReadiness });
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
@@ -254,11 +262,11 @@ export default function AdminAccountingPage() {
     <ERPPageShell
       eyebrow="Accounting & Finance"
       title="Accounting & Finance Cockpit"
-      subtitle="Icon-based operator cockpit for accounting setup, collections, books, reconciliation, and reports. Rent/lease collection routes to the unified backend-safe source collection workflow; this page itself does not post payments, receipts, journals, or reconciliations."
+      subtitle="Icon-based operator cockpit for accounting setup, collections, books, reconciliation, and reports. Rent/lease accounting bridge status is read from backend readiness and executes only from controlled workspaces."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting" }]}
       actions={[{ href: ROUTES.admin.accountingChartOfAccounts, label: "Fix finance accounts", variant: "primary" }, { href: ROUTES.admin.collectionControlCenter, label: "Collection Control", variant: "secondary" }, { href: ROUTES.admin.setupReadiness, label: "Setup Readiness", variant: "secondary" }]}
-      stats={[{ label: "Chart Accounts", value: displayMetric(data?.chartAccountsCount), tone: "info" }, { label: "Finance Accounts", value: displayMetric(data?.financeAccountsCount), tone: setupBlocked ? "warning" : "success" }, { label: "Draft Journals", value: displayMetric(data?.draftJournalsCount), tone: (data?.draftJournalsCount ?? 0) > 0 ? "warning" : "success" }, { label: "Posted Movements", value: displayMetric(data?.postedMovementsCount), tone: "info" }]}
-      statusBadge={{ label: setupBlocked ? "Setup blocked" : "Read-only cockpit", tone: setupBlocked ? "warning" : "info" }}
+      stats={[{ label: "Chart Accounts", value: displayMetric(data?.chartAccountsCount), tone: "info" }, { label: "Finance Accounts", value: displayMetric(data?.financeAccountsCount), tone: setupBlocked ? "warning" : "success" }, { label: "Bridge Status", value: displayMetric(data?.accountingReadiness?.status), tone: data?.accountingReadiness?.status === "READY" ? "success" : "warning" }, { label: "Posted Movements", value: displayMetric(data?.postedMovementsCount), tone: "info" }]}
+      statusBadge={{ label: data?.accountingReadiness?.status === "READY" ? "Bridge ready" : setupBlocked ? "Setup blocked" : "Read-only cockpit", tone: data?.accountingReadiness?.status === "READY" ? "success" : setupBlocked ? "warning" : "info" }}
     >
       <div className="space-y-6">
         <div className="flex justify-end"><button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing || loading} className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"><RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" />{refreshing ? "Refreshing..." : "Refresh"}</button></div>
@@ -266,10 +274,10 @@ export default function AdminAccountingPage() {
         {!loading && error ? <ERPErrorState title="Unable to load accounting cockpit" description={error} onRetry={() => void loadPage("initial")} /> : null}
         {!loading && !error && data ? (
           <>
-            {backendModuleCount === 0 ? <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">No accounting modules exposed by backend. This cockpit is using the checked admin route registry and existing read-only readiness endpoints; deferred modules are not linked.</div> : null}
-            <ERPSectionShell title="Readiness posture" description="Operational counts are read from backend APIs. Values that are not exposed are shown explicitly instead of fake zeroes."><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">{[["Chart accounts", displayMetric(data.chartAccountsCount)], ["Finance accounts", displayMetric(data.financeAccountsCount)], ["Draft journals", displayMetric(data.draftJournalsCount)], ["Posted movements", displayMetric(data.postedMovementsCount)], ["Setup blockers", displayMetric(setupBlockerCount)], ["Collection-ready accounts", displayMetric(collectionReadyAccountsCount)], ["Blocked finance accounts", displayMetric(blockedFinanceAccountsCount)]].map(([label, value]) => <div key={label} className="rounded-2xl border border-border bg-card px-4 py-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-2 text-lg font-semibold text-foreground">{value}</p></div>)}</div></ERPSectionShell>
-            {setupBlocked ? <div className="rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950"><div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" aria-hidden="true" />Setup blockers must be fixed before live money operations.</div><p className="mt-1 text-red-900">Blocked/system accounts are diagnostic only; collection-ready accounts require a posting-enabled leaf ASSET chart account.</p></div> : null}
-            {MODULE_GROUPS.length === 0 ? <ERPEmptyState title="No accounting modules exposed by backend." description="The cockpit cannot render module cards until a capability list or local route-safe module map is available." /> : MODULE_GROUPS.map((group) => <ERPSectionShell key={group.title} title={group.title} description={group.description}><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{group.modules.map((module) => <ModuleCard key={module.key} module={module} setupBlocked={setupBlocked} setupBlockers={setupBlockers.length > 0 ? setupBlockers : ["Accounting setup readiness is blocked."]} />)}</div></ERPSectionShell>)}
+            {backendModuleCount === 0 ? <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">No accounting modules exposed by backend. This cockpit is using the checked admin route registry and existing readiness endpoints; deferred modules are not linked.</div> : null}
+            <ERPSectionShell title="Readiness posture" description="Operational counts are read from backend APIs. Values that are not exposed are shown explicitly instead of fake zeroes."><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">{[["Chart accounts", displayMetric(data.chartAccountsCount)], ["Finance accounts", displayMetric(data.financeAccountsCount)], ["Draft journals", displayMetric(data.draftJournalsCount)], ["Bridge status", displayMetric(data.accountingReadiness?.status)], ["Setup blockers", displayMetric(setupBlockerCount)], ["Deposit sources", displayMetric(data.accountingReadiness?.counters?.deposit_sources_with_collection)], ["Monthly sources", displayMetric(data.accountingReadiness?.counters?.monthly_sources_with_collection)]].map(([label, value]) => <div key={label} className="rounded-2xl border border-border bg-card px-4 py-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-2 text-lg font-semibold text-foreground">{value}</p></div>)}</div></ERPSectionShell>
+            {data.accountingReadiness?.blockers?.length ? <div className="rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950"><div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" aria-hidden="true" />Rent/lease accounting bridge blockers</div><p className="mt-1 text-red-900">{data.accountingReadiness.blockers[0]}</p></div> : null}
+            {MODULE_GROUPS.length === 0 ? <ERPEmptyState title="No accounting modules exposed by backend." description="The cockpit cannot render module cards until a capability list or local route-safe module map is available." /> : MODULE_GROUPS.map((group) => <ERPSectionShell key={group.title} title={group.title} description={group.description}><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{group.modules.map((module) => <ModuleCard key={module.key} module={module} setupBlocked={setupBlocked} readiness={data.accountingReadiness} setupBlockers={setupBlockers.length > 0 ? setupBlockers : ["Accounting setup readiness is blocked."]} />)}</div></ERPSectionShell>)}
           </>
         ) : null}
       </div>
