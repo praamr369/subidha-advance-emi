@@ -9,6 +9,7 @@ export type ReceivableSourceType =
 export type CollectionPrimaryAction =
   | "COLLECT_EMI"
   | "COLLECT_DIRECT_SALE"
+  | "COLLECT_RENT_LEASE"
   | "OPEN_SALE"
   | "VIEW_RECEIPTS"
   | "VIEW_ONLY"
@@ -59,6 +60,8 @@ export type UnifiedReceivableResult = {
   action_url?: string;
   is_overdue?: boolean;
   due_date?: string | null;
+  demand_id?: number | null;
+  demand_type?: string;
   operational_state?: string;
   next_actions?: string[];
   blocking_reasons?: string[];
@@ -78,6 +81,7 @@ export type UnifiedReceivablePreviewResponse = {
   requested_amount: string;
   pending_dues: Array<Record<string, unknown>>;
   allocation_preview: Array<Record<string, unknown>>;
+  allocations?: Array<Record<string, unknown>>;
   unallocated_amount: string;
   overpayment_warning: boolean;
   disabled_reason?: string;
@@ -120,6 +124,7 @@ function toStringValue(value: unknown): string {
 
 function normalizePrimaryAction(value: unknown): CollectionPrimaryAction {
   const v = String(value || "").toUpperCase();
+  if (v === "COLLECT_RENT_LEASE") return "COLLECT_RENT_LEASE";
   if (v === "COLLECT_DIRECT_SALE") return "COLLECT_DIRECT_SALE";
   if (v === "OPEN_SALE") return "OPEN_SALE";
   if (v === "VIEW_RECEIPTS") return "VIEW_RECEIPTS";
@@ -212,6 +217,8 @@ function normalizeReceivable(row: Record<string, unknown>): UnifiedReceivableRes
       typeof row.due_date === "string" || row.due_date === null
         ? row.due_date
         : null,
+    demand_id: toNumberOrNull(row.demand_id),
+    demand_type: toStringValue(row.demand_type),
     operational_state: toStringValue(row.operational_state),
     next_actions: Array.isArray(row.next_actions) ? row.next_actions.map((item) => String(item)) : [],
     blocking_reasons: Array.isArray(row.blocking_reasons) ? row.blocking_reasons.map((item) => String(item)) : [],
@@ -278,4 +285,3 @@ export function previewCashierReceivableAllocation(payload: {
     headers: { "Content-Type": "application/json" },
   } as RequestInit);
 }
-
