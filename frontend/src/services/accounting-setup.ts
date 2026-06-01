@@ -91,55 +91,26 @@ export type AccountingSetupMatrixPayload = {
 export type AccountingSetupReadinessPayload = {
   finance_accounts: AccountingSetupReadinessFinanceAccount[];
   chart_accounts: AccountingSetupReadinessChartAccount[];
+  modules?: unknown[];
+  operational_collection_accounts?: AccountingSetupReadinessFinanceAccount[];
+  diagnostic_system_accounts?: AccountingSetupReadinessFinanceAccount[];
+  chart_of_accounts_health?: AccountingSetupMatrixPayload["chart_of_accounts_health"];
+  posting_profiles?: AccountingSetupMatrixPayload["posting_profiles"];
+  posting_profile_readiness?: PostingProfileReadinessItem[];
+  collection_requirements?: unknown[];
+  operator_copy?: Record<string, string>;
+  not_exposed_label?: string;
   summary: {
     cash_accounts_ready_count: number;
     bank_accounts_ready_count: number;
     upi_accounts_ready_count: number;
     blockers_count: number;
     warnings_count: number;
+    [key: string]: number;
   };
 };
 
-export type AccountingSetupStatusPayload = {
-  status?: string;
-  warnings_count?: number;
-  warnings?: { code: string; message: string }[];
-  last_validated_at?: string;
-  coa_ready?: boolean;
-  finance_accounts_ready?: boolean;
-  mappings_complete?: boolean;
-  missing_required_accounts?: string[];
-  missing_required_mappings?: string[];
-  required_coa_system_codes?: string[];
-  required_mapping_purposes?: string[];
-  ledger_anchor_present?: boolean;
-  real_settlement_accounts_present?: boolean;
-  chart_accounts_total?: number;
-  chart_accounts_active?: number;
-  chart_accounts_inactive?: number;
-  chart_accounts_root?: number;
-  chart_accounts_child?: number;
-  chart_accounts_active_root?: number;
-  chart_accounts_active_child?: number;
-  finance_accounts_total?: number;
-  finance_accounts_active?: number;
-  finance_accounts_inactive?: number;
-  required_system_accounts_total?: number;
-  required_system_accounts_present?: number;
-  required_system_accounts_missing?: string[];
-  required_mappings_total?: number;
-  required_mappings_complete?: number;
-  required_mappings_missing?: string[];
-  journals_configured?: boolean;
-  journal_ready?: boolean;
-  setup_complete?: boolean;
-  blocking_reasons?: string[];
-  setup_health_status?: "OK" | "WARNING" | "BLOCKED" | string;
-  setup_health_blockers_count?: number;
-  setup_health_warnings_count?: number;
-  posting_readiness?: "READY" | "BLOCKED" | string;
-  reconciliation_readiness?: "READY" | "BLOCKED" | string;
-};
+export type AccountingSetupStatusPayload = Record<string, unknown>;
 
 export type CollectionRepairPreviewPayload = {
   dry_run: boolean;
@@ -153,20 +124,41 @@ export type CollectionRepairPreviewPayload = {
 };
 
 const SYSTEM_PROFILE_BLOCKER = "System posting profile diagnostic only; not a customer collection destination.";
-const BLOCKED_PROFILE_ACTION = "Run Accounting Setup defaults or map the required posting accounts before marking this workflow ready.";
 
-const PROFILE_ROWS: Array<{ key: string; label: string; debit: string[]; credit: string[]; implemented: boolean; deferred?: string }> = [
-  { key: "emi_collection", label: "EMI Collection", debit: ["CUSTOMER_RECEIVABLE"], credit: ["EMI_INCOME"], implemented: true },
+const ACCOUNT_CODES: Record<string, string[]> = {
+  CASH_COLLECTION: ["CASH-1000", "CASH-1000-P"],
+  BANK_COLLECTION: ["BANK-1010", "BANK-1010-P"],
+  UPI_COLLECTION: ["UPI-1020", "UPI-1020-P"],
+  CUSTOMER_RECEIVABLE: ["AR-1000"],
+  CUSTOMER_ADVANCE_UNEARNED_REVENUE: ["ADV-2200"],
+  EMI_INCOME: ["EMI-4000"],
+  EMI_COLLECTION_CLEARING: ["EMI-2100"],
+  DIRECT_SALE_INCOME: ["REV-4000"],
+  SALES_REVENUE: ["REV-4000"],
+  RENT_INCOME: ["RENT-4000"],
+  LEASE_INCOME: ["LEASE-4000"],
+  SECURITY_DEPOSIT_LIABILITY: ["SEC-2300"],
+  SALES_RETURNS: ["REV-4010"],
+  COMMISSION_EXPENSE: ["COM-5100"],
+  COMMISSION_PAYABLE: ["COM-2100"],
+  PARTNER_COMMISSION_PAYABLE: ["COM-2100"],
+  ACCOUNTS_PAYABLE: ["AP-2000"],
+  INVENTORY_ASSET: ["INV-1200"],
+  INPUT_GST: ["GST-1100"],
+};
+
+const PROFILE_ROWS = [
+  { key: "emi_collection", label: "EMI Collection", debit: ["CUSTOMER_RECEIVABLE"], credit: ["EMI_INCOME", "EMI_COLLECTION_CLEARING"], implemented: true },
   { key: "direct_sale_collection", label: "Direct Sale Collection", debit: ["CUSTOMER_RECEIVABLE"], credit: ["DIRECT_SALE_INCOME"], implemented: true },
   { key: "customer_advance", label: "Customer Advance", debit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], credit: ["CUSTOMER_ADVANCE_UNEARNED_REVENUE"], implemented: true },
   { key: "rent_lease_collection", label: "Rent / Lease Collection", debit: ["CUSTOMER_RECEIVABLE"], credit: ["RENT_INCOME", "LEASE_INCOME"], implemented: false, deferred: "Rent/lease collection remains deferred until an approved backend collection route exists." },
-  { key: "security_deposit", label: "Security Deposit", debit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], credit: ["SECURITY_DEPOSIT_LIABILITY"], implemented: false, deferred: "Security deposit collection is diagnostic until backend collection execution is enabled." },
-  { key: "refund_customer_credit", label: "Refund / Customer Credit", debit: ["CUSTOMER_RECEIVABLE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
+  { key: "security_deposit", label: "Security Deposit", debit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], credit: ["SECURITY_DEPOSIT_LIABILITY"], implemented: false, deferred: "Security deposit collection remains diagnostic until backend collection execution is enabled." },
+  { key: "refund_customer_credit", label: "Refund / Customer Credit", debit: ["SALES_RETURNS", "CUSTOMER_RECEIVABLE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
   { key: "commission_payout", label: "Commission Payout", debit: ["COMMISSION_EXPENSE"], credit: ["COMMISSION_PAYABLE"], implemented: true },
   { key: "vendor_payment", label: "Vendor Payment", debit: ["ACCOUNTS_PAYABLE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
-  { key: "purchase_inventory", label: "Purchase / Inventory", debit: ["INVENTORY_ASSET"], credit: ["ACCOUNTS_PAYABLE"], implemented: true },
-  { key: "reconciliation_clearing", label: "Reconciliation Clearing", debit: ["CUSTOMER_RECEIVABLE"], credit: ["CUSTOMER_RECEIVABLE"], implemented: true },
-];
+  { key: "purchase_inventory", label: "Purchase / Inventory", debit: ["INVENTORY_ASSET", "INPUT_GST"], credit: ["ACCOUNTS_PAYABLE"], implemented: true },
+  { key: "reconciliation_clearing", label: "Reconciliation Clearing", debit: ["EMI_COLLECTION_CLEARING", "CUSTOMER_RECEIVABLE"], credit: ["EMI_COLLECTION_CLEARING", "CUSTOMER_RECEIVABLE"], implemented: true },
+] as const;
 
 function normalizeFinanceAccount(account: AccountingSetupReadinessFinanceAccount): AccountingSetupReadinessFinanceAccount {
   return {
@@ -177,99 +169,108 @@ function normalizeFinanceAccount(account: AccountingSetupReadinessFinanceAccount
   };
 }
 
-function chartIsPostingLeaf(account: AccountingSetupReadinessChartAccount): boolean {
-  return Boolean(account.is_posting || account.is_posting_ready || account.allowed_for_collection);
+function isPostingAccount(account: AccountingSetupReadinessChartAccount): boolean {
+  return Boolean(account.is_active !== false && account.allow_manual_posting !== false);
 }
 
-function chartIsGroupControl(account: AccountingSetupReadinessChartAccount): boolean {
-  return Boolean(account.is_group_control || !account.allow_manual_posting || !chartIsPostingLeaf(account));
+function findAccount(key: string, accounts: AccountingSetupReadinessChartAccount[]): AccountingSetupReadinessChartAccount | null {
+  const codes = ACCOUNT_CODES[key] ?? [key];
+  return accounts.find((account) => codes.includes((account.code || "").toUpperCase()) && isPostingAccount(account)) ?? null;
 }
 
-function buildCoaHealth(chartAccounts: AccountingSetupReadinessChartAccount[]): AccountingSetupMatrixPayload["chart_of_accounts_health"] {
-  const groupControl = chartAccounts.filter(chartIsGroupControl);
-  const postingLeaf = chartAccounts.filter(chartIsPostingLeaf);
-  const missingLeafAssets = chartAccounts.filter((account) => (account.account_type || account.type) === "ASSET" && !chartIsPostingLeaf(account));
-  const inactiveOrNonPosting = chartAccounts.filter((account) => account.is_active === false || !chartIsPostingLeaf(account));
+function buildCoaHealth(accounts: AccountingSetupReadinessChartAccount[]): AccountingSetupMatrixPayload["chart_of_accounts_health"] {
+  const postingLeaf = accounts.filter(isPostingAccount);
+  const nonPosting = accounts.filter((account) => !isPostingAccount(account));
+  const missingLeafAssets = accounts.filter((account) => (account.account_type || account.type) === "ASSET" && !isPostingAccount(account));
   return {
-    group_control_accounts: groupControl,
+    group_control_accounts: nonPosting,
     posting_leaf_accounts: postingLeaf,
     missing_posting_leaf_accounts: missingLeafAssets,
-    inactive_or_non_posting_blockers: inactiveOrNonPosting,
+    inactive_or_non_posting_blockers: nonPosting,
     counts: {
-      group_control_count: groupControl.length,
+      group_control_count: nonPosting.length,
       posting_leaf_count: postingLeaf.length,
       missing_posting_leaf_count: missingLeafAssets.length,
-      inactive_or_non_posting_count: inactiveOrNonPosting.length,
+      inactive_or_non_posting_count: nonPosting.length,
     },
   };
 }
 
-function buildProfileReadiness(): PostingProfileReadinessItem[] {
-  return PROFILE_ROWS.map((row) => ({
-    key: row.key,
-    label: row.label,
-    status: row.implemented ? "BLOCKED" : "DEFERRED",
-    required_debit_account: row.debit,
-    required_credit_account: row.credit,
-    configured_debit_account: [],
-    configured_credit_account: [],
-    blockers: [row.deferred || "Required posting profile mapping is not exposed by the current readiness endpoint."],
-    recommended_action: row.deferred || BLOCKED_PROFILE_ACTION,
-    recommended_actions: [row.deferred || BLOCKED_PROFILE_ACTION],
-    implemented: row.implemented,
-  }));
+function buildProfileReadiness(accounts: AccountingSetupReadinessChartAccount[]): PostingProfileReadinessItem[] {
+  return PROFILE_ROWS.map((row) => {
+    const debit = row.debit.map((key) => findAccount(key, accounts));
+    const credit = row.credit.map((key) => findAccount(key, accounts));
+    const debitAccounts = debit.filter(Boolean) as AccountingSetupReadinessChartAccount[];
+    const creditAccounts = credit.filter(Boolean) as AccountingSetupReadinessChartAccount[];
+    const debitMissing = row.debit.filter((_, index) => !debit[index]);
+    const creditMissing = row.credit.filter((_, index) => !credit[index]);
+    const blockers = [
+      ...("deferred" in row && row.deferred ? [row.deferred] : []),
+      ...debitMissing.map((key) => `Debit account ${key} is not configured as posting-ready.`),
+      ...creditMissing.map((key) => `Credit account ${key} is not configured as posting-ready.`),
+    ];
+    const configuredCount = debitAccounts.length + creditAccounts.length;
+    const status = !row.implemented ? "DEFERRED" : blockers.length === 0 ? "READY" : configuredCount > 0 ? "PARTIAL" : "BLOCKED";
+    return {
+      key: row.key,
+      label: row.label,
+      status,
+      required_debit_account: [...row.debit],
+      required_credit_account: [...row.credit],
+      configured_debit_account: debitAccounts,
+      configured_credit_account: creditAccounts,
+      blockers,
+      recommended_action: blockers[0] || null,
+      recommended_actions: blockers,
+      implemented: row.implemented,
+    };
+  });
 }
 
 function buildMatrixFromReadiness(payload: AccountingSetupReadinessPayload): AccountingSetupMatrixPayload {
   const financeAccounts = (payload.finance_accounts ?? []).map(normalizeFinanceAccount);
-  const operational = financeAccounts.filter((account) => !account.diagnostic_only && !account.system_posting_profile);
-  const diagnostic: AccountingSetupReadinessFinanceAccount[] = [
-    {
-      id: -1,
-      name: "Ledger posting profiles (system)",
-      code: "SYSTEM-POSTING-PROFILES",
-      kind: "SYSTEM",
-      mapped_chart_account: null,
-      diagnostic_only: true,
-      system_posting_profile: true,
-      operational_collection_account: false,
-      collection_ready: false,
-      selectable_for_collection: false,
-      is_selectable_collection_account: false,
-      collection_blocker_reason: SYSTEM_PROFILE_BLOCKER,
-      recommended_action: "Review this row in System Posting Profiles, not in customer collection selectors.",
-      account_role: "system_posting_profile",
-    },
-  ];
-  const coaHealth = buildCoaHealth(payload.chart_accounts ?? []);
+  const operational = payload.operational_collection_accounts ?? financeAccounts.filter((account) => !account.diagnostic_only && !account.system_posting_profile);
+  const diagnostic = payload.diagnostic_system_accounts ?? [{
+    id: -1,
+    name: "Ledger posting profiles (system)",
+    code: "SYSTEM-POSTING-PROFILES",
+    kind: "SYSTEM",
+    mapped_chart_account: null,
+    diagnostic_only: true,
+    system_posting_profile: true,
+    operational_collection_account: false,
+    collection_ready: false,
+    selectable_for_collection: false,
+    is_selectable_collection_account: false,
+    collection_blocker_reason: SYSTEM_PROFILE_BLOCKER,
+    recommended_action: "Review this row in System Posting Profiles, not in customer collection selectors.",
+    account_role: "system_posting_profile",
+  }];
+  const readiness = payload.posting_profile_readiness ?? buildProfileReadiness(payload.chart_accounts ?? []);
   return {
-    modules: [],
+    modules: payload.modules ?? readiness.map((profile) => ({ module_key: profile.key, label: profile.label, status: profile.status, workflow_active: profile.implemented, collection_action_enabled: profile.implemented && profile.status === "READY", blockers: profile.blockers })),
     finance_accounts: financeAccounts,
     operational_collection_accounts: operational,
     diagnostic_system_accounts: diagnostic,
     chart_accounts: payload.chart_accounts ?? [],
-    chart_of_accounts_health: coaHealth,
-    posting_profiles: diagnostic.map((account) => ({
-      key: account.code || "system_posting_profiles",
-      label: account.name,
-      diagnostic_only: true,
-      selectable_for_collection: false,
-      collection_ready: false,
-      collection_blocker_reason: SYSTEM_PROFILE_BLOCKER,
-      status: "BLOCKED",
-    })),
-    posting_profile_readiness: buildProfileReadiness(),
-    collection_requirements: [],
-    operator_copy: {
+    chart_of_accounts_health: payload.chart_of_accounts_health ?? buildCoaHealth(payload.chart_accounts ?? []),
+    posting_profiles: payload.posting_profiles ?? diagnostic.map((account) => ({ key: account.code || "system_posting_profiles", label: account.name, diagnostic_only: true, selectable_for_collection: false, collection_ready: false, collection_blocker_reason: SYSTEM_PROFILE_BLOCKER, status: "BLOCKED" })),
+    posting_profile_readiness: readiness,
+    collection_requirements: payload.collection_requirements ?? [],
+    operator_copy: payload.operator_copy ?? {
       finance_accounts: "Finance Accounts are where money is received or paid.",
       posting_profiles: "Posting Profiles decide which ledger accounts are debited and credited.",
       chart_of_accounts: "Chart of Accounts is the ledger structure.",
       system_profiles: "System posting profiles are diagnostic only and cannot receive customer collections.",
       blocked_collection: "Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account.",
     },
-    not_exposed_label: "Not exposed",
+    not_exposed_label: payload.not_exposed_label ?? "Not exposed",
     summary: {
       ...payload.summary,
+      ready_count: readiness.filter((row) => row.status === "READY").length,
+      blocked_count: readiness.filter((row) => row.status === "BLOCKED").length,
+      partial_count: readiness.filter((row) => row.status === "PARTIAL").length,
+      deferred_count: readiness.filter((row) => row.status === "DEFERRED").length,
       selectable_collection_accounts_count: operational.filter((account) => account.selectable_for_collection).length,
       operational_collection_accounts_count: operational.length,
       diagnostic_system_accounts_count: diagnostic.length,
@@ -286,15 +287,11 @@ export async function getAccountingSetupReadiness(): Promise<AccountingSetupRead
 }
 
 export async function getAccountingSetupMatrix(): Promise<AccountingSetupMatrixPayload> {
-  const payload = await getAccountingSetupReadiness();
-  return buildMatrixFromReadiness(payload);
+  return buildMatrixFromReadiness(await getAccountingSetupReadiness());
 }
 
 export async function postAccountingSetupBootstrap(dryRun = false) {
-  return request("/admin/accounting/setup/bootstrap/", {
-    method: "POST",
-    body: JSON.stringify({ dry_run: dryRun }),
-  });
+  return request("/admin/accounting/setup/bootstrap/", { method: "POST", body: JSON.stringify({ dry_run: dryRun }) });
 }
 
 export async function getFinanceAccountMappings() {
@@ -302,27 +299,15 @@ export async function getFinanceAccountMappings() {
 }
 
 export async function createFinanceAccountMapping(payload: Record<string, unknown>) {
-  return request("/admin/accounting/finance-account-mappings/", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  return request("/admin/accounting/finance-account-mappings/", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export async function patchFinanceAccountMapping(id: number, payload: Record<string, unknown>) {
-  return request(`/admin/accounting/finance-account-mappings/${id}/`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
+  return request(`/admin/accounting/finance-account-mappings/${id}/`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
-export async function updateFinanceAccountMapping(
-  id: number,
-  payload: { chart_account_id?: number; auto_create_posting_account?: boolean },
-) {
-  return request(`/admin/accounting/finance-accounts/${id}/mapping/`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
+export async function updateFinanceAccountMapping(id: number, payload: { chart_account_id?: number; auto_create_posting_account?: boolean }) {
+  return request(`/admin/accounting/finance-accounts/${id}/mapping/`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
 export async function getAccountingMappingSuggestions() {
@@ -334,19 +319,12 @@ export async function getCollectionRepairPreview(): Promise<CollectionRepairPrev
 }
 
 export async function repairSuggestedMappings(dryRun = false) {
-  return request("/admin/accounting/mapping-suggestions/repair/", {
-    method: "POST",
-    body: JSON.stringify({ dry_run: dryRun }),
-  });
+  return request("/admin/accounting/mapping-suggestions/repair/", { method: "POST", body: JSON.stringify({ dry_run: dryRun }) });
 }
 
 export async function executeCollectionMappingRepair(confirmationText: string, financeAccountId?: number) {
   return request("/admin/accounting/mapping-suggestions/repair/", {
     method: "POST",
-    body: JSON.stringify({
-      dry_run: false,
-      confirmation_text: confirmationText,
-      ...(financeAccountId ? { finance_account_id: financeAccountId } : {}),
-    }),
+    body: JSON.stringify({ dry_run: false, confirmation_text: confirmationText, ...(financeAccountId ? { finance_account_id: financeAccountId } : {}) }),
   });
 }
