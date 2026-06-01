@@ -13,17 +13,18 @@ from api.v1.serializers.contract_references import (
     UnifiedReceivableCollectSerializer,
     UnifiedReceivablePreviewSerializer,
 )
-from subscriptions.models import ContractReference
-from subscriptions.models import BusinessEventType
+from subscriptions.models import BusinessEventType, ContractReference
 from subscriptions.services.business_event_service import append_business_event
 from subscriptions.services.contract_reference_service import (
     collect_unified_receivable,
-    resolve_contract_reference_row,
     search_contract_references,
 )
 from subscriptions.services.rent_lease_collection_workflow_service import (
     preview_unified_receivable_allocation,
     search_receivables,
+)
+from subscriptions.services.rent_lease_contract_reference_adapter import (
+    resolve_contract_reference_row,
 )
 
 
