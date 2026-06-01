@@ -3,6 +3,14 @@ from django.db import models
 
 from subscriptions.models_business_setup import BusinessSetupTimeStampedModel, PolicyPage
 
+POLICY_STATUS_CHOICES = (
+    ("DRAFT", "Draft"),
+    ("UNDER_REVIEW", "Under Review"),
+    ("APPROVED", "Approved"),
+    ("PUBLISHED", "Published"),
+    ("ARCHIVED", "Archived"),
+)
+
 
 class PolicyVisibility(models.TextChoices):
     PUBLIC = "PUBLIC", "Public"
@@ -61,3 +69,9 @@ class PolicyGovernanceMetadata(BusinessSetupTimeStampedModel):
 
     def __str__(self):
         return f"{self.policy.slug} v{self.policy.version} [{self.visibility}]"
+
+
+# PG-2B runtime compatibility: PolicyPage remains the source row, but the
+# allowed lifecycle statuses are extended additively. The companion migration
+# updates the migration state/field definition.
+PolicyPage._meta.get_field("status").choices = POLICY_STATUS_CHOICES
