@@ -1,0 +1,461 @@
+from __future__ import annotations
+
+import json
+from decimal import Decimal
+from typing import Any
+
+from django.core.exceptions import ValidationError
+from django.db import connection, transaction
+from django.db.models import Sum
+from django.utils import timezone
+
+from accounting.models import (
+    ChartOfAccount,
+    ChartOfAccountType,
+    FinanceAccount,
+    JournalEntry,
+    JournalEntryLine,
+    JournalEntryStatus,
+    JournalEntryType,
+)
+from subscriptions.models import (
+    RentLeaseBillingDemand,
+    RentLeaseDemandStatus,
+    RentLeaseDemandType,
+    RentLeaseDepositTransaction,
+    RentLeaseDepositTransactionType,
+    q2,
+)
+
+
+class RentLeasePostingError(ValidationError):
+    pass
+
+
+def _money(value: Any) -> Decimal:
+    return q2(Decimal(str(value or "0.00")))
+
+
+def _mapping(lock: bool = False) -> dict[str, Any] | None:
+    suffix = " FOR UPDATE" if lock else ""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, monthly_income_account_id, deposit_liability_account_id,
+                   deposit_refund_account_id, damage_recovery_income_account_id,
+                   settlement_finance_account_id, customer_advance_liability_account_id,
+                   rent_income_account_id, lease_income_account_id
+            FROM accounting_rent_lease_account_mappings
+            WHERE is_active = TRUE
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """ + suffix
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return dict(zip([col[0] for col in cursor.description], row))
+
+
+def _account(account_id: int | None, field: str, account_type: str) -> ChartOfAccount:
+    if not account_id:
+        raise RentLeasePostingError({field: f"{field} is not configured."})
+    account = ChartOfAccount.objects.filter(pk=account_id, is_active=True).first()
+    if not account:
+        raise RentLeasePostingError({field: "Configured account is missing or inactive."})
+    if account.account_type != account_type:
+        raise RentLeasePostingError({field: f"Account must be {account_type}."})
+    return account
+
+
+def _settlement_account(mapping: dict[str, Any], override_id: int | None = None) -> ChartOfAccount:
+    finance_id = override_id or mapping.get("settlement_finance_account_id")
+    if not finance_id:
+        raise RentLeasePostingError({"settlement_finance_account": "Settlement finance account is required before posting."})
+    finance = FinanceAccount.objects.select_related("chart_account").filter(pk=finance_id, is_active=True).first()
+    if not finance:
+        raise RentLeasePostingError({"settlement_finance_account": "Settlement finance account is missing or inactive."})
+    if finance.chart_account.account_type != ChartOfAccountType.ASSET:
+        raise RentLeasePostingError({"settlement_finance_account": "Settlement finance account must map to ASSET."})
+    return finance.chart_account
+
+
+def _account_json(account: ChartOfAccount) -> dict[str, Any]:
+    return {"id": account.id, "code": account.code, "name": account.name, "account_type": account.account_type}
+
+
+def _line(account: ChartOfAccount, description: str, *, debit: Decimal = Decimal("0.00"), credit: Decimal = Decimal("0.00")) -> dict[str, Any]:
+    return {"account": _account_json(account), "description": description, "debit": f"{q2(debit):.2f}", "credit": f"{q2(credit):.2f}"}
+
+
+def _snapshot(mapping: dict[str, Any] | None) -> dict[str, Any]:
+    if not mapping:
+        return {"mapping_configured": False}
+    return {"mapping_configured": True, "mapping_id": mapping["id"], "ids": dict(mapping)}
+
+
+def _preview(source_model: str, source_id: int | str, source_reference: str, event_type: str, amount: Decimal, lines: list[dict[str, Any]], mapping: dict[str, Any], *, postable: bool = True, blocked_reason: str = "") -> dict[str, Any]:
+    debit_total = sum(_money(line["debit"]) for line in lines)
+    credit_total = sum(_money(line["credit"]) for line in lines)
+    if debit_total != credit_total:
+        raise RentLeasePostingError({"lines": "Posting preview is not balanced."})
+    return {
+        "source_model": source_model,
+        "source_id": str(source_id),
+        "source_reference": source_reference,
+        "event_type": event_type,
+        "amount": f"{q2(amount):.2f}",
+        "status": "POSTABLE" if postable else "BLOCKED",
+        "postable": postable,
+        "blocked_reason": blocked_reason,
+        "idempotency_key": f"{source_model}:{source_id}:{event_type}",
+        "debit_total": f"{debit_total:.2f}",
+        "credit_total": f"{credit_total:.2f}",
+        "lines": lines,
+        "mapping_snapshot": _snapshot(mapping),
+        "duplicate_posting_protection": "Execution is idempotent by source model, source id, and event type.",
+    }
+
+
+def _store_preview(payload: dict[str, Any], status: str = "PREVIEWED", reason: str = "") -> None:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO accounting_operational_accounting_postings
+                (source_model, source_id, event_type, idempotency_key, amount, status,
+                 mapping_snapshot, preview_payload, failure_reason, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, NOW(), NOW())
+            ON CONFLICT (idempotency_key) DO UPDATE SET
+                amount = EXCLUDED.amount,
+                status = CASE WHEN accounting_operational_accounting_postings.status = 'POSTED' THEN 'POSTED' ELSE EXCLUDED.status END,
+                mapping_snapshot = EXCLUDED.mapping_snapshot,
+                preview_payload = EXCLUDED.preview_payload,
+                failure_reason = EXCLUDED.failure_reason,
+                updated_at = NOW()
+            """,
+            [payload["source_model"], payload["source_id"], payload["event_type"], payload["idempotency_key"], payload["amount"], status, json.dumps(payload["mapping_snapshot"]), json.dumps(payload), reason],
+        )
+
+
+def _posting(idempotency_key: str) -> dict[str, Any] | None:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, status, journal_entry_id, preview_payload, posted_at
+            FROM accounting_operational_accounting_postings
+            WHERE idempotency_key = %s
+            FOR UPDATE
+            """,
+            [idempotency_key],
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {"id": row[0], "status": row[1], "journal_entry_id": row[2], "preview_payload": row[3] or {}, "posted_at": row[4].isoformat() if row[4] else None}
+
+
+def _create_journal(payload: dict[str, Any], actor=None) -> JournalEntry:
+    now = timezone.now()
+    journal = JournalEntry.objects.create(
+        entry_date=timezone.localdate(),
+        entry_type=JournalEntryType.SYSTEM_BRIDGE,
+        status=JournalEntryStatus.POSTED,
+        memo=f"{payload['event_type']} bridge posting for {payload['source_reference']}",
+        source_model=payload["source_model"],
+        source_id=payload["source_id"],
+        source_type=payload["event_type"],
+        source_reference=payload["source_reference"],
+        approved_by=actor,
+        approved_at=now,
+        posted_by=actor,
+        posted_at=now,
+    )
+    for line in payload["lines"]:
+        JournalEntryLine.objects.create(
+            journal_entry=journal,
+            chart_account_id=line["account"]["id"],
+            description=line["description"],
+            debit_amount=_money(line["debit"]),
+            credit_amount=_money(line["credit"]),
+        )
+    return journal
+
+
+def _execute(payload: dict[str, Any], actor=None) -> dict[str, Any]:
+    if not payload.get("postable"):
+        _store_preview(payload, "BLOCKED", payload.get("blocked_reason") or "Blocked.")
+        raise RentLeasePostingError({"detail": payload.get("blocked_reason") or "Posting is blocked."})
+    existing = _posting(payload["idempotency_key"])
+    if existing and existing["status"] == "POSTED" and existing["journal_entry_id"]:
+        return {"detail": "Posting already exists; duplicate execution returned existing journal.", "status": "POSTED", "posting_id": existing["id"], "journal_entry_id": existing["journal_entry_id"], "posted_at": existing["posted_at"], "preview": existing["preview_payload"] or payload}
+    _store_preview(payload)
+    journal = _create_journal(payload, actor=actor)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE accounting_operational_accounting_postings
+            SET status = 'POSTED', journal_entry_id = %s, posted_by_id = %s,
+                posted_at = COALESCE(posted_at, NOW()), updated_at = NOW()
+            WHERE idempotency_key = %s
+            """,
+            [journal.id, getattr(actor, "id", None), payload["idempotency_key"]],
+        )
+    posted = _posting(payload["idempotency_key"])
+    return {"detail": "Posting executed.", "status": "POSTED", "posting_id": posted["id"] if posted else None, "journal_entry_id": journal.id, "journal_entry_no": journal.entry_no, "posted_at": journal.posted_at.isoformat() if journal.posted_at else None, "preview": payload}
+
+
+def _demand(demand_id: int, lock: bool = False) -> RentLeaseBillingDemand:
+    qs = RentLeaseBillingDemand.objects.select_related("subscription", "subscription__customer", "subscription__product")
+    if lock:
+        qs = qs.select_for_update()
+    demand = qs.filter(pk=demand_id).first()
+    if not demand:
+        raise RentLeasePostingError({"detail": "Rent/lease demand not found."})
+    return demand
+
+
+def get_rent_lease_accounting_readiness() -> dict[str, Any]:
+    mapping = _mapping(False)
+    blockers: list[str] = []
+    if ChartOfAccount.objects.filter(is_active=True).count() == 0:
+        blockers.append("Chart of Accounts records are missing.")
+    if FinanceAccount.objects.filter(is_active=True).count() == 0:
+        blockers.append("Finance accounts are missing.")
+    if not mapping:
+        blockers.append("Active rent/lease account mapping is missing.")
+    else:
+        for key, label in [
+            ("monthly_income_account_id", "Monthly income fallback account"),
+            ("deposit_liability_account_id", "Security deposit liability account"),
+            ("damage_recovery_income_account_id", "Damage recovery income account"),
+            ("settlement_finance_account_id", "Settlement finance account"),
+            ("customer_advance_liability_account_id", "Customer advance liability account"),
+        ]:
+            if not mapping.get(key):
+                blockers.append(f"{label} is missing.")
+    status = "READY" if not blockers else "NEEDS_MAPPING"
+    return {
+        "status": status,
+        "source_collection_enabled": True,
+        "accounting_bridge_enabled": status == "READY",
+        "blockers": blockers,
+        "mapping": _snapshot(mapping),
+        "counters": {
+            "deposit_sources_with_collection": RentLeaseBillingDemand.objects.filter(demand_type=RentLeaseDemandType.SECURITY_DEPOSIT, collected_amount__gt=0).count(),
+            "monthly_sources_with_collection": RentLeaseBillingDemand.objects.filter(demand_type__in=[RentLeaseDemandType.RENT_MONTHLY, RentLeaseDemandType.LEASE_MONTHLY], collected_amount__gt=0).count(),
+        },
+    }
+
+
+def preview_security_deposit_collection_posting(demand_id: int, actor=None) -> dict[str, Any]:
+    demand = _demand(demand_id)
+    if demand.demand_type != RentLeaseDemandType.SECURITY_DEPOSIT:
+        raise RentLeasePostingError({"detail": "Demand is not a security deposit demand."})
+    amount = _money(demand.collected_amount)
+    if amount <= 0:
+        raise RentLeasePostingError({"detail": "Security deposit must have collected source amount before posting."})
+    mapping = _mapping(False)
+    if not mapping:
+        raise RentLeasePostingError({"detail": "No active rent/lease account mapping configured."})
+    settlement = _settlement_account(mapping)
+    liability = _account(mapping.get("deposit_liability_account_id"), "deposit_liability_account", ChartOfAccountType.LIABILITY)
+    payload = _preview("RentLeaseBillingDemand", demand.id, demand.reference_key, "SECURITY_DEPOSIT_COLLECTION", amount, [_line(settlement, "Settlement asset from deposit source collection", debit=amount), _line(liability, "Security deposit liability", credit=amount)], mapping)
+    _store_preview(payload)
+    return payload
+
+
+def execute_security_deposit_collection_posting(demand_id: int, actor=None) -> dict[str, Any]:
+    with transaction.atomic():
+        _demand(demand_id, True)
+        _mapping(True)
+        return _execute(preview_security_deposit_collection_posting(demand_id, actor), actor)
+
+
+def preview_rent_lease_monthly_posting(source_id: int, actor=None) -> dict[str, Any]:
+    demand = _demand(source_id)
+    if demand.demand_type not in {RentLeaseDemandType.RENT_MONTHLY, RentLeaseDemandType.LEASE_MONTHLY}:
+        raise RentLeasePostingError({"detail": "Demand is not a rent/lease monthly demand."})
+    amount = _money(demand.collected_amount)
+    if amount <= 0 or demand.status not in {RentLeaseDemandStatus.PAID, RentLeaseDemandStatus.PARTIAL}:
+        raise RentLeasePostingError({"detail": "Monthly demand must have collected source amount before posting."})
+    mapping = _mapping(False)
+    if not mapping:
+        raise RentLeasePostingError({"detail": "No active rent/lease account mapping configured."})
+    settlement = _settlement_account(mapping)
+    if demand.demand_type == RentLeaseDemandType.RENT_MONTHLY:
+        income = _account(mapping.get("rent_income_account_id") or mapping.get("monthly_income_account_id"), "rent_income_account", ChartOfAccountType.INCOME)
+        event = "RENT_MONTHLY_COLLECTION"
+    else:
+        income = _account(mapping.get("lease_income_account_id") or mapping.get("monthly_income_account_id"), "lease_income_account", ChartOfAccountType.INCOME)
+        event = "LEASE_MONTHLY_COLLECTION"
+    payload = _preview("RentLeaseBillingDemand", demand.id, demand.reference_key, event, amount, [_line(settlement, "Settlement asset from rent/lease source collection", debit=amount), _line(income, "Rent/lease monthly income", credit=amount)], mapping)
+    _store_preview(payload)
+    return payload
+
+
+def execute_rent_lease_monthly_posting(source_id: int, actor=None) -> dict[str, Any]:
+    with transaction.atomic():
+        _demand(source_id, True)
+        _mapping(True)
+        return _execute(preview_rent_lease_monthly_posting(source_id, actor), actor)
+
+
+def preview_security_deposit_refund_posting(demand_id: int, actor=None) -> dict[str, Any]:
+    demand = _demand(demand_id)
+    amount = _money(RentLeaseDepositTransaction.objects.filter(demand=demand, transaction_type=RentLeaseDepositTransactionType.REFUNDED).aggregate(total=Sum("amount"))["total"])
+    if amount <= 0:
+        raise RentLeasePostingError({"detail": "No refunded source amount exists for this deposit."})
+    mapping = _mapping(False)
+    if not mapping:
+        raise RentLeasePostingError({"detail": "No active rent/lease account mapping configured."})
+    liability = _account(mapping.get("deposit_liability_account_id"), "deposit_liability_account", ChartOfAccountType.LIABILITY)
+    settlement = _settlement_account(mapping)
+    payload = _preview("RentLeaseBillingDemand", demand.id, demand.reference_key, "SECURITY_DEPOSIT_REFUND", amount, [_line(liability, "Reduce security deposit liability", debit=amount), _line(settlement, "Settlement asset paid out for deposit refund", credit=amount)], mapping)
+    _store_preview(payload)
+    return payload
+
+
+def execute_security_deposit_refund_posting(demand_id: int, actor=None) -> dict[str, Any]:
+    with transaction.atomic():
+        _demand(demand_id, True)
+        _mapping(True)
+        return _execute(preview_security_deposit_refund_posting(demand_id, actor), actor)
+
+
+def preview_damage_recovery_posting(demand_id: int, actor=None) -> dict[str, Any]:
+    demand = _demand(demand_id)
+    amount = _money(demand.deducted_amount)
+    if amount <= 0:
+        raise RentLeasePostingError({"detail": "No damage deduction source amount exists for this deposit."})
+    mapping = _mapping(False)
+    if not mapping:
+        raise RentLeasePostingError({"detail": "No active rent/lease account mapping configured."})
+    liability = _account(mapping.get("deposit_liability_account_id"), "deposit_liability_account", ChartOfAccountType.LIABILITY)
+    income = _account(mapping.get("damage_recovery_income_account_id"), "damage_recovery_income_account", ChartOfAccountType.INCOME)
+    payload = _preview("RentLeaseBillingDemand", demand.id, demand.reference_key, "SECURITY_DEPOSIT_DAMAGE_RECOVERY", amount, [_line(liability, "Reduce security deposit liability for damage deduction", debit=amount), _line(income, "Damage recovery income", credit=amount)], mapping)
+    _store_preview(payload)
+    return payload
+
+
+def execute_damage_recovery_posting(demand_id: int, actor=None) -> dict[str, Any]:
+    with transaction.atomic():
+        _demand(demand_id, True)
+        _mapping(True)
+        return _execute(preview_damage_recovery_posting(demand_id, actor), actor)
+
+
+def get_rent_lease_accounting_summary() -> dict[str, Any]:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT status, COUNT(*) FROM accounting_operational_accounting_postings GROUP BY status")
+        bridge = {row[0].lower(): row[1] for row in cursor.fetchall()}
+    return {
+        "readiness": get_rent_lease_accounting_readiness(),
+        "demand_records": RentLeaseBillingDemand.objects.count(),
+        "monthly_collected_sources": RentLeaseBillingDemand.objects.filter(demand_type__in=[RentLeaseDemandType.RENT_MONTHLY, RentLeaseDemandType.LEASE_MONTHLY], collected_amount__gt=0).count(),
+        "deposit_collected_sources": RentLeaseBillingDemand.objects.filter(demand_type=RentLeaseDemandType.SECURITY_DEPOSIT, collected_amount__gt=0).count(),
+        "posting_bridge": bridge,
+        "not_used": {"lucky_ids": True, "draws": True},
+    }
+
+
+def list_customer_advances() -> dict[str, Any]:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT id, customer_id, amount, transaction_type, status, payment_method, finance_account_id, reference_no, notes, created_at FROM accounting_customer_advance_source_records ORDER BY created_at DESC, id DESC LIMIT 200")
+        rows = [dict(zip([col[0] for col in cursor.description], row)) for row in cursor.fetchall()]
+    for row in rows:
+        row["amount"] = f"{_money(row['amount']):.2f}"
+        if row.get("created_at"):
+            row["created_at"] = row["created_at"].isoformat()
+    return {"count": len(rows), "results": rows}
+
+
+def create_customer_advance_source_record(*, customer_id=None, amount=None, transaction_type="COLLECTION", payment_method="", finance_account_id=None, reference_no="", notes="", created_by=None) -> dict[str, Any]:
+    amount_q = _money(amount)
+    if amount_q <= 0:
+        raise RentLeasePostingError({"amount": "Advance amount must be greater than zero."})
+    tx_type = (transaction_type or "COLLECTION").strip().upper()
+    if tx_type not in {"COLLECTION", "REFUND", "ADJUSTMENT"}:
+        raise RentLeasePostingError({"transaction_type": "Unsupported customer advance transaction type."})
+    status = "REFUNDED" if tx_type == "REFUND" else "COLLECTED"
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO accounting_customer_advance_source_records
+                (customer_id, amount, transaction_type, status, payment_method, finance_account_id, reference_no, notes, created_by_id, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+            RETURNING id
+            """,
+            [customer_id, f"{amount_q:.2f}", tx_type, status, (payment_method or "").strip().upper(), finance_account_id, (reference_no or "").strip().upper() or None, (notes or "").strip(), getattr(created_by, "id", None)],
+        )
+        record_id = cursor.fetchone()[0]
+    return get_customer_advance(record_id)
+
+
+def get_customer_advance(record_id: int) -> dict[str, Any]:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT id, customer_id, amount, transaction_type, status, payment_method, finance_account_id, reference_no, notes, created_at FROM accounting_customer_advance_source_records WHERE id = %s", [record_id])
+        row = cursor.fetchone()
+        if not row:
+            raise RentLeasePostingError({"detail": "Customer advance record not found."})
+        data = dict(zip([col[0] for col in cursor.description], row))
+    data["amount"] = f"{_money(data['amount']):.2f}"
+    if data.get("created_at"):
+        data["created_at"] = data["created_at"].isoformat()
+    return data
+
+
+def _advance_for_update(record_id: int) -> dict[str, Any]:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT id FROM accounting_customer_advance_source_records WHERE id = %s FOR UPDATE", [record_id])
+        if not cursor.fetchone():
+            raise RentLeasePostingError({"detail": "Customer advance record not found."})
+    return get_customer_advance(record_id)
+
+
+def preview_customer_advance_posting(record_id: int, actor=None) -> dict[str, Any]:
+    record = get_customer_advance(record_id)
+    if record["transaction_type"] == "ADJUSTMENT":
+        mapping = _mapping(False) or {"id": None}
+        payload = _preview("CustomerAdvanceSourceRecord", record["id"], record.get("reference_no") or f"ADV-{record['id']}", "CUSTOMER_ADVANCE_ADJUSTMENT_BLOCKED", _money(record["amount"]), [], mapping, postable=False, blocked_reason="Customer advance adjustment is blocked until settlement allocation support exists.")
+        _store_preview(payload, "BLOCKED", payload["blocked_reason"])
+        return payload
+    if record["transaction_type"] == "REFUND":
+        return preview_customer_advance_refund_posting(record_id, actor)
+    mapping = _mapping(False)
+    if not mapping:
+        raise RentLeasePostingError({"detail": "No active rent/lease account mapping configured."})
+    amount = _money(record["amount"])
+    settlement = _settlement_account(mapping, record.get("finance_account_id"))
+    liability = _account(mapping.get("customer_advance_liability_account_id"), "customer_advance_liability_account", ChartOfAccountType.LIABILITY)
+    payload = _preview("CustomerAdvanceSourceRecord", record["id"], record.get("reference_no") or f"ADV-{record['id']}", "CUSTOMER_ADVANCE_COLLECTION", amount, [_line(settlement, "Settlement asset from customer advance source", debit=amount), _line(liability, "Customer advance liability", credit=amount)], mapping)
+    _store_preview(payload)
+    return payload
+
+
+def execute_customer_advance_posting(record_id: int, actor=None) -> dict[str, Any]:
+    with transaction.atomic():
+        _advance_for_update(record_id)
+        _mapping(True)
+        return _execute(preview_customer_advance_posting(record_id, actor), actor)
+
+
+def preview_customer_advance_refund_posting(record_id: int, actor=None) -> dict[str, Any]:
+    record = get_customer_advance(record_id)
+    if record["transaction_type"] != "REFUND":
+        raise RentLeasePostingError({"detail": "Customer advance record is not a refund."})
+    mapping = _mapping(False)
+    if not mapping:
+        raise RentLeasePostingError({"detail": "No active rent/lease account mapping configured."})
+    amount = _money(record["amount"])
+    liability = _account(mapping.get("customer_advance_liability_account_id"), "customer_advance_liability_account", ChartOfAccountType.LIABILITY)
+    settlement = _settlement_account(mapping, record.get("finance_account_id"))
+    payload = _preview("CustomerAdvanceSourceRecord", record["id"], record.get("reference_no") or f"ADV-{record['id']}", "CUSTOMER_ADVANCE_REFUND", amount, [_line(liability, "Reduce customer advance liability", debit=amount), _line(settlement, "Settlement asset paid out for customer advance refund", credit=amount)], mapping)
+    _store_preview(payload)
+    return payload
+
+
+def execute_customer_advance_refund_posting(record_id: int, actor=None) -> dict[str, Any]:
+    with transaction.atomic():
+        _advance_for_update(record_id)
+        _mapping(True)
+        return _execute(preview_customer_advance_refund_posting(record_id, actor), actor)
