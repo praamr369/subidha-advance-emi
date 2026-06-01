@@ -1,5 +1,6 @@
 from django.urls import path
 
+from api.v1.views.admin_accounting_mapping_auto_sync import AdminRentLeaseAccountMappingAutoSyncView
 from api.v1.views.admin_rent_lease_accounting_bridge import (
     AdminAccountingReadinessView,
     AdminCustomerAdvanceDetailView,
@@ -21,6 +22,7 @@ from api.v1.views.admin_rent_lease_accounting_bridge import (
 urlpatterns = [
     path("accounting/readiness/", AdminAccountingReadinessView.as_view()),
     path("finance/account-mapping/", AdminRentLeaseAccountMappingBridgeView.as_view()),
+    path("finance/account-mapping/auto-sync/", AdminRentLeaseAccountMappingAutoSyncView.as_view()),
     path("finance/deposits/<int:pk>/posting-preview/", AdminDepositPostingPreviewView.as_view()),
     path("finance/deposits/<int:pk>/posting-execute/", AdminDepositPostingExecuteView.as_view()),
     path("finance/deposits/<int:pk>/refund-posting-preview/", AdminDepositRefundPostingPreviewView.as_view()),
