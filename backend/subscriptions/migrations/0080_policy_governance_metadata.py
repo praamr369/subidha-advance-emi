@@ -1,6 +1,7 @@
 # Generated manually for PG-2B additive policy governance metadata.
 
 import django.db.models.deletion
+import django.utils.timezone
 from django.conf import settings
 from django.db import migrations, models
 
@@ -46,7 +47,7 @@ class Migration(migrations.Migration):
             name="PolicyGovernanceMetadata",
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("created_at", models.DateTimeField(db_index=True, auto_now_add=False)),
+                ("created_at", models.DateTimeField(db_index=True, default=django.utils.timezone.now)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 ("visibility", models.CharField(choices=[("PUBLIC", "Public"), ("INTERNAL", "Internal")], db_index=True, default="PUBLIC", max_length=16)),
                 ("governance_category", models.CharField(blank=True, db_index=True, default="", max_length=80)),
