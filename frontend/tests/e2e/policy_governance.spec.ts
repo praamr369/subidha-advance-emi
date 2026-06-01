@@ -2,7 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { authStatePath } from "./helpers/smoke-data";
 
-const policiesPayload = {
+type PolicyFixtureRow = Record<string, unknown>;
+type CoverageFixtureRow = Record<string, unknown>;
+
+const policiesPayload: { count: number; results: PolicyFixtureRow[] } = {
   count: 3,
   results: [
     {
@@ -94,7 +97,100 @@ const policiesPayload = {
   ],
 };
 
-const coveragePayload = {
+const coverageGroups: Array<{ group: string; items: CoverageFixtureRow[] }> = [
+  {
+    group: "Public Legal",
+    items: [
+      {
+        required_policy_key: "terms",
+        label: "Terms and Conditions",
+        coverage_group: "Public Legal",
+        catalog_coverage_group: "Public Legal",
+        category: "GENERAL",
+        stored_category: "GENERAL",
+        visibility: "PUBLIC",
+        catalog_visibility: "PUBLIC",
+        status: "DRAFT",
+        policy_id: 101,
+        slug: "terms",
+        public_ready: false,
+        internal_ready: false,
+        blocker_reason: "Public policy exists but is not published.",
+        recommended_action: "Review, approve, then publish.",
+        metadata_synced: true,
+        metadata_mismatches: [],
+      },
+      {
+        required_policy_key: "business-compliance",
+        label: "Business Compliance Policy",
+        coverage_group: "Public Legal",
+        catalog_coverage_group: "Public Legal",
+        category: "COMPLIANCE",
+        stored_category: "COMPLIANCE",
+        visibility: "INTERNAL",
+        catalog_visibility: "PUBLIC",
+        status: "DRAFT",
+        policy_id: 104,
+        slug: "business-compliance",
+        public_ready: false,
+        internal_ready: false,
+        blocker_reason: "Stored governance metadata does not match catalog visibility.",
+        recommended_action: "Sync governance metadata from catalog.",
+        metadata_synced: false,
+        metadata_mismatches: ["visibility"],
+      },
+      {
+        required_policy_key: "ownership-business-proof",
+        label: "Ownership and Business Proof Policy",
+        coverage_group: "Public Legal",
+        catalog_coverage_group: "Public Legal",
+        category: "COMPLIANCE",
+        stored_category: "COMPLIANCE",
+        visibility: "PUBLIC",
+        catalog_visibility: "PUBLIC",
+        status: "MISSING",
+        policy_id: null,
+        slug: "ownership-business-proof",
+        public_ready: false,
+        internal_ready: false,
+        blocker_reason: "Policy template is missing.",
+        recommended_action: "Seed default templates.",
+        metadata_synced: true,
+        metadata_mismatches: [],
+      },
+    ],
+  },
+  {
+    group: "Finance / Accounting Controls",
+    items: [
+      {
+        required_policy_key: "payment-reversal-void-policy",
+        label: "Payment Reversal and Receipt Void Policy",
+        coverage_group: "Finance / Accounting Controls",
+        catalog_coverage_group: "Finance / Accounting Controls",
+        category: "PAYMENT_CONTROL",
+        stored_category: "PAYMENT_CONTROL",
+        visibility: "INTERNAL",
+        catalog_visibility: "INTERNAL",
+        status: "UNDER_REVIEW",
+        policy_id: 102,
+        slug: "payment-reversal-void-policy",
+        public_ready: false,
+        internal_ready: false,
+        blocker_reason: "Internal governance policy is not approved or accepted.",
+        recommended_action: "Review internally and use Accept Internal Policy.",
+        metadata_synced: true,
+        metadata_mismatches: [],
+      },
+    ],
+  },
+];
+
+const coveragePayload: {
+  summary: Record<string, number>;
+  groups: Array<{ group: string; items: CoverageFixtureRow[] }>;
+  results: CoverageFixtureRow[];
+} = {
   summary: {
     required_count: 4,
     missing_count: 1,
@@ -109,97 +205,9 @@ const coveragePayload = {
     internal_under_review_count: 1,
     metadata_mismatch_count: 1,
   },
-  groups: [
-    {
-      group: "Public Legal",
-      items: [
-        {
-          required_policy_key: "terms",
-          label: "Terms and Conditions",
-          coverage_group: "Public Legal",
-          catalog_coverage_group: "Public Legal",
-          category: "GENERAL",
-          stored_category: "GENERAL",
-          visibility: "PUBLIC",
-          catalog_visibility: "PUBLIC",
-          status: "DRAFT",
-          policy_id: 101,
-          slug: "terms",
-          public_ready: false,
-          internal_ready: false,
-          blocker_reason: "Public policy exists but is not published.",
-          recommended_action: "Review, approve, then publish.",
-          metadata_synced: true,
-          metadata_mismatches: [],
-        },
-        {
-          required_policy_key: "business-compliance",
-          label: "Business Compliance Policy",
-          coverage_group: "Public Legal",
-          catalog_coverage_group: "Public Legal",
-          category: "COMPLIANCE",
-          stored_category: "COMPLIANCE",
-          visibility: "INTERNAL",
-          catalog_visibility: "PUBLIC",
-          status: "DRAFT",
-          policy_id: 104,
-          slug: "business-compliance",
-          public_ready: false,
-          internal_ready: false,
-          blocker_reason: "Stored governance metadata does not match catalog visibility.",
-          recommended_action: "Sync governance metadata from catalog.",
-          metadata_synced: false,
-          metadata_mismatches: ["visibility"],
-        },
-        {
-          required_policy_key: "ownership-business-proof",
-          label: "Ownership and Business Proof Policy",
-          coverage_group: "Public Legal",
-          catalog_coverage_group: "Public Legal",
-          category: "COMPLIANCE",
-          stored_category: "COMPLIANCE",
-          visibility: "PUBLIC",
-          catalog_visibility: "PUBLIC",
-          status: "MISSING",
-          policy_id: null,
-          slug: "ownership-business-proof",
-          public_ready: false,
-          internal_ready: false,
-          blocker_reason: "Policy template is missing.",
-          recommended_action: "Seed default templates.",
-          metadata_synced: true,
-          metadata_mismatches: [],
-        },
-      ],
-    },
-    {
-      group: "Finance / Accounting Controls",
-      items: [
-        {
-          required_policy_key: "payment-reversal-void-policy",
-          label: "Payment Reversal and Receipt Void Policy",
-          coverage_group: "Finance / Accounting Controls",
-          catalog_coverage_group: "Finance / Accounting Controls",
-          category: "PAYMENT_CONTROL",
-          stored_category: "PAYMENT_CONTROL",
-          visibility: "INTERNAL",
-          catalog_visibility: "INTERNAL",
-          status: "UNDER_REVIEW",
-          policy_id: 102,
-          slug: "payment-reversal-void-policy",
-          public_ready: false,
-          internal_ready: false,
-          blocker_reason: "Internal governance policy is not approved or accepted.",
-          recommended_action: "Review internally and use Accept Internal Policy.",
-          metadata_synced: true,
-          metadata_mismatches: [],
-        },
-      ],
-    },
-  ],
-  results: [],
+  groups: coverageGroups,
+  results: coverageGroups.flatMap((group) => group.items),
 };
-coveragePayload.results = coveragePayload.groups.flatMap((group) => group.items);
 
 async function mockPolicyGovernance(page: Page) {
   await page.route("**/api/v1/admin/public-site/policies/**", async (route) => {
