@@ -10,9 +10,14 @@ from typing import Any
 from django.core.exceptions import ValidationError
 
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
-from subscriptions.models import ContractReferenceType, PlanType, Subscription
+from subscriptions.models import ContractReferenceType, PlanType, RentLeaseDemandType, Subscription
 from subscriptions.services.payment_service import record_emi_payment
 from subscriptions.services import contract_reference_service as crs
+from subscriptions.services.rent_lease_collection_workflow_service import (
+    collect_rent_lease_monthly_demand,
+    collect_security_deposit_with_metadata,
+    rent_lease_receivable_position,
+)
 
 
 def _payment_collection_idempotency_key(value: str | None) -> str | None:
@@ -140,13 +145,38 @@ def route_collection(
         }
 
     if source_type in {ContractReferenceType.RENT, ContractReferenceType.LEASE}:
-        raise ValidationError(
-            {
-                "source_type": (
-                    "Rent and lease unified collection is disabled until a production-safe "
-                    "posting service is wired for this flow."
-                )
-            }
-        )
+        plan_type = PlanType.RENT if source_type == ContractReferenceType.RENT else PlanType.LEASE
+        subscription = Subscription.objects.filter(pk=source_id, plan_type=plan_type).first()
+        if not subscription:
+            raise ValidationError({"source_id": "Rent/lease subscription was not found."})
+        position = rent_lease_receivable_position(subscription)
+        demand_id = position.get("demand_id")
+        demand_type = position.get("demand_type")
+        if not position.get("is_collectible") or not demand_id:
+            raise ValidationError(position.get("disabled_reason") or "No collectible rent/lease demand is currently pending.")
+        common_kwargs = {
+            "subscription": subscription,
+            "amount": amount,
+            "performed_by": collected_by,
+            "reference_no": reference_no or "",
+            "finance_account_id": finance_account_id,
+            "payment_method": payment_method,
+            "payment_date": payment_date,
+            "branch_id": branch_id,
+            "cash_counter_id": cash_counter_id,
+            "note": note or "",
+        }
+        if demand_type == RentLeaseDemandType.SECURITY_DEPOSIT:
+            demand = collect_security_deposit_with_metadata(**common_kwargs)
+        else:
+            demand = collect_rent_lease_monthly_demand(demand_id=demand_id, **common_kwargs)
+        return {
+            "source_type": source_type,
+            "created": True,
+            "subscription_id": subscription.id,
+            "demand_id": demand.id,
+            "demand_type": demand.demand_type,
+            "message": "Rent/lease collection recorded against the authoritative demand source.",
+        }
 
     raise ValidationError({"source_type": f"Unsupported source type: {source_type}."})
