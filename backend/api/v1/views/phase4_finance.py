@@ -63,7 +63,13 @@ from subscriptions.services.rent_lease_billing_service import (
     approve_deposit_refund,
     record_deposit_refund,
 )
-from subscriptions.services.rent_lease_finance_sync_service import get_active_account_mapping
+from subscriptions.services.rent_lease_finance_sync_service import (
+    ensure_premade_rent_lease_accounting_setup,
+    get_active_account_mapping,
+)
+
+
+POSTING_READY_NOTE = "Operational source collection is enabled. Rent/lease accounting bridge posts system journals after premade COA/FA/mapping setup is available."
 
 
 def _safe_customer_profile(request):
@@ -299,62 +305,74 @@ class AdminFinanceDepositRefundRecordView(APIView):
         )
 
 
+def _serialize_rent_lease_mapping(mapping):
+    return None if mapping is None else {
+        "id": mapping.id,
+        "monthly_income_account_id": mapping.monthly_income_account_id,
+        "monthly_income_account_code": mapping.monthly_income_account.code,
+        "deposit_liability_account_id": mapping.deposit_liability_account_id,
+        "deposit_liability_account_code": mapping.deposit_liability_account.code,
+        "deposit_refund_account_id": mapping.deposit_refund_account_id,
+        "deposit_refund_account_code": mapping.deposit_refund_account.code,
+        "damage_recovery_income_account_id": mapping.damage_recovery_income_account_id,
+        "damage_recovery_income_account_code": mapping.damage_recovery_income_account.code,
+        "settlement_finance_account_id": mapping.settlement_finance_account_id,
+        "settlement_finance_account_name": mapping.settlement_finance_account.name if mapping.settlement_finance_account_id else None,
+        "is_active": mapping.is_active,
+        "notes": mapping.notes,
+    }
+
+
+def _account_mapping_payload(mapping):
+    return {
+        "mapping": _serialize_rent_lease_mapping(mapping),
+        "chart_accounts": [
+            {"id": row.id, "code": row.code, "name": row.name, "account_type": row.account_type, "system_code": row.system_code}
+            for row in ChartOfAccount.objects.filter(is_active=True).order_by("code")[:500]
+        ],
+        "finance_accounts": [
+            {"id": row.id, "name": row.name, "kind": row.kind, "chart_account_code": row.chart_account.code}
+            for row in FinanceAccount.objects.select_related("chart_account").filter(is_active=True).order_by("name")[:200]
+        ],
+        "posting_boundary_note": POSTING_READY_NOTE,
+        "premade_setup_enabled": True,
+    }
+
+
 class AdminFinanceAccountMappingView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        mapping = get_active_account_mapping()
-        return Response(
-            {
-                "mapping": None
-                if mapping is None
-                else {
-                    "id": mapping.id,
-                    "monthly_income_account_id": mapping.monthly_income_account_id,
-                    "monthly_income_account_code": mapping.monthly_income_account.code,
-                    "deposit_liability_account_id": mapping.deposit_liability_account_id,
-                    "deposit_liability_account_code": mapping.deposit_liability_account.code,
-                    "deposit_refund_account_id": mapping.deposit_refund_account_id,
-                    "deposit_refund_account_code": mapping.deposit_refund_account.code,
-                    "damage_recovery_income_account_id": mapping.damage_recovery_income_account_id,
-                    "damage_recovery_income_account_code": mapping.damage_recovery_income_account.code,
-                    "settlement_finance_account_id": mapping.settlement_finance_account_id,
-                    "is_active": mapping.is_active,
-                    "notes": mapping.notes,
-                },
-                "chart_accounts": [
-                    {"id": row.id, "code": row.code, "name": row.name, "account_type": row.account_type}
-                    for row in ChartOfAccount.objects.filter(is_active=True).order_by("code")[:500]
-                ],
-                "finance_accounts": [
-                    {"id": row.id, "name": row.name, "kind": row.kind}
-                    for row in FinanceAccount.objects.filter(is_active=True).order_by("name")[:200]
-                ],
-            }
-        )
+        mapping = ensure_premade_rent_lease_accounting_setup(performed_by=request.user)
+        return Response(_account_mapping_payload(mapping))
 
     def post(self, request):
         payload = request.data
+        action = (payload.get("action") or "").strip().upper()
+        if action == "ENSURE_PREMADE":
+            mapping = ensure_premade_rent_lease_accounting_setup(performed_by=request.user)
+            return Response({"detail": "Premade rent/lease accounting setup is ready.", "mapping_id": mapping.id, **_account_mapping_payload(mapping)})
+
         mapping = get_active_account_mapping()
         if mapping is None:
             mapping = RentLeaseAccountingAccountMapping(is_active=True)
-        monthly_income_account_id = int(payload.get("monthly_income_account_id") or 0)
-        deposit_liability_account_id = int(payload.get("deposit_liability_account_id") or 0)
-        deposit_refund_account_id = int(payload.get("deposit_refund_account_id") or 0)
-        damage_recovery_income_account_id = int(payload.get("damage_recovery_income_account_id") or 0)
-        settlement_finance_account_id_raw = payload.get("settlement_finance_account_id")
-        mapping.monthly_income_account = ChartOfAccount.objects.get(pk=monthly_income_account_id)
-        mapping.deposit_liability_account = ChartOfAccount.objects.get(pk=deposit_liability_account_id)
-        mapping.deposit_refund_account = ChartOfAccount.objects.get(pk=deposit_refund_account_id)
-        mapping.damage_recovery_income_account = ChartOfAccount.objects.get(pk=damage_recovery_income_account_id)
-        mapping.settlement_finance_account = (
-            FinanceAccount.objects.get(pk=int(settlement_finance_account_id_raw))
-            if str(settlement_finance_account_id_raw or "").isdigit()
-            else None
-        )
-        mapping.notes = (payload.get("notes") or "").strip()
-        mapping.is_active = True
         try:
+            monthly_income_account_id = int(payload.get("monthly_income_account_id") or 0)
+            deposit_liability_account_id = int(payload.get("deposit_liability_account_id") or 0)
+            deposit_refund_account_id = int(payload.get("deposit_refund_account_id") or 0)
+            damage_recovery_income_account_id = int(payload.get("damage_recovery_income_account_id") or 0)
+            settlement_finance_account_id_raw = payload.get("settlement_finance_account_id")
+            mapping.monthly_income_account = ChartOfAccount.objects.get(pk=monthly_income_account_id)
+            mapping.deposit_liability_account = ChartOfAccount.objects.get(pk=deposit_liability_account_id)
+            mapping.deposit_refund_account = ChartOfAccount.objects.get(pk=deposit_refund_account_id)
+            mapping.damage_recovery_income_account = ChartOfAccount.objects.get(pk=damage_recovery_income_account_id)
+            mapping.settlement_finance_account = (
+                FinanceAccount.objects.get(pk=int(settlement_finance_account_id_raw))
+                if str(settlement_finance_account_id_raw or "").isdigit()
+                else mapping.settlement_finance_account
+            )
+            mapping.notes = (payload.get("notes") or "").strip()
+            mapping.is_active = True
             mapping.save()
         except Exception as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -367,7 +385,7 @@ class AdminFinanceAccountMappingView(APIView):
                 "mapping_id": mapping.id,
             },
         )
-        return Response({"detail": "Rent/lease account mapping saved.", "mapping_id": mapping.id})
+        return Response({"detail": "Rent/lease account mapping saved.", "mapping_id": mapping.id, **_account_mapping_payload(mapping)})
 
 
 class AdminInvoiceRegisterView(APIView):
@@ -618,214 +636,3 @@ class CustomerReceiptPdfView(APIView):
             f'attachment; filename="receipt-{receipt.receipt_no or receipt.id}.pdf"'
         )
         return response
-
-
-class CustomerDepositPdfView(APIView):
-    permission_classes = [IsCustomer]
-
-    def get(self, request, pk: int):
-        customer = getattr(request.user, "customer_profile", None)
-        if customer is None:
-            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
-        demand = (
-            RentLeaseBillingDemand.objects.select_related("subscription", "subscription__customer", "subscription__product")
-            .filter(
-                pk=pk,
-                demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
-                subscription__customer=customer,
-            )
-            .first()
-        )
-        if demand is None:
-            return Response({"detail": "Deposit not found."}, status=status.HTTP_404_NOT_FOUND)
-        pdf_bytes = render_security_deposit_pdf(deposit_or_contract=demand)
-        response = HttpResponse(pdf_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="deposit-{demand.reference_key}.pdf"'
-        return response
-
-
-class CustomerReturnInspectionPdfView(APIView):
-    permission_classes = [IsCustomer]
-
-    def get(self, request, pk: int):
-        customer = getattr(request.user, "customer_profile", None)
-        if customer is None:
-            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
-        inspection = (
-            RentLeaseReturnInspection.objects.select_related("subscription", "subscription__customer")
-            .filter(pk=pk, subscription__customer=customer)
-            .first()
-        )
-        if inspection is None:
-            return Response({"detail": "Return inspection not found."}, status=status.HTTP_404_NOT_FOUND)
-        pdf_bytes = render_return_inspection_pdf(return_or_inspection_record=inspection)
-        response = HttpResponse(pdf_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = (
-            f'attachment; filename="return-inspection-{inspection.id}.pdf"'
-        )
-        return response
-
-
-class CustomerDocumentListView(APIView):
-    permission_classes = [IsCustomer]
-
-    def get(self, request):
-        customer = getattr(request.user, "customer_profile", None)
-        if customer is None:
-            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
-        return Response(customer_document_list(customer=customer))
-
-
-class CustomerPaymentScheduleView(APIView):
-    permission_classes = [IsCustomer]
-
-    def get(self, request):
-        customer = getattr(request.user, "customer_profile", None)
-        if customer is None:
-            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
-        return Response(customer_payment_schedule(customer=customer))
-
-
-class CustomerAccountStatementView(APIView):
-    permission_classes = [IsCustomer]
-
-    def get(self, request):
-        customer = getattr(request.user, "customer_profile", None)
-        if customer is None:
-            return Response({"detail": "Customer profile missing."}, status=status.HTTP_404_NOT_FOUND)
-        flt = FinanceFilter.from_query_params(request.query_params)
-        return Response(customer_account_statement(customer=customer, flt=flt))
-
-
-class CustomerDirectSaleListView(APIView):
-    permission_classes = [IsCustomer]
-
-    def get(self, request):
-        customer = _safe_customer_profile(request)
-        if customer is None:
-            return Response(
-                {"count": 0, "page": 1, "page_size": 20, "results": []},
-                status=status.HTTP_200_OK,
-            )
-
-        queryset = _direct_sale_queryset_for_customer(customer)
-        page_rows, page, page_size, total_count = _paginate_customer_queryset(request, queryset)
-        rows = list(page_rows)
-        for row in rows:
-            row._customer_invoice = row.billing_invoices.order_by("-invoice_date", "-id").first()
-            row._customer_lines = list(row.lines.all())
-        serializer = CustomerDirectSaleListSerializer(rows, many=True, context={"request": request})
-        return Response(
-            {
-                "count": total_count,
-                "page": page,
-                "page_size": page_size,
-                "results": serializer.data,
-            }
-        )
-
-
-class CustomerDirectSaleDetailView(APIView):
-    permission_classes = [IsCustomer]
-
-    def get(self, request, pk: int):
-        customer = _safe_customer_profile(request)
-        if customer is None:
-            return Response({"detail": "Direct sale not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        sale = _direct_sale_queryset_for_customer(customer).filter(pk=pk).first()
-        if sale is None:
-            return Response({"detail": "Direct sale not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        sale._customer_invoice = sale.billing_invoices.order_by("-invoice_date", "-id").first()
-        sale._customer_lines = list(sale.lines.all())
-        sale._customer_receipts = list(sale.receipts.order_by("-receipt_date", "-id"))
-        serializer = CustomerDirectSaleDetailSerializer(sale, context={"request": request})
-        return Response(serializer.data)
-
-
-class CustomerDirectSaleSummaryView(APIView):
-    permission_classes = [IsCustomer]
-
-    def get(self, request):
-        customer = _safe_customer_profile(request)
-        if customer is None:
-            serializer = CustomerDirectSaleSummarySerializer(
-                {
-                    "total_direct_sale_invoices": 0,
-                    "total_outstanding_direct_sale_dues": Decimal("0.00"),
-                    "total_paid_direct_sale_amount": Decimal("0.00"),
-                    "overdue_direct_sale_count": 0,
-                    "latest_direct_sale_invoice": None,
-                }
-            )
-            return Response(serializer.data)
-
-        rows = list(_direct_sale_queryset_for_customer(customer))
-        total_invoices = len(rows)
-        total_paid = Decimal("0.00")
-        total_due = Decimal("0.00")
-        overdue_count = 0
-        latest_invoice = None
-
-        for index, row in enumerate(rows):
-            total_paid += Decimal(str(row.received_total or "0.00"))
-            outstanding = _direct_sale_outstanding_amount(row)
-            status_token = (row.status or "").upper()
-            invoice = row.billing_invoices.order_by("-invoice_date", "-id").first()
-            invoice_status = (getattr(invoice, "status", "") or "").strip().upper()
-            is_payable_status = (
-                status_token not in INACTIVE_DIRECT_SALE_STATUSES
-                and invoice_status in {BillingDocumentStatus.APPROVED, BillingDocumentStatus.POSTED}
-            )
-            if is_payable_status:
-                total_due += outstanding
-            if is_payable_status and outstanding > Decimal("0.00"):
-                overdue_count += 1
-            if index == 0:
-                latest_invoice = {
-                    "id": row.id,
-                    "document_number": row.sale_no,
-                    "invoice_number": getattr(invoice, "document_no", None),
-                    "sale_date": row.sale_date,
-                    "status": row.status,
-                    "grand_total": row.grand_total,
-                    "paid_amount": row.received_total,
-                    "outstanding_amount": outstanding,
-                    "detail_url": request.build_absolute_uri(f"/customer/direct-sales/{row.id}"),
-                    "invoice_pdf_url": request.build_absolute_uri(f"/api/v1/customer/invoices/{invoice.id}/pdf/")
-                    if invoice is not None
-                    else None,
-                }
-
-        serializer = CustomerDirectSaleSummarySerializer(
-            {
-                "total_direct_sale_invoices": total_invoices,
-                "total_outstanding_direct_sale_dues": total_due.quantize(Decimal("0.01")),
-                "total_paid_direct_sale_amount": total_paid.quantize(Decimal("0.01")),
-                "overdue_direct_sale_count": overdue_count,
-                "latest_direct_sale_invoice": latest_invoice,
-            }
-        )
-        return Response(serializer.data)
-
-
-class PartnerFinanceSummaryView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsPartner]
-
-    def get(self, request):
-        return Response(partner_finance_summary(partner=request.user))
-
-
-class PartnerLinkedCustomerPaymentsView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsPartner]
-
-    def get(self, request):
-        return Response(partner_linked_customer_payments(partner=request.user))
-
-
-class PartnerReceiptListView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsPartner]
-
-    def get(self, request):
-        return Response(partner_receipt_list(partner=request.user))
