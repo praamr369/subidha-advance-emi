@@ -18,6 +18,18 @@ export type ComplianceVerificationStatus = "PENDING" | "VERIFIED" | "REJECTED" |
 export type ComplianceReviewStatus = "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED";
 export type ComplianceDisplayStatus = ComplianceReviewStatus | "NOT_PROVIDED";
 
+export type PolicyLifecycleActions = {
+  can_edit: boolean;
+  can_submit_review: boolean;
+  can_approve: boolean;
+  can_reject: boolean;
+  can_publish: boolean;
+  can_accept_internal: boolean;
+  can_archive: boolean;
+  can_create_draft: boolean;
+  can_sync_metadata: boolean;
+};
+
 export type AdminPolicyPage = {
   id: number;
   slug: string;
@@ -31,7 +43,26 @@ export type AdminPolicyPage = {
   public_ready?: boolean;
   internal_ready?: boolean;
   requires_legal_review?: boolean;
+  requires_admin_acceptance?: boolean;
+  owner?: number | null;
+  owner_username?: string;
+  reviewer?: number | null;
+  reviewer_username?: string;
+  approved_by?: number | null;
+  approved_by_username?: string;
+  archived_by?: number | null;
+  archived_by_username?: string;
+  submitted_for_review_at?: string | null;
+  approved_at?: string | null;
+  archived_at?: string | null;
   review_due_date?: string | null;
+  internal_acceptance_at?: string | null;
+  internal_accepted_by?: number | null;
+  internal_accepted_by_username?: string;
+  rejection_reason?: string;
+  archive_reason?: string;
+  source_template_key?: string;
+  lifecycle_actions?: PolicyLifecycleActions;
   title: string;
   summary: string;
   content: string;
@@ -59,19 +90,43 @@ export type PolicyCreatePayload = {
   summary: string;
   content: string;
   status?: "DRAFT" | "ARCHIVED";
+  visibility?: PolicyVisibility;
+  governance_category?: string;
+  coverage_group?: string;
+  requires_legal_review?: boolean;
+  requires_admin_acceptance?: boolean;
+  review_due_date?: string | null;
 };
 
 export type PolicyUpdatePayload = Partial<
-  Pick<AdminPolicyPage, "slug" | "category" | "title" | "summary" | "content" | "status" | "effective_date" | "last_reviewed_at">
+  Pick<
+    AdminPolicyPage,
+    | "slug"
+    | "category"
+    | "title"
+    | "summary"
+    | "content"
+    | "effective_date"
+    | "last_reviewed_at"
+    | "visibility"
+    | "governance_category"
+    | "coverage_group"
+    | "requires_legal_review"
+    | "requires_admin_acceptance"
+    | "review_due_date"
+    | "source_template_key"
+  >
 >;
 
 export type PolicyCoverageRow = {
   required_policy_key: string;
   label: string;
   coverage_group: string;
+  catalog_coverage_group?: string;
   category: string;
   stored_category?: string;
   visibility: PolicyVisibility;
+  catalog_visibility?: PolicyVisibility;
   status: PolicyStatus | "MISSING";
   policy_id?: number | null;
   slug: string;
@@ -81,6 +136,9 @@ export type PolicyCoverageRow = {
   recommended_action?: string;
   requires_legal_review?: boolean;
   requires_admin_acceptance?: boolean;
+  metadata_synced?: boolean;
+  metadata_mismatches?: string[];
+  review_due_date?: string | null;
 };
 
 export type PolicyCoverageGroup = { group: string; items: PolicyCoverageRow[] };
@@ -91,9 +149,13 @@ export type PolicyCoverageMatrix = {
     public_required_count: number;
     public_published_count: number;
     public_draft_count: number;
+    public_under_review_count?: number;
+    public_approved_count?: number;
     internal_required_count: number;
     internal_ready_count: number;
     internal_draft_count: number;
+    internal_under_review_count?: number;
+    metadata_mismatch_count?: number;
   };
   groups: PolicyCoverageGroup[];
   results: PolicyCoverageRow[];
@@ -216,12 +278,32 @@ export async function updateAdminPolicy(id: number, payload: PolicyUpdatePayload
   return apiFetch<AdminPolicyPage>(`/admin/public-site/policies/${id}/`, { method: "PATCH", body: payload });
 }
 
+export async function submitAdminPolicyForReview(id: number): Promise<AdminPolicyPage> {
+  return apiFetch<AdminPolicyPage>(`/admin/public-site/policies/${id}/submit-review/`, { method: "POST", body: {} });
+}
+
+export async function approveAdminPolicy(id: number): Promise<AdminPolicyPage> {
+  return apiFetch<AdminPolicyPage>(`/admin/public-site/policies/${id}/approve/`, { method: "POST", body: {} });
+}
+
+export async function rejectAdminPolicy(id: number, reason: string): Promise<AdminPolicyPage> {
+  return apiFetch<AdminPolicyPage>(`/admin/public-site/policies/${id}/reject/`, { method: "POST", body: { reason } });
+}
+
+export async function acceptInternalPolicy(id: number): Promise<AdminPolicyPage> {
+  return apiFetch<AdminPolicyPage>(`/admin/public-site/policies/${id}/accept-internal/`, { method: "POST", body: {} });
+}
+
+export async function syncPolicyGovernanceMetadata(id: number): Promise<AdminPolicyPage> {
+  return apiFetch<AdminPolicyPage>(`/admin/public-site/policies/${id}/sync-governance-metadata/`, { method: "POST", body: {} });
+}
+
 export async function publishAdminPolicy(id: number, payload?: { effective_date?: string; review_now?: boolean }): Promise<AdminPolicyPage> {
   return apiFetch<AdminPolicyPage>(`/admin/public-site/policies/${id}/publish/`, { method: "POST", body: payload || {} });
 }
 
-export async function archiveAdminPolicy(id: number): Promise<AdminPolicyPage> {
-  return apiFetch<AdminPolicyPage>(`/admin/public-site/policies/${id}/archive/`, { method: "POST", body: {} });
+export async function archiveAdminPolicy(id: number, reason?: string): Promise<AdminPolicyPage> {
+  return apiFetch<AdminPolicyPage>(`/admin/public-site/policies/${id}/archive/`, { method: "POST", body: reason ? { reason } : {} });
 }
 
 export async function createAdminPolicyDraft(id: number): Promise<AdminPolicyPage> {
