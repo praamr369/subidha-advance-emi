@@ -99,18 +99,26 @@ def _preview_number(*, prefix: str, next_number: int, padding: int) -> str:
     return f"{prefix}-{str(next_number).zfill(padding)}"
 
 
-def _issued_queryset_for_spec(*, spec: NumberingSpec, sequence: DocumentSequence | None = None) -> QuerySet:
-    if spec.doc_kind == "invoice":
-        queryset = BillingInvoice.objects.exclude(document_no__isnull=True).exclude(document_no="")
-    else:
-        queryset = ReceiptDocument.objects.exclude(receipt_no__isnull=True).exclude(receipt_no="")
-    if sequence is not None:
-        queryset = queryset.filter(doc_series_id=sequence.id)
-    return queryset
-
-
 def _issued_field_for_spec(spec: NumberingSpec) -> str:
     return "document_no" if spec.doc_kind == "invoice" else "receipt_no"
+
+
+def _base_issued_queryset_for_spec(*, spec: NumberingSpec) -> QuerySet:
+    if spec.doc_kind == "invoice":
+        return BillingInvoice.objects.exclude(document_no__isnull=True).exclude(document_no="")
+    return ReceiptDocument.objects.exclude(receipt_no__isnull=True).exclude(receipt_no="")
+
+
+def _issued_queryset_for_spec(*, spec: NumberingSpec, sequence: DocumentSequence | None = None, prefix: str = "") -> QuerySet:
+    queryset = _base_issued_queryset_for_spec(spec=spec)
+    if sequence is None:
+        return queryset
+    if spec.doc_kind == "invoice":
+        return queryset.filter(doc_series_id=sequence.id)
+    receipt_prefix = (prefix or sequence.prefix or "").strip().upper()
+    if not receipt_prefix:
+        return queryset.none()
+    return queryset.filter(receipt_no__istartswith=f"{receipt_prefix}-")
 
 
 def _issued_duplicate_count(*, field_name: str, queryset: QuerySet) -> int:
@@ -133,24 +141,24 @@ def _extract_issued_numeric_suffix(value: str | None, *, prefix: str) -> int | N
 def _max_issued_for_prefix(*, spec: NumberingSpec, prefix: str) -> int:
     field_name = _issued_field_for_spec(spec)
     maximum = 0
-    for value in _issued_queryset_for_spec(spec=spec).values_list(field_name, flat=True):
+    for value in _base_issued_queryset_for_spec(spec=spec).values_list(field_name, flat=True):
         suffix = _extract_issued_numeric_suffix(value, prefix=prefix)
         if suffix is not None and suffix > maximum:
             maximum = suffix
     return maximum
 
 
-def _last_issued_for_sequence(*, spec: NumberingSpec, sequence: DocumentSequence | None) -> str | None:
+def _last_issued_for_sequence(*, spec: NumberingSpec, sequence: DocumentSequence | None, prefix: str) -> str | None:
     if sequence is None:
         return None
     field_name = _issued_field_for_spec(spec)
-    return _issued_queryset_for_spec(spec=spec, sequence=sequence).aggregate(last_issued=Max(field_name)).get("last_issued")
+    return _issued_queryset_for_spec(spec=spec, sequence=sequence, prefix=prefix).aggregate(last_issued=Max(field_name)).get("last_issued")
 
 
-def _issued_count_for_sequence(*, spec: NumberingSpec, sequence: DocumentSequence | None) -> int:
+def _issued_count_for_sequence(*, spec: NumberingSpec, sequence: DocumentSequence | None, prefix: str) -> int:
     if sequence is None:
         return 0
-    return _issued_queryset_for_spec(spec=spec, sequence=sequence).count()
+    return _issued_queryset_for_spec(spec=spec, sequence=sequence, prefix=prefix).count()
 
 
 def _validate_prefix(prefix: str) -> str:
@@ -165,7 +173,7 @@ def _validate_prefix(prefix: str) -> str:
 def _validate_duplicate_risk(*, spec: NumberingSpec, prefix: str, padding: int, next_number: int) -> None:
     proposed_number = _preview_number(prefix=prefix, next_number=next_number, padding=padding)
     field_name = _issued_field_for_spec(spec)
-    if _issued_queryset_for_spec(spec=spec).filter(**{field_name: proposed_number}).exists():
+    if _base_issued_queryset_for_spec(spec=spec).filter(**{field_name: proposed_number}).exists():
         raise ValueError(f"{spec.label} numbering would collide with existing issued number {proposed_number}.")
 
 
@@ -176,12 +184,12 @@ def _sequence_row(*, spec: NumberingSpec, fy: str) -> dict:
     padding = sequence.padding if sequence else 5
     next_number = sequence.next_number if sequence else 1
     preview = _preview_number(prefix=prefix, next_number=next_number, padding=padding) if configured else None
-    issued_count = _issued_count_for_sequence(spec=spec, sequence=sequence)
-    last_issued = _last_issued_for_sequence(spec=spec, sequence=sequence)
+    issued_count = _issued_count_for_sequence(spec=spec, sequence=sequence, prefix=prefix)
+    last_issued = _last_issued_for_sequence(spec=spec, sequence=sequence, prefix=prefix)
     max_issued = _max_issued_for_prefix(spec=spec, prefix=prefix)
     min_safe_next = max_issued + 1
     field_name = _issued_field_for_spec(spec)
-    duplicate_count = _issued_duplicate_count(field_name=field_name, queryset=_issued_queryset_for_spec(spec=spec, sequence=sequence)) if sequence else 0
+    duplicate_count = _issued_duplicate_count(field_name=field_name, queryset=_issued_queryset_for_spec(spec=spec, sequence=sequence, prefix=prefix)) if sequence else 0
     status = "needs_setup"
     warnings: list[str] = []
     blockers: list[str] = []
@@ -199,6 +207,8 @@ def _sequence_row(*, spec: NumberingSpec, fy: str) -> dict:
         warnings.append("Optional/future workflow numbering is not configured yet.")
     if configured and issued_count > 0:
         warnings.append("Existing documents already use this sequence. Prefix and next number changes affect future documents only.")
+    if configured and spec.doc_kind == "receipt":
+        warnings.append("Receipt documents are matched by receipt number prefix for setup readiness.")
     return {
         "key": spec.key,
         "name": spec.label,
