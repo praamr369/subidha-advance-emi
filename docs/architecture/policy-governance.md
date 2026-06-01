@@ -2,27 +2,29 @@
 
 Branch: `update`
 
-Status: **Phase PG-2A coverage matrix and public/internal separation implemented**
+Status: **Phase PG-2B stored governance metadata and lifecycle migration implemented**
 
 ## Purpose
 
 Policy Governance controls public legal pages and internal operating-control policies for SUBIDHA CORE.
 
-It must keep three rules clear:
+It keeps these rules explicit:
 
 ```text
 Seeded policies remain DRAFT.
 DRAFT is never public.
-INTERNAL is never served by public policy APIs.
+APPROVED public policy is not public until PUBLISHED.
+INTERNAL policy is never served by public policy APIs.
+Stored governance metadata decides public/internal exposure.
 ```
 
-Public launch requires reviewed and published public policies. Internal governance policies support audit/control but do not replace legal review.
+Public launch requires reviewed and published public policies. Internal governance policies support staff/admin controls and auditability, but they are not customer-facing legal pages.
 
-## Current implementation model
+## Stored data model
 
-The existing `PolicyPage` model remains backward-compatible. No schema migration is required in Phase PG-2A.
+The existing `PolicyPage` row remains the canonical policy content/version row.
 
-Current stored fields include:
+Stored fields already on `PolicyPage`:
 
 ```text
 slug
@@ -40,22 +42,120 @@ created_by
 updated_by
 ```
 
-Phase PG-2A adds governance behavior through a policy coverage catalog and computed serializer/service fields rather than immediately changing existing data.
-
-Computed metadata includes:
+PG-2B adds an additive one-to-one metadata table:
 
 ```text
+policy_governance_metadata
+```
+
+Stored governance metadata fields:
+
+```text
+policy
 visibility: PUBLIC | INTERNAL
 governance_category
 coverage_group
-public_visible
-internal_only
-public_ready
-internal_ready
 requires_legal_review
+requires_admin_acceptance
+owner
+reviewer
+approved_by
+archived_by
+submitted_for_review_at
+approved_at
+archived_at
 review_due_date
-last_published_at
+internal_acceptance_at
+internal_accepted_by
+rejection_reason
+archive_reason
+source_template_key
 ```
+
+The separate metadata table preserves existing policy rows, content, URLs, versions, and public behavior while making governance state durable.
+
+## Lifecycle states
+
+PG-2B expands policy lifecycle states additively:
+
+```text
+DRAFT
+UNDER_REVIEW
+APPROVED
+PUBLISHED
+ARCHIVED
+```
+
+Existing values remain valid:
+
+```text
+DRAFT stays DRAFT
+PUBLISHED stays PUBLISHED
+ARCHIVED stays ARCHIVED
+```
+
+No migration publishes drafts or changes policy content.
+
+## Lifecycle transitions
+
+Supported service-layer transitions:
+
+```text
+DRAFT -> UNDER_REVIEW
+UNDER_REVIEW -> APPROVED
+UNDER_REVIEW -> DRAFT with rejection_reason
+APPROVED -> PUBLISHED for PUBLIC policies
+DRAFT -> PUBLISHED only when review_now=true for backward compatibility
+APPROVED/PUBLISHED -> ARCHIVED with archive_reason
+DRAFT/UNDER_REVIEW/APPROVED/PUBLISHED INTERNAL -> internally accepted
+```
+
+Rules:
+
+```text
+Reject requires reason.
+Archive stores reason, archived_by, archived_at.
+Published/approved content is locked; use create-draft before editing legal content.
+Create-draft copies governance metadata and resets lifecycle metadata.
+Internal policy acceptance never exposes the policy publicly.
+```
+
+## Admin APIs
+
+Existing admin policy APIs remain:
+
+```text
+GET  /api/v1/admin/public-site/policies/
+POST /api/v1/admin/public-site/policies/
+GET  /api/v1/admin/public-site/policies/by-slug/:slug/
+PATCH /api/v1/admin/public-site/policies/:id/
+POST /api/v1/admin/public-site/policies/:id/publish/
+POST /api/v1/admin/public-site/policies/:id/archive/
+POST /api/v1/admin/public-site/policies/:id/create-draft/
+POST /api/v1/admin/public-site/policies/seed-defaults/
+GET  /api/v1/admin/settings/policies/coverage/
+```
+
+PG-2B adds explicit admin-only lifecycle APIs:
+
+```text
+POST /api/v1/admin/public-site/policies/:id/submit-review/
+POST /api/v1/admin/public-site/policies/:id/approve/
+POST /api/v1/admin/public-site/policies/:id/reject/
+POST /api/v1/admin/public-site/policies/:id/accept-internal/
+POST /api/v1/admin/public-site/policies/:id/sync-governance-metadata/
+```
+
+Payload rules:
+
+```text
+reject: { reason }
+archive: optional { reason }
+publish: optional { effective_date, review_now }
+sync-governance-metadata: no content/status mutation
+```
+
+All endpoints are authenticated admin-only.
 
 ## Coverage catalog
 
@@ -65,16 +165,7 @@ The coverage catalog lives in:
 backend/subscriptions/services/policy_coverage_catalog.py
 ```
 
-It defines all required policy slugs, labels, coverage groups, visibility, governance categories, compatible stored categories, and seed template body.
-
-Because the current database enum has fewer category choices, PG-2A stores a compatible category while exposing the richer governance category through the API.
-
-Example:
-
-```text
-governance category: COOKIE_CONSENT
-stored compatible category: PRIVACY
-```
+It defines required policy slugs, labels, coverage groups, public/internal visibility, governance categories, compatible stored categories, admin-acceptance requirements, and seed template body.
 
 ## Default seed behavior
 
@@ -92,22 +183,23 @@ seed is idempotent by slug
 existing policy content is not overwritten by default
 published policies are not rewritten
 internal policies are not made public
+stored metadata is created from the coverage catalog
 ```
 
 Explicit draft overwrite remains controlled by the existing `overwrite_existing_drafts` request flag.
 
-## Public/internal separation
+## Public/internal exposure
 
-Public policy APIs only return policies when both conditions are true:
+Public policy APIs return policies only when both conditions are true:
 
 ```text
 status = PUBLISHED
-visibility = PUBLIC
+stored visibility = PUBLIC
 ```
 
-Internal governance policies are excluded from public policy list/detail services even if a row is accidentally published.
+Internal governance policies are excluded from public list/detail services even if their `status` is accidentally or historically `PUBLISHED`.
 
-Admin policy APIs show both public and internal policy rows to authorized admins.
+Unknown custom policy slugs can be public only when stored metadata is PUBLIC and status is PUBLISHED.
 
 ## Coverage matrix API
 
@@ -117,23 +209,17 @@ Admin read-only endpoint:
 GET /api/v1/admin/settings/policies/coverage/
 ```
 
-Response includes:
-
-```text
-summary
-groups
-results
-```
-
-Each row includes:
+Each row includes stored metadata plus catalog comparison:
 
 ```text
 required_policy_key
 label
 coverage_group
+catalog_coverage_group
 category
 stored_category
 visibility
+catalog_visibility
 status
 policy_id
 slug
@@ -143,50 +229,43 @@ blocker_reason
 recommended_action
 requires_legal_review
 requires_admin_acceptance
+metadata_synced
+metadata_mismatches
+review_due_date
 ```
 
-Coverage groups:
+Summary includes:
 
 ```text
-Public Legal
-Customer Operations
-Lucky Plan / EMI
-Rent / Lease / Deposit
-Service / Delivery / Warranty
-Privacy / Data
-Finance / Accounting Controls
-Staff / Access / Audit
-Inventory / Vendor / Commission
-Backup / Incident Response
+required_count
+missing_count
+public_required_count
+public_published_count
+public_draft_count
+public_under_review_count
+public_approved_count
+internal_required_count
+internal_ready_count
+internal_draft_count
+internal_under_review_count
+metadata_mismatch_count
 ```
 
-## Lifecycle behavior
-
-Existing backend lifecycle states remain:
+Readiness meaning:
 
 ```text
-DRAFT
-PUBLISHED
-ARCHIVED
+PUBLIC ready = visibility PUBLIC + status PUBLISHED
+INTERNAL ready = visibility INTERNAL + status APPROVED or internal_acceptance_at exists
+PUBLISHED internal rows are treated as internally ready for compatibility but never public
 ```
 
-The frontend type accepts future states:
+Metadata mismatch behavior:
 
 ```text
-UNDER_REVIEW
-APPROVED
+visibility mismatch is dangerous and blocks readiness
+category/group/admin-acceptance mismatch is surfaced for sync
+sync-governance-metadata updates metadata only, not content or status
 ```
-
-Those future states are not stored yet in PG-2A. A later migration can add them additively.
-
-Current readiness rule:
-
-```text
-PUBLIC ready = PUBLISHED and PUBLIC
-INTERNAL ready = PUBLISHED and INTERNAL
-```
-
-Internal DRAFT rows generate setup warnings, not public API exposure.
 
 ## Setup readiness integration
 
@@ -196,14 +275,17 @@ It blocks readiness when:
 
 ```text
 required public policy templates are missing
-required public policy templates exist only as DRAFT/ARCHIVED
+required public policy templates are not PUBLISHED
+stored metadata mismatch affects visibility/readiness
 ```
 
 It warns when:
 
 ```text
 internal governance templates are missing
-internal governance templates are still DRAFT
+internal governance templates are not approved/accepted
+metadata mismatch exists but is not dangerous
+review due date is past
 ```
 
 Launch checklist includes:
@@ -212,75 +294,85 @@ Launch checklist includes:
 can_publish_public_policies
 ```
 
+Setup Readiness remains read-only. It does not seed, submit, approve, publish, archive, sync metadata, or mutate historical rows.
+
 ## Frontend behavior
 
-Admin route:
+Service contract supports:
 
 ```text
-/admin/settings/policies
+submitAdminPolicyForReview(id)
+approveAdminPolicy(id)
+rejectAdminPolicy(id, reason)
+acceptInternalPolicy(id)
+syncPolicyGovernanceMetadata(id)
+publishAdminPolicy(id, payload)
+archiveAdminPolicy(id, reason)
+createAdminPolicyDraft(id)
 ```
 
-The page shows:
-
-```text
-All/Public/Internal/Draft/Published/Missing coverage filters
-Policy Coverage Matrix grouped by governance area
-PUBLIC/INTERNAL visibility badges
-DRAFT/PUBLISHED/ARCHIVED lifecycle badges
-public/internal readiness
-blocker and recommended action
-Open policy when row exists
-Seed missing template when row is missing
-```
-
-The policy editor route remains:
-
-```text
-/admin/settings/policies/[slug]
-```
-
-The dynamic route uses unwrapped App Router params and does not access `params.slug` directly.
+Frontend policy types now include stored governance metadata, lifecycle action flags, public/internal readiness, and metadata mismatch information.
 
 ## Existing data impact
 
-No existing policies are deleted.
+Existing policies are not deleted.
 
-No existing policy content is overwritten by default.
+Existing content is not overwritten.
 
-No payments, receipts, subscriptions, accounting, reconciliation, inventory, delivery, rent/lease, deposit, commission, payout, amendments, Lucky IDs, or batch records are changed.
+Existing DRAFT/PUBLISHED/ARCHIVED statuses remain unchanged.
+
+Existing rows receive additive governance metadata by migration.
+
+Existing public URLs continue to work for PUBLIC + PUBLISHED policies.
+
+## Public API safety
+
+Public policy list/detail APIs rely on stored visibility metadata and status.
+
+They never expose INTERNAL policies.
+
+They never expose DRAFT, UNDER_REVIEW, APPROVED, or ARCHIVED policies.
 
 ## Financial integrity impact
 
-No financial posting behavior changes.
+No payment, receipt, journal, settlement, reconciliation, invoice, subscription, rent/lease, deposit, commission, payout, inventory, delivery, amendment, Lucky ID, batch, or draw logic is changed.
 
-Policy Governance is read/setup/legal-governance only. It does not mutate money-moving records.
+Policy Governance is setup/legal-governance only. It does not mutate money-moving records.
 
 ## Auditability impact
 
-Policy creation, update, publish, archive, draft creation, and seed actions continue to use the existing audit path.
-
-Internal governance templates improve audit coverage for reversal, posting, reconciliation, day close, mapping, commission, vendor, inventory, amendment, access, audit retention, backup, and incident response.
-
-## Future migration recommendation
-
-A future additive migration should add stored fields for:
+Audit events are recorded for:
 
 ```text
-visibility
-owner
-reviewer
-approved_by
-archived_at
-review_due_date
-requires_legal_review
-requires_admin_acceptance
+policy seed
+policy create
+policy update
+submit review
+approve
+reject
+publish
+archive
+create draft
+internal acceptance
+metadata sync
 ```
 
-A future additive lifecycle update should add:
+Governance metadata stores who reviewed, approved, archived, or internally accepted policy records.
+
+## Future rent/lease compatibility
+
+Policy Governance already separates rent/lease customer policies from internal operating controls.
+
+This supports future rental/leasing expansion through durable governance around:
 
 ```text
-UNDER_REVIEW
-APPROVED
+rental/lease public terms
+security deposit policy
+possession/handover policy
+return damage inspection policy
+internal amendment controls
+internal accounting/reconciliation controls
+backup/restore and incident response controls
 ```
 
-This was intentionally deferred from PG-2A to avoid breaking existing policy rows and public policy behavior.
+Future rent/lease policy additions can be catalog entries and stored metadata rows without changing historical policy content.
