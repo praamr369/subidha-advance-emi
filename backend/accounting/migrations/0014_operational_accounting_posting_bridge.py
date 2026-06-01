@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
                 idempotency_key VARCHAR(220) NOT NULL UNIQUE,
                 amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
                 status VARCHAR(20) NOT NULL DEFAULT 'PREVIEWED',
-                journal_entry_id BIGINT NULL REFERENCES accounting_journal_entries(id) ON DELETE PROTECT,
+                journal_entry_id BIGINT NULL REFERENCES accounting_journal_entries(id) ON DELETE RESTRICT,
                 mapping_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
                 preview_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
                 failure_reason TEXT NOT NULL DEFAULT '',
@@ -37,11 +37,11 @@ class Migration(migrations.Migration):
                 ON accounting_operational_accounting_postings(posted_at);
 
             ALTER TABLE accounting_rent_lease_account_mappings
-                ADD COLUMN IF NOT EXISTS customer_advance_liability_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE PROTECT;
+                ADD COLUMN IF NOT EXISTS customer_advance_liability_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE RESTRICT;
             ALTER TABLE accounting_rent_lease_account_mappings
-                ADD COLUMN IF NOT EXISTS rent_income_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE PROTECT;
+                ADD COLUMN IF NOT EXISTS rent_income_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE RESTRICT;
             ALTER TABLE accounting_rent_lease_account_mappings
-                ADD COLUMN IF NOT EXISTS lease_income_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE PROTECT;
+                ADD COLUMN IF NOT EXISTS lease_income_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE RESTRICT;
 
             CREATE INDEX IF NOT EXISTS accounting_rlmap_customer_advance_idx
                 ON accounting_rent_lease_account_mappings(customer_advance_liability_account_id);
@@ -52,12 +52,12 @@ class Migration(migrations.Migration):
 
             CREATE TABLE IF NOT EXISTS accounting_customer_advance_source_records (
                 id BIGSERIAL PRIMARY KEY,
-                customer_id BIGINT NULL REFERENCES customers(id) ON DELETE PROTECT,
+                customer_id BIGINT NULL REFERENCES customers(id) ON DELETE RESTRICT,
                 amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
                 transaction_type VARCHAR(20) NOT NULL,
                 status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
                 payment_method VARCHAR(20) NOT NULL DEFAULT '',
-                finance_account_id BIGINT NULL REFERENCES accounting_finance_accounts(id) ON DELETE PROTECT,
+                finance_account_id BIGINT NULL REFERENCES accounting_finance_accounts(id) ON DELETE RESTRICT,
                 reference_no VARCHAR(120) NULL UNIQUE,
                 notes TEXT NOT NULL DEFAULT '',
                 created_by_id BIGINT NULL,
