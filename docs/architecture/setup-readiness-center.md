@@ -2,7 +2,7 @@
 
 Branch: `update`
 
-Status: **Read-only setup readiness with operator-proof finance, business compliance, and policy governance guidance**
+Status: **Read-only setup readiness with business compliance and PG-2B policy governance metadata guidance**
 
 ## Purpose
 
@@ -47,7 +47,12 @@ It does not:
 - remap finance accounts
 - repair accounting setup
 - seed policies
+- submit policies for review
+- approve policies
+- accept internal policies
 - publish policies
+- archive policies
+- sync policy governance metadata
 - seed compliance checklist rows
 - approve compliance documents
 - upload compliance files
@@ -70,7 +75,7 @@ The API returns these sections:
 | `business_profile` | Active legal/trade/contact business identity exists. |
 | `print_branding` | Print/PDF display identity and signature/branding settings are configured. |
 | `business_compliance` | Actual shop identity, premises proof, address proof, PAN/tax proof, bank proof, and recommended registration evidence readiness. |
-| `policy_governance` | Required public/internal policies exist and have the correct lifecycle state. |
+| `policy_governance` | Required public/internal policies exist, have safe stored governance metadata, and have the correct lifecycle state. |
 | `chart_of_accounts` | Required active COA/system ledgers exist. |
 | `finance_accounts` | Active operational cash/bank/UPI finance accounts are mapped to posting-ready asset accounts. |
 | `branch_cash_counter` | Active primary branch and active collection counter exist. |
@@ -102,10 +107,10 @@ It blocks readiness when:
 
 ```text
 active business profile is missing
-required premises proof is missing or not approved
-required business address proof is missing or not approved
-required PAN/tax proof is missing or not approved
-required bank proof is missing or not approved
+required premises proof is missing, unapproved, or missing real file evidence
+required business address proof is missing, unapproved, or missing real file evidence
+required PAN/tax proof is missing, unapproved, or missing real file evidence
+required bank proof is missing, unapproved, or missing real file evidence
 ```
 
 It warns when:
@@ -115,6 +120,7 @@ GST evidence is missing or not approved
 Udyam/MSME evidence is missing or not approved
 shop/trade license evidence is missing or not approved
 compliance rows are pending review
+public summary needs separate approval
 ```
 
 Readiness copy must stay honest:
@@ -122,7 +128,7 @@ Readiness copy must stay honest:
 ```text
 Compliance document templates are operational checklist items, not legal publication.
 Private documents remain private by default.
-Public summary requires approval.
+Public summary requires separate approval.
 GST/Udyam readiness requires actual data/status.
 Setup readiness must not fake readiness from seeded empty rows.
 ```
@@ -135,18 +141,62 @@ Policy Governance readiness uses the coverage matrix from:
 GET /api/v1/admin/settings/policies/coverage/
 ```
 
+PG-2B stores governance metadata separately from policy content:
+
+```text
+visibility: PUBLIC | INTERNAL
+governance_category
+coverage_group
+requires_legal_review
+requires_admin_acceptance
+review_due_date
+source_template_key
+```
+
+Policy lifecycle states:
+
+```text
+DRAFT
+UNDER_REVIEW
+APPROVED
+PUBLISHED
+ARCHIVED
+```
+
 It blocks readiness when:
 
 ```text
 required public policies are missing
-required public policies exist only as DRAFT or ARCHIVED
+required public policies exist but are not PUBLISHED
+stored metadata mismatch affects visibility/readiness
 ```
 
 It warns when:
 
 ```text
 internal governance policies are missing
-internal governance policies are still DRAFT
+internal governance policies are not APPROVED or internally accepted
+metadata mismatch exists but is not dangerous
+review due date is past
+```
+
+Coverage metadata exposed through the section includes:
+
+```text
+coverage_summary.public_required_count
+coverage_summary.public_published_count
+coverage_summary.public_draft_count
+coverage_summary.public_under_review_count
+coverage_summary.public_approved_count
+coverage_summary.internal_required_count
+coverage_summary.internal_ready_count
+coverage_summary.internal_draft_count
+coverage_summary.internal_under_review_count
+coverage_summary.metadata_mismatch_count
+public_missing_count
+public_not_published_count
+internal_missing_count
+internal_draft_count
 ```
 
 Readiness copy must stay honest:
@@ -154,6 +204,7 @@ Readiness copy must stay honest:
 ```text
 Seeded policies remain DRAFT.
 DRAFT is not public.
+APPROVED public policies are not public until PUBLISHED.
 INTERNAL is never public.
 Public launch requires published public policies.
 Internal governance policies support audit/control but do not replace legal review.
@@ -225,9 +276,11 @@ Items are marked ready only when the backend readiness payload supports them.
 
 ## Existing data impact
 
-No existing business data is changed.
+Setup Readiness itself does not change existing business data.
 
-No migration is required for this readiness update.
+PG-2B adds additive Policy Governance metadata migrations, but the readiness endpoint remains read-only.
+
+No existing policies, compliance documents, business profile records, finance records, or historical transaction records are edited by reading readiness.
 
 ## Financial integrity impact
 
@@ -240,6 +293,8 @@ The readiness center reports configuration blockers but does not weaken collecti
 Auditability improves by exposing one admin evidence surface for setup health and blockers.
 
 The readiness center itself does not create audit records because it does not mutate data.
+
+Policy Governance lifecycle actions create their own audit events outside the readiness center.
 
 ## Daily shop usability impact
 
