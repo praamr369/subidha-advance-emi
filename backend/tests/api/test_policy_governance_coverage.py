@@ -6,7 +6,6 @@ from accounting.models import JournalEntry
 from reconciliation.models import ReconciliationRun
 from subscriptions.models import Payment
 from subscriptions.models_business_setup import PolicyPage, PolicyStatus
-from subscriptions.models_policy_governance import PolicyGovernanceMetadata
 from subscriptions.services.policy_governance_service import (
     POLICY_STATUS_APPROVED,
     POLICY_STATUS_DRAFT,
@@ -18,6 +17,8 @@ from subscriptions.services.policy_governance_service import (
     create_draft_from_policy,
     get_public_published_policy,
     list_public_published_policies,
+    policy_internal_ready,
+    policy_is_public_visible,
     publish_policy_page,
     reject_policy,
     seed_default_policy_pages,
@@ -133,7 +134,7 @@ class PolicyGovernanceCoverageTests(APITestCase):
 
         published = publish_policy_page(policy=approved, performed_by=self.admin)
         self.assertEqual(published.status, POLICY_STATUS_PUBLISHED)
-        self.assertTrue(published.public_visible)
+        self.assertTrue(policy_is_public_visible(published))
 
     def test_reject_requires_reason_and_accept_internal_does_not_expose_publicly(self):
         seed_default_policy_pages(performed_by=self.admin)
@@ -144,7 +145,7 @@ class PolicyGovernanceCoverageTests(APITestCase):
 
         accepted = accept_internal_policy(submitted, performed_by=self.admin)
         self.assertEqual(accepted.status, POLICY_STATUS_APPROVED)
-        self.assertTrue(accepted.internal_ready)
+        self.assertTrue(policy_internal_ready(accepted))
         self.assertIsNotNone(accepted.governance_metadata.internal_acceptance_at)
         self.assertIsNone(get_public_published_policy(accepted.slug))
 
