@@ -135,20 +135,37 @@ export type DocumentNumberingSequence = {
   name: string;
   series_code: string;
   financial_year: string;
+  workflow_group?: string;
+  doc_kind?: "invoice" | "receipt" | string;
+  description?: string;
+  required_for_go_live?: boolean;
   configured: boolean;
   prefix: string;
   next_number: number;
   padding: number;
   next_number_preview: string | null;
   last_issued_number: string | null;
-  status: "ready" | "needs_setup" | "duplicate_risk" | string;
+  issued_count?: number;
+  max_issued_number?: number;
+  min_safe_next_number?: number;
+  duplicate_count?: number;
+  status: "ready" | "needs_setup" | "duplicate_risk" | "blocked" | string;
+  warnings?: string[];
+  blockers?: string[];
+  can_edit_prefix?: boolean;
+  can_edit_next_number?: boolean;
+  can_seed_default?: boolean;
+  default_prefix?: string;
+  default_padding?: number;
 };
 
 export type DocumentNumberingState = {
   financial_year: string;
   sequences: DocumentNumberingSequence[];
   checks: Record<string, boolean>;
+  summary?: Record<string, number>;
   duplicate_issues: Record<string, number>;
+  operator_rules?: string[];
 };
 
 export async function getBusinessProfile(): Promise<BusinessProfile | null> {
@@ -199,9 +216,7 @@ export type DocumentNumberingUpdatePayload = {
   padding?: number;
 };
 
-export async function updateDocumentNumbering(
-  payload: DocumentNumberingUpdatePayload
-): Promise<DocumentNumberingState> {
+export async function updateDocumentNumbering(payload: DocumentNumberingUpdatePayload): Promise<DocumentNumberingState> {
   return apiFetch<DocumentNumberingState>("/admin/business-setup/document-numbering/", {
     method: "PATCH",
     body: payload,
@@ -240,66 +255,45 @@ export async function getResetScopes(): Promise<{ scopes: ResetScope[] }> {
   return apiFetch<{ scopes: ResetScope[] }>("/admin/business-setup/reset-scopes/");
 }
 
-export async function getModularResetPreview(payload: {
-  scopes: string[];
-  preserve_username: string;
-  preserve_user_ids?: number[];
-}): Promise<Record<string, unknown>> {
+export async function getModularResetPreview(payload: { scopes: string[]; preserve_username: string; preserve_user_ids?: number[] }): Promise<Record<string, unknown>> {
   return apiFetch<Record<string, unknown>>("/admin/business-setup/reset-preview-v2/", {
     method: "POST",
     body: payload,
   });
 }
 
-export async function executeModularReset(payload: {
-  scopes: string[];
-  preserve_username: string;
-  confirmation_phrase: string;
-  backup_job_id?: number;
-}): Promise<Record<string, unknown>> {
+export async function executeModularReset(payload: { scopes: string[]; preserve_username: string; confirmation_phrase: string; backup_job_id?: number }): Promise<Record<string, unknown>> {
   return apiFetch<Record<string, unknown>>("/admin/business-setup/reset-v2/", {
     method: "POST",
     body: payload,
   });
 }
 
-export async function createBackupJob(payload: {
-  job_type: "FULL_DATABASE_LOGICAL" | "SELECTED_SCOPES_EXPORT";
-  scopes: string[];
-}): Promise<{ id: number; status: string; checksum: string }> {
-  return apiFetch("/admin/business-setup/backups/", {
+export async function getBackupJobs(): Promise<{ results: unknown[] }> {
+  return apiFetch<{ results: unknown[] }>("/admin/business-setup/backups/");
+}
+
+export async function createBackupJob(payload: { job_type: string; scopes: string[] }): Promise<Record<string, unknown>> {
+  return apiFetch<Record<string, unknown>>("/admin/business-setup/backups/", {
     method: "POST",
     body: payload,
   });
 }
 
-export async function listBackupJobs(): Promise<{ jobs: Array<Record<string, unknown>> }> {
-  return apiFetch("/admin/business-setup/backups/");
+export async function getRestoreJobs(): Promise<{ results: unknown[] }> {
+  return apiFetch<{ results: unknown[] }>("/admin/business-setup/restore-jobs/");
 }
 
-export async function getRestorePreview(payload: {
-  restore_type?: "FULL_BACKUP_RESTORE_PREVIEW" | "SELECTED_SCOPE_RESTORE_PREVIEW" | "SETUP_SNAPSHOT_RESTORE_PREVIEW" | "LOCAL_SANDBOX_RESTORE_PREVIEW";
-  backup_job_id?: number;
-  scopes?: string[];
-  snapshot_payload?: Record<string, unknown>;
-  preserve_admin_username?: string;
-}): Promise<Record<string, unknown>> {
-  return apiFetch("/admin/business-setup/restore/preview/", {
+export async function createRestorePreview(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return apiFetch<Record<string, unknown>>("/admin/business-setup/restore/preview/", {
     method: "POST",
     body: payload,
   });
 }
 
-export async function executeRestore(payload: {
-  restore_job_id: number;
-  confirmation_phrase: string;
-}): Promise<Record<string, unknown>> {
-  return apiFetch("/admin/business-setup/restore/", {
+export async function executeRestore(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return apiFetch<Record<string, unknown>>("/admin/business-setup/restore/", {
     method: "POST",
     body: payload,
   });
-}
-
-export async function listRestoreJobs(): Promise<{ jobs: Array<Record<string, unknown>> }> {
-  return apiFetch("/admin/business-setup/restore-jobs/");
 }
