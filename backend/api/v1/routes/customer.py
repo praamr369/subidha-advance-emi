@@ -18,7 +18,7 @@ from api.v1.views.customer import (
     CustomerSupportRequestListCreateView,
     CustomerSubscriptionDetailView,
 )
-from api.v1.views.phase4_finance import (
+from api.v1.views.customer_finance import (
     CustomerAccountStatementView,
     CustomerDirectSaleDetailView,
     CustomerDirectSaleListView,
