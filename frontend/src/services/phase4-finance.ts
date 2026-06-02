@@ -226,7 +226,15 @@ export async function saveAdminRentLeaseAccountMapping(input: Record<string, unk
   });
 }
 
+async function bootstrapAdminAccountingSetup() {
+  return apiFetch<Record<string, unknown>>(`/admin/accounting/setup/bootstrap/`, {
+    method: "POST",
+    body: JSON.stringify({ dry_run: false }),
+  });
+}
+
 export async function ensureAdminRentLeasePremadeAccountingSetup() {
+  await bootstrapAdminAccountingSetup();
   return saveAdminRentLeaseAccountMapping({ action: "ENSURE_PREMADE" });
 }
 
