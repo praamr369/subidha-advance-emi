@@ -22,7 +22,7 @@ from api.v1.views.partner_dashboard import (
     PartnerPaymentListView,
     PartnerSubscriptionDetailView,
 )
-from api.v1.views.phase4_finance import (
+from api.v1.views.partner_finance import (
     PartnerFinanceSummaryView,
     PartnerLinkedCustomerPaymentsView,
     PartnerReceiptListView,
