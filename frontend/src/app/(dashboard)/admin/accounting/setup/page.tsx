@@ -57,6 +57,20 @@ function firstBlocker(item: PostingProfileReadinessItem): string {
   return item.blockers?.[0] || item.recommended_action || "Ready.";
 }
 
+function warningCode(warning: unknown): string {
+  if (warning && typeof warning === "object" && "code" in warning) {
+    return String((warning as { code?: unknown }).code ?? "WARNING");
+  }
+  return "WARNING";
+}
+
+function warningMessage(warning: unknown): string {
+  if (warning && typeof warning === "object" && "message" in warning) {
+    return String((warning as { message?: unknown }).message ?? "");
+  }
+  return String(warning ?? "");
+}
+
 function RepairDialog({
   open,
   targets,
@@ -374,7 +388,14 @@ export default function AdminAccountingSetupPage() {
           ) : null}
           {warnings.length > 0 ? (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              {warnings.length} warning{warnings.length === 1 ? "" : "s"} detected. Review before go-live.
+              <div className="font-semibold">{warnings.length} warning{warnings.length === 1 ? "" : "s"} detected. Review before go-live.</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+                {warnings.map((warning) => (
+                  <li key={`${warningCode(warning)}-${warningMessage(warning)}`}>
+                    <span className="font-medium">{warningCode(warning)}:</span> {warningMessage(warning)}
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
         </section>

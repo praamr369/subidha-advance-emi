@@ -26,6 +26,10 @@ from subscriptions.models import (
     RentLeaseDepositTransactionType,
     q2,
 )
+from subscriptions.services.rent_lease_accounting_readiness_service import (
+    get_rent_lease_accounting_readiness,
+)
+from subscriptions.services.rent_lease_finance_sync_service import get_active_account_mapping
 
 
 class RentLeasePostingError(ValidationError):
@@ -37,7 +41,22 @@ def _money(value: Any) -> Decimal:
 
 
 def _mapping(lock: bool = False) -> dict[str, Any] | None:
-    suffix = " FOR UPDATE" if lock else ""
+    mapping = get_active_account_mapping(auto_create=True)
+    if mapping is None:
+        return None
+    if lock:
+        mapping = (
+            mapping.__class__.objects.select_for_update()
+            .select_related(
+                "monthly_income_account",
+                "deposit_liability_account",
+                "deposit_refund_account",
+                "damage_recovery_income_account",
+                "settlement_finance_account",
+                "settlement_finance_account__chart_account",
+            )
+            .get(pk=mapping.pk)
+        )
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -46,10 +65,9 @@ def _mapping(lock: bool = False) -> dict[str, Any] | None:
                    settlement_finance_account_id, customer_advance_liability_account_id,
                    rent_income_account_id, lease_income_account_id
             FROM accounting_rent_lease_account_mappings
-            WHERE is_active = TRUE
-            ORDER BY created_at DESC, id DESC
-            LIMIT 1
-            """ + suffix
+            WHERE id = %s
+            """,
+            [mapping.id],
         )
         row = cursor.fetchone()
         if not row:
@@ -212,41 +230,6 @@ def _demand(demand_id: int, lock: bool = False) -> RentLeaseBillingDemand:
     if not demand:
         raise RentLeasePostingError({"detail": "Rent/lease demand not found."})
     return demand
-
-
-def get_rent_lease_accounting_readiness() -> dict[str, Any]:
-    mapping = _mapping(False)
-    blockers: list[str] = []
-    if ChartOfAccount.objects.filter(is_active=True).count() == 0:
-        blockers.append("Chart of Accounts records are missing.")
-    if FinanceAccount.objects.filter(is_active=True).count() == 0:
-        blockers.append("Finance accounts are missing.")
-    if not mapping:
-        blockers.append("Active rent/lease account mapping is missing.")
-    else:
-        for key, label in [
-            ("monthly_income_account_id", "Monthly income fallback account"),
-            ("deposit_liability_account_id", "Security deposit liability account"),
-            ("damage_recovery_income_account_id", "Damage recovery income account"),
-            ("settlement_finance_account_id", "Settlement finance account"),
-            ("customer_advance_liability_account_id", "Customer advance liability account"),
-        ]:
-            if not mapping.get(key):
-                blockers.append(f"{label} is missing.")
-    status = "READY" if not blockers else "NEEDS_MAPPING"
-    return {
-        "status": status,
-        "source_collection_enabled": True,
-        "accounting_bridge_enabled": status == "READY",
-        "blockers": blockers,
-        "mapping": _snapshot(mapping),
-        "counters": {
-            "deposit_sources_with_collection": RentLeaseBillingDemand.objects.filter(demand_type=RentLeaseDemandType.SECURITY_DEPOSIT, collected_amount__gt=0).count(),
-            "monthly_sources_with_collection": RentLeaseBillingDemand.objects.filter(demand_type__in=[RentLeaseDemandType.RENT_MONTHLY, RentLeaseDemandType.LEASE_MONTHLY], collected_amount__gt=0).count(),
-        },
-    }
-
-
 def preview_security_deposit_collection_posting(demand_id: int, actor=None) -> dict[str, Any]:
     demand = _demand(demand_id)
     if demand.demand_type != RentLeaseDemandType.SECURITY_DEPOSIT:

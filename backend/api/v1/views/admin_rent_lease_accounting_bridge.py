@@ -9,11 +9,23 @@ from rest_framework.views import APIView
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, RentLeaseAccountingAccountMapping
 from api.v1.permissions import IsAdmin
 from subscriptions.services import rent_lease_accounting_posting_service as bridge
+from subscriptions.services.rent_lease_finance_sync_service import (
+    ensure_premade_rent_lease_accounting_setup,
+    get_active_account_mapping,
+)
 
 
 def _error(exc: Exception) -> Response:
     detail = getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or str(exc)
     return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _clean_error_response(detail: str, field_errors: dict[str, list[str] | str], *, status_code=status.HTTP_400_BAD_REQUEST) -> Response:
+    normalized = {
+        field: messages if isinstance(messages, list) else [str(messages)]
+        for field, messages in field_errors.items()
+    }
+    return Response({"detail": detail, "field_errors": normalized}, status=status_code)
 
 
 def _account(pk, field: str, expected: str) -> ChartOfAccount:
@@ -26,13 +38,7 @@ def _account(pk, field: str, expected: str) -> ChartOfAccount:
 
 
 def _mapping_payload() -> dict | None:
-    mapping = RentLeaseAccountingAccountMapping.objects.select_related(
-        "monthly_income_account",
-        "deposit_liability_account",
-        "deposit_refund_account",
-        "damage_recovery_income_account",
-        "settlement_finance_account",
-    ).filter(is_active=True).first()
+    mapping = get_active_account_mapping(auto_create=False)
     if mapping is None:
         return None
     with connection.cursor() as cursor:
@@ -47,10 +53,23 @@ def _mapping_payload() -> dict | None:
     return {
         "id": mapping.id,
         "monthly_income_account_id": mapping.monthly_income_account_id,
+        "monthly_income_account_code": mapping.monthly_income_account.code,
+        "monthly_income_account_name": mapping.monthly_income_account.name,
+        "monthly_income_account_type": mapping.monthly_income_account.account_type,
         "deposit_liability_account_id": mapping.deposit_liability_account_id,
+        "deposit_liability_account_code": mapping.deposit_liability_account.code,
+        "deposit_liability_account_name": mapping.deposit_liability_account.name,
+        "deposit_liability_account_type": mapping.deposit_liability_account.account_type,
         "deposit_refund_account_id": mapping.deposit_refund_account_id,
+        "deposit_refund_account_code": mapping.deposit_refund_account.code,
+        "deposit_refund_account_name": mapping.deposit_refund_account.name,
+        "deposit_refund_account_type": mapping.deposit_refund_account.account_type,
         "damage_recovery_income_account_id": mapping.damage_recovery_income_account_id,
+        "damage_recovery_income_account_code": mapping.damage_recovery_income_account.code,
+        "damage_recovery_income_account_name": mapping.damage_recovery_income_account.name,
+        "damage_recovery_income_account_type": mapping.damage_recovery_income_account.account_type,
         "settlement_finance_account_id": mapping.settlement_finance_account_id,
+        "settlement_finance_account_name": mapping.settlement_finance_account.name if mapping.settlement_finance_account_id else None,
         "customer_advance_liability_account_id": extra[0],
         "rent_income_account_id": extra[1],
         "lease_income_account_id": extra[2],
@@ -74,11 +93,20 @@ class AdminRentLeaseAccountMappingBridgeView(APIView):
             "mapping": _mapping_payload(),
             "readiness": bridge.get_rent_lease_accounting_readiness(),
             "chart_accounts": [
-                {"id": row.id, "code": row.code, "name": row.name, "account_type": row.account_type}
+                {"id": row.id, "code": row.code, "name": row.name, "account_type": row.account_type, "system_code": row.system_code}
                 for row in ChartOfAccount.objects.filter(is_active=True).order_by("code")[:500]
             ],
             "finance_accounts": [
-                {"id": row.id, "name": row.name, "kind": row.kind, "chart_account_id": row.chart_account_id, "chart_account_type": row.chart_account.account_type}
+                {
+                    "id": row.id,
+                    "name": row.name,
+                    "kind": row.kind,
+                    "chart_account_id": row.chart_account_id,
+                    "chart_account_code": row.chart_account.code,
+                    "chart_account_type": row.chart_account.account_type,
+                    "chart_account_is_active": row.chart_account.is_active,
+                    "is_real_settlement_account": row.is_real_settlement_account,
+                }
                 for row in FinanceAccount.objects.select_related("chart_account").filter(is_active=True).order_by("name")[:200]
             ],
             "guidance": {
@@ -92,16 +120,36 @@ class AdminRentLeaseAccountMappingBridgeView(APIView):
         })
 
     def post(self, request):
+        action = (request.data.get("action") or "").strip().upper()
+        if action == "ENSURE_PREMADE":
+            try:
+                mapping = ensure_premade_rent_lease_accounting_setup(performed_by=request.user)
+            except Exception as exc:
+                return _clean_error_response(
+                    "Premade rent/lease accounting setup could not be completed.",
+                    {"non_field_errors": str(exc)},
+                )
+            return Response(
+                {
+                    "detail": "Premade rent/lease accounting setup is ready.",
+                    "mapping_id": mapping.id,
+                    "mapping": _mapping_payload(),
+                    "readiness": bridge.get_rent_lease_accounting_readiness(),
+                }
+            )
         try:
             data = request.data
-            mapping = RentLeaseAccountingAccountMapping.objects.filter(is_active=True).first() or RentLeaseAccountingAccountMapping(is_active=True)
+            mapping = get_active_account_mapping(auto_create=False) or RentLeaseAccountingAccountMapping(is_active=True)
             mapping.monthly_income_account = _account(data.get("monthly_income_account_id"), "monthly_income_account", ChartOfAccountType.INCOME)
             mapping.deposit_liability_account = _account(data.get("deposit_liability_account_id"), "deposit_liability_account", ChartOfAccountType.LIABILITY)
             mapping.deposit_refund_account = _account(data.get("deposit_refund_account_id"), "deposit_refund_account", ChartOfAccountType.ASSET)
             mapping.damage_recovery_income_account = _account(data.get("damage_recovery_income_account_id"), "damage_recovery_income_account", ChartOfAccountType.INCOME)
             settlement_id = data.get("settlement_finance_account_id")
-            mapping.settlement_finance_account = FinanceAccount.objects.get(pk=int(settlement_id)) if str(settlement_id or "").isdigit() else None
-            if mapping.settlement_finance_account and mapping.settlement_finance_account.chart_account.account_type != ChartOfAccountType.ASSET:
+            if str(settlement_id or "").isdigit():
+                mapping.settlement_finance_account = FinanceAccount.objects.select_related("chart_account").get(pk=int(settlement_id), is_active=True)
+            if not mapping.settlement_finance_account_id:
+                raise ValidationError({"settlement_finance_account": "Settlement finance account is required."})
+            if mapping.settlement_finance_account.chart_account.account_type != ChartOfAccountType.ASSET:
                 raise ValidationError({"settlement_finance_account": "Settlement finance account must map to ASSET."})
             mapping.notes = (data.get("notes") or "").strip()
             mapping.is_active = True
@@ -125,9 +173,21 @@ class AdminRentLeaseAccountMappingBridgeView(APIView):
                     """,
                     [data.get("customer_advance_liability_account_id") or None, data.get("rent_income_account_id") or None, data.get("lease_income_account_id") or None, mapping.id],
                 )
+        except ValidationError as exc:
+            field_errors = getattr(exc, "message_dict", None)
+            if not field_errors:
+                field_errors = {"non_field_errors": getattr(exc, "messages", [str(exc)])}
+            return _clean_error_response("Invalid rent/lease mapping.", field_errors)
         except Exception as exc:
-            return _error(exc)
-        return Response({"detail": "Rent/lease account mapping saved.", "mapping_id": mapping.id, "readiness": bridge.get_rent_lease_accounting_readiness()})
+            return _clean_error_response("Invalid rent/lease mapping.", {"non_field_errors": str(exc)})
+        return Response(
+            {
+                "detail": "Rent/lease account mapping saved.",
+                "mapping_id": mapping.id,
+                "mapping": _mapping_payload(),
+                "readiness": bridge.get_rent_lease_accounting_readiness(),
+            }
+        )
 
 
 class AdminRentLeaseAccountingSummaryView(APIView):

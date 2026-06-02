@@ -210,10 +210,18 @@ export async function recordAdminDepositRefund(input: {
 
 export type AdminRentLeaseAccountMappingPayload = {
   mapping: Record<string, unknown> | null;
+  readiness?: {
+    status?: string;
+    reason?: string;
+    blockers?: string[];
+    field_errors?: Record<string, string[]>;
+    accounts?: Record<string, unknown>;
+  };
   chart_accounts: Array<Record<string, unknown>>;
   finance_accounts: Array<Record<string, unknown>>;
   posting_boundary_note?: string;
   premade_setup_enabled?: boolean;
+  setup_error?: string | null;
 };
 
 export async function getAdminRentLeaseAccountMapping() {

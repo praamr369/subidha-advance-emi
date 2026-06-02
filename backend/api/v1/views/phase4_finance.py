@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import HttpResponse
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -13,7 +14,7 @@ from api.v1.serializers.billing import (
     CustomerDirectSaleListSerializer,
     CustomerDirectSaleSummarySerializer,
 )
-from accounting.models import ChartOfAccount, FinanceAccount, RentLeaseAccountingAccountMapping
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, RentLeaseAccountingAccountMapping
 from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, ReceiptDocument
 from core.services.operational_visibility import INACTIVE_DIRECT_SALE_STATUSES
 from subscriptions.models import (
@@ -67,6 +68,7 @@ from subscriptions.services.rent_lease_finance_sync_service import (
     ensure_premade_rent_lease_accounting_setup,
     get_active_account_mapping,
 )
+from subscriptions.services.rent_lease_accounting_readiness_service import get_rent_lease_accounting_readiness
 
 
 POSTING_READY_NOTE = "Operational source collection is enabled. Rent/lease accounting bridge posts system journals after premade COA/FA/mapping setup is available."
@@ -323,59 +325,110 @@ def _serialize_rent_lease_mapping(mapping):
     }
 
 
-def _account_mapping_payload(mapping):
+def _account_mapping_payload(mapping, *, setup_error: str | None = None):
     return {
         "mapping": _serialize_rent_lease_mapping(mapping),
+        "readiness": get_rent_lease_accounting_readiness(auto_create=False),
         "chart_accounts": [
             {"id": row.id, "code": row.code, "name": row.name, "account_type": row.account_type, "system_code": row.system_code}
             for row in ChartOfAccount.objects.filter(is_active=True).order_by("code")[:500]
         ],
         "finance_accounts": [
-            {"id": row.id, "name": row.name, "kind": row.kind, "chart_account_code": row.chart_account.code}
+            {
+                "id": row.id,
+                "name": row.name,
+                "kind": row.kind,
+                "chart_account_code": row.chart_account.code,
+                "chart_account_type": row.chart_account.account_type,
+                "is_real_settlement_account": row.is_real_settlement_account,
+            }
             for row in FinanceAccount.objects.select_related("chart_account").filter(is_active=True).order_by("name")[:200]
         ],
         "posting_boundary_note": POSTING_READY_NOTE,
         "premade_setup_enabled": True,
+        "setup_error": setup_error,
     }
+
+
+def _clean_error_response(detail: str, field_errors: dict[str, str], *, status_code=status.HTTP_400_BAD_REQUEST) -> Response:
+    normalized = {
+        field: messages if isinstance(messages, list) else [str(messages)]
+        for field, messages in field_errors.items()
+    }
+    return Response({"detail": detail, "field_errors": normalized}, status=status_code)
+
+
+def _active_chart_account(pk, field: str, expected_type: str) -> ChartOfAccount:
+    account = ChartOfAccount.objects.filter(pk=int(pk or 0), is_active=True).first()
+    if account is None:
+        raise DjangoValidationError({field: "Active chart account is required."})
+    if account.account_type != expected_type:
+        raise DjangoValidationError({field: f"Account must be {expected_type}."})
+    return account
+
+
+def _active_settlement_account(pk) -> FinanceAccount | None:
+    if pk in {None, ""}:
+        return None
+    if not str(pk).isdigit():
+        raise DjangoValidationError({"settlement_finance_account": "Active settlement finance account is required."})
+    account = FinanceAccount.objects.select_related("chart_account").filter(pk=int(pk), is_active=True).first()
+    if account is None:
+        raise DjangoValidationError({"settlement_finance_account": "Active settlement finance account is required."})
+    if not account.chart_account_id or not account.chart_account.is_active:
+        raise DjangoValidationError({"settlement_finance_account": "Settlement finance account must use an active chart account."})
+    if account.chart_account.account_type != ChartOfAccountType.ASSET:
+        raise DjangoValidationError({"settlement_finance_account": "Settlement finance account must map to ASSET."})
+    return account
 
 
 class AdminFinanceAccountMappingView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        mapping = ensure_premade_rent_lease_accounting_setup(performed_by=request.user)
-        return Response(_account_mapping_payload(mapping))
+        try:
+            mapping = ensure_premade_rent_lease_accounting_setup(performed_by=request.user)
+            return Response(_account_mapping_payload(mapping))
+        except Exception as exc:
+            return Response(_account_mapping_payload(None, setup_error=str(exc)))
 
     def post(self, request):
         payload = request.data
         action = (payload.get("action") or "").strip().upper()
         if action == "ENSURE_PREMADE":
-            mapping = ensure_premade_rent_lease_accounting_setup(performed_by=request.user)
+            try:
+                mapping = ensure_premade_rent_lease_accounting_setup(performed_by=request.user)
+            except Exception as exc:
+                return _clean_error_response(
+                    "Premade rent/lease accounting setup could not be completed.",
+                    {"non_field_errors": str(exc)},
+                )
             return Response({"detail": "Premade rent/lease accounting setup is ready.", "mapping_id": mapping.id, **_account_mapping_payload(mapping)})
 
-        mapping = get_active_account_mapping()
+        mapping = get_active_account_mapping(auto_create=False)
         if mapping is None:
             mapping = RentLeaseAccountingAccountMapping(is_active=True)
         try:
-            monthly_income_account_id = int(payload.get("monthly_income_account_id") or 0)
-            deposit_liability_account_id = int(payload.get("deposit_liability_account_id") or 0)
-            deposit_refund_account_id = int(payload.get("deposit_refund_account_id") or 0)
-            damage_recovery_income_account_id = int(payload.get("damage_recovery_income_account_id") or 0)
-            settlement_finance_account_id_raw = payload.get("settlement_finance_account_id")
-            mapping.monthly_income_account = ChartOfAccount.objects.get(pk=monthly_income_account_id)
-            mapping.deposit_liability_account = ChartOfAccount.objects.get(pk=deposit_liability_account_id)
-            mapping.deposit_refund_account = ChartOfAccount.objects.get(pk=deposit_refund_account_id)
-            mapping.damage_recovery_income_account = ChartOfAccount.objects.get(pk=damage_recovery_income_account_id)
-            mapping.settlement_finance_account = (
-                FinanceAccount.objects.get(pk=int(settlement_finance_account_id_raw))
-                if str(settlement_finance_account_id_raw or "").isdigit()
-                else mapping.settlement_finance_account
-            )
+            mapping.monthly_income_account = _active_chart_account(payload.get("monthly_income_account_id"), "monthly_income_account", ChartOfAccountType.INCOME)
+            mapping.deposit_liability_account = _active_chart_account(payload.get("deposit_liability_account_id"), "deposit_liability_account", ChartOfAccountType.LIABILITY)
+            mapping.deposit_refund_account = _active_chart_account(payload.get("deposit_refund_account_id"), "deposit_refund_account", ChartOfAccountType.ASSET)
+            mapping.damage_recovery_income_account = _active_chart_account(payload.get("damage_recovery_income_account_id"), "damage_recovery_income_account", ChartOfAccountType.INCOME)
+            settlement_finance_account = _active_settlement_account(payload.get("settlement_finance_account_id"))
+            if settlement_finance_account is not None:
+                mapping.settlement_finance_account = settlement_finance_account
             mapping.notes = (payload.get("notes") or "").strip()
             mapping.is_active = True
             mapping.save()
+        except DjangoValidationError as exc:
+            field_errors = {
+                field: " ".join(str(message) for message in messages)
+                for field, messages in (getattr(exc, "message_dict", None) or {}).items()
+            }
+            if not field_errors:
+                field_errors = {"non_field_errors": " ".join(str(message) for message in getattr(exc, "messages", [str(exc)]))}
+            return _clean_error_response("Invalid rent/lease mapping.", field_errors)
         except Exception as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _clean_error_response("Invalid rent/lease mapping.", {"non_field_errors": str(exc)})
         log_audit(
             action_type="PAYMENT_FLAGGED",
             instance=mapping,

@@ -15,7 +15,7 @@ REQUIRED_SYSTEM_CODES = {
     "rent_income_account": ("RENT_INCOME", ChartOfAccountType.INCOME),
     "lease_income_account": ("LEASE_INCOME", ChartOfAccountType.INCOME),
     "deposit_liability_account": ("SECURITY_DEPOSIT_LIABILITY", ChartOfAccountType.LIABILITY),
-    "deposit_refund_account": ("SECURITY_DEPOSIT_LIABILITY", ChartOfAccountType.LIABILITY),
+    "deposit_refund_account": ("CASH_COLLECTION", ChartOfAccountType.ASSET),
     "damage_recovery_income_account": ("DAMAGE_RECOVERY", ChartOfAccountType.INCOME),
     "customer_advance_liability_account": ("CUSTOMER_ADVANCE_UNEARNED_REVENUE", ChartOfAccountType.LIABILITY),
 }

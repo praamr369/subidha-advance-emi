@@ -1024,17 +1024,22 @@ class RentLeaseAccountingAccountMapping(AccountingTimeStampedModel):
             errors["monthly_income_account"] = "Monthly income account must be an INCOME chart account."
         if self.deposit_liability_account_id and self.deposit_liability_account.account_type != ChartOfAccountType.LIABILITY:
             errors["deposit_liability_account"] = "Deposit liability account must be a LIABILITY chart account."
-        if self.deposit_refund_account_id and self.deposit_refund_account.account_type not in {
-            ChartOfAccountType.ASSET,
-            ChartOfAccountType.LIABILITY,
-            ChartOfAccountType.EXPENSE,
-        }:
-            errors["deposit_refund_account"] = "Deposit refund account must be an ASSET, LIABILITY, or EXPENSE chart account."
+        if self.deposit_refund_account_id and self.deposit_refund_account.account_type != ChartOfAccountType.ASSET:
+            errors["deposit_refund_account"] = "Deposit refund account must be an ASSET chart account."
         if (
             self.damage_recovery_income_account_id
             and self.damage_recovery_income_account.account_type != ChartOfAccountType.INCOME
         ):
             errors["damage_recovery_income_account"] = "Damage recovery account must be an INCOME chart account."
+        if self.settlement_finance_account_id:
+            if not self.settlement_finance_account.is_active:
+                errors["settlement_finance_account"] = "Settlement finance account must be active."
+            elif (
+                not self.settlement_finance_account.chart_account_id
+                or not self.settlement_finance_account.chart_account.is_active
+                or self.settlement_finance_account.chart_account.account_type != ChartOfAccountType.ASSET
+            ):
+                errors["settlement_finance_account"] = "Settlement finance account must map to an active ASSET chart account."
         if errors:
             raise ValidationError(errors)
 

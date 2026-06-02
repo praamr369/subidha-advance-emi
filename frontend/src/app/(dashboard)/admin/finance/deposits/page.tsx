@@ -11,6 +11,8 @@ import StatusBadge from "@/components/ui/status-badge";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import { ApiError } from "@/lib/api";
+import { getAccountingSetupReadiness } from "@/services/accounting-setup";
 import {
   approveAdminDepositRefund,
   createAdminDepositDeduction,
@@ -26,6 +28,12 @@ const SOURCE_NOTE = "Security deposits are recorded against authoritative rent/l
 const HISTORY_NOTE = "Refund actions do not rewrite historical collection, receipt, journal, settlement, or reconciliation records.";
 const MAPPING_NOTE = "Premade setup creates the required COA, Finance Account, and active rent/lease mapping. Manual override remains available for admin control.";
 const READY_NOTE = "Operational source collection is enabled. Rent/lease accounting bridge posts system journals after premade COA/FA/mapping setup is available.";
+const REQUIRED_MAPPING_TYPES: Record<string, string> = {
+  monthly_income_account_id: "INCOME",
+  deposit_liability_account_id: "LIABILITY",
+  deposit_refund_account_id: "ASSET",
+  damage_recovery_income_account_id: "INCOME",
+};
 
 function money(value: unknown): string {
   const parsed = Number(value ?? 0);
@@ -45,6 +53,27 @@ function posture(row: AdminDepositRow): string {
   return "VIEW_ONLY";
 }
 
+function accountType(account: Record<string, unknown> | undefined): string {
+  return String(account?.account_type ?? account?.type ?? "").trim().toUpperCase();
+}
+
+function financeAccountChartType(account: Record<string, unknown> | undefined): string {
+  const nested = account?.chart_account;
+  if (nested && typeof nested === "object") {
+    return accountType(nested as Record<string, unknown>);
+  }
+  return String(account?.chart_account_type ?? "").trim().toUpperCase();
+}
+
+function formatApiError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && Object.keys(err.fieldErrors).length > 0) {
+    return Object.entries(err.fieldErrors)
+      .map(([field, messages]) => `${field}: ${messages.join(" ")}`)
+      .join(" ");
+  }
+  return err instanceof Error ? err.message : fallback;
+}
+
 export default function AdminFinanceDepositsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +82,8 @@ export default function AdminFinanceDepositsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mapping, setMapping] = useState<Record<string, unknown> | null>(null);
   const [mappingNote, setMappingNote] = useState(READY_NOTE);
+  const [mappingSetupError, setMappingSetupError] = useState<string | null>(null);
+  const [backendMappingFieldErrors, setBackendMappingFieldErrors] = useState<Record<string, string[]>>({});
   const [chartAccounts, setChartAccounts] = useState<Array<Record<string, unknown>>>([]);
   const [financeAccounts, setFinanceAccounts] = useState<Array<Record<string, unknown>>>([]);
   const [form, setForm] = useState({ amount: "", reason: "", approval_transaction_id: "" });
@@ -68,9 +99,11 @@ export default function AdminFinanceDepositsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [registerPayload, mappingPayload] = await Promise.all([
+      const [registerPayload, mappingResult] = await Promise.all([
         listAdminDepositRegister(),
-        getAdminRentLeaseAccountMapping(),
+        getAdminRentLeaseAccountMapping()
+          .then((payload) => ({ ok: true as const, payload }))
+          .catch((err) => ({ ok: false as const, err })),
       ]);
       const nextRows = registerPayload.results ?? [];
       setRows(nextRows);
@@ -79,21 +112,41 @@ export default function AdminFinanceDepositsPage() {
           ? current
           : nextRows[0]?.demand_id ?? null,
       );
-      setMapping(mappingPayload.mapping ?? null);
-      setMappingNote(mappingPayload.posting_boundary_note || READY_NOTE);
-      setChartAccounts(mappingPayload.chart_accounts ?? []);
-      setFinanceAccounts(mappingPayload.finance_accounts ?? []);
-      setMappingForm({
-        monthly_income_account_id: String(mappingPayload.mapping?.monthly_income_account_id ?? ""),
-        deposit_liability_account_id: String(mappingPayload.mapping?.deposit_liability_account_id ?? ""),
-        deposit_refund_account_id: String(mappingPayload.mapping?.deposit_refund_account_id ?? ""),
-        damage_recovery_income_account_id: String(mappingPayload.mapping?.damage_recovery_income_account_id ?? ""),
-        settlement_finance_account_id: String(mappingPayload.mapping?.settlement_finance_account_id ?? ""),
-        notes: String(mappingPayload.mapping?.notes ?? ""),
-      });
+      if (mappingResult.ok) {
+        const mappingPayload = mappingResult.payload;
+        setMapping(mappingPayload.mapping ?? null);
+        setMappingNote(mappingPayload.posting_boundary_note || READY_NOTE);
+        const readinessStatus = String(mappingPayload.readiness?.status ?? "").toUpperCase();
+        const readinessReason = readinessStatus && readinessStatus !== "READY" ? mappingPayload.readiness?.reason : "";
+        setMappingSetupError(String(mappingPayload.setup_error ?? readinessReason ?? "").trim() || null);
+        setBackendMappingFieldErrors(mappingPayload.readiness?.field_errors ?? {});
+        setChartAccounts(mappingPayload.chart_accounts ?? []);
+        setFinanceAccounts(mappingPayload.finance_accounts ?? []);
+        setMappingForm({
+          monthly_income_account_id: String(mappingPayload.mapping?.monthly_income_account_id ?? ""),
+          deposit_liability_account_id: String(mappingPayload.mapping?.deposit_liability_account_id ?? ""),
+          deposit_refund_account_id: String(mappingPayload.mapping?.deposit_refund_account_id ?? ""),
+          damage_recovery_income_account_id: String(mappingPayload.mapping?.damage_recovery_income_account_id ?? ""),
+          settlement_finance_account_id: String(mappingPayload.mapping?.settlement_finance_account_id ?? ""),
+          notes: String(mappingPayload.mapping?.notes ?? ""),
+        });
+      } else {
+        setMapping(null);
+        setBackendMappingFieldErrors({});
+        setMappingSetupError(formatApiError(mappingResult.err, "Rent/lease mapping requires repair."));
+        setMappingNote("Rent/lease mapping could not be loaded. Review the notice below or run premade setup to repair COA/FA/mapping.");
+        try {
+          const readiness = await getAccountingSetupReadiness();
+          setChartAccounts((readiness.chart_accounts ?? []) as Array<Record<string, unknown>>);
+          setFinanceAccounts((readiness.finance_accounts ?? []) as Array<Record<string, unknown>>);
+        } catch {
+          setChartAccounts([]);
+          setFinanceAccounts([]);
+        }
+      }
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load deposit finance workspace.");
+      setError(formatApiError(err, "Failed to load deposit finance workspace."));
     } finally {
       setLoading(false);
     }
@@ -120,12 +173,35 @@ export default function AdminFinanceDepositsPage() {
   const canDeduct = Boolean(selected?.can_deduct && validAmount && form.reason.trim());
   const canApprove = Boolean(selected?.can_approve_refund && validAmount);
   const canRecord = Boolean(selected?.can_record_refund && validAmount);
-  const canSaveMapping = Boolean(
-    mappingForm.monthly_income_account_id &&
-      mappingForm.deposit_liability_account_id &&
-      mappingForm.deposit_refund_account_id &&
-      mappingForm.damage_recovery_income_account_id,
-  );
+  const accountById = useMemo(() => {
+    const out = new Map<string, Record<string, unknown>>();
+    chartAccounts.forEach((account) => out.set(String(account.id), account));
+    return out;
+  }, [chartAccounts]);
+
+  const mappingFieldErrors = useMemo(() => {
+    const errors: Record<string, string> = {};
+    for (const [field, expectedType] of Object.entries(REQUIRED_MAPPING_TYPES)) {
+      const selectedValue = mappingForm[field as keyof typeof mappingForm];
+      if (!selectedValue) {
+        errors[field] = `${expectedType} account is required.`;
+        continue;
+      }
+      const selectedAccount = accountById.get(selectedValue);
+      if (accountType(selectedAccount) !== expectedType) {
+        errors[field] = `Select an active ${expectedType} chart account.`;
+      }
+    }
+    const selectedSettlement = mappingForm.settlement_finance_account_id
+      ? financeAccounts.find((account) => String(account.id) === mappingForm.settlement_finance_account_id)
+      : undefined;
+    if (mappingForm.settlement_finance_account_id && financeAccountChartType(selectedSettlement) !== "ASSET") {
+      errors.settlement_finance_account_id = "Select an active finance account mapped to an ASSET chart account.";
+    }
+    return errors;
+  }, [accountById, financeAccounts, mappingForm]);
+
+  const canSaveMapping = Object.keys(mappingFieldErrors).length === 0;
 
   async function runAction(kind: "deduct" | "approve" | "record") {
     if (!selected) return;
@@ -149,7 +225,7 @@ export default function AdminFinanceDepositsPage() {
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Deposit action failed.");
+      setError(formatApiError(err, "Deposit action failed."));
     }
   }
 
@@ -159,7 +235,7 @@ export default function AdminFinanceDepositsPage() {
       setNotice(response.detail || "Premade rent/lease accounting setup is ready.");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to ensure premade rent/lease accounting setup.");
+      setError(formatApiError(err, "Failed to ensure premade rent/lease accounting setup."));
     }
   }
 
@@ -174,10 +250,12 @@ export default function AdminFinanceDepositsPage() {
         settlement_finance_account_id: mappingForm.settlement_finance_account_id ? Number(mappingForm.settlement_finance_account_id) : null,
         notes: mappingForm.notes,
       });
+      setBackendMappingFieldErrors({});
       setNotice("Rent/lease accounting mapping saved. Bridge is posting-ready for future source events.");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save account mapping.");
+      if (err instanceof ApiError) setBackendMappingFieldErrors(err.fieldErrors);
+      setError(formatApiError(err, "Failed to save account mapping."));
     }
   }
 
@@ -303,6 +381,7 @@ export default function AdminFinanceDepositsPage() {
 
       <WorkspaceSection title="Accounting Mapping Panel" description={MAPPING_NOTE}>
         <div id="accounting-mapping" className="rounded-xl border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{mappingNote}</div>
+        {mappingSetupError ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Repair required: {mappingSetupError}</div> : null}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" className="rounded-xl border px-3 py-2 text-sm font-semibold" onClick={() => void handleEnsurePremade()}>
             Ensure Premade COA + FA + Mapping
@@ -320,25 +399,33 @@ export default function AdminFinanceDepositsPage() {
         ) : null}
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {[
-            ["monthly_income_account_id", "Monthly income account"],
-            ["deposit_liability_account_id", "Deposit liability account"],
-            ["deposit_refund_account_id", "Deposit refund account"],
-            ["damage_recovery_income_account_id", "Damage recovery income account"],
-          ].map(([key, label]) => (
+            ["monthly_income_account_id", "Monthly income account", "INCOME"],
+            ["deposit_liability_account_id", "Deposit liability account", "LIABILITY"],
+            ["deposit_refund_account_id", "Deposit refund account", "ASSET"],
+            ["damage_recovery_income_account_id", "Damage recovery income account", "INCOME"],
+          ].map(([key, label, expectedType]) => (
             <label key={key} className="text-sm">
-              <div className="mb-1 text-xs text-muted-foreground">{label}</div>
+              <div className="mb-1 text-xs text-muted-foreground">{label} ({expectedType})</div>
               <select className="w-full rounded-xl border px-3 py-2 text-sm" value={mappingForm[key as keyof typeof mappingForm]} onChange={(e) => setMappingForm((c) => ({ ...c, [key]: e.target.value }))}>
                 <option value="">Select account</option>
-                {chartAccounts.map((acc) => <option key={String(acc.id)} value={String(acc.id)}>{String(acc.code)} - {String(acc.name)} ({String(acc.account_type)})</option>)}
+                {chartAccounts
+                  .filter((acc) => accountType(acc) === expectedType)
+                  .map((acc) => <option key={String(acc.id)} value={String(acc.id)}>{String(acc.code)} - {String(acc.name)} ({String(acc.account_type ?? acc.type)})</option>)}
               </select>
+              {mappingFieldErrors[key] ? <div className="mt-1 text-xs text-red-700">{mappingFieldErrors[key]}</div> : null}
+              {backendMappingFieldErrors[key]?.length ? <div className="mt-1 text-xs text-red-700">{backendMappingFieldErrors[key].join(" ")}</div> : null}
             </label>
           ))}
           <label className="text-sm">
             <div className="mb-1 text-xs text-muted-foreground">Settlement finance account</div>
             <select className="w-full rounded-xl border px-3 py-2 text-sm" value={mappingForm.settlement_finance_account_id} onChange={(e) => setMappingForm((c) => ({ ...c, settlement_finance_account_id: e.target.value }))}>
               <option value="">Use premade/default</option>
-              {financeAccounts.map((acc) => <option key={String(acc.id)} value={String(acc.id)}>{String(acc.name)} ({String(acc.kind)})</option>)}
+              {financeAccounts
+                .filter((acc) => financeAccountChartType(acc) === "ASSET" && acc.is_active !== false && acc.chart_account_is_active !== false)
+                .map((acc) => <option key={String(acc.id)} value={String(acc.id)}>{String(acc.name)} ({String(acc.kind)})</option>)}
             </select>
+            {mappingFieldErrors.settlement_finance_account_id ? <div className="mt-1 text-xs text-red-700">{mappingFieldErrors.settlement_finance_account_id}</div> : null}
+            {backendMappingFieldErrors.settlement_finance_account?.length ? <div className="mt-1 text-xs text-red-700">{backendMappingFieldErrors.settlement_finance_account.join(" ")}</div> : null}
           </label>
           <textarea className="rounded-xl border px-3 py-2 text-sm md:col-span-2" rows={3} placeholder="Notes" value={mappingForm.notes} onChange={(e) => setMappingForm((c) => ({ ...c, notes: e.target.value }))} />
         </div>
