@@ -20,9 +20,21 @@ const PURCHASE_VENDOR_EVENT_KEYS = new Set([
   "vendor_purchase_bill",
   "vendor_payment",
   "purchase_inventory_receive",
-  "inventory_purchase_receive",
   "vendor_return",
   "purchase_expense",
+]);
+
+const INVENTORY_EVENT_KEYS = new Set([
+  "inventory_purchase_receive",
+  "inventory_adjustment_gain",
+  "inventory_adjustment_loss",
+  "inventory_delivery_out",
+]);
+
+const MANUFACTURING_EVENT_KEYS = new Set([
+  "manufacturing_consumption",
+  "manufacturing_output",
+  "manufacturing_wastage",
 ]);
 
 const PAYROLL_EVENT_KEYS = new Set([
@@ -38,6 +50,8 @@ function cx(...values: Array<string | false | null | undefined>) {
 }
 
 function bridgeGroupName(event: AccountingBridgeReadinessEvent): string {
+  if (INVENTORY_EVENT_KEYS.has(event.event_key)) return "Inventory";
+  if (MANUFACTURING_EVENT_KEYS.has(event.event_key)) return "Manufacturing";
   if (PURCHASE_VENDOR_EVENT_KEYS.has(event.event_key)) return "Purchase & Vendors";
   if (PAYROLL_EVENT_KEYS.has(event.event_key)) return "HR & Payroll";
   return event.event_group || event.source_module || "Other";
