@@ -5,14 +5,14 @@ from rest_framework.views import APIView
 
 from accounting.services.purchase_vendor_bridge_guard_service import run_inventory_posting_bridges_guarded
 from api.v1.permissions import IsAdmin
-from api.v1.serializers.accounting_phase3 import CommissionPayoutBridgeRunSerializer
+from api.v1.serializers.accounting_phase3 import PurchaseVendorBridgeRunSerializer
 
 
 class InventoryBridgeRunView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def post(self, request):
-        serializer = CommissionPayoutBridgeRunSerializer(data=request.data)
+        serializer = PurchaseVendorBridgeRunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             payload = run_inventory_posting_bridges_guarded(
