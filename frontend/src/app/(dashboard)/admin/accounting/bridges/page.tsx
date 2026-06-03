@@ -177,6 +177,7 @@ export default function AccountingBridgeReadinessPage() {
         { label: "Bridge Readiness" },
       ]}
       actions={[
+        { href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge Reconciliation", variant: "secondary" },
         { href: ROUTES.admin.accountingSetup, label: "Accounting Setup", variant: "secondary" },
         { href: ROUTES.admin.accountingChartOfAccounts, label: "Chart of Accounts", variant: "secondary" },
       ]}
@@ -207,6 +208,7 @@ export default function AccountingBridgeReadinessPage() {
             <SummaryCard label="Not configured" value={summary.not_configured_count} tone="border-slate-200 bg-slate-50 text-slate-900" />
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
+            <Link href={ROUTES.admin.accountingBridgeReconciliation} className="rounded-xl border px-3 py-2 text-sm font-semibold">Bridge Reconciliation</Link>
             <Link href={ROUTES.admin.accountingSetup} className="rounded-xl border px-3 py-2 text-sm font-semibold">Accounting Setup</Link>
             <Link href={ROUTES.admin.financeCollect} className="rounded-xl border px-3 py-2 text-sm font-semibold">Finance Collection</Link>
             <Link href={ROUTES.admin.billingDirectSales} className="rounded-xl border px-3 py-2 text-sm font-semibold">Direct Sale</Link>
