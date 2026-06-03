@@ -9,6 +9,9 @@ from accounting.services.finance_account_readiness import finance_account_readin
 from subscriptions.models import RentLeaseBillingDemand, RentLeaseDemandType
 from subscriptions.services.rent_lease_finance_sync_service import get_active_account_mapping
 
+POSTING_MODE_AUDIT_DEFERRED = "AUDIT_DEFERRED"
+POSTING_APPROVAL_REQUIRED_ACTION = "Enable bridge posting through approved accounting bridge workflow."
+
 
 def _account_payload(account: ChartOfAccount | None) -> dict[str, Any] | None:
     if account is None:
@@ -144,6 +147,12 @@ def get_rent_lease_accounting_readiness(*, auto_create: bool = True) -> dict[str
             "settlement_finance_account_id": mapping.settlement_finance_account_id,
             **extra_ids,
         }
+    mapping_ready = status == "READY"
+    posting_message = (
+        "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled."
+        if mapping_ready
+        else blockers[0] if blockers else "Rent/lease accounting mapping is not ready."
+    )
     return {
         "status": status,
         "reason": "Rent/lease accounting bridge is ready." if status == "READY" else blockers[0] if blockers else "",
@@ -152,6 +161,13 @@ def get_rent_lease_accounting_readiness(*, auto_create: bool = True) -> dict[str
         "blockers": blockers,
         "source_collection_enabled": True,
         "accounting_bridge_enabled": status == "READY",
+        "collection_ready": True,
+        "mapping_ready": mapping_ready,
+        "posting_bridge_ready": False,
+        "posting_bridge_approved": False,
+        "posting_mode": POSTING_MODE_AUDIT_DEFERRED,
+        "message": posting_message,
+        "operator_action": POSTING_APPROVAL_REQUIRED_ACTION if mapping_ready else "Complete rent/lease COA, finance account, and mapping setup.",
         "mapping": mapping_snapshot or {"mapping_configured": False},
         "accounts": accounts,
         "counters": {

@@ -4,6 +4,13 @@ export type AccountingReadiness = {
   status: string;
   source_collection_enabled: boolean;
   accounting_bridge_enabled: boolean;
+  collection_ready?: boolean;
+  mapping_ready?: boolean;
+  posting_bridge_ready?: boolean;
+  posting_bridge_approved?: boolean;
+  posting_mode?: "AUDIT_DEFERRED" | "POSTING_ENABLED" | "MANUAL_APPROVAL_REQUIRED" | string;
+  message?: string | null;
+  operator_action?: string | null;
   blockers: string[];
   mapping?: Record<string, unknown> | null;
   counters?: Record<string, number>;

@@ -72,7 +72,7 @@ from subscriptions.services.rent_lease_finance_sync_service import (
 from subscriptions.services.rent_lease_accounting_readiness_service import get_rent_lease_accounting_readiness
 
 
-POSTING_READY_NOTE = "Operational source collection is enabled. Rent/lease accounting bridge posts system journals after premade COA/FA/mapping setup is available."
+POSTING_READY_NOTE = "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled."
 
 
 def _safe_customer_profile(request):
@@ -327,9 +327,10 @@ def _serialize_rent_lease_mapping(mapping):
 
 
 def _account_mapping_payload(mapping, *, setup_error: str | None = None):
+    readiness = get_rent_lease_accounting_readiness(auto_create=False)
     return {
         "mapping": _serialize_rent_lease_mapping(mapping),
-        "readiness": get_rent_lease_accounting_readiness(auto_create=False),
+        "readiness": readiness,
         "chart_accounts": [
             {"id": row.id, "code": row.code, "name": row.name, "account_type": row.account_type, "system_code": row.system_code}
             for row in ChartOfAccount.objects.filter(is_active=True).order_by("code")[:500]
@@ -349,7 +350,7 @@ def _account_mapping_payload(mapping, *, setup_error: str | None = None):
             }
             for row in FinanceAccount.objects.select_related("chart_account").filter(is_active=True).order_by("name")[:200]
         ],
-        "posting_boundary_note": POSTING_READY_NOTE,
+        "posting_boundary_note": readiness.get("message") or POSTING_READY_NOTE,
         "premade_setup_enabled": True,
         "setup_error": setup_error,
     }

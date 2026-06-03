@@ -55,7 +55,12 @@ function isSelectable(account: AccountingSetupReadinessFinanceAccount): boolean 
 }
 
 function firstBlocker(item: PostingProfileReadinessItem): string {
-  return item.blockers?.[0] || item.recommended_action || "Ready.";
+  return item.blockers?.[0] || item.message || item.recommended_action || "Ready.";
+}
+
+function setupFlagLabel(value: boolean | undefined): string {
+  if (value === undefined) return "Not exposed";
+  return value ? "Ready" : "Not ready";
 }
 
 function issueLevel(issue: unknown): string {
@@ -507,6 +512,27 @@ export default function AdminAccountingSetupPage() {
                 <div className="mt-3 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
                   {firstBlocker(item)}
                 </div>
+                {item.collection_ready !== undefined || item.mapping_ready !== undefined || item.posting_mode ? (
+                  <div className="mt-3 grid gap-2 text-xs md:grid-cols-3">
+                    <div className="rounded-xl border border-border bg-muted/20 p-3">
+                      <div className="font-semibold text-foreground">Source collection</div>
+                      <div className="mt-1 text-muted-foreground">{setupFlagLabel(item.collection_ready)}</div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/20 p-3">
+                      <div className="font-semibold text-foreground">COA / FA mapping</div>
+                      <div className="mt-1 text-muted-foreground">{setupFlagLabel(item.mapping_ready)}</div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/20 p-3">
+                      <div className="font-semibold text-foreground">Posting mode</div>
+                      <div className="mt-1 text-muted-foreground">{item.posting_mode || "Not exposed"}</div>
+                    </div>
+                  </div>
+                ) : null}
+                {item.operator_action ? (
+                  <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-950">
+                    Action: {item.operator_action}
+                  </div>
+                ) : null}
                 {!item.implemented ? <div className="mt-2 text-xs font-medium text-blue-800">Deferred workflow. Do not create fake collection action.</div> : null}
               </article>
             ))}

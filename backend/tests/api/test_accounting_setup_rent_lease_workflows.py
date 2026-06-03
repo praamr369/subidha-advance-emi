@@ -47,7 +47,12 @@ class AccountingSetupRentLeaseWorkflowReadinessTests(APITestCase):
         self.assertTrue(row["implemented"])
         self.assertEqual(row["status"], "READY")
         self.assertEqual(row["blockers"], [])
-        self.assertIn("Operational source collection is enabled", row["operator_note"])
+        self.assertTrue(row["collection_ready"])
+        self.assertTrue(row["mapping_ready"])
+        self.assertFalse(row["posting_bridge_approved"])
+        self.assertFalse(row["posting_bridge_ready"])
+        self.assertEqual(row["posting_mode"], "AUDIT_DEFERRED")
+        self.assertIn("Operational source collection and mapping are ready", row["operator_note"])
 
     def test_security_deposit_ready_when_required_accounts_exist(self):
         asset = self._coa("RL-CASH-DEP", "Deposit Cash", ChartOfAccountType.ASSET)
@@ -62,7 +67,12 @@ class AccountingSetupRentLeaseWorkflowReadinessTests(APITestCase):
         self.assertTrue(row["implemented"])
         self.assertEqual(row["status"], "READY")
         self.assertEqual(row["blockers"], [])
-        self.assertIn("Accounting posting bridge remains audit-deferred", row["operator_note"])
+        self.assertTrue(row["collection_ready"])
+        self.assertTrue(row["mapping_ready"])
+        self.assertFalse(row["posting_bridge_approved"])
+        self.assertFalse(row["posting_bridge_ready"])
+        self.assertEqual(row["posting_mode"], "AUDIT_DEFERRED")
+        self.assertIn("Accounting bridge posting remains audit-deferred", row["operator_note"])
 
     def test_missing_rent_lease_accounts_block_readiness_not_fake_ready(self):
         row = self._row("rent_lease_collection")

@@ -3,6 +3,8 @@ import { expect, test } from "@playwright/test";
 import { authStatePath } from "./helpers/smoke-data";
 
 const rentLeaseNote =
+  "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled.";
+const staleRentLeaseNote =
   "Operational source collection is enabled. Accounting posting bridge remains audit-deferred until approved.";
 
 const chartAccount = (id: number, code: string, name: string, account_type = "ASSET") => ({
@@ -47,6 +49,13 @@ const readinessPayload = {
       key: "rent_lease_collection",
       label: "Rent / Lease Collection",
       status: "READY",
+      collection_ready: true,
+      mapping_ready: true,
+      posting_bridge_ready: false,
+      posting_bridge_approved: false,
+      posting_mode: "AUDIT_DEFERRED",
+      message: rentLeaseNote,
+      operator_action: "Enable bridge posting through approved accounting bridge workflow.",
       required_debit_account: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"],
       required_credit_account: ["RENT_INCOME", "LEASE_INCOME"],
       configured_debit_account: [cash, bank, upi],
@@ -61,6 +70,13 @@ const readinessPayload = {
       key: "security_deposit",
       label: "Security Deposit",
       status: "READY",
+      collection_ready: true,
+      mapping_ready: true,
+      posting_bridge_ready: false,
+      posting_bridge_approved: false,
+      posting_mode: "AUDIT_DEFERRED",
+      message: rentLeaseNote,
+      operator_action: "Enable bridge posting through approved accounting bridge workflow.",
       required_debit_account: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"],
       required_credit_account: ["SECURITY_DEPOSIT_LIABILITY"],
       configured_debit_account: [cash, bank, upi],
@@ -129,6 +145,9 @@ test.describe("accounting setup rent/lease workflow readiness", () => {
     await expect(page.getByText("Rent / Lease Collection")).toBeVisible();
     await expect(page.getByText("Security Deposit")).toBeVisible();
     await expect(page.getByText(rentLeaseNote).first()).toBeVisible();
+    await expect(page.locator("body")).toContainText("Posting mode");
+    await expect(page.locator("body")).toContainText("AUDIT_DEFERRED");
+    await expect(page.locator("body")).not.toContainText(staleRentLeaseNote);
     await expect(page.locator("body")).not.toContainText(
       "Deferred workflow. Do not create fake collection action."
     );

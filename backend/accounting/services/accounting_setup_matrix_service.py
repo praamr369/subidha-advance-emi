@@ -22,9 +22,11 @@ OPERATOR_BLOCKED_COPY = "Blocked from collection selectors until mapped to a pos
 SYSTEM_DIAGNOSTIC_COPY = "System posting profile diagnostic only; not a customer collection destination."
 LEAF_ASSET_ACTION = "Repair creates or reuses a posting leaf account and remaps this finance account only."
 RENT_LEASE_SOURCE_COLLECTION_COPY = (
-    "Operational source collection is enabled. Accounting posting bridge remains "
-    "audit-deferred until approved."
+    "Operational source collection and mapping are ready. Accounting bridge posting "
+    "remains audit-deferred until approval is enabled."
 )
+RENT_LEASE_POSTING_OPERATOR_ACTION = "Enable bridge posting through approved accounting bridge workflow."
+RENT_LEASE_POSTING_MODE = "AUDIT_DEFERRED"
 NOT_EXPOSED = "Not exposed"
 
 
@@ -270,6 +272,20 @@ def _profile_readiness_item(
     else:
         status = "BLOCKED"
 
+    is_rent_lease_bridge = spec.key in {"rent_lease_collection", "security_deposit"}
+    mapping_ready = bool(debit_ready and credit_ready)
+    rent_lease_contract: dict[str, Any] = {}
+    if is_rent_lease_bridge:
+        rent_lease_contract = {
+            "collection_ready": True,
+            "mapping_ready": mapping_ready,
+            "posting_bridge_ready": False,
+            "posting_bridge_approved": False,
+            "posting_mode": RENT_LEASE_POSTING_MODE,
+            "message": RENT_LEASE_SOURCE_COLLECTION_COPY if mapping_ready else blockers[0] if blockers else "Accounting mapping is not ready.",
+            "operator_action": None if not mapping_ready else RENT_LEASE_POSTING_OPERATOR_ACTION,
+        }
+
     return {
         "key": spec.key,
         "label": spec.label,
@@ -281,12 +297,13 @@ def _profile_readiness_item(
         "debit_rows": debit_rows,
         "credit_rows": credit_rows,
         "blockers": blockers,
-        "recommended_action": recommended_actions[0] if recommended_actions else (RENT_LEASE_SOURCE_COLLECTION_COPY if spec.key in {"rent_lease_collection", "security_deposit"} else None),
+        "recommended_action": recommended_actions[0] if recommended_actions else (rent_lease_contract.get("message") if is_rent_lease_bridge else None),
         "recommended_actions": recommended_actions,
         "implemented": spec.implemented,
         "configured_count": configured_count,
         "required_count": total_count,
-        "operator_note": RENT_LEASE_SOURCE_COLLECTION_COPY if spec.key in {"rent_lease_collection", "security_deposit"} else None,
+        "operator_note": rent_lease_contract.get("message") if is_rent_lease_bridge else None,
+        **rent_lease_contract,
     }
 
 

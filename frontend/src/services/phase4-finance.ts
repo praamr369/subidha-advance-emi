@@ -213,6 +213,13 @@ export type AdminRentLeaseAccountMappingPayload = {
   readiness?: {
     status?: string;
     reason?: string;
+    collection_ready?: boolean;
+    mapping_ready?: boolean;
+    posting_bridge_ready?: boolean;
+    posting_bridge_approved?: boolean;
+    posting_mode?: string;
+    message?: string | null;
+    operator_action?: string | null;
     blockers?: string[];
     field_errors?: Record<string, string[]>;
     accounts?: Record<string, unknown>;

@@ -24,10 +24,10 @@ import {
   type AdminDepositRow,
 } from "@/services/phase4-finance";
 
-const SOURCE_NOTE = "Security deposits are recorded against authoritative rent/lease demand records. The accounting bridge posts system journals when premade COA, finance account, and mapping setup is ready.";
+const SOURCE_NOTE = "Security deposits are recorded against authoritative rent/lease demand records. Mapping readiness and posting mode are shown separately.";
 const HISTORY_NOTE = "Refund actions do not rewrite historical collection, receipt, journal, settlement, or reconciliation records.";
 const MAPPING_NOTE = "Premade setup creates the required COA, Finance Account, and active rent/lease mapping. Manual override remains available for admin control.";
-const READY_NOTE = "Operational source collection is enabled. Rent/lease accounting bridge posts system journals after premade COA/FA/mapping setup is available.";
+const READY_NOTE = "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled.";
 const REQUIRED_MAPPING_TYPES: Record<string, string> = {
   monthly_income_account_id: "INCOME",
   deposit_liability_account_id: "LIABILITY",
@@ -91,6 +91,8 @@ export default function AdminFinanceDepositsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mapping, setMapping] = useState<Record<string, unknown> | null>(null);
   const [mappingNote, setMappingNote] = useState(READY_NOTE);
+  const [postingMode, setPostingMode] = useState("AUDIT_DEFERRED");
+  const [postingOperatorAction, setPostingOperatorAction] = useState<string | null>(null);
   const [mappingSetupError, setMappingSetupError] = useState<string | null>(null);
   const [backendMappingFieldErrors, setBackendMappingFieldErrors] = useState<Record<string, string[]>>({});
   const [chartAccounts, setChartAccounts] = useState<Array<Record<string, unknown>>>([]);
@@ -124,7 +126,9 @@ export default function AdminFinanceDepositsPage() {
       if (mappingResult.ok) {
         const mappingPayload = mappingResult.payload;
         setMapping(mappingPayload.mapping ?? null);
-        setMappingNote(mappingPayload.posting_boundary_note || READY_NOTE);
+        setMappingNote(mappingPayload.readiness?.message || mappingPayload.posting_boundary_note || READY_NOTE);
+        setPostingMode(String(mappingPayload.readiness?.posting_mode ?? "AUDIT_DEFERRED"));
+        setPostingOperatorAction(mappingPayload.readiness?.operator_action ?? null);
         const readinessStatus = String(mappingPayload.readiness?.status ?? "").toUpperCase();
         const readinessReason = readinessStatus && readinessStatus !== "READY" ? mappingPayload.readiness?.reason : "";
         setMappingSetupError(String(mappingPayload.setup_error ?? readinessReason ?? "").trim() || null);
@@ -144,6 +148,8 @@ export default function AdminFinanceDepositsPage() {
         setBackendMappingFieldErrors({});
         setMappingSetupError(formatApiError(mappingResult.err, "Rent/lease mapping requires repair."));
         setMappingNote("Rent/lease mapping could not be loaded. Review the notice below or run premade setup to repair COA/FA/mapping.");
+        setPostingMode("AUDIT_DEFERRED");
+        setPostingOperatorAction(null);
         try {
           const readiness = await getAccountingSetupReadiness();
           setChartAccounts((readiness.chart_accounts ?? []) as Array<Record<string, unknown>>);
@@ -390,6 +396,10 @@ export default function AdminFinanceDepositsPage() {
 
       <WorkspaceSection title="Accounting Mapping Panel" description={MAPPING_NOTE}>
         <div id="accounting-mapping" className="rounded-xl border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{mappingNote}</div>
+        <div className="mt-2 rounded-xl border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          Posting mode: <span className="font-semibold text-foreground">{postingMode}</span>
+          {postingOperatorAction ? <span className="ml-2">Action: {postingOperatorAction}</span> : null}
+        </div>
         {mappingSetupError ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Repair required: {mappingSetupError}</div> : null}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" className="rounded-xl border px-3 py-2 text-sm font-semibold" onClick={() => void handleEnsurePremade()}>

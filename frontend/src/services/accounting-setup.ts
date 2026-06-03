@@ -43,6 +43,13 @@ export type PostingProfileReadinessItem = {
   key: string;
   label: string;
   status: "READY" | "BLOCKED" | "PARTIAL" | "DEFERRED" | string;
+  collection_ready?: boolean;
+  mapping_ready?: boolean;
+  posting_bridge_ready?: boolean;
+  posting_bridge_approved?: boolean;
+  posting_mode?: "AUDIT_DEFERRED" | "POSTING_ENABLED" | "MANUAL_APPROVAL_REQUIRED" | string;
+  message?: string | null;
+  operator_action?: string | null;
   required_debit_account: string[];
   required_credit_account: string[];
   configured_debit_account: AccountingSetupReadinessChartAccount[];
@@ -125,7 +132,8 @@ export type CollectionRepairPreviewPayload = {
 };
 
 const SYSTEM_PROFILE_BLOCKER = "System posting profile diagnostic only; not a customer collection destination.";
-const RENT_LEASE_SOURCE_COLLECTION_COPY = "Operational source collection is enabled. Accounting posting bridge remains audit-deferred until approved.";
+const RENT_LEASE_SOURCE_COLLECTION_COPY = "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled.";
+const RENT_LEASE_POSTING_OPERATOR_ACTION = "Enable bridge posting through approved accounting bridge workflow.";
 
 const ACCOUNT_CODES: Record<string, string[]> = {
   CASH_COLLECTION: ["CASH-1000", "CASH-1000-P"],
@@ -213,19 +221,32 @@ function buildProfileReadiness(accounts: AccountingSetupReadinessChartAccount[])
     const configuredCount = debitAccounts.length + creditAccounts.length;
     const status = !row.implemented ? "DEFERRED" : blockers.length === 0 ? "READY" : configuredCount > 0 ? "PARTIAL" : "BLOCKED";
     const operatorNote = "operatorNote" in row ? row.operatorNote : null;
+    const isRentLeaseBridge = row.key === "rent_lease_collection" || row.key === "security_deposit";
+    const mappingReady = blockers.length === 0;
     return {
       key: row.key,
       label: row.label,
       status,
+      ...(isRentLeaseBridge
+        ? {
+            collection_ready: true,
+            mapping_ready: mappingReady,
+            posting_bridge_ready: false,
+            posting_bridge_approved: false,
+            posting_mode: "AUDIT_DEFERRED",
+            message: mappingReady ? RENT_LEASE_SOURCE_COLLECTION_COPY : blockers[0] ?? "Accounting mapping is not ready.",
+            operator_action: mappingReady ? RENT_LEASE_POSTING_OPERATOR_ACTION : "Complete rent/lease COA, finance account, and mapping setup.",
+          }
+        : {}),
       required_debit_account: [...row.debit],
       required_credit_account: [...row.credit],
       configured_debit_account: debitAccounts,
       configured_credit_account: creditAccounts,
       blockers,
-      recommended_action: blockers[0] || operatorNote,
+      recommended_action: blockers[0] || (isRentLeaseBridge ? RENT_LEASE_SOURCE_COLLECTION_COPY : operatorNote),
       recommended_actions: blockers,
       implemented: row.implemented,
-      operator_note: operatorNote,
+      operator_note: isRentLeaseBridge ? (mappingReady ? RENT_LEASE_SOURCE_COLLECTION_COPY : blockers[0] ?? operatorNote) : operatorNote,
     };
   });
 }

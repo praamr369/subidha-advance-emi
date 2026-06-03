@@ -40,8 +40,8 @@ from subscriptions.services.rent_lease_finance_sync_service import (
 
 COLLECT_RENT_LEASE = "COLLECT_RENT_LEASE"
 SOURCE_COLLECTION_AUDIT_NOTE = (
-    "Operational source collection is enabled. Accounting posting bridge remains "
-    "audit-deferred until approved."
+    "Operational source collection and mapping are ready. Accounting bridge posting "
+    "remains audit-deferred until approval is enabled."
 )
 
 
