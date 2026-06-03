@@ -136,7 +136,7 @@ export type DocumentNumberingSequence = {
   series_code: string;
   financial_year: string;
   workflow_group?: string;
-  doc_kind?: "invoice" | "receipt" | string;
+  doc_kind?: "invoice" | string;
   description?: string;
   required_for_go_live?: boolean;
   configured: boolean;
@@ -269,19 +269,23 @@ export async function executeModularReset(payload: { scopes: string[]; preserve_
   });
 }
 
-export async function getBackupJobs(): Promise<{ results: unknown[] }> {
-  return apiFetch<{ results: unknown[] }>("/admin/business-setup/backups/");
+export async function getBackupJobs(): Promise<{ results: unknown[]; jobs: unknown[] }> {
+  const payload = await apiFetch<{ results?: unknown[]; jobs?: unknown[] }>("/admin/business-setup/backups/");
+  const rows = payload.jobs ?? payload.results ?? [];
+  return { ...payload, results: rows, jobs: rows };
 }
 
-export async function createBackupJob(payload: { job_type: string; scopes: string[] }): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/backups/", {
+export async function createBackupJob(payload: { job_type: string; scopes: string[] }): Promise<Record<string, unknown> & { id?: number }> {
+  return apiFetch<Record<string, unknown> & { id?: number }>("/admin/business-setup/backups/", {
     method: "POST",
     body: payload,
   });
 }
 
-export async function getRestoreJobs(): Promise<{ results: unknown[] }> {
-  return apiFetch<{ results: unknown[] }>("/admin/business-setup/restore-jobs/");
+export async function getRestoreJobs(): Promise<{ results: unknown[]; jobs: unknown[] }> {
+  const payload = await apiFetch<{ results?: unknown[]; jobs?: unknown[] }>("/admin/business-setup/restore-jobs/");
+  const rows = payload.jobs ?? payload.results ?? [];
+  return { ...payload, results: rows, jobs: rows };
 }
 
 export async function createRestorePreview(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -297,3 +301,7 @@ export async function executeRestore(payload: Record<string, unknown>): Promise<
     body: payload,
   });
 }
+
+export const listBackupJobs = getBackupJobs;
+export const listRestoreJobs = getRestoreJobs;
+export const getRestorePreview = createRestorePreview;
