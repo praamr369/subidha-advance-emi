@@ -67,6 +67,10 @@ class Phase3BridgeRunSerializer(AccountingBookQuerySerializer):
     dry_run = serializers.BooleanField(required=False, default=False)
 
 
+class CommissionPayoutBridgeRunSerializer(Phase3BridgeRunSerializer):
+    posting_approved = serializers.BooleanField(required=False, default=False)
+
+
 class MasterImportActionSerializer(serializers.Serializer):
     pass
 
@@ -218,10 +222,8 @@ class DepreciationRunSerializer(serializers.ModelSerializer):
 class VendorSettlementSerializer(serializers.ModelSerializer):
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
     branch_code = serializers.CharField(source="branch.code", read_only=True)
-    branch_name = serializers.CharField(source="branch.name", read_only=True)
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
-    purchase_bill_no = serializers.CharField(source="purchase_bill.bill_no", read_only=True)
-    posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
+    journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
 
     class Meta:
         model = VendorSettlement
@@ -230,19 +232,18 @@ class VendorSettlementSerializer(serializers.ModelSerializer):
             "settlement_no",
             "vendor",
             "vendor_name",
-            "settlement_date",
-            "amount",
+            "purchase_bill",
             "branch",
             "branch_code",
-            "branch_name",
+            "settlement_date",
+            "amount",
             "finance_account",
             "finance_account_name",
             "reference_no",
-            "purchase_bill",
-            "purchase_bill_no",
             "status",
             "posted_journal_entry",
-            "posted_journal_entry_no",
+            "journal_entry_no",
+            "notes",
             "created_at",
             "updated_at",
         ]
@@ -251,7 +252,7 @@ class VendorSettlementSerializer(serializers.ModelSerializer):
             "settlement_no",
             "status",
             "posted_journal_entry",
-            "posted_journal_entry_no",
+            "journal_entry_no",
             "created_at",
             "updated_at",
         ]
@@ -259,9 +260,6 @@ class VendorSettlementSerializer(serializers.ModelSerializer):
 
 class AccountingBridgePostingSerializer(serializers.ModelSerializer):
     journal_entry_no = serializers.CharField(source="journal_entry.entry_no", read_only=True)
-    journal_entry_status = serializers.CharField(source="journal_entry.status", read_only=True)
-    journal_entry_date = serializers.DateField(source="journal_entry.entry_date", read_only=True)
-    journal_entry_memo = serializers.CharField(source="journal_entry.memo", read_only=True)
 
     class Meta:
         model = AccountingBridgePosting
@@ -270,18 +268,12 @@ class AccountingBridgePostingSerializer(serializers.ModelSerializer):
             "source_model",
             "source_id",
             "purpose",
-            "voucher_type",
-            "source_type",
-            "source_reference",
-            "source_document_no",
-            "source_event_date",
-            "trace_metadata",
             "journal_entry",
             "journal_entry_no",
-            "journal_entry_status",
-            "journal_entry_date",
-            "journal_entry_memo",
+            "source_type",
+            "source_reference",
+            "voucher_type",
+            "trace_metadata",
             "created_at",
-            "updated_at",
         ]
         read_only_fields = fields
