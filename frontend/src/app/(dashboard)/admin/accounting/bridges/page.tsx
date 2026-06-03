@@ -16,8 +16,22 @@ import {
   type AccountingBridgeReadinessPayload,
 } from "@/services/accounting-bridge-readiness";
 
+const PURCHASE_VENDOR_EVENT_KEYS = new Set([
+  "vendor_purchase_bill",
+  "vendor_payment",
+  "purchase_inventory_receive",
+  "inventory_purchase_receive",
+  "vendor_return",
+  "purchase_expense",
+]);
+
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
+}
+
+function bridgeGroupName(event: AccountingBridgeReadinessEvent): string {
+  if (PURCHASE_VENDOR_EVENT_KEYS.has(event.event_key)) return "Purchase & Vendors";
+  return event.event_group || event.source_module || "Other";
 }
 
 function statusClass(status: string): string {
@@ -96,7 +110,7 @@ export default function AccountingBridgeReadinessPage() {
   const groupedEvents = useMemo(() => {
     const groups = new Map<string, AccountingBridgeReadinessEvent[]>();
     for (const event of payload?.events ?? []) {
-      const key = event.event_group || event.source_module || "Other";
+      const key = bridgeGroupName(event);
       groups.set(key, [...(groups.get(key) ?? []), event]);
     }
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
