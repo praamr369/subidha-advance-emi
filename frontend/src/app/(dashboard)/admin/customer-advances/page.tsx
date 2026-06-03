@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -27,6 +26,11 @@ function text(value: unknown): string {
   return value === null || value === undefined || value === "" ? "—" : String(value);
 }
 
+function firstRowId(rows: AdvanceRow[]): number | null {
+  const parsed = Number(rows[0]?.id ?? 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export default function AdminCustomerAdvancesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +46,7 @@ export default function AdminCustomerAdvancesPage() {
       const payload = await listCustomerAdvances();
       const nextRows = payload.results ?? [];
       setRows(nextRows);
-      setSelectedId((current) => current ?? Number(nextRows[0]?.id ?? 0) || null);
+      setSelectedId((current) => current ?? firstRowId(nextRows));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load customer advances.");
