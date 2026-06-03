@@ -10,6 +10,7 @@ from subscriptions.models import RentLeaseBillingDemand, RentLeaseDemandType
 from subscriptions.services.rent_lease_finance_sync_service import get_active_account_mapping
 
 POSTING_MODE_AUDIT_DEFERRED = "AUDIT_DEFERRED"
+POSTING_MODE_POSTING_ENABLED = "POSTING_ENABLED"
 POSTING_APPROVAL_REQUIRED_ACTION = "Enable bridge posting through approved accounting bridge workflow."
 
 
@@ -148,8 +149,16 @@ def get_rent_lease_accounting_readiness(*, auto_create: bool = True) -> dict[str
             **extra_ids,
         }
     mapping_ready = status == "READY"
+    from subscriptions.services.rent_lease_posting_bridge_config_service import get_rent_lease_posting_bridge_state
+
+    bridge_state = get_rent_lease_posting_bridge_state(readiness={"status": status, "mapping_ready": mapping_ready})
+    posting_bridge_approved = bool(bridge_state["posting_bridge_approved"])
+    posting_bridge_ready = bool(bridge_state["posting_bridge_ready"])
+    posting_mode = bridge_state["posting_mode"]
     posting_message = (
-        "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled."
+        "Operational source collection, mapping, and posting bridge approval are ready. Future explicit posting execution is enabled."
+        if posting_bridge_ready
+        else "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled."
         if mapping_ready
         else blockers[0] if blockers else "Rent/lease accounting mapping is not ready."
     )
@@ -163,11 +172,12 @@ def get_rent_lease_accounting_readiness(*, auto_create: bool = True) -> dict[str
         "accounting_bridge_enabled": status == "READY",
         "collection_ready": True,
         "mapping_ready": mapping_ready,
-        "posting_bridge_ready": False,
-        "posting_bridge_approved": False,
-        "posting_mode": POSTING_MODE_AUDIT_DEFERRED,
+        "posting_bridge_ready": posting_bridge_ready,
+        "posting_bridge_approved": posting_bridge_approved,
+        "posting_mode": posting_mode,
         "message": posting_message,
-        "operator_action": POSTING_APPROVAL_REQUIRED_ACTION if mapping_ready else "Complete rent/lease COA, finance account, and mapping setup.",
+        "operator_action": None if posting_bridge_ready else POSTING_APPROVAL_REQUIRED_ACTION if mapping_ready else "Complete rent/lease COA, finance account, and mapping setup.",
+        "posting_bridge_config": bridge_state["config"],
         "mapping": mapping_snapshot or {"mapping_configured": False},
         "accounts": accounts,
         "counters": {

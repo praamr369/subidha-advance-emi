@@ -29,8 +29,16 @@ import {
   type AccountingSetupHealthResponse,
   type AccountingSetupHealthIssue,
 } from "@/services/accounting";
+import {
+  disableRentLeasePostingBridge,
+  enableRentLeasePostingBridge,
+  getRentLeasePostingBridgeConfig,
+  type RentLeasePostingBridgeConfigResponse,
+} from "@/services/rent-lease-accounting-bridge";
 
 const REPAIR_CONFIRMATION_TEXT = "REPAIR COLLECTION MAPPINGS";
+const ENABLE_BRIDGE_CONFIRMATION_TEXT = "ENABLE RENT LEASE POSTING";
+const DISABLE_BRIDGE_CONFIRMATION_TEXT = "DISABLE RENT LEASE POSTING";
 const HISTORICAL_REPAIR_NOTE = "This will not post payments, create receipts, rewrite journals, settlements, reconciliations, or day-close records.";
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -205,19 +213,25 @@ export default function AdminAccountingSetupPage() {
   const [repairTargets, setRepairTargets] = useState<AccountingSetupReadinessFinanceAccount[]>([]);
   const [repairPreview, setRepairPreview] = useState<CollectionRepairPreviewPayload | null>(null);
   const [repairing, setRepairing] = useState(false);
+  const [bridgeConfig, setBridgeConfig] = useState<RentLeasePostingBridgeConfigResponse | null>(null);
+  const [bridgeReason, setBridgeReason] = useState("");
+  const [bridgeConfirmation, setBridgeConfirmation] = useState("");
+  const [bridgeSaving, setBridgeSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [healthRes, readinessRes, matrixRes] = await Promise.all([
+      const [healthRes, readinessRes, matrixRes, bridgeRes] = await Promise.all([
         getAccountingSetupHealth(),
         getAccountingSetupReadiness(),
         getAccountingSetupMatrix(),
+        getRentLeasePostingBridgeConfig(),
       ]);
       setHealth(healthRes);
       setReadiness(readinessRes);
       setMatrix(matrixRes);
+      setBridgeConfig(bridgeRes);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load accounting setup.");
     } finally {
@@ -236,6 +250,16 @@ export default function AdminAccountingSetupPage() {
 
   const chartAccounts = matrix?.chart_accounts ?? readiness?.chart_accounts ?? [];
   const postingProfileReadiness = matrix?.posting_profile_readiness ?? [];
+  const bridgeReadiness = bridgeConfig?.readiness;
+  const bridgeEnabled = Boolean(bridgeConfig?.config?.is_enabled);
+  const bridgeMappingReady = Boolean(bridgeReadiness?.mapping_ready && bridgeReadiness?.status === "READY");
+  const bridgePostingMode = bridgeReadiness?.posting_mode ?? "AUDIT_DEFERRED";
+  const expectedBridgeConfirmation = bridgeEnabled ? DISABLE_BRIDGE_CONFIRMATION_TEXT : ENABLE_BRIDGE_CONFIRMATION_TEXT;
+  const canSubmitBridge = Boolean(
+    bridgeReason.trim() &&
+    bridgeConfirmation.trim() === expectedBridgeConfirmation &&
+    (bridgeEnabled || bridgeMappingReady),
+  );
   const diagnosticAccounts = matrix?.diagnostic_system_accounts ?? [];
   const coaHealth = matrix?.chart_of_accounts_health;
   const repairableAccounts = businessFinanceAccounts.filter((account) => !isSelectable(account) && account.can_auto_create_posting_account);
@@ -332,6 +356,26 @@ export default function AdminAccountingSetupPage() {
       setRepairing(false);
     }
   }, [load, repairTargets]);
+
+  const submitBridgeApproval = useCallback(async () => {
+    if (!canSubmitBridge) return;
+    setBridgeSaving(true);
+    setError(null);
+    try {
+      const input = { reason: bridgeReason, confirmation: bridgeConfirmation };
+      const response = bridgeEnabled
+        ? await disableRentLeasePostingBridge(input)
+        : await enableRentLeasePostingBridge(input);
+      setBridgeConfig(response);
+      setBridgeReason("");
+      setBridgeConfirmation("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update rent/lease posting bridge approval.");
+    } finally {
+      setBridgeSaving(false);
+    }
+  }, [bridgeConfirmation, bridgeEnabled, bridgeReason, canSubmitBridge, load]);
 
   if (loading) {
     return (
@@ -443,6 +487,80 @@ export default function AdminAccountingSetupPage() {
               <IssueList issues={healthInfos} />
             </div>
           ) : null}
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rent / lease posting bridge</div>
+              <h2 className="mt-1 text-lg font-semibold text-foreground">Current mode {bridgePostingMode}</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
+                Enabling this bridge only allows future explicit backend posting preview/execute workflows to proceed. It does not create backdated journals, payments, receipts, settlement allocations, or reconciliation records.
+              </p>
+            </div>
+            <span className={cx("rounded-full border px-3 py-1 text-xs font-semibold", statusClass(bridgePostingMode === "POSTING_ENABLED" ? "READY" : bridgeMappingReady ? "DEFERRED" : "BLOCKED"))}>
+              {bridgeEnabled ? "Approved" : "Approval required"}
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
+            <div className="rounded-xl border border-border bg-muted/20 p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping readiness</div>
+              <div className="mt-1 font-semibold text-foreground">{bridgeReadiness?.status ?? "Not loaded"}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{bridgeMappingReady ? "COA and Finance Account mapping are valid." : bridgeReadiness?.reason ?? "Complete mapping before enabling."}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-muted/20 p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posting approval</div>
+              <div className="mt-1 font-semibold text-foreground">{bridgeEnabled ? "Enabled" : "Disabled"}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{bridgeConfig?.config?.reason || "No approval reason recorded."}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-muted/20 p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Future execution</div>
+              <div className="mt-1 font-semibold text-foreground">{bridgeReadiness?.posting_bridge_ready ? "Allowed" : "Blocked"}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{bridgeReadiness?.operator_action || "Future explicit posting execution is enabled."}</div>
+            </div>
+          </div>
+          {bridgeReadiness?.blockers?.length ? (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+              {bridgeReadiness.blockers[0]}
+            </div>
+          ) : null}
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_1fr]">
+            <label className="text-sm">
+              <div className="mb-1 text-xs font-semibold text-muted-foreground">Reason</div>
+              <textarea
+                className="min-h-24 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                value={bridgeReason}
+                onChange={(event) => setBridgeReason(event.target.value)}
+                placeholder={bridgeEnabled ? "Reason for disabling posting bridge" : "Reason for enabling posting bridge"}
+              />
+            </label>
+            <div className="space-y-3">
+              <label className="block text-sm">
+                <div className="mb-1 text-xs font-semibold text-muted-foreground">Typed confirmation</div>
+                <input
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  value={bridgeConfirmation}
+                  onChange={(event) => setBridgeConfirmation(event.target.value)}
+                  placeholder={expectedBridgeConfirmation}
+                />
+              </label>
+              <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+                Required phrase: <span className="font-semibold text-foreground">{expectedBridgeConfirmation}</span>
+              </div>
+              {!bridgeEnabled && !bridgeMappingReady ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                  Enable is disabled until rent/lease mapping readiness is valid.
+                </div>
+              ) : null}
+              <ActionButton
+                variant={bridgeEnabled ? "secondary" : "primary"}
+                onClick={() => void submitBridgeApproval()}
+                disabled={!canSubmitBridge || bridgeSaving}
+              >
+                {bridgeSaving ? "Saving..." : bridgeEnabled ? "Disable posting bridge" : "Enable posting bridge"}
+              </ActionButton>
+            </div>
+          </div>
         </section>
 
         <section className="space-y-3">

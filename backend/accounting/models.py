@@ -1049,6 +1049,45 @@ class RentLeaseAccountingAccountMapping(AccountingTimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class RentLeasePostingBridgeConfig(AccountingTimeStampedModel):
+    """Singleton approval switch for explicit rent/lease accounting bridge posting."""
+
+    is_enabled = models.BooleanField(default=False, db_index=True)
+    enabled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    enabled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="enabled_rent_lease_posting_bridge_configs",
+    )
+    disabled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    disabled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="disabled_rent_lease_posting_bridge_configs",
+    )
+    reason = models.TextField(blank=True, default="")
+    last_readiness_snapshot = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "accounting_rent_lease_posting_bridge_config"
+        ordering = ["id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(id=1),
+                name="ck_singleton_rent_lease_posting_bridge_config",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.reason = (self.reason or "").strip()
+        super().save(*args, **kwargs)
+
+
 class JournalEntry(AccountingTimeStampedModel):
     entry_no = models.CharField(
         max_length=40,

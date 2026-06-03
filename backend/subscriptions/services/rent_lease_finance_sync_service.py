@@ -37,6 +37,9 @@ from subscriptions.models import (
     q2,
 )
 from subscriptions.services.audit_service import log_audit
+from subscriptions.services.rent_lease_posting_bridge_config_service import (
+    get_rent_lease_posting_bridge_state,
+)
 
 
 RENT_LEASE_PREMADE_ACCOUNTS = (
@@ -408,6 +411,16 @@ def _post_bridge_journal(
     memo: str,
 ) -> SyncResult:
     amount_q = _money(amount)
+    bridge_state = get_rent_lease_posting_bridge_state(readiness={"status": "READY", "mapping_ready": True})
+    if not bridge_state["posting_bridge_ready"]:
+        return _result(
+            event=event,
+            status="DEFERRED",
+            source_model="Subscription",
+            source_id=subscription.id,
+            reason=bridge_state["blocked_reason"] or "Rent/lease posting bridge execution is blocked.",
+            source_reference=source_reference,
+        )
     if amount_q <= MONEY_ZERO:
         return _result(
             event=event,

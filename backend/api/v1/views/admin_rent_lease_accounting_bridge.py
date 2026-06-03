@@ -13,6 +13,11 @@ from subscriptions.services.rent_lease_finance_sync_service import (
     ensure_premade_rent_lease_accounting_setup,
     get_active_account_mapping,
 )
+from subscriptions.services.rent_lease_posting_bridge_config_service import (
+    disable_rent_lease_posting_bridge,
+    enable_rent_lease_posting_bridge,
+    get_rent_lease_posting_bridge_state,
+)
 
 
 def _error(exc: Exception) -> Response:
@@ -83,6 +88,47 @@ class AdminAccountingReadinessView(APIView):
 
     def get(self, request):
         return Response(bridge.get_rent_lease_accounting_readiness())
+
+
+class AdminRentLeasePostingBridgeConfigView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        readiness = bridge.get_rent_lease_accounting_readiness()
+        state = get_rent_lease_posting_bridge_state(readiness=readiness)
+        return Response({"config": state["config"], "readiness": readiness})
+
+
+class AdminRentLeasePostingBridgeEnableView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        try:
+            return Response(
+                enable_rent_lease_posting_bridge(
+                    request.user,
+                    reason=request.data.get("reason", ""),
+                    confirmation=request.data.get("confirmation", ""),
+                )
+            )
+        except Exception as exc:
+            return _error(exc)
+
+
+class AdminRentLeasePostingBridgeDisableView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        try:
+            return Response(
+                disable_rent_lease_posting_bridge(
+                    request.user,
+                    reason=request.data.get("reason", ""),
+                    confirmation=request.data.get("confirmation", ""),
+                )
+            )
+        except Exception as exc:
+            return _error(exc)
 
 
 class AdminRentLeaseAccountMappingBridgeView(APIView):

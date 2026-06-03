@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/api";
 
 export type AccountingReadiness = {
   status: string;
+  reason?: string;
   source_collection_enabled: boolean;
   accounting_bridge_enabled: boolean;
   collection_ready?: boolean;
@@ -12,8 +13,34 @@ export type AccountingReadiness = {
   message?: string | null;
   operator_action?: string | null;
   blockers: string[];
+  field_errors?: Record<string, string[]>;
   mapping?: Record<string, unknown> | null;
   counters?: Record<string, number>;
+  posting_bridge_config?: RentLeasePostingBridgeConfig;
+};
+
+export type RentLeasePostingBridgeConfig = {
+  id: number;
+  is_enabled: boolean;
+  enabled_at: string | null;
+  enabled_by_id: number | null;
+  disabled_at: string | null;
+  disabled_by_id: number | null;
+  reason: string;
+  last_readiness_snapshot: Record<string, unknown>;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type RentLeasePostingBridgeConfigResponse = {
+  detail?: string;
+  config: RentLeasePostingBridgeConfig;
+  readiness: AccountingReadiness;
+};
+
+export type RentLeasePostingBridgeApprovalInput = {
+  reason: string;
+  confirmation: string;
 };
 
 export type AccountMappingResponse = {
@@ -89,6 +116,24 @@ export function getRentLeaseAccountingSummary() {
     posting_bridge: Record<string, number>;
     not_used: { lucky_ids: boolean; draws: boolean };
   }>("/admin/rent-lease/accounting-summary/");
+}
+
+export function getRentLeasePostingBridgeConfig() {
+  return apiFetch<RentLeasePostingBridgeConfigResponse>("/admin/rent-lease/accounting-bridge/config/");
+}
+
+export function enableRentLeasePostingBridge(input: RentLeasePostingBridgeApprovalInput) {
+  return apiFetch<RentLeasePostingBridgeConfigResponse>("/admin/rent-lease/accounting-bridge/enable/", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function disableRentLeasePostingBridge(input: RentLeasePostingBridgeApprovalInput) {
+  return apiFetch<RentLeasePostingBridgeConfigResponse>("/admin/rent-lease/accounting-bridge/disable/", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function previewDepositPosting(id: number | string) {

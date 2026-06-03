@@ -16,6 +16,9 @@ from accounting.services.finance_account_readiness import (
     chart_account_is_posting_ready,
     finance_account_readiness,
 )
+from subscriptions.services.rent_lease_posting_bridge_config_service import (
+    get_rent_lease_posting_bridge_state,
+)
 
 
 OPERATOR_BLOCKED_COPY = "Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account."
@@ -276,14 +279,16 @@ def _profile_readiness_item(
     mapping_ready = bool(debit_ready and credit_ready)
     rent_lease_contract: dict[str, Any] = {}
     if is_rent_lease_bridge:
+        bridge_state = get_rent_lease_posting_bridge_state(readiness={"status": "READY" if mapping_ready else "NEEDS_MAPPING", "mapping_ready": mapping_ready})
+        posting_bridge_ready = bool(bridge_state["posting_bridge_ready"])
         rent_lease_contract = {
             "collection_ready": True,
             "mapping_ready": mapping_ready,
-            "posting_bridge_ready": False,
-            "posting_bridge_approved": False,
-            "posting_mode": RENT_LEASE_POSTING_MODE,
-            "message": RENT_LEASE_SOURCE_COLLECTION_COPY if mapping_ready else blockers[0] if blockers else "Accounting mapping is not ready.",
-            "operator_action": None if not mapping_ready else RENT_LEASE_POSTING_OPERATOR_ACTION,
+            "posting_bridge_ready": posting_bridge_ready,
+            "posting_bridge_approved": bool(bridge_state["posting_bridge_approved"]),
+            "posting_mode": bridge_state["posting_mode"],
+            "message": "Operational source collection, mapping, and posting bridge approval are ready. Future explicit posting execution is enabled." if posting_bridge_ready else RENT_LEASE_SOURCE_COLLECTION_COPY if mapping_ready else blockers[0] if blockers else "Accounting mapping is not ready.",
+            "operator_action": None if posting_bridge_ready or not mapping_ready else RENT_LEASE_POSTING_OPERATOR_ACTION,
         }
 
     return {

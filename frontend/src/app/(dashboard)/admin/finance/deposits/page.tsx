@@ -266,7 +266,7 @@ export default function AdminFinanceDepositsPage() {
         notes: mappingForm.notes,
       });
       setBackendMappingFieldErrors({});
-      setNotice("Rent/lease accounting mapping saved. Bridge is posting-ready for future source events.");
+      setNotice("Rent/lease accounting mapping saved. Posting mode follows the backend bridge approval state.");
       await load();
     } catch (err) {
       if (err instanceof ApiError) setBackendMappingFieldErrors(err.fieldErrors);

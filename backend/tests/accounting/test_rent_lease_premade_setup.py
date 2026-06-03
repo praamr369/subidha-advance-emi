@@ -10,11 +10,15 @@ from accounting.models import (
     FinanceAccountKind,
     FinanceAccountMappingPurpose,
     JournalEntry,
+    MoneyMovement,
     RentLeaseAccountingAccountMapping,
 )
 from billing.models import ReceiptDocument
 from reconciliation.models import ReconciliationItem
-from subscriptions.models import Payment
+from settlements.models import SettlementAllocation
+from subscriptions.models import AuditLog, Payment
+from subscriptions.services import rent_lease_posting_bridge_config_service as bridge_config
+from subscriptions.services.rent_lease_accounting_posting_service import _execute, _line, _preview
 from subscriptions.services.rent_lease_accounting_readiness_service import (
     get_rent_lease_accounting_readiness as canonical_readiness,
 )
@@ -51,6 +55,9 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
         self.assertEqual(ReconciliationItem.objects.count(), before["reconciliation_items"])
         self.assertEqual(get_rent_lease_accounting_readiness()["status"], "READY")
         self.assertEqual(canonical_readiness()["status"], "READY")
+        self.assertFalse(canonical_readiness()["posting_bridge_approved"])
+        self.assertFalse(canonical_readiness()["posting_bridge_ready"])
+        self.assertEqual(canonical_readiness()["posting_mode"], "AUDIT_DEFERRED")
         self.assertTrue(
             FinanceAccountCoaMapping.objects.filter(
                 finance_account=mapping.settlement_finance_account,
@@ -134,6 +141,127 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
 
         self.assertEqual(readiness["status"], "READY")
         self.assertEqual(readiness["mapping_id"], mapping.id)
+
+
+class RentLeasePostingBridgeConfigTests(TestCase):
+    def setUp(self):
+        self.admin = create_admin_user(username="bridge_config_admin", phone="9000004501")
+
+    def _financial_counts(self):
+        return {
+            "journals": JournalEntry.objects.count(),
+            "payments": Payment.objects.count(),
+            "receipts": ReceiptDocument.objects.count(),
+            "money_movements": MoneyMovement.objects.count(),
+            "settlement_allocations": SettlementAllocation.objects.count(),
+            "reconciliation_items": ReconciliationItem.objects.count(),
+        }
+
+    def _posting_payload(self):
+        mapping = ensure_premade_rent_lease_accounting_setup()
+        amount = "100.00"
+        return _preview(
+            "TestSource",
+            1,
+            "TEST-1",
+            "RENT_MONTHLY_COLLECTION",
+            amount,
+            [
+                _line(mapping.settlement_finance_account.chart_account, "Settlement asset", debit=amount),
+                _line(mapping.monthly_income_account, "Rent income", credit=amount),
+            ],
+            {"id": mapping.id},
+        )
+
+    def test_default_config_disabled(self):
+        config = bridge_config.get_rent_lease_posting_bridge_config()
+        readiness = canonical_readiness()
+
+        self.assertFalse(config.is_enabled)
+        self.assertFalse(readiness["posting_bridge_approved"])
+        self.assertFalse(readiness["posting_bridge_ready"])
+        self.assertEqual(readiness["posting_mode"], "AUDIT_DEFERRED")
+
+    def test_enable_fails_without_reason(self):
+        with self.assertRaisesMessage(Exception, "Reason is required"):
+            bridge_config.enable_rent_lease_posting_bridge(
+                self.admin,
+                reason="",
+                confirmation=bridge_config.ENABLE_RENT_LEASE_POSTING_CONFIRMATION,
+            )
+
+    def test_enable_fails_with_wrong_confirmation(self):
+        with self.assertRaisesMessage(Exception, "Type exactly: ENABLE RENT LEASE POSTING"):
+            bridge_config.enable_rent_lease_posting_bridge(
+                self.admin,
+                reason="Approved after setup review",
+                confirmation="ENABLE",
+            )
+
+    def test_enable_fails_when_readiness_invalid(self):
+        original = bridge_config._readiness_for_enable
+        try:
+            bridge_config._readiness_for_enable = lambda: {"status": "NEEDS_MAPPING", "mapping_ready": False}
+            with self.assertRaisesMessage(Exception, "readiness"):
+                bridge_config.enable_rent_lease_posting_bridge(
+                    self.admin,
+                    reason="Approved after setup review",
+                    confirmation=bridge_config.ENABLE_RENT_LEASE_POSTING_CONFIRMATION,
+                )
+        finally:
+            bridge_config._readiness_for_enable = original
+
+    def test_enable_and_disable_create_audit_but_no_financial_records(self):
+        ensure_premade_rent_lease_accounting_setup()
+        before = self._financial_counts()
+
+        enabled = bridge_config.enable_rent_lease_posting_bridge(
+            self.admin,
+            reason="Approved after accounting setup review",
+            confirmation=bridge_config.ENABLE_RENT_LEASE_POSTING_CONFIRMATION,
+        )
+        disabled = bridge_config.disable_rent_lease_posting_bridge(
+            self.admin,
+            reason="Disable after control review",
+            confirmation=bridge_config.DISABLE_RENT_LEASE_POSTING_CONFIRMATION,
+        )
+
+        self.assertEqual(self._financial_counts(), before)
+        self.assertTrue(enabled["config"]["is_enabled"])
+        self.assertFalse(disabled["config"]["is_enabled"])
+        self.assertTrue(
+            AuditLog.objects.filter(
+                model_name="RentLeasePostingBridgeConfig",
+                metadata__event="RENT_LEASE_POSTING_BRIDGE_ENABLED",
+            ).exists()
+        )
+        self.assertTrue(
+            AuditLog.objects.filter(
+                model_name="RentLeasePostingBridgeConfig",
+                metadata__event="RENT_LEASE_POSTING_BRIDGE_DISABLED",
+            ).exists()
+        )
+
+    def test_explicit_posting_blocked_when_config_disabled(self):
+        result = _execute(self._posting_payload(), actor=self.admin)
+
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIsNone(result["journal_entry_id"])
+        self.assertEqual(JournalEntry.objects.count(), 0)
+
+    def test_explicit_posting_allowed_when_config_enabled_and_ready(self):
+        ensure_premade_rent_lease_accounting_setup()
+        bridge_config.enable_rent_lease_posting_bridge(
+            self.admin,
+            reason="Approved after accounting setup review",
+            confirmation=bridge_config.ENABLE_RENT_LEASE_POSTING_CONFIRMATION,
+        )
+
+        result = _execute(self._posting_payload(), actor=self.admin)
+
+        self.assertEqual(result["status"], "POSTED")
+        self.assertIsNotNone(result["journal_entry_id"])
+        self.assertEqual(JournalEntry.objects.count(), 1)
 
 
 class AdminFinanceAccountMappingApiTests(APITestCase):
@@ -232,3 +360,35 @@ class AdminFinanceAccountMappingApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["readiness"]["status"], "READY")
         self.assertNotIn("Active rent/lease account mapping is missing.", response.data["readiness"]["blockers"])
+
+    def test_posting_bridge_config_endpoint_defaults_disabled(self):
+        response = self.client.get("/api/v1/admin/rent-lease/accounting-bridge/config/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["config"]["is_enabled"])
+        self.assertEqual(response.data["readiness"]["posting_mode"], "AUDIT_DEFERRED")
+
+    def test_posting_bridge_enable_and_disable_endpoints(self):
+        ensure_premade_rent_lease_accounting_setup()
+
+        enable_response = self.client.post(
+            "/api/v1/admin/rent-lease/accounting-bridge/enable/",
+            {
+                "reason": "Approved after setup review",
+                "confirmation": bridge_config.ENABLE_RENT_LEASE_POSTING_CONFIRMATION,
+            },
+            format="json",
+        )
+        disable_response = self.client.post(
+            "/api/v1/admin/rent-lease/accounting-bridge/disable/",
+            {
+                "reason": "Paused after control review",
+                "confirmation": bridge_config.DISABLE_RENT_LEASE_POSTING_CONFIRMATION,
+            },
+            format="json",
+        )
+
+        self.assertEqual(enable_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(enable_response.data["readiness"]["posting_mode"], "POSTING_ENABLED")
+        self.assertEqual(disable_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(disable_response.data["readiness"]["posting_mode"], "AUDIT_DEFERRED")

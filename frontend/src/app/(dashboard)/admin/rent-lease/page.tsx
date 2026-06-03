@@ -94,6 +94,7 @@ export default function AdminRentLeaseCockpitPage() {
   const bridgeStatus = summary?.readiness?.status ?? "Loading";
   const bridgeReady = bridgeStatus === "READY";
   const postingMode = summary?.readiness?.posting_mode ?? "Not exposed";
+  const postingEnabled = postingMode === "POSTING_ENABLED";
   const postingMessage = summary?.readiness?.message ?? "Source collection is enabled. Posting remains explicit, idempotent, and controlled by backend preview/execute endpoints.";
 
   return (
@@ -103,13 +104,13 @@ export default function AdminRentLeaseCockpitPage() {
       subtitle="Parent module cockpit for rent and lease contracts, deposits, monthly demands, possession, handover, inspections, returns, documents, and explicit accounting bridge status. Lucky ID and draw workflows stay out of this module."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Rent / Lease" }]}
       actions={[{ href: ROUTES.admin.subscriptionsRentCreate, label: "Create Rent", variant: "primary" }, { href: ROUTES.admin.subscriptionsLeaseCreate, label: "Create Lease", variant: "secondary" }, { href: ROUTES.admin.financeDeposits, label: "Deposit Operations", variant: "secondary" }, { href: `${ROUTES.admin.financeCollect}?workflow=unified`, label: "Unified Collection", variant: "secondary" }]}
-      stats={[{ label: "Demand records", value: valueOf(summary?.demand_records), tone: "info" }, { label: "Mapping readiness", value: bridgeStatus, tone: bridgeReady ? "success" : "warning" }, { label: "Posting mode", value: postingMode, tone: bridgeReady ? "info" : "warning" }, { label: "Lucky IDs", value: "Not used", tone: "success" }]}
+      stats={[{ label: "Demand records", value: valueOf(summary?.demand_records), tone: "info" }, { label: "Mapping readiness", value: bridgeStatus, tone: bridgeReady ? "success" : "warning" }, { label: "Posting mode", value: postingMode, tone: postingEnabled ? "success" : "warning" }, { label: "Lucky IDs", value: "Not used", tone: "success" }]}
       statusBadge={{ label: bridgeReady ? "Mapping ready" : "Needs mapping", tone: bridgeReady ? "success" : "warning" }}
     >
       <div className="space-y-6">
         {loading ? <ERPLoadingState label="Loading rent/lease accounting summary..." /> : null}
         {error ? <ERPErrorState title="Unable to load rent/lease summary" description={error} onRetry={() => void loadSummary()} /> : null}
-        {summary ? <div className={`rounded-[1.25rem] border px-4 py-3 text-sm ${bridgeReady ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
+        {summary ? <div className={`rounded-[1.25rem] border px-4 py-3 text-sm ${postingEnabled ? "border-emerald-200 bg-emerald-50 text-emerald-950" : bridgeReady ? "border-blue-200 bg-blue-50 text-blue-950" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
           <div className="flex items-center gap-2 font-semibold"><ShieldCheck className="h-4 w-4" aria-hidden="true" />Rent/lease accounting mapping: {bridgeStatus}</div>
           <p className="mt-1">{postingMessage}</p>
           <div className="mt-2 text-xs font-semibold uppercase tracking-wide">Posting mode: {postingMode}</div>

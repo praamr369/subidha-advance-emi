@@ -30,6 +30,9 @@ from subscriptions.services.rent_lease_accounting_readiness_service import (
     get_rent_lease_accounting_readiness,
 )
 from subscriptions.services.rent_lease_finance_sync_service import get_active_account_mapping
+from subscriptions.services.rent_lease_posting_bridge_config_service import (
+    get_rent_lease_posting_bridge_state,
+)
 
 
 class RentLeasePostingError(ValidationError):
@@ -206,6 +209,22 @@ def _create_journal(payload: dict[str, Any], actor=None) -> JournalEntry:
 
 
 def _execute(payload: dict[str, Any], actor=None) -> dict[str, Any]:
+    readiness = get_rent_lease_accounting_readiness(auto_create=True)
+    bridge_state = get_rent_lease_posting_bridge_state(readiness=readiness)
+    if not bridge_state["posting_bridge_ready"]:
+        reason = bridge_state["blocked_reason"] or "Rent/lease posting bridge execution is blocked."
+        blocked_payload = {**payload, "status": "BLOCKED", "postable": False, "blocked_reason": reason}
+        _store_preview(blocked_payload, "BLOCKED", reason)
+        return {
+            "detail": reason,
+            "status": "BLOCKED",
+            "posting_id": None,
+            "journal_entry_id": None,
+            "journal_entry_no": None,
+            "posted_at": None,
+            "preview": blocked_payload,
+            "readiness": readiness,
+        }
     if not payload.get("postable"):
         _store_preview(payload, "BLOCKED", payload.get("blocked_reason") or "Blocked.")
         raise RentLeasePostingError({"detail": payload.get("blocked_reason") or "Posting is blocked."})
