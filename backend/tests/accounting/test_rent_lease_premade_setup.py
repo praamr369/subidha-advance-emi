@@ -107,6 +107,34 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
         self.assertEqual(readiness_after["mapping_id"], mapping.id)
         self.assertNotIn("Active rent/lease account mapping is missing.", readiness_after["blockers"])
 
+    def test_rent_lease_mapping_stays_ready_with_multiple_mapped_cash_accounts(self):
+        mapping = ensure_premade_rent_lease_accounting_setup()
+        extra_chart = ChartOfAccount.objects.create(
+            code="RL-EXTRA-CASH",
+            name="Rent Lease Extra Cash",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        extra_cash = FinanceAccount.objects.create(
+            name="Rent Lease Extra Cash Desk",
+            kind=FinanceAccountKind.CASH,
+            chart_account=extra_chart,
+            is_real_settlement_account=True,
+            is_active=True,
+        )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=extra_cash,
+            chart_account=extra_chart,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
+        )
+
+        readiness = canonical_readiness(auto_create=False)
+
+        self.assertEqual(readiness["status"], "READY")
+        self.assertEqual(readiness["mapping_id"], mapping.id)
+
 
 class AdminFinanceAccountMappingApiTests(APITestCase):
     def setUp(self):
@@ -170,6 +198,12 @@ class AdminFinanceAccountMappingApiTests(APITestCase):
             kind=FinanceAccountKind.CASH,
             chart_account=refund,
             is_real_settlement_account=True,
+            is_active=True,
+        )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=settlement,
+            chart_account=refund,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
             is_active=True,
         )
 

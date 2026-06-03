@@ -182,6 +182,25 @@ DEFAULT_UPI_GATEWAY_SYSTEM_CODE = "UPI_COLLECTION"
 READINESS_INFORMATIONAL_WARNING_CODES: frozenset[str] = frozenset()
 
 
+def _setup_issue(
+    *,
+    code: str,
+    message: str,
+    level: str = "WARNING",
+    affected_ids: list[int] | None = None,
+    repairable: bool = False,
+    operator_action: str = "",
+) -> dict[str, Any]:
+    return {
+        "level": level,
+        "code": code,
+        "message": message,
+        "affected_ids": affected_ids or [],
+        "repairable": repairable,
+        "operator_action": operator_action,
+    }
+
+
 class AccountingSetupService:
     PURPOSE_TO_SYSTEM_CODE: dict[str, str] = {
         FinanceAccountMappingPurpose.CASH_COLLECTION: DEFAULT_CASH_IN_HAND_SYSTEM_CODE,
@@ -581,26 +600,30 @@ class AccountingSetupService:
         return [p for p in REQUIRED_MAPPING_PURPOSES if p not in active_purposes]
 
     @staticmethod
-    def get_setup_warnings() -> list[dict[str, str]]:
-        warnings: list[dict[str, str]] = []
+    def get_setup_warnings() -> list[dict[str, Any]]:
+        warnings: list[dict[str, Any]] = []
         ledger_key = LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME.strip().lower()
 
         settlement_present = FinanceAccount.objects.filter(is_active=True, is_real_settlement_account=True).exists()
         if not settlement_present:
             warnings.append(
-                {
-                    "code": "MISSING_ACTIVE_SETTLEMENT_ACCOUNT",
-                    "message": "No active finance account flagged as a real settlement desk (cash/bank/UPI/gateway).",
-                }
+                _setup_issue(
+                    code="MISSING_ACTIVE_SETTLEMENT_ACCOUNT",
+                    message="No active finance account flagged as a real settlement desk (cash/bank/UPI/gateway).",
+                    level="ERROR",
+                    operator_action="Create or activate at least one real settlement finance account.",
+                )
             )
 
         ledger_anchor = FinanceAccount.objects.filter(name__iexact=LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME).first()
         if ledger_anchor is None or not ledger_anchor.is_active:
             warnings.append(
-                {
-                    "code": "MISSING_LEDGER_PROFILE_ANCHOR",
-                    "message": "Ledger posting profile anchor finance account is missing or inactive.",
-                }
+                _setup_issue(
+                    code="MISSING_LEDGER_PROFILE_ANCHOR",
+                    message="Ledger posting profile anchor finance account is missing or inactive.",
+                    level="ERROR",
+                    operator_action="Run Accounting Setup defaults to recreate the system posting profile anchor.",
+                )
             )
 
         active_finance_accounts = FinanceAccount.objects.filter(is_active=True)
@@ -611,30 +634,44 @@ class AccountingSetupService:
                 if name_lower == ledger_key and not account.is_real_settlement_account:
                     continue
                 warnings.append(
-                    {
-                        "code": "BANK_FINANCE_ANCHORED_TO_CASH_IN_HAND",
-                        "message": (
+                    _setup_issue(
+                        code="BANK_FINANCE_ANCHORED_TO_CASH_IN_HAND",
+                        message=(
                             f"{account.name} is a bank finance account but its primary chart link is Cash in Hand; "
                             "use a dedicated bank/UPI ledger on the chart."
                         ),
-                    }
+                        affected_ids=[account.id],
+                        repairable=True,
+                        operator_action="Map this bank finance account to a posting-ready bank ASSET account.",
+                    )
                 )
             if account.kind == FinanceAccountKind.UPI and AccountingSetupService._chart_is_cash_in_hand(chart):
                 if name_lower == ledger_key and not account.is_real_settlement_account:
                     continue
                 warnings.append(
-                    {
-                        "code": "UPI_FINANCE_ANCHORED_TO_CASH_IN_HAND",
-                        "message": (
+                    _setup_issue(
+                        code="UPI_FINANCE_ANCHORED_TO_CASH_IN_HAND",
+                        message=(
                             f"{account.name} is a UPI finance account but its primary chart link is Cash in Hand; "
                             "map it to the UPI/payment-gateway style asset ledger instead."
                         ),
-                    }
+                        affected_ids=[account.id],
+                        repairable=True,
+                        operator_action="Map this UPI finance account to a posting-ready UPI/payment-gateway ASSET account.",
+                    )
                 )
 
             has_mapping = FinanceAccountCoaMapping.objects.filter(finance_account=account, is_active=True).exists()
             if not has_mapping:
-                warnings.append({"code": "UNMAPPED_FINANCE_ACCOUNT", "message": f"{account.name} has no active COA mapping."})
+                warnings.append(
+                    _setup_issue(
+                        code="UNMAPPED_FINANCE_ACCOUNT",
+                        message=f"{account.name} has no active COA mapping.",
+                        affected_ids=[account.id],
+                        repairable=bool(account.is_real_settlement_account),
+                        operator_action="Repair blocked collection mappings or add the required COA mapping.",
+                    )
+                )
 
             if (
                 account.is_real_settlement_account
@@ -651,13 +688,16 @@ class AccountingSetupService:
                 ).exists()
             ):
                 warnings.append(
-                    {
-                        "code": "SETTLEMENT_ACCOUNT_WITHOUT_COLLECTION_MAPPING",
-                        "message": (
+                    _setup_issue(
+                        code="SETTLEMENT_ACCOUNT_WITHOUT_COLLECTION_MAPPING",
+                        message=(
                             f"{account.name} is marked as a settlement desk but has no cash/UPI/bank/gateway "
                             "collection-purpose mapping."
                         ),
-                    }
+                        affected_ids=[account.id],
+                        repairable=True,
+                        operator_action="Create the matching collection-purpose mapping for this finance account.",
+                    )
                 )
 
             name_lower = account.name.strip().lower()
@@ -677,13 +717,15 @@ class AccountingSetupService:
             )
             if account.is_active and account.is_real_settlement_account and looks_conceptual and name_lower != ledger_key:
                 warnings.append(
-                    {
-                        "code": "FINANCE_ACCOUNT_LOOKS_CONCEPTUAL",
-                        "message": (
+                    _setup_issue(
+                        code="FINANCE_ACCOUNT_LOOKS_CONCEPTUAL",
+                        message=(
                             f"{account.name} looks like an income/liability ledger concept but is flagged as a "
                             "settlement desk; income and liabilities belong on the chart via mappings."
                         ),
-                    }
+                        affected_ids=[account.id],
+                        operator_action="Rename/reclassify the account or move ledger-only behavior to posting profiles.",
+                    )
                 )
 
             if (
@@ -692,13 +734,15 @@ class AccountingSetupService:
                 and name_lower != ledger_key
             ):
                 warnings.append(
-                    {
-                        "code": "LEGACY_NON_SETTLEMENT_FINANCE_ACCOUNT",
-                        "message": (
+                    _setup_issue(
+                        code="LEGACY_NON_SETTLEMENT_FINANCE_ACCOUNT",
+                        message=(
                             f"{account.name} is not flagged as a settlement desk; verify it is intentional legacy "
                             "data or deactivate after migrating mappings."
                         ),
-                    }
+                        affected_ids=[account.id],
+                        operator_action="Verify this legacy row is intentional and not exposed to collection selectors.",
+                    )
                 )
 
         active_mappings = FinanceAccountCoaMapping.objects.select_related("chart_account", "finance_account").filter(
@@ -713,25 +757,31 @@ class AccountingSetupService:
                 default_counts[purpose] = default_counts.get(purpose, 0) + 1
             if not mapping.chart_account.is_active:
                 warnings.append(
-                    {
-                        "code": "INACTIVE_CHART_ACCOUNT",
-                        "message": (
+                    _setup_issue(
+                        code="INACTIVE_CHART_ACCOUNT",
+                        message=(
                             f"{mapping.finance_account.name} maps to inactive chart account "
                             f"{mapping.chart_account.name}."
                         ),
-                    }
+                        affected_ids=[mapping.finance_account_id, mapping.chart_account_id],
+                        repairable=True,
+                        operator_action="Map the finance account to an active chart account.",
+                    )
                 )
             expected_types = PURPOSE_EXPECTED_ACCOUNT_TYPES.get(mapping.purpose)
             if expected_types and mapping.chart_account.account_type not in expected_types:
                 expected_types_label = ", ".join(expected_types)
                 warnings.append(
-                    {
-                        "code": "MAPPING_ACCOUNT_TYPE_MISMATCH",
-                        "message": (
+                    _setup_issue(
+                        code="MAPPING_ACCOUNT_TYPE_MISMATCH",
+                        message=(
                             f"{mapping.finance_account.name} mapping for {mapping.purpose} "
                             f"uses {mapping.chart_account.account_type}, expected {expected_types_label}."
                         ),
-                    }
+                        affected_ids=[mapping.finance_account_id, mapping.chart_account_id],
+                        repairable=True,
+                        operator_action="Map this purpose to the expected chart account type.",
+                    )
                 )
 
             if (
@@ -739,26 +789,32 @@ class AccountingSetupService:
                 and AccountingSetupService._chart_is_cash_in_hand(mapping.chart_account)
             ):
                 warnings.append(
-                    {
-                        "code": "BANK_COLLECTION_MAPPED_TO_CASH_IN_HAND",
-                        "message": (
+                    _setup_issue(
+                        code="BANK_COLLECTION_MAPPED_TO_CASH_IN_HAND",
+                        message=(
                             f"{mapping.finance_account.name}: bank collection is mapped to Cash in Hand; "
                             "use the bank ledger chart account instead."
                         ),
-                    }
+                        affected_ids=[mapping.finance_account_id, mapping.chart_account_id],
+                        repairable=True,
+                        operator_action="Map bank collection to a bank ASSET ledger.",
+                    )
                 )
             if (
                 mapping.purpose == FinanceAccountMappingPurpose.UPI_COLLECTION
                 and AccountingSetupService._chart_is_cash_in_hand(mapping.chart_account)
             ):
                 warnings.append(
-                    {
-                        "code": "UPI_COLLECTION_MAPPED_TO_CASH_IN_HAND",
-                        "message": (
+                    _setup_issue(
+                        code="UPI_COLLECTION_MAPPED_TO_CASH_IN_HAND",
+                        message=(
                             f"{mapping.finance_account.name}: UPI collection is mapped to Cash in Hand; "
                             "use the UPI / payment gateway asset ledger instead."
                         ),
-                    }
+                        affected_ids=[mapping.finance_account_id, mapping.chart_account_id],
+                        repairable=True,
+                        operator_action="Map UPI collection to a UPI/payment-gateway ASSET ledger.",
+                    )
                 )
 
             fa = mapping.finance_account
@@ -775,32 +831,37 @@ class AccountingSetupService:
                 }
             ):
                 warnings.append(
-                    {
-                        "code": "SETTLEMENT_ACCOUNT_NON_COLLECTION_PURPOSE",
-                        "message": (
+                    _setup_issue(
+                        code="SETTLEMENT_ACCOUNT_NON_COLLECTION_PURPOSE",
+                        message=(
                             f"{fa.name} is a settlement desk but participates in mapping purpose "
                             f"{mapping.purpose}; prefer linking ledger-only purposes via "
                             f"{LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME}."
                         ),
-                    }
+                        affected_ids=[fa.id],
+                        operator_action="Move ledger-only mappings to system posting profiles.",
+                    )
                 )
 
         for purpose, count in default_counts.items():
             if count > 1:
                 warnings.append(
-                    {
-                        "code": "DUPLICATE_DEFAULT_MAPPING",
-                        "message": f"Purpose {purpose} has {count} default mappings.",
-                    }
+                    _setup_issue(
+                        code="DUPLICATE_DEFAULT_MAPPING",
+                        message=f"Purpose {purpose} has {count} default mappings.",
+                        operator_action="Keep exactly one active default mapping per purpose.",
+                    )
                 )
 
         for purpose in REQUIRED_MAPPING_PURPOSES:
             if purpose not in mapped_purposes:
                 warnings.append(
-                    {
-                        "code": "MISSING_REQUIRED_PURPOSE",
-                        "message": f"No active mapping configured for required purpose {purpose}.",
-                    }
+                    _setup_issue(
+                        code="MISSING_REQUIRED_PURPOSE",
+                        message=f"No active mapping configured for required purpose {purpose}.",
+                        repairable=True,
+                        operator_action="Run Accounting Setup defaults or create the required mapping.",
+                    )
                 )
 
         return warnings

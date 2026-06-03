@@ -15,6 +15,7 @@ from api.v1.serializers.billing import (
     CustomerDirectSaleSummarySerializer,
 )
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, RentLeaseAccountingAccountMapping
+from accounting.services.finance_account_readiness import finance_account_readiness
 from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, ReceiptDocument
 from core.services.operational_visibility import INACTIVE_DIRECT_SALE_STATUSES
 from subscriptions.models import (
@@ -340,7 +341,11 @@ def _account_mapping_payload(mapping, *, setup_error: str | None = None):
                 "kind": row.kind,
                 "chart_account_code": row.chart_account.code,
                 "chart_account_type": row.chart_account.account_type,
+                "chart_account_is_active": row.chart_account.is_active,
                 "is_real_settlement_account": row.is_real_settlement_account,
+                "collection_ready": finance_account_readiness(row).collection_ready,
+                "selectable_for_collection": finance_account_readiness(row).selectable_for_collection,
+                "collection_blocker_reason": finance_account_readiness(row).collection_blocker_reason,
             }
             for row in FinanceAccount.objects.select_related("chart_account").filter(is_active=True).order_by("name")[:200]
         ],
@@ -375,6 +380,16 @@ def _active_settlement_account(pk) -> FinanceAccount | None:
     account = FinanceAccount.objects.select_related("chart_account").filter(pk=int(pk), is_active=True).first()
     if account is None:
         raise DjangoValidationError({"settlement_finance_account": "Active settlement finance account is required."})
+    readiness = finance_account_readiness(account)
+    if not account.is_real_settlement_account or not readiness.selectable_for_collection:
+        raise DjangoValidationError(
+            {
+                "settlement_finance_account": (
+                    readiness.collection_blocker_reason
+                    or "Settlement finance account must be a collection-ready real settlement account."
+                )
+            }
+        )
     if not account.chart_account_id or not account.chart_account.is_active:
         raise DjangoValidationError({"settlement_finance_account": "Settlement finance account must use an active chart account."})
     if account.chart_account.account_type != ChartOfAccountType.ASSET:

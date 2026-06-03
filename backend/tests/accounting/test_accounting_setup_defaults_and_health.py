@@ -20,6 +20,11 @@ from accounting.models import (
 )
 from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
 from accounting.services.setup_health_service import get_accounting_setup_health
+from accounting.services.collection_mapping_repair_service import (
+    CONFIRM_COLLECTION_MAPPING_REPAIR,
+    execute_collection_mapping_repairs,
+    preview_collection_mapping_repairs,
+)
 from accounting.services.system_accounts_service import ensure_system_account
 from tests.helpers import create_admin_user
 from tests.helpers import ensure_default_payment_collection_accounts
@@ -104,7 +109,7 @@ class SetupDefaultsAndHealthTests(TestCase):
         self.assertTrue(legacy.is_legacy)
         self.assertTrue(bool(legacy.superseded_by_id))
 
-    def test_setup_health_blocks_multiple_active_settlement_finance_accounts(self):
+    def test_setup_health_reports_multiple_ready_cash_accounts_as_info(self):
         apply_accounting_setup_defaults(performed_by=self.admin)
         cash_chart = ChartOfAccount.objects.create(
             code="HEALTH-DUPE-CASH",
@@ -121,9 +126,73 @@ class SetupDefaultsAndHealthTests(TestCase):
             is_active=True,
             is_real_settlement_account=True,
         )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=FinanceAccount.objects.get(name="Health Dupe Cash Desk"),
+            chart_account=cash_chart,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
+        )
         health = get_accounting_setup_health()
-        self.assertEqual(health["status"], "BLOCKED")
-        self.assertTrue(any("Multiple active CASH" in msg for msg in health["blockers"]))
+        self.assertNotEqual(health["status"], "BLOCKED")
+        self.assertTrue(any(issue["code"] == "MULTIPLE_ACTIVE_CASH_ACCOUNTS" for issue in health["infos"]))
+        self.assertFalse(any("Multiple active CASH" in str(msg) for msg in health["warnings"]))
+
+    def test_setup_health_warns_when_extra_cash_account_is_unmapped(self):
+        apply_accounting_setup_defaults(performed_by=self.admin)
+        cash_chart = ChartOfAccount.objects.create(
+            code="HEALTH-UNMAPPED-CASH",
+            name="Health Unmapped Cash",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        FinanceAccount.objects.create(
+            name="Health Unmapped Cash Desk",
+            kind=FinanceAccountKind.CASH,
+            chart_account=cash_chart,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+        health = get_accounting_setup_health()
+        self.assertEqual(health["status"], "WARNING")
+        self.assertTrue(any(issue["code"] == "MULTIPLE_ACTIVE_CASH_ACCOUNTS_WITH_BLOCKED_MAPPING" for issue in health["warnings"]))
+
+    def test_collection_mapping_repair_creates_missing_safe_mapping(self):
+        cash_chart = ChartOfAccount.objects.create(
+            code="REPAIR-MISSING-MAP",
+            name="Repair Missing Mapping Cash",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        finance_account = FinanceAccount.objects.create(
+            name="Repair Missing Mapping Desk",
+            kind=FinanceAccountKind.CASH,
+            chart_account=cash_chart,
+            opening_balance=Decimal("0.00"),
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+
+        preview = preview_collection_mapping_repairs(finance_account_id=finance_account.id)
+        self.assertEqual(preview["summary"]["repairable_count"], 1)
+
+        result = execute_collection_mapping_repairs(
+            actor=self.admin,
+            confirmation_text=CONFIRM_COLLECTION_MAPPING_REPAIR,
+            finance_account_id=finance_account.id,
+        )
+
+        self.assertEqual(result["summary"]["repaired_count"], 1)
+        self.assertTrue(
+            FinanceAccountCoaMapping.objects.filter(
+                finance_account=finance_account,
+                chart_account=cash_chart,
+                purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+                is_active=True,
+            ).exists()
+        )
 
     def test_setup_health_warns_when_legacy_coa_rows_exist(self):
         apply_accounting_setup_defaults(performed_by=self.admin)
@@ -254,3 +323,24 @@ class SetupDefaultsAndHealthTests(TestCase):
         broken = AccountingSetupService.validate_accounting_setup()
         self.assertFalse(broken["mappings_complete"])
         self.assertIn(FinanceAccountMappingPurpose.EMI_INCOME, broken["missing_required_mappings"])
+
+    def test_validation_warns_when_cash_collection_mapping_points_to_non_asset(self):
+        apply_accounting_setup_defaults(performed_by=self.admin)
+        liability = ChartOfAccount.objects.create(
+            code="BAD-CASH-LIA",
+            name="Bad Cash Liability",
+            account_type=ChartOfAccountType.LIABILITY,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        mapping = FinanceAccountCoaMapping.objects.filter(
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
+        ).first()
+        self.assertIsNotNone(mapping)
+        FinanceAccountCoaMapping.objects.filter(pk=mapping.pk).update(chart_account=liability)
+
+        broken = AccountingSetupService.validate_accounting_setup()
+
+        self.assertFalse(broken["mappings_complete"])
+        self.assertTrue(any(w["code"] == "MAPPING_ACCOUNT_TYPE_MISMATCH" for w in broken["warnings"]))

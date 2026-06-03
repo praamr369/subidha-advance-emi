@@ -22,6 +22,7 @@ from accounting.services.accounting_setup_catalog import (
     MANUAL_COLLECTION_CHART_ACCOUNTS,
     SYSTEM_POSTING_PROFILE_ACCOUNTS,
 )
+from accounting.services.finance_account_readiness import finance_account_readiness
 
 
 def _norm_name(value: str | None) -> str:
@@ -216,6 +217,25 @@ def _bridge_snapshot() -> dict[str, int]:
     }
 
 
+def _issue(
+    *,
+    level: str,
+    code: str,
+    message: str,
+    affected_ids: list[int] | None = None,
+    repairable: bool = False,
+    operator_action: str = "",
+) -> dict[str, Any]:
+    return {
+        "level": level,
+        "code": code,
+        "message": message,
+        "affected_ids": affected_ids or [],
+        "repairable": repairable,
+        "operator_action": operator_action,
+    }
+
+
 def get_accounting_setup_health() -> dict[str, Any]:
     """
     Go-live focused accounting readiness health.
@@ -235,16 +255,69 @@ def get_accounting_setup_health() -> dict[str, Any]:
     coa = _coa_snapshot()
     bridges = _bridge_snapshot()
 
-    blockers: list[str] = []
-    warnings: list[str] = []
+    blockers: list[Any] = []
+    warnings: list[Any] = []
+    infos: list[dict[str, Any]] = []
 
     for kind, snapshot in finance_accounts.items():
         if snapshot["active_count"] == 0:
-            blockers.append(f"Missing active {kind} FinanceAccount.")
+            blockers.append(
+                _issue(
+                    level="ERROR",
+                    code=f"MISSING_ACTIVE_{kind}_FINANCE_ACCOUNT",
+                    message=f"Missing active {kind} FinanceAccount.",
+                    operator_action=f"Create or activate a {kind} collection finance account.",
+                )
+            )
         if snapshot["active_count"] > 1:
-            warnings.append(f"Multiple active {kind} FinanceAccounts configured; each account is evaluated independently.")
+            active_ids = [int(row["id"]) for row in snapshot["active"]]
+            ready_ids = []
+            blocked_ids = []
+            for account in FinanceAccount.objects.select_related("chart_account").filter(pk__in=active_ids):
+                readiness = finance_account_readiness(account)
+                if readiness.selectable_for_collection:
+                    ready_ids.append(account.id)
+                else:
+                    blocked_ids.append(account.id)
+            if blocked_ids:
+                warnings.append(
+                    _issue(
+                        level="WARNING",
+                        code=f"MULTIPLE_ACTIVE_{kind}_ACCOUNTS_WITH_BLOCKED_MAPPING",
+                        message=(
+                            f"Multiple active {kind} FinanceAccounts configured; "
+                            f"{len(blocked_ids)} account(s) are not collection-ready."
+                        ),
+                        affected_ids=blocked_ids,
+                        repairable=True,
+                        operator_action="Repair blocked collection mappings or deactivate only truly unused accounts.",
+                    )
+                )
+            else:
+                infos.append(
+                    _issue(
+                        level="INFO",
+                        code=f"MULTIPLE_ACTIVE_{kind}_ACCOUNTS",
+                        message=(
+                            f"Multiple active {kind} FinanceAccounts configured; each account is mapped "
+                            "and collection-ready, so this is informational."
+                        ),
+                        affected_ids=ready_ids,
+                        repairable=False,
+                        operator_action="No action required unless one account is obsolete or mislabeled.",
+                    )
+                )
         if snapshot["linked_to_inactive_coa_ids"]:
-            blockers.append(f"{kind} FinanceAccount linked to inactive ChartOfAccount.")
+            blockers.append(
+                _issue(
+                    level="ERROR",
+                    code=f"{kind}_FINANCE_ACCOUNT_LINKED_TO_INACTIVE_COA",
+                    message=f"{kind} FinanceAccount linked to inactive ChartOfAccount.",
+                    affected_ids=snapshot["linked_to_inactive_coa_ids"],
+                    repairable=True,
+                    operator_action="Map affected finance accounts to active posting ASSET accounts.",
+                )
+            )
 
     required_collection_keys = {spec.key for spec in MANUAL_COLLECTION_CHART_ACCOUNTS}
     required_profile_keys = {spec.key for spec in SYSTEM_POSTING_PROFILE_ACCOUNTS}
@@ -284,6 +357,8 @@ def get_accounting_setup_health() -> dict[str, Any]:
         "status": status,
         "blockers": blockers,
         "warnings": warnings,
+        "infos": infos,
+        "issues": [*blockers, *warnings, *infos],
         "generated_at": timezone.now().isoformat(),
         "finance_accounts": finance_accounts,
         "canonical_accounts": canonical_accounts,

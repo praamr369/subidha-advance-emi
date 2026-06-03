@@ -5,6 +5,7 @@ from typing import Any
 from django.db import connection
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount
+from accounting.services.finance_account_readiness import finance_account_readiness
 from subscriptions.models import RentLeaseBillingDemand, RentLeaseDemandType
 from subscriptions.services.rent_lease_finance_sync_service import get_active_account_mapping
 
@@ -80,6 +81,9 @@ def _settlement_error(account: FinanceAccount | None) -> str | None:
         return "Settlement finance account is missing."
     if not account.is_active:
         return "Settlement finance account is inactive."
+    readiness = finance_account_readiness(account)
+    if not account.is_real_settlement_account or not readiness.selectable_for_collection:
+        return readiness.collection_blocker_reason or "Settlement finance account must be collection-ready."
     if not account.chart_account_id:
         return "Settlement finance account must map to an active ASSET chart account."
     if not account.chart_account.is_active:

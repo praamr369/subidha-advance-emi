@@ -6,8 +6,17 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount
-from accounting.services.finance_account_readiness import chart_account_allowed_for_collection, finance_account_readiness
+from accounting.models import (
+    ChartOfAccount,
+    ChartOfAccountType,
+    FinanceAccount,
+    FinanceAccountCoaMapping,
+)
+from accounting.services.finance_account_readiness import (
+    COLLECTION_MAPPING_PURPOSE_BY_KIND,
+    chart_account_allowed_for_collection,
+    finance_account_readiness,
+)
 from accounting.services.master_edit_service import AccountingMasterUpdateService
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
@@ -71,10 +80,23 @@ def _find_existing_posting_child(parent: ChartOfAccount, *, kind: str) -> ChartO
 def _preview_for_account(account: FinanceAccount) -> dict[str, Any]:
     readiness = finance_account_readiness(account)
     current = getattr(account, "chart_account", None)
+    expected_purpose = COLLECTION_MAPPING_PURPOSE_BY_KIND.get((account.kind or "").strip().upper())
+    has_expected_mapping = bool(
+        current
+        and expected_purpose
+        and FinanceAccountCoaMapping.objects.filter(
+            finance_account=account,
+            chart_account=current,
+            purpose=expected_purpose,
+            is_active=True,
+        ).exists()
+    )
     base = {
         "finance_account_id": account.id,
         "finance_account_name": account.name,
         "finance_account_kind": account.kind,
+        "expected_mapping_purpose": expected_purpose,
+        "has_expected_collection_mapping": has_expected_mapping,
         "current_chart_account": _chart_payload(current),
         "blocker_reason": readiness.collection_blocker_reason,
         "risk_note": HISTORICAL_MUTATION_NOTE,
@@ -82,6 +104,20 @@ def _preview_for_account(account: FinanceAccount) -> dict[str, Any]:
         "diagnostic_only": readiness.diagnostic_only,
         "selectable_for_collection": readiness.selectable_for_collection,
     }
+    if (
+        not readiness.selectable_for_collection
+        and current is not None
+        and expected_purpose
+        and chart_account_allowed_for_collection(current, kind=account.kind)
+        and not has_expected_mapping
+    ):
+        return {
+            **base,
+            "repairable": True,
+            "repair_action_type": "CREATE_COLLECTION_COA_MAPPING",
+            "suggested_posting_chart_account": _chart_payload(current),
+            "reason": f"Create missing {expected_purpose} mapping to the current posting ASSET account.",
+        }
     if readiness.collection_ready:
         return {
             **base,
@@ -221,18 +257,61 @@ def execute_collection_mapping_repairs(*, actor, confirmation_text: str, finance
             continue
         old_chart_id = account.chart_account_id
         try:
-            if preview["repair_action_type"] == "REMAP_TO_EXISTING_POSTING_ACCOUNT":
+            if preview["repair_action_type"] == "CREATE_COLLECTION_COA_MAPPING":
+                purpose = preview.get("expected_mapping_purpose")
+                if not purpose:
+                    raise serializers.ValidationError({"purpose": "Collection mapping purpose could not be resolved."})
+                target = account.chart_account
+                if not chart_account_allowed_for_collection(target, kind=account.kind):
+                    raise serializers.ValidationError({"chart_account": "Current chart account is not collection-ready."})
+                mapping, created = FinanceAccountCoaMapping.objects.get_or_create(
+                    finance_account=account,
+                    purpose=purpose,
+                    is_active=True,
+                    defaults={
+                        "chart_account": target,
+                        "created_by": actor,
+                        "updated_by": actor,
+                        "notes": "Created by Accounting Setup guided collection mapping repair.",
+                    },
+                )
+                if not created and mapping.chart_account_id != target.id:
+                    mapping.chart_account = target
+                    mapping.updated_by = actor
+                    mapping.notes = "Updated by Accounting Setup guided collection mapping repair."
+                    mapping.save(update_fields=["chart_account", "updated_by", "notes", "updated_at"])
+                updated = FinanceAccount.objects.select_related("chart_account").get(pk=account.pk)
+            elif preview["repair_action_type"] == "REMAP_TO_EXISTING_POSTING_ACCOUNT":
                 target = ChartOfAccount.objects.get(pk=preview["suggested_posting_chart_account"]["id"])
+                if not chart_account_allowed_for_collection(target, kind=account.kind):
+                    raise serializers.ValidationError({"chart_account": "Suggested target is not collection-ready."})
+                updated = AccountingMasterUpdateService.update_finance_account(
+                    account=account,
+                    payload={"chart_account": target},
+                    actor=actor,
+                )
             else:
                 current = account.chart_account
                 target = _create_leaf_posting_account(current)
-            if not chart_account_allowed_for_collection(target, kind=account.kind):
-                raise serializers.ValidationError({"chart_account": "Suggested target is not collection-ready."})
-            updated = AccountingMasterUpdateService.update_finance_account(
-                account=account,
-                payload={"chart_account": target},
-                actor=actor,
-            )
+                if not chart_account_allowed_for_collection(target, kind=account.kind):
+                    raise serializers.ValidationError({"chart_account": "Suggested target is not collection-ready."})
+                updated = AccountingMasterUpdateService.update_finance_account(
+                    account=account,
+                    payload={"chart_account": target},
+                    actor=actor,
+                )
+                purpose = COLLECTION_MAPPING_PURPOSE_BY_KIND.get((updated.kind or "").strip().upper())
+                if purpose:
+                    FinanceAccountCoaMapping.objects.update_or_create(
+                        finance_account=updated,
+                        purpose=purpose,
+                        is_active=True,
+                        defaults={
+                            "chart_account": updated.chart_account,
+                            "updated_by": actor,
+                            "notes": "Updated by Accounting Setup guided collection mapping repair.",
+                        },
+                    )
             readiness = finance_account_readiness(updated)
             log_audit(
                 action_type=AuditLog.ActionType.PAYMENT_FLAGGED,

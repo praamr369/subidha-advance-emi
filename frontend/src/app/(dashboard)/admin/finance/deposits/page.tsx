@@ -65,6 +65,15 @@ function financeAccountChartType(account: Record<string, unknown> | undefined): 
   return String(account?.chart_account_type ?? "").trim().toUpperCase();
 }
 
+function isSelectableSettlementFinanceAccount(account: Record<string, unknown>): boolean {
+  if (account.is_active === false || account.chart_account_is_active === false) return false;
+  if (account.is_real_settlement_account === false || account.diagnostic_only === true || account.system_posting_profile === true) return false;
+  if (account.selectable_for_collection !== undefined) return Boolean(account.selectable_for_collection);
+  if (account.is_selectable_collection_account !== undefined) return Boolean(account.is_selectable_collection_account);
+  if (account.collection_ready !== undefined) return Boolean(account.collection_ready);
+  return financeAccountChartType(account) === "ASSET";
+}
+
 function formatApiError(err: unknown, fallback: string): string {
   if (err instanceof ApiError && Object.keys(err.fieldErrors).length > 0) {
     return Object.entries(err.fieldErrors)
@@ -195,8 +204,8 @@ export default function AdminFinanceDepositsPage() {
     const selectedSettlement = mappingForm.settlement_finance_account_id
       ? financeAccounts.find((account) => String(account.id) === mappingForm.settlement_finance_account_id)
       : undefined;
-    if (mappingForm.settlement_finance_account_id && financeAccountChartType(selectedSettlement) !== "ASSET") {
-      errors.settlement_finance_account_id = "Select an active finance account mapped to an ASSET chart account.";
+    if (mappingForm.settlement_finance_account_id && (!selectedSettlement || !isSelectableSettlementFinanceAccount(selectedSettlement))) {
+      errors.settlement_finance_account_id = "Select an active collection-ready settlement finance account mapped to an ASSET chart account.";
     }
     return errors;
   }, [accountById, financeAccounts, mappingForm]);
@@ -421,7 +430,7 @@ export default function AdminFinanceDepositsPage() {
             <select className="w-full rounded-xl border px-3 py-2 text-sm" value={mappingForm.settlement_finance_account_id} onChange={(e) => setMappingForm((c) => ({ ...c, settlement_finance_account_id: e.target.value }))}>
               <option value="">Use premade/default</option>
               {financeAccounts
-                .filter((acc) => financeAccountChartType(acc) === "ASSET" && acc.is_active !== false && acc.chart_account_is_active !== false)
+                .filter(isSelectableSettlementFinanceAccount)
                 .map((acc) => <option key={String(acc.id)} value={String(acc.id)}>{String(acc.name)} ({String(acc.kind)})</option>)}
             </select>
             {mappingFieldErrors.settlement_finance_account_id ? <div className="mt-1 text-xs text-red-700">{mappingFieldErrors.settlement_finance_account_id}</div> : null}

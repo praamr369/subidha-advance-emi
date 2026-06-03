@@ -26,6 +26,7 @@ from accounting.models import (
     RentLeaseAccountingAccountMapping,
 )
 from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
+from accounting.services.finance_account_readiness import finance_account_readiness
 from accounting.services.system_accounts_service import ensure_system_account
 from subscriptions.models import (
     AuditLog,
@@ -161,14 +162,7 @@ def _valid_chart(account: ChartOfAccount | None, expected_type: str) -> bool:
 
 
 def _valid_settlement_account(account: FinanceAccount | None) -> bool:
-    return bool(
-        account
-        and account.is_active
-        and account.is_real_settlement_account
-        and account.chart_account
-        and account.chart_account.is_active
-        and account.chart_account.account_type == ChartOfAccountType.ASSET
-    )
+    return bool(account and account.is_active and account.is_real_settlement_account and finance_account_readiness(account).selectable_for_collection)
 
 
 def _locked_active_mapping_for_update() -> RentLeaseAccountingAccountMapping | None:

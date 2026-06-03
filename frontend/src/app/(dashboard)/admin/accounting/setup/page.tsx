@@ -27,6 +27,7 @@ import {
   previewAccountingSetupDefaults,
   type AccountingSetupDefaultsPreviewResponse,
   type AccountingSetupHealthResponse,
+  type AccountingSetupHealthIssue,
 } from "@/services/accounting";
 
 const REPAIR_CONFIRMATION_TEXT = "REPAIR COLLECTION MAPPINGS";
@@ -57,6 +58,13 @@ function firstBlocker(item: PostingProfileReadinessItem): string {
   return item.blockers?.[0] || item.recommended_action || "Ready.";
 }
 
+function issueLevel(issue: unknown): string {
+  if (issue && typeof issue === "object" && "level" in issue) {
+    return String((issue as { level?: unknown }).level ?? "WARNING").toUpperCase();
+  }
+  return "WARNING";
+}
+
 function warningCode(warning: unknown): string {
   if (warning && typeof warning === "object" && "code" in warning) {
     return String((warning as { code?: unknown }).code ?? "WARNING");
@@ -69,6 +77,39 @@ function warningMessage(warning: unknown): string {
     return String((warning as { message?: unknown }).message ?? "");
   }
   return String(warning ?? "");
+}
+
+function warningAction(warning: unknown): string {
+  if (warning && typeof warning === "object" && "operator_action" in warning) {
+    return String((warning as { operator_action?: unknown }).operator_action ?? "");
+  }
+  return "";
+}
+
+function warningAffectedIds(warning: unknown): string {
+  if (warning && typeof warning === "object" && "affected_ids" in warning) {
+    const ids = (warning as { affected_ids?: unknown }).affected_ids;
+    return Array.isArray(ids) && ids.length ? `Affected IDs: ${ids.join(", ")}` : "";
+  }
+  return "";
+}
+
+function IssueList({ issues }: { issues: Array<string | AccountingSetupHealthIssue> }) {
+  return (
+    <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+      {issues.map((warning) => {
+        const action = warningAction(warning);
+        const affected = warningAffectedIds(warning);
+        return (
+          <li key={`${warningCode(warning)}-${warningMessage(warning)}-${affected}`}>
+            <span className="font-medium">{warningCode(warning)}:</span> {warningMessage(warning)}
+            {affected ? <span className="ml-1 text-muted-foreground">{affected}</span> : null}
+            {action ? <div className="mt-0.5 text-muted-foreground">Action: {action}</div> : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 function RepairDialog({
@@ -195,7 +236,8 @@ export default function AdminAccountingSetupPage() {
   const repairableAccounts = businessFinanceAccounts.filter((account) => !isSelectable(account) && account.can_auto_create_posting_account);
 
   const blockers = health?.blockers ?? [];
-  const warnings = health?.warnings ?? [];
+  const healthInfos = health?.infos ?? (health?.issues ?? []).filter((issue) => issueLevel(issue) === "INFO") as AccountingSetupHealthIssue[];
+  const warnings = (health?.warnings ?? []).filter((issue) => issueLevel(issue) !== "INFO");
   const displayStatus = health?.status ?? (matrix ? "READY" : "BLOCKED");
 
   const previewDefaults = useCallback(async () => {
@@ -381,21 +423,19 @@ export default function AdminAccountingSetupPage() {
           {blockers.length > 0 ? (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">
               <div className="font-semibold">Go-live blockers</div>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-                {blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
-              </ul>
+              <IssueList issues={blockers} />
             </div>
           ) : null}
           {warnings.length > 0 ? (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <div className="font-semibold">{warnings.length} warning{warnings.length === 1 ? "" : "s"} detected. Review before go-live.</div>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-                {warnings.map((warning) => (
-                  <li key={`${warningCode(warning)}-${warningMessage(warning)}`}>
-                    <span className="font-medium">{warningCode(warning)}:</span> {warningMessage(warning)}
-                  </li>
-                ))}
-              </ul>
+              <IssueList issues={warnings} />
+            </div>
+          ) : null}
+          {healthInfos.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
+              <div className="font-semibold">{healthInfos.length} informational note{healthInfos.length === 1 ? "" : "s"}</div>
+              <IssueList issues={healthInfos} />
             </div>
           ) : null}
         </section>

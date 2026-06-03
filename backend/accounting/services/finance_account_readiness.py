@@ -7,6 +7,8 @@ from accounting.models import (
     ChartOfAccountType,
     FinanceAccount,
     FinanceAccountKind,
+    FinanceAccountCoaMapping,
+    FinanceAccountMappingPurpose,
     SYSTEM_LEDGER_POSTING_PROFILE_NAME,
 )
 
@@ -22,6 +24,12 @@ COLLECTION_FINANCE_ACCOUNT_KINDS: frozenset[str] = frozenset(
 SYSTEM_POSTING_PROFILE_DIAGNOSTIC_BLOCKER = (
     "System posting profile diagnostic only; not a customer collection destination."
 )
+
+COLLECTION_MAPPING_PURPOSE_BY_KIND: dict[str, str] = {
+    FinanceAccountKind.CASH: FinanceAccountMappingPurpose.CASH_COLLECTION,
+    FinanceAccountKind.BANK: FinanceAccountMappingPurpose.BANK_COLLECTION,
+    FinanceAccountKind.UPI: FinanceAccountMappingPurpose.UPI_COLLECTION,
+}
 
 
 @dataclass(frozen=True)
@@ -110,6 +118,23 @@ def chart_account_allowed_for_collection(chart_account: ChartOfAccount | None, *
     )
 
 
+def finance_account_has_collection_mapping(finance_account: FinanceAccount) -> bool:
+    purpose = COLLECTION_MAPPING_PURPOSE_BY_KIND.get((finance_account.kind or "").strip().upper())
+    if not purpose:
+        return False
+    chart_account_id = getattr(finance_account, "chart_account_id", None)
+    if not chart_account_id:
+        return False
+    return FinanceAccountCoaMapping.objects.filter(
+        finance_account_id=finance_account.pk,
+        chart_account_id=chart_account_id,
+        purpose=purpose,
+        is_active=True,
+        chart_account__is_active=True,
+        chart_account__account_type=ChartOfAccountType.ASSET,
+    ).exists()
+
+
 def finance_account_readiness(
     finance_account: FinanceAccount,
     *,
@@ -191,6 +216,15 @@ def finance_account_readiness(
             collection_ready=False,
             collection_blocker_reason="Mapped chart account is a group/control account, not a posting account.",
             recommended_action="Choose a leaf ASSET chart account with no child accounts.",
+            operational_collection_account=operational_collection_account,
+            system_posting_profile=system_posting_profile,
+            diagnostic_only=diagnostic_only,
+        )
+    if not finance_account_has_collection_mapping(finance_account):
+        return _readiness(
+            collection_ready=False,
+            collection_blocker_reason="No active collection-purpose COA mapping is configured for this finance account.",
+            recommended_action="Repair blocked collection mappings or add a matching CASH/BANK/UPI collection mapping.",
             operational_collection_account=operational_collection_account,
             system_posting_profile=system_posting_profile,
             diagnostic_only=diagnostic_only,

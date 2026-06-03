@@ -956,10 +956,21 @@ export type BridgeRunResponse = {
   }>;
 };
 
+export type AccountingSetupHealthIssue = {
+  level?: "INFO" | "WARNING" | "ERROR" | string;
+  code?: string;
+  message?: string;
+  affected_ids?: number[];
+  repairable?: boolean;
+  operator_action?: string;
+};
+
 export type AccountingSetupHealthResponse = {
   status: "OK" | "WARNING" | "BLOCKED";
-  blockers: string[];
-  warnings: string[];
+  blockers: Array<string | AccountingSetupHealthIssue>;
+  warnings: Array<string | AccountingSetupHealthIssue>;
+  infos?: AccountingSetupHealthIssue[];
+  issues?: Array<string | AccountingSetupHealthIssue>;
   generated_at?: string;
   finance_accounts: Record<
     "CASH" | "BANK" | "UPI",
