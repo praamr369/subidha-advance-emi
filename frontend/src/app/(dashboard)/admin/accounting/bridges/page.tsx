@@ -25,12 +25,21 @@ const PURCHASE_VENDOR_EVENT_KEYS = new Set([
   "purchase_expense",
 ]);
 
+const PAYROLL_EVENT_KEYS = new Set([
+  "salary_expense",
+  "salary_payable",
+  "salary_payment",
+  "staff_advance",
+  "expense_claim_payment",
+]);
+
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
 function bridgeGroupName(event: AccountingBridgeReadinessEvent): string {
   if (PURCHASE_VENDOR_EVENT_KEYS.has(event.event_key)) return "Purchase & Vendors";
+  if (PAYROLL_EVENT_KEYS.has(event.event_key)) return "HR & Payroll";
   return event.event_group || event.source_module || "Other";
 }
 
