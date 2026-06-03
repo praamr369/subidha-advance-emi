@@ -23,6 +23,10 @@ from api.v1.views.accounting import (
     StaffLedgerView,
     VendorViewSet,
 )
+from api.v1.views.accounting_commission_payout_bridge import (
+    CommissionSettlementBridgeRunView,
+    PayoutBatchBridgeRunView,
+)
 from api.v1.views.accounting_phase2 import (
     BalanceSheetReportView,
     BridgeRunView,
@@ -48,7 +52,6 @@ from api.v1.views.accounting_phase3 import (
     CashBookView,
     ChartOfAccountsImportPostView,
     ChartOfAccountsImportPreviewView,
-    CommissionSettlementBridgeRunView,
     DepreciationRunViewSet,
     EmployeeImportPostView,
     EmployeeImportPreviewView,
@@ -56,7 +59,6 @@ from api.v1.views.accounting_phase3 import (
     EmiSubscriptionBridgeRunView,
     EmiWaiverBridgeRunView,
     InventoryBridgeRunView,
-    PayoutBatchBridgeRunView,
     PostingLockViewSet,
     PurchaseBookView,
     RetailSaleBridgeRunView,
