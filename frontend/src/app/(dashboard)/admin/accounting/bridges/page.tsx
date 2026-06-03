@@ -1,380 +1,231 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import {
-  AccountingNotice,
-  accountingErrorMessage,
-  accountingFieldClassName,
-} from "@/components/accounting/shared";
-import { AccountingControlShell } from "@/components/layout/page-shells";
 import ActionButton from "@/components/ui/ActionButton";
 import PortalPage from "@/components/ui/PortalPage";
-import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
-  listAccountingBridgePostings,
-  runAccountingBridge,
-  runCommissionSettlementBridge,
-  runEmiPaymentBridge,
-  runEmiSubscriptionBridge,
-  runEmiWaiverBridge,
-  runInventoryPostingBridge,
-  runPayoutBatchBridge,
-  runRetailSaleBridge,
-  type AccountingBridgePosting,
-  type BridgeRunResponse,
-  type Phase3BridgeRunResponse,
-} from "@/services/accounting";
+  getAccountingBridgeReadiness,
+  type AccountingBridgeReadinessAccount,
+  type AccountingBridgeReadinessEvent,
+  type AccountingBridgeReadinessPayload,
+} from "@/services/accounting-bridge-readiness";
 
-const today = new Date().toISOString().slice(0, 10);
+function cx(...values: Array<string | false | null | undefined>) {
+  return values.filter(Boolean).join(" ");
+}
 
-export default function AccountingBridgesPage() {
-  const [submitting, setSubmitting] = useState(false);
+function statusClass(status: string): string {
+  const normalized = status.toUpperCase();
+  if (normalized === "READY") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (normalized === "INFO") return "border-blue-200 bg-blue-50 text-blue-900";
+  if (normalized === "WARNING") return "border-amber-200 bg-amber-50 text-amber-950";
+  return "border-red-200 bg-red-50 text-red-900";
+}
+
+function accountLabel(account: AccountingBridgeReadinessAccount): string {
+  const code = account.code ? `${account.code} · ` : "";
+  const name = account.name ?? account.kind ?? "Configured account";
+  const type = account.account_type ? ` (${account.account_type})` : "";
+  const purpose = account.purpose ? ` · ${account.purpose}` : account.requirement ? ` · ${account.requirement}` : "";
+  return `${code}${name}${type}${purpose}`;
+}
+
+function AccountList({ accounts, emptyLabel }: { accounts: AccountingBridgeReadinessAccount[]; emptyLabel: string }) {
+  if (!accounts.length) return <span className="text-muted-foreground">{emptyLabel}</span>;
+  return (
+    <ul className="space-y-1">
+      {accounts.map((account, index) => (
+        <li key={`${account.id ?? account.name ?? account.kind ?? "account"}-${account.purpose ?? account.requirement ?? index}`}>
+          {accountLabel(account)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function BlockingReasons({ event }: { event: AccountingBridgeReadinessEvent }) {
+  if (!event.blocking_reasons.length) return <span className="text-emerald-700">No blocking reasons.</span>;
+  return (
+    <ul className="list-disc space-y-1 pl-4 text-red-800">
+      {event.blocking_reasons.map((reason, index) => (
+        <li key={`${event.event_key}-reason-${index}-${reason.slice(0, 24)}`}>{reason}</li>
+      ))}
+    </ul>
+  );
+}
+
+function SummaryCard({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className={cx("rounded-2xl border p-4 shadow-sm", tone)}>
+      <div className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</div>
+      <div className="mt-2 text-2xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+export default function AccountingBridgeReadinessPage() {
+  const [payload, setPayload] = useState<AccountingBridgeReadinessPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [result, setResult] = useState<BridgeRunResponse | null>(null);
-  const [phase3Results, setPhase3Results] = useState<Phase3BridgeRunResponse[]>([]);
-  const [bridgeRows, setBridgeRows] = useState<AccountingBridgePosting[]>([]);
-  const [form, setForm] = useState({
-    start_date: today.slice(0, 8) + "01",
-    end_date: today,
-    dry_run: true,
-    payment_collection: true,
-    payment_reversal: true,
-  });
 
-  async function loadBridgePostings() {
+  async function load({ silent = false }: { silent?: boolean } = {}) {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
     try {
-      const payload = await listAccountingBridgePostings();
-      setBridgeRows(payload.results.slice(0, 8));
-    } catch {
-      setBridgeRows([]);
+      setPayload(await getAccountingBridgeReadiness());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load accounting bridge readiness.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   }
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadInitialBridgePostings() {
-      try {
-        const payload = await listAccountingBridgePostings();
-        if (!cancelled) setBridgeRows(payload.results.slice(0, 8));
-      } catch {
-        if (!cancelled) setBridgeRows([]);
-      }
-    }
-    void loadInitialBridgePostings();
-    return () => {
-      cancelled = true;
-    };
+    void load();
   }, []);
 
-  async function handleRun(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const selectedPurposes = [
-      ...(form.payment_collection ? ["PAYMENT_COLLECTION"] : []),
-      ...(form.payment_reversal ? ["PAYMENT_REVERSAL"] : []),
-    ];
-    if (selectedPurposes.length === 0) {
-      setNotice(null);
-      setResult(null);
-      setError("Select at least one legacy bridge purpose before running the bridge.");
-      return;
+  const groupedEvents = useMemo(() => {
+    const groups = new Map<string, AccountingBridgeReadinessEvent[]>();
+    for (const event of payload?.events ?? []) {
+      const key = event.source_module || "other";
+      groups.set(key, [...(groups.get(key) ?? []), event]);
     }
-    setSubmitting(true);
-    try {
-      const payload = await runAccountingBridge({
-        start_date: form.start_date,
-        end_date: form.end_date,
-        dry_run: form.dry_run,
-        purposes: selectedPurposes,
-      });
-      setResult(payload);
-      await loadBridgePostings();
-      setError(null);
-      setNotice(form.dry_run ? "Bridge dry run completed." : "Bridge run completed.");
-    } catch (err) {
-      setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to run accounting bridges."));
-      setResult(null);
-    } finally {
-      setSubmitting(false);
-    }
+    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [payload?.events]);
+
+  if (loading) {
+    return (
+      <PortalPage title="Accounting Bridge Readiness" subtitle="Validating operational finance/accounting bridge mappings against real Chart of Accounts and FinanceAccount setup.">
+        <LoadingBlock label="Loading accounting bridge readiness..." />
+      </PortalPage>
+    );
   }
 
-  async function handlePhase3Run(
-    label: string,
-    runner: (payload: {
-      start_date: string;
-      end_date: string;
-      dry_run?: boolean;
-    }) => Promise<Phase3BridgeRunResponse>
-  ) {
-    setSubmitting(true);
-    try {
-      const payload = await runner({
-        start_date: form.start_date,
-        end_date: form.end_date,
-        dry_run: form.dry_run,
-      });
-      setPhase3Results((current) => [payload, ...current.filter((item) => item.purpose !== payload.purpose)]);
-      await loadBridgePostings();
-      setError(null);
-      setNotice(`${label} ${form.dry_run ? "dry run" : "live run"} completed.`);
-    } catch (err) {
-      setNotice(null);
-      setError(accountingErrorMessage(err, `Failed to run ${label.toLowerCase()}.`));
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const summary = payload?.summary ?? {
+    ready_count: 0,
+    info_count: 0,
+    warning_count: 0,
+    error_count: 0,
+    not_configured_count: 0,
+  };
 
   return (
     <PortalPage
-      title="Bridge Runs"
-      subtitle="Controlled, idempotent bridge execution from approved operational records into accounting journals. Payment, billing, waiver, commission, payout, and inventory truth remain in their own source modules."
+      title="Accounting Bridge Readiness"
+      subtitle="Read-only readiness checks for future accounting bridge posting. This page does not post journals, create receipts, allocate settlements, or mutate source records."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
-        { label: "Bridge Runs" },
+        { label: "Bridge Readiness" },
       ]}
       actions={[
-        { href: ROUTES.admin.accountingItrPack, label: "ITR Export Pack", variant: "secondary" },
-        { href: ROUTES.admin.accountingTaxInvoices, label: "GST Docs", variant: "secondary" },
+        { href: ROUTES.admin.accountingSetup, label: "Accounting Setup", variant: "secondary" },
+        { href: ROUTES.admin.accountingChartOfAccounts, label: "Chart of Accounts", variant: "secondary" },
       ]}
-      statusBadge={{ label: "Admin Only", tone: "info" }}
+      statusBadge={{ label: "Readiness Only", tone: "info" }}
     >
-      <AccountingControlShell
-        readinessWarnings={
-          <div className="space-y-4">
-            {notice ? <AccountingNotice message={notice} /> : null}
-            <MetricStrip
-              items={[
-                {
-                  label: "Legacy bridge purposes",
-                  value: [form.payment_collection && "Collection", form.payment_reversal && "Reversal"].filter(Boolean).join(" + ") || "None selected",
-                },
-                { label: "Phase-3 results captured", value: String(phase3Results.length) },
-                { label: "Dry run", value: form.dry_run ? "Yes" : "No" },
-                { label: "Recent postings shown", value: String(bridgeRows.length) },
-              ]}
-            />
-            {submitting ? <LoadingBlock label="Running accounting bridge..." /> : null}
-            {!submitting && error ? <ErrorState title="Unable to run accounting bridge" description={error} /> : null}
-          </div>
-        }
-        primaryRegister={
-          <div className="space-y-6">
-            <WorkspaceSection
-              title="Latest bridge result"
-              description="The response below comes directly from the bridge run endpoint, including idempotent existing-count tracking."
-            >
-              {!result ? (
-                <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
-                  Run a dry run or live bridge to see the latest result payload here.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
-                    {result.start_date} to {result.end_date} • {result.dry_run ? "Dry run" : "Live run"}
-                  </div>
-                  {result.results.map((row) => (
-                    <div key={row.purpose} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
-                      <div className="font-semibold text-foreground">{row.purpose}</div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        Candidates: {row.candidates} • Created: {row.created_count} • Existing: {row.existing_count}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </WorkspaceSection>
+      <div className="space-y-6">
+        {error ? <ErrorState title="Unable to load bridge readiness" description={error} onRetry={() => void load()} /> : null}
 
-            <WorkspaceSection
-              title="Phase-3 Results"
-              description="Each result reflects the real bridge endpoint response, including skips where accounting recognition is intentionally deferred for safety."
-            >
-              {phase3Results.length === 0 ? (
-                <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
-                  Run one of the Phase-3 bridge actions to inspect its latest payload here.
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {phase3Results.map((row) => (
-                    <div key={row.purpose} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
-                      <div className="font-semibold text-foreground">{row.purpose}</div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        {row.start_date} to {row.end_date} • {row.dry_run ? "Dry run" : "Live run"}
-                      </div>
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        Candidates: {row.candidates ?? 0} • Created: {row.created_count ?? 0} • Existing:{" "}
-                        {row.existing_count ?? 0}
-                      </div>
-                      {row.settlement_created_count || row.settlement_existing_count ? (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          Settlement bridges: Created {row.settlement_created_count ?? 0} • Existing{" "}
-                          {row.settlement_existing_count ?? 0}
-                        </div>
-                      ) : null}
-                      {row.skipped && row.skipped.length > 0 ? (
-                        <div className="mt-2 text-xs text-amber-700">Skipped: {row.skipped.length} rows</div>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </WorkspaceSection>
-
-            <WorkspaceSection
-              title="Recent bridge provenance"
-              description="Read-only bridge posting register showing which source event already produced a controlled journal entry."
-            >
-              {bridgeRows.length === 0 ? (
-                <div className="rounded-2xl border border-border bg-background px-4 py-4 text-sm text-muted-foreground shadow-sm">
-                  No bridge postings recorded yet.
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {bridgeRows.map((row) => (
-                    <div key={row.id} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
-                      <div className="font-semibold text-foreground">
-                        {row.purpose} • {row.source_type || row.source_model} #{row.source_reference || row.source_id}
-                      </div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        {row.voucher_type || "SYSTEM_BRIDGE"} • Journal {row.journal_entry_no || row.journal_entry} •{" "}
-                        {row.journal_entry_status || "UNKNOWN"}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {row.source_event_date || row.journal_entry_date || "—"} •{" "}
-                        {row.source_document_no || row.journal_entry_memo || "No document reference"}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </WorkspaceSection>
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Universal readiness registry</div>
+              <h2 className="mt-1 text-xl font-semibold text-foreground">Operational event mapping status</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
+                Each event below answers only whether its future accounting bridge would have safe debit, credit, and finance-account mappings. Posting remains disabled here by design.
+              </p>
+            </div>
+            <ActionButton variant="secondary" onClick={() => void load({ silent: true })} disabled={refreshing}>
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </ActionButton>
           </div>
-        }
-        controlPanel={
-          <div className="space-y-4">
-            <WorkspaceSection
-              title="Run payment bridge"
-              description="Dry run first to inspect payment collection and payment reversal candidates before creating bridge journals."
-            >
-              <form className="grid gap-3" onSubmit={handleRun}>
-                <label className="text-sm text-muted-foreground">
-                  Start date
-                  <input
-                    type="date"
-                    value={form.start_date}
-                    onChange={(event) => setForm((current) => ({ ...current, start_date: event.target.value }))}
-                    className={accountingFieldClassName()}
-                  />
-                </label>
-                <label className="text-sm text-muted-foreground">
-                  End date
-                  <input
-                    type="date"
-                    value={form.end_date}
-                    onChange={(event) => setForm((current) => ({ ...current, end_date: event.target.value }))}
-                    className={accountingFieldClassName()}
-                  />
-                </label>
-                <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.payment_collection}
-                    onChange={(event) => setForm((current) => ({ ...current, payment_collection: event.target.checked }))}
-                  />
-                  PAYMENT_COLLECTION purpose
-                </label>
-                <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.payment_reversal}
-                    onChange={(event) => setForm((current) => ({ ...current, payment_reversal: event.target.checked }))}
-                  />
-                  PAYMENT_REVERSAL purpose
-                </label>
-                <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.dry_run}
-                    onChange={(event) => setForm((current) => ({ ...current, dry_run: event.target.checked }))}
-                  />
-                  Dry run only
-                </label>
-                <button
-                  type="submit"
-                  className="rounded-xl border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-[0_18px_38px_-24px_rgba(15,23,42,0.9)] transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                  disabled={submitting || (!form.payment_collection && !form.payment_reversal)}
-                >
-                  Run Bridge
-                </button>
-              </form>
-            </WorkspaceSection>
 
-            <WorkspaceSection
-              title="Phase-3 Bridge Runners"
-              description="Run the newer additive bridges separately so retail billing, inventory, EMI waiver, commission settlement, payout, and EMI receipt posting stay explicit and auditable."
-              contentClassName="grid gap-3 md:grid-cols-2"
-            >
-              <ActionButton
-                variant="primary"
-                loading={submitting}
-                onClick={() => void handlePhase3Run("Retail sale bridge", runRetailSaleBridge)}
-              >
-                Run retail sale
-              </ActionButton>
-              <ActionButton
-                variant="secondary"
-                loading={submitting}
-                onClick={() => void handlePhase3Run("Inventory bridge", runInventoryPostingBridge)}
-              >
-                Run inventory posting
-              </ActionButton>
-              <ActionButton
-                variant="secondary"
-                loading={submitting}
-                onClick={() => void handlePhase3Run("EMI subscription bridge", runEmiSubscriptionBridge)}
-              >
-                Run EMI subscription
-              </ActionButton>
-              <ActionButton
-                variant="secondary"
-                loading={submitting}
-                onClick={() => void handlePhase3Run("EMI payment bridge", runEmiPaymentBridge)}
-              >
-                Run EMI payment receipts
-              </ActionButton>
-              <ActionButton
-                variant="secondary"
-                loading={submitting}
-                onClick={() => void handlePhase3Run("EMI waiver bridge", runEmiWaiverBridge)}
-              >
-                Run EMI waiver
-              </ActionButton>
-              <ActionButton
-                variant="secondary"
-                loading={submitting}
-                onClick={() => void handlePhase3Run("Commission settlement bridge", runCommissionSettlementBridge)}
-              >
-                Run commission settlement
-              </ActionButton>
-              <ActionButton
-                variant="secondary"
-                loading={submitting}
-                onClick={() => void handlePhase3Run("Payout batch bridge", runPayoutBatchBridge)}
-              >
-                Run payout batches
-              </ActionButton>
-            </WorkspaceSection>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <SummaryCard label="Ready" value={summary.ready_count} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+            <SummaryCard label="Info" value={summary.info_count} tone="border-blue-200 bg-blue-50 text-blue-900" />
+            <SummaryCard label="Warning" value={summary.warning_count} tone="border-amber-200 bg-amber-50 text-amber-950" />
+            <SummaryCard label="Error" value={summary.error_count} tone="border-red-200 bg-red-50 text-red-900" />
+            <SummaryCard label="Not configured" value={summary.not_configured_count} tone="border-slate-200 bg-slate-50 text-slate-900" />
           </div>
-        }
-      />
+        </section>
+
+        {groupedEvents.length === 0 ? (
+          <WorkspaceSection title="No bridge events exposed" description="No operational source modules with bridge readiness registry entries were found in this repository state.">
+            <div className="rounded-2xl border border-border bg-background p-4 text-sm text-muted-foreground shadow-sm">
+              Confirm that source modules are installed before enabling any future accounting bridge work.
+            </div>
+          </WorkspaceSection>
+        ) : null}
+
+        {groupedEvents.map(([sourceModule, events]) => (
+          <WorkspaceSection
+            key={`source-module-${sourceModule}`}
+            title={sourceModule.replaceAll("_", " ").replace(/^./, (value) => value.toUpperCase())}
+            description="Readiness is based on active FinanceAccount, FinanceAccountCoaMapping, RentLeaseAccountingAccountMapping, and Chart of Accounts setup."
+          >
+            <div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm">
+              <table className="min-w-full divide-y divide-border text-sm">
+                <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Event</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Debit readiness</th>
+                    <th className="px-4 py-3 font-semibold">Credit readiness</th>
+                    <th className="px-4 py-3 font-semibold">Finance account readiness</th>
+                    <th className="px-4 py-3 font-semibold">Posting mode</th>
+                    <th className="px-4 py-3 font-semibold">Operator action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {events.map((event) => (
+                    <tr key={event.event_key} className="align-top">
+                      <td className="px-4 py-4">
+                        <div className="font-semibold text-foreground">{event.label}</div>
+                        <div className="mt-1 font-mono text-xs text-muted-foreground">{event.event_key}</div>
+                        {event.source_model ? <div className="mt-1 text-xs text-muted-foreground">Source: {event.source_model}</div> : null}
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={cx("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(event.status))}>
+                          {event.status}
+                        </span>
+                        <div className="mt-2 text-xs text-muted-foreground">Can post: {event.can_post ? "Yes" : "No"}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Repairable: {event.repairable ? "Yes" : "No"}</div>
+                      </td>
+                      <td className="px-4 py-4 text-xs">
+                        <div className="font-semibold text-foreground">Required</div>
+                        <div className="mt-1 text-muted-foreground">{(event.debit_requirements ?? []).join(", ") || "Not specified"}</div>
+                        <div className="mt-3 font-semibold text-foreground">Configured</div>
+                        <div className="mt-1"><AccountList accounts={event.debit_accounts} emptyLabel="No debit account configured." /></div>
+                      </td>
+                      <td className="px-4 py-4 text-xs">
+                        <div className="font-semibold text-foreground">Required</div>
+                        <div className="mt-1 text-muted-foreground">{(event.credit_requirements ?? []).join(", ") || "Not specified"}</div>
+                        <div className="mt-3 font-semibold text-foreground">Configured</div>
+                        <div className="mt-1"><AccountList accounts={event.credit_accounts} emptyLabel="No credit account configured." /></div>
+                      </td>
+                      <td className="px-4 py-4 text-xs">
+                        <AccountList accounts={event.finance_accounts} emptyLabel="No finance account required or configured." />
+                        <div className="mt-3"><BlockingReasons event={event} /></div>
+                      </td>
+                      <td className="px-4 py-4 text-xs font-semibold text-foreground">{event.posting_mode}</td>
+                      <td className="px-4 py-4 text-xs text-muted-foreground">{event.operator_action}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </WorkspaceSection>
+        ))}
+      </div>
     </PortalPage>
   );
 }
