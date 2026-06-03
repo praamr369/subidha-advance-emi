@@ -505,6 +505,32 @@ function UserDropdown({
   );
 }
 
+type TopbarQuickAction = {
+  key: string;
+  label: string;
+  title: string;
+  href: unknown;
+};
+
+function isConcreteLinkHref(href: unknown): href is string {
+  return typeof href === "string" && href.trim().length > 0;
+}
+
+function warnInvalidTopbarAction(action: TopbarQuickAction) {
+  if (process.env.NODE_ENV === "production") return;
+  console.warn("[Topbar] Skipping quick action with invalid href", {
+    key: action.key,
+    label: action.label,
+    href: action.href,
+  });
+}
+
+function hasValidTopbarHref(action: TopbarQuickAction): action is TopbarQuickAction & { href: string } {
+  const valid = isConcreteLinkHref(action.href);
+  if (!valid) warnInvalidTopbarAction(action);
+  return valid;
+}
+
 function SidebarContent({
   role,
   pathname,
@@ -1292,6 +1318,18 @@ function Topbar({
   isLoggingOut: boolean;
   mobileOpen: boolean;
 }) {
+  const topbarActions: TopbarQuickAction[] =
+    role === "ADMIN"
+      ? [
+          { key: "create-customer", label: "Customer", title: "Create customer", href: `${ROUTES.admin.customers}/create` },
+          { key: "create-contract", label: "Contract", title: "Create contract", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },
+          { key: "create-direct-sale", label: "Direct Sale", title: "Create direct sale", href: ROUTES.admin.billingDirectSaleCreate },
+          { key: "collect-payment", label: "Payment", title: "Collect payment", href: ROUTES.admin.financeCollect },
+          { key: "open-delivery", label: "Delivery", title: "Open delivery workspace", href: ROUTES.admin.deliveryCreate },
+        ]
+      : [];
+  const validTopbarActions = topbarActions.filter(hasValidTopbarHref);
+
   return (
     <PortalHeader>
       <div className="flex min-h-[4.5rem] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 sm:min-h-[4.75rem] sm:gap-x-4 sm:px-4 lg:px-6 xl:px-8">
@@ -1323,18 +1361,12 @@ function Topbar({
         <div className="flex min-w-0 max-w-full flex-[1_1_14rem] flex-wrap items-center justify-end gap-2 sm:flex-[0_1_auto]">
           {role === "ADMIN" ? (
             <div className="hidden min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 xl:flex">
-              {[
-                { label: "Customer", href: `${ROUTES.admin.customers}/create` },
-                { label: "Contract", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },
-                { label: "Direct Sale", href: ROUTES.admin.billingDirectSaleCreate },
-                { label: "Payment", href: ROUTES.admin.financeCollect },
-                { label: "Delivery", href: ROUTES.admin.deliveryCreate },
-              ].map((action) => (
+              {validTopbarActions.map((action) => (
                 <Link
-                  key={action.href}
+                  key={action.key || `topbar-${action.label}-${action.href}`}
                   href={action.href}
                   className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2.5 text-xs font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
-                  title={`Create ${action.label}`}
+                  title={action.title}
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {action.label}

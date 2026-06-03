@@ -171,6 +171,28 @@ def _valid_settlement_account(account: FinanceAccount | None) -> bool:
     )
 
 
+def _locked_active_mapping_for_update() -> RentLeaseAccountingAccountMapping | None:
+    mapping_lock = (
+        RentLeaseAccountingAccountMapping.objects.select_for_update(of=("self",))
+        .filter(is_active=True)
+        .order_by("id")
+        .first()
+    )
+    if mapping_lock is None:
+        return None
+    return (
+        RentLeaseAccountingAccountMapping.objects.select_related(
+            "monthly_income_account",
+            "deposit_liability_account",
+            "deposit_refund_account",
+            "damage_recovery_income_account",
+            "settlement_finance_account",
+            "settlement_finance_account__chart_account",
+        )
+        .get(pk=mapping_lock.pk)
+    )
+
+
 @transaction.atomic
 def ensure_premade_rent_lease_accounting_setup(*, performed_by=None) -> RentLeaseAccountingAccountMapping:
     """Create/claim day-one COA, finance account, and active rent/lease mapping.
@@ -233,19 +255,7 @@ def ensure_premade_rent_lease_accounting_setup(*, performed_by=None) -> RentLeas
         },
     )
 
-    mapping = (
-        RentLeaseAccountingAccountMapping.objects.select_for_update()
-        .select_related(
-            "monthly_income_account",
-            "deposit_liability_account",
-            "deposit_refund_account",
-            "damage_recovery_income_account",
-            "settlement_finance_account",
-            "settlement_finance_account__chart_account",
-        )
-        .filter(is_active=True)
-        .first()
-    )
+    mapping = _locked_active_mapping_for_update()
     if mapping is None:
         mapping = RentLeaseAccountingAccountMapping.objects.create(
             monthly_income_account=monthly_income_account,

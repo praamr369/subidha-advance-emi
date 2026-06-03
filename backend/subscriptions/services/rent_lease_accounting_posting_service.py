@@ -45,9 +45,15 @@ def _mapping(lock: bool = False) -> dict[str, Any] | None:
     if mapping is None:
         return None
     if lock:
+        mapping_lock = (
+            mapping.__class__.objects.select_for_update(of=("self",))
+            .filter(pk=mapping.pk)
+            .first()
+        )
+        if mapping_lock is None:
+            return None
         mapping = (
-            mapping.__class__.objects.select_for_update()
-            .select_related(
+            mapping.__class__.objects.select_related(
                 "monthly_income_account",
                 "deposit_liability_account",
                 "deposit_refund_account",
@@ -55,7 +61,7 @@ def _mapping(lock: bool = False) -> dict[str, Any] | None:
                 "settlement_finance_account",
                 "settlement_finance_account__chart_account",
             )
-            .get(pk=mapping.pk)
+            .get(pk=mapping_lock.pk)
         )
     with connection.cursor() as cursor:
         cursor.execute(
