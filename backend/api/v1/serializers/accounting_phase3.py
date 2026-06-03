@@ -71,6 +71,10 @@ class CommissionPayoutBridgeRunSerializer(Phase3BridgeRunSerializer):
     posting_approved = serializers.BooleanField(required=False, default=False)
 
 
+class PurchaseVendorBridgeRunSerializer(Phase3BridgeRunSerializer):
+    posting_approved = serializers.BooleanField(required=False, default=False)
+
+
 class MasterImportActionSerializer(serializers.Serializer):
     pass
 
