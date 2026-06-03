@@ -58,7 +58,6 @@ from api.v1.views.accounting_phase3 import (
     EmiPaymentBridgeRunView,
     EmiSubscriptionBridgeRunView,
     EmiWaiverBridgeRunView,
-    InventoryBridgeRunView,
     PostingLockViewSet,
     PurchaseBookView,
     RetailSaleBridgeRunView,
@@ -68,6 +67,7 @@ from api.v1.views.accounting_phase3 import (
     VendorImportPreviewView,
     VendorSettlementViewSet,
 )
+from api.v1.views.accounting_purchase_vendor_bridge import InventoryBridgeRunView
 
 router = DefaultRouter()
 router.register(r"chart-of-accounts", ChartOfAccountViewSet, basename="accounting-chart-of-accounts")
