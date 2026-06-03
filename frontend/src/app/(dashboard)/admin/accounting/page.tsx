@@ -154,6 +154,17 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load accounting cockpit.";
 }
 
+function metricNumber(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function metricString(value: unknown): string | number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" || typeof value === "number") return value;
+  return String(value);
+}
+
 function displayMetric(value: number | string | null | undefined): string {
   if (value === null || value === undefined) return "Not exposed";
   return String(value);
@@ -162,7 +173,7 @@ function displayMetric(value: number | string | null | undefined): string {
 function compactBlockers(readiness: AccountingSetupReadinessPayload | null): string[] {
   if (!readiness) return [];
   return readiness.finance_accounts
-    .filter((account) => !account.collection_ready && !(account as { is_active?: boolean }).is_active === false)
+    .filter((account) => !account.collection_ready && account.is_active !== false)
     .map((account) => {
       const reason = account.collection_blocker_reason || account.blocker_reason || "Finance account is not collection-ready.";
       return `${account.name} (${account.kind}): ${reason}`;
@@ -252,10 +263,11 @@ export default function AdminAccountingPage() {
   useEffect(() => { void loadPage("initial"); }, []);
 
   const setupBlockers = useMemo(() => compactBlockers(data?.setupReadiness ?? null), [data?.setupReadiness]);
-  const setupBlockerCount = data?.setupStatus?.setup_health_blockers_count ?? data?.setupReadiness?.summary.blockers_count ?? null;
+  const setupBlockerCount = metricNumber(data?.setupStatus?.setup_health_blockers_count) ?? data?.setupReadiness?.summary.blockers_count ?? null;
   const collectionReadyAccountsCount = data?.setupReadiness ? data.setupReadiness.summary.cash_accounts_ready_count + data.setupReadiness.summary.bank_accounts_ready_count + data.setupReadiness.summary.upi_accounts_ready_count : null;
   const setupBlocked = Boolean((setupBlockerCount ?? 0) > 0 || data?.setupStatus?.setup_health_status === "BLOCKED" || data?.setupStatus?.status === "BLOCKED");
   const backendModuleCount = Array.isArray(data?.controlPayload?.modules) ? data?.controlPayload?.modules?.length ?? 0 : Array.isArray(data?.controlPayload?.capabilities) ? data?.controlPayload?.capabilities?.length ?? 0 : 0;
+  const bridgeStatusValue = metricString(data?.accountingReadiness?.status);
 
   return (
     <ERPPageShell
@@ -264,7 +276,7 @@ export default function AdminAccountingPage() {
       subtitle="Icon-based operator cockpit for accounting setup, collections, books, reconciliation, and reports. Rent/lease accounting bridge status is read from backend readiness and executes only from controlled workspaces."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting" }]}
       actions={[{ href: ROUTES.admin.accountingChartOfAccounts, label: "Chart of Accounts", variant: "secondary" }, { href: ROUTES.admin.accountingFinanceAccounts, label: "Finance Accounts", variant: "primary" }, { href: ROUTES.admin.setupReadiness, label: "Setup Readiness", variant: "secondary" }]}
-      stats={[{ label: "Chart Accounts", value: displayMetric(data?.chartAccountsCount), tone: "info" }, { label: "Finance Accounts", value: displayMetric(data?.financeAccountsCount), tone: setupBlocked ? "warning" : "success" }, { label: "Bridge Status", value: displayMetric(data?.accountingReadiness?.status), tone: data?.accountingReadiness?.status === "READY" ? "success" : "warning" }, { label: "Collection-ready FA", value: displayMetric(collectionReadyAccountsCount), tone: "info" }]}
+      stats={[{ label: "Chart Accounts", value: displayMetric(data?.chartAccountsCount), tone: "info" }, { label: "Finance Accounts", value: displayMetric(data?.financeAccountsCount), tone: setupBlocked ? "warning" : "success" }, { label: "Bridge Status", value: displayMetric(bridgeStatusValue), tone: data?.accountingReadiness?.status === "READY" ? "success" : "warning" }, { label: "Collection-ready FA", value: displayMetric(collectionReadyAccountsCount), tone: "info" }]}
       statusBadge={{ label: data?.accountingReadiness?.status === "READY" ? "Bridge ready" : setupBlocked ? "Setup blocked" : "Read-only cockpit", tone: data?.accountingReadiness?.status === "READY" ? "success" : setupBlocked ? "warning" : "info" }}
     >
       <div className="space-y-6">
@@ -274,7 +286,7 @@ export default function AdminAccountingPage() {
         {!loading && !error && data ? (
           <>
             {backendModuleCount === 0 ? <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">No accounting modules exposed by backend. This cockpit is using the checked admin route registry and existing readiness endpoints; deferred modules are not linked.</div> : null}
-            <ERPSectionShell title="Readiness posture" description="Operational counts are read from backend APIs. Values that are not exposed are shown explicitly instead of fake zeroes."><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">{[["Chart accounts", displayMetric(data.chartAccountsCount)], ["Finance accounts", displayMetric(data.financeAccountsCount)], ["Draft journals", displayMetric(data.draftJournalsCount)], ["Bridge status", displayMetric(data.accountingReadiness?.status)], ["Setup blockers", displayMetric(setupBlockerCount)], ["Deposit sources", displayMetric(data.accountingReadiness?.counters?.deposit_sources_with_collection)], ["Monthly sources", displayMetric(data.accountingReadiness?.counters?.monthly_sources_with_collection)]].map(([label, value]) => <div key={label} className="rounded-2xl border border-border bg-card px-4 py-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-2 text-lg font-semibold text-foreground">{value}</p></div>)}</div></ERPSectionShell>
+            <ERPSectionShell title="Readiness posture" description="Operational counts are read from backend APIs. Values that are not exposed are shown explicitly instead of fake zeroes."><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">{[["Chart accounts", displayMetric(data.chartAccountsCount)], ["Finance accounts", displayMetric(data.financeAccountsCount)], ["Draft journals", displayMetric(data.draftJournalsCount)], ["Bridge status", displayMetric(bridgeStatusValue)], ["Setup blockers", displayMetric(setupBlockerCount)], ["Deposit sources", displayMetric(data.accountingReadiness?.counters?.deposit_sources_with_collection)], ["Monthly sources", displayMetric(data.accountingReadiness?.counters?.monthly_sources_with_collection)]].map(([label, value]) => <div key={label} className="rounded-2xl border border-border bg-card px-4 py-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-2 text-lg font-semibold text-foreground">{value}</p></div>)}</div></ERPSectionShell>
             {data.accountingReadiness?.blockers?.length ? <div className="rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950"><div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" aria-hidden="true" />Rent/lease accounting bridge blockers</div><p className="mt-1 text-red-900">{data.accountingReadiness.blockers[0]}</p></div> : null}
             {MODULE_GROUPS.length === 0 ? <ERPEmptyState title="No accounting modules exposed by backend." description="The cockpit cannot render module cards until a capability list or local route-safe module map is available." /> : MODULE_GROUPS.map((group) => <ERPSectionShell key={group.title} title={group.title} description={group.description}><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{group.modules.map((module) => <ModuleCard key={module.key} module={module} setupBlocked={setupBlocked} readiness={data.accountingReadiness} setupBlockers={setupBlockers.length > 0 ? setupBlockers : ["Accounting setup readiness is blocked."]} />)}</div></ERPSectionShell>)}
           </>
