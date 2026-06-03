@@ -22,6 +22,7 @@ import {
   ERPSectionShell,
   ERPStatusBadge,
 } from "@/components/erp";
+import AccountingBridgeReadinessIndicator from "@/components/admin/accounting/AccountingBridgeReadinessIndicator";
 import { DataTableShell } from "@/components/ui/operations";
 import { RegistryPageShell } from "@/components/layout/page-shells";
 import { downloadCsv } from "@/lib/export/csv";
@@ -545,6 +546,11 @@ export default function AdminPaymentsPage() {
         tone: "info",
       }}
     >
+      <AccountingBridgeReadinessIndicator
+        title="EMI payment and collection bridge mappings"
+        eventKeys={["advance_emi_collection", "subscription_emi_payment", "subscription_emi_waiver_loss"]}
+      />
+
       <RegistryPageShell
         summary={
           !loading && !error ? (

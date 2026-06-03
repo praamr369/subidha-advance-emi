@@ -17,6 +17,7 @@ export type AccountingBridgeReadinessAccount = {
   purpose?: string | null;
   requirement?: string | null;
   is_active?: boolean;
+  is_real_settlement_account?: boolean;
   chart_account?: AccountingBridgeReadinessAccount | null;
 };
 
@@ -24,6 +25,7 @@ export type AccountingBridgeReadinessEvent = {
   event_key: string;
   label: string;
   source_module: string;
+  event_group?: string;
   source_model?: string;
   status: string;
   can_post: boolean;
@@ -35,7 +37,6 @@ export type AccountingBridgeReadinessEvent = {
   finance_accounts: AccountingBridgeReadinessAccount[];
   blocking_reasons: string[];
   operator_action: string;
-  repairable: boolean;
 };
 
 export type AccountingBridgeReadinessPayload = {

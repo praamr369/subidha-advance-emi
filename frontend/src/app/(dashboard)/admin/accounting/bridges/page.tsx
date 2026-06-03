@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -95,7 +96,7 @@ export default function AccountingBridgeReadinessPage() {
   const groupedEvents = useMemo(() => {
     const groups = new Map<string, AccountingBridgeReadinessEvent[]>();
     for (const event of payload?.events ?? []) {
-      const key = event.source_module || "other";
+      const key = event.event_group || event.source_module || "Other";
       groups.set(key, [...(groups.get(key) ?? []), event]);
     }
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
@@ -156,6 +157,14 @@ export default function AccountingBridgeReadinessPage() {
             <SummaryCard label="Error" value={summary.error_count} tone="border-red-200 bg-red-50 text-red-900" />
             <SummaryCard label="Not configured" value={summary.not_configured_count} tone="border-slate-200 bg-slate-50 text-slate-900" />
           </div>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link href={ROUTES.admin.accountingSetup} className="rounded-xl border px-3 py-2 text-sm font-semibold">Accounting Setup</Link>
+            <Link href={ROUTES.admin.financeCollect} className="rounded-xl border px-3 py-2 text-sm font-semibold">Finance Collection</Link>
+            <Link href={ROUTES.admin.billingDirectSales} className="rounded-xl border px-3 py-2 text-sm font-semibold">Direct Sale</Link>
+            <Link href={ROUTES.admin.payments} className="rounded-xl border px-3 py-2 text-sm font-semibold">Payments</Link>
+            <Link href={ROUTES.admin.rentLease} className="rounded-xl border px-3 py-2 text-sm font-semibold">Rent/Lease</Link>
+            <Link href={ROUTES.admin.financeDeposits} className="rounded-xl border px-3 py-2 text-sm font-semibold">Deposits</Link>
+          </div>
         </section>
 
         {groupedEvents.length === 0 ? (
@@ -166,10 +175,10 @@ export default function AccountingBridgeReadinessPage() {
           </WorkspaceSection>
         ) : null}
 
-        {groupedEvents.map(([sourceModule, events]) => (
+        {groupedEvents.map(([groupName, events]) => (
           <WorkspaceSection
-            key={`source-module-${sourceModule}`}
-            title={sourceModule.replaceAll("_", " ").replace(/^./, (value) => value.toUpperCase())}
+            key={`bridge-group-${groupName}`}
+            title={groupName}
             description="Readiness is based on active FinanceAccount, FinanceAccountCoaMapping, RentLeaseAccountingAccountMapping, and Chart of Accounts setup."
           >
             <div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm">
@@ -198,7 +207,6 @@ export default function AccountingBridgeReadinessPage() {
                           {event.status}
                         </span>
                         <div className="mt-2 text-xs text-muted-foreground">Can post: {event.can_post ? "Yes" : "No"}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">Repairable: {event.repairable ? "Yes" : "No"}</div>
                       </td>
                       <td className="px-4 py-4 text-xs">
                         <div className="font-semibold text-foreground">Required</div>

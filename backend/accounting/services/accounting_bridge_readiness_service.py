@@ -6,6 +6,8 @@ from typing import Any
 from django.apps import apps
 
 from accounting.models import (
+    BusinessTaxProfile,
+    BusinessTaxRegistrationMode,
     ChartOfAccount,
     ChartOfAccountType,
     FinanceAccount,
@@ -58,7 +60,6 @@ PURPOSE_EXPECTED_ACCOUNT_TYPE: dict[str, str] = {
     FinanceAccountMappingPurpose.INVENTORY_ASSET: ChartOfAccountType.ASSET,
 }
 
-
 @dataclass(frozen=True)
 class BridgeEventSpec:
     event_key: str
@@ -66,6 +67,7 @@ class BridgeEventSpec:
     source_module: str
     source_app: str
     source_model: str
+    event_group: str
     debit_requirements: tuple[str, ...]
     credit_requirements: tuple[str, ...]
     debit_mapping_purposes: tuple[str, ...] = ()
@@ -78,7 +80,6 @@ class BridgeEventSpec:
     operator_action: str = (
         "Review mapping readiness only. Future posting must use an approved, explicit accounting bridge workflow."
     )
-    repairable: bool = False
 
     @property
     def required_coa_system_codes(self) -> tuple[str, ...]:
@@ -96,6 +97,7 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="subscriptions",
         source_app="subscriptions",
         source_model="Payment",
+        event_group="EMI",
         debit_requirements=("Cash / Bank / UPI FinanceAccount",),
         credit_requirements=("CUSTOMER_RECEIVABLE", "EMI_INCOME"),
         debit_mapping_purposes=(
@@ -108,27 +110,14 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
             FinanceAccountMappingPurpose.EMI_INCOME,
         ),
         required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
-        repairable=True,
     ),
     BridgeEventSpec(
-        event_key="direct_sale_invoice",
-        label="Direct sale invoice",
-        source_module="billing",
-        source_app="billing",
-        source_model="DirectSale",
-        debit_requirements=("CUSTOMER_RECEIVABLE",),
-        credit_requirements=("SALES_REVENUE", "OUTPUT_GST"),
-        debit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
-        credit_mapping_purposes=(FinanceAccountMappingPurpose.DIRECT_SALE_INCOME,),
-        credit_coa_system_codes=("OUTPUT_GST",),
-        repairable=True,
-    ),
-    BridgeEventSpec(
-        event_key="direct_sale_receipt",
-        label="Direct sale receipt",
-        source_module="billing",
-        source_app="billing",
-        source_model="ReceiptDocument",
+        event_key="subscription_emi_payment",
+        label="Subscription EMI payment",
+        source_module="subscriptions",
+        source_app="subscriptions",
+        source_model="Payment",
+        event_group="EMI",
         debit_requirements=("Cash / Bank / UPI FinanceAccount",),
         credit_requirements=("CUSTOMER_RECEIVABLE",),
         debit_mapping_purposes=(
@@ -138,7 +127,72 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         ),
         credit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
         required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
-        repairable=True,
+    ),
+    BridgeEventSpec(
+        event_key="subscription_emi_waiver_loss",
+        label="Subscription EMI waiver loss",
+        source_module="subscriptions",
+        source_app="subscriptions",
+        source_model="AuditLog",
+        event_group="EMI",
+        debit_requirements=("WAIVER_LOSS",),
+        credit_requirements=("EMI_WAIVER_RESERVE",),
+        debit_mapping_purposes=(FinanceAccountMappingPurpose.WAIVER_LOSS,),
+        credit_coa_system_codes=("EMI_WAIVER_RESERVE",),
+    ),
+    BridgeEventSpec(
+        event_key="direct_sale_invoice",
+        label="Direct sale invoice",
+        source_module="billing",
+        source_app="billing",
+        source_model="BillingInvoice",
+        event_group="Direct Sale",
+        debit_requirements=("CUSTOMER_RECEIVABLE",),
+        credit_requirements=("DIRECT_SALE_INCOME", "OUTPUT_GST when GST enabled"),
+        debit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.DIRECT_SALE_INCOME,),
+    ),
+    BridgeEventSpec(
+        event_key="direct_sale_receipt",
+        label="Direct sale receipt",
+        source_module="billing",
+        source_app="billing",
+        source_model="ReceiptDocument",
+        event_group="Direct Sale",
+        debit_requirements=("Cash / Bank / UPI FinanceAccount",),
+        credit_requirements=("CUSTOMER_RECEIVABLE",),
+        debit_mapping_purposes=(
+            FinanceAccountMappingPurpose.CASH_COLLECTION,
+            FinanceAccountMappingPurpose.BANK_COLLECTION,
+            FinanceAccountMappingPurpose.UPI_COLLECTION,
+        ),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
+        required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
+    ),
+    BridgeEventSpec(
+        event_key="direct_sale_return",
+        label="Direct sale return",
+        source_module="billing",
+        source_app="billing",
+        source_model="DirectSaleReturn",
+        event_group="Direct Sale",
+        debit_requirements=("SALES_RETURNS",),
+        credit_requirements=("CUSTOMER_RECEIVABLE",),
+        debit_coa_system_codes=("SALES_RETURNS",),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
+    ),
+    BridgeEventSpec(
+        event_key="direct_sale_outstanding",
+        label="Direct sale outstanding",
+        source_module="billing",
+        source_app="billing",
+        source_model="DirectSale",
+        event_group="Direct Sale",
+        debit_requirements=("CUSTOMER_RECEIVABLE",),
+        credit_requirements=("DIRECT_SALE_INCOME",),
+        debit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.DIRECT_SALE_INCOME,),
+        operator_action="Validate receivable and sales income readiness only. Outstanding collection remains controlled by direct-sale payment workflows.",
     ),
     BridgeEventSpec(
         event_key="rent_lease_monthly_collection",
@@ -146,6 +200,7 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="subscriptions",
         source_app="subscriptions",
         source_model="Subscription",
+        event_group="Rent / Lease",
         debit_requirements=("RentLeaseAccountingAccountMapping.settlement_finance_account",),
         credit_requirements=("RentLeaseAccountingAccountMapping.monthly_income_account",),
         requires_rent_lease_mapping=True,
@@ -157,6 +212,7 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="subscriptions",
         source_app="subscriptions",
         source_model="Subscription",
+        event_group="Rent / Lease",
         debit_requirements=("RentLeaseAccountingAccountMapping.settlement_finance_account",),
         credit_requirements=("RentLeaseAccountingAccountMapping.deposit_liability_account",),
         requires_rent_lease_mapping=True,
@@ -168,6 +224,7 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="subscriptions",
         source_app="subscriptions",
         source_model="Subscription",
+        event_group="Rent / Lease",
         debit_requirements=("RentLeaseAccountingAccountMapping.deposit_liability_account",),
         credit_requirements=("RentLeaseAccountingAccountMapping.deposit_refund_account",),
         requires_rent_lease_mapping=True,
@@ -179,6 +236,7 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="subscriptions",
         source_app="subscriptions",
         source_model="Subscription",
+        event_group="Rent / Lease",
         debit_requirements=("RentLeaseAccountingAccountMapping.settlement_finance_account",),
         credit_requirements=("RentLeaseAccountingAccountMapping.damage_recovery_income_account",),
         requires_rent_lease_mapping=True,
@@ -190,6 +248,7 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="billing",
         source_app="billing",
         source_model="ReceiptDocument",
+        event_group="Customer Credit",
         debit_requirements=("Cash / Bank / UPI FinanceAccount",),
         credit_requirements=("CUSTOMER_ADVANCE_UNEARNED_REVENUE",),
         debit_mapping_purposes=(
@@ -199,7 +258,6 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         ),
         credit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_ADVANCE_UNEARNED_REVENUE,),
         required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="refund_customer_credit",
@@ -207,6 +265,7 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="billing",
         source_app="billing",
         source_model="ReceiptDocument",
+        event_group="Customer Credit",
         debit_requirements=("SALES_RETURNS", "CUSTOMER_RECEIVABLE"),
         credit_requirements=("Cash / Bank / UPI FinanceAccount",),
         debit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
@@ -217,7 +276,6 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
             FinanceAccountMappingPurpose.UPI_COLLECTION,
         ),
         required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="commission_accrual",
@@ -225,11 +283,11 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="subscriptions",
         source_app="subscriptions",
         source_model="Commission",
+        event_group="Commission",
         debit_requirements=("COMMISSION_EXPENSE",),
         credit_requirements=("COMMISSION_PAYABLE",),
         debit_mapping_purposes=(FinanceAccountMappingPurpose.COMMISSION_EXPENSE,),
         credit_mapping_purposes=(FinanceAccountMappingPurpose.COMMISSION_PAYABLE,),
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="commission_payout",
@@ -237,6 +295,7 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="subscriptions",
         source_app="subscriptions",
         source_model="CommissionPayoutBatch",
+        event_group="Commission",
         debit_requirements=("COMMISSION_PAYABLE",),
         credit_requirements=("Cash / Bank / UPI FinanceAccount",),
         debit_mapping_purposes=(FinanceAccountMappingPurpose.COMMISSION_PAYABLE,),
@@ -246,7 +305,6 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
             FinanceAccountMappingPurpose.UPI_COLLECTION,
         ),
         required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="vendor_purchase_bill",
@@ -254,12 +312,12 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="inventory",
         source_app="inventory",
         source_model="PurchaseBill",
+        event_group="Vendor / Inventory",
         debit_requirements=("INVENTORY_ASSET", "INPUT_GST"),
         credit_requirements=("ACCOUNTS_PAYABLE",),
         debit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
         debit_coa_system_codes=("INPUT_GST",),
         credit_coa_system_codes=("ACCOUNTS_PAYABLE",),
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="vendor_payment",
@@ -267,6 +325,7 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="accounting",
         source_app="accounting",
         source_model="VendorSettlement",
+        event_group="Vendor / Inventory",
         debit_requirements=("ACCOUNTS_PAYABLE",),
         credit_requirements=("Cash / Bank / UPI FinanceAccount",),
         debit_coa_system_codes=("ACCOUNTS_PAYABLE",),
@@ -276,7 +335,6 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
             FinanceAccountMappingPurpose.UPI_COLLECTION,
         ),
         required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="salary_expense",
@@ -284,11 +342,11 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="accounting",
         source_app="accounting",
         source_model="SalarySheet",
+        event_group="Payroll",
         debit_requirements=("SALARY_EXPENSE",),
         credit_requirements=("SALARY_PAYABLE",),
         debit_mapping_purposes=(FinanceAccountMappingPurpose.SALARY_EXPENSE,),
         credit_coa_system_codes=("SALARY_PAYABLE",),
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="salary_payment",
@@ -296,6 +354,7 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="accounting",
         source_app="accounting",
         source_model="SalaryPayment",
+        event_group="Payroll",
         debit_requirements=("SALARY_PAYABLE",),
         credit_requirements=("Cash / Bank / UPI FinanceAccount",),
         debit_coa_system_codes=("SALARY_PAYABLE",),
@@ -305,7 +364,6 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
             FinanceAccountMappingPurpose.UPI_COLLECTION,
         ),
         required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="inventory_purchase_receive",
@@ -313,11 +371,11 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="inventory",
         source_app="inventory",
         source_model="StockLedger",
+        event_group="Vendor / Inventory",
         debit_requirements=("INVENTORY_ASSET",),
         credit_requirements=("ACCOUNTS_PAYABLE",),
         debit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
         credit_coa_system_codes=("ACCOUNTS_PAYABLE",),
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="inventory_delivery_out",
@@ -325,11 +383,11 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="inventory",
         source_app="inventory",
         source_model="StockLedger",
+        event_group="Vendor / Inventory",
         debit_requirements=("DELIVERY_EXPENSE",),
         credit_requirements=("INVENTORY_ASSET",),
         debit_mapping_purposes=(FinanceAccountMappingPurpose.DELIVERY_EXPENSE,),
         credit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="manufacturing_consumption",
@@ -337,11 +395,11 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="manufacturing",
         source_app="manufacturing",
         source_model="ProductionJob",
+        event_group="Manufacturing",
         debit_requirements=("WORK_IN_PROGRESS_INVENTORY",),
         credit_requirements=("INVENTORY_ASSET",),
         debit_coa_system_codes=("WORK_IN_PROGRESS_INVENTORY",),
         credit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="manufacturing_output",
@@ -349,11 +407,11 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="manufacturing",
         source_app="manufacturing",
         source_model="ProductionJob",
+        event_group="Manufacturing",
         debit_requirements=("INVENTORY_ASSET",),
         credit_requirements=("WORK_IN_PROGRESS_INVENTORY",),
         debit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
         credit_coa_system_codes=("WORK_IN_PROGRESS_INVENTORY",),
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="customer_return",
@@ -361,11 +419,11 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="billing",
         source_app="billing",
         source_model="DirectSaleReturn",
+        event_group="Direct Sale",
         debit_requirements=("SALES_RETURNS",),
         credit_requirements=("CUSTOMER_RECEIVABLE",),
         debit_coa_system_codes=("SALES_RETURNS",),
         credit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
-        repairable=True,
     ),
     BridgeEventSpec(
         event_key="sales_return",
@@ -373,11 +431,11 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         source_module="billing",
         source_app="billing",
         source_model="CreditNote",
+        event_group="Direct Sale",
         debit_requirements=("SALES_RETURNS",),
         credit_requirements=("CUSTOMER_RECEIVABLE",),
         debit_coa_system_codes=("SALES_RETURNS",),
         credit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
-        repairable=True,
     ),
 )
 
@@ -533,6 +591,16 @@ def _validate_system_code(system_code: str, *, chart_accounts: list[dict[str, An
     return validate_coa(account, _expected_type_for_system_code(system_code))
 
 
+def _gst_liability_mapping_required() -> bool:
+    return BusinessTaxProfile.objects.filter(
+        is_active=True,
+        mode__in=(
+            BusinessTaxRegistrationMode.GST_REGULAR,
+            BusinessTaxRegistrationMode.GST_COMPOSITION,
+        ),
+    ).exists()
+
+
 def _validate_finance_account_kind(kind: str, *, finance_accounts: list[dict[str, Any]]) -> list[dict[str, str]]:
     accounts = list(
         FinanceAccount.objects.select_related("chart_account")
@@ -664,6 +732,8 @@ def _validate_event_spec(spec: BridgeEventSpec) -> dict[str, Any]:
         issues.extend(_validate_system_code(system_code, chart_accounts=debit_accounts))
     for system_code in spec.credit_coa_system_codes:
         issues.extend(_validate_system_code(system_code, chart_accounts=credit_accounts))
+    if spec.event_key == "direct_sale_invoice" and _gst_liability_mapping_required():
+        issues.extend(_validate_system_code("OUTPUT_GST", chart_accounts=credit_accounts))
     for kind in spec.required_finance_account_kinds:
         issues.extend(_validate_finance_account_kind(kind, finance_accounts=finance_accounts))
 
@@ -680,15 +750,12 @@ def _validate_event_spec(spec: BridgeEventSpec) -> dict[str, Any]:
 
     status = _status_from_issues(issues)
     blocking_reasons = list(dict.fromkeys(issue["reason"] for issue in issues if issue.get("reason")))
-    repairable = bool(spec.repairable and status in {STATUS_WARNING, STATUS_NOT_CONFIGURED})
-    if rent_lease_payload is not None:
-        repairable = bool(rent_lease_payload.get("repairable"))
-
     return {
         "event_key": spec.event_key,
         "label": spec.label,
         "source_module": spec.source_module,
         "source_model": spec.source_model,
+        "event_group": spec.event_group,
         "status": status,
         "can_post": False,
         "posting_mode": spec.posting_mode,
@@ -702,7 +769,6 @@ def _validate_event_spec(spec: BridgeEventSpec) -> dict[str, Any]:
         "finance_accounts": _dedupe_finance_account_payloads(finance_accounts),
         "blocking_reasons": blocking_reasons,
         "operator_action": _operator_action_for_status(spec, status, blocking_reasons),
-        "repairable": repairable,
     }
 
 
@@ -737,6 +803,7 @@ def get_accounting_bridge_event_registry() -> list[dict[str, Any]]:
             "label": spec.label,
             "source_module": spec.source_module,
             "source_model": spec.source_model,
+            "event_group": spec.event_group,
             "debit_requirements": list(spec.debit_requirements),
             "credit_requirements": list(spec.credit_requirements),
             "required_finance_account_kinds": list(spec.required_finance_account_kinds),

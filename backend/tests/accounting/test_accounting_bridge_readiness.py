@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting.models import (
+    AccountingBridgePosting,
     ChartOfAccount,
     ChartOfAccountType,
     FinanceAccount,
@@ -10,13 +11,14 @@ from accounting.models import (
     FinanceAccountKind,
     FinanceAccountMappingPurpose,
     JournalEntry,
+    JournalEntryLine,
     RentLeaseAccountingAccountMapping,
 )
 from accounting.services.accounting_setup_service import AccountingSetupService
 from billing.models import ReceiptDocument
 from reconciliation.models import ReconciliationItem
 from settlements.models import SettlementAllocation
-from subscriptions.models import Payment
+from subscriptions.models import Commission, CommissionPayoutBatch, CommissionPayoutLine, Payment
 
 
 User = get_user_model()
@@ -51,6 +53,7 @@ class AccountingBridgeReadinessTests(APITestCase):
             self.assertIn("event_key", event)
             self.assertIn("label", event)
             self.assertIn("source_module", event)
+            self.assertIn("event_group", event)
             self.assertIn(event["status"], {"READY", "INFO", "WARNING", "ERROR", "NOT_CONFIGURED"})
             self.assertFalse(event["can_post"])
             self.assertEqual(event["posting_mode"], "AUDIT_DEFERRED")
@@ -59,7 +62,26 @@ class AccountingBridgeReadinessTests(APITestCase):
             self.assertIsInstance(event["finance_accounts"], list)
             self.assertIsInstance(event["blocking_reasons"], list)
             self.assertIn("operator_action", event)
-            self.assertIn("repairable", event)
+
+    def test_direct_sale_and_emi_event_readiness_keys_are_exposed(self):
+        response = self.client.get("/api/v1/admin/accounting/bridge-readiness/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        events = {event["event_key"]: event for event in response.data["events"]}
+        required = {
+            "advance_emi_collection",
+            "subscription_emi_payment",
+            "subscription_emi_waiver_loss",
+            "direct_sale_invoice",
+            "direct_sale_receipt",
+            "direct_sale_return",
+            "direct_sale_outstanding",
+        }
+        self.assertTrue(required.issubset(set(events)))
+        for event_key in required:
+            self.assertFalse(events[event_key]["can_post"])
+            self.assertEqual(events[event_key]["posting_mode"], "AUDIT_DEFERRED")
+            self.assertIn(events[event_key]["event_group"], {"EMI", "Direct Sale"})
 
     def test_multiple_valid_cash_accounts_do_not_produce_warning(self):
         self._bootstrap()
@@ -106,6 +128,42 @@ class AccountingBridgeReadinessTests(APITestCase):
                 and any("CUSTOMER_RECEIVABLE" in reason for reason in event["blocking_reasons"])
                 for event in response.data["events"]
             )
+        )
+
+    def test_missing_sales_income_mapping_blocks_direct_sale_invoice_readiness(self):
+        self._bootstrap()
+        FinanceAccountCoaMapping.objects.filter(
+            purpose=FinanceAccountMappingPurpose.DIRECT_SALE_INCOME,
+            is_active=True,
+        ).update(is_active=False)
+
+        response = self.client.get("/api/v1/admin/accounting/bridge-readiness/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        direct_sale_invoice = next(
+            event for event in response.data["events"] if event["event_key"] == "direct_sale_invoice"
+        )
+        self.assertEqual(direct_sale_invoice["status"], "WARNING")
+        self.assertFalse(direct_sale_invoice["can_post"])
+        self.assertTrue(
+            any("DIRECT_SALE_INCOME" in reason for reason in direct_sale_invoice["blocking_reasons"])
+        )
+
+    def test_missing_collection_mapping_blocks_direct_sale_receipt_readiness(self):
+        self._bootstrap()
+        FinanceAccountCoaMapping.objects.filter(
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
+        ).update(is_active=False)
+
+        response = self.client.get("/api/v1/admin/accounting/bridge-readiness/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        direct_sale_receipt = next(
+            event for event in response.data["events"] if event["event_key"] == "direct_sale_receipt"
+        )
+        self.assertEqual(direct_sale_receipt["status"], "WARNING")
+        self.assertFalse(direct_sale_receipt["can_post"])
+        self.assertTrue(
+            any("CASH_COLLECTION" in reason for reason in direct_sale_receipt["blocking_reasons"])
         )
 
     def test_invalid_coa_type_produces_error(self):
@@ -164,7 +222,12 @@ class AccountingBridgeReadinessTests(APITestCase):
     def test_readiness_creates_no_financial_records(self):
         counts_before = {
             "journals": JournalEntry.objects.count(),
+            "journal_lines": JournalEntryLine.objects.count(),
+            "bridge_postings": AccountingBridgePosting.objects.count(),
             "payments": Payment.objects.count(),
+            "commissions": Commission.objects.count(),
+            "payout_batches": CommissionPayoutBatch.objects.count(),
+            "payout_lines": CommissionPayoutLine.objects.count(),
             "receipts": ReceiptDocument.objects.count(),
             "settlement_allocations": SettlementAllocation.objects.count(),
             "reconciliation_items": ReconciliationItem.objects.count(),
@@ -175,7 +238,12 @@ class AccountingBridgeReadinessTests(APITestCase):
 
         counts_after = {
             "journals": JournalEntry.objects.count(),
+            "journal_lines": JournalEntryLine.objects.count(),
+            "bridge_postings": AccountingBridgePosting.objects.count(),
             "payments": Payment.objects.count(),
+            "commissions": Commission.objects.count(),
+            "payout_batches": CommissionPayoutBatch.objects.count(),
+            "payout_lines": CommissionPayoutLine.objects.count(),
             "receipts": ReceiptDocument.objects.count(),
             "settlement_allocations": SettlementAllocation.objects.count(),
             "reconciliation_items": ReconciliationItem.objects.count(),

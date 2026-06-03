@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
+import AccountingBridgeReadinessIndicator from "@/components/admin/accounting/AccountingBridgeReadinessIndicator";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { DashboardGridSkeleton } from "@/components/feedback/Skeleton";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
@@ -2037,6 +2038,11 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         title="Billing route map"
         description="Move between retail sales, invoices, receipts, documents, and billing books without mixing direct-sale and EMI collection workflows."
         groups={BILLING_CONTROL_DIRECTORY_GROUPS}
+      />
+
+      <AccountingBridgeReadinessIndicator
+        title="Direct sale invoice, receipt, return, and outstanding bridge mappings"
+        eventKeys={["direct_sale_invoice", "direct_sale_receipt", "direct_sale_return", "direct_sale_outstanding"]}
       />
 
       <OperationalNextStepsPanel
