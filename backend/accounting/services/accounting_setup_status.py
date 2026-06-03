@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from accounting.models import ChartOfAccount, FinanceAccount
+from accounting.services.accounting_bridge_readiness_service import build_accounting_bridge_readiness_summary
 from accounting.services.accounting_setup_service import (
     READINESS_INFORMATIONAL_WARNING_CODES,
     REQUIRED_COA_SYSTEM_CODES,
@@ -97,6 +98,7 @@ def get_admin_accounting_setup_status() -> dict[str, Any]:
     health_warnings = list(health.get("warnings") or [])
     journals = health.get("journals") or {}
     bridges = health.get("bridges") or {}
+    bridge_readiness_summary = build_accounting_bridge_readiness_summary()
 
     posting_ready = bool(
         setup_complete
@@ -120,6 +122,7 @@ def get_admin_accounting_setup_status() -> dict[str, Any]:
         "required_mappings_total": n_map_req,
         "required_mappings_complete": n_map_req - len(missing_map),
         "required_mappings_missing": missing_map,
+        "bridge_readiness": bridge_readiness_summary,
         "journals_configured": True,
         "journal_ready": journal_ready,
         "setup_complete": setup_complete,
