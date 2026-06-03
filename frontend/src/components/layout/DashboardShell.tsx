@@ -383,23 +383,23 @@ function countsForGroup(groupTitle: string, badges: Record<string, number>): Arr
       { label: "Outstanding", key: "admin.badges.outstanding_count" },
       { label: "Overdue", key: "admin.badges.overdue_count" },
     ],
-    "Billing & Finance": [
+    "Accounting & Finance": [
       { label: "Overdue", key: "admin.badges.overdue_count" },
       { label: "Unreconciled", key: "admin.badges.unreconciled_count" },
     ],
-    "Returns & Reversals": [
+    "Service Desk": [
       { label: "Returns", key: "admin.badges.pending_return_count" },
       { label: "Refunds", key: "admin.badges.pending_refund_count" },
     ],
-    "Delivery & Service": [
+    "Sales & Contracts": [
       { label: "Delivery", key: "admin.badges.pending_delivery_count" },
-      { label: "Support", key: "admin.badges.open_support_ticket_count" },
+      { label: "Pending Draw", key: "admin.badges.pending_draw_count" },
     ],
     Inventory: [
       { label: "Low Stock", key: "admin.badges.low_stock_count" },
       { label: "Inspection", key: "admin.badges.inspection_stock_count" },
     ],
-    "Lucky Plan": [{ label: "Pending Draw", key: "admin.badges.pending_draw_count" }],
+    "CRM / Parties": [{ label: "Support", key: "admin.badges.open_support_ticket_count" }],
   };
   return (byGroup[groupTitle] ?? [])
     .map((row) => ({ label: row.label, value: Number(badges[row.key] ?? 0) }))
@@ -614,29 +614,30 @@ function SidebarContent({
     const allowedGroupTitles = new Set([
       "Command Center",
       "Sales & Contracts",
-      "Collections",
-      "Billing & Finance",
-      "Delivery & Service",
-      "Returns & Reversals",
+      "Rent / Lease",
+      "Accounting & Finance",
       "Inventory",
-      "Lucky Plan",
-      "CRM & Partners",
-      "Reports & Audit",
+      "Purchase & Vendors",
+      "Manufacturing",
+      "CRM / Parties",
+      "Service Desk",
+      "HR & Staff",
+      "Reports & Analysis",
       "Settings",
     ]);
     const simpleFinanceAllowed = new Set([
       "Finance Workspace",
-      "Collections",
-      "Dues",
-      "Overdue",
-      "Payment Collection",
+      "Collection",
+      "Payments",
+      "Outstandings",
       "Reconciliation",
       "Deposits",
+      "Reversal Control",
     ]);
     return navGroups
       .filter((group) => allowedGroupTitles.has(group.title))
       .map((group) => {
-        if (group.title !== "Billing & Finance") return group;
+        if (group.title !== "Accounting & Finance") return group;
         return {
           ...group,
           items: group.items.filter((item) => simpleFinanceAllowed.has(item.label)),

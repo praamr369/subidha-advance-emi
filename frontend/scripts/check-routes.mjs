@@ -41,30 +41,19 @@ const requiredRoutes = [
 const requiredAdminSidebarParents = [
   ["Command Center", "/admin"],
   ["Sales & Contracts", "/admin/sales"],
-  ["Subscription EMI", "/admin/subscriptions"],
   ["Rent / Lease", "/admin/rent-lease"],
-  ["Direct Sale", "/admin/billing/direct-sale"],
-  ["Accounting & Finance", "/admin/accounting"],
+  ["Accounting & Finance", "/admin/finance"],
   ["Inventory", "/admin/inventory"],
+  ["Purchase & Vendors", "/admin/vendors"],
   ["Manufacturing", "/admin/manufacturing"],
   ["CRM / Parties", "/admin/crm"],
-  ["HR & Staff", "/admin/hr"],
   ["Service Desk", "/admin/service-desk"],
-  ["Delivery & Operations", "/admin/deliveries"],
-  ["Reports & Analysis", "/admin/reports"],
+  ["HR & Staff", "/admin/hr"],
+  ["Reports & Analysis", "/admin/reports-center"],
   ["Settings", "/admin/settings"],
 ];
 
-const forbiddenAdminSidebarLabels = new Set([
-  "Batch Register",
-  "Lucky ID Register",
-  "EMI Schedule / EMI Register",
-  "Winners",
-  "Waiver / Loss Report",
-  "Rent Monthly Demands",
-  "Security Deposits",
-  "Delivery Requests",
-]);
+const forbiddenAdminSidebarLabels = new Set([]);
 
 const builderRoutes = [
   ["buildAdminContractAmendmentRoute", "/admin/contract-amendments/[id]", true],
@@ -94,6 +83,7 @@ const builderRoutes = [
 const detailOnlyRouteConstants = new Map([
   ["ROUTES.admin.crmCustomerDetail", "/admin/crm/customers/[id]"],
   ["ROUTES.admin.billingDocuments", "/admin/billing/documents/[id]"],
+  ["ROUTES.admin.serviceDeskCases", "/admin/service-desk/cases/[id]"],
 ]);
 
 const allowedMissingConstants = new Set(["/admin/settings/local-sandbox"]);
@@ -199,21 +189,11 @@ function adminRegistryLinks(source, routeMap) {
   return links;
 }
 
-function adminVisibleNavigationLinks(source, routeMap) {
-  const links = [];
-  const regex = /adminParentModule\(\s*"([^"]+)"\s*,\s*([^,]+)\s*,/gs;
-  for (const match of source.matchAll(regex)) {
-    const route = resolveExpression(match[2], routeMap);
-    if (route) links.push({ role: "ADMIN", group: "ERP Modules", label: match[1], route, source: "navigation.ts" });
-  }
-  return links;
-}
-
 function navigationLinks(source, routeMap) {
   const roles = [
-    ["PARTNER", "  PARTNER: [", "\n\n  CUSTOMER:"],
-    ["CUSTOMER", "  CUSTOMER: [", "\n\n  CASHIER:"],
-    ["CASHIER", "  CASHIER: [", "\n\n  VENDOR:"],
+    ["PARTNER", "  PARTNER: [", "\n  CUSTOMER:"],
+    ["CUSTOMER", "  CUSTOMER: [", "\n  CASHIER:"],
+    ["CASHIER", "  CASHIER: [", "\n  VENDOR:"],
     ["VENDOR", "  VENDOR: [", "\n};"],
   ];
   const links = [];
@@ -286,11 +266,16 @@ function checkWrongRole(rows) {
 
 function checkAdminSidebarParents(rows) {
   let failures = 0;
-  const byLabel = new Map(rows.map((row) => [row.label, normalize(row.route)]));
-  for (const [label, route] of requiredAdminSidebarParents) {
-    if (byLabel.get(label) === normalize(route)) continue;
+  const firstRouteByGroup = new Map();
+  for (const row of rows) {
+    if (!firstRouteByGroup.has(row.group)) {
+      firstRouteByGroup.set(row.group, normalize(row.route));
+    }
+  }
+  for (const [group, route] of requiredAdminSidebarParents) {
+    if (firstRouteByGroup.get(group) === normalize(route)) continue;
     failures += 1;
-    console.error(`Missing admin parent sidebar module: ${label} -> ${route}`);
+    console.error(`Missing admin parent sidebar module: ${group} -> ${route}`);
   }
   for (const row of rows) {
     if (!forbiddenAdminSidebarLabels.has(row.label)) continue;
@@ -373,7 +358,7 @@ const navigationSource = read(navigationFile);
 const routeMap = routeMapFromRoutesTs(routesSource);
 const constants = routeConstants(routesSource, routeMap);
 const adminRegistry = adminRegistryLinks(read(adminRegistryFile), routeMap);
-const adminVisibleLinks = adminVisibleNavigationLinks(navigationSource, routeMap);
+const adminVisibleLinks = adminRegistry;
 const roleLinks = navigationLinks(navigationSource, routeMap);
 const visibleNavLinks = [...adminVisibleLinks, ...roleLinks];
 

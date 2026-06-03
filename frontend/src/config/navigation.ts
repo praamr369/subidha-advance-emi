@@ -1,4 +1,5 @@
 import { ROUTES } from "@/lib/routes";
+import { ADMIN_ROUTE_TREE, type AdminRouteRegistryItem } from "@/config/admin-route-registry";
 
 export type NavigationRole = "ADMIN" | "PARTNER" | "CUSTOMER" | "CASHIER" | "VENDOR";
 
@@ -66,32 +67,52 @@ function flattenGroups(groups: NavGroup[]): NavItem[] {
   return groups.flatMap((group) => flattenItems(group.items));
 }
 
-function adminParentModule(label: string, href: string, icon: NavIconKey, description: string, badgeSource?: string): NavItem {
-  return { label, href, icon, description, badgeSource };
+const ADMIN_MODULE_ICONS: Record<string, NavIconKey> = {
+  "Command Center": "dashboard",
+  "Sales & Contracts": "billing",
+  "Rent / Lease": "subscriptions",
+  "Accounting & Finance": "accounting",
+  Inventory: "inventory",
+  "Purchase & Vendors": "procurement",
+  Manufacturing: "manufacturing",
+  "CRM / Parties": "crm",
+  "Service Desk": "serviceDesk",
+  "HR & Staff": "payroll",
+  "Reports & Analysis": "reports",
+  Settings: "settings",
+};
+
+function registryItemToNavItem(row: AdminRouteRegistryItem): NavItem {
+  const icon = ADMIN_MODULE_ICONS[row.group] ?? "dashboard";
+  return {
+    label: row.label,
+    href: row.href,
+    icon,
+    description: row.description,
+    badgeSource: row.badgeSource,
+    disabled: row.status === "deferred",
+    children: row.children?.map(registryItemToNavItem),
+  };
 }
 
-export const ADMIN_PARENT_NAVIGATION: NavGroup[] = [
-  {
-    title: "Command Center",
-    icon: "dashboard",
-    items: [
-      adminParentModule("Command Center", ROUTES.admin.dashboard, "dashboard", "Daily dashboard, today's work, operations command center, BI, alerts, and global search."),
-      adminParentModule("Sales & Contracts", ROUTES.admin.salesWorkspace, "billing", "Sales workspace for invoices, receipts, customer contracts, and handoff controls."),
-      adminParentModule("Subscription EMI", ROUTES.admin.subscriptions, "subscriptions", "Advance EMI cockpit for batches, Lucky IDs, EMI schedules, payments, draws, waivers, and amendments.", "queue.subscription_requests_pending"),
-      adminParentModule("Rent / Lease", ROUTES.admin.rentLease, "subscriptions", "Rent and lease cockpit for contracts, deposits, monthly demands, possession, inspections, and returns."),
-      adminParentModule("Direct Sale", ROUTES.admin.billingDirectSaleWorkspace, "billing", "Direct-sale billing cockpit for retail sale, invoice, receipt, collection, delivery, and return workflows."),
-      adminParentModule("Accounting & Finance", ROUTES.admin.accounting, "accounting", "Finance cockpit for accounting setup, collections, journals, reconciliation, reports, GST, ITR, payables, and payouts.", "admin.badges.unreconciled_count"),
-      adminParentModule("Inventory", ROUTES.admin.inventory, "inventory", "Inventory cockpit for stock, locations, adjustments, purchase needs, returns, quality holds, and stock ledger.", "admin.badges.low_stock_count"),
-      adminParentModule("Manufacturing", ROUTES.admin.manufacturing, "manufacturing", "Manufacturing cockpit for BOMs, production jobs, production consumption/output, and costing."),
-      adminParentModule("CRM / Parties", ROUTES.admin.crmWorkspace, "crm", "Party cockpit for customers, vendors, partners, interactions, KYC, leads, and customer 360.", "admin.badges.open_support_ticket_count"),
-      adminParentModule("HR & Staff", ROUTES.admin.hr, "payroll", "HR cockpit for staff, roles, attendance, salary, payroll, expenses, and permissions."),
-      adminParentModule("Service Desk", ROUTES.admin.serviceDesk, "serviceDesk", "Service cockpit for cases, support tickets, returns, damaged returns, and follow-up controls.", "admin.badges.open_support_ticket_count"),
-      adminParentModule("Delivery & Operations", ROUTES.admin.deliveries, "deliveries", "Delivery cockpit for delivery cases, handover, documents, return logistics, and operational dispatch.", "admin.badges.pending_delivery_count"),
-      adminParentModule("Reports & Analysis", ROUTES.admin.reports, "reports", "Reports cockpit for BI, accounting reports, operational reports, and reconciliation analysis."),
-      adminParentModule("Settings", ROUTES.admin.settings, "settings", "Settings cockpit for setup readiness, business profile, branding, branches, counters, accounting setup, and backups."),
-    ],
-  },
-];
+function buildAdminNavigationGroups(): NavGroup[] {
+  const byGroup = ADMIN_ROUTE_TREE.reduce<Map<string, AdminRouteRegistryItem[]>>((acc, row) => {
+    const items = acc.get(row.group) ?? [];
+    items.push(row);
+    acc.set(row.group, items);
+    return acc;
+  }, new Map());
+
+  return Object.keys(ADMIN_MODULE_ICONS)
+    .map((title) => ({
+      title,
+      icon: ADMIN_MODULE_ICONS[title],
+      items: (byGroup.get(title) ?? []).map(registryItemToNavItem),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+export const ADMIN_PARENT_NAVIGATION: NavGroup[] = buildAdminNavigationGroups();
 
 export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
   ADMIN: ADMIN_PARENT_NAVIGATION,
