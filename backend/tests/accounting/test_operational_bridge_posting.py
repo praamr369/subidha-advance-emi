@@ -13,9 +13,11 @@ from accounting.models import (
 )
 from accounting.services.bridge_run_service import (
     run_bridge_postings,
-    run_commission_settlement_bridges,
     run_emi_waiver_bridges,
-    run_payout_batch_bridges,
+)
+from accounting.services.commission_payout_bridge_guard_service import (
+    run_commission_settlement_bridges_guarded as run_commission_settlement_bridges,
+    run_payout_batch_bridges_guarded as run_payout_batch_bridges,
 )
 from billing.services.billing_service import generate_emi_payment_receipt
 from subscriptions.services.commission_payout_service import (
@@ -63,7 +65,6 @@ class OperationalAccountingBridgePostingTests(TestCase):
             is_active=True,
             is_real_settlement_account=True,
         )
-        # New bridge collection logic requires an unambiguous single active settlement account per kind.
         FinanceAccount.objects.filter(
             kind=kind,
             is_active=True,
@@ -244,12 +245,14 @@ class OperationalAccountingBridgePostingTests(TestCase):
             start_date=self.today - timedelta(days=1),
             end_date=self.today,
             dry_run=False,
+            posting_approved=True,
             performed_by=self.admin,
         )
         second = run_commission_settlement_bridges(
             start_date=self.today - timedelta(days=1),
             end_date=self.today,
             dry_run=False,
+            posting_approved=True,
             performed_by=self.admin,
         )
 
@@ -305,12 +308,14 @@ class OperationalAccountingBridgePostingTests(TestCase):
             start_date=self.today - timedelta(days=1),
             end_date=self.today,
             dry_run=False,
+            posting_approved=True,
             performed_by=self.admin,
         )
         second = run_payout_batch_bridges(
             start_date=self.today - timedelta(days=1),
             end_date=self.today,
             dry_run=False,
+            posting_approved=True,
             performed_by=self.admin,
         )
 
