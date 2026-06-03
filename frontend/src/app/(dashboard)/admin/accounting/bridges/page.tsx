@@ -16,6 +16,17 @@ import {
   type AccountingBridgeReadinessPayload,
 } from "@/services/accounting-bridge-readiness";
 
+const RETURNS_DAMAGE_CREDIT_EVENT_KEYS = new Set([
+  "customer_return",
+  "sales_return",
+  "credit_note_issue",
+  "customer_refund",
+  "customer_credit_adjustment",
+  "damage_recovery",
+  "security_deposit_damage_deduction",
+  "refund_customer_credit",
+]);
+
 const PURCHASE_VENDOR_EVENT_KEYS = new Set([
   "vendor_purchase_bill",
   "vendor_payment",
@@ -50,6 +61,7 @@ function cx(...values: Array<string | false | null | undefined>) {
 }
 
 function bridgeGroupName(event: AccountingBridgeReadinessEvent): string {
+  if (RETURNS_DAMAGE_CREDIT_EVENT_KEYS.has(event.event_key)) return "Returns, Damage & Credit";
   if (INVENTORY_EVENT_KEYS.has(event.event_key)) return "Inventory";
   if (MANUFACTURING_EVENT_KEYS.has(event.event_key)) return "Manufacturing";
   if (PURCHASE_VENDOR_EVENT_KEYS.has(event.event_key)) return "Purchase & Vendors";
