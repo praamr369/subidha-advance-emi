@@ -291,3 +291,28 @@ export async function listCustomerReceipts() {
 export async function listCustomerDocuments() {
   return apiFetch<{ count: number; results: FinanceDocumentRow[] }>("/customer/documents/");
 }
+
+export async function getCustomerAccountStatement() {
+  return apiFetch<{
+    summary: Record<string, Money>;
+    payments: Array<Record<string, unknown>>;
+    receipts: Array<Record<string, unknown>>;
+    invoices: Array<Record<string, unknown>>;
+  }>("/customer/account-statement/");
+}
+
+export async function getCustomerPaymentSchedule() {
+  return apiFetch<{ count?: number; results: Array<Record<string, unknown>> }>("/customer/payment-schedule/");
+}
+
+export async function getPartnerFinanceSummary() {
+  return apiFetch<{ partner_id?: number; summary: Record<string, unknown> }>("/partner/finance/summary/");
+}
+
+export async function listPartnerLinkedCustomerPayments() {
+  return apiFetch<{ count?: number; results: Array<Record<string, unknown>> }>("/partner/linked-customer-payments/");
+}
+
+export async function listPartnerReceipts() {
+  return apiFetch<{ count?: number; results: Array<Record<string, unknown>> }>("/partner/receipts/");
+}
