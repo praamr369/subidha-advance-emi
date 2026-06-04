@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import ActionButton from "@/components/ui/ActionButton";
 
@@ -8,7 +8,7 @@ type StaffDataPageProps<T> = {
   title: string;
   description: string;
   load: () => Promise<T>;
-  render: (data: T) => React.ReactNode;
+  render: (data: T) => ReactNode;
   empty?: (data: T) => boolean;
   emptyMessage?: string;
 };
@@ -34,6 +34,8 @@ export default function StaffDataPage<T>({ title, description, load, render, emp
     void refresh();
   }, []);
 
+  const isEmpty = data ? Boolean(empty?.(data)) : false;
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -56,13 +58,13 @@ export default function StaffDataPage<T>({ title, description, load, render, emp
         <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-900 shadow-sm">{error}</div>
       ) : null}
 
-      {!loading && !error && data && empty?.(data) ? (
+      {!loading && !error && data && isEmpty ? (
         <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
           {emptyMessage || "No records available."}
         </div>
       ) : null}
 
-      {!loading && !error && data && !empty?.(data) ? render(data) : null}
+      {!loading && !error && data && !isEmpty ? render(data) : null}
     </div>
   );
 }
