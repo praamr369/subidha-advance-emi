@@ -17,7 +17,7 @@ import {
   type StoredSession,
 } from "@/lib/auth/session";
 
-type Role = "ADMIN" | "PARTNER" | "CUSTOMER" | "CASHIER" | string;
+type Role = "ADMIN" | "PARTNER" | "CUSTOMER" | "CASHIER" | "VENDOR" | "STAFF" | string;
 
 type AuthUser = StoredSession & {
   role: Role;
