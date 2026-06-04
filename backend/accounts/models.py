@@ -1,6 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -13,6 +14,7 @@ class UserRole(models.TextChoices):
     CUSTOMER = "CUSTOMER", "Customer"
     CASHIER = "CASHIER", "Cashier"
     VENDOR = "VENDOR", "Vendor"
+    STAFF = "STAFF", "Staff"
 
 
 class User(AbstractUser):
@@ -80,6 +82,57 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.username} ({self.role})"
+
+
+class StaffIdentity(models.Model):
+    """One-to-one login identity for an internal employee profile.
+
+    The employee profile remains the HR/payroll source of truth. This link only
+    enables staff portal authentication and self-scoped reads.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="staff_identity",
+    )
+    employee = models.OneToOneField(
+        "accounting.EmployeeProfile",
+        on_delete=models.PROTECT,
+        related_name="staff_identity",
+    )
+    login_enabled = models.BooleanField(default=True, db_index=True)
+    temporary_password_last_set_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_staff_identities",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "staff_identities"
+        ordering = ["employee_id"]
+        indexes = [
+            models.Index(fields=["login_enabled"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.user_id and getattr(self.user, "role", None) != UserRole.STAFF:
+            errors["user"] = "Staff identity must link to a STAFF user."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee_id} -> {self.user_id}"
 
 
 class PasswordResetChannel(models.TextChoices):
@@ -228,296 +281,5 @@ class UserCapabilityOverride(models.Model):
             models.Index(fields=["capability", "is_allowed"]),
         ]
 
-    def clean(self):
-        super().clean()
-        self.note = (self.note or "").strip()
-
-    def save(self, *args, **kwargs):
-        self.note = (self.note or "").strip()
-        self.full_clean()
-        super().save(*args, **kwargs)
-
     def __str__(self):
-        return f"user={self.user_id}:{self.capability.code}={self.is_allowed}"
-
-
-class PasswordResetRequest(models.Model):
-    user = models.ForeignKey(
-        User,
-        on_delete=models.PROTECT,
-        related_name="password_reset_requests",
-    )
-    role_snapshot = models.CharField(max_length=20, db_index=True)
-    channel = models.CharField(
-        max_length=20,
-        choices=PasswordResetChannel.choices,
-        default=PasswordResetChannel.PHONE_OTP,
-        db_index=True,
-    )
-    identifier_snapshot = models.CharField(
-        max_length=255,
-        db_index=True,
-        help_text="Identifier used at request time, such as phone, email, or username.",
-    )
-    otp_hash = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-        help_text="Store only the hashed OTP. Never store raw OTP values.",
-    )
-    expires_at = models.DateTimeField(db_index=True)
-    verified_at = models.DateTimeField(null=True, blank=True)
-    used_at = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(
-        max_length=20,
-        choices=PasswordResetStatus.choices,
-        default=PasswordResetStatus.PENDING,
-        db_index=True,
-    )
-    failed_attempt_count = models.PositiveIntegerField(default=0)
-    max_attempts = models.PositiveIntegerField(default=5)
-    resend_count = models.PositiveIntegerField(default=0)
-    last_sent_at = models.DateTimeField(null=True, blank=True)
-    requested_by_ip = models.GenericIPAddressField(null=True, blank=True)
-    requested_user_agent = models.TextField(blank=True, default="")
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "password_reset_requests"
-        ordering = ["-created_at"]
-        indexes = [
-            models.Index(fields=["user", "status", "created_at"]),
-            models.Index(fields=["identifier_snapshot", "status", "created_at"]),
-            models.Index(fields=["channel", "status", "expires_at"]),
-        ]
-
-    def clean(self):
-        super().clean()
-        errors = {}
-
-        self.role_snapshot = (self.role_snapshot or "").strip()
-        self.identifier_snapshot = (self.identifier_snapshot or "").strip()
-        self.requested_user_agent = (self.requested_user_agent or "").strip()
-
-        if not self.role_snapshot:
-            errors["role_snapshot"] = "Role snapshot is required."
-
-        if self.role_snapshot not in UserRole.values:
-            errors["role_snapshot"] = "Role snapshot is invalid."
-
-        if not self.identifier_snapshot:
-            errors["identifier_snapshot"] = "Identifier snapshot is required."
-
-        if self.max_attempts <= 0:
-            errors["max_attempts"] = "Max attempts must be greater than zero."
-
-        if self.failed_attempt_count < 0:
-            errors["failed_attempt_count"] = "Failed attempt count cannot be negative."
-
-        if self.failed_attempt_count > self.max_attempts:
-            errors["failed_attempt_count"] = "Failed attempt count cannot exceed max attempts."
-
-        if self.resend_count < 0:
-            errors["resend_count"] = "Resend count cannot be negative."
-
-        if self.expires_at is None:
-            errors["expires_at"] = "Expiry time is required."
-
-        if self.verified_at and self.verified_at > timezone.now():
-            errors["verified_at"] = "Verified time cannot be in the future."
-
-        if self.used_at and self.used_at > timezone.now():
-            errors["used_at"] = "Used time cannot be in the future."
-
-        if self.last_sent_at and self.last_sent_at > timezone.now():
-            errors["last_sent_at"] = "Last sent time cannot be in the future."
-
-        if self.verified_at and self.used_at and self.used_at < self.verified_at:
-            errors["used_at"] = "Used time cannot be earlier than verified time."
-
-        if errors:
-            raise ValidationError(errors)
-
-    def save(self, *args, **kwargs):
-        self.role_snapshot = (self.role_snapshot or "").strip()
-        self.identifier_snapshot = (self.identifier_snapshot or "").strip()
-        self.requested_user_agent = (self.requested_user_agent or "").strip()
-
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    @property
-    def is_expired(self) -> bool:
-        return timezone.now() >= self.expires_at
-
-    @property
-    def is_locked(self) -> bool:
-        return self.failed_attempt_count >= self.max_attempts or self.status == PasswordResetStatus.LOCKED
-
-    @property
-    def is_pending(self) -> bool:
-        return self.status == PasswordResetStatus.PENDING
-
-    def is_usable(self) -> bool:
-        return (
-            self.status == PasswordResetStatus.PENDING
-            and not self.is_expired
-            and self.failed_attempt_count < self.max_attempts
-            and self.used_at is None
-        )
-
-    @classmethod
-    def default_expiry(cls):
-        return timezone.now() + timedelta(minutes=10)
-
-    def mark_expired(self, save: bool = True):
-        if self.status != PasswordResetStatus.EXPIRED:
-            self.status = PasswordResetStatus.EXPIRED
-            if save:
-                self.save(update_fields=["status", "updated_at"])
-
-    def mark_cancelled(self, save: bool = True):
-        if self.status != PasswordResetStatus.CANCELLED:
-            self.status = PasswordResetStatus.CANCELLED
-            if save:
-                self.save(update_fields=["status", "updated_at"])
-
-    def mark_locked(self, save: bool = True):
-        if self.status != PasswordResetStatus.LOCKED:
-            self.status = PasswordResetStatus.LOCKED
-            if save:
-                self.save(update_fields=["status", "updated_at"])
-
-    def mark_verified(self, save: bool = True):
-        self.verified_at = timezone.now()
-        self.status = PasswordResetStatus.VERIFIED
-        if save:
-            self.save(update_fields=["verified_at", "status", "updated_at"])
-
-    def mark_used(self, save: bool = True):
-        now = timezone.now()
-        if not self.verified_at:
-            self.verified_at = now
-        self.used_at = now
-        self.status = PasswordResetStatus.USED
-        if save:
-            self.save(update_fields=["verified_at", "used_at", "status", "updated_at"])
-
-    def increment_failed_attempt(self, save: bool = True):
-        self.failed_attempt_count += 1
-        if self.failed_attempt_count >= self.max_attempts:
-            self.status = PasswordResetStatus.LOCKED
-
-        if save:
-            update_fields = ["failed_attempt_count", "updated_at"]
-            if self.status == PasswordResetStatus.LOCKED:
-                update_fields.append("status")
-            self.save(update_fields=update_fields)
-
-    def __str__(self):
-        return f"PasswordResetRequest#{self.pk} user={self.user_id} status={self.status}"
-
-
-class UsernameChangeSource(models.TextChoices):
-    SELF = "SELF", "Self"
-    ADMIN = "ADMIN", "Admin"
-
-
-class ReservedUsername(models.Model):
-    username = models.CharField(max_length=150, unique=True, db_index=True)
-    reserved_from_user = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        related_name="reserved_usernames",
-        null=True,
-        blank=True,
-    )
-    reserved_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    reason = models.CharField(max_length=255, blank=True, default="")
-
-    class Meta:
-        db_table = "reserved_usernames"
-        ordering = ["-reserved_at", "-id"]
-        indexes = [
-            models.Index(fields=["reserved_at"]),
-        ]
-
-    def clean(self):
-        super().clean()
-        self.username = (self.username or "").strip().lower()
-        self.reason = (self.reason or "").strip()
-        if not self.username:
-            raise ValidationError({"username": "Reserved username is required."})
-
-    def save(self, *args, **kwargs):
-        self.username = (self.username or "").strip().lower()
-        self.reason = (self.reason or "").strip()
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.username
-
-
-class UsernameChangeAudit(models.Model):
-    user = models.ForeignKey(
-        User,
-        on_delete=models.PROTECT,
-        related_name="username_change_audits",
-    )
-    old_username = models.CharField(max_length=150)
-    new_username = models.CharField(max_length=150)
-    changed_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        related_name="performed_username_changes",
-        null=True,
-        blank=True,
-    )
-    changed_by_role = models.CharField(max_length=20, blank=True, default="")
-    source = models.CharField(
-        max_length=20,
-        choices=UsernameChangeSource.choices,
-        default=UsernameChangeSource.SELF,
-        db_index=True,
-    )
-    reason = models.TextField(blank=True, default="")
-    changed_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    user_agent = models.TextField(blank=True, default="")
-
-    class Meta:
-        db_table = "username_change_audits"
-        ordering = ["-changed_at", "-id"]
-        indexes = [
-            models.Index(fields=["user", "changed_at"]),
-            models.Index(fields=["source", "changed_at"]),
-        ]
-
-    def clean(self):
-        super().clean()
-        errors = {}
-        self.old_username = (self.old_username or "").strip()
-        self.new_username = (self.new_username or "").strip()
-        self.changed_by_role = (self.changed_by_role or "").strip().upper()
-        self.reason = (self.reason or "").strip()
-        self.user_agent = (self.user_agent or "").strip()
-
-        if not self.old_username:
-            errors["old_username"] = "Old username is required."
-        if not self.new_username:
-            errors["new_username"] = "New username is required."
-        if self.source == UsernameChangeSource.ADMIN and not self.reason:
-            errors["reason"] = "Reason is required for admin username changes."
-        if errors:
-            raise ValidationError(errors)
-
-    def save(self, *args, **kwargs):
-        self.old_username = (self.old_username or "").strip()
-        self.new_username = (self.new_username or "").strip()
-        self.changed_by_role = (self.changed_by_role or "").strip().upper()
-        self.reason = (self.reason or "").strip()
-        self.user_agent = (self.user_agent or "").strip()
-        self.full_clean()
-        super().save(*args, **kwargs)
+        return f"{self.user_id}:{self.capability.code}={self.is_allowed}"
