@@ -16,7 +16,6 @@ def seed_staff_role_capabilities(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("accounting", "0029_rentleasepostingbridgeconfig"),
         ("accounts", "0007_capability_matrix"),
     ]
