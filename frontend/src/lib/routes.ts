@@ -38,7 +38,6 @@ export const ROUTES = {
   admin: {
     root: "/admin",
     dashboard: "/admin",
-
     analytics: "/admin/analytics",
     analyticsRiskMonitor: "/admin/analytics/risk-monitor",
     analyticsChurnAnalysis: "/admin/analytics/churn-analysis",
@@ -75,7 +74,6 @@ export const ROUTES = {
     partnerPaymentRequests: "/admin/partner-payment-requests",
     auditLogs: "/admin/audit-logs",
     auditEvents: "/admin/audit/events",
-
     collections: "/admin/collections",
     collectionControlCenter: "/admin/collections/control-center",
     outstandings: "/admin/outstandings",
@@ -115,7 +113,6 @@ export const ROUTES = {
     partnersCollectionRequests: "/admin/partners/collection-requests",
     reminders: "/admin/reminders",
     remindersPaymentReminders: "/admin/reminders/payment-reminders",
-
     crm: "/admin/crm",
     crmLeads: "/admin/crm/leads",
     crmPipeline: "/admin/crm/pipeline",
@@ -123,7 +120,6 @@ export const ROUTES = {
     crmKyc: "/admin/crm/kyc",
     crmCustomerDetail: "/admin/crm/customers",
     crmParties: "/admin/crm/parties",
-
     billing: "/admin/billing",
     billingDirectSales: "/admin/billing/direct-sales",
     billingDirectSaleWorkspace: "/admin/billing/direct-sale",
@@ -139,7 +135,6 @@ export const ROUTES = {
     billingDebitNotes: "/admin/billing/debit-notes",
     billingDocuments: "/admin/billing/documents",
     billingReversals: "/admin/billing/reversals",
-
     inventory: "/admin/inventory",
     inventoryItems: "/admin/inventory/items",
     inventoryLocations: "/admin/inventory/locations",
@@ -173,17 +168,14 @@ export const ROUTES = {
     purchaseVendorPayables: "/admin/purchases/vendor-payables",
     purchaseVendorPayments: "/admin/purchases/vendor-payments",
     purchaseVendorReturns: "/admin/purchases/vendor-returns",
-
     manufacturing: "/admin/manufacturing",
     manufacturingBoms: "/admin/manufacturing/boms",
     manufacturingJobs: "/admin/manufacturing/jobs",
-
     serviceDesk: "/admin/service-desk",
     serviceDeskCases: "/admin/service-desk/cases",
     serviceDeskComplaints: "/admin/service-desk/complaints",
     serviceDeskReturns: "/admin/service-desk/returns",
     serviceDeskTickets: "/admin/service-desk/tickets",
-
     accounting: "/admin/accounting",
     accountingControlCenter: "/admin/accounting/control-center",
     accountingSetup: "/admin/accounting/setup",
@@ -219,5 +211,15 @@ export const ROUTES = {
     accountingAttendance: "/admin/accounting/attendance",
     accountingLeave: "/admin/accounting/leave",
     accountingSalary: "/admin/accounting/salary",
+  },
+
+  staff: {
+    dashboard: "/staff",
+    profile: "/staff/profile",
+    attendance: "/staff/attendance",
+    payslips: "/staff/payslips",
+    salary: "/staff/salary",
+    reports: "/staff/reports",
+    tasks: "/staff/tasks",
   },
 };
