@@ -3,11 +3,12 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
+from django.utils.crypto import get_random_string
 from rest_framework import serializers
 
 from accounts.models import StaffIdentity, UserRole
 from accounting.models import EmployeeAttendance, EmployeeProfile, SalaryPayment, SalarySheet
-from api.v1.serializers.accounting import EmployeeAttendanceSerializer, EmployeeProfileSerializer, SalaryPaymentSerializer, SalarySheetSerializer
+from api.v1.serializers.accounting import EmployeeAttendanceSerializer, EmployeeProfileSerializer, SalarySheetSerializer
 from crm.models import PartyLink, PartyLinkRole
 from crm.services.party_service import sync_party_for_employee
 
@@ -69,7 +70,7 @@ class AdminStaffCreateSerializer(serializers.Serializer):
     @transaction.atomic
     def create(self, validated_data):
         request = self.context.get("request")
-        temporary_password = validated_data.pop("temporary_password", "") or User.objects.make_random_password(length=12)
+        temporary_password = validated_data.pop("temporary_password", "") or get_random_string(length=12)
         branch_id = validated_data.pop("branch", None)
         login_enabled = validated_data.pop("login_enabled", True)
         email = (validated_data.pop("email", "") or "").strip().lower()
