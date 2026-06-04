@@ -26,6 +26,7 @@ export type AccountingSetupReadinessFinanceAccount = {
   branch?: { id?: number | null; code?: string | null; name?: string | null } | null;
   mapped_chart_account?: AccountingSetupReadinessChartAccount | null;
   suggested_chart_account?: AccountingSetupReadinessChartAccount | null;
+  is_active?: boolean;
   can_auto_create_posting_account?: boolean;
   operational_collection_account?: boolean;
   system_posting_profile?: boolean;

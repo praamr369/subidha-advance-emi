@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import ErrorState from "@/components/feedback/ErrorState";
@@ -63,7 +63,7 @@ export default function AccountingBridgeReconciliationPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function load(nextFilters = filters, { silent = false }: { silent?: boolean } = {}) {
+  const load = useCallback(async (nextFilters = filters, { silent = false }: { silent?: boolean } = {}) => {
     if (silent) setRefreshing(true);
     else setLoading(true);
     setError(null);
@@ -75,11 +75,11 @@ export default function AccountingBridgeReconciliationPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, [filters]);
 
   useEffect(() => {
     void load({});
-  }, []);
+  }, [load]);
 
   const exceptionRows = useMemo(() => (payload?.results ?? []).filter((row) => row.status === "EXCEPTION" || row.exception_reasons.length > 0), [payload?.results]);
   const rows = payload?.results ?? [];

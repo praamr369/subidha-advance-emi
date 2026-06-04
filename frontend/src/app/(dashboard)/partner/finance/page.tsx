@@ -17,6 +17,10 @@ function money(value: unknown): string {
   return `₹${Number(value ?? 0).toFixed(2)}`;
 }
 
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
 export default function PartnerFinancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +48,7 @@ export default function PartnerFinancePage() {
       setReceipts(
         (receiptsPayload.results ?? []).map((row) => ({
           id: Number(row.id ?? 0),
-          receipt_no: row.receipt_no ?? null,
+          receipt_no: optionalString(row.receipt_no),
           receipt_date: String(row.receipt_date ?? "—"),
           amount: String(row.amount ?? "0.00"),
         }))

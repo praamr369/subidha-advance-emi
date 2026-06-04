@@ -22,6 +22,10 @@ function err(e: unknown) {
   return e instanceof Error ? e.message : "Request failed.";
 }
 
+function recordRows(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value) ? value.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row)) : [];
+}
+
 export default function BusinessSetupResetPage() {
   const [scopes, setScopes] = useState<ResetScope[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -48,8 +52,8 @@ export default function BusinessSetupResetPage() {
         listRestoreJobs(),
       ]);
       setScopes(scopeRes.scopes || []);
-      setBackupJobs(backupsRes.jobs || []);
-      setRestoreJobs(restoreRes.jobs || []);
+      setBackupJobs(recordRows(backupsRes.jobs));
+      setRestoreJobs(recordRows(restoreRes.jobs));
     })().catch((e) => setPreviewError(err(e)));
   }, []);
 
@@ -74,9 +78,9 @@ export default function BusinessSetupResetPage() {
   async function runBackup(jobType: "SELECTED_SCOPES_EXPORT" | "FULL_DATABASE_LOGICAL") {
     try {
       const created = await createBackupJob({ job_type: jobType, scopes: selected });
-      setSelectedBackupId(created.id);
+      setSelectedBackupId(typeof created.id === "number" ? created.id : null);
       const res = await listBackupJobs();
-      setBackupJobs(res.jobs || []);
+      setBackupJobs(recordRows(res.jobs));
     } catch (e) {
       setPreviewError(err(e));
     }
@@ -134,7 +138,7 @@ export default function BusinessSetupResetPage() {
     try {
       await executeRestore({ restore_job_id: restoreJobId, confirmation_phrase: restoreConfirm });
       const jobs = await listRestoreJobs();
-      setRestoreJobs(jobs.jobs || []);
+      setRestoreJobs(recordRows(jobs.jobs));
     } catch (e) {
       setPreviewError(err(e));
     }

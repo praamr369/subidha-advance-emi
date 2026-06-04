@@ -13,6 +13,10 @@ function toNumber(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function countRows(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
+}
+
 export default function AccountingSetupGuidePage() {
   const [checklist, setChecklist] = useState<SetupChecklist | null>(null);
   const [acctStatus, setAcctStatus] = useState<AccountingSetupStatusPayload | null>(null);
@@ -41,7 +45,7 @@ export default function AccountingSetupGuidePage() {
   const chartRootsStmt = toNumber(checklist?.counts?.statement_root_accounts ?? checklist?.counts?.visible_register_count);
   const chartChildren = toNumber(checklist?.counts?.child_sub_accounts ?? checklist?.counts?.active_child_chart_accounts);
   const nonStatement = toNumber(checklist?.counts?.non_statement_accounts);
-  const blockerCount = toNumber(acctStatus?.setup_health_blockers_count) || (acctStatus?.blocking_reasons?.length ?? 0);
+  const blockerCount = toNumber(acctStatus?.setup_health_blockers_count) || countRows(acctStatus?.blocking_reasons);
   const healthWarningCount = toNumber(acctStatus?.setup_health_warnings_count);
   const setupStatus = String(acctStatus?.setup_health_status ?? acctStatus?.status ?? "—");
   const postingReadiness = String(acctStatus?.posting_readiness ?? "BLOCKED");
