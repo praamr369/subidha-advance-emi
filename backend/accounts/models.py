@@ -117,7 +117,7 @@ class StaffIdentity(models.Model):
         db_table = "staff_identities"
         ordering = ["employee_id"]
         indexes = [
-            models.Index(fields=["login_enabled"]),
+            models.Index(fields=["login_enabled"], name="staff_ident_login__db34f5_idx"),
         ]
 
     def clean(self):
@@ -148,6 +148,106 @@ class PasswordResetStatus(models.TextChoices):
     EXPIRED = "EXPIRED", "Expired"
     CANCELLED = "CANCELLED", "Cancelled"
     LOCKED = "LOCKED", "Locked"
+
+
+class PasswordResetRequest(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="password_reset_requests",
+    )
+    role_snapshot = models.CharField(max_length=20, db_index=True)
+    channel = models.CharField(
+        max_length=20,
+        choices=PasswordResetChannel.choices,
+        default=PasswordResetChannel.PHONE_OTP,
+        db_index=True,
+    )
+    identifier_snapshot = models.CharField(
+        max_length=255,
+        db_index=True,
+        help_text="Identifier used at request time, such as phone, email, or username.",
+    )
+    otp_hash = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Store only the hashed OTP. Never store raw OTP values.",
+    )
+    expires_at = models.DateTimeField(db_index=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=PasswordResetStatus.choices,
+        default=PasswordResetStatus.PENDING,
+        db_index=True,
+    )
+    failed_attempt_count = models.PositiveIntegerField(default=0)
+    max_attempts = models.PositiveIntegerField(default=5)
+    requested_by_ip = models.GenericIPAddressField(null=True, blank=True)
+    requested_user_agent = models.TextField(blank=True, default="")
+    resend_count = models.PositiveIntegerField(default=0)
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "password_reset_requests"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "status", "created_at"]),
+            models.Index(fields=["identifier_snapshot", "status", "created_at"]),
+            models.Index(fields=["channel", "status", "expires_at"]),
+        ]
+
+    @property
+    def is_expired(self):
+        return bool(self.expires_at and timezone.now() >= self.expires_at)
+
+    def is_usable(self):
+        return (
+            self.status == PasswordResetStatus.PENDING
+            and not self.is_expired
+            and self.failed_attempt_count < self.max_attempts
+        )
+
+    def mark_verified(self, *, save=False):
+        self.status = PasswordResetStatus.VERIFIED
+        self.verified_at = timezone.now()
+        if save:
+            self.save(update_fields=["status", "verified_at", "updated_at"])
+
+    def mark_used(self, *, save=False):
+        self.status = PasswordResetStatus.USED
+        self.used_at = timezone.now()
+        if save:
+            self.save(update_fields=["status", "used_at", "updated_at"])
+
+    def mark_expired(self, *, save=False):
+        self.status = PasswordResetStatus.EXPIRED
+        if save:
+            self.save(update_fields=["status", "updated_at"])
+
+    def mark_cancelled(self, *, save=False):
+        self.status = PasswordResetStatus.CANCELLED
+        if save:
+            self.save(update_fields=["status", "updated_at"])
+
+    def mark_locked(self, *, save=False):
+        self.status = PasswordResetStatus.LOCKED
+        if save:
+            self.save(update_fields=["status", "updated_at"])
+
+    def increment_failed_attempt(self, *, save=False):
+        self.failed_attempt_count += 1
+        if self.failed_attempt_count >= self.max_attempts:
+            self.status = PasswordResetStatus.LOCKED
+        if save:
+            self.save(update_fields=["failed_attempt_count", "status", "updated_at"])
+
+    def __str__(self):
+        return f"{self.user_id}:{self.channel}:{self.status}"
 
 
 DEFAULT_CAPABILITY_CODES = (
@@ -283,3 +383,75 @@ class UserCapabilityOverride(models.Model):
 
     def __str__(self):
         return f"{self.user_id}:{self.capability.code}={self.is_allowed}"
+
+
+class UsernameChangeSource(models.TextChoices):
+    SELF = "SELF", "Self"
+    ADMIN = "ADMIN", "Admin"
+
+
+class ReservedUsername(models.Model):
+    username = models.CharField(max_length=150, unique=True, db_index=True)
+    reserved_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    reason = models.CharField(max_length=255, blank=True, default="")
+    reserved_from_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="reserved_usernames",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "reserved_usernames"
+        ordering = ["-reserved_at", "-id"]
+        indexes = [
+            models.Index(fields=["reserved_at"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.username = (self.username or "").strip().lower()
+        self.reason = (self.reason or "").strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.username
+
+
+class UsernameChangeAudit(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="username_change_audits",
+    )
+    old_username = models.CharField(max_length=150)
+    new_username = models.CharField(max_length=150)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="performed_username_changes",
+        null=True,
+        blank=True,
+    )
+    changed_by_role = models.CharField(max_length=20, blank=True, default="")
+    source = models.CharField(
+        max_length=20,
+        choices=UsernameChangeSource.choices,
+        default=UsernameChangeSource.SELF,
+        db_index=True,
+    )
+    reason = models.TextField(blank=True, default="")
+    changed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "username_change_audits"
+        ordering = ["-changed_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "changed_at"]),
+            models.Index(fields=["source", "changed_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}:{self.old_username}->{self.new_username}"
