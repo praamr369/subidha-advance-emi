@@ -213,6 +213,33 @@ export const ROUTES = {
     accountingSalary: "/admin/accounting/salary",
   },
 
+  customer: {
+    dashboard: "/customer",
+    profile: "/customer/profile",
+    subscriptions: "/customer/subscriptions",
+    payments: "/customer/payments",
+    documents: "/customer/documents",
+    support: "/customer/support",
+  },
+
+  partner: {
+    dashboard: "/partner",
+    customers: "/partner/customers",
+    commissions: "/partner/commissions",
+    payouts: "/partner/payouts",
+    support: "/partner/support",
+  },
+
+  cashier: {
+    dashboard: "/cashier",
+    collections: "/cashier/collections",
+    dayClose: "/cashier/day-close",
+  },
+
+  vendor: {
+    dashboard: "/vendor",
+  },
+
   staff: {
     dashboard: "/staff",
     profile: "/staff/profile",
