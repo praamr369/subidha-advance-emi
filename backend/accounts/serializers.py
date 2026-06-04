@@ -2,12 +2,12 @@ import logging
 
 import re
 
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from accounts.models import UserRole
+from accounts.models import StaffIdentity, UserRole
 from subscriptions.models import Customer
 
 User = get_user_model()
@@ -15,7 +15,10 @@ security_logger = logging.getLogger("security.events")
 
 
 def staff_identity_payload(user):
-    identity = getattr(user, "staff_identity", None)
+    try:
+        identity = user.staff_identity
+    except StaffIdentity.DoesNotExist:
+        return None
     if identity is None:
         return None
     employee = getattr(identity, "employee", None)
@@ -70,15 +73,6 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class CustomTokenSerializer(TokenObtainPairSerializer):
-    """
-    Canonical JWT serializer for SUBIDHA CORE.
-
-    Enterprise rules:
-    - business role comes from accounts.User.role
-    - token/user payload must not derive role from Django groups
-    - payload should be stable for frontend routing and guards
-    """
-
     default_error_messages = {
         "no_active_account": "Unable to log in with provided credentials.",
         "invalid_credentials": "Unable to log in with provided credentials.",
