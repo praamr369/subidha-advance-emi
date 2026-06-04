@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 
 import PolicyMarkdown from "@/components/public/PolicyMarkdown";
 import PageHeader from "@/components/ui/PageHeader";
@@ -68,7 +68,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
   const [rejectReason, setRejectReason] = useState("");
   const [archiveReason, setArchiveReason] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       const payload = await getAdminPolicyBySlug(slug);
@@ -79,11 +79,11 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
     } finally {
       setLoading(false);
     }
-  }
+  }, [slug]);
 
   useEffect(() => {
     void load();
-  }, [slug]);
+  }, [load]);
 
   const isContentLocked = useMemo(() => policy?.status === "PUBLISHED" || policy?.status === "APPROVED" || policy?.status === "ARCHIVED", [policy]);
   const actions = policy?.lifecycle_actions;
