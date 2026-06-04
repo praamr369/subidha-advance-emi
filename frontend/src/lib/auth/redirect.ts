@@ -16,6 +16,8 @@ export function getDashboardRouteForRole(role: string | null | undefined): strin
       return ROUTES.cashier.dashboard;
     case "VENDOR":
       return ROUTES.vendor.dashboard;
+    case "STAFF":
+      return ROUTES.staff.dashboard;
     default:
       return ROUTES.public.home;
   }
