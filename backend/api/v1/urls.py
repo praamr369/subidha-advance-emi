@@ -27,7 +27,7 @@ urlpatterns = [
     path("vendor/", include("api.v1.routes.vendor")),
     path("customer/", include("api.v1.routes.contract_amendments_customer")),
     path("customer/", include("api.v1.routes.customer")),
-    # Phase 1: shared customer lookup/create (admin + partner access)
+    path("staff/", include("api.v1.routes.staff")),
     path("customers/", include("api.v1.routes.customers")),
     path("cashier/", include("api.v1.routes.cashier")),
     path("notifications/", include("api.v1.routes.notifications")),
