@@ -61,6 +61,133 @@ export type NavGroup = {
   items: NavItem[];
 };
 
+type RoleRouteNamespace = Record<string, string>;
+
+type PartnerRoutes = {
+  root: string;
+  dashboard: string;
+  customers: string;
+  subscriptions: string;
+  subscriptionRequests: string;
+  collectionRequests: string;
+  commissions: string;
+  payouts: string;
+  reports: string;
+  notifications: string;
+  contractAmendments: string;
+};
+
+type CustomerRoutes = {
+  root: string;
+  dashboard: string;
+  subscriptions: string;
+  contractAmendments: string;
+  payments: string;
+  deliveries: string;
+  directSales: string;
+  support: string;
+  supportNew: string;
+  notifications: string;
+  profile: string;
+};
+
+type CashierRoutes = {
+  root: string;
+  dashboard: string;
+  collect: string;
+  collectionControlCenter: string;
+  payments: string;
+  dayClose: string;
+  notifications: string;
+};
+
+type VendorRoutes = {
+  root: string;
+  dashboard: string;
+  quotes: string;
+  orders: string;
+  ledger: string;
+  outstanding: string;
+  purchaseReturns: string;
+  products: string;
+  documents: string;
+  notifications: string;
+  profile: string;
+};
+
+type RoleRouteNamespaces = {
+  partner?: Partial<PartnerRoutes>;
+  customer?: Partial<CustomerRoutes>;
+  cashier?: Partial<CashierRoutes>;
+  vendor?: Partial<VendorRoutes>;
+};
+
+function buildRouteNamespace<T extends RoleRouteNamespace>(namespace: Partial<T> | undefined, fallbacks: T): T {
+  const merged: RoleRouteNamespace = { ...fallbacks };
+
+  Object.entries(namespace ?? {}).forEach(([key, value]) => {
+    if (typeof value === "string" && value.length > 0) {
+      merged[key] = value;
+    }
+  });
+
+  return merged as T;
+}
+
+const roleRouteNamespaces = ROUTES as unknown as RoleRouteNamespaces;
+
+const PARTNER_ROUTES = buildRouteNamespace<PartnerRoutes>(roleRouteNamespaces.partner, {
+  root: "/partner",
+  dashboard: "/partner",
+  customers: "/partner/customers",
+  subscriptions: "/partner/subscriptions",
+  subscriptionRequests: "/partner/subscription-requests",
+  collectionRequests: "/partner/collection-requests",
+  commissions: "/partner/commissions",
+  payouts: "/partner/payouts",
+  reports: "/partner/reports",
+  notifications: "/partner/notifications",
+  contractAmendments: "/partner/contract-amendments",
+});
+
+const CUSTOMER_ROUTES = buildRouteNamespace<CustomerRoutes>(roleRouteNamespaces.customer, {
+  root: "/customer",
+  dashboard: "/customer/dashboard",
+  subscriptions: "/customer/subscriptions",
+  contractAmendments: "/customer/contract-amendments",
+  payments: "/customer/payments",
+  deliveries: "/customer/deliveries",
+  directSales: "/customer/direct-sales",
+  support: "/customer/support",
+  supportNew: "/customer/support/new",
+  notifications: "/customer/notifications",
+  profile: "/customer/profile",
+});
+
+const CASHIER_ROUTES = buildRouteNamespace<CashierRoutes>(roleRouteNamespaces.cashier, {
+  root: "/cashier",
+  dashboard: "/cashier",
+  collect: "/cashier/collect",
+  collectionControlCenter: "/cashier/collections/control-center",
+  payments: "/cashier/payments",
+  dayClose: "/cashier/day-close",
+  notifications: "/cashier/notifications",
+});
+
+const VENDOR_ROUTES = buildRouteNamespace<VendorRoutes>(roleRouteNamespaces.vendor, {
+  root: "/vendor",
+  dashboard: "/vendor",
+  quotes: "/vendor/quotes",
+  orders: "/vendor/orders",
+  ledger: "/vendor/ledger",
+  outstanding: "/vendor/outstanding",
+  purchaseReturns: "/vendor/purchase-returns",
+  products: "/vendor/products",
+  documents: "/vendor/documents",
+  notifications: "/vendor/notifications",
+  profile: "/vendor/profile",
+});
+
 function flattenGroups(groups: NavGroup[]): NavItem[] {
   const flattenItems = (items: NavItem[]): NavItem[] =>
     items.flatMap((item) => [item, ...(item.children ? flattenItems(item.children) : [])]);
@@ -117,74 +244,74 @@ export const ADMIN_PARENT_NAVIGATION: NavGroup[] = buildAdminNavigationGroups();
 export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
   ADMIN: ADMIN_PARENT_NAVIGATION,
   PARTNER: [
-    { title: "Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: ROUTES.partner.dashboard, icon: "dashboard" }] },
-    { title: "My Customers", icon: "customers", items: [{ label: "My Customers", href: ROUTES.partner.customers, icon: "customers" }] },
-    { title: "Contract Amendments", icon: "subscriptions", items: [{ label: "Customer amendment requests", href: ROUTES.partner.contractAmendments, icon: "subscriptions" }] },
-    { title: "Leads", icon: "leads", items: [{ label: "Leads", href: ROUTES.partner.subscriptionRequests, icon: "leads" }] },
-    { title: "Commissions", icon: "collections", items: [{ label: "Commissions", href: ROUTES.partner.commissions, icon: "commissions" }] },
-    { title: "Payouts", icon: "payoutBatches", items: [{ label: "Payouts", href: ROUTES.partner.payouts, icon: "payoutBatches" }] },
-    { title: "Statements", icon: "reports", items: [{ label: "Statements", href: ROUTES.partner.reports, icon: "reports" }] },
-    { title: "Support", icon: "support", items: [{ label: "Support", href: ROUTES.partner.notifications, icon: "support" }] },
-    { title: "Profile", icon: "profile", items: [{ label: "Profile", href: ROUTES.partner.dashboard, icon: "profile" }] },
+    { title: "Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: PARTNER_ROUTES.dashboard, icon: "dashboard" }] },
+    { title: "My Customers", icon: "customers", items: [{ label: "My Customers", href: PARTNER_ROUTES.customers, icon: "customers" }] },
+    { title: "Contract Amendments", icon: "subscriptions", items: [{ label: "Customer amendment requests", href: PARTNER_ROUTES.contractAmendments, icon: "subscriptions" }] },
+    { title: "Leads", icon: "leads", items: [{ label: "Leads", href: PARTNER_ROUTES.subscriptionRequests, icon: "leads" }] },
+    { title: "Commissions", icon: "collections", items: [{ label: "Commissions", href: PARTNER_ROUTES.commissions, icon: "commissions" }] },
+    { title: "Payouts", icon: "payoutBatches", items: [{ label: "Payouts", href: PARTNER_ROUTES.payouts, icon: "payoutBatches" }] },
+    { title: "Statements", icon: "reports", items: [{ label: "Statements", href: PARTNER_ROUTES.reports, icon: "reports" }] },
+    { title: "Support", icon: "support", items: [{ label: "Support", href: PARTNER_ROUTES.notifications, icon: "support" }] },
+    { title: "Profile", icon: "profile", items: [{ label: "Profile", href: PARTNER_ROUTES.dashboard, icon: "profile" }] },
   ],
   CUSTOMER: [
-    { title: "Dashboard", icon: "home", items: [{ label: "Dashboard", href: ROUTES.customer.dashboard, icon: "home" }] },
+    { title: "Dashboard", icon: "home", items: [{ label: "Dashboard", href: CUSTOMER_ROUTES.dashboard, icon: "home" }] },
     {
       title: "My Contracts",
       icon: "subscriptions",
       items: [
-        { label: "My Contracts", href: ROUTES.customer.subscriptions, icon: "subscriptions" },
-        { label: "My amendment requests", href: ROUTES.customer.contractAmendments, icon: "subscriptions" },
+        { label: "My Contracts", href: CUSTOMER_ROUTES.subscriptions, icon: "subscriptions" },
+        { label: "My amendment requests", href: CUSTOMER_ROUTES.contractAmendments, icon: "subscriptions" },
       ],
     },
-    { title: "Payments & Receipts", icon: "payments", items: [{ label: "Payments & Receipts", href: ROUTES.customer.payments, icon: "payments" }] },
-    { title: "Delivery", icon: "deliveries", items: [{ label: "Delivery", href: ROUTES.customer.deliveries, icon: "deliveries" }] },
+    { title: "Payments & Receipts", icon: "payments", items: [{ label: "Payments & Receipts", href: CUSTOMER_ROUTES.payments, icon: "payments" }] },
+    { title: "Delivery", icon: "deliveries", items: [{ label: "Delivery", href: CUSTOMER_ROUTES.deliveries, icon: "deliveries" }] },
     {
       title: "Support",
       icon: "support",
       items: [
-        { label: "Support", href: ROUTES.customer.support, icon: "support" },
-        { label: "Returns / Service", href: ROUTES.customer.support, icon: "serviceDesk" },
-        { label: "Lucky Draw", href: ROUTES.customer.subscriptions, icon: "luckyDraws" },
-        { label: "Notifications", href: ROUTES.customer.notifications, icon: "reminders" },
+        { label: "Support", href: CUSTOMER_ROUTES.support, icon: "support" },
+        { label: "Returns / Service", href: CUSTOMER_ROUTES.support, icon: "serviceDesk" },
+        { label: "Lucky Draw", href: CUSTOMER_ROUTES.subscriptions, icon: "luckyDraws" },
+        { label: "Notifications", href: CUSTOMER_ROUTES.notifications, icon: "reminders" },
       ],
     },
-    { title: "Profile", icon: "profile", items: [{ label: "Profile", href: ROUTES.customer.profile, icon: "profile" }] },
+    { title: "Profile", icon: "profile", items: [{ label: "Profile", href: CUSTOMER_ROUTES.profile, icon: "profile" }] },
   ],
   CASHIER: [
-    { title: "Cashier Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: ROUTES.cashier.dashboard, icon: "dashboard" }] },
-    { title: "Customer Search", icon: "cashCounter", items: [{ label: "Customer Search", href: ROUTES.cashier.collect, icon: "customers" }] },
+    { title: "Cashier Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: CASHIER_ROUTES.dashboard, icon: "dashboard" }] },
+    { title: "Customer Search", icon: "cashCounter", items: [{ label: "Customer Search", href: CASHIER_ROUTES.collect, icon: "customers" }] },
     {
       title: "Collections",
       icon: "collections",
       items: [
-        { label: "Collections", href: `${ROUTES.cashier.collect}?workflow=unified`, icon: "collectPayment" },
-        { label: "Collection Control Center", href: ROUTES.cashier.collectionControlCenter, icon: "collections" },
-        { label: "Direct-Sale Collection", href: `${ROUTES.cashier.collect}?workflow=direct-sale`, icon: "billing" },
-        { label: "EMI Collection", href: `${ROUTES.cashier.collect}?workflow=advance-emi`, icon: "emis" },
+        { label: "Collections", href: `${CASHIER_ROUTES.collect}?workflow=unified`, icon: "collectPayment" },
+        { label: "Collection Control Center", href: CASHIER_ROUTES.collectionControlCenter, icon: "collections" },
+        { label: "Direct-Sale Collection", href: `${CASHIER_ROUTES.collect}?workflow=direct-sale`, icon: "billing" },
+        { label: "EMI Collection", href: `${CASHIER_ROUTES.collect}?workflow=advance-emi`, icon: "emis" },
       ],
     },
     {
       title: "Receipts",
       icon: "payments",
       items: [
-        { label: "Payment History", href: ROUTES.cashier.payments, icon: "payments" },
-        { label: "Cash Closing", href: ROUTES.cashier.dayClose, icon: "cashCounter" },
+        { label: "Payment History", href: CASHIER_ROUTES.payments, icon: "payments" },
+        { label: "Cash Closing", href: CASHIER_ROUTES.dayClose, icon: "cashCounter" },
       ],
     },
-    { title: "Support", icon: "support", items: [{ label: "Notifications", href: ROUTES.cashier.notifications, icon: "reminders" }] },
+    { title: "Support", icon: "support", items: [{ label: "Notifications", href: CASHIER_ROUTES.notifications, icon: "reminders" }] },
   ],
   VENDOR: [
-    { title: "Dashboard", items: [{ label: "Dashboard", href: ROUTES.vendor.dashboard, icon: "dashboard", description: "Vendor operational dashboard." }] },
-    { title: "Quote Requests", items: [{ label: "Quote Requests", href: ROUTES.vendor.quotes, icon: "billing", description: "Quote requests and submissions." }] },
-    { title: "Purchase Orders", items: [{ label: "Purchase Orders", href: ROUTES.vendor.orders, icon: "procurement", description: "Purchase order visibility." }] },
-    { title: "Ledger", items: [{ label: "Ledger", href: ROUTES.vendor.ledger, icon: "accounting", description: "Vendor ledger entries." }] },
-    { title: "Outstanding", items: [{ label: "Outstanding", href: ROUTES.vendor.outstanding, icon: "finance", description: "Vendor outstanding balance." }] },
-    { title: "Purchase Returns", items: [{ label: "Purchase Returns", href: ROUTES.vendor.purchaseReturns, icon: "serviceDesk", description: "Purchase return visibility." }] },
-    { title: "Products", items: [{ label: "Products", href: ROUTES.vendor.products, icon: "inventory", description: "Vendor product catalog." }] },
-    { title: "Documents", items: [{ label: "Documents", href: ROUTES.vendor.documents, icon: "reports", description: "Vendor documents and uploads." }] },
-    { title: "Support", items: [{ label: "Notifications", href: ROUTES.vendor.notifications, icon: "reminders", description: "Role-safe vendor alerts." }] },
-    { title: "Profile", items: [{ label: "Profile", href: ROUTES.vendor.profile, icon: "crm", description: "Vendor profile and service areas." }] },
+    { title: "Dashboard", items: [{ label: "Dashboard", href: VENDOR_ROUTES.dashboard, icon: "dashboard", description: "Vendor operational dashboard." }] },
+    { title: "Quote Requests", items: [{ label: "Quote Requests", href: VENDOR_ROUTES.quotes, icon: "billing", description: "Quote requests and submissions." }] },
+    { title: "Purchase Orders", items: [{ label: "Purchase Orders", href: VENDOR_ROUTES.orders, icon: "procurement", description: "Purchase order visibility." }] },
+    { title: "Ledger", items: [{ label: "Ledger", href: VENDOR_ROUTES.ledger, icon: "accounting", description: "Vendor ledger entries." }] },
+    { title: "Outstanding", items: [{ label: "Outstanding", href: VENDOR_ROUTES.outstanding, icon: "finance", description: "Vendor outstanding balance." }] },
+    { title: "Purchase Returns", items: [{ label: "Purchase Returns", href: VENDOR_ROUTES.purchaseReturns, icon: "serviceDesk", description: "Purchase return visibility." }] },
+    { title: "Products", items: [{ label: "Products", href: VENDOR_ROUTES.products, icon: "inventory", description: "Vendor product catalog." }] },
+    { title: "Documents", items: [{ label: "Documents", href: VENDOR_ROUTES.documents, icon: "reports", description: "Vendor documents and uploads." }] },
+    { title: "Support", items: [{ label: "Notifications", href: VENDOR_ROUTES.notifications, icon: "reminders", description: "Role-safe vendor alerts." }] },
+    { title: "Profile", items: [{ label: "Profile", href: VENDOR_ROUTES.profile, icon: "crm", description: "Vendor profile and service areas." }] },
   ],
 };
 
