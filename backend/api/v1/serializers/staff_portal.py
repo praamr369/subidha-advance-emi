@@ -39,6 +39,7 @@ class StaffIdentitySerializer(serializers.ModelSerializer):
 
 
 class AdminStaffCreateSerializer(serializers.Serializer):
+    employee = serializers.IntegerField(required=False)
     name = serializers.CharField(max_length=120)
     phone = serializers.CharField(max_length=20)
     email = serializers.EmailField(required=False, allow_blank=True)
@@ -50,6 +51,18 @@ class AdminStaffCreateSerializer(serializers.Serializer):
     joining_date = serializers.DateField()
     base_salary = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     login_enabled = serializers.BooleanField(default=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        employee_id = attrs.get("employee")
+        if employee_id:
+            employee = EmployeeProfile.objects.filter(pk=employee_id).first()
+            if employee is None:
+                raise serializers.ValidationError({"employee": "Employee profile not found."})
+            if StaffIdentity.objects.filter(employee=employee).exists():
+                raise serializers.ValidationError({"employee": "This employee already has a staff login."})
+            attrs["employee_instance"] = employee
+        return attrs
 
     def validate_username(self, value):
         username = (value or "").strip()
@@ -73,6 +86,8 @@ class AdminStaffCreateSerializer(serializers.Serializer):
         temporary_password = validated_data.pop("temporary_password", "") or get_random_string(length=12)
         branch_id = validated_data.pop("branch", None)
         login_enabled = validated_data.pop("login_enabled", True)
+        employee = validated_data.pop("employee_instance", None)
+        validated_data.pop("employee", None)
         email = (validated_data.pop("email", "") or "").strip().lower()
         username = validated_data.pop("username")
         phone = validated_data["phone"]
@@ -88,16 +103,17 @@ class AdminStaffCreateSerializer(serializers.Serializer):
             is_active=login_enabled,
             is_staff=False,
         )
-        employee = EmployeeProfile.objects.create(
-            name=name,
-            phone=phone,
-            designation=validated_data.get("designation", ""),
-            department=validated_data.get("department", ""),
-            branch_id=branch_id,
-            joining_date=validated_data["joining_date"],
-            base_salary=validated_data.get("base_salary"),
-            is_active=True,
-        )
+        if employee is None:
+            employee = EmployeeProfile.objects.create(
+                name=name,
+                phone=phone,
+                designation=validated_data.get("designation", ""),
+                department=validated_data.get("department", ""),
+                branch_id=branch_id,
+                joining_date=validated_data["joining_date"],
+                base_salary=validated_data.get("base_salary"),
+                is_active=True,
+            )
         identity = StaffIdentity.objects.create(
             user=user,
             employee=employee,

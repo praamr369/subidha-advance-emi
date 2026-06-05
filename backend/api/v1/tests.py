@@ -138,12 +138,86 @@ class FinalPreDeployHrStaffHardeningTests(TestCase):
         )
         response = self.client.post(
             f"/api/v1/admin/hr/staff/{employee.id}/status/",
-            {"action": "DEACTIVATE"},
+            {"action": "DEACTIVATE", "reason": "Left shop operations"},
             format="json",
         )
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertFalse(EmployeeProfile.objects.get(pk=employee.id).is_active)
+        employee.refresh_from_db()
+        self.assertFalse(employee.is_active)
+        self.assertEqual(employee.employment_status, "INACTIVE")
+        self.assertEqual(employee.deactivation_reason, "Left shop operations")
+        self.assertIsNotNone(employee.deactivated_at)
         self.assertEqual(EmployeeAttendance.objects.filter(employee=employee).count(), 1)
+
+    def test_staff_cockpit_draft_active_and_payroll_validation(self):
+        draft = self.client.post(
+            "/api/v1/admin/hr/staff/",
+            {
+                "name": "Draft Staff",
+                "phone": "9811111666",
+                "employment_status": "DRAFT",
+                "is_active": False,
+            },
+            format="json",
+        )
+        self.assertEqual(draft.status_code, 200, draft.data)
+        self.assertEqual(draft.data["employee"]["employment_status"], "DRAFT")
+        self.assertFalse(draft.data["employee"]["is_active"])
+
+        active_missing = self.client.post(
+            "/api/v1/admin/hr/staff/",
+            {
+                "name": "Active Missing",
+                "phone": "9811111667",
+                "employment_status": "ACTIVE",
+            },
+            format="json",
+        )
+        self.assertEqual(active_missing.status_code, 400)
+        self.assertIn("designation", active_missing.data)
+
+        payroll_missing = self.client.post(
+            "/api/v1/admin/hr/staff/",
+            {
+                "name": "Payroll Missing",
+                "phone": "9811111668",
+                "designation": "Operator",
+                "department": "Store",
+                "employment_status": "ACTIVE",
+                "employment_type": "DAILY_WAGE",
+                "payroll_eligible": True,
+                "salary_effective_from": "2026-06-01",
+            },
+            format="json",
+        )
+        self.assertEqual(payroll_missing.status_code, 400)
+        self.assertIn("daily_wage_rate", payroll_missing.data)
+
+        ready = self.client.post(
+            "/api/v1/admin/hr/staff/",
+            {
+                "name": "Ready Staff",
+                "phone": "9811111669",
+                "designation": "Operator",
+                "department": "Store",
+                "employment_status": "ACTIVE",
+                "employment_type": "DAILY_WAGE",
+                "daily_wage_rate": "900.00",
+                "payroll_eligible": True,
+                "salary_effective_from": "2026-06-01",
+                "attendance_policy": "Day shift",
+                "kyc_id_type": "NID",
+                "kyc_id_number": "NID-123",
+                "kyc_verified": True,
+            },
+            format="json",
+        )
+        self.assertEqual(ready.status_code, 200, ready.data)
+        payload = ready.data["employee"]
+        self.assertTrue(payload["payroll_ready"])
+        self.assertTrue(payload["documents_ready"])
+        self.assertTrue(payload["attendance_ready"])
+        self.assertEqual(payload["pay_basis"], "Daily wage")
 
     def test_staff_document_metadata_and_pdf_endpoints(self):
         employee = EmployeeProfile.objects.create(name="Staff Doc", phone="9811111444", joining_date=date(2026, 1, 1))

@@ -24,13 +24,25 @@ export type HrStaff = {
   branch_name?: string | null;
   designation?: string;
   department?: string;
+  employment_status?: string;
   employment_type?: string;
+  reporting_manager?: string;
+  work_location?: string;
+  probation_end_date?: string | null;
+  attendance_policy?: string;
+  shift_name?: string;
   salary_effective_from?: string | null;
   temporary_contract_end_date?: string | null;
   daily_wage_rate?: string | null;
   hourly_wage_rate?: string | null;
   piece_rate_amount?: string | null;
   piece_rate_unit_label?: string;
+  payroll_eligible?: boolean;
+  payment_mode?: string;
+  bank_account_name?: string;
+  bank_account_number?: string;
+  bank_ifsc?: string;
+  upi_id?: string;
   kyc_id_type?: string;
   kyc_id_number?: string;
   kyc_verified?: boolean;
@@ -39,6 +51,18 @@ export type HrStaff = {
   emergency_contact_phone?: string;
   cost_center_code?: string;
   payroll_expense_account?: number | null;
+  deactivation_reason?: string;
+  deactivated_at?: string | null;
+  deactivated_by?: number | null;
+  profile_ready?: boolean;
+  employment_ready?: boolean;
+  payroll_ready?: boolean;
+  attendance_ready?: boolean;
+  documents_ready?: boolean;
+  access_ready?: boolean;
+  login_created?: boolean;
+  readiness_warnings?: string[];
+  pay_basis?: string;
   notes?: string;
   joining_date: string;
   base_salary?: string | null;
@@ -140,9 +164,13 @@ export async function getHrSummary() {
 type StaffListParams = {
   q?: string;
   is_active?: string;
+  status?: string;
+  employment_status?: string;
   department?: string;
   employment_type?: string;
   branch?: string | number;
+  payroll_ready?: string;
+  payroll_eligible?: string;
   kyc_verified?: string;
 };
 
@@ -173,6 +201,7 @@ export async function createHrStaff(payload: {
   cash_counter?: number | null;
   joining_date?: string | null;
   is_active?: boolean;
+  employment_status?: "DRAFT" | "ACTIVE" | "INACTIVE";
   base_salary?: string | null;
   designation?: string;
   department?: string;
@@ -184,12 +213,23 @@ export async function createHrStaff(payload: {
     | "PIECE_RATE"
     | "MANUFACTURING"
     | "SERVICE";
+  reporting_manager?: string;
+  work_location?: string;
+  probation_end_date?: string | null;
+  attendance_policy?: string;
+  shift_name?: string;
   salary_effective_from?: string | null;
   temporary_contract_end_date?: string | null;
   daily_wage_rate?: string | null;
   hourly_wage_rate?: string | null;
   piece_rate_amount?: string | null;
   piece_rate_unit_label?: string;
+  payroll_eligible?: boolean;
+  payment_mode?: "CASH" | "BANK" | "UPI";
+  bank_account_name?: string;
+  bank_account_number?: string;
+  bank_ifsc?: string;
+  upi_id?: string;
   kyc_id_type?: string;
   kyc_id_number?: string;
   kyc_verified?: boolean;
@@ -248,10 +288,10 @@ export async function listHrSalaryPayments(params: Record<string, string | numbe
   return apiFetch<{ count: number; results: HrSalaryPayment[] }>(`/admin/hr/salary-payments/${queryString(params)}`);
 }
 
-export async function setHrStaffStatus(staffId: number, action: "DEACTIVATE" | "REACTIVATE") {
+export async function setHrStaffStatus(staffId: number, action: "DEACTIVATE" | "REACTIVATE", reason?: string) {
   return apiFetch<HrStaff>(`/admin/hr/staff/${staffId}/status/`, {
     method: "POST",
-    body: JSON.stringify({ action }),
+    body: JSON.stringify({ action, reason }),
   });
 }
 

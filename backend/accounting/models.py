@@ -236,6 +236,18 @@ class EmploymentType(models.TextChoices):
     SERVICE = "SERVICE", "Service Worker"
 
 
+class EmployeeStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    ACTIVE = "ACTIVE", "Active"
+    INACTIVE = "INACTIVE", "Inactive"
+
+
+class StaffPaymentMode(models.TextChoices):
+    CASH = "CASH", "Cash"
+    BANK = "BANK", "Bank"
+    UPI = "UPI", "UPI"
+
+
 class EmployeeDocumentType(models.TextChoices):
     ID_PROOF = "ID_PROOF", "ID Proof"
     ADDRESS_PROOF = "ADDRESS_PROOF", "Address Proof"
@@ -2073,12 +2085,23 @@ class EmployeeProfile(AccountingTimeStampedModel):
         validators=[MinValueValidator(MONEY_ZERO)],
     )
     is_active = models.BooleanField(default=True, db_index=True)
+    employment_status = models.CharField(
+        max_length=20,
+        choices=EmployeeStatus.choices,
+        default=EmployeeStatus.ACTIVE,
+        db_index=True,
+    )
     employment_type = models.CharField(
         max_length=30,
         choices=EmploymentType.choices,
         default=EmploymentType.PERMANENT_MONTHLY,
         db_index=True,
     )
+    reporting_manager = models.CharField(max_length=120, blank=True, default="")
+    work_location = models.CharField(max_length=120, blank=True, default="")
+    probation_end_date = models.DateField(null=True, blank=True)
+    attendance_policy = models.CharField(max_length=120, blank=True, default="")
+    shift_name = models.CharField(max_length=120, blank=True, default="")
     salary_effective_from = models.DateField(null=True, blank=True)
     temporary_contract_end_date = models.DateField(null=True, blank=True)
     daily_wage_rate = models.DecimalField(
@@ -2103,6 +2126,17 @@ class EmployeeProfile(AccountingTimeStampedModel):
         validators=[MinValueValidator(MONEY_ZERO)],
     )
     piece_rate_unit_label = models.CharField(max_length=60, blank=True, default="")
+    payroll_eligible = models.BooleanField(default=False, db_index=True)
+    payment_mode = models.CharField(
+        max_length=20,
+        choices=StaffPaymentMode.choices,
+        default=StaffPaymentMode.CASH,
+        db_index=True,
+    )
+    bank_account_name = models.CharField(max_length=120, blank=True, default="")
+    bank_account_number = models.CharField(max_length=80, blank=True, default="")
+    bank_ifsc = models.CharField(max_length=40, blank=True, default="")
+    upi_id = models.CharField(max_length=80, blank=True, default="")
     kyc_id_type = models.CharField(max_length=40, blank=True, default="")
     kyc_id_number = models.CharField(max_length=80, blank=True, default="")
     kyc_verified = models.BooleanField(default=False, db_index=True)
@@ -2116,6 +2150,15 @@ class EmployeeProfile(AccountingTimeStampedModel):
         null=True,
         blank=True,
         related_name="employee_profiles_payroll_expense",
+    )
+    deactivation_reason = models.TextField(blank=True, default="")
+    deactivated_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    deactivated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="deactivated_employee_profiles",
     )
     notes = models.TextField(blank=True, default="")
 
@@ -2135,14 +2178,27 @@ class EmployeeProfile(AccountingTimeStampedModel):
         self.phone = (self.phone or "").strip()
         self.designation = (self.designation or "").strip()
         self.department = (self.department or "").strip()
+        self.reporting_manager = (self.reporting_manager or "").strip()
+        self.work_location = (self.work_location or "").strip()
+        self.attendance_policy = (self.attendance_policy or "").strip()
+        self.shift_name = (self.shift_name or "").strip()
         self.piece_rate_unit_label = (self.piece_rate_unit_label or "").strip()
+        self.bank_account_name = (self.bank_account_name or "").strip()
+        self.bank_account_number = (self.bank_account_number or "").strip()
+        self.bank_ifsc = (self.bank_ifsc or "").strip().upper()
+        self.upi_id = (self.upi_id or "").strip()
         self.kyc_id_type = (self.kyc_id_type or "").strip().upper()
         self.kyc_id_number = (self.kyc_id_number or "").strip()
         self.address = (self.address or "").strip()
         self.emergency_contact_name = (self.emergency_contact_name or "").strip()
         self.emergency_contact_phone = (self.emergency_contact_phone or "").strip()
         self.cost_center_code = (self.cost_center_code or "").strip().upper()
+        self.deactivation_reason = (self.deactivation_reason or "").strip()
         self.notes = (self.notes or "").strip()
+        if self.employment_status == EmployeeStatus.INACTIVE:
+            self.is_active = False
+        elif self.is_active:
+            self.employment_status = EmployeeStatus.ACTIVE
         if self.branch_id is None:
             self.branch = _default_branch()
         self.full_clean()

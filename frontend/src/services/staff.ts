@@ -105,6 +105,7 @@ export type AdminStaffIdentity = {
 };
 
 export type AdminStaffCreateInput = {
+  employee?: number;
   name: string;
   phone: string;
   email?: string;

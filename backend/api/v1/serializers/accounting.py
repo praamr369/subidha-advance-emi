@@ -13,6 +13,8 @@ from accounting.models import (
     EmployeeExpenseClaimPayment,
     EmployeeProfile,
     EmployeeDocument,
+    EmployeeStatus,
+    EmploymentType,
     ExpenseVoucher,
     ExpenseClaimStatus,
     ExpenseVoucherStatus,
@@ -694,6 +696,135 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
     compensation_components = EmployeeCompensationComponentSerializer(many=True, required=False)
     branch_code = serializers.CharField(source="branch.code", read_only=True)
     branch_name = serializers.CharField(source="branch.name", read_only=True)
+    profile_ready = serializers.SerializerMethodField()
+    employment_ready = serializers.SerializerMethodField()
+    payroll_ready = serializers.SerializerMethodField()
+    attendance_ready = serializers.SerializerMethodField()
+    documents_ready = serializers.SerializerMethodField()
+    access_ready = serializers.SerializerMethodField()
+    login_created = serializers.SerializerMethodField()
+    readiness_warnings = serializers.SerializerMethodField()
+    pay_basis = serializers.SerializerMethodField()
+
+    def _has_pay_setup(self, employee):
+        if employee.employment_type == EmploymentType.PERMANENT_MONTHLY:
+            return employee.base_salary is not None
+        if employee.employment_type == EmploymentType.DAILY_WAGE:
+            return employee.daily_wage_rate is not None
+        if employee.employment_type == EmploymentType.HOURLY:
+            return employee.hourly_wage_rate is not None
+        if employee.employment_type == EmploymentType.PIECE_RATE:
+            return employee.piece_rate_amount is not None and bool(employee.piece_rate_unit_label)
+        return any(
+            value is not None
+            for value in [
+                employee.base_salary,
+                employee.daily_wage_rate,
+                employee.hourly_wage_rate,
+                employee.piece_rate_amount,
+            ]
+        )
+
+    def get_profile_ready(self, employee):
+        return bool(employee.name and employee.phone and employee.designation and employee.branch_id)
+
+    def get_employment_ready(self, employee):
+        return bool(employee.employment_status == EmployeeStatus.ACTIVE and employee.joining_date and employee.employment_type)
+
+    def get_payroll_ready(self, employee):
+        return bool(employee.payroll_eligible and self._has_pay_setup(employee) and employee.salary_effective_from)
+
+    def get_attendance_ready(self, employee):
+        return bool(employee.branch_id and (employee.attendance_policy or employee.shift_name))
+
+    def get_documents_ready(self, employee):
+        return bool(employee.kyc_verified and employee.kyc_id_type and employee.kyc_id_number)
+
+    def get_access_ready(self, employee):
+        identity = getattr(employee, "staff_identity", None)
+        return bool(identity and identity.login_enabled)
+
+    def get_login_created(self, employee):
+        return bool(getattr(employee, "staff_identity", None))
+
+    def get_pay_basis(self, employee):
+        if employee.employment_type == EmploymentType.PERMANENT_MONTHLY and employee.base_salary is not None:
+            return "Monthly base"
+        if employee.employment_type == EmploymentType.DAILY_WAGE and employee.daily_wage_rate is not None:
+            return "Daily wage"
+        if employee.employment_type == EmploymentType.HOURLY and employee.hourly_wage_rate is not None:
+            return "Hourly"
+        if employee.employment_type == EmploymentType.PIECE_RATE and employee.piece_rate_amount is not None:
+            return "Piece rate"
+        if employee.base_salary is not None:
+            return "Contract/base payout"
+        return "Not configured"
+
+    def get_readiness_warnings(self, employee):
+        warnings = []
+        if not employee.branch_id or not employee.department:
+            warnings.append("Missing branch/department")
+        if not self._has_pay_setup(employee):
+            warnings.append("Missing salary setup")
+        if not employee.attendance_policy and not employee.shift_name:
+            warnings.append("Missing attendance policy")
+        if not employee.kyc_verified:
+            warnings.append("Missing KYC")
+        if not getattr(employee, "staff_identity", None):
+            warnings.append("Login not created")
+        return warnings
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = self.instance
+
+        def value(name, default=None):
+            if name in attrs:
+                return attrs[name]
+            return getattr(instance, name, default) if instance is not None else default
+
+        employment_status = value("employment_status", EmployeeStatus.ACTIVE)
+        employment_type = value("employment_type", EmploymentType.PERMANENT_MONTHLY)
+        payroll_eligible = bool(value("payroll_eligible", False))
+        errors = {}
+
+        if employment_status == EmployeeStatus.ACTIVE:
+            required = {
+                "name": value("name", ""),
+                "phone": value("phone", ""),
+                "designation": value("designation", ""),
+                "branch": value("branch", None),
+                "joining_date": value("joining_date", None),
+                "employment_type": employment_type,
+            }
+            for field, field_value in required.items():
+                if field_value in {None, ""}:
+                    errors[field] = "Required for active staff."
+
+        if payroll_eligible:
+            if employment_type == EmploymentType.PERMANENT_MONTHLY and value("base_salary") is None:
+                errors["base_salary"] = "Base salary is required for permanent monthly staff."
+            elif employment_type == EmploymentType.DAILY_WAGE and value("daily_wage_rate") is None:
+                errors["daily_wage_rate"] = "Daily wage is required for daily wage staff."
+            elif employment_type == EmploymentType.HOURLY and value("hourly_wage_rate") is None:
+                errors["hourly_wage_rate"] = "Hourly wage is required for hourly staff."
+            elif employment_type == EmploymentType.PIECE_RATE:
+                if value("piece_rate_amount") is None:
+                    errors["piece_rate_amount"] = "Piece rate is required for piece-rate staff."
+                if not value("piece_rate_unit_label", ""):
+                    errors["piece_rate_unit_label"] = "Piece unit is required for piece-rate staff."
+            if value("salary_effective_from") is None:
+                errors["salary_effective_from"] = "Salary effective date is required when payroll eligible."
+
+        payment_mode = value("payment_mode", "CASH")
+        if payroll_eligible and payment_mode == "BANK" and not value("bank_account_number", ""):
+            errors["bank_account_number"] = "Bank account number is required for bank payment mode."
+        if payroll_eligible and payment_mode == "UPI" and not value("upi_id", ""):
+            errors["upi_id"] = "UPI ID is required for UPI payment mode."
+
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
     def create(self, validated_data):
         components = validated_data.pop("compensation_components", [])
@@ -728,13 +859,25 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "base_salary",
             "standard_daily_hours",
             "overtime_rate_per_hour",
+            "employment_status",
             "employment_type",
+            "reporting_manager",
+            "work_location",
+            "probation_end_date",
+            "attendance_policy",
+            "shift_name",
             "salary_effective_from",
             "temporary_contract_end_date",
             "daily_wage_rate",
             "hourly_wage_rate",
             "piece_rate_amount",
             "piece_rate_unit_label",
+            "payroll_eligible",
+            "payment_mode",
+            "bank_account_name",
+            "bank_account_number",
+            "bank_ifsc",
+            "upi_id",
             "kyc_id_type",
             "kyc_id_number",
             "kyc_verified",
@@ -744,12 +887,40 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "cost_center_code",
             "payroll_expense_account",
             "is_active",
+            "deactivation_reason",
+            "deactivated_at",
+            "deactivated_by",
             "notes",
             "compensation_components",
+            "profile_ready",
+            "employment_ready",
+            "payroll_ready",
+            "attendance_ready",
+            "documents_ready",
+            "access_ready",
+            "login_created",
+            "readiness_warnings",
+            "pay_basis",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "employee_code", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "employee_code",
+            "deactivated_at",
+            "deactivated_by",
+            "profile_ready",
+            "employment_ready",
+            "payroll_ready",
+            "attendance_ready",
+            "documents_ready",
+            "access_ready",
+            "login_created",
+            "readiness_warnings",
+            "pay_basis",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class EmployeeDocumentSerializer(serializers.ModelSerializer):

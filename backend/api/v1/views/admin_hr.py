@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 
 from accounting.models import (
     AttendanceStatus,
+    EmployeeStatus,
     EmployeeAttendance,
     EmployeeDocument,
     EmployeeExpenseClaim,
@@ -68,17 +69,29 @@ class HrStaffCreateSerializer(serializers.Serializer):
     cash_counter = serializers.IntegerField(required=False, allow_null=True)
     joining_date = serializers.DateField(required=False, allow_null=True)
     is_active = serializers.BooleanField(required=False, default=True)
+    employment_status = serializers.ChoiceField(choices=EmployeeStatus.choices, required=False)
     base_salary = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True)
     designation = serializers.CharField(required=False, allow_blank=True)
     department = serializers.CharField(required=False, allow_blank=True)
     employment_type = serializers.ChoiceField(choices=EmploymentType.choices, required=False)
+    reporting_manager = serializers.CharField(required=False, allow_blank=True)
+    work_location = serializers.CharField(required=False, allow_blank=True)
+    probation_end_date = serializers.DateField(required=False, allow_null=True)
+    attendance_policy = serializers.CharField(required=False, allow_blank=True)
+    shift_name = serializers.CharField(required=False, allow_blank=True)
     salary_effective_from = serializers.DateField(required=False, allow_null=True)
     temporary_contract_end_date = serializers.DateField(required=False, allow_null=True)
     daily_wage_rate = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     hourly_wage_rate = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     piece_rate_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     piece_rate_unit_label = serializers.CharField(required=False, allow_blank=True)
+    payroll_eligible = serializers.BooleanField(required=False)
+    payment_mode = serializers.ChoiceField(choices=[("CASH", "CASH"), ("BANK", "BANK"), ("UPI", "UPI")], required=False)
+    bank_account_name = serializers.CharField(required=False, allow_blank=True)
+    bank_account_number = serializers.CharField(required=False, allow_blank=True)
+    bank_ifsc = serializers.CharField(required=False, allow_blank=True)
+    upi_id = serializers.CharField(required=False, allow_blank=True)
     kyc_id_type = serializers.CharField(required=False, allow_blank=True)
     kyc_id_number = serializers.CharField(required=False, allow_blank=True)
     kyc_verified = serializers.BooleanField(required=False)
@@ -91,21 +104,28 @@ class HrStaffCreateSerializer(serializers.Serializer):
 
 class AdminHrStaffListCreateView(_AdminBase):
     def get(self, request):
-        qs = EmployeeProfile.objects.select_related("branch").all().order_by("name", "id")
+        qs = EmployeeProfile.objects.select_related("branch", "staff_identity").all().order_by("name", "id")
         is_active = request.query_params.get("is_active")
+        status_value = (request.query_params.get("status") or request.query_params.get("employment_status") or "").strip().upper()
         branch_id = request.query_params.get("branch")
         department = (request.query_params.get("department") or "").strip()
         employment_type = (request.query_params.get("employment_type") or "").strip().upper()
+        payroll_ready = request.query_params.get("payroll_ready")
+        payroll_eligible = request.query_params.get("payroll_eligible")
         kyc_verified = request.query_params.get("kyc_verified")
         q = (request.query_params.get("q") or "").strip()
         if is_active in {"true", "false"}:
             qs = qs.filter(is_active=is_active == "true")
+        if status_value:
+            qs = qs.filter(employment_status=status_value)
         if branch_id:
             qs = qs.filter(branch_id=branch_id)
         if department:
             qs = qs.filter(department__iexact=department)
         if employment_type:
             qs = qs.filter(employment_type=employment_type)
+        if payroll_eligible in {"true", "false"}:
+            qs = qs.filter(payroll_eligible=payroll_eligible == "true")
         if kyc_verified in {"true", "false"}:
             qs = qs.filter(kyc_verified=kyc_verified == "true")
         if q:
@@ -116,12 +136,18 @@ class AdminHrStaffListCreateView(_AdminBase):
                 | Q(department__icontains=q)
                 | Q(designation__icontains=q)
             )
+        if payroll_ready in {"true", "false"}:
+            serializer_for_filter = EmployeeProfileSerializer(context={"request": request})
+            wanted = payroll_ready == "true"
+            qs = [employee for employee in qs[:200] if serializer_for_filter.get_payroll_ready(employee) is wanted]
+            return Response({"count": len(qs), "results": EmployeeProfileSerializer(qs, many=True, context={"request": request}).data})
         qs = qs[:200]
         return Response({"count": qs.count(), "results": EmployeeProfileSerializer(qs, many=True, context={"request": request}).data})
 
     def post(self, request):
         serializer = HrStaffCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        employment_status = serializer.validated_data.get("employment_status") or EmployeeStatus.ACTIVE
         try:
             payload = create_staff_profile(
                 performed_by=request.user,
@@ -132,7 +158,7 @@ class AdminHrStaffListCreateView(_AdminBase):
                 branch_id=serializer.validated_data.get("branch"),
                 cash_counter_id=serializer.validated_data.get("cash_counter"),
                 joining_date=serializer.validated_data.get("joining_date"),
-                is_active=serializer.validated_data.get("is_active", True),
+                is_active=employment_status == EmployeeStatus.ACTIVE and serializer.validated_data.get("is_active", True),
                 base_salary=serializer.validated_data.get("base_salary"),
                 notes=serializer.validated_data.get("notes") or "",
             )
@@ -145,13 +171,25 @@ class AdminHrStaffListCreateView(_AdminBase):
             data={
                 "designation": serializer.validated_data.get("designation") or "",
                 "department": serializer.validated_data.get("department") or "",
+                "employment_status": employment_status,
                 "employment_type": serializer.validated_data.get("employment_type") or EmploymentType.PERMANENT_MONTHLY,
+                "reporting_manager": serializer.validated_data.get("reporting_manager") or "",
+                "work_location": serializer.validated_data.get("work_location") or "",
+                "probation_end_date": serializer.validated_data.get("probation_end_date"),
+                "attendance_policy": serializer.validated_data.get("attendance_policy") or "",
+                "shift_name": serializer.validated_data.get("shift_name") or "",
                 "salary_effective_from": serializer.validated_data.get("salary_effective_from"),
                 "temporary_contract_end_date": serializer.validated_data.get("temporary_contract_end_date"),
                 "daily_wage_rate": serializer.validated_data.get("daily_wage_rate"),
                 "hourly_wage_rate": serializer.validated_data.get("hourly_wage_rate"),
                 "piece_rate_amount": serializer.validated_data.get("piece_rate_amount"),
                 "piece_rate_unit_label": serializer.validated_data.get("piece_rate_unit_label") or "",
+                "payroll_eligible": serializer.validated_data.get("payroll_eligible", False),
+                "payment_mode": serializer.validated_data.get("payment_mode") or "CASH",
+                "bank_account_name": serializer.validated_data.get("bank_account_name") or "",
+                "bank_account_number": serializer.validated_data.get("bank_account_number") or "",
+                "bank_ifsc": serializer.validated_data.get("bank_ifsc") or "",
+                "upi_id": serializer.validated_data.get("upi_id") or "",
                 "kyc_id_type": serializer.validated_data.get("kyc_id_type") or "",
                 "kyc_id_number": serializer.validated_data.get("kyc_id_number") or "",
                 "kyc_verified": serializer.validated_data.get("kyc_verified", False),
@@ -200,6 +238,7 @@ class AdminHrStaffPatchView(_AdminBase):
 
 class HrStaffStatusSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=[("DEACTIVATE", "DEACTIVATE"), ("REACTIVATE", "REACTIVATE")])
+    reason = serializers.CharField(required=False, allow_blank=True)
 
 
 class AdminHrStaffStatusView(_AdminBase):
@@ -209,7 +248,24 @@ class AdminHrStaffStatusView(_AdminBase):
         serializer.is_valid(raise_exception=True)
         action = serializer.validated_data["action"]
         employee.is_active = action == "REACTIVATE"
-        employee.save(update_fields=["is_active", "updated_at"])
+        if action == "DEACTIVATE":
+            employee.employment_status = EmployeeStatus.INACTIVE
+            employee.deactivation_reason = serializer.validated_data.get("reason") or ""
+            employee.deactivated_at = timezone.now()
+            employee.deactivated_by = request.user
+            employee.save(
+                update_fields=[
+                    "is_active",
+                    "employment_status",
+                    "deactivation_reason",
+                    "deactivated_at",
+                    "deactivated_by",
+                    "updated_at",
+                ]
+            )
+        else:
+            employee.employment_status = EmployeeStatus.ACTIVE
+            employee.save(update_fields=["is_active", "employment_status", "updated_at"])
         return Response(EmployeeProfileSerializer(employee, context={"request": request}).data)
 
 
