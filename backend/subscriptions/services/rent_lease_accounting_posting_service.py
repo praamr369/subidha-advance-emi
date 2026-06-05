@@ -145,9 +145,22 @@ def _preview(source_model: str, source_id: int | str, source_reference: str, eve
 
 
 def _store_preview(payload: dict[str, Any], status: str = "PREVIEWED", reason: str = "") -> None:
-    with connection.cursor() as cursor:
-        cursor.execute(
+    if connection.vendor == "sqlite":
+        sql = """
+            INSERT INTO accounting_operational_accounting_postings
+                (source_model, source_id, event_type, idempotency_key, amount, status,
+                 mapping_snapshot, preview_payload, failure_reason, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT (idempotency_key) DO UPDATE SET
+                amount = EXCLUDED.amount,
+                status = CASE WHEN accounting_operational_accounting_postings.status = 'POSTED' THEN 'POSTED' ELSE EXCLUDED.status END,
+                mapping_snapshot = EXCLUDED.mapping_snapshot,
+                preview_payload = EXCLUDED.preview_payload,
+                failure_reason = EXCLUDED.failure_reason,
+                updated_at = CURRENT_TIMESTAMP
             """
+    else:
+        sql = """
             INSERT INTO accounting_operational_accounting_postings
                 (source_model, source_id, event_type, idempotency_key, amount, status,
                  mapping_snapshot, preview_payload, failure_reason, created_at, updated_at)
@@ -159,7 +172,10 @@ def _store_preview(payload: dict[str, Any], status: str = "PREVIEWED", reason: s
                 preview_payload = EXCLUDED.preview_payload,
                 failure_reason = EXCLUDED.failure_reason,
                 updated_at = NOW()
-            """,
+            """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            sql,
             [payload["source_model"], payload["source_id"], payload["event_type"], payload["idempotency_key"], payload["amount"], status, json.dumps(payload["mapping_snapshot"]), json.dumps(payload), reason],
         )
 

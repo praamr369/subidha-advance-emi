@@ -8,6 +8,7 @@ urlpatterns = [
     path("health/deep/", PublicApiDeepHealthView.as_view()),
     path("auth/", include("api.v1.routes.auth")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
+    path("admin/", include("api.v1.routes.admin_accounting_bridge_readiness")),
     path("admin/", include("api.v1.routes.admin_rent_lease_accounting_bridge")),
     path("admin/", include("api.v1.routes.contract_amendments_admin")),
     path("admin/", include("api.v1.routes.admin_staff_identity")),
