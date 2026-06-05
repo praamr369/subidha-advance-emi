@@ -267,7 +267,12 @@ class FinalPreDeployHrStaffHardeningTests(TestCase):
         pre_salary_sheet_count = employee.salary_sheets.count()
         patch = self.client.patch(
             f"/api/v1/admin/hr/staff/{employee.id}/",
-            {"base_salary": "32000.00", "employment_type": "PERMANENT_MONTHLY"},
+            {
+                "base_salary": "32000.00",
+                "employment_type": "PERMANENT_MONTHLY",
+                "designation": "Store Staff",
+                "department": "Store",
+            },
             format="json",
         )
         self.assertEqual(patch.status_code, 200, patch.data)

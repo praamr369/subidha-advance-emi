@@ -5,6 +5,142 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 
+TABLE_NAME = "accounting_employee_profiles"
+
+
+def _existing_columns(schema_editor):
+    with schema_editor.connection.cursor() as cursor:
+        return {
+            column.name
+            for column in schema_editor.connection.introspection.get_table_description(
+                cursor, TABLE_NAME
+            )
+        }
+
+
+def _add_staff_cockpit_columns(apps, schema_editor):
+    vendor = schema_editor.connection.vendor
+    if vendor == "postgresql":
+        _add_staff_cockpit_columns_postgresql(apps, schema_editor)
+        return
+    if vendor == "sqlite":
+        _add_staff_cockpit_columns_sqlite(schema_editor)
+        return
+
+    raise RuntimeError(
+        "accounting.0030_employeeprofile_staff_cockpit_fields only supports "
+        "PostgreSQL and SQLite database migrations."
+    )
+
+
+def _add_staff_cockpit_columns_postgresql(apps, schema_editor):
+    UserModel = apps.get_model(*settings.AUTH_USER_MODEL.split("."))
+    user_table = schema_editor.quote_name(UserModel._meta.db_table)
+    table = schema_editor.quote_name(TABLE_NAME)
+
+    statements = [
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS attendance_policy varchar(120) NOT NULL DEFAULT ''",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS bank_account_name varchar(120) NOT NULL DEFAULT ''",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS bank_account_number varchar(80) NOT NULL DEFAULT ''",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS bank_ifsc varchar(40) NOT NULL DEFAULT ''",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS deactivated_at timestamp with time zone NULL",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS deactivated_by_id bigint NULL",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS deactivation_reason text NOT NULL DEFAULT ''",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS employment_status varchar(20) NOT NULL DEFAULT 'ACTIVE'",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS payroll_eligible boolean NOT NULL DEFAULT false",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS payment_mode varchar(20) NOT NULL DEFAULT 'CASH'",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS probation_end_date date NULL",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS reporting_manager varchar(120) NOT NULL DEFAULT ''",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS shift_name varchar(120) NOT NULL DEFAULT ''",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS upi_id varchar(80) NOT NULL DEFAULT ''",
+        f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS work_location varchar(120) NOT NULL DEFAULT ''",
+        f"ALTER TABLE {table} ALTER COLUMN attendance_policy DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN bank_account_name DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN bank_account_number DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN bank_ifsc DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN deactivation_reason DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN employment_status DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN payroll_eligible DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN payment_mode DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN reporting_manager DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN shift_name DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN upi_id DROP DEFAULT",
+        f"ALTER TABLE {table} ALTER COLUMN work_location DROP DEFAULT",
+        "CREATE INDEX IF NOT EXISTS accounting_employee_profiles_deactivated_at_0030_idx "
+        f"ON {table} (deactivated_at)",
+        "CREATE INDEX IF NOT EXISTS accounting_employee_profiles_employment_status_0030_idx "
+        f"ON {table} (employment_status)",
+        "CREATE INDEX IF NOT EXISTS accounting_employee_profiles_payroll_eligible_0030_idx "
+        f"ON {table} (payroll_eligible)",
+        "CREATE INDEX IF NOT EXISTS accounting_employee_profiles_payment_mode_0030_idx "
+        f"ON {table} (payment_mode)",
+        "CREATE INDEX IF NOT EXISTS accounting_employee_profiles_deactivated_by_id_0030_idx "
+        f"ON {table} (deactivated_by_id)",
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'accounting_employee_profiles_deactivated_by_id_0030_fk'
+            ) THEN
+                ALTER TABLE accounting_employee_profiles
+                ADD CONSTRAINT accounting_employee_profiles_deactivated_by_id_0030_fk
+                FOREIGN KEY (deactivated_by_id)
+                REFERENCES %s (id)
+                DEFERRABLE INITIALLY DEFERRED;
+            END IF;
+        END
+        $$;
+        """
+        % user_table,
+    ]
+    for statement in statements:
+        schema_editor.execute(statement)
+
+
+def _add_staff_cockpit_columns_sqlite(schema_editor):
+    existing = _existing_columns(schema_editor)
+    columns = [
+        ("attendance_policy", "varchar(120) NOT NULL DEFAULT ''"),
+        ("bank_account_name", "varchar(120) NOT NULL DEFAULT ''"),
+        ("bank_account_number", "varchar(80) NOT NULL DEFAULT ''"),
+        ("bank_ifsc", "varchar(40) NOT NULL DEFAULT ''"),
+        ("deactivated_at", "datetime NULL"),
+        ("deactivated_by_id", "bigint NULL"),
+        ("deactivation_reason", "text NOT NULL DEFAULT ''"),
+        ("employment_status", "varchar(20) NOT NULL DEFAULT 'ACTIVE'"),
+        ("payroll_eligible", "bool NOT NULL DEFAULT 0"),
+        ("payment_mode", "varchar(20) NOT NULL DEFAULT 'CASH'"),
+        ("probation_end_date", "date NULL"),
+        ("reporting_manager", "varchar(120) NOT NULL DEFAULT ''"),
+        ("shift_name", "varchar(120) NOT NULL DEFAULT ''"),
+        ("upi_id", "varchar(80) NOT NULL DEFAULT ''"),
+        ("work_location", "varchar(120) NOT NULL DEFAULT ''"),
+    ]
+    table = schema_editor.quote_name(TABLE_NAME)
+    for column_name, definition in columns:
+        if column_name not in existing:
+            schema_editor.execute(
+                f"ALTER TABLE {table} ADD COLUMN {schema_editor.quote_name(column_name)} {definition}"
+            )
+
+    index_statements = [
+        "CREATE INDEX IF NOT EXISTS accounting_employee_profiles_deactivated_at_0030_idx "
+        f"ON {table} (deactivated_at)",
+        "CREATE INDEX IF NOT EXISTS accounting_employee_profiles_employment_status_0030_idx "
+        f"ON {table} (employment_status)",
+        "CREATE INDEX IF NOT EXISTS accounting_employee_profiles_payroll_eligible_0030_idx "
+        f"ON {table} (payroll_eligible)",
+        "CREATE INDEX IF NOT EXISTS accounting_employee_profiles_payment_mode_0030_idx "
+        f"ON {table} (payment_mode)",
+        "CREATE INDEX IF NOT EXISTS accounting_employee_profiles_deactivated_by_id_0030_idx "
+        f"ON {table} (deactivated_by_id)",
+    ]
+    for statement in index_statements:
+        schema_editor.execute(statement)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -13,95 +149,109 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="attendance_policy",
-            field=models.CharField(blank=True, default="", max_length=120),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="bank_account_name",
-            field=models.CharField(blank=True, default="", max_length=120),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="bank_account_number",
-            field=models.CharField(blank=True, default="", max_length=80),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="bank_ifsc",
-            field=models.CharField(blank=True, default="", max_length=40),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="deactivated_at",
-            field=models.DateTimeField(blank=True, db_index=True, null=True),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="deactivated_by",
-            field=models.ForeignKey(
-                blank=True,
-                null=True,
-                on_delete=django.db.models.deletion.PROTECT,
-                related_name="deactivated_employee_profiles",
-                to=settings.AUTH_USER_MODEL,
-            ),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="deactivation_reason",
-            field=models.TextField(blank=True, default=""),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="employment_status",
-            field=models.CharField(
-                choices=[("DRAFT", "Draft"), ("ACTIVE", "Active"), ("INACTIVE", "Inactive")],
-                db_index=True,
-                default="ACTIVE",
-                max_length=20,
-            ),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="payroll_eligible",
-            field=models.BooleanField(db_index=True, default=False),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="payment_mode",
-            field=models.CharField(
-                choices=[("CASH", "Cash"), ("BANK", "Bank"), ("UPI", "UPI")],
-                db_index=True,
-                default="CASH",
-                max_length=20,
-            ),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="probation_end_date",
-            field=models.DateField(blank=True, null=True),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="reporting_manager",
-            field=models.CharField(blank=True, default="", max_length=120),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="shift_name",
-            field=models.CharField(blank=True, default="", max_length=120),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="upi_id",
-            field=models.CharField(blank=True, default="", max_length=80),
-        ),
-        migrations.AddField(
-            model_name="employeeprofile",
-            name="work_location",
-            field=models.CharField(blank=True, default="", max_length=120),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(
+                    _add_staff_cockpit_columns,
+                    reverse_code=migrations.RunPython.noop,
+                )
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="attendance_policy",
+                    field=models.CharField(blank=True, default="", max_length=120),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="bank_account_name",
+                    field=models.CharField(blank=True, default="", max_length=120),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="bank_account_number",
+                    field=models.CharField(blank=True, default="", max_length=80),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="bank_ifsc",
+                    field=models.CharField(blank=True, default="", max_length=40),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="deactivated_at",
+                    field=models.DateTimeField(blank=True, db_index=True, null=True),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="deactivated_by",
+                    field=models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="deactivated_employee_profiles",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="deactivation_reason",
+                    field=models.TextField(blank=True, default=""),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="employment_status",
+                    field=models.CharField(
+                        choices=[
+                            ("DRAFT", "Draft"),
+                            ("ACTIVE", "Active"),
+                            ("INACTIVE", "Inactive"),
+                        ],
+                        db_index=True,
+                        default="ACTIVE",
+                        max_length=20,
+                    ),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="payroll_eligible",
+                    field=models.BooleanField(db_index=True, default=False),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="payment_mode",
+                    field=models.CharField(
+                        choices=[("CASH", "Cash"), ("BANK", "Bank"), ("UPI", "UPI")],
+                        db_index=True,
+                        default="CASH",
+                        max_length=20,
+                    ),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="probation_end_date",
+                    field=models.DateField(blank=True, null=True),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="reporting_manager",
+                    field=models.CharField(blank=True, default="", max_length=120),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="shift_name",
+                    field=models.CharField(blank=True, default="", max_length=120),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="upi_id",
+                    field=models.CharField(blank=True, default="", max_length=80),
+                ),
+                migrations.AddField(
+                    model_name="employeeprofile",
+                    name="work_location",
+                    field=models.CharField(blank=True, default="", max_length=120),
+                ),
+            ],
         ),
     ]
