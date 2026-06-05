@@ -21,13 +21,13 @@ class Migration(migrations.Migration):
                 amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
                 status VARCHAR(20) NOT NULL DEFAULT 'PREVIEWED',
                 journal_entry_id BIGINT NULL REFERENCES accounting_journal_entries(id) ON DELETE RESTRICT,
-                mapping_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
-                preview_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+                mapping_snapshot JSONB NOT NULL DEFAULT '{}',
+                preview_payload JSONB NOT NULL DEFAULT '{}',
                 failure_reason TEXT NOT NULL DEFAULT '',
                 posted_by_id BIGINT NULL,
                 posted_at TIMESTAMPTZ NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS accounting_oap_source_idx
                 ON accounting_operational_accounting_postings(source_model, source_id);
@@ -37,11 +37,11 @@ class Migration(migrations.Migration):
                 ON accounting_operational_accounting_postings(posted_at);
 
             ALTER TABLE accounting_rent_lease_account_mappings
-                ADD COLUMN IF NOT EXISTS customer_advance_liability_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE RESTRICT;
+                ADD COLUMN customer_advance_liability_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE RESTRICT;
             ALTER TABLE accounting_rent_lease_account_mappings
-                ADD COLUMN IF NOT EXISTS rent_income_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE RESTRICT;
+                ADD COLUMN rent_income_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE RESTRICT;
             ALTER TABLE accounting_rent_lease_account_mappings
-                ADD COLUMN IF NOT EXISTS lease_income_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE RESTRICT;
+                ADD COLUMN lease_income_account_id BIGINT NULL REFERENCES accounting_chart_of_accounts(id) ON DELETE RESTRICT;
 
             CREATE INDEX IF NOT EXISTS accounting_rlmap_customer_advance_idx
                 ON accounting_rent_lease_account_mappings(customer_advance_liability_account_id);
@@ -63,8 +63,8 @@ class Migration(migrations.Migration):
                 created_by_id BIGINT NULL,
                 approved_by_id BIGINT NULL,
                 approved_at TIMESTAMPTZ NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS accounting_customer_adv_customer_idx
                 ON accounting_customer_advance_source_records(customer_id);
