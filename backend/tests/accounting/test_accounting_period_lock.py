@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from accounting.models import AccountingPeriod, ChartOfAccount, ChartOfAccountType
+from accounting.models import AccountingPeriod, AccountingPeriodStatus, ChartOfAccount, ChartOfAccountType, FinancialYear
 from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
 from tests.helpers import create_admin_user
 
@@ -28,11 +28,22 @@ class AccountingPeriodLockTests(TestCase):
 
     def test_locked_period_blocks_journal_posting(self):
         entry_date = date(2026, 4, 10)
-        AccountingPeriod.objects.create(
+        financial_year = FinancialYear.objects.create(
             code="FY2026-27",
-            label="2026-27",
+            name="FY 2026-27",
             start_date=date(2026, 4, 1),
             end_date=date(2027, 3, 31),
+            is_active=True,
+            activated_by=self.admin,
+        )
+        AccountingPeriod.objects.create(
+            code="FY2026-27-APR",
+            label="April 2026",
+            name="April 2026",
+            financial_year=financial_year,
+            start_date=date(2026, 4, 1),
+            end_date=date(2026, 4, 30),
+            status=AccountingPeriodStatus.LOCKED,
             is_locked=True,
             locked_by=self.admin,
         )
@@ -54,6 +65,5 @@ class AccountingPeriodLockTests(TestCase):
             ],
         )
 
-        with self.assertRaisesMessage(ValueError, "Accounting period FY2026-27 is locked."):
+        with self.assertRaisesMessage(ValueError, "Accounting period FY2026-27-APR is locked."):
             post_journal_entry(journal_entry_id=journal.id, posted_by=self.admin)
-

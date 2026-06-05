@@ -727,12 +727,34 @@ export type ExportPackJob = {
   updated_at?: string;
 };
 
+export type AccountingPeriodStatus = "OPEN" | "LOCKED" | "CLOSED";
+
+export type FinancialYear = {
+  id: number;
+  code: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  activated_at?: string | null;
+  activated_by?: number | null;
+  activated_by_username?: string | null;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type AccountingPeriod = {
   id: number;
   code: string;
   label: string;
+  name?: string;
   start_date: string;
   end_date: string;
+  financial_year?: number | null;
+  financial_year_code?: string | null;
+  financial_year_name?: string | null;
+  status?: AccountingPeriodStatus;
   is_locked: boolean;
   locked_at?: string | null;
   locked_by?: number | null;
@@ -749,6 +771,16 @@ export type PostingLock = {
   locked_by?: number | null;
   locked_by_username?: string | null;
   locked_at?: string | null;
+};
+
+export type AccountingPeriodReadiness = {
+  reference_date: string;
+  active_financial_year: FinancialYear | null;
+  current_period: AccountingPeriod | null;
+  posting_lock: PostingLock | null;
+  is_ready: boolean;
+  errors: string[];
+  warnings: string[];
 };
 
 export type AssetCategory = {
@@ -1728,6 +1760,44 @@ export function runAccountingBridge(payload: {
   });
 }
 
+export function listFinancialYears(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<FinancialYear>>(
+    `/accounting/financial-years/${buildQuery(params)}`
+  );
+}
+
+export function createFinancialYear(payload: {
+  code: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  notes?: string;
+}) {
+  return apiFetch<FinancialYear>("/accounting/financial-years/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function activateFinancialYear(id: number) {
+  return apiFetch<AccountingActionResponse<{ financial_year: FinancialYear }>>(
+    `/accounting/financial-years/${id}/activate/`,
+    { method: "POST" }
+  );
+}
+
+export function generateAccountingPeriods(financialYearId: number) {
+  return apiFetch<
+    AccountingActionResponse<{
+      financial_year: FinancialYear;
+      periods: AccountingPeriod[];
+      created_count: number;
+    }>
+  >(`/accounting/financial-years/${financialYearId}/generate-periods/`, {
+    method: "POST",
+  });
+}
+
 export function listAccountingPeriods(params: Record<string, string | number | undefined | null> = {}) {
   return apiFetch<AccountingPaginatedResponse<AccountingPeriod>>(
     `/accounting/periods/${buildQuery(params)}`
@@ -1751,6 +1821,16 @@ export function lockAccountingPeriod(id: number, reason = "") {
   );
 }
 
+export function updateAccountingPeriodStatus(id: number, status: AccountingPeriodStatus, reason = "") {
+  return apiFetch<AccountingActionResponse<{ period: AccountingPeriod }>>(
+    `/accounting/periods/${id}/status/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status, reason }),
+    }
+  );
+}
+
 export function unlockAccountingPeriod(id: number, reason = "") {
   return apiFetch<AccountingActionResponse<{ period: AccountingPeriod }>>(
     `/accounting/periods/${id}/unlock/`,
@@ -1762,13 +1842,7 @@ export function unlockAccountingPeriod(id: number, reason = "") {
 }
 
 export function closeAccountingPeriod(id: number, reason = "") {
-  return apiFetch<AccountingActionResponse<{ period: AccountingPeriod }>>(
-    `/accounting/periods/${id}/close/`,
-    {
-      method: "POST",
-      body: JSON.stringify({ reason }),
-    }
-  );
+  return updateAccountingPeriodStatus(id, "CLOSED", reason);
 }
 
 export function reopenAccountingPeriod(id: number, reason = "") {
@@ -1779,6 +1853,10 @@ export function reopenAccountingPeriod(id: number, reason = "") {
       body: JSON.stringify({ reason }),
     }
   );
+}
+
+export function getAccountingPeriodsReadiness() {
+  return apiFetch<AccountingPeriodReadiness>("/accounting/periods/readiness/");
 }
 
 export function listPostingLocks(params: Record<string, string | number | undefined | null> = {}) {

@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounting.models import (
@@ -42,6 +43,7 @@ from subscriptions.services.product_recontract_preview_service import (
     record_product_recontract_admin_approval,
     record_product_recontract_customer_consent,
 )
+from tests.helpers import ensure_open_accounting_period_for_date
 
 
 class ContractRecontractAccountingPostingTests(TestCase):
@@ -102,6 +104,7 @@ class ContractRecontractAccountingPostingTests(TestCase):
                 entry_type=LedgerEntryType.EMI_PAYMENT,
                 entry_direction=LedgerDirection.CREDIT,
             )
+        ensure_open_accounting_period_for_date(timezone.localdate(), performed_by=self.admin)
 
     def _ensure_posting_profiles(self):
         self.receivable_account = ChartOfAccount.objects.create(

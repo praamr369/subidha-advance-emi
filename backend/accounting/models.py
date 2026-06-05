@@ -219,6 +219,12 @@ class PayrollPeriodStatus(models.TextChoices):
     CLOSED = "CLOSED", "Closed"
 
 
+class AccountingPeriodStatus(models.TextChoices):
+    OPEN = "OPEN", "Open"
+    LOCKED = "LOCKED", "Locked"
+    CLOSED = "CLOSED", "Closed"
+
+
 class AttendanceStatus(models.TextChoices):
     PRESENT = "PRESENT", "Present"
     HALF_DAY = "HALF_DAY", "Half Day"
@@ -551,11 +557,78 @@ class ComplianceAlertThreshold(AccountingTimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class FinancialYear(AccountingTimeStampedModel):
+    code = models.CharField(max_length=20, unique=True, db_index=True)
+    name = models.CharField(max_length=120)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_active = models.BooleanField(default=False, db_index=True)
+    activated_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    activated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="activated_financial_years",
+    )
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_financial_years"
+        ordering = ["-start_date", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_active"],
+                condition=Q(is_active=True),
+                name="accounting_financial_year_single_active",
+            ),
+            models.CheckConstraint(
+                condition=Q(end_date__gte=models.F("start_date")),
+                name="accounting_financial_year_end_after_start",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not (self.code or "").strip():
+            errors["code"] = "Financial year code is required."
+        if not (self.name or "").strip():
+            errors["name"] = "Financial year name is required."
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            errors["end_date"] = "End date cannot be earlier than start date."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        self.name = (self.name or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.code} ({self.start_date} - {self.end_date})"
+
+
 class AccountingPeriod(AccountingTimeStampedModel):
     code = models.CharField(max_length=30, unique=True, db_index=True)
     label = models.CharField(max_length=80)
     start_date = models.DateField(db_index=True)
     end_date = models.DateField(db_index=True)
+    financial_year = models.ForeignKey(
+        FinancialYear,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="periods",
+    )
+    name = models.CharField(max_length=80, blank=True, default="")
+    status = models.CharField(
+        max_length=20,
+        choices=AccountingPeriodStatus.choices,
+        default=AccountingPeriodStatus.OPEN,
+        db_index=True,
+    )
     is_locked = models.BooleanField(default=False, db_index=True)
     locked_at = models.DateTimeField(null=True, blank=True, db_index=True)
     locked_by = models.ForeignKey(
@@ -588,16 +661,29 @@ class AccountingPeriod(AccountingTimeStampedModel):
         errors = {}
         if not (self.code or "").strip():
             errors["code"] = "Accounting period code is required."
-        if not (self.label or "").strip():
-            errors["label"] = "Accounting period label is required."
+        if not ((self.name or "").strip() or (self.label or "").strip()):
+            errors["name"] = "Accounting period name or label is required."
         if self.start_date and self.end_date and self.end_date < self.start_date:
             errors["end_date"] = "End date cannot be earlier than start date."
+        if self.financial_year_id and self.start_date and self.end_date:
+            if self.start_date < self.financial_year.start_date or self.end_date > self.financial_year.end_date:
+                errors["financial_year"] = "Accounting period dates must be inside the linked financial year."
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.code = (self.code or "").strip().upper()
+        self.name = (self.name or "").strip()
         self.label = (self.label or "").strip()
+        if not self.name:
+            self.name = self.label or self.code
+        if not self.label:
+            self.label = self.name or self.code
+        self.status = (self.status or AccountingPeriodStatus.OPEN).strip().upper()
+        if self.is_locked and self.status == AccountingPeriodStatus.OPEN:
+            self.status = AccountingPeriodStatus.LOCKED
+        if self.status in {AccountingPeriodStatus.LOCKED, AccountingPeriodStatus.CLOSED}:
+            self.is_locked = True
         self.lock_reason = (self.lock_reason or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)

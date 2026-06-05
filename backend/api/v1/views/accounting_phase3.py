@@ -8,9 +8,11 @@ from rest_framework.views import APIView
 from accounting.models import (
     AccountingBridgePosting,
     AccountingPeriod,
+    AccountingPeriodStatus,
     Asset,
     AssetCategory,
     DepreciationRun,
+    FinancialYear,
     PostingLock,
     VendorSettlement,
 )
@@ -37,9 +39,13 @@ from accounting.services.depreciation_service import (
     run_depreciation,
 )
 from accounting.services.period_service import (
+    activate_financial_year,
+    build_accounting_period_readiness,
     create_posting_lock,
+    generate_monthly_periods,
     lock_accounting_period,
     remove_posting_lock,
+    set_accounting_period_status,
     unlock_accounting_period,
 )
 from accounting.services.purchase_bill_posting_service import (
@@ -65,9 +71,11 @@ from api.v1.serializers.accounting_phase3 import (
     AssetCategorySerializer,
     AssetSerializer,
     DepreciationRunSerializer,
+    FinancialYearSerializer,
     MasterImportActionSerializer,
     PostingLockSerializer,
     PeriodActionSerializer,
+    PeriodStatusActionSerializer,
     Phase3BridgeRunSerializer,
     VendorSettlementSerializer,
 )
@@ -79,17 +87,97 @@ class AdminAccountingPhase3ViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "head", "options"]
 
 
+class FinancialYearViewSet(AdminAccountingPhase3ViewSet):
+    queryset = FinancialYear.objects.select_related("activated_by").all()
+    serializer_class = FinancialYearSerializer
+    search_fields = ["code", "name"]
+    ordering_fields = ["start_date", "end_date", "code", "is_active"]
+    ordering = ["-start_date", "-id"]
+
+    @action(detail=True, methods=["post"], url_path="activate")
+    def activate(self, request, pk=None):
+        financial_year = activate_financial_year(financial_year_id=int(pk), performed_by=request.user)
+        payload = FinancialYearSerializer(financial_year, context=self.get_serializer_context())
+        return Response({"updated": True, "financial_year": payload.data})
+
+    @action(detail=True, methods=["post"], url_path="generate-periods")
+    def generate_periods(self, request, pk=None):
+        result = generate_monthly_periods(financial_year_id=int(pk), performed_by=request.user)
+        period_payload = AccountingPeriodSerializer(
+            result["periods"],
+            many=True,
+            context=self.get_serializer_context(),
+        )
+        fy_payload = FinancialYearSerializer(result["financial_year"], context=self.get_serializer_context())
+        return Response(
+            {
+                "updated": result["created_count"] > 0,
+                "created_count": result["created_count"],
+                "financial_year": fy_payload.data,
+                "periods": period_payload.data,
+            }
+        )
+
+
 class AccountingPeriodViewSet(AdminAccountingPhase3ViewSet):
-    queryset = AccountingPeriod.objects.select_related("locked_by").all()
+    queryset = AccountingPeriod.objects.select_related("financial_year", "locked_by").all()
     serializer_class = AccountingPeriodSerializer
-    search_fields = ["code", "label"]
-    ordering_fields = ["start_date", "end_date", "code"]
+    search_fields = ["code", "label", "name", "financial_year__code"]
+    ordering_fields = ["start_date", "end_date", "code", "status"]
     ordering = ["-start_date", "-id"]
 
     def get_serializer_class(self):
+        if self.action == "status_period":
+            return PeriodStatusActionSerializer
         if self.action in {"lock_period", "unlock_period", "close_period", "reopen_period"}:
             return PeriodActionSerializer
         return super().get_serializer_class()
+
+    @action(detail=False, methods=["get"], url_path="readiness")
+    def readiness(self, request):
+        readiness = build_accounting_period_readiness()
+        fy_payload = (
+            FinancialYearSerializer(readiness["active_financial_year"], context=self.get_serializer_context()).data
+            if readiness["active_financial_year"] is not None
+            else None
+        )
+        period_payload = (
+            AccountingPeriodSerializer(readiness["current_period"], context=self.get_serializer_context()).data
+            if readiness["current_period"] is not None
+            else None
+        )
+        lock_payload = (
+            PostingLockSerializer(readiness["posting_lock"], context=self.get_serializer_context()).data
+            if readiness["posting_lock"] is not None
+            else None
+        )
+        return Response(
+            {
+                "reference_date": readiness["reference_date"],
+                "active_financial_year": fy_payload,
+                "current_period": period_payload,
+                "posting_lock": lock_payload,
+                "is_ready": readiness["is_ready"],
+                "errors": readiness["errors"],
+                "warnings": readiness["warnings"],
+            }
+        )
+
+    @action(detail=True, methods=["post"], url_path="status")
+    def status_period(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            period, updated = set_accounting_period_status(
+                period_id=int(pk),
+                status=serializer.validated_data["status"],
+                performed_by=request.user,
+                reason=serializer.validated_data.get("reason", ""),
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = AccountingPeriodSerializer(period, context=self.get_serializer_context())
+        return Response({"updated": updated, "period": payload.data})
 
     @action(detail=True, methods=["post"], url_path="lock")
     def lock_period(self, request, pk=None):
@@ -117,7 +205,16 @@ class AccountingPeriodViewSet(AdminAccountingPhase3ViewSet):
 
     @action(detail=True, methods=["post"], url_path="close")
     def close_period(self, request, pk=None):
-        return self.lock_period(request, pk=pk)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        period, updated = set_accounting_period_status(
+            period_id=int(pk),
+            status=AccountingPeriodStatus.CLOSED,
+            performed_by=request.user,
+            reason=serializer.validated_data.get("reason", ""),
+        )
+        payload = AccountingPeriodSerializer(period, context=self.get_serializer_context())
+        return Response({"updated": updated, "period": payload.data})
 
     @action(detail=True, methods=["post"], url_path="reopen")
     def reopen_period(self, request, pk=None):

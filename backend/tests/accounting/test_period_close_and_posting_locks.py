@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from accounting.models import AccountingPeriod, ChartOfAccount, ChartOfAccountType
+from accounting.models import AccountingPeriod, AccountingPeriodStatus, ChartOfAccount, ChartOfAccountType, FinancialYear
 from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
 from accounting.services.period_service import create_posting_lock
 from tests.helpers import create_admin_user
@@ -23,6 +23,14 @@ class AccountingPeriodCloseAndPostingLockTests(TestCase):
             name="Period Close Income",
             account_type=ChartOfAccountType.INCOME,
         )
+        self.financial_year = FinancialYear.objects.create(
+            code="FY2026-27",
+            name="FY 2026-27",
+            start_date=date(2026, 4, 1),
+            end_date=date(2027, 3, 31),
+            is_active=True,
+            activated_by=self.admin,
+        )
 
     def _draft_journal(self, entry_date: date):
         return create_journal_entry(
@@ -38,20 +46,31 @@ class AccountingPeriodCloseAndPostingLockTests(TestCase):
     def test_closed_period_blocks_posting(self):
         entry_date = date(2026, 4, 18)
         AccountingPeriod.objects.create(
-            code="FY2026-27",
-            label="2026-27",
+            code="FY2026-27-APR",
+            label="April 2026",
+            name="April 2026",
+            financial_year=self.financial_year,
             start_date=date(2026, 4, 1),
-            end_date=date(2027, 3, 31),
+            end_date=date(2026, 4, 30),
+            status=AccountingPeriodStatus.CLOSED,
             is_locked=True,
             locked_by=self.admin,
         )
         journal = self._draft_journal(entry_date)
 
-        with self.assertRaisesMessage(ValueError, "Accounting period FY2026-27 is locked."):
+        with self.assertRaisesMessage(ValueError, "Accounting period FY2026-27-APR is closed."):
             post_journal_entry(journal_entry_id=journal.id, posted_by=self.admin)
 
     def test_posting_lock_blocks_single_day_posting(self):
         entry_date = date(2026, 4, 19)
+        AccountingPeriod.objects.create(
+            code="FY2026-27-APR",
+            label="April 2026",
+            name="April 2026",
+            financial_year=self.financial_year,
+            start_date=date(2026, 4, 1),
+            end_date=date(2026, 4, 30),
+        )
         journal = self._draft_journal(entry_date)
         create_posting_lock(
             lock_date=entry_date,
@@ -61,4 +80,3 @@ class AccountingPeriodCloseAndPostingLockTests(TestCase):
 
         with self.assertRaisesMessage(ValueError, f"Accounting posting lock exists for {entry_date.isoformat()}."):
             post_journal_entry(journal_entry_id=journal.id, posted_by=self.admin)
-

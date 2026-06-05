@@ -19,6 +19,7 @@ from accounting.models import (
     ExpenseVoucher,
     ExportPackJob,
     FinanceAccount,
+    FinancialYear,
     JournalEntry,
     JournalEntryLine,
     LeaveRequest,
@@ -172,11 +173,18 @@ class DocumentSequenceAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
 
 
+@admin.register(FinancialYear)
+class FinancialYearAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "start_date", "end_date", "is_active", "activated_by")
+    search_fields = ("code", "name")
+    list_filter = ("is_active",)
+
+
 @admin.register(AccountingPeriod)
 class AccountingPeriodAdmin(admin.ModelAdmin):
-    list_display = ("code", "label", "start_date", "end_date", "is_locked", "locked_by")
-    search_fields = ("code", "label")
-    list_filter = ("is_locked",)
+    list_display = ("code", "name", "start_date", "end_date", "financial_year", "status", "is_locked", "locked_by")
+    search_fields = ("code", "label", "name", "financial_year__code")
+    list_filter = ("status", "is_locked", "financial_year")
 
 
 @admin.register(PostingLock)

@@ -8,6 +8,7 @@ from accounting.models import EmployeeAttendance, EmployeeDocument, EmployeeProf
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from services.subscriptions.create_subscription import create_subscription
@@ -34,7 +35,11 @@ from subscriptions.services.contract_reference_service import (
     ensure_contract_reference_for_direct_sale,
     ensure_contract_reference_for_subscription,
 )
-from tests.helpers import ensure_default_payment_collection_accounts, suppress_expected_request_logs
+from tests.helpers import (
+    ensure_default_payment_collection_accounts,
+    ensure_open_accounting_period_for_date,
+    suppress_expected_request_logs,
+)
 
 
 class PermissionTests(TestCase):
@@ -343,6 +348,7 @@ class Phase9FOperationalReadinessTests(TestCase):
             performed_by=self.admin,
         )
         self.reference = ContractReference.objects.get(subscription=self.subscription)
+        ensure_open_accounting_period_for_date(timezone.localdate(), performed_by=self.admin)
 
     def test_business_reset_requires_json_boolean_and_preserves_one_admin(self):
         self.client.force_authenticate(self.admin)
@@ -466,9 +472,9 @@ class Phase9FOperationalReadinessTests(TestCase):
         self.assertEqual(rent_row["source_type"], ContractReferenceType.RENT)
         self.assertEqual(rent_row["result_type"], "RENT")
         self.assertEqual(rent_row["allowed_actions"], [])
-        self.assertEqual(rent_row["primary_action"], "VIEW_ONLY")
-        self.assertEqual(rent_row["action_type"], "VIEW_ONLY")
-        self.assertIn("production-safe", rent_row["disabled_reason"])
+        self.assertEqual(rent_row["primary_action"], "DISABLED")
+        self.assertEqual(rent_row["action_type"], "DISABLED")
+        self.assertIn("collectible rent/lease demand", rent_row["disabled_reason"])
 
         blocked_collect = self.client.post(
             "/api/v1/admin/receivables/collect/",
@@ -483,7 +489,7 @@ class Phase9FOperationalReadinessTests(TestCase):
             format="json",
         )
         self.assertEqual(blocked_collect.status_code, 400)
-        self.assertIn("source_type", str(blocked_collect.data))
+        self.assertIn("collectible rent/lease demand", str(blocked_collect.data))
 
     def test_unified_receivable_search_returns_direct_sale_result_type_for_cashier(self):
         fy = financial_year_for(date(2026, 5, 1))
@@ -538,7 +544,7 @@ class Phase9FOperationalReadinessTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertGreaterEqual(response.data["count"], 1)
         row = response.data["results"][0]
-        self.assertEqual(row["result_type"], "DIRECT_SALE")
+        self.assertEqual(row["result_type"], "DIRECT_SALE_PAID")
         self.assertEqual(row["source_type"], ContractReferenceType.DIRECT_SALE)
 
 
@@ -1190,6 +1196,7 @@ class Phase9AContractReferenceApiTests(TestCase):
             performed_by=self.admin,
         )
         self.reference = ContractReference.objects.get(subscription=self.subscription)
+        ensure_open_accounting_period_for_date(timezone.localdate(), performed_by=self.admin)
 
     def _create_direct_sale_reference(
         self,

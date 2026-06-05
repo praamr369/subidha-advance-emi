@@ -4,10 +4,14 @@ from datetime import date
 from decimal import Decimal
 
 from accounting.models import (
+    AccountingPeriod,
     ChartOfAccount,
     ChartOfAccountType,
     FinanceAccount,
+    FinanceAccountCoaMapping,
     FinanceAccountKind,
+    FinanceAccountMappingPurpose,
+    FinancialYear,
 )
 from accounts.models import User, UserRole
 from subscriptions.models import (
@@ -60,6 +64,56 @@ def create_admin_user(username="admin_test", phone="9000000001", email=""):
         first_name="Admin",
         is_staff=True,
     )
+
+
+def ensure_open_accounting_period_for_date(reference_date: date, *, performed_by=None):
+    if performed_by is None:
+        performed_by = create_admin_user(
+            username=f"period_admin_{reference_date.strftime('%Y%m%d')}",
+            phone=f"939{reference_date.strftime('%m%d%H%M')[:7]}",
+        )
+    if reference_date.month >= 4:
+        start_year = reference_date.year
+    else:
+        start_year = reference_date.year - 1
+    fy_start = date(start_year, 4, 1)
+    fy_end = date(start_year + 1, 3, 31)
+    fy_code = f"FY{fy_start.year}-{str(fy_end.year)[-2:]}"
+    FinancialYear.objects.filter(is_active=True).exclude(code=fy_code).update(is_active=False)
+    financial_year, _ = FinancialYear.objects.get_or_create(
+        code=fy_code,
+        defaults={
+            "name": f"FY {fy_start.year}-{str(fy_end.year)[-2:]}",
+            "start_date": fy_start,
+            "end_date": fy_end,
+            "is_active": True,
+            "activated_by": performed_by,
+        },
+    )
+    if not financial_year.is_active:
+        financial_year.is_active = True
+        financial_year.activated_by = performed_by
+        financial_year.save(update_fields=["is_active", "activated_by", "updated_at"])
+    period_start = date(reference_date.year, reference_date.month, 1)
+    if reference_date.month == 12:
+        next_month = date(reference_date.year + 1, 1, 1)
+    else:
+        next_month = date(reference_date.year, reference_date.month + 1, 1)
+    period_end = min(next_month - date.resolution, fy_end)
+    period, _ = AccountingPeriod.objects.get_or_create(
+        start_date=period_start,
+        end_date=period_end,
+        defaults={
+            "financial_year": financial_year,
+            "code": f"{fy_code}-{reference_date.year}{reference_date.month:02d}",
+            "label": reference_date.strftime("%B %Y"),
+            "name": reference_date.strftime("%B %Y"),
+        },
+    )
+    if period.financial_year_id != financial_year.id:
+        period.financial_year = financial_year
+        period.save(update_fields=["financial_year", "updated_at"])
+    return financial_year, period
 
 
 def create_partner_user(username="partner_test", phone="9000000002", email=""):
@@ -347,6 +401,7 @@ def ensure_default_payment_collection_accounts():
                 "chart_account": chart_account,
                 "opening_balance": Decimal("0.00"),
                 "is_active": True,
+                "is_real_settlement_account": True,
             },
         )
         finance_updates = []
@@ -359,8 +414,32 @@ def ensure_default_payment_collection_accounts():
         if not finance_account.is_active:
             finance_account.is_active = True
             finance_updates.append("is_active")
+        if not finance_account.is_real_settlement_account:
+            finance_account.is_real_settlement_account = True
+            finance_updates.append("is_real_settlement_account")
         if finance_updates:
             finance_account.save(update_fields=finance_updates)
+        purpose = {
+            FinanceAccountKind.CASH: FinanceAccountMappingPurpose.CASH_COLLECTION,
+            FinanceAccountKind.BANK: FinanceAccountMappingPurpose.BANK_COLLECTION,
+            FinanceAccountKind.UPI: FinanceAccountMappingPurpose.UPI_COLLECTION,
+        }[kind]
+        FinanceAccountCoaMapping.objects.update_or_create(
+            finance_account=finance_account,
+            purpose=purpose,
+            defaults={
+                "chart_account": chart_account,
+                "is_active": True,
+                "is_default": not FinanceAccountCoaMapping.objects.filter(
+                    purpose=purpose,
+                    is_active=True,
+                    is_default=True,
+                )
+                .exclude(finance_account=finance_account)
+                .exists(),
+                "notes": "Test default collection mapping.",
+            },
+        )
         accounts[kind] = finance_account
     return accounts
 

@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.contract_amendments import ContractAmendmentSerializer
 from api.v1.views.contract_amendments import _amendment_queryset
+from subscriptions.models import Customer
 
 
 class AdminContractAmendmentFilteredListView(APIView):
@@ -38,9 +39,12 @@ class AdminContractAmendmentFilteredListView(APIView):
             queryset = queryset.filter(amendment_type=amendment_type.strip().upper())
         if customer:
             customer_value = customer.strip()
-            customer_filter = Q(customer__name__icontains=customer_value) | Q(customer__phone__icontains=customer_value)
-            if customer_value.isdigit():
-                customer_filter |= Q(customer_id=int(customer_value))
+            if customer_value.isdigit() and Customer.objects.filter(pk=int(customer_value)).exists():
+                customer_filter = Q(customer_id=int(customer_value))
+            else:
+                customer_filter = Q(customer__name__icontains=customer_value) | Q(customer__phone__icontains=customer_value)
+                if customer_value.isdigit():
+                    customer_filter |= Q(customer_id=int(customer_value))
             queryset = queryset.filter(customer_filter)
         if partner:
             partner_value = partner.strip()

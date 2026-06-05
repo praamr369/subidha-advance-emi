@@ -58,6 +58,7 @@ from api.v1.views.accounting_phase3 import (
     EmiPaymentBridgeRunView,
     EmiSubscriptionBridgeRunView,
     EmiWaiverBridgeRunView,
+    FinancialYearViewSet,
     PostingLockViewSet,
     PurchaseBookView,
     RetailSaleBridgeRunView,
@@ -88,6 +89,7 @@ router.register(r"expense-claim-payments", EmployeeExpenseClaimPaymentViewSet, b
 router.register(r"tax-invoices", TaxInvoiceViewSet, basename="accounting-tax-invoices")
 router.register(r"credit-notes", CreditNoteViewSet, basename="accounting-credit-notes")
 router.register(r"debit-notes", DebitNoteViewSet, basename="accounting-debit-notes")
+router.register(r"financial-years", FinancialYearViewSet, basename="accounting-financial-years")
 router.register(r"periods", AccountingPeriodViewSet, basename="accounting-periods")
 router.register(r"locks", PostingLockViewSet, basename="accounting-locks")
 router.register(r"bridge-postings", AccountingBridgePostingViewSet, basename="accounting-bridge-postings")

@@ -5,10 +5,12 @@ from rest_framework import serializers
 from accounting.models import (
     AccountingBridgePosting,
     AccountingPeriod,
+    AccountingPeriodStatus,
     Asset,
     AssetCategory,
     DepreciationLine,
     DepreciationRun,
+    FinancialYear,
     PostingLock,
     VendorSettlement,
 )
@@ -18,8 +20,45 @@ class PeriodActionSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
 
 
+class FinancialYearSerializer(serializers.ModelSerializer):
+    activated_by_username = serializers.CharField(source="activated_by.username", read_only=True)
+
+    class Meta:
+        model = FinancialYear
+        fields = [
+            "id",
+            "code",
+            "name",
+            "start_date",
+            "end_date",
+            "is_active",
+            "activated_at",
+            "activated_by",
+            "activated_by_username",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "is_active",
+            "activated_at",
+            "activated_by",
+            "activated_by_username",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class PeriodStatusActionSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=AccountingPeriodStatus.choices)
+    reason = serializers.CharField(required=False, allow_blank=True)
+
+
 class AccountingPeriodSerializer(serializers.ModelSerializer):
     locked_by_username = serializers.CharField(source="locked_by.username", read_only=True)
+    financial_year_code = serializers.CharField(source="financial_year.code", read_only=True)
+    financial_year_name = serializers.CharField(source="financial_year.name", read_only=True)
 
     class Meta:
         model = AccountingPeriod
@@ -27,8 +66,13 @@ class AccountingPeriodSerializer(serializers.ModelSerializer):
             "id",
             "code",
             "label",
+            "name",
             "start_date",
             "end_date",
+            "financial_year",
+            "financial_year_code",
+            "financial_year_name",
+            "status",
             "is_locked",
             "locked_at",
             "locked_by",
@@ -44,6 +88,8 @@ class AccountingPeriodSerializer(serializers.ModelSerializer):
             "locked_by",
             "locked_by_username",
             "lock_reason",
+            "financial_year_code",
+            "financial_year_name",
             "created_at",
             "updated_at",
         ]

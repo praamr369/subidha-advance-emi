@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from calendar import month_name, monthrange
 from datetime import date
 
 from django.db import transaction
 from django.utils import timezone
 
-from accounting.models import AccountingPeriod, PostingLock
+from accounting.models import AccountingPeriod, AccountingPeriodStatus, FinancialYear, PostingLock
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
@@ -23,30 +24,225 @@ def financial_year_code(reference_date: date) -> str:
     return f"FY{start_date.year}-{str(end_date.year)[-2:]}"
 
 
-def ensure_accounting_period(reference_date: date) -> AccountingPeriod:
-    existing = (
-        AccountingPeriod.objects.filter(start_date__lte=reference_date, end_date__gte=reference_date)
+def get_active_financial_year() -> FinancialYear | None:
+    return FinancialYear.objects.filter(is_active=True).order_by("-start_date", "-id").first()
+
+
+@transaction.atomic
+def activate_financial_year(financial_year_id: int, performed_by) -> FinancialYear:
+    financial_year = FinancialYear.objects.select_for_update().get(pk=financial_year_id)
+    FinancialYear.objects.select_for_update().filter(is_active=True).exclude(pk=financial_year.pk).update(
+        is_active=False,
+        activated_at=None,
+        activated_by=None,
+    )
+    financial_year.is_active = True
+    financial_year.activated_at = timezone.now()
+    financial_year.activated_by = performed_by
+    financial_year.save(update_fields=["is_active", "activated_at", "activated_by", "updated_at"])
+    log_audit(
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        instance=financial_year,
+        performed_by=performed_by,
+        metadata={
+            "event": "ACCOUNTING_FINANCIAL_YEAR_ACTIVATED",
+            "financial_year_id": financial_year.id,
+            "financial_year_code": financial_year.code,
+        },
+    )
+    return financial_year
+
+
+def _next_month_start(value: date) -> date:
+    if value.month == 12:
+        return date(value.year + 1, 1, 1)
+    return date(value.year, value.month + 1, 1)
+
+
+@transaction.atomic
+def generate_monthly_periods(financial_year_id: int, performed_by) -> dict:
+    financial_year = FinancialYear.objects.select_for_update().get(pk=financial_year_id)
+    periods: list[AccountingPeriod] = []
+    created_count = 0
+    current = financial_year.start_date
+    sequence = 1
+
+    while current <= financial_year.end_date:
+        month_end = date(current.year, current.month, monthrange(current.year, current.month)[1])
+        period_end = min(month_end, financial_year.end_date)
+        code = f"{financial_year.code}-{current.year}{current.month:02d}"
+        name = f"{month_name[current.month]} {current.year}"
+        period, created = AccountingPeriod.objects.get_or_create(
+            start_date=current,
+            end_date=period_end,
+            defaults={
+                "financial_year": financial_year,
+                "code": code,
+                "name": name,
+                "label": name,
+                "status": AccountingPeriodStatus.OPEN,
+            },
+        )
+        if not created and period.financial_year_id is None:
+            period.financial_year = financial_year
+            if not period.name:
+                period.name = period.label or name
+            period.save(update_fields=["financial_year", "name", "label", "status", "is_locked", "updated_at"])
+        created_count += 1 if created else 0
+        periods.append(period)
+        current = _next_month_start(current)
+        sequence += 1
+
+    log_audit(
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        instance=financial_year,
+        performed_by=performed_by,
+        metadata={
+            "event": "ACCOUNTING_PERIODS_GENERATED",
+            "financial_year_id": financial_year.id,
+            "financial_year_code": financial_year.code,
+            "period_count": len(periods),
+            "created_count": created_count,
+        },
+    )
+    return {"financial_year": financial_year, "periods": periods, "created_count": created_count}
+
+
+def resolve_accounting_period(posting_date: date) -> AccountingPeriod:
+    financial_year = get_active_financial_year()
+    if financial_year is None:
+        raise ValueError("No active financial year is configured for accounting posting.")
+    if posting_date < financial_year.start_date or posting_date > financial_year.end_date:
+        raise ValueError(
+            f"Posting date {posting_date.isoformat()} is outside active financial year {financial_year.code}."
+        )
+    period = (
+        AccountingPeriod.objects.select_related("financial_year", "locked_by")
+        .filter(
+            financial_year=financial_year,
+            start_date__lte=posting_date,
+            end_date__gte=posting_date,
+        )
         .order_by("start_date", "id")
         .first()
     )
-    if existing is not None:
-        return existing
-
-    start_date, end_date = financial_year_bounds(reference_date)
-    code = financial_year_code(reference_date)
-    period, _ = AccountingPeriod.objects.get_or_create(
-        code=code,
-        defaults={
-            "label": f"{start_date.year}-{str(end_date.year)[-2:]}",
-            "start_date": start_date,
-            "end_date": end_date,
-        },
-    )
+    if period is None:
+        raise ValueError(f"No accounting period is configured for posting date {posting_date.isoformat()}.")
     return period
 
 
+def validate_posting_date(posting_date: date) -> AccountingPeriod:
+    period = resolve_accounting_period(posting_date)
+    if period.status == AccountingPeriodStatus.CLOSED:
+        raise ValueError(f"Accounting period {period.code} is closed.")
+    if period.status == AccountingPeriodStatus.LOCKED or period.is_locked:
+        raise ValueError(f"Accounting period {period.code} is locked.")
+    return period
+
+
+def build_accounting_period_readiness(reference_date: date | None = None) -> dict:
+    reference_date = reference_date or timezone.localdate()
+    active_financial_year = get_active_financial_year()
+    current_period = None
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if active_financial_year is None:
+        errors.append("No active financial year is configured.")
+    elif reference_date < active_financial_year.start_date or reference_date > active_financial_year.end_date:
+        errors.append(f"Today is outside active financial year {active_financial_year.code}.")
+    else:
+        current_period = (
+            AccountingPeriod.objects.select_related("financial_year", "locked_by")
+            .filter(
+                financial_year=active_financial_year,
+                start_date__lte=reference_date,
+                end_date__gte=reference_date,
+            )
+            .order_by("start_date", "id")
+            .first()
+        )
+        if current_period is None:
+            errors.append("No accounting period covers today's posting date.")
+        elif current_period.status == AccountingPeriodStatus.CLOSED:
+            errors.append(f"Current accounting period {current_period.code} is closed.")
+        elif current_period.status == AccountingPeriodStatus.LOCKED or current_period.is_locked:
+            errors.append(f"Current accounting period {current_period.code} is locked.")
+
+        period_count = AccountingPeriod.objects.filter(financial_year=active_financial_year).count()
+        if period_count == 0:
+            errors.append(f"No accounting periods have been generated for {active_financial_year.code}.")
+        elif period_count < 12:
+            warnings.append(f"{active_financial_year.code} has only {period_count} configured period(s).")
+
+    posting_lock = PostingLock.objects.filter(lock_date=reference_date).first()
+    if posting_lock is not None:
+        errors.append(f"Posting lock exists for {reference_date.isoformat()}.")
+
+    return {
+        "reference_date": reference_date,
+        "active_financial_year": active_financial_year,
+        "current_period": current_period,
+        "is_ready": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "posting_lock": posting_lock,
+    }
+
+
+@transaction.atomic
+def set_accounting_period_status(
+    *,
+    period_id: int,
+    status: str,
+    performed_by,
+    reason: str = "",
+) -> tuple[AccountingPeriod, bool]:
+    normalized_status = (status or "").strip().upper()
+    if normalized_status not in AccountingPeriodStatus.values:
+        raise ValueError("Invalid accounting period status.")
+
+    period = AccountingPeriod.objects.select_for_update().get(pk=period_id)
+    updated = period.status != normalized_status
+    period.status = normalized_status
+    period.lock_reason = (reason or "").strip()
+    if normalized_status == AccountingPeriodStatus.OPEN:
+        period.is_locked = False
+        period.locked_at = None
+        period.locked_by = None
+    else:
+        period.is_locked = True
+        if period.locked_at is None:
+            period.locked_at = timezone.now()
+        period.locked_by = performed_by
+    period.save(
+        update_fields=[
+            "status",
+            "is_locked",
+            "locked_at",
+            "locked_by",
+            "lock_reason",
+            "updated_at",
+        ]
+    )
+
+    log_audit(
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        instance=period,
+        performed_by=performed_by,
+        metadata={
+            "event": "ACCOUNTING_PERIOD_STATUS_CHANGED",
+            "period_id": period.id,
+            "period_code": period.code,
+            "status": period.status,
+            "reason": period.lock_reason,
+        },
+    )
+    return period, updated
+
+
 def assert_accounting_period_open(*, reference_date: date, performed_by=None, instance=None, event: str | None = None) -> AccountingPeriod:
-    period = ensure_accounting_period(reference_date)
+    period = validate_posting_date(reference_date)
     posting_lock = PostingLock.objects.filter(lock_date=reference_date).first()
     if posting_lock is not None:
         if instance is not None:
@@ -61,75 +257,27 @@ def assert_accounting_period_open(*, reference_date: date, performed_by=None, in
                 },
             )
         raise ValueError(f"Accounting posting lock exists for {reference_date.isoformat()}.")
-
-    if not period.is_locked:
-        return period
-
-    if instance is not None:
-        log_audit(
-            action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
-            instance=instance,
-            performed_by=performed_by,
-            metadata={
-                "event": event or "ACCOUNTING_PERIOD_LOCKED_BLOCK",
-                "period_id": period.id,
-                "period_code": period.code,
-                "reference_date": reference_date.isoformat(),
-            },
-        )
-    raise ValueError(f"Accounting period {period.code} is locked.")
+    return period
 
 
 @transaction.atomic
 def lock_accounting_period(*, period_id: int, performed_by, reason: str = "") -> tuple[AccountingPeriod, bool]:
-    period = AccountingPeriod.objects.select_for_update().get(pk=period_id)
-    if period.is_locked:
-        return period, False
-
-    period.is_locked = True
-    period.locked_at = timezone.now()
-    period.locked_by = performed_by
-    period.lock_reason = (reason or "").strip()
-    period.save(update_fields=["is_locked", "locked_at", "locked_by", "lock_reason", "updated_at"])
-
-    log_audit(
-        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
-        instance=period,
+    return set_accounting_period_status(
+        period_id=period_id,
+        status=AccountingPeriodStatus.LOCKED,
         performed_by=performed_by,
-        metadata={
-            "event": "ACCOUNTING_PERIOD_LOCKED",
-            "period_id": period.id,
-            "period_code": period.code,
-            "lock_reason": period.lock_reason,
-        },
+        reason=reason,
     )
-    return period, True
 
 
 @transaction.atomic
 def unlock_accounting_period(*, period_id: int, performed_by, reason: str = "") -> tuple[AccountingPeriod, bool]:
-    period = AccountingPeriod.objects.select_for_update().get(pk=period_id)
-    if not period.is_locked:
-        return period, False
-
-    period.is_locked = False
-    period.locked_at = None
-    period.locked_by = None
-    period.lock_reason = (reason or "").strip()
-    period.save(update_fields=["is_locked", "locked_at", "locked_by", "lock_reason", "updated_at"])
-
-    log_audit(
-        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
-        instance=period,
+    return set_accounting_period_status(
+        period_id=period_id,
+        status=AccountingPeriodStatus.OPEN,
         performed_by=performed_by,
-        metadata={
-            "event": "ACCOUNTING_PERIOD_UNLOCKED",
-            "period_id": period.id,
-            "period_code": period.code,
-            "unlock_reason": period.lock_reason,
-        },
+        reason=reason,
     )
-    return period, True
 
 
 @transaction.atomic

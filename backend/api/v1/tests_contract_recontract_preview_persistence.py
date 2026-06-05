@@ -210,7 +210,7 @@ class ContractRecontractPreviewPersistenceTests(TestCase):
         missing_response = self.post_save(missing_target)
 
         self.assertEqual(unsupported_response.status_code, 400, unsupported_response.data)
-        self.assertIn("product_change", str(unsupported_response.data).lower())
+        self.assertIn("product change/upgrade", str(unsupported_response.data).lower())
         self.assertEqual(missing_response.status_code, 400, missing_response.data)
         self.assertIn("approved_product_id", str(missing_response.data).lower())
         self.assertFalse(ContractRecontractEvent.objects.exists())
