@@ -13,8 +13,6 @@ const STAFF_NAV = [
   { href: ROUTES.staff.attendance, label: "Attendance" },
   { href: ROUTES.staff.payslips, label: "Payslips" },
   { href: ROUTES.staff.salary, label: "Salary Summary" },
-  { href: ROUTES.staff.reports, label: "My Reports" },
-  { href: ROUTES.staff.tasks, label: "Assigned Work" },
 ];
 
 function isActive(pathname: string, href: string): boolean {

@@ -308,6 +308,15 @@ export const ROUTES = {
     notifications: "/cashier/notifications",
   },
 
+  staff: {
+    root: "/staff",
+    dashboard: "/staff",
+    profile: "/staff/profile",
+    attendance: "/staff/attendance",
+    payslips: "/staff/payslips",
+    salary: "/staff/salary",
+  },
+
   vendor: {
     root: "/vendor",
     dashboard: "/vendor",

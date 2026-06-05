@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import ActionButton from "@/components/ui/ActionButton";
 
@@ -18,7 +18,7 @@ export default function StaffDataPage<T>({ title, description, load, render, emp
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -28,11 +28,11 @@ export default function StaffDataPage<T>({ title, description, load, render, emp
     } finally {
       setLoading(false);
     }
-  }
+  }, [load]);
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [refresh]);
 
   const isEmpty = data ? Boolean(empty?.(data)) : false;
 
