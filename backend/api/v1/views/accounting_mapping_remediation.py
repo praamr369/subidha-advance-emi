@@ -10,6 +10,7 @@ from accounting.services.accounting_mapping_remediation_service import (
     apply_mapping,
     build_mapping_remediation_summary,
     create_missing_mapped_account,
+    seed_supported_defaults,
 )
 
 
@@ -53,6 +54,12 @@ class AccountingMappingRemediationApplyView(_AdminAccountingMappingRemediationBa
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class AccountingMappingRemediationSeedSupportedDefaultsView(_AdminAccountingMappingRemediationBase):
+    def post(self, request):
+        payload = seed_supported_defaults(actor=request.user)
         return Response(payload, status=status.HTTP_200_OK)
 
 
