@@ -36,6 +36,7 @@ export type ProductRecord = {
   missing_fields?: string[];
   next_actions?: string[];
   created_at?: string;
+  updated_at?: string;
 };
 
 export type ProductListParams = {
@@ -43,7 +44,42 @@ export type ProductListParams = {
   category?: string;
   subcategory?: string;
   unit_of_measure?: string;
-  is_active?: boolean;
+  is_active?: boolean | string;
+  active?: string;
+  inventory?: string;
+  image_status?: string;
+  capability?: string;
+  readiness?: string;
+  page?: number;
+  page_size?: number;
+};
+
+export type ProductRegisterSummary = {
+  total_products: number;
+  inventory_ready: number;
+  stock_profile_pending: number;
+  subscription_ready: number;
+  direct_sale_ready: number;
+  rent_lease_ready: number;
+  image_missing: number;
+  catalog_cleanup_required: number;
+  total_base_value: string;
+};
+
+export type ProductRegisterPage = {
+  count: number;
+  total_count: number;
+  catalog_total_count: number;
+  page: number;
+  page_size: number;
+  page_size_options: number[];
+  num_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+  range_start: number;
+  range_end: number;
+  summary: ProductRegisterSummary;
+  results: ProductRecord[];
 };
 
 export type ProductCatalogOptions = {
@@ -136,13 +172,43 @@ function normalizeProductRecord(product: ProductRecord): ProductRecord {
 function buildQuery(params?: ProductListParams): string {
   if (!params) return "";
   const search = new URLSearchParams();
-  if (params.q) search.set("q", params.q);
-  if (params.category) search.set("category", params.category);
-  if (params.subcategory) search.set("subcategory", params.subcategory);
-  if (params.unit_of_measure) search.set("unit_of_measure", params.unit_of_measure);
-  if (typeof params.is_active === "boolean") search.set("is_active", String(params.is_active));
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      search.set(key, String(value).trim());
+    }
+  }
   const query = search.toString();
   return query ? `?${query}` : "";
+}
+
+export async function listProductRegister(params?: ProductListParams): Promise<ProductRegisterPage> {
+  const payload = await request<ProductRegisterPage>(`/admin/products/register/${buildQuery(params)}`);
+  return {
+    ...payload,
+    count: Number(payload.count || 0),
+    total_count: Number(payload.total_count ?? payload.count ?? 0),
+    catalog_total_count: Number(payload.catalog_total_count ?? payload.count ?? 0),
+    page: Number(payload.page || params?.page || 1),
+    page_size: Number(payload.page_size || params?.page_size || 50),
+    page_size_options: payload.page_size_options || [20, 50, 100],
+    num_pages: Number(payload.num_pages || 0),
+    has_next: Boolean(payload.has_next),
+    has_previous: Boolean(payload.has_previous),
+    range_start: Number(payload.range_start || 0),
+    range_end: Number(payload.range_end || 0),
+    summary: payload.summary || {
+      total_products: Number(payload.count || 0),
+      inventory_ready: 0,
+      stock_profile_pending: 0,
+      subscription_ready: 0,
+      direct_sale_ready: 0,
+      rent_lease_ready: 0,
+      image_missing: 0,
+      catalog_cleanup_required: 0,
+      total_base_value: "0.00",
+    },
+    results: (payload.results || []).map((product) => normalizeProductRecord(product)),
+  };
 }
 
 export async function listProducts(params?: ProductListParams): Promise<ProductRecord[]> {
