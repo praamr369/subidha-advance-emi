@@ -11,12 +11,14 @@ from api.v1.views.accounting_mapping_remediation import (
 )
 from api.v1.views.accounting_year_end_close import AccountingYearEndCloseView, AccountingYearEndReadinessView
 from api.v1.views.admin_product_inventory_profile import AdminProductInventoryProfilePrepareView
+from api.v1.views.admin_product_register import AdminProductRegisterView
 
 urlpatterns = [
     path("health/", PublicApiHealthView.as_view()),
     path("health/deep/", PublicApiDeepHealthView.as_view()),
     path("auth/", include("api.v1.routes.auth")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
+    path("admin/products/register/", AdminProductRegisterView.as_view()),
     path("admin/products/<int:pk>/prepare-inventory-profile/", AdminProductInventoryProfilePrepareView.as_view()),
     path("admin/accounting/mapping-remediation/", AccountingMappingRemediationView.as_view()),
     path("admin/accounting/mapping-remediation/create-account/", AccountingMappingRemediationCreateAccountView.as_view()),
