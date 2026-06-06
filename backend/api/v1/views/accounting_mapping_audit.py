@@ -100,11 +100,16 @@ def _status_from_bridge(row: dict[str, Any] | None) -> str:
     status_value = str(row.get("status") or "NOT_CONFIGURED").upper()
     if status_value == "READY":
         return "READY"
-    if status_value == "WARNING" or status_value == "NOT_CONFIGURED":
+    if status_value in {"WARNING", "NOT_CONFIGURED"}:
         return "MISSING_MAPPING"
     if status_value == "ERROR":
         return "CONFLICT"
     return status_value
+
+
+def _first_reason(bridge: dict[str, Any] | None) -> str | None:
+    reasons = (bridge or {}).get("blocking_reasons") or []
+    return str(reasons[0]) if reasons else None
 
 
 def _audit_row(event_key: str, period: dict[str, Any], bridge: dict[str, Any] | None, remediation: dict[str, Any] | None) -> dict[str, Any]:
@@ -113,11 +118,12 @@ def _audit_row(event_key: str, period: dict[str, Any], bridge: dict[str, Any] | 
     blocker_reason = (
         "StaffAdvance has no real source workflow. Keep it unsupported and non-postable."
         if event_key == "staff_advance"
-        else (bridge or {}).get("blocking_reasons", [None])[0]
+        else _first_reason(bridge)
         or (remediation or {}).get("reason")
         or (bridge or {}).get("operator_action")
         or "Ready."
     )
+    final_status = status_value if status_value != "READY" else ("BLOCKED_BY_PERIOD" if not period.get("accounting_period_ready") else "BLOCKED_BY_NUMBERING" if not period.get("journal_numbering_ready") else "READY")
     return {
         "event_key": event_key,
         "event_label": label,
@@ -133,12 +139,12 @@ def _audit_row(event_key: str, period: dict[str, Any], bridge: dict[str, Any] | 
         "credit_account_code": ((bridge or {}).get("credit_requirements") or [None])[0],
         "debit_account_type": None,
         "credit_account_type": None,
-        "debit_mapping_status": status_value if status_value != "READY" else "READY",
-        "credit_mapping_status": status_value if status_value != "READY" else "READY",
+        "debit_mapping_status": "READY" if status_value == "READY" else status_value,
+        "credit_mapping_status": "READY" if status_value == "READY" else status_value,
         "finance_account_status": "READY" if (bridge or {}).get("finance_accounts") or status_value == "READY" else "MISSING_MAPPING",
         "period_readiness": "READY" if period.get("accounting_period_ready") else "BLOCKED_BY_PERIOD",
         "numbering_readiness": "READY" if period.get("journal_numbering_ready") else "BLOCKED_BY_NUMBERING",
-        "status": status_value if status_value != "READY" else ("BLOCKED_BY_PERIOD" if not period.get("accounting_period_ready") else "BLOCKED_BY_NUMBERING" if not period.get("journal_numbering_ready") else "READY"),
+        "status": final_status,
         "bridge_status": (bridge or {}).get("status"),
         "can_seed": event_key != "staff_advance" and status_value != "READY",
         "can_apply_mapping": bool((remediation or {}).get("can_apply_mapping") or (remediation or {}).get("can_map_account")),
@@ -162,30 +168,7 @@ def build_mapping_audit_payload(*, read_only: bool = True) -> dict[str, Any]:
     unsupported = [row for row in rows if not row["supported"]]
     blocked_period = [row for row in rows if row["status"] == "BLOCKED_BY_PERIOD"]
     blocked_numbering = [row for row in rows if row["status"] == "BLOCKED_BY_NUMBERING"]
-    return {
-        "generated_at": period.get("reference_date"),
-        "read_only": read_only,
-        "journal_entries_created": 0,
-        "document_sequences_allocated": 0,
-        "period_readiness": period,
-        "year_end_impact": "BLOCKED" if len(ready) != len(rows) else "READY",
-        "bridge_impact": "BLOCKED" if len(ready) != len(rows) else "READY",
-        "summary": {
-            "total_events": len(rows),
-            "ready": len(ready),
-            "missing_mapping": len(missing),
-            "conflicts": len(conflicts),
-            "unsupported": len(unsupported),
-            "blocked_by_period": len(blocked_period),
-            "blocked_by_numbering": len(blocked_numbering),
-        },
-        "events": rows,
-        "ready_mappings": ready,
-        "missing_mappings": missing,
-        "conflicts": conflicts,
-        "unsupported_events": unsupported,
-        "setup_blockers": [row for row in rows if row["status"] != "READY"],
-    }
+    return {"generated_at": period.get("reference_date"), "read_only": read_only, "journal_entries_created": 0, "document_sequences_allocated": 0, "period_readiness": period, "year_end_impact": "BLOCKED" if len(ready) != len(rows) else "READY", "bridge_impact": "BLOCKED" if len(ready) != len(rows) else "READY", "summary": {"total_events": len(rows), "ready": len(ready), "missing_mapping": len(missing), "conflicts": len(conflicts), "unsupported": len(unsupported), "blocked_by_period": len(blocked_period), "blocked_by_numbering": len(blocked_numbering)}, "events": rows, "ready_mappings": ready, "missing_mappings": missing, "conflicts": conflicts, "unsupported_events": unsupported, "setup_blockers": [row for row in rows if row["status"] != "READY"]}
 
 
 class AccountingMappingAuditView(APIView):
@@ -204,13 +187,7 @@ class AccountingMappingAuditSeedDefaultsView(APIView):
         before = build_mapping_audit_payload(read_only=True)
         result = seed_supported_defaults(actor=request.user)
         after = build_mapping_audit_payload(read_only=False)
-        return Response({
-            "before": before,
-            "after": after,
-            "remediation": result,
-            "journal_entries_created": JournalEntry.objects.count() - journal_before,
-            "document_sequences_allocated": DocumentSequence.objects.count() - sequence_before,
-        }, status=status.HTTP_200_OK)
+        return Response({"before": before, "after": after, "remediation": result, "journal_entries_created": JournalEntry.objects.count() - journal_before, "document_sequences_allocated": DocumentSequence.objects.count() - sequence_before}, status=status.HTTP_200_OK)
 
 
 class AccountingMappingAuditFixEventView(APIView):
