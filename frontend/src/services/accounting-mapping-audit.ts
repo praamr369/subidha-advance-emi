@@ -57,12 +57,19 @@ export type AccountingMappingAuditPayload = {
   setup_blockers: AccountingMappingAuditRow[];
 };
 
+export type AccountingMappingAuditSeedResponse = {
+  before: AccountingMappingAuditPayload;
+  after: AccountingMappingAuditPayload;
+  journal_entries_created: number;
+  document_sequences_allocated: number;
+};
+
 export async function getAccountingMappingAudit(): Promise<AccountingMappingAuditPayload> {
   return request<AccountingMappingAuditPayload>("/admin/accounting/mapping-audit/");
 }
 
-export async function seedAccountingMappingSafeDefaults(): Promise<{ before: AccountingMappingAuditPayload; after: AccountingMappingAuditPayload; journal_entries_created: number; document_sequences_allocated: number }> {
-  return request("/admin/accounting/mapping-audit/seed-safe-defaults/", {
+export async function seedAccountingMappingSafeDefaults(): Promise<AccountingMappingAuditSeedResponse> {
+  return request<AccountingMappingAuditSeedResponse>("/admin/accounting/mapping-audit/seed-safe-defaults/", {
     method: "POST",
     body: JSON.stringify({}),
     retryCount: 0,
