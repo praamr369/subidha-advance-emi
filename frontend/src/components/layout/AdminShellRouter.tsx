@@ -19,7 +19,7 @@ export default function AdminShellRouter({ children }: { children: ReactNode }) 
 
   return (
     <RoleGuard allowedRoles={["ADMIN"]}>
-      <DashboardShell>{children}</DashboardShell>
+      <DashboardShell forcedRole="ADMIN">{children}</DashboardShell>
     </RoleGuard>
   );
 }
