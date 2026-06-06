@@ -4,12 +4,14 @@ from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
 from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
 from api.v1.views.accounting_bridge_reconciliation import AccountingBridgeReconciliationView
 from api.v1.views.accounting_year_end_close import AccountingYearEndCloseView, AccountingYearEndReadinessView
+from api.v1.views.admin_product_inventory_profile import AdminProductInventoryProfilePrepareView
 
 urlpatterns = [
     path("health/", PublicApiHealthView.as_view()),
     path("health/deep/", PublicApiDeepHealthView.as_view()),
     path("auth/", include("api.v1.routes.auth")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
+    path("admin/products/<int:pk>/prepare-inventory-profile/", AdminProductInventoryProfilePrepareView.as_view()),
     path("admin/", include("api.v1.routes.admin_accounting_bridge_readiness")),
     path("admin/", include("api.v1.routes.admin_rent_lease_accounting_bridge")),
     path("admin/", include("api.v1.routes.contract_amendments_admin")),
