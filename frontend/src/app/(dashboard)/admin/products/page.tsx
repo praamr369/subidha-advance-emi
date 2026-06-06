@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Download, RefreshCw, Search } from "lucide-react";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
@@ -97,7 +97,7 @@ export default function AdminProductsPage() {
   const rows = payload.results;
   const summary = payload.summary;
 
-  async function loadPage(mode: "initial" | "refresh" = "initial") {
+  const loadPage = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
     try {
@@ -122,11 +122,11 @@ export default function AdminProductsPage() {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
     }
-  }
+  }, [filters, page, pageSize]);
 
   useEffect(() => {
     void loadPage("initial");
-  }, [filters, page, pageSize]);
+  }, [loadPage]);
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

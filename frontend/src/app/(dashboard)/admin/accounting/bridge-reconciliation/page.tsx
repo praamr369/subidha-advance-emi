@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import ErrorState from "@/components/feedback/ErrorState";
@@ -87,7 +87,7 @@ export default function AccountingBridgeReconciliationPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  async function load(nextFilters = filters, opts: { silent?: boolean } = {}) {
+  const load = useCallback(async (nextFilters: AccountingBridgeReconciliationFilters = {}, opts: { silent?: boolean } = {}) => {
     if (opts.silent) setRefreshing(true);
     else setLoading(true);
     setError(null);
@@ -101,14 +101,14 @@ export default function AccountingBridgeReconciliationPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     const initial = filtersFromLocation();
     setFilters(initial);
     setDraftFilters(initial);
     void load(initial);
-  }, []);
+  }, [load]);
 
   const remediationByEvent = useMemo(() => {
     const map = new Map<string, AccountingMappingRemediationRow>();

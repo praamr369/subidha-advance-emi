@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -14,6 +15,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DataTableShell } from "@/components/ui/operations";
 import { toArray } from "@/lib/api";
+import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getProduct, type ProductRecord } from "@/services/products";
 import { request } from "@/services/api";
 
@@ -157,7 +159,7 @@ export default function AdminProductDetailPage() {
 
               <ERPSectionShell title="Image/catalog readiness" description="Catalog completeness for public/product discovery and daily shop lookup.">
                 {product.image ? (
-                  <div className="overflow-hidden rounded-2xl border border-border bg-background"><img src={product.image} alt={product.name} className="h-72 w-full object-cover" /></div>
+                  <div className="relative h-72 overflow-hidden rounded-2xl border border-border bg-background"><Image src={product.image} alt={product.name} fill sizes="(min-width: 1280px) 50vw, 100vw" className="object-cover" unoptimized={shouldBypassNextImageOptimization(product.image)} /></div>
                 ) : (
                   <ERPEmptyState title="No product image" description="Use quick action or full edit to attach a product image for catalog completeness." action={<Link href={`/admin/products/${product.id}/edit#image`} className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground">Upload Image</Link>} />
                 )}

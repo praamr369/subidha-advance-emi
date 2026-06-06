@@ -104,14 +104,14 @@ export default function AccountingMappingAuditPage() {
     }
   }
 
-  const rows = payload?.events ?? [];
   const unsupported = payload?.unsupported_events ?? [];
   const conflicts = payload?.conflicts ?? [];
   const grouped = useMemo(() => {
+    const rows = payload?.events ?? [];
     const map = new Map<string, AccountingMappingAuditRow[]>();
     for (const row of rows) map.set(row.module, [...(map.get(row.module) ?? []), row]);
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [rows]);
+  }, [payload?.events]);
 
   if (loading) return <PortalPage title="Accounting Mapping Cockpit" subtitle="Full setup verification for accounting mappings."><LoadingBlock label="Loading mapping audit..." /></PortalPage>;
 

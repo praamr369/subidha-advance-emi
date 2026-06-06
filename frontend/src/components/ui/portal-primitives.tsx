@@ -3,9 +3,10 @@ import { Inbox, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export function PageSection({ children, className }: { children: ReactNode; className?: string }) {
+export function PageSection({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
   return (
     <section
+      id={id}
       className={cn(
         "workspace-section-shell surface-panel-elevated rounded-[1.6rem] p-4 sm:p-5",
         className

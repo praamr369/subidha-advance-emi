@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
@@ -11,6 +12,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
+import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getProduct, getProductCatalogOptions, updateProduct, type ProductCatalogOptions, type ProductRecord } from "@/services/products";
 
 function money(value: string | number | null | undefined): string {
@@ -23,10 +25,6 @@ function fieldClass() {
 
 function areaClass() {
   return "mt-1 min-h-28 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-ring";
-}
-
-function toBool(value: unknown, fallback = false) {
-  return typeof value === "boolean" ? value : fallback;
 }
 
 function safePlan(value: unknown): "EMI" | "RENT" | "LEASE" {
@@ -43,7 +41,6 @@ function check(label: string, ok: boolean) {
 
 export default function AdminProductEditPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const productId = params?.id;
   const [product, setProduct] = useState<ProductRecord | null>(null);
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>({ categories: [], subcategories: [], unit_of_measure_masters: [], unit_of_measure_options: ["PCS"] });
@@ -244,7 +241,7 @@ export default function AdminProductEditPage() {
               <ERPSectionShell title="Image" description="Single image used for catalog completeness and daily product lookup." id="image">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-3"><input type="file" accept="image/*" onChange={onImageChange} className={fieldClass()} /><label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Remove existing image<input type="checkbox" checked={clearImage} onChange={(event) => { setClearImage(event.target.checked); if (event.target.checked) setImageFile(null); }} /></label></div>
-                  <div className="overflow-hidden rounded-2xl border border-border bg-muted/30">{imagePreview || (product.image && !clearImage) ? <img src={imagePreview || product.image || ""} alt={name} className="h-56 w-full object-cover" /> : <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">No image selected</div>}</div>
+                  <div className="relative h-56 overflow-hidden rounded-2xl border border-border bg-muted/30">{imagePreview || (product.image && !clearImage) ? <Image src={imagePreview || product.image || ""} alt={name} fill sizes="(min-width: 1280px) 360px, (min-width: 768px) 50vw, 100vw" className="object-cover" unoptimized={Boolean(imagePreview) || shouldBypassNextImageOptimization(product.image)} /> : <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">No image selected</div>}</div>
                 </div>
               </ERPSectionShell>
             </div>

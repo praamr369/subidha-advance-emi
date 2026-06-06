@@ -6,6 +6,7 @@ import { PageSection, SectionHeader } from "@/components/ui/portal-primitives";
 import { cn } from "@/lib/utils";
 
 type ERPSectionShellProps = {
+  id?: string;
   title?: string;
   description?: string;
   actions?: ReactNode;
@@ -15,6 +16,7 @@ type ERPSectionShellProps = {
 };
 
 export default function ERPSectionShell({
+  id,
   title,
   description,
   actions,
@@ -25,7 +27,7 @@ export default function ERPSectionShell({
   const showHeader = Boolean(title || description || actions);
 
   return (
-    <PageSection className={cn("relative", className)}>
+    <PageSection id={id} className={cn("relative", className)}>
       {showHeader ? (
         <SectionHeader title={title ?? "Section"} description={description} actions={actions} />
       ) : null}
@@ -34,4 +36,3 @@ export default function ERPSectionShell({
     </PageSection>
   );
 }
-
