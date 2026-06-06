@@ -7,6 +7,7 @@ from api.v1.views.accounting_mapping_remediation import (
     AccountingMappingRemediationAcknowledgeView,
     AccountingMappingRemediationApplyView,
     AccountingMappingRemediationCreateAccountView,
+    AccountingMappingRemediationSeedSupportedDefaultsView,
     AccountingMappingRemediationView,
 )
 from api.v1.views.accounting_year_end_close import AccountingYearEndCloseView, AccountingYearEndReadinessView
@@ -23,6 +24,7 @@ urlpatterns = [
     path("admin/accounting/mapping-remediation/", AccountingMappingRemediationView.as_view()),
     path("admin/accounting/mapping-remediation/create-account/", AccountingMappingRemediationCreateAccountView.as_view()),
     path("admin/accounting/mapping-remediation/apply/", AccountingMappingRemediationApplyView.as_view()),
+    path("admin/accounting/mapping-remediation/seed-supported-defaults/", AccountingMappingRemediationSeedSupportedDefaultsView.as_view()),
     path("admin/accounting/mapping-remediation/acknowledge/", AccountingMappingRemediationAcknowledgeView.as_view()),
     path("admin/", include("api.v1.routes.admin_accounting_bridge_readiness")),
     path("admin/", include("api.v1.routes.admin_rent_lease_accounting_bridge")),
@@ -54,5 +56,4 @@ urlpatterns = [
     path("notifications/", include("api.v1.routes.notifications")),
     path("public/", include("api.v1.routes.public")),
     path("executive/", include("api.v1.routes.executive")),
-    path("winner/", include("api.v1.route_modules.winner_urls")),
 ]
