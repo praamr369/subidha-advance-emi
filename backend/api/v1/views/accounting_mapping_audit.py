@@ -95,6 +95,77 @@ def _remediation_rows_by_key() -> dict[str, dict[str, Any]]:
     return rows
 
 
+def _missing_fields(postability: dict[str, Any], bridge: dict[str, Any] | None) -> list[str]:
+    missing: list[str] = []
+    debit_requirements = (bridge or {}).get("debit_requirements") or []
+    credit_requirements = (bridge or {}).get("credit_requirements") or []
+    if not postability.get("mapping_ready"):
+        if not debit_requirements:
+            missing.append("debit_account")
+        if not credit_requirements:
+            missing.append("credit_account")
+    if not postability.get("finance_account_ready"):
+        missing.append("finance_account")
+    if not postability.get("active_financial_year_ready"):
+        missing.append("active_financial_year")
+    if not postability.get("accounting_period_ready"):
+        missing.append("accounting_period")
+    if not postability.get("journal_numbering_ready"):
+        missing.append("journal_numbering")
+    if not postability.get("approval_ready"):
+        missing.append("posting_approval")
+    return missing
+
+
+def _blocker_category(status_value: str, blocker_code: str | None) -> str:
+    if blocker_code == "UNSUPPORTED_SOURCE" or status_value == "UNSUPPORTED_SOURCE":
+        return "unsupported_source"
+    if status_value == "BLOCKED_BY_MAPPING":
+        return "mapping"
+    if status_value == "BLOCKED_BY_PERIOD":
+        return "period"
+    if status_value == "BLOCKED_BY_NUMBERING":
+        return "numbering"
+    if status_value == "BLOCKED_BY_APPROVAL":
+        return "approval"
+    if status_value in {"READY", "POSTABLE", "READY_UNPOSTED", "POSTED", "RECONCILED"}:
+        return "ready"
+    return "setup"
+
+
+def _severity(status_value: str, blocker_code: str | None) -> str:
+    if status_value in {"READY", "POSTABLE", "READY_UNPOSTED", "POSTED", "RECONCILED"}:
+        return "READY"
+    if blocker_code == "UNSUPPORTED_SOURCE" or status_value == "UNSUPPORTED_SOURCE":
+        return "UNSUPPORTED"
+    if status_value in {"BLOCKED_BY_MAPPING", "BLOCKED_BY_PERIOD", "BLOCKED_BY_NUMBERING", "BLOCKED_BY_APPROVAL"}:
+        return "BLOCKED"
+    return "WARNING"
+
+
+def _remediation_route(category: str, postability: dict[str, Any]) -> str:
+    if category == "numbering":
+        return "/admin/settings/business-setup/document-numbering"
+    if category == "period":
+        return "/admin/accounting/periods"
+    if category == "approval":
+        return "/admin/accounting/bridges"
+    if category == "unsupported_source":
+        return "/admin/accounting/setup/mapping-audit"
+    return postability.get("setup_href") or "/admin/accounting/setup"
+
+
+def _remediation_label(category: str) -> str:
+    return {
+        "mapping": "Open accounting setup",
+        "period": "Open periods",
+        "numbering": "Open document numbering",
+        "approval": "Open bridge approval",
+        "unsupported_source": "Keep unsupported",
+        "ready": "Ready",
+    }.get(category, "Open setup")
+
+
 def _audit_row(event_key: str, period: dict[str, Any], bridge: dict[str, Any] | None, remediation: dict[str, Any] | None) -> dict[str, Any]:
     label, module, source_model = REQUIRED_EVENTS[event_key]
     postability = evaluate_accounting_postability(
@@ -107,6 +178,9 @@ def _audit_row(event_key: str, period: dict[str, Any], bridge: dict[str, Any] | 
         source_workflow_exists=event_key != "staff_advance" and bridge is not None,
     )
     mapping_status = "READY" if postability["mapping_ready"] else "BLOCKED_BY_MAPPING"
+    status_value = str(postability["status"])
+    category = _blocker_category(status_value, postability.get("blocker_code"))
+    severity = _severity(status_value, postability.get("blocker_code"))
     return {
         **postability,
         "label": label,
@@ -127,6 +201,13 @@ def _audit_row(event_key: str, period: dict[str, Any], bridge: dict[str, Any] | 
         "can_seed": event_key != "staff_advance" and postability["status"] in {"BLOCKED_BY_MAPPING", "BLOCKED_BY_PERIOD", "BLOCKED_BY_NUMBERING"},
         "can_apply_mapping": bool((remediation or {}).get("can_apply_mapping") or (remediation or {}).get("can_map_account")),
         "can_post": False,
+        "severity": severity,
+        "blocker_category": category,
+        "remediation_label": _remediation_label(category),
+        "remediation_route": _remediation_route(category, postability),
+        "missing_fields": _missing_fields(postability, bridge),
+        "is_close_blocker": severity in {"BLOCKED", "UNSUPPORTED"},
+        "is_posting_blocker": status_value not in {"READY", "POSTABLE", "READY_UNPOSTED", "POSTED", "RECONCILED"},
         "details": {"bridge": bridge or {}, "remediation": remediation or {}, "postability": postability},
     }
 

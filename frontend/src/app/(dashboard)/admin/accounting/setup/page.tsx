@@ -71,6 +71,17 @@ function setupFlagLabel(value: boolean | undefined): string {
   return value ? "Ready" : "Not ready";
 }
 
+function healthStatusClass(ready: boolean | undefined): string {
+  if (ready === true) return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (ready === false) return "border-red-200 bg-red-50 text-red-900";
+  return "border-amber-200 bg-amber-50 text-amber-950";
+}
+
+function profileMatches(item: PostingProfileReadinessItem, keys: string[]) {
+  const text = `${item.key} ${item.label}`.toLowerCase();
+  return keys.some((key) => text.includes(key.toLowerCase()));
+}
+
 function issueLevel(issue: unknown): string {
   if (issue && typeof issue === "object" && "level" in issue) {
     return String((issue as { level?: unknown }).level ?? "WARNING").toUpperCase();
@@ -268,6 +279,72 @@ export default function AdminAccountingSetupPage() {
   const healthInfos = health?.infos ?? (health?.issues ?? []).filter((issue) => issueLevel(issue) === "INFO") as AccountingSetupHealthIssue[];
   const warnings = (health?.warnings ?? []).filter((issue) => issueLevel(issue) !== "INFO");
   const displayStatus = health?.status ?? (matrix ? "READY" : "BLOCKED");
+  const setupHealth = [
+    {
+      label: "Ready for collection",
+      ready: businessFinanceAccounts.some((account) => isSelectable(account)),
+      detail: `${businessFinanceAccounts.filter((account) => isSelectable(account)).length} selectable money account(s)`,
+    },
+    {
+      label: "Ready for posting",
+      ready: postingProfileReadiness.length > 0 && postingProfileReadiness.every((item) => item.status === "READY" || item.status === "DEFERRED"),
+      detail: `${postingProfileReadiness.filter((item) => item.status !== "READY" && item.status !== "DEFERRED").length} posting profile blocker(s)`,
+    },
+    {
+      label: "Ready for reconciliation",
+      ready: bridgeMappingReady,
+      detail: bridgeReadiness?.operator_action || bridgeReadiness?.reason || "Reconciliation mapping readiness is not exposed.",
+    },
+    {
+      label: "Ready for period close",
+      ready: displayStatus === "READY" && bridgeReadiness?.posting_controls_ready !== false,
+      detail: displayStatus === "READY" ? "Setup health is ready." : "Resolve setup blockers before close.",
+    },
+  ];
+  const guidedSections = [
+    {
+      title: "Money accounts",
+      explanation: "Cash, bank, and UPI accounts are where staff receive or pay real money.",
+      required: ["Cash Counter", "Bank Account", "UPI Account"],
+      accounts: businessFinanceAccounts.filter((account) => ["CASH", "BANK", "UPI"].includes(String(account.kind).toUpperCase())),
+      profiles: [],
+    },
+    {
+      title: "Liability accounts",
+      explanation: "Customer advance, security deposit, and refund payable balances must remain separate from income.",
+      required: ["Customer Advance", "Security Deposit", "Refund Payable"],
+      accounts: [],
+      profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["advance", "security_deposit", "refund"])),
+    },
+    {
+      title: "Income accounts",
+      explanation: "EMI, rent, lease, and direct sale income mappings affect future postings only.",
+      required: ["EMI Collection", "Rent Income", "Lease Income", "Direct Sale Income"],
+      accounts: [],
+      profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["emi", "rent_lease", "direct_sale"])),
+    },
+    {
+      title: "Inventory/COGS",
+      explanation: "Inventory asset, COGS, stock adjustment, and purchase clearing keep stock value auditable.",
+      required: ["Inventory Asset", "COGS", "Stock Adjustment", "Purchase Clearing"],
+      accounts: [],
+      profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["inventory", "purchase"])),
+    },
+    {
+      title: "Commission/payout",
+      explanation: "Commission expense and partner payable mappings keep payout liability traceable.",
+      required: ["Commission Expense", "Partner Payable"],
+      accounts: [],
+      profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["commission", "payout"])),
+    },
+    {
+      title: "Reconciliation clearing",
+      explanation: "Bank, UPI, and suspense clearing accounts help isolate settlement and exception differences.",
+      required: ["Bank clearing", "UPI clearing", "Suspense/exception clearing"],
+      accounts: businessFinanceAccounts.filter((account) => ["BANK", "UPI"].includes(String(account.kind).toUpperCase())),
+      profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["reconciliation", "clearing"])),
+    },
+  ];
 
   const previewDefaults = useCallback(async () => {
     setPreviewing(true);
@@ -490,6 +567,85 @@ export default function AdminAccountingSetupPage() {
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Setup health</div>
+              <h2 className="mt-1 text-lg font-semibold text-foreground">Future postings use these mappings</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Changing mappings affects future postings only. Existing payments, receipts, journals, reconciliations, and document numbers are not rewritten from this page.</p>
+            </div>
+            <span className={cx("rounded-full border px-3 py-1 text-xs font-semibold", statusClass(displayStatus))}>{displayStatus}</span>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            {setupHealth.map((item) => (
+              <div key={item.label} className={cx("rounded-xl border p-3 text-sm", healthStatusClass(item.ready))}>
+                <div className="font-semibold">{item.label}</div>
+                <div className="mt-1 text-xs opacity-85">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Guided setup</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Review each required business bucket, then use the existing mapping editor below for explicit changes.</p>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {guidedSections.map((section) => {
+              const rows = [
+                ...section.accounts.map((account) => ({
+                  key: `account-${account.id}`,
+                  label: account.name,
+                  status: isSelectable(account) ? "READY" : "BLOCKED",
+                  linked: accountLabel(account.mapped_chart_account),
+                  action: account.collection_blocker_reason || account.blocker_reason || account.recommended_action || "Mapped and selectable.",
+                })),
+                ...section.profiles.map((profile) => ({
+                  key: `profile-${profile.key}`,
+                  label: profile.label,
+                  status: profile.status,
+                  linked: [
+                    ...profile.configured_debit_account.map(accountLabel),
+                    ...profile.configured_credit_account.map(accountLabel),
+                  ].join(", ") || "Not configured",
+                  action: firstBlocker(profile),
+                })),
+              ];
+              const sectionReady = rows.length > 0 && rows.every((row) => row.status === "READY" || row.status === "DEFERRED");
+              const sectionMissing = rows.length === 0 || rows.some((row) => row.status === "BLOCKED");
+              return (
+                <article key={section.title} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">{section.title}</h3>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{section.explanation}</p>
+                    </div>
+                    <span className={cx("rounded-full border px-2.5 py-1 text-[11px] font-semibold", sectionReady ? statusClass("READY") : sectionMissing ? statusClass("BLOCKED") : statusClass("WARNING"))}>{sectionReady ? "Ready" : sectionMissing ? "Missing" : "Warning"}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {section.required.map((item) => <span key={item} className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">{item}</span>)}
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {rows.length ? rows.map((row) => (
+                      <div key={row.key} className="rounded-xl border border-border bg-background px-3 py-2 text-xs">
+                        <div className="flex items-start justify-between gap-2">
+                          <div><div className="font-semibold text-foreground">{row.label}</div><div className="mt-1 text-muted-foreground">Linked: {row.linked}</div></div>
+                          <span className={cx("rounded-full border px-2 py-0.5 font-semibold", statusClass(row.status))}>{row.status}</span>
+                        </div>
+                        <div className="mt-2 text-muted-foreground">{row.action}</div>
+                      </div>
+                    )) : <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">No matching setup row is exposed by the backend yet.</div>}
+                  </div>
+                  <div className="mt-3">
+                    <ActionButton variant="secondary" onClick={() => window.location.hash = "business-finance-accounts"}>Edit mapping</ActionButton>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rent / lease posting bridge</div>
@@ -563,7 +719,7 @@ export default function AdminAccountingSetupPage() {
           </div>
         </section>
 
-        <section className="space-y-3">
+        <section id="business-finance-accounts" className="space-y-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">1. Business Finance Accounts</h2>
             <p className="mt-1 text-sm text-muted-foreground">

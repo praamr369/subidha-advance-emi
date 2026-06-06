@@ -42,6 +42,13 @@ export type AccountingMappingAuditRow = {
   recommended_action?: string | null;
   setup_href?: string | null;
   action_href?: string | null;
+  severity?: "READY" | "BLOCKED" | "WARNING" | "UNSUPPORTED" | string;
+  blocker_category?: "mapping" | "period" | "numbering" | "approval" | "unsupported_source" | "ready" | "setup" | string;
+  remediation_label?: string | null;
+  remediation_route?: string | null;
+  missing_fields?: string[];
+  is_close_blocker?: boolean;
+  is_posting_blocker?: boolean;
   details?: Record<string, unknown>;
 };
 

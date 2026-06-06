@@ -38,6 +38,7 @@ function workflowLabel(sequence: DocumentNumberingSequence): string {
 }
 
 const emptyDraft = { prefix: "", pattern: "{PREFIX}-{number}", suffix: "", reset_policy: "YEARLY", next_number: "1", padding: "5" };
+const SUMMARY_ORDER = ["CONTRACT", "RECEIPT", "TAX_INVOICE", "DIRECT_SALE", "RENT_INVOICE", "LEASE_INVOICE", "DEPOSIT_RECEIPT", "CREDIT_NOTE", "DEBIT_NOTE", "JOURNAL_ENTRY", "SETTLEMENT", "PAYOUT"];
 
 function nextPreview(pattern: string, prefix: string, suffix: string, fy: string, doc: string, nextNumber: string, padding: string): string {
   const safeNumber = Math.max(1, Number(nextNumber || "1"));
@@ -96,6 +97,14 @@ export default function BusinessSetupDocumentNumberingPage() {
   }, []);
 
   const rows = useMemo(() => data?.sequences || [], [data]);
+  const summaryRows = useMemo(() => {
+    const rank = (sequence: DocumentNumberingSequence) => {
+      const key = `${sequence.key} ${sequence.document_type} ${sequence.name}`.toUpperCase();
+      const index = SUMMARY_ORDER.findIndex((item) => key.includes(item));
+      return index === -1 ? SUMMARY_ORDER.length : index;
+    };
+    return [...rows].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  }, [rows]);
   const summary = data?.summary || {};
   const missingRows = rows.filter((row) => !row.configured);
   const blockingRows = rows.filter((row) => row.status === "blocked" || row.status === "duplicate_risk");
@@ -108,8 +117,24 @@ export default function BusinessSetupDocumentNumberingPage() {
       setError(null);
       setNotice(null);
       const minSafeNext = sequence.min_safe_next_number || 1;
-      const nextNumber = Math.max(minSafeNext, Number(draft.next_number || "0"));
-      const padding = Math.min(12, Math.max(1, Number(draft.padding || "0")));
+      const nextNumber = Number(draft.next_number || "0");
+      const padding = Number(draft.padding || "0");
+      if (!draft.prefix.trim()) {
+        setError("Prefix cannot be empty.");
+        return;
+      }
+      if (!Number.isFinite(padding) || padding < 1 || padding > 12) {
+        setError("Padding must be between 1 and 12.");
+        return;
+      }
+      if (!Number.isFinite(nextNumber) || nextNumber < minSafeNext) {
+        setError(`Next number cannot be below the last issued safe value (${minSafeNext}).`);
+        return;
+      }
+      const livePrefixChanged = sequence.configured && Number(sequence.issued_count || 0) > 0 && draft.prefix.trim().toUpperCase() !== (sequence.prefix || "").trim().toUpperCase();
+      if (livePrefixChanged && !window.confirm("Changing numbering affects future documents only. Existing documents are never renumbered. Continue with this prefix change?")) {
+        return;
+      }
       const response = await updateDocumentNumbering({
         key: sequence.key,
         prefix: draft.prefix,
@@ -204,7 +229,7 @@ export default function BusinessSetupDocumentNumberingPage() {
       <BusinessSetupLinks />
 
       <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-        Numbering changes affect future documents only. Existing invoices, receipts, and audit trails are never renumbered from this setup page.
+        Changing numbering affects future documents only. Existing documents are never renumbered.
       </section>
 
       {data?.setup_blockers?.length ? (
@@ -218,6 +243,36 @@ export default function BusinessSetupDocumentNumberingPage() {
 
       {notice ? <section className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</section> : null}
       {error ? <section className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</section> : null}
+
+      <section className="rounded-2xl border border-border bg-card shadow-sm">
+        <div className="border-b border-border px-5 py-4">
+          <div className="text-sm font-semibold text-foreground">Sequence summary</div>
+          <p className="mt-1 text-sm text-muted-foreground">Preview the next future number and verify where each sequence is used before editing details below.</p>
+        </div>
+        <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
+          {summaryRows.length === 0 ? <div className="text-sm text-muted-foreground">No numbering rows returned by the backend.</div> : null}
+          {summaryRows.map((sequence) => (
+            <article key={`summary-${sequence.key}`} className="rounded-xl border border-border bg-background p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">{sequence.name}</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">{workflowLabel(sequence)} · {sequence.document_type || sequence.key}</p>
+                </div>
+                <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusClass(sequence.status)}`}>{statusLabel(sequence.status)}</span>
+              </div>
+              <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                <div><span className="text-muted-foreground">Prefix</span><div className="font-semibold text-foreground">{sequence.prefix || "Missing"}</div></div>
+                <div><span className="text-muted-foreground">Next preview</span><div className="font-semibold text-foreground">{sequence.preview_number || sequence.next_number_preview || "Not configured"}</div></div>
+                <div><span className="text-muted-foreground">Last issued</span><div className="font-semibold text-foreground">{sequence.last_issued_number || "None"}</div></div>
+                <div><span className="text-muted-foreground">Fiscal year mode</span><div className="font-semibold text-foreground">{sequence.reset_policy || "YEARLY"}</div></div>
+              </div>
+              <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                Used for: {sequence.description || `${sequence.doc_kind || "document"} workflow in ${workflowLabel(sequence)}.`}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">

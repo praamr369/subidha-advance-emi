@@ -217,11 +217,13 @@ def _ensure_collection_mappings(*, performed_by=None, finance_accounts: dict[str
             target_finance = ledger_anchor
         mapping = FinanceAccountCoaMapping.objects.filter(finance_account=target_finance, purpose=purpose, is_active=True).first()
         if mapping is None:
+            mapping = FinanceAccountCoaMapping.objects.filter(purpose=purpose, is_default=True, is_active=True).first()
+        if mapping is None:
             mapping = FinanceAccountCoaMapping.objects.create(finance_account=target_finance, chart_account=target_chart, purpose=purpose, is_default=True, is_active=True, created_by=performed_by, updated_by=performed_by, notes="Seeded by accounting setup defaults.")
             created.append({"id": mapping.id, "purpose": purpose, "finance_account_id": target_finance.id})
         else:
             changes = {}
-            if mapping.chart_account_id != target_chart.id:
+            if mapping.finance_account_id == target_finance.id and mapping.chart_account_id != target_chart.id:
                 changes["chart_account"] = target_chart
             if not mapping.is_default:
                 changes["is_default"] = True

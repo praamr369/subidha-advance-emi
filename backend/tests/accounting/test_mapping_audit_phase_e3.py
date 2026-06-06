@@ -59,6 +59,12 @@ class AccountingMappingAuditPhaseE3Tests(APITestCase):
         self.assertFalse(rows["staff_advance"]["supported"])
         self.assertFalse(rows["staff_advance"]["can_post"])
         self.assertEqual(rows["staff_advance"]["blocker_code"], "UNSUPPORTED_SOURCE")
+        self.assertEqual(rows["staff_advance"]["severity"], "UNSUPPORTED")
+        self.assertEqual(rows["staff_advance"]["blocker_category"], "unsupported_source")
+        self.assertEqual(rows["staff_advance"]["remediation_route"], "/admin/accounting/setup/mapping-audit")
+        self.assertIsInstance(rows["staff_advance"]["missing_fields"], list)
+        self.assertTrue(rows["staff_advance"]["is_close_blocker"])
+        self.assertTrue(rows["staff_advance"]["is_posting_blocker"])
 
     def test_validate_all_is_read_only(self):
         journal_before = JournalEntry.objects.count()

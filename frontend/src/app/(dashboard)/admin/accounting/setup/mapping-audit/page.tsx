@@ -18,24 +18,110 @@ import {
   type AccountingMappingAuditRow,
 } from "@/services/accounting-mapping-audit";
 
+const FILTERS = ["All", "Blocked", "Unsupported", "Warnings", "Ready"] as const;
+type AuditFilter = (typeof FILTERS)[number];
+
+const GROUP_ORDER = [
+  "Collection posting mappings",
+  "Inventory mappings",
+  "Manufacturing mappings",
+  "Payments/refunds mappings",
+  "Rent/lease monthly mappings",
+  "Subscription/EMI mappings",
+  "Unsupported/fallback mappings",
+  "Other mappings",
+];
+
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
 function statusClass(status: string): string {
   const value = status.toUpperCase();
-  if (value === "READY") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (["READY", "POSTABLE", "POSTED", "RECONCILED"].includes(value)) return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (value.includes("UNSUPPORTED") || value.includes("CONFLICT") || value.includes("ERROR")) return "border-red-200 bg-red-50 text-red-900";
-  if (value.includes("BLOCKED") || value.includes("MISSING") || value.includes("INACTIVE")) return "border-amber-200 bg-amber-50 text-amber-950";
+  if (value.includes("WARNING") || value.includes("BLOCKED") || value.includes("MISSING") || value.includes("INACTIVE")) return "border-amber-200 bg-amber-50 text-amber-950";
   return "border-slate-200 bg-slate-50 text-slate-900";
-}
-
-function SummaryCard({ label, value, tone }: { label: string; value: string | number; tone: string }) {
-  return <div className={cx("rounded-2xl border p-4 shadow-sm", tone)}><div className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</div><div className="mt-2 text-2xl font-semibold">{value}</div></div>;
 }
 
 function MappingStatus({ value }: { value: string }) {
   return <span className={cx("inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold", statusClass(value))}>{value}</span>;
+}
+
+function SummaryCard({ label, value, tone }: { label: string; value: string | number; tone: string }) {
+  return <div className={cx("rounded-xl border p-4 shadow-sm", tone)}><div className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</div><div className="mt-2 text-2xl font-semibold">{value}</div></div>;
+}
+
+function normalizedStatus(row: AccountingMappingAuditRow): string {
+  return String(row.status || row.bridge_status || "UNKNOWN").toUpperCase();
+}
+
+function groupName(row: AccountingMappingAuditRow): string {
+  const text = `${row.module ?? ""} ${row.event_key ?? ""} ${row.event_label ?? ""}`.toLowerCase();
+  if (text.includes("collection") || text.includes("cashier")) return "Collection posting mappings";
+  if (text.includes("inventory") || text.includes("stock") || text.includes("purchase")) return "Inventory mappings";
+  if (text.includes("manufacturing") || text.includes("production")) return "Manufacturing mappings";
+  if (text.includes("payment") || text.includes("refund") || text.includes("receipt") || text.includes("settlement") || text.includes("bank") || text.includes("reversal") || text.includes("void")) return "Payments/refunds mappings";
+  if (text.includes("rent") || text.includes("lease") || text.includes("deposit") || text.includes("damage")) return "Rent/lease monthly mappings";
+  if (text.includes("subscription") || text.includes("emi") || text.includes("cancellation")) return "Subscription/EMI mappings";
+  if (text.includes("unsupported") || row.supported === false || normalizedStatus(row).includes("UNSUPPORTED")) return "Unsupported/fallback mappings";
+  return "Other mappings";
+}
+
+function rowMatchesFilter(row: AccountingMappingAuditRow, filter: AuditFilter): boolean {
+  const status = normalizedStatus(row);
+  if (filter === "All") return true;
+  if (filter === "Blocked") return status.startsWith("BLOCKED") || status.includes("MISSING") || status.includes("INACTIVE") || row.blocker_code !== null;
+  if (filter === "Unsupported") return status.includes("UNSUPPORTED") || row.supported === false;
+  if (filter === "Warnings") return status.includes("WARNING") || status.includes("CONFLICT");
+  if (filter === "Ready") return ["READY", "POSTABLE", "POSTED", "RECONCILED"].includes(status);
+  return true;
+}
+
+function rowMatchesSearch(row: AccountingMappingAuditRow, search: string): boolean {
+  const needle = search.trim().toLowerCase();
+  if (!needle) return true;
+  return [
+    row.event_label,
+    row.label,
+    row.event_key,
+    row.module,
+    row.source_model,
+    row.status,
+    row.bridge_status,
+    row.debit_purpose,
+    row.credit_purpose,
+    row.debit_account_code,
+    row.credit_account_code,
+  ].filter(Boolean).join(" ").toLowerCase().includes(needle);
+}
+
+function rowStats(rows: AccountingMappingAuditRow[]) {
+  return {
+    total: rows.length,
+    ready: rows.filter((row) => ["READY", "POSTABLE", "POSTED", "RECONCILED"].includes(normalizedStatus(row))).length,
+    blocked: rows.filter((row) => rowMatchesFilter(row, "Blocked")).length,
+    warning: rows.filter((row) => rowMatchesFilter(row, "Warnings")).length,
+    unsupported: rows.filter((row) => rowMatchesFilter(row, "Unsupported")).length,
+  };
+}
+
+function missingLabel(row: AccountingMappingAuditRow): string {
+  const missing = [];
+  if (row.debit_mapping_status !== "READY") missing.push(`Debit: ${row.debit_mapping_status}`);
+  if (row.credit_mapping_status !== "READY") missing.push(`Credit: ${row.credit_mapping_status}`);
+  if (row.finance_account_status !== "READY") missing.push(`Finance account: ${row.finance_account_status}`);
+  if (row.numbering_readiness !== "READY") missing.push(`Numbering: ${row.numbering_readiness}`);
+  if (row.period_readiness !== "READY") missing.push(`Period: ${row.period_readiness}`);
+  return missing.join(" · ") || "No missing setup reported";
+}
+
+function routeForRow(row: AccountingMappingAuditRow): string {
+  if (row.setup_href) return row.setup_href;
+  if (row.finance_account_status !== "READY") return ROUTES.admin.accountingFinanceAccounts;
+  if (row.period_readiness !== "READY") return ROUTES.admin.accountingPeriods;
+  if (row.numbering_readiness !== "READY") return ROUTES.admin.settingsBusinessSetupDocumentNumbering;
+  return ROUTES.admin.accountingSetup;
 }
 
 export default function AccountingMappingAuditPage() {
@@ -43,6 +129,8 @@ export default function AccountingMappingAuditPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [filter, setFilter] = useState<AuditFilter>("All");
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -104,24 +192,26 @@ export default function AccountingMappingAuditPage() {
     }
   }
 
-  const unsupported = payload?.unsupported_events ?? [];
-  const conflicts = payload?.conflicts ?? [];
+  const rows = useMemo(() => payload?.events ?? [], [payload?.events]);
+  const visibleRows = useMemo(() => rows.filter((row) => rowMatchesFilter(row, filter) && rowMatchesSearch(row, search)), [rows, filter, search]);
   const grouped = useMemo(() => {
-    const rows = payload?.events ?? [];
     const map = new Map<string, AccountingMappingAuditRow[]>();
-    for (const row of rows) map.set(row.module, [...(map.get(row.module) ?? []), row]);
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [payload?.events]);
+    for (const row of visibleRows) {
+      const key = groupName(row);
+      map.set(key, [...(map.get(key) ?? []), row]);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
+  }, [visibleRows]);
 
-  if (loading) return <PortalPage title="Accounting Mapping Cockpit" subtitle="Full setup verification for accounting mappings."><LoadingBlock label="Loading mapping audit..." /></PortalPage>;
+  if (loading) return <PortalPage title="Accounting Mapping Audit" subtitle="Full setup verification for accounting mappings."><LoadingBlock label="Loading mapping audit..." /></PortalPage>;
 
   const summary = payload?.summary ?? { total_events: 0, ready: 0, missing_mapping: 0, conflicts: 0, unsupported: 0, blocked_by_period: 0, blocked_by_numbering: 0 };
   const period = payload?.period_readiness ?? {};
 
   return (
     <PortalPage
-      title="Accounting Mapping Cockpit"
-      subtitle="Verify every supported accounting event, seed safe setup defaults, and keep unsupported workflows clearly non-postable."
+      title="Accounting Mapping Audit"
+      subtitle="Operator remediation view for accounting mappings, blockers, unsupported workflows, and setup routes."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Setup", href: ROUTES.admin.accountingSetup }, { label: "Mapping Audit" }]}
       actions={[{ href: ROUTES.admin.accountingSetup, label: "Accounting Setup", variant: "secondary" }, { href: ROUTES.admin.accountingBridges, label: "Bridge Readiness", variant: "secondary" }, { href: ROUTES.admin.accountingPeriods, label: "Periods", variant: "secondary" }]}
       statusBadge={{ label: payload?.year_end_impact === "READY" ? "Year-End Ready" : "Year-End Blocked", tone: payload?.year_end_impact === "READY" ? "success" : "warning" }}
@@ -133,9 +223,9 @@ export default function AccountingMappingAuditPage() {
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Full accounting mapping verification</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping audit remediation</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Bridge impact: {payload?.bridge_impact ?? "Not loaded"}</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Setup actions create only setup metadata such as Chart of Accounts, Finance Accounts, mappings, and posting profiles. They do not create JournalEntry, Payment, Receipt, ReconciliationItem, or document numbers.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. Explicit setup actions may create setup metadata only; they do not post journals or mutate source money records.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <ActionButton variant="primary" onClick={() => void seedDefaults()} disabled={Boolean(busy)}>{busy === "seed" ? "Seeding..." : "Seed Safe Defaults"}</ActionButton>
@@ -148,7 +238,7 @@ export default function AccountingMappingAuditPage() {
             <SummaryCard label="Ready" value={summary.ready} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
             <SummaryCard label="Missing" value={summary.missing_mapping} tone="border-amber-200 bg-amber-50 text-amber-950" />
             <SummaryCard label="Conflicts" value={summary.conflicts} tone="border-red-200 bg-red-50 text-red-900" />
-            <SummaryCard label="Unsupported" value={summary.unsupported} tone="border-slate-200 bg-slate-50 text-slate-900" />
+            <SummaryCard label="Unsupported" value={summary.unsupported} tone="border-red-200 bg-red-50 text-red-900" />
             <SummaryCard label="Period blocked" value={summary.blocked_by_period} tone="border-amber-200 bg-amber-50 text-amber-950" />
             <SummaryCard label="Numbering blocked" value={summary.blocked_by_numbering} tone="border-amber-200 bg-amber-50 text-amber-950" />
           </div>
@@ -161,30 +251,57 @@ export default function AccountingMappingAuditPage() {
           <div className="mt-4 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">Active FY: {String((period.active_financial_year as { code?: string } | undefined)?.code ?? "Missing")} · Current period: {String((period.current_period as { code?: string } | undefined)?.code ?? "Missing")}</div>
         </section>
 
-        <WorkspaceSection title="Conflict panel" description="Wrong type, duplicate active mapping, inactive account/mapping, and source-support issues are blocked from posting.">
-          <div className="grid gap-3 md:grid-cols-2">
-            {(conflicts.length ? conflicts : payload?.setup_blockers.slice(0, 6) ?? []).map((row) => <div key={`conflict-${row.event_key}`} className="rounded-2xl border border-border bg-card p-4 text-sm shadow-sm"><div className="flex items-start justify-between gap-2"><div><div className="font-semibold text-foreground">{row.event_label}</div><div className="font-mono text-xs text-muted-foreground">{row.event_key}</div></div><MappingStatus value={row.status} /></div><p className="mt-2 text-xs text-muted-foreground">{row.blocker_reason || row.recommended_action}</p><Link href={row.setup_href || ROUTES.admin.accountingSetup} className="mt-3 inline-flex rounded-lg border border-border px-3 py-2 text-xs font-semibold">Open setup</Link></div>)}
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-2">{FILTERS.map((item) => <button key={item} type="button" onClick={() => setFilter(item)} className={cx("rounded-full border px-3 py-1.5 text-xs font-semibold", filter === item ? "border-foreground bg-foreground text-background" : "border-border bg-background text-foreground")}>{item}</button>)}</div>
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search event, source, profile key" className="min-h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-foreground lg:w-96" />
           </div>
-        </WorkspaceSection>
+        </section>
 
-        <WorkspaceSection title="Unsupported workflow panel" description="Future workflows remain visible without fake readiness or post buttons.">
-          <div className="grid gap-3 md:grid-cols-2">
-            {unsupported.map((row) => <div key={`unsupported-${row.event_key}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800"><div className="font-semibold">{row.event_label}</div><div className="mt-1 font-mono text-xs">{row.event_key}</div><p className="mt-2 text-xs">{row.recommended_action || row.blocker_reason}</p><div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold">No Post button available</div></div>)}
+        {grouped.map(([name, groupRows]) => {
+          const stats = rowStats(groupRows);
+          return (
+            <WorkspaceSection key={name} title={name} description="Blocked rows show missing debit, credit, finance, numbering, period, and the suggested setup route.">
+              <div className="mb-3 grid gap-2 sm:grid-cols-5">
+                {Object.entries(stats).map(([label, value]) => <div key={`${name}-${label}`} className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold capitalize text-muted-foreground">{label}</div><div className="mt-1 text-lg font-semibold text-foreground">{value}</div></div>)}
+              </div>
+              <div className="grid gap-3">
+                {groupRows.map((row) => (
+                  <article key={row.event_key} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold text-foreground">{row.event_label}</h3><MappingStatus value={row.status} /></div><div className="mt-1 text-xs text-muted-foreground">{row.module} · {row.source_model} · <span className="font-mono">{row.event_key}</span></div></div>
+                      <div className="flex flex-wrap gap-2">
+                        {row.supported && row.status !== "READY" ? <button type="button" disabled={busy === row.event_key} onClick={() => void fixEvent(row)} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{busy === row.event_key ? "Fixing..." : "Fix setup event"}</button> : null}
+                        <Link href={routeForRow(row)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold">Open suggested route</Link>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-5">
+                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Missing debit</div><p className="mt-1 text-muted-foreground">{row.debit_mapping_status === "READY" ? "No" : row.debit_mapping_status}</p></div>
+                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Missing credit</div><p className="mt-1 text-muted-foreground">{row.credit_mapping_status === "READY" ? "No" : row.credit_mapping_status}</p></div>
+                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Finance account</div><p className="mt-1 text-muted-foreground">{row.finance_account_status}</p></div>
+                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Numbering</div><p className="mt-1 text-muted-foreground">{row.numbering_readiness}</p></div>
+                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Period</div><p className="mt-1 text-muted-foreground">{row.period_readiness}</p></div>
+                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">{missingLabel(row)}</p>
+                    {row.blocker_reason || row.recommended_action ? <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">{row.blocker_reason || row.recommended_action}</p> : null}
+                  </article>
+                ))}
+              </div>
+            </WorkspaceSection>
+          );
+        })}
+
+        <details className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <summary className="cursor-pointer text-base font-semibold text-foreground">Advanced raw mapping evidence</summary>
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-border bg-background shadow-sm">
+            <table className="min-w-full divide-y divide-border text-sm">
+              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Event</th><th className="px-4 py-3">Source</th><th className="px-4 py-3">Debit</th><th className="px-4 py-3">Credit</th><th className="px-4 py-3">Finance</th><th className="px-4 py-3">Numbering</th><th className="px-4 py-3">Period</th><th className="px-4 py-3">Status</th></tr></thead>
+              <tbody className="divide-y divide-border">
+                {rows.map((row) => <tr key={`raw-${row.event_key}`} className="align-top"><td className="px-4 py-4"><div className="font-semibold text-foreground">{row.event_label}</div><div className="font-mono text-xs text-muted-foreground">{row.event_key}</div></td><td className="px-4 py-4 text-xs text-muted-foreground">{row.source_model}</td><td className="px-4 py-4"><MappingStatus value={row.debit_mapping_status} /></td><td className="px-4 py-4"><MappingStatus value={row.credit_mapping_status} /></td><td className="px-4 py-4"><MappingStatus value={row.finance_account_status} /></td><td className="px-4 py-4"><MappingStatus value={row.numbering_readiness} /></td><td className="px-4 py-4"><MappingStatus value={row.period_readiness} /></td><td className="px-4 py-4"><MappingStatus value={row.status} /></td></tr>)}
+              </tbody>
+            </table>
           </div>
-        </WorkspaceSection>
-
-        {grouped.map(([module, moduleRows]) => (
-          <WorkspaceSection key={module} title={`${module} event matrix`} description="Canonical status from mapping audit. Use setup actions only; posting remains outside this cockpit.">
-            <div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm">
-              <table className="min-w-full divide-y divide-border text-sm">
-                <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Event</th><th className="px-4 py-3">Source</th><th className="px-4 py-3">Debit</th><th className="px-4 py-3">Credit</th><th className="px-4 py-3">Finance</th><th className="px-4 py-3">Numbering</th><th className="px-4 py-3">Period</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th></tr></thead>
-                <tbody className="divide-y divide-border">
-                  {moduleRows.map((row) => <tr key={row.event_key} className="align-top"><td className="px-4 py-4"><div className="font-semibold text-foreground">{row.event_label}</div><div className="font-mono text-xs text-muted-foreground">{row.event_key}</div></td><td className="px-4 py-4 text-xs text-muted-foreground">{row.source_model}</td><td className="px-4 py-4"><MappingStatus value={row.debit_mapping_status} /></td><td className="px-4 py-4"><MappingStatus value={row.credit_mapping_status} /></td><td className="px-4 py-4"><MappingStatus value={row.finance_account_status} /></td><td className="px-4 py-4"><MappingStatus value={row.numbering_readiness} /></td><td className="px-4 py-4"><MappingStatus value={row.period_readiness} /></td><td className="px-4 py-4"><MappingStatus value={row.status} /></td><td className="px-4 py-4 text-xs"><div className="flex flex-col gap-2">{row.supported && row.status !== "READY" ? <button type="button" disabled={busy === row.event_key} onClick={() => void fixEvent(row)} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left font-semibold text-amber-950">{busy === row.event_key ? "Fixing..." : "Fix Event"}</button> : null}<Link href={row.setup_href || ROUTES.admin.accountingSetup} className="rounded-lg border border-border px-3 py-2 font-semibold">Open setup</Link><span className="text-muted-foreground">{row.recommended_action}</span></div></td></tr>)}
-                </tbody>
-              </table>
-            </div>
-          </WorkspaceSection>
-        ))}
+        </details>
       </div>
     </PortalPage>
   );

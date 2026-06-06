@@ -36,6 +36,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { listChartOfAccounts, listFinanceAccounts, listJournalEntries } from "@/services/accounting";
+import { getAccountingBridgeReadiness, type AccountingBridgeReadinessPayload } from "@/services/accounting-bridge-readiness";
 import {
   getAccountingSetupReadiness,
   getAccountingSetupStatus,
@@ -79,6 +80,7 @@ type CockpitData = {
   postedMovementsCount: number | null;
   setupStatus: AccountingSetupStatusPayload | null;
   setupReadiness: AccountingSetupReadinessPayload | null;
+  bridgeReadiness: AccountingBridgeReadinessPayload | null;
   accountingReadiness: AccountingReadiness | null;
   controlPayload: AccountingControlPayload | null;
 };
@@ -154,6 +156,10 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load accounting cockpit.";
 }
 
+function cx(...values: Array<string | false | null | undefined>) {
+  return values.filter(Boolean).join(" ");
+}
+
 function metricNumber(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -170,6 +176,11 @@ function displayMetric(value: number | string | null | undefined): string {
   return String(value);
 }
 
+function asCount(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function compactBlockers(readiness: AccountingSetupReadinessPayload | null): string[] {
   if (!readiness) return [];
   return readiness.finance_accounts
@@ -179,6 +190,62 @@ function compactBlockers(readiness: AccountingSetupReadinessPayload | null): str
       return `${account.name} (${account.kind}): ${reason}`;
     })
     .slice(0, 3);
+}
+
+function controlBlockers(data: CockpitData | null, setupBlockerCount: number | null) {
+  if (!data) return [];
+  const bridgeBlockers = data.accountingReadiness?.blockers ?? [];
+  const bridgeSummary: Partial<AccountingBridgeReadinessPayload["summary"]> = data.bridgeReadiness?.summary ?? {};
+  const periodReady = data.accountingReadiness?.accounting_period_readiness?.posting_controls_ready;
+  const currentPeriod = data.accountingReadiness?.accounting_period_readiness?.current_period;
+  const numberingReady = data.accountingReadiness?.accounting_period_readiness?.journal_numbering_ready;
+  const bridgeBlockerCount = asCount(bridgeSummary.blocked_count);
+  const mappingBlockerCount = asCount(bridgeSummary.blocked_by_mapping_count) + asCount(bridgeSummary.unsupported_source_count);
+  const reconciliationExceptionCount = asCount(bridgeSummary.ready_unposted_count);
+  return [
+    {
+      label: "Broken finance accounts",
+      detail: setupBlockerCount ? `${setupBlockerCount} setup blocker(s) detected.` : "No broken finance account blocker exposed.",
+      href: ROUTES.admin.accountingFinanceAccounts,
+      blocked: Boolean(setupBlockerCount && setupBlockerCount > 0),
+    },
+    {
+      label: "Missing required posting profiles",
+      detail: data.setupStatus?.setup_health_status === "BLOCKED" ? "Posting profile health is blocked." : "No posting profile blocker exposed.",
+      href: ROUTES.admin.accountingSetup,
+      blocked: data.setupStatus?.setup_health_status === "BLOCKED",
+    },
+    {
+      label: "Unresolved mapping audit blockers",
+      detail: mappingBlockerCount ? `${mappingBlockerCount} mapping/unsupported blocker(s) detected.` : bridgeBlockers[0] || "No bridge/mapping blocker exposed.",
+      href: "/admin/accounting/setup/mapping-audit",
+      blocked: mappingBlockerCount > 0 || bridgeBlockers.length > 0 || data.accountingReadiness?.status !== "READY",
+    },
+    {
+      label: "Bridge readiness blockers",
+      detail: bridgeBlockerCount ? `${bridgeBlockerCount} bridge blocker(s) detected.` : "No bridge blocker exposed.",
+      href: ROUTES.admin.accountingBridges,
+      blocked: bridgeBlockerCount > 0,
+    },
+    {
+      label: "Reconciliation exceptions",
+      detail: reconciliationExceptionCount ? `${reconciliationExceptionCount} ready/unposted source row(s) need review.` : "Open reconciliation and review exceptions before close.",
+      href: ROUTES.admin.accountingBridgeReconciliation,
+      blocked: reconciliationExceptionCount > 0,
+    },
+    {
+      label: "Open period/year-end blockers",
+      detail: periodReady === false ? "Period, financial year, or posting controls are blocked." : currentPeriod?.code ? `${currentPeriod.code} is current.` : "No current period exposed.",
+      href: ROUTES.admin.accountingPeriods,
+      blocked: periodReady === false || !currentPeriod,
+    },
+    {
+      label: "Numbering warnings",
+      detail: numberingReady === false ? "Journal numbering is not ready." : "No numbering blocker exposed.",
+      href: ROUTES.admin.settingsBusinessSetupDocumentNumbering,
+      blocked: numberingReady === false,
+    },
+  ].sort((a, b) => Number(b.blocked) - Number(a.blocked));
 }
 
 function bridgeStatus(readiness: AccountingReadiness | null): ModuleStatus {
@@ -240,16 +307,17 @@ export default function AdminAccountingPage() {
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
     try {
-      const [chartAccounts, financeAccounts, draftJournals, controlPayload, setupStatus, setupReadiness, accountingReadiness] = await Promise.all([
+      const [chartAccounts, financeAccounts, draftJournals, controlPayload, setupStatus, setupReadiness, bridgeReadiness, accountingReadiness] = await Promise.all([
         listChartOfAccounts(),
         listFinanceAccounts(),
         listJournalEntries({ status: "DRAFT" }),
         getAdminAccountingControlCenter() as Promise<AccountingControlPayload>,
         getAccountingSetupStatus(),
         getAccountingSetupReadiness(),
+        getAccountingBridgeReadiness(),
         getAccountingReadiness(),
       ]);
-      setData({ chartAccountsCount: chartAccounts.count, financeAccountsCount: financeAccounts.count, draftJournalsCount: draftJournals.count, postedMovementsCount: null, controlPayload, setupStatus, setupReadiness, accountingReadiness });
+      setData({ chartAccountsCount: chartAccounts.count, financeAccountsCount: financeAccounts.count, draftJournalsCount: draftJournals.count, postedMovementsCount: null, controlPayload, setupStatus, setupReadiness, bridgeReadiness, accountingReadiness });
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
@@ -268,6 +336,15 @@ export default function AdminAccountingPage() {
   const setupBlocked = Boolean((setupBlockerCount ?? 0) > 0 || data?.setupStatus?.setup_health_status === "BLOCKED" || data?.setupStatus?.status === "BLOCKED");
   const backendModuleCount = Array.isArray(data?.controlPayload?.modules) ? data?.controlPayload?.modules?.length ?? 0 : Array.isArray(data?.controlPayload?.capabilities) ? data?.controlPayload?.capabilities?.length ?? 0 : 0;
   const bridgeStatusValue = metricString(data?.accountingReadiness?.status);
+  const fixFirst = controlBlockers(data, setupBlockerCount);
+  const readinessCounters = data?.accountingReadiness?.counters as Record<string, unknown> | undefined;
+  const reconciliationExceptionCount =
+    asCount(data?.bridgeReadiness?.summary.ready_unposted_count) ||
+    (metricNumber(readinessCounters?.reconciliation_exceptions) ?? metricNumber(data?.controlPayload?.kpis?.reconciliation_exceptions) ?? null);
+  const mappingBlockerCount = asCount(data?.bridgeReadiness?.summary.blocked_by_mapping_count) + asCount(data?.bridgeReadiness?.summary.unsupported_source_count) + (setupBlockerCount ?? 0);
+  const bridgeBlockerCount = asCount(data?.bridgeReadiness?.summary.blocked_count);
+  const currentOpenPeriod = data?.bridgeReadiness?.accounting_period_readiness?.current_period?.code ?? data?.accountingReadiness?.accounting_period_readiness?.current_period?.code;
+  const periodCloseStatus = data?.bridgeReadiness?.accounting_period_readiness?.current_period?.status ?? (data?.accountingReadiness?.accounting_period_readiness?.posting_controls_ready === false ? "Blocked" : data?.accountingReadiness?.accounting_period_readiness?.current_period?.status);
 
   return (
     <ERPPageShell
@@ -286,6 +363,49 @@ export default function AdminAccountingPage() {
         {!loading && !error && data ? (
           <>
             {backendModuleCount === 0 ? <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">No accounting modules exposed by backend. This cockpit is using the checked admin route registry and existing readiness endpoints; deferred modules are not linked.</div> : null}
+            <ERPSectionShell title="Accounting Control Center" description="Start here: status, blockers, primary actions, and daily finance workflows. This control center is read-only.">
+              <div className="grid gap-3 lg:grid-cols-[1.1fr_1fr]">
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {[
+                      ["Readiness", displayMetric(bridgeStatusValue)],
+                      ["Chart accounts", displayMetric(data.chartAccountsCount)],
+                      ["Finance accounts", displayMetric(data.financeAccountsCount)],
+                      ["Broken/missing mappings", displayMetric(mappingBlockerCount)],
+                      ["Collection-ready", displayMetric(collectionReadyAccountsCount)],
+                      ["Current open period", displayMetric(currentOpenPeriod)],
+                      ["Period close", displayMetric(periodCloseStatus)],
+                      ["Recon exceptions", displayMetric(reconciliationExceptionCount)],
+                      ["Bridge blockers", displayMetric(bridgeBlockerCount)],
+                    ].map(([label, value]) => <div key={label} className="rounded-xl border border-border bg-background px-3 py-2"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div><div className="mt-1 text-lg font-semibold text-foreground">{value}</div></div>)}
+                  </div>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {[
+                      ["Open Setup", ROUTES.admin.accountingSetup],
+                      ["Open Bridge Readiness", ROUTES.admin.accountingBridges],
+                      ["Open Mapping Audit", "/admin/accounting/setup/mapping-audit"],
+                      ["Open Reconciliation", ROUTES.admin.accountingBridgeReconciliation],
+                      ["Open Periods", ROUTES.admin.accountingPeriods],
+                      ["Open Document Numbering", ROUTES.admin.settingsBusinessSetupDocumentNumbering],
+                      ["Open Finance Accounts", ROUTES.admin.accountingFinanceAccounts],
+                    ].map(([label, href]) => <Link key={label} href={href} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted">{label}</Link>)}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <h2 className="text-sm font-semibold text-foreground">Fix first</h2>
+                  <div className="mt-3 space-y-2">
+                    {fixFirst.map((item, index) => (
+                      <div key={item.label} className={cx("rounded-xl border px-3 py-2 text-sm", item.blocked ? "border-amber-200 bg-amber-50 text-amber-950" : "border-border bg-background text-muted-foreground")}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div><div className="font-semibold text-foreground">{index + 1}. {item.label}</div><div className="mt-1 text-xs">{item.detail}</div></div>
+                          <Link href={item.href} className="shrink-0 text-xs font-semibold text-primary underline underline-offset-4">Open</Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </ERPSectionShell>
             <ERPSectionShell title="Readiness posture" description="Operational counts are read from backend APIs. Values that are not exposed are shown explicitly instead of fake zeroes."><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">{[["Chart accounts", displayMetric(data.chartAccountsCount)], ["Finance accounts", displayMetric(data.financeAccountsCount)], ["Draft journals", displayMetric(data.draftJournalsCount)], ["Bridge status", displayMetric(bridgeStatusValue)], ["Active FY", displayMetric(data.accountingReadiness?.financial_year_readiness?.active_financial_year?.code)], ["Period", displayMetric(data.accountingReadiness?.accounting_period_readiness?.current_period?.code)], ["Period status", displayMetric(data.accountingReadiness?.accounting_period_readiness?.current_period?.status)], ["Setup blockers", displayMetric(setupBlockerCount)], ["Deposit sources", displayMetric(data.accountingReadiness?.counters?.deposit_sources_with_collection)], ["Monthly sources", displayMetric(data.accountingReadiness?.counters?.monthly_sources_with_collection)]].map(([label, value]) => <div key={label} className="rounded-2xl border border-border bg-card px-4 py-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-2 text-lg font-semibold text-foreground">{value}</p></div>)}</div></ERPSectionShell>
             {data.accountingReadiness?.blockers?.length ? <div className="rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950"><div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" aria-hidden="true" />Rent/lease accounting bridge blockers</div><p className="mt-1 text-red-900">{data.accountingReadiness.blockers[0]}</p></div> : null}
             {MODULE_GROUPS.length === 0 ? <ERPEmptyState title="No accounting modules exposed by backend." description="The cockpit cannot render module cards until a capability list or local route-safe module map is available." /> : MODULE_GROUPS.map((group) => <ERPSectionShell key={group.title} title={group.title} description={group.description}><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{group.modules.map((module) => <ModuleCard key={module.key} module={module} setupBlocked={setupBlocked} readiness={data.accountingReadiness} setupBlockers={setupBlockers.length > 0 ? setupBlockers : ["Accounting setup readiness is blocked."]} />)}</div></ERPSectionShell>)}

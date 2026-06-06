@@ -16,6 +16,7 @@ export type AccountingBridgeReadinessSummary = {
   blocked_by_numbering_count?: number;
   blocked_by_approval_count?: number;
   unsupported_source_count?: number;
+  skipped_count?: number;
   source_count?: number;
   status_counts?: Record<string, number>;
 };
@@ -39,7 +40,9 @@ export type AccountingBridgeReadinessEvent = {
   event_label?: string;
   module?: string;
   source_module: string;
+  canonical_status?: string;
   event_group?: string;
+  source_event_key?: string;
   source_model?: string;
   supported?: boolean;
   source_workflow_exists?: boolean;
@@ -56,12 +59,24 @@ export type AccountingBridgeReadinessEvent = {
   can_post: boolean;
   can_reconcile?: boolean;
   status: string;
+  severity?: string | null;
   blocker_code?: string | null;
+  blocker_category?: string | null;
   blocker_reason?: string | null;
   recommended_action?: string | null;
+  remediation_label?: string | null;
+  remediation_route?: string | null;
+  safe_next_action_label?: string | null;
+  safe_next_action_route?: string | null;
+  is_posting_blocker?: boolean;
+  is_close_blocker?: boolean;
+  explanation?: string | null;
   action_href?: string | null;
   setup_href?: string | null;
   posting_mode: string;
+  required_profile_keys?: string[];
+  missing_profile_keys?: string[];
+  missing_fields?: string[];
   debit_requirements?: string[];
   credit_requirements?: string[];
   debit_accounts: AccountingBridgeReadinessAccount[];
@@ -69,6 +84,7 @@ export type AccountingBridgeReadinessEvent = {
   finance_accounts: AccountingBridgeReadinessAccount[];
   blocking_reasons: string[];
   operator_action: string;
+  warning_count?: number;
 };
 
 export type AccountingBridgeReadinessPayload = {
