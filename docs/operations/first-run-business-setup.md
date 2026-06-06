@@ -1,185 +1,109 @@
 # First-Run Business Operating Setup (SUBIDHA CORE)
 
-This document describes the canonical “Start from Zero” setup flow after a controlled business reset or a fresh installation, using the existing SUBIDHA CORE modules.
+This document describes the canonical “Start from Zero” setup flow for a fresh Subidha Furniture installation.
 
-The workflow is designed to be:
+## Canonical setup route
 
-- operationally practical for a real furniture shop
-- financially safe
-- auditable
-- backward compatible
-- future-ready for rent/lease without forcing inventory CSV import today
+Use:
 
-## Entry points in the UI
+- `/admin/settings/business-setup` — canonical Fresh Start Business Setup cockpit
+- `/admin/setup/readiness` — compatibility alias to the canonical cockpit
 
-After logging in as an ADMIN, use:
+Do not maintain two competing setup UIs.
 
-- `/admin/settings/business-setup` — Start from Zero cockpit
-- `/admin/setup/readiness` — detailed categorized readiness
-- `/admin/settings/business-setup/checklist` — legacy checklist view
-- `/admin/settings/business-setup/dry-runs` — read-only validation checks
-- `/admin/settings/business-setup/reset` — typed reset/backup/restore workflow
+## Production readiness categories
 
-Setup and reset controls are admin-only. Customer, partner, cashier, vendor, and staff roles must not receive these controls.
+The business setup cockpit groups readiness as:
 
-## Readiness categories
+1. `CORE_REQUIRED`
+2. `FINANCE_ACCOUNTING_REQUIRED`
+3. `RENT_LEASE_REQUIRED`
+4. `DIRECT_SALE_REQUIRED`
+5. `SUBSCRIPTION_EMI_REQUIRED`
+6. `INVENTORY_REQUIRED`
+7. `STAFF_HR_PAYROLL_REQUIRED`
+8. `CRM_REQUIRED`
+9. `RESET_DRY_RUN_REQUIRED`
+10. `OPTIONAL_OR_FUTURE`
 
-Fresh-start setup readiness is normalized into these categories:
+Status labels are `READY`, `REQUIRED_PENDING`, `BLOCKED`, `WARNING`, `INFO`, `APPROVAL_GATED`, and `FUTURE_UNSUPPORTED`.
 
-1. `REQUIRED_FOR_COLLECTION`
-2. `REQUIRED_FOR_ACCOUNTING_POSTING`
-3. `REQUIRED_FOR_DOCUMENTS`
-4. `REQUIRED_FOR_OPERATIONS`
-5. `RECOMMENDED_FOR_GO_LIVE`
-6. `OPTIONAL_OR_FUTURE`
+## Safe setup rule
 
-## First operational start requirements
+The **Ensure Fresh Start Setup** action may repair setup metadata only, such as default COA, finance accounts, mappings, branch/counter setup, document-numbering profiles, print branding posture, and accounting setup metadata.
 
-Before live collection, configure or repair:
+It must not create live operational records, post journals, allocate issued document numbers, create stock quantity, create salary/payroll results, or create customer contracts.
 
-- business profile
-- active admin user
-- at least one active branch
-- at least one active cash/counter/collection finance account
-- core Chart of Accounts
-- FinanceAccount-to-COA mapping for real collection accounts
-- document numbering setup
-- minimal print branding
-- product/catalog route readiness
-- accounting bridge readiness access
+## Required live workflows
 
-The safe **Ensure Fresh Start Setup** action may repair setup master data only:
+### Rent / Lease
 
-- default COA
-- default FinanceAccounts
-- FinanceAccountCoaMappings
-- default branch
-- default cash counter where safe
-- default document numbering setup profiles
-- minimal print branding settings object
-- accounting setup metadata
+Rent/Lease is live for this business and is production-required, not optional/future.
 
-It must not create:
-
-- Payment
-- ReceiptDocument
-- JournalEntry
-- MoneyMovement
-- SettlementAllocation
-- ReconciliationItem
-- StockLedger
-- OpeningStock
-- SalaryPayment
-- Commission
-- PayoutBatch
-- customer contracts
-- subscriptions
-- direct-sale invoices
-
-## Recommended order
-
-### 1) Business profile
-
-Route:
-
-- `/admin/settings/business-setup/profile`
-
-Configure legal name, trade name, phone, email, address, tax mode, optional GSTIN/PAN/Udyam/MSME, and document footer data.
-
-GSTIN, PAN, Udyam/MSME, and website are optional unless the selected tax/compliance mode requires them.
-
-### 2) Branch and counter setup
+Required setup includes rent income, lease income, security deposit liability, damage recovery income, settlement finance account, deposit workflow, monthly demand workflow, collection workflow, and bridge readiness. Posting may remain approval-gated.
 
 Routes:
 
-- `/admin/settings/business-setup/branches`
-- `/admin/settings/business-setup/cash-desks`
-- `/admin/branches`
-- `/admin/counters`
-
-Minimum requirement:
-
-- at least one active branch
-- at least one active collection counter
-- at least one active collection-ready FinanceAccount
-
-### 3) Finance and accounting setup
-
-Routes:
-
-- `/admin/accounting/setup`
-- `/admin/settings/business-setup/finance-accounts`
+- `/admin/rent-lease`
 - `/admin/accounting/bridges`
 - `/admin/accounting/bridge-reconciliation`
-- `/admin/settings/business-setup/document-numbering`
+- `/admin/settings/business-setup/finance-accounts`
 
-Minimum setup includes core COA, cash/bank/UPI ASSET accounts, receivable/income/liability/expense accounts, and mapping for controlled posting.
+### Inventory
 
-Accounting bridge readiness is read-only. It may show a row as postable, but actual posting must remain through explicit approved bridge/posting workflows.
+Inventory is a required admin workflow, but setup must not fake stock quantity.
 
-### 4) Documents and branding
+The cockpit should show:
 
-Routes:
-
-- `/admin/settings/business-setup/document-numbering`
-- `/admin/settings/business-setup/print-branding`
-
-Stable document numbering and minimal print branding are required before issuing customer-facing evidence documents.
-
-### 5) Products
-
-Route:
-
-- `/admin/products`
-
-Create active products with correct base price. Existing contract pricing snapshots must not be mutated by later product edits.
-
-### 6) Staff and HR
-
-Routes:
-
-- `/admin/settings/business-setup/staff`
-- `/admin/hr/staff`
-
-Staff setup is recommended unless payroll is actively used. Accounting/finance setup controls remain admin-only.
-
-### 7) Inventory onboarding
+- CSV stock upload as an admin workflow
+- manual opening stock as an admin workflow
+- current stock entry may remain `REQUIRED_PENDING`
+- missing stock does not make fake stock ready
+- only explicit opening-stock/import confirmation workflows may create real stock records
 
 Routes:
 
 - `/admin/inventory/readiness`
 - `/admin/inventory/opening-stock`
+- `/admin/inventory/items`
+- `/admin/inventory/ledger`
 
-Inventory opening stock is not a hard blocker for starting core EMI/direct-sale/rent-lease collection.
+### Staff / HR / Payroll
 
-Current shop stock may be on pen and paper. Therefore:
+Staff setup, staff login, attendance, payroll setup, payslip readiness, salary expense COA, and salary payable COA are required admin workflows.
 
-- stock upload is not required for initial system setup
-- opening stock can be entered manually later
-- CSV import is optional/future
-- inventory accounting readiness may remain onboarding-pending
-- stock availability must not be faked
-- readiness pages must not create StockLedger or OpeningStock records
+Setup pages must not create fake salary outputs.
+
+Routes:
+
+- `/admin/hr/staff`
+- `/admin/hr/attendance`
+- `/admin/hr/payroll`
+- `/admin/hr/salary-payments`
+- `/admin/settings/business-setup/staff`
+
+### CRM
+
+CRM enrichment is a required admin workflow for production setup. PartyMaster, leads/followups, and customer/partner/staff linking should be visible where supported.
+
+Setup pages must not create fake CRM interactions.
+
+Routes:
+
+- `/admin/crm`
+- `/admin/crm/parties`
+- `/admin/crm/leads`
+- `/admin/crm/follow-ups`
 
 ## Reset and dry-run safety
 
-Dry-run preview is read-only. Reset/restore actions require typed confirmation and must preserve the required admin username when the workflow requires it.
+Dry-run preview is read-only. Reset/restore actions require typed confirmation and must preserve the configured primary admin user.
 
-Use:
+Routes:
 
 - `/admin/settings/business-setup/dry-runs`
 - `/admin/settings/business-setup/reset`
 
-Backup/restore lists must show real job rows or empty states. Do not add fake backup rows.
-
 ## Unsupported future workflows
 
-Keep the following visible but non-blocking for initial operations unless implemented for real:
-
-- Staff Advance workflow
-- full manufacturing costing
-- advanced inventory valuation
-- backdated journal import
-- bulk CSV stock import
-
-Staff Advance must remain unsupported/non-postable until a real audited StaffAdvance source workflow exists.
+Staff Advance remains `FUTURE_UNSUPPORTED` unless a real audited StaffAdvance source workflow is implemented. Do not fake Staff Advance posting readiness.
