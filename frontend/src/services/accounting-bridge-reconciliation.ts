@@ -2,12 +2,19 @@ import { request } from "@/services/api";
 
 export type AccountingBridgeReconciliationSummary = {
   source_count: number;
+  ready_count?: number;
+  postable_count?: number;
   ready_unposted_count: number;
-  blocked_count: number;
-  blocked_by_mapping_count?: number;
   posted_count: number;
   settled_count: number;
   reconciled_count: number;
+  blocked_count: number;
+  blocked_by_mapping_count?: number;
+  blocked_by_period_count?: number;
+  blocked_by_numbering_count?: number;
+  blocked_by_approval_count?: number;
+  unsupported_count?: number;
+  unsupported_source_count?: number;
   exception_count: number;
   total_invoices?: number;
   total_receipts?: number;
@@ -72,24 +79,33 @@ export type AccountingBridgeReconciliationRow = {
   module: string;
   event_group?: string;
   source_model?: string | null;
+  source_type?: string | null;
   source_id?: string | null;
   source_reference?: string | null;
+  supported?: boolean;
   status: string;
   mapping_status?: string;
   posting_mode?: string;
+  can_preview?: boolean;
   can_post: boolean;
+  can_reconcile?: boolean;
   is_postable?: boolean;
   is_acknowledgeable?: boolean;
   blocker_code?: string | null;
   blocker_label?: string | null;
   blocker_count?: number;
+  blocker_reason?: string | null;
   recommended_action?: string | null;
   action_href?: string | null;
+  setup_href?: string | null;
   preview_action_href?: string | null;
   post_action_href?: string | null;
   source_action_href?: string | null;
   financial_year_id?: number | null;
   accounting_period_id?: number | null;
+  financial_year?: { id?: number; code?: string; name?: string; is_active?: boolean } | null;
+  accounting_period?: { id?: number; code?: string; name?: string; status?: string } | null;
+  period_status?: string | null;
   journal_entry?: AccountingBridgeReconciliationJournal | null;
   settlement_linked: boolean;
   reconciliation_linked: boolean;
@@ -100,6 +116,7 @@ export type AccountingBridgeReconciliationRow = {
 
 export type AccountingBridgeReconciliationPayload = {
   summary: AccountingBridgeReconciliationSummary;
+  canonical_statuses?: string[];
   selected_financial_year?: { id?: number; code?: string; name?: string; is_active?: boolean } | null;
   selected_accounting_period?: { id?: number; code?: string; name?: string; status?: string } | null;
   period_status?: string | null;
