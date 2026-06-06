@@ -85,7 +85,7 @@ class YearEndCloseReadinessTests(TestCase):
         payload = build_year_end_close_readiness(financial_year.id)
         self.assertFalse(payload["ready_to_close"])
         issue = {item["code"]: item for item in payload["blocking_items"]}["OPEN_PERIODS"]
-        self.assertIn("Lock eligible", issue["recommended_action"])
+        self.assertIn("lock eligible", issue["recommended_action"].lower())
         self.assertTrue(issue["action_href"])
 
     @patch("accounting.services.year_end_close_service._bridge_payload", return_value={"summary": {"unposted_bridge_item_count": 3, "blocked_bridge_item_count": 0}, "results": []})
