@@ -18,11 +18,13 @@ import {
 
 const MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit";
 const DOCUMENT_NUMBERING_HREF = ROUTES.admin.settingsBusinessSetupDocumentNumbering;
+const BRIDGE_RECONCILIATION_HREF = ROUTES.admin.accountingBridgeReconciliation;
 
-const FILTERS = ["All", "Blocked", "Unsupported", "Postable", "Reconciled", "Ready", "Skipped", "Warnings"] as const;
+const FILTERS = ["All", "Blocked", "Unsupported", "Postable", "Reconciliation pending", "Approval", "Reconciled", "Ready", "Skipped", "Warnings"] as const;
 type BridgeFilter = (typeof FILTERS)[number];
 
 const GROUP_ORDER = [
+  "Unsupported / Fallback",
   "Collections",
   "Customer Credit",
   "Direct Sale",
@@ -35,19 +37,15 @@ const GROUP_ORDER = [
   "Commission / Payout",
   "HR & Payroll",
   "Returns / Corrections",
-  "Unsupported / Fallback",
   "Other",
 ];
 
 const FIX_FIRST_ORDER = [
   "Unsupported source blockers",
-  "Missing posting profiles",
-  "Missing debit accounts",
-  "Missing credit accounts",
-  "Missing finance accounts",
-  "Reconciliation exceptions",
-  "Numbering or period blockers",
-  "Warning-only rows",
+  "Missing finance/account/profile setup",
+  "Approval-gated workflows",
+  "Reconciliation pending",
+  "Skipped/warning rows",
 ];
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -60,8 +58,9 @@ function normalizedStatus(event: AccountingBridgeReadinessEvent): string {
 
 function statusClass(status: string): string {
   const normalized = status.toUpperCase();
-  if (["READY", "POSTABLE", "POSTED", "RECONCILED", "OPEN"].includes(normalized)) return "border-emerald-200 bg-emerald-50 text-emerald-900";
-  if (normalized === "READY_UNPOSTED") return "border-blue-200 bg-blue-50 text-blue-900";
+  if (["READY", "RECONCILED", "OPEN"].includes(normalized)) return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (["POSTABLE", "READY_UNPOSTED"].includes(normalized)) return "border-blue-200 bg-blue-50 text-blue-900";
+  if (normalized === "BLOCKED_BY_APPROVAL") return "border-purple-200 bg-purple-50 text-purple-900";
   if (normalized.includes("WARNING") || normalized === "SKIPPED") return "border-amber-200 bg-amber-50 text-amber-950";
   if (normalized.startsWith("BLOCKED") || normalized === "LOCKED") return "border-red-200 bg-red-50 text-red-900";
   if (normalized === "UNSUPPORTED_SOURCE" || normalized.includes("UNSUPPORTED")) return "border-red-200 bg-red-50 text-red-900";
@@ -70,6 +69,7 @@ function statusClass(status: string): string {
 
 function groupName(event: AccountingBridgeReadinessEvent): string {
   const text = `${event.event_group ?? ""} ${event.module ?? ""} ${event.source_module ?? ""} ${event.event_key ?? ""}`.toLowerCase();
+  if (isUnsupported(event)) return "Unsupported / Fallback";
   if (text.includes("advance") || text.includes("customer credit")) return "Customer Credit";
   if (text.includes("direct") || text.includes("sale") || text.includes("billing")) return "Direct Sale";
   if (text.includes("emi") || text.includes("subscription") || text.includes("cancellation")) return "EMI / Subscription";
@@ -81,7 +81,6 @@ function groupName(event: AccountingBridgeReadinessEvent): string {
   if (text.includes("commission") || text.includes("payout")) return "Commission / Payout";
   if (text.includes("staff") || text.includes("payroll") || text.includes("hr")) return "HR & Payroll";
   if (text.includes("return") || text.includes("correction") || text.includes("reversal") || text.includes("void")) return "Returns / Corrections";
-  if (text.includes("unsupported") || event.supported === false || normalizedStatus(event).includes("UNSUPPORTED")) return "Unsupported / Fallback";
   if (text.includes("collection") || text.includes("cashier")) return "Collections";
   return event.event_group || event.module || event.source_module || "Other";
 }
@@ -98,6 +97,32 @@ function accountText(accounts: AccountingBridgeReadinessAccount[], fallback: str
   return accounts.length ? accounts.map(accountLabel).join(", ") : fallback;
 }
 
+function isUnsupported(event: AccountingBridgeReadinessEvent): boolean {
+  const status = normalizedStatus(event);
+  return status === "UNSUPPORTED_SOURCE" || status.includes("UNSUPPORTED") || event.supported === false || event.source_workflow_exists === false;
+}
+
+function isApprovalGated(event: AccountingBridgeReadinessEvent): boolean {
+  return normalizedStatus(event) === "BLOCKED_BY_APPROVAL" || event.approval_ready === false;
+}
+
+function isReconciled(event: AccountingBridgeReadinessEvent): boolean {
+  return normalizedStatus(event) === "RECONCILED" || event.reconciliation_ready === true;
+}
+
+function isPostableSetup(event: AccountingBridgeReadinessEvent): boolean {
+  const status = normalizedStatus(event);
+  return status === "POSTABLE" || status === "READY_UNPOSTED" || status === "RECONCILED" || status === "READY" || Boolean(event.can_post);
+}
+
+function isBusinessReady(event: AccountingBridgeReadinessEvent): boolean {
+  return isPostableSetup(event) && isReconciled(event) && !isApprovalGated(event) && !isUnsupported(event);
+}
+
+function isReconciliationPending(event: AccountingBridgeReadinessEvent): boolean {
+  return isPostableSetup(event) && !isReconciled(event) && !isApprovalGated(event) && !isUnsupported(event);
+}
+
 function missingFields(event: AccountingBridgeReadinessEvent): string[] {
   const fields = new Set<string>(event.missing_fields ?? []);
   if ((event.debit_requirements?.length ?? 0) > 0 && event.debit_accounts.length === 0) fields.add("Missing debit account");
@@ -105,39 +130,64 @@ function missingFields(event: AccountingBridgeReadinessEvent): string[] {
   if (event.finance_account_ready === false || normalizedStatus(event) === "BLOCKED_BY_MAPPING") {
     if (event.finance_accounts.length === 0) fields.add("Missing finance account");
   }
-  if (event.posting_profile_ready === false) fields.add("Missing posting profile");
+  if (event.posting_profile_ready === false || (event.missing_profile_keys?.length ?? 0) > 0) fields.add("Missing posting profile");
   if (event.accounting_period_ready === false || normalizedStatus(event) === "BLOCKED_BY_PERIOD") fields.add("Accounting period not ready");
   if (event.journal_numbering_ready === false || normalizedStatus(event) === "BLOCKED_BY_NUMBERING") fields.add("Document numbering not ready");
   return Array.from(fields);
 }
 
-function routeForEvent(event: AccountingBridgeReadinessEvent): string {
-  if (event.safe_next_action_route) return event.safe_next_action_route;
-  if (event.remediation_route) return event.remediation_route;
+function hasSetupGap(event: AccountingBridgeReadinessEvent): boolean {
   const status = normalizedStatus(event);
   const fields = missingFields(event).join(" ").toLowerCase();
+  return status === "BLOCKED_BY_MAPPING" || fields.includes("missing") || (event.missing_profile_keys?.length ?? 0) > 0 || event.posting_profile_ready === false;
+}
+
+function bridgeReconciliationRoute(status?: string): string {
+  return status ? `${BRIDGE_RECONCILIATION_HREF}?status=${encodeURIComponent(status)}` : BRIDGE_RECONCILIATION_HREF;
+}
+
+function routeForEvent(event: AccountingBridgeReadinessEvent): string {
+  if (isReconciliationPending(event)) return bridgeReconciliationRoute("READY_UNPOSTED");
+  const status = normalizedStatus(event);
+  const fields = missingFields(event).join(" ").toLowerCase();
+  if (isApprovalGated(event)) return event.safe_next_action_route || event.action_href || bridgeReconciliationRoute("BLOCKED_BY_APPROVAL");
   if (status === "BLOCKED_BY_PERIOD" || fields.includes("period")) return ROUTES.admin.accountingPeriods;
   if (status === "BLOCKED_BY_NUMBERING" || fields.includes("numbering")) return DOCUMENT_NUMBERING_HREF;
   if (fields.includes("finance account")) return ROUTES.admin.accountingFinanceAccounts;
-  if (status.includes("UNSUPPORTED")) return MAPPING_AUDIT_HREF;
+  if (isUnsupported(event)) return ROUTES.admin.accountingFinanceAccounts || ROUTES.admin.accountingSetup;
+  if (event.safe_next_action_route) return event.safe_next_action_route;
+  if (event.remediation_route) return event.remediation_route;
   return event.setup_href || event.action_href || MAPPING_AUDIT_HREF;
 }
 
 function actionLabel(event: AccountingBridgeReadinessEvent): string {
-  if (event.safe_next_action_label) return event.safe_next_action_label;
-  if (event.remediation_label) return event.remediation_label;
   const status = normalizedStatus(event);
-  if (status === "POSTABLE" || status === "READY_UNPOSTED") return "Open bridge reconciliation";
+  if (isReconciliationPending(event)) return "Open bridge reconciliation";
+  if (isApprovalGated(event)) return "Review controlled approval";
+  if (isUnsupported(event)) return "Review unsupported source";
+  if (isBusinessReady(event)) return "Review ready evidence";
   if (status === "RECONCILED") return "Review evidence";
   if (status === "BLOCKED_BY_PERIOD") return "Open periods";
   if (status === "BLOCKED_BY_NUMBERING") return "Open numbering";
   if (missingFields(event).some((field) => field.toLowerCase().includes("finance"))) return "Open finance accounts";
-  if (status.includes("UNSUPPORTED")) return "Review unsupported source";
   if (status.startsWith("BLOCKED")) return "Open mapping audit";
-  return "Open setup";
+  return event.safe_next_action_label || event.remediation_label || "Open setup";
+}
+
+function displayLabel(event: AccountingBridgeReadinessEvent): string {
+  const status = normalizedStatus(event);
+  if (isUnsupported(event)) return "Unsupported source";
+  if (isApprovalGated(event)) return "Approval required";
+  if (isReconciliationPending(event)) return "Postable · Reconciliation pending";
+  if (isBusinessReady(event)) return "Ready";
+  if (status === "BLOCKED_BY_MAPPING") return "Setup/mapping missing";
+  return status.replaceAll("_", " ");
 }
 
 function rowExplanation(event: AccountingBridgeReadinessEvent): string {
+  if (isUnsupported(event)) return "Do not create fake posting readiness. Implement or disable the source workflow before this can become postable.";
+  if (isApprovalGated(event)) return "Accounting setup exists, but controlled bridge posting approval is required.";
+  if (isReconciliationPending(event)) return "Accounting setup is complete enough to be postable, but reconciliation evidence is still pending. Use bridge reconciliation, not mapping audit.";
   return event.explanation || event.blocker_reason || event.blocking_reasons?.[0] || event.recommended_action || event.operator_action || "No blocker reported by backend.";
 }
 
@@ -145,11 +195,13 @@ function rowMatchesFilter(event: AccountingBridgeReadinessEvent, filter: BridgeF
   const status = normalizedStatus(event);
   const blocker = Boolean(event.is_posting_blocker ?? event.is_close_blocker ?? status.startsWith("BLOCKED"));
   if (filter === "All") return true;
-  if (filter === "Blocked") return blocker && !status.includes("UNSUPPORTED");
-  if (filter === "Unsupported") return status.includes("UNSUPPORTED") || event.supported === false;
-  if (filter === "Postable") return status === "POSTABLE" || status === "READY_UNPOSTED" || event.can_post;
-  if (filter === "Reconciled") return status === "RECONCILED";
-  if (filter === "Ready") return status === "READY";
+  if (filter === "Blocked") return blocker && !isUnsupported(event);
+  if (filter === "Unsupported") return isUnsupported(event);
+  if (filter === "Postable") return isPostableSetup(event);
+  if (filter === "Reconciliation pending") return isReconciliationPending(event);
+  if (filter === "Approval") return isApprovalGated(event);
+  if (filter === "Reconciled") return isReconciled(event);
+  if (filter === "Ready") return isBusinessReady(event);
   if (filter === "Skipped") return status === "SKIPPED";
   if (filter === "Warnings") return status.includes("WARNING") || Boolean(event.warning_count);
   return true;
@@ -169,6 +221,7 @@ function rowMatchesSearch(event: AccountingBridgeReadinessEvent, search: string)
     event.source_model,
     event.status,
     event.canonical_status,
+    displayLabel(event),
     ...(event.required_profile_keys ?? []),
     ...(event.missing_profile_keys ?? []),
     ...event.debit_accounts.map(accountLabel),
@@ -180,28 +233,24 @@ function rowMatchesSearch(event: AccountingBridgeReadinessEvent, search: string)
 
 function classifyFix(event: AccountingBridgeReadinessEvent): string | null {
   const status = normalizedStatus(event);
-  const fields = missingFields(event).join(" ").toLowerCase();
-  if (status.includes("UNSUPPORTED") || event.supported === false) return "Unsupported source blockers";
-  if ((event.missing_profile_keys?.length ?? 0) > 0 || event.posting_profile_ready === false) return "Missing posting profiles";
-  if (fields.includes("debit")) return "Missing debit accounts";
-  if (fields.includes("credit")) return "Missing credit accounts";
-  if (fields.includes("finance")) return "Missing finance accounts";
-  if (event.reconciliation_ready === false || status.includes("RECONCILIATION")) return "Reconciliation exceptions";
-  if (fields.includes("period") || fields.includes("numbering") || status === "BLOCKED_BY_PERIOD" || status === "BLOCKED_BY_NUMBERING") return "Numbering or period blockers";
-  if (status.includes("WARNING")) return "Warning-only rows";
+  if (isUnsupported(event)) return "Unsupported source blockers";
+  if (hasSetupGap(event)) return "Missing finance/account/profile setup";
+  if (isApprovalGated(event)) return "Approval-gated workflows";
+  if (isReconciliationPending(event) || event.reconciliation_ready === false || status.includes("RECONCILIATION")) return "Reconciliation pending";
+  if (status.includes("WARNING") || status === "SKIPPED") return "Skipped/warning rows";
   return null;
 }
 
 function groupStats(events: AccountingBridgeReadinessEvent[]) {
   return {
     total: events.length,
-    ready: events.filter((event) => normalizedStatus(event) === "READY").length,
-    postable: events.filter((event) => normalizedStatus(event) === "POSTABLE" || normalizedStatus(event) === "READY_UNPOSTED" || event.can_post).length,
-    reconciled: events.filter((event) => normalizedStatus(event) === "RECONCILED").length,
-    blocked: events.filter((event) => normalizedStatus(event).startsWith("BLOCKED")).length,
-    unsupported: events.filter((event) => normalizedStatus(event).includes("UNSUPPORTED") || event.supported === false).length,
-    skipped: events.filter((event) => normalizedStatus(event) === "SKIPPED").length,
-    warning: events.filter((event) => normalizedStatus(event).includes("WARNING") || Boolean(event.warning_count)).length,
+    ready: events.filter(isBusinessReady).length,
+    postable: events.filter(isPostableSetup).length,
+    reconciled: events.filter(isReconciled).length,
+    approval: events.filter(isApprovalGated).length,
+    unsupported: events.filter(isUnsupported).length,
+    pending: events.filter(isReconciliationPending).length,
+    setup: events.filter(hasSetupGap).length,
   };
 }
 
@@ -210,11 +259,19 @@ function SummaryCard({ label, value, tone, href }: { label: string; value: numbe
   return href ? <Link href={href}>{body}</Link> : body;
 }
 
+function readinessPill(label: string, ok: boolean, blockedText = "Blocked") {
+  return <span className={cx("inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold", ok ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-950")}>{label}: {ok ? "Ready" : blockedText}</span>;
+}
+
 function BridgeRow({ event }: { event: AccountingBridgeReadinessEvent }) {
   const status = normalizedStatus(event);
   const fields = missingFields(event);
   const profileKeys = event.required_profile_keys ?? event.debit_requirements ?? event.credit_requirements ?? [];
   const missingProfiles = event.missing_profile_keys ?? [];
+  const postingReady = isPostableSetup(event);
+  const reconciliationReady = isReconciled(event);
+  const approvalReady = !isApprovalGated(event);
+  const unsupported = isUnsupported(event);
 
   return (
     <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -223,10 +280,18 @@ function BridgeRow({ event }: { event: AccountingBridgeReadinessEvent }) {
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-semibold text-foreground">{event.label || event.event_label || event.event_key}</h3>
             <span className={cx("rounded-full border px-2.5 py-1 text-[11px] font-semibold", statusClass(status))}>{status}</span>
+            <span className={cx("rounded-full border px-2.5 py-1 text-[11px] font-semibold", statusClass(displayLabel(event)))}>{displayLabel(event)}</span>
           </div>
-          <div className="mt-1 text-xs text-muted-foreground">{event.source_module || event.module || "Accounting"} · <span className="font-mono">{event.source_event_key || event.event_key}</span></div>
+          <div className="mt-1 text-xs text-muted-foreground">Source module: {event.source_module || event.module || "Accounting"} · Event: <span className="font-mono">{event.source_event_key || event.event_key}</span></div>
         </div>
         <Link href={routeForEvent(event)} className="inline-flex rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted">{actionLabel(event)}</Link>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold text-foreground">Posting readiness</div><div className="mt-2 flex flex-wrap gap-1">{readinessPill("Posting", postingReady, "Not postable")}</div><p className="mt-2 text-muted-foreground">{postingReady ? "Mapping, period, and numbering gates are ready." : "Posting setup still has a blocker."}</p></div>
+        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold text-foreground">Reconciliation readiness</div><div className="mt-2 flex flex-wrap gap-1">{readinessPill("Reconciliation", reconciliationReady, "Pending")}</div><p className="mt-2 text-muted-foreground">{reconciliationReady ? "Reconciliation evidence is present." : "Open bridge reconciliation before treating this as final-ready."}</p></div>
+        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold text-foreground">Approval readiness</div><div className="mt-2 flex flex-wrap gap-1">{readinessPill("Approval", approvalReady, "Required")}</div><p className="mt-2 text-muted-foreground">{approvalReady ? "No controlled approval blocker is reported." : "Controlled admin approval is required; this is not a mapping setup failure."}</p></div>
+        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold text-foreground">Unsupported-source state</div><div className="mt-2 flex flex-wrap gap-1">{readinessPill("Source", !unsupported, "Unsupported")}</div><p className="mt-2 text-muted-foreground">{unsupported ? "Do not fake readiness. Implement or disable the source workflow." : "Real source workflow is available."}</p></div>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -235,18 +300,17 @@ function BridgeRow({ event }: { event: AccountingBridgeReadinessEvent }) {
         <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold text-foreground">Finance-account readiness</div><p className="mt-1 text-muted-foreground">{accountText(event.finance_accounts, fields.some((field) => field.includes("finance")) ? "Missing finance account" : "No finance account required")}</p></div>
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
         <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold text-foreground">Required profile keys</div><p className="mt-1 text-muted-foreground">{profileKeys.length ? profileKeys.join(", ") : "Not specified by backend"}</p></div>
         <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold text-foreground">Missing fields</div><p className="mt-1 text-muted-foreground">{[...missingProfiles, ...fields].length ? [...missingProfiles, ...fields].join(", ") : "None reported"}</p></div>
+        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold text-foreground">Recommended action route</div><Link href={routeForEvent(event)} className="mt-1 inline-flex font-semibold text-primary underline underline-offset-4">{routeForEvent(event)}</Link></div>
       </div>
 
-      {(status.startsWith("BLOCKED") || status.includes("UNSUPPORTED") || status.includes("WARNING")) ? (
-        <details className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          <summary className="cursor-pointer font-semibold">Why blocked?</summary>
-          <p className="mt-2 leading-6">{rowExplanation(event)}</p>
-          <p className="mt-2 text-xs">Blocks posting: {String(Boolean(event.is_posting_blocker ?? status.startsWith("BLOCKED")))} · Blocks close: {String(Boolean(event.is_close_blocker ?? (status.startsWith("BLOCKED") || status.includes("UNSUPPORTED"))))}</p>
-        </details>
-      ) : null}
+      <details className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950" open={status.startsWith("BLOCKED") || unsupported || isReconciliationPending(event)}>
+        <summary className="cursor-pointer font-semibold">Why blocked?</summary>
+        <p className="mt-2 leading-6">{rowExplanation(event)}</p>
+        <p className="mt-2 text-xs">Blocks posting: {String(Boolean(event.is_posting_blocker ?? status.startsWith("BLOCKED") || unsupported))} · Blocks close: {String(Boolean(event.is_close_blocker ?? (status.startsWith("BLOCKED") || unsupported || isReconciliationPending(event))))}</p>
+      </details>
     </article>
   );
 }
@@ -305,28 +369,27 @@ export default function AccountingBridgeReadinessPage() {
     return <PortalPage title="Accounting Bridge Readiness" subtitle="Validating bridge mappings and canonical postability."><LoadingBlock label="Loading accounting bridge readiness..." /></PortalPage>;
   }
 
-  const summary: Partial<AccountingBridgeReadinessPayload["summary"]> = payload?.summary ?? {
-    ready_count: 0,
-    postable_count: 0,
-    reconciled_count: 0,
-    blocked_count: 0,
-    unsupported_source_count: 0,
-    skipped_count: 0,
-    source_count: allEvents.length,
-  };
+  const summary: Partial<AccountingBridgeReadinessPayload["summary"]> = payload?.summary ?? { source_count: allEvents.length };
   const periodReadiness = payload?.accounting_period_readiness ?? payload?.financial_year_readiness ?? null;
   const totalRows = summary.source_count ?? allEvents.length;
   const activeSourceCount = allEvents.filter((event) => event.source_workflow_exists !== false && event.supported !== false).length;
-  const unsupportedCount = summary.unsupported_source_count ?? allEvents.filter((event) => normalizedStatus(event).includes("UNSUPPORTED")).length;
-  const skippedCount = summary.skipped_count ?? allEvents.filter((event) => normalizedStatus(event) === "SKIPPED").length;
-  const bridgeStatus = unsupportedCount || summary.blocked_count ? "Blocked" : summary.postable_count || summary.ready_count ? "Ready" : "Needs review";
+  const postableCount = allEvents.filter(isPostableSetup).length;
+  const reconciledCount = allEvents.filter(isReconciled).length;
+  const readyCount = allEvents.filter(isBusinessReady).length;
+  const approvalCount = allEvents.filter(isApprovalGated).length;
+  const unsupportedCount = allEvents.filter(isUnsupported).length;
+  const reconciliationPendingCount = allEvents.filter(isReconciliationPending).length;
+  const setupMissingCount = allEvents.filter(hasSetupGap).length;
+  const skippedWarningCount = allEvents.filter((event) => normalizedStatus(event) === "SKIPPED" || normalizedStatus(event).includes("WARNING") || Boolean(event.warning_count)).length;
+  const setupMostlyReady = postableCount > setupMissingCount;
+  const bridgeStatus = unsupportedCount || approvalCount || reconciliationPendingCount || setupMissingCount ? "Blocked" : readyCount ? "Ready" : "Needs review";
 
   return (
     <PortalPage
       title="Accounting Bridge Readiness"
-      subtitle="Operator-first control center for what is postable, what is blocked, and where setup should be fixed. This page is read-only."
+      subtitle="Operator-first control center for what is postable, reconciled, blocked, and ready. This page is read-only."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Readiness" }]}
-      actions={[{ href: MAPPING_AUDIT_HREF, label: "Mapping Audit", variant: "secondary" }, { href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge Reconciliation", variant: "secondary" }, { href: ROUTES.admin.accountingSetup, label: "Accounting Setup", variant: "secondary" }]}
+      actions={[{ href: MAPPING_AUDIT_HREF, label: "Mapping Audit", variant: "secondary" }, { href: BRIDGE_RECONCILIATION_HREF, label: "Bridge Reconciliation", variant: "secondary" }, { href: ROUTES.admin.accountingSetup, label: "Accounting Setup", variant: "secondary" }]}
       statusBadge={{ label: bridgeStatus, tone: bridgeStatus === "Ready" ? "success" : "warning" }}
     >
       <div className="space-y-6">
@@ -337,11 +400,12 @@ export default function AccountingBridgeReadinessPage() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting Bridge Readiness</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">FY {periodReadiness?.active_financial_year?.code ?? "not configured"} · {bridgeStatus}</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Readiness checks do not post journals, complete reconciliation, create mappings, or mutate source records.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Postable means accounting setup is complete. Ready means the event is postable, reconciled, and not blocked by approval or unsupported source.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Current interpretation: {setupMostlyReady ? "Setup mostly ready" : "Setup needs remediation"}; reconciliation pending; Staff advance unsupported; approval-gated workflows pending controlled approval.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href={MAPPING_AUDIT_HREF} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Mapping Audit</Link>
-              <Link href={ROUTES.admin.accountingBridgeReconciliation} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Bridge Reconciliation</Link>
+              <Link href={BRIDGE_RECONCILIATION_HREF} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open bridge reconciliation</Link>
               <Link href={ROUTES.admin.accountingSetup} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Accounting Setup</Link>
               <Link href={DOCUMENT_NUMBERING_HREF} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Document Numbering</Link>
               <Link href={ROUTES.admin.accountingFinanceAccounts} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Finance Accounts</Link>
@@ -352,18 +416,21 @@ export default function AccountingBridgeReadinessPage() {
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <SummaryCard label="Active sources" value={activeSourceCount} tone="border-slate-200 bg-slate-50 text-slate-900" />
             <SummaryCard label="Total profiles" value={summary.source_count ?? totalRows} tone="border-slate-200 bg-slate-50 text-slate-900" />
-            <SummaryCard label="Ready" value={summary.ready_count ?? 0} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
-            <SummaryCard label="Postable" value={summary.postable_count ?? 0} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
-            <SummaryCard label="Reconciled" value={summary.reconciled_count ?? 0} tone="border-emerald-200 bg-white text-emerald-900" />
-            <SummaryCard label="Unsupported" value={unsupportedCount} tone="border-red-200 bg-red-50 text-red-900" />
-            <SummaryCard label="Skipped" value={skippedCount} tone="border-slate-200 bg-slate-50 text-slate-900" />
+            <SummaryCard label="Postable" value={postableCount} tone="border-blue-200 bg-blue-50 text-blue-900" />
+            <SummaryCard label="Reconciled" value={reconciledCount} tone="border-emerald-200 bg-white text-emerald-900" />
+            <SummaryCard label="Ready" value={readyCount} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+            <SummaryCard label="Blocked by approval" value={approvalCount} tone="border-purple-200 bg-purple-50 text-purple-900" href={bridgeReconciliationRoute("BLOCKED_BY_APPROVAL")} />
+            <SummaryCard label="Unsupported source" value={unsupportedCount} tone="border-red-200 bg-red-50 text-red-900" />
+            <SummaryCard label="Reconciliation pending" value={reconciliationPendingCount} tone="border-amber-200 bg-amber-50 text-amber-950" href={bridgeReconciliationRoute("READY_UNPOSTED")} />
+            <SummaryCard label="Setup/mapping missing" value={setupMissingCount} tone="border-red-200 bg-red-50 text-red-900" href={MAPPING_AUDIT_HREF} />
+            <SummaryCard label="Skipped/warnings" value={skippedWarningCount} tone="border-slate-200 bg-slate-50 text-slate-900" />
             <SummaryCard label="Total rows" value={totalRows} tone="border-slate-200 bg-slate-50 text-slate-900" />
             <SummaryCard label="Current status" value={bridgeStatus} tone={bridgeStatus === "Ready" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-950"} />
           </div>
         </section>
 
-        <WorkspaceSection title="Fix first" description="Ranked by close/posting severity. Open the target setup screen; no fix is applied from this readiness page.">
-          {fixFirst.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{fixFirst.map((item) => <Link key={item.label} href={routeForEvent(item.rows[0])} className="rounded-xl border border-border bg-card p-4 shadow-sm hover:bg-muted/40"><div className="text-sm font-semibold text-foreground">{item.label}</div><div className="mt-2 text-2xl font-semibold">{item.rows.length}</div><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.rows[0].label || item.rows[0].event_key}: {rowExplanation(item.rows[0])}</p></Link>)}</div> : <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">No blocker buckets found in the current readiness payload.</div>}
+        <WorkspaceSection title="Fix first" description="Ranked by close/posting severity. Reconciliation exceptions route to bridge reconciliation, not mapping audit.">
+          {fixFirst.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">{fixFirst.map((item) => <Link key={item.label} href={routeForEvent(item.rows[0])} className="rounded-xl border border-border bg-card p-4 shadow-sm hover:bg-muted/40"><div className="text-sm font-semibold text-foreground">{item.label}</div><div className="mt-2 text-2xl font-semibold">{item.rows.length}</div><p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{item.rows[0].label || item.rows[0].event_key}: {rowExplanation(item.rows[0])}</p></Link>)}</div> : <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">No blocker buckets found in the current readiness payload.</div>}
         </WorkspaceSection>
 
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -376,7 +443,7 @@ export default function AccountingBridgeReadinessPage() {
         {groupedEvents.map(([name, events]) => {
           const stats = groupStats(events);
           return (
-            <WorkspaceSection key={name} title={name} description="Grouped bridge rows show readiness, blockers, explanation, and the safest next route.">
+            <WorkspaceSection key={name} title={name} description="Grouped bridge rows show posting readiness, reconciliation readiness, approval readiness, unsupported-source state, and safest next route.">
               <div className="mb-3 grid gap-2 sm:grid-cols-4 xl:grid-cols-8">
                 {Object.entries(stats).map(([label, value]) => <div key={`${name}-${label}`} className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold capitalize text-muted-foreground">{label}</div><div className="mt-1 text-lg font-semibold text-foreground">{value}</div></div>)}
               </div>
@@ -391,9 +458,9 @@ export default function AccountingBridgeReadinessPage() {
           <summary className="cursor-pointer text-base font-semibold text-foreground">Advanced raw readiness</summary>
           <div className="mt-4 overflow-x-auto rounded-2xl border border-border bg-background shadow-sm">
             <table className="min-w-full divide-y divide-border text-sm">
-              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Event</th><th className="px-4 py-3">Canonical status</th><th className="px-4 py-3">Debit</th><th className="px-4 py-3">Credit</th><th className="px-4 py-3">Finance</th><th className="px-4 py-3">Backend reason</th></tr></thead>
+              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Event</th><th className="px-4 py-3">Canonical status</th><th className="px-4 py-3">Posting</th><th className="px-4 py-3">Reconciliation</th><th className="px-4 py-3">Approval</th><th className="px-4 py-3">Unsupported</th><th className="px-4 py-3">Backend reason</th></tr></thead>
               <tbody className="divide-y divide-border">
-                {allEvents.map((event) => <tr key={`raw-${event.event_key}`} className="align-top"><td className="px-4 py-4"><div className="font-semibold">{event.label}</div><div className="font-mono text-xs text-muted-foreground">{event.event_key}</div></td><td className="px-4 py-4"><span className={cx("rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(normalizedStatus(event)))}>{normalizedStatus(event)}</span></td><td className="px-4 py-4 text-xs">{accountText(event.debit_accounts, (event.debit_requirements ?? []).join(", ") || "None")}</td><td className="px-4 py-4 text-xs">{accountText(event.credit_accounts, (event.credit_requirements ?? []).join(", ") || "None")}</td><td className="px-4 py-4 text-xs">{accountText(event.finance_accounts, "None")}</td><td className="px-4 py-4 text-xs text-muted-foreground">{rowExplanation(event)}</td></tr>)}
+                {allEvents.map((event) => <tr key={`raw-${event.event_key}`} className="align-top"><td className="px-4 py-4"><div className="font-semibold">{event.label}</div><div className="font-mono text-xs text-muted-foreground">{event.event_key}</div></td><td className="px-4 py-4"><span className={cx("rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(normalizedStatus(event)))}>{normalizedStatus(event)}</span></td><td className="px-4 py-4 text-xs">{isPostableSetup(event) ? "Postable" : "Not postable"}</td><td className="px-4 py-4 text-xs">{isReconciled(event) ? "Reconciled" : "Pending"}</td><td className="px-4 py-4 text-xs">{isApprovalGated(event) ? "Approval required" : "Ready"}</td><td className="px-4 py-4 text-xs">{isUnsupported(event) ? "Unsupported source" : "Supported source"}</td><td className="px-4 py-4 text-xs text-muted-foreground">{rowExplanation(event)}</td></tr>)}
               </tbody>
             </table>
           </div>
