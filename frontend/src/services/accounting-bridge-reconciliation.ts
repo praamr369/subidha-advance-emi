@@ -94,5 +94,5 @@ function toQuery(filters?: AccountingBridgeReconciliationFilters): string {
 export async function getAccountingBridgeReconciliation(
   filters?: AccountingBridgeReconciliationFilters,
 ): Promise<AccountingBridgeReconciliationPayload> {
-  return request<AccountingBridgeReconciliationPayload>(`/admin/accounting/bridge-reconciliation/${toQuery(filters)}`);
+  return request<AccountingBridgeReconciliationPayload>("/accounting/bridge-reconciliation/" + toQuery(filters));
 }
