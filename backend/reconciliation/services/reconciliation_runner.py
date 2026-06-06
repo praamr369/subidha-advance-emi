@@ -28,6 +28,8 @@ class PhaseFRunRequest:
     date_from: date | None = None
     date_to: date | None = None
     branch_id: int | None = None
+    financial_year: str | None = None
+    accounting_period: str | None = None
 
 
 @transaction.atomic
@@ -45,6 +47,9 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         started_at=timezone.now(),
         metadata={
             "phase": "K",
+            "financial_year": request.financial_year,
+            "accounting_period": request.accounting_period,
+            "read_only_contract": "Reconciliation checks must not create JournalEntry, DocumentSequence, source operational records, or posting bridge rows.",
             "checks": [
                 "PAYMENT_MISSING_RECEIPT_DOCUMENT",
                 "RECEIPT_DOCUMENT_PAYMENT_LINK_INVALID",
@@ -121,12 +126,7 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
     )
 
     try:
-        totals = {
-            "checked": 0,
-            "matched": 0,
-            "exceptions": 0,
-            "high_risk": 0,
-        }
+        totals = {"checked": 0, "matched": 0, "exceptions": 0, "high_risk": 0}
         totals = run_emi_checks(run=run, totals=totals)
         totals = run_accounting_bridge_checks(run=run, totals=totals)
         totals = run_direct_sale_billing_checks(run=run, totals=totals)
@@ -142,23 +142,11 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
         run.high_risk_count = totals["high_risk"]
         run.status = ReconciliationRunStatus.COMPLETED
         run.finished_at = timezone.now()
-        run.save(
-            update_fields=[
-                "total_checked",
-                "total_matched",
-                "total_exceptions",
-                "high_risk_count",
-                "status",
-                "finished_at",
-            ]
-        )
+        run.save(update_fields=["total_checked", "total_matched", "total_exceptions", "high_risk_count", "status", "finished_at"])
     except Exception as exc:
         run.status = ReconciliationRunStatus.FAILED
         run.finished_at = timezone.now()
-        run.metadata = {
-            **(run.metadata or {}),
-            "error": str(exc),
-        }
+        run.metadata = {**(run.metadata or {}), "error": str(exc)}
         run.save(update_fields=["status", "finished_at", "metadata"])
         raise
 
