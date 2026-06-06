@@ -15,46 +15,14 @@ import {
   type AccountingBridgeReadinessEvent,
   type AccountingBridgeReadinessPayload,
 } from "@/services/accounting-bridge-readiness";
+import { seedSupportedAccountingMappings } from "@/services/accounting-mapping-remediation";
+import { generateCurrentAccountingPeriod } from "@/services/accounting-period-actions";
 
-const RETURNS_DAMAGE_CREDIT_EVENT_KEYS = new Set([
-  "customer_return",
-  "sales_return",
-  "credit_note_issue",
-  "customer_refund",
-  "customer_credit_adjustment",
-  "damage_recovery",
-  "security_deposit_damage_deduction",
-  "refund_customer_credit",
-]);
-
-const PURCHASE_VENDOR_EVENT_KEYS = new Set([
-  "vendor_purchase_bill",
-  "vendor_payment",
-  "purchase_inventory_receive",
-  "vendor_return",
-  "purchase_expense",
-]);
-
-const INVENTORY_EVENT_KEYS = new Set([
-  "inventory_purchase_receive",
-  "inventory_adjustment_gain",
-  "inventory_adjustment_loss",
-  "inventory_delivery_out",
-]);
-
-const MANUFACTURING_EVENT_KEYS = new Set([
-  "manufacturing_consumption",
-  "manufacturing_output",
-  "manufacturing_wastage",
-]);
-
-const PAYROLL_EVENT_KEYS = new Set([
-  "salary_expense",
-  "salary_payable",
-  "salary_payment",
-  "staff_advance",
-  "expense_claim_payment",
-]);
+const RETURNS_DAMAGE_CREDIT_EVENT_KEYS = new Set(["customer_return", "sales_return", "credit_note_issue", "customer_refund", "customer_credit_adjustment", "damage_recovery", "security_deposit_damage_deduction", "refund_customer_credit"]);
+const PURCHASE_VENDOR_EVENT_KEYS = new Set(["vendor_purchase_bill", "vendor_payment", "purchase_inventory_receive", "vendor_return", "purchase_expense"]);
+const INVENTORY_EVENT_KEYS = new Set(["inventory_purchase_receive", "inventory_adjustment_gain", "inventory_adjustment_loss", "inventory_delivery_out"]);
+const MANUFACTURING_EVENT_KEYS = new Set(["manufacturing_consumption", "manufacturing_output", "manufacturing_wastage"]);
+const PAYROLL_EVENT_KEYS = new Set(["salary_expense", "salary_payable", "salary_payment", "staff_advance", "expense_claim_payment"]);
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -71,9 +39,9 @@ function bridgeGroupName(event: AccountingBridgeReadinessEvent): string {
 
 function statusClass(status: string): string {
   const normalized = status.toUpperCase();
-  if (normalized === "READY") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (normalized === "READY" || normalized === "OPEN") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (normalized === "INFO") return "border-blue-200 bg-blue-50 text-blue-900";
-  if (normalized === "WARNING") return "border-amber-200 bg-amber-50 text-amber-950";
+  if (normalized === "WARNING" || normalized === "LOCKED") return "border-amber-200 bg-amber-50 text-amber-950";
   return "border-red-200 bg-red-50 text-red-900";
 }
 
@@ -87,41 +55,31 @@ function accountLabel(account: AccountingBridgeReadinessAccount): string {
 
 function AccountList({ accounts, emptyLabel }: { accounts: AccountingBridgeReadinessAccount[]; emptyLabel: string }) {
   if (!accounts.length) return <span className="text-muted-foreground">{emptyLabel}</span>;
-  return (
-    <ul className="space-y-1">
-      {accounts.map((account, index) => (
-        <li key={`${account.id ?? account.name ?? account.kind ?? "account"}-${account.purpose ?? account.requirement ?? index}`}>
-          {accountLabel(account)}
-        </li>
-      ))}
-    </ul>
-  );
+  return <ul className="space-y-1">{accounts.map((account, index) => <li key={`${account.id ?? account.name ?? account.kind ?? "account"}-${account.purpose ?? account.requirement ?? index}`}>{accountLabel(account)}</li>)}</ul>;
 }
 
 function BlockingReasons({ event }: { event: AccountingBridgeReadinessEvent }) {
   if (!event.blocking_reasons.length) return <span className="text-emerald-700">No blocking reasons.</span>;
-  return (
-    <ul className="list-disc space-y-1 pl-4 text-red-800">
-      {event.blocking_reasons.map((reason, index) => (
-        <li key={`${event.event_key}-reason-${index}-${reason.slice(0, 24)}`}>{reason}</li>
-      ))}
-    </ul>
-  );
+  return <ul className="list-disc space-y-1 pl-4 text-red-800">{event.blocking_reasons.map((reason, index) => <li key={`${event.event_key}-reason-${index}-${reason.slice(0, 24)}`}>{reason}</li>)}</ul>;
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: number; tone: string }) {
-  return (
-    <div className={cx("rounded-2xl border p-4 shadow-sm", tone)}>
-      <div className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
-    </div>
-  );
+function SummaryCard({ label, value, tone }: { label: string; value: number | string; tone: string }) {
+  return <div className={cx("rounded-2xl border p-4 shadow-sm", tone)}><div className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</div><div className="mt-2 text-2xl font-semibold">{value}</div></div>;
+}
+
+function setupHrefForEvent(event: AccountingBridgeReadinessEvent): string {
+  if (event.event_key === "staff_advance") return ROUTES.admin.accountingSetup;
+  if (event.event_key.includes("rent") || event.event_key.includes("lease") || event.event_key.includes("deposit")) return ROUTES.admin.settingsBusinessSetupChecklist;
+  if (event.event_key.includes("inventory") || event.event_key.includes("manufacturing") || event.event_key.includes("commission") || event.event_key.includes("payout") || event.event_key.includes("purchase")) return ROUTES.admin.accountingSetup;
+  return ROUTES.admin.accountingChartOfAccounts;
 }
 
 export default function AccountingBridgeReadinessPage() {
   const [payload, setPayload] = useState<AccountingBridgeReadinessPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load({ silent = false }: { silent?: boolean } = {}) {
@@ -138,9 +96,35 @@ export default function AccountingBridgeReadinessPage() {
     }
   }
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useEffect(() => { void load(); }, []);
+
+  async function handleSeedMappings() {
+    setActionBusy("seed");
+    setNotice(null);
+    try {
+      const result = await seedSupportedAccountingMappings();
+      setNotice(`Supported defaults seeded. Journals created: ${result.journal_entries_created}; document numbers allocated: ${result.document_sequences_allocated}.`);
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to seed supported mappings.");
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleGeneratePeriod() {
+    setActionBusy("period");
+    setNotice(null);
+    try {
+      const result = await generateCurrentAccountingPeriod();
+      setNotice(result.detail || "Current accounting period generated or confirmed.");
+      await load({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate current accounting period.");
+    } finally {
+      setActionBusy(null);
+    }
+  }
 
   const groupedEvents = useMemo(() => {
     const groups = new Map<string, AccountingBridgeReadinessEvent[]>();
@@ -152,55 +136,37 @@ export default function AccountingBridgeReadinessPage() {
   }, [payload?.events]);
 
   if (loading) {
-    return (
-      <PortalPage title="Accounting Bridge Readiness" subtitle="Validating operational finance/accounting bridge mappings against real Chart of Accounts and FinanceAccount setup.">
-        <LoadingBlock label="Loading accounting bridge readiness..." />
-      </PortalPage>
-    );
+    return <PortalPage title="Accounting Bridge Readiness" subtitle="Validating operational finance/accounting bridge mappings against real Chart of Accounts and FinanceAccount setup."><LoadingBlock label="Loading accounting bridge readiness..." /></PortalPage>;
   }
 
-  const summary = payload?.summary ?? {
-    ready_count: 0,
-    info_count: 0,
-    warning_count: 0,
-    error_count: 0,
-    not_configured_count: 0,
-    postable_count: 0,
-    blocked_count: 0,
-  };
+  const summary = payload?.summary ?? { ready_count: 0, info_count: 0, warning_count: 0, error_count: 0, not_configured_count: 0, postable_count: 0, blocked_count: 0 };
   const periodReadiness = payload?.accounting_period_readiness ?? payload?.financial_year_readiness ?? null;
+  const hasCurrentPeriodBlocker = (periodReadiness?.blockers ?? []).some((reason) => reason.toLowerCase().includes("period"));
 
   return (
     <PortalPage
       title="Accounting Bridge Readiness"
-      subtitle="Read-only readiness checks for future accounting bridge posting. This page does not post journals, create receipts, allocate settlements, or mutate source records."
-      breadcrumbs={[
-        { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "Accounting", href: ROUTES.admin.accounting },
-        { label: "Bridge Readiness" },
-      ]}
-      actions={[
-        { href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge Reconciliation", variant: "secondary" },
-        { href: ROUTES.admin.accountingSetup, label: "Accounting Setup", variant: "secondary" },
-        { href: ROUTES.admin.accountingChartOfAccounts, label: "Chart of Accounts", variant: "secondary" },
-      ]}
-      statusBadge={{ label: "Readiness Only", tone: "info" }}
+      subtitle="Read-only readiness checks for future accounting bridge posting. Setup buttons create only accounts/mappings; this page does not post journals, create receipts, allocate settlements, or mutate source records."
+      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Readiness" }]}
+      actions={[{ href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge Reconciliation", variant: "secondary" }, { href: ROUTES.admin.accountingSetup, label: "Accounting Setup", variant: "secondary" }, { href: ROUTES.admin.accountingChartOfAccounts, label: "Chart of Accounts", variant: "secondary" }]}
+      statusBadge={{ label: "Readiness + Setup Actions", tone: "info" }}
     >
       <div className="space-y-6">
         {error ? <ErrorState title="Unable to load bridge readiness" description={error} onRetry={() => void load()} /> : null}
+        {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Universal readiness registry</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Operational event mapping status</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
-                Each event below answers only whether its future accounting bridge would have safe debit, credit, and finance-account mappings. Posting remains disabled here by design.
-              </p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Each event below answers whether a future accounting bridge has safe debit, credit, and finance-account mappings. Posting remains disabled here by design.</p>
             </div>
-            <ActionButton variant="secondary" onClick={() => void load({ silent: true })} disabled={refreshing}>
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </ActionButton>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton variant="primary" onClick={() => void handleSeedMappings()} disabled={Boolean(actionBusy)}> {actionBusy === "seed" ? "Seeding..." : "Seed Supported Mappings"}</ActionButton>
+              {hasCurrentPeriodBlocker ? <ActionButton variant="secondary" onClick={() => void handleGeneratePeriod()} disabled={Boolean(actionBusy)}>{actionBusy === "period" ? "Generating..." : "Generate Current Period"}</ActionButton> : null}
+              <ActionButton variant="secondary" onClick={() => void load({ silent: true })} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh Readiness"}</ActionButton>
+            </div>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
@@ -213,96 +179,37 @@ export default function AccountingBridgeReadinessPage() {
             <SummaryCard label="Not configured" value={summary.not_configured_count} tone="border-slate-200 bg-slate-50 text-slate-900" />
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Active FY</div>
-              <div className="mt-1 font-semibold text-foreground">{periodReadiness?.active_financial_year?.code ?? "Not configured"}</div>
-            </div>
-            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting period</div>
-              <div className="mt-1 font-semibold text-foreground">{periodReadiness?.current_period?.code ?? "Not configured"}</div>
-            </div>
-            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Period status</div>
-              <span className={cx("mt-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(periodReadiness?.current_period?.status ?? "ERROR"))}>
-                {periodReadiness?.current_period?.status ?? "BLOCKED"}
-              </span>
-            </div>
+            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Active FY</div><div className="mt-1 font-semibold text-foreground">{periodReadiness?.active_financial_year?.code ?? "Not configured"}</div></div>
+            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting period</div><div className="mt-1 font-semibold text-foreground">{periodReadiness?.current_period?.code ?? "Not configured"}</div></div>
+            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Period status</div><span className={cx("mt-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(periodReadiness?.current_period?.status ?? "ERROR"))}>{periodReadiness?.current_period?.status ?? "BLOCKED"}</span></div>
           </div>
-          {periodReadiness?.blockers?.length ? (
-            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-              {periodReadiness.blockers[0]}
-            </div>
-          ) : null}
+          {periodReadiness?.blockers?.length ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">{periodReadiness.blockers[0]}</div> : null}
           <div className="mt-5 flex flex-wrap gap-2">
+            <Link href={ROUTES.admin.accountingPeriods} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Accounting Periods</Link>
             <Link href={ROUTES.admin.accountingBridgeReconciliation} className="rounded-xl border px-3 py-2 text-sm font-semibold">Bridge Reconciliation</Link>
-            <Link href={ROUTES.admin.accountingSetup} className="rounded-xl border px-3 py-2 text-sm font-semibold">Accounting Setup</Link>
-            <Link href={ROUTES.admin.financeCollect} className="rounded-xl border px-3 py-2 text-sm font-semibold">Finance Collection</Link>
-            <Link href={ROUTES.admin.billingDirectSales} className="rounded-xl border px-3 py-2 text-sm font-semibold">Direct Sale</Link>
-            <Link href={ROUTES.admin.payments} className="rounded-xl border px-3 py-2 text-sm font-semibold">Payments</Link>
-            <Link href={ROUTES.admin.rentLease} className="rounded-xl border px-3 py-2 text-sm font-semibold">Rent/Lease</Link>
-            <Link href={ROUTES.admin.financeDeposits} className="rounded-xl border px-3 py-2 text-sm font-semibold">Deposits</Link>
+            <Link href={ROUTES.admin.accountingSetup} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Mapping Setup</Link>
+            <Link href={ROUTES.admin.accountingChartOfAccounts} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open COA Setup</Link>
+            <Link href={ROUTES.admin.accountingFinanceAccounts} className="rounded-xl border px-3 py-2 text-sm font-semibold">Open Finance Accounts</Link>
           </div>
         </section>
 
-        {groupedEvents.length === 0 ? (
-          <WorkspaceSection title="No bridge events exposed" description="No operational source modules with bridge readiness registry entries were found in this repository state.">
-            <div className="rounded-2xl border border-border bg-background p-4 text-sm text-muted-foreground shadow-sm">
-              Confirm that source modules are installed before enabling any future accounting bridge work.
-            </div>
-          </WorkspaceSection>
-        ) : null}
+        {groupedEvents.length === 0 ? <WorkspaceSection title="No bridge events exposed" description="No operational source modules with bridge readiness registry entries were found in this repository state."><div className="rounded-2xl border border-border bg-background p-4 text-sm text-muted-foreground shadow-sm">Confirm that source modules are installed before enabling any future accounting bridge work.</div></WorkspaceSection> : null}
 
         {groupedEvents.map(([groupName, events]) => (
-          <WorkspaceSection
-            key={`bridge-group-${groupName}`}
-            title={groupName}
-            description="Readiness is based on active FinanceAccount, FinanceAccountCoaMapping, RentLeaseAccountingAccountMapping, and Chart of Accounts setup."
-          >
+          <WorkspaceSection key={`bridge-group-${groupName}`} title={groupName} description="Readiness is based on active FinanceAccount, FinanceAccountCoaMapping, RentLeaseAccountingAccountMapping, and Chart of Accounts setup.">
             <div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm">
               <table className="min-w-full divide-y divide-border text-sm">
-                <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Event</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Debit readiness</th>
-                    <th className="px-4 py-3 font-semibold">Credit readiness</th>
-                    <th className="px-4 py-3 font-semibold">Finance account readiness</th>
-                    <th className="px-4 py-3 font-semibold">Posting mode</th>
-                    <th className="px-4 py-3 font-semibold">Operator action</th>
-                  </tr>
-                </thead>
+                <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3 font-semibold">Event</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Debit readiness</th><th className="px-4 py-3 font-semibold">Credit readiness</th><th className="px-4 py-3 font-semibold">Finance account readiness</th><th className="px-4 py-3 font-semibold">Posting mode</th><th className="px-4 py-3 font-semibold">Recommended action</th></tr></thead>
                 <tbody className="divide-y divide-border">
                   {events.map((event) => (
                     <tr key={event.event_key} className="align-top">
-                      <td className="px-4 py-4">
-                        <div className="font-semibold text-foreground">{event.label}</div>
-                        <div className="mt-1 font-mono text-xs text-muted-foreground">{event.event_key}</div>
-                        {event.source_model ? <div className="mt-1 text-xs text-muted-foreground">Source: {event.source_model}</div> : null}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={cx("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(event.status))}>
-                          {event.status}
-                        </span>
-                        <div className="mt-2 text-xs text-muted-foreground">Can post: {event.can_post ? "Yes" : "No"}</div>
-                      </td>
-                      <td className="px-4 py-4 text-xs">
-                        <div className="font-semibold text-foreground">Required</div>
-                        <div className="mt-1 text-muted-foreground">{(event.debit_requirements ?? []).join(", ") || "Not specified"}</div>
-                        <div className="mt-3 font-semibold text-foreground">Configured</div>
-                        <div className="mt-1"><AccountList accounts={event.debit_accounts} emptyLabel="No debit account configured." /></div>
-                      </td>
-                      <td className="px-4 py-4 text-xs">
-                        <div className="font-semibold text-foreground">Required</div>
-                        <div className="mt-1 text-muted-foreground">{(event.credit_requirements ?? []).join(", ") || "Not specified"}</div>
-                        <div className="mt-3 font-semibold text-foreground">Configured</div>
-                        <div className="mt-1"><AccountList accounts={event.credit_accounts} emptyLabel="No credit account configured." /></div>
-                      </td>
-                      <td className="px-4 py-4 text-xs">
-                        <AccountList accounts={event.finance_accounts} emptyLabel="No finance account required or configured." />
-                        <div className="mt-3"><BlockingReasons event={event} /></div>
-                      </td>
+                      <td className="px-4 py-4"><div className="font-semibold text-foreground">{event.label}</div><div className="mt-1 font-mono text-xs text-muted-foreground">{event.event_key}</div>{event.source_model ? <div className="mt-1 text-xs text-muted-foreground">Source: {event.source_model}</div> : null}</td>
+                      <td className="px-4 py-4"><span className={cx("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(event.status))}>{event.status}</span><div className="mt-2 text-xs text-muted-foreground">Can post: {event.can_post ? "Yes" : "No"}</div></td>
+                      <td className="px-4 py-4 text-xs"><div className="font-semibold text-foreground">Required</div><div className="mt-1 text-muted-foreground">{(event.debit_requirements ?? []).join(", ") || "Not specified"}</div><div className="mt-3 font-semibold text-foreground">Configured</div><div className="mt-1"><AccountList accounts={event.debit_accounts} emptyLabel="No debit account configured." /></div></td>
+                      <td className="px-4 py-4 text-xs"><div className="font-semibold text-foreground">Required</div><div className="mt-1 text-muted-foreground">{(event.credit_requirements ?? []).join(", ") || "Not specified"}</div><div className="mt-3 font-semibold text-foreground">Configured</div><div className="mt-1"><AccountList accounts={event.credit_accounts} emptyLabel="No credit account configured." /></div></td>
+                      <td className="px-4 py-4 text-xs"><AccountList accounts={event.finance_accounts} emptyLabel="No finance account required or configured." /><div className="mt-3"><BlockingReasons event={event} /></div></td>
                       <td className="px-4 py-4 text-xs font-semibold text-foreground">{event.posting_mode}</td>
-                      <td className="px-4 py-4 text-xs text-muted-foreground">{event.operator_action}</td>
+                      <td className="px-4 py-4 text-xs text-muted-foreground"><div>{event.operator_action}</div>{event.status !== "READY" ? <Link href={setupHrefForEvent(event)} className="mt-2 inline-flex rounded-lg border border-border bg-background px-3 py-2 font-semibold text-foreground">Open setup</Link> : <Link href={`${ROUTES.admin.accountingBridgeReconciliation}?event_key=${encodeURIComponent(event.event_key)}`} className="mt-2 inline-flex rounded-lg border border-border bg-background px-3 py-2 font-semibold text-foreground">Review bridge items</Link>}{event.event_key === "staff_advance" ? <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">Unsupported source model; no post action is available.</div> : null}</td>
                     </tr>
                   ))}
                 </tbody>
