@@ -7,6 +7,7 @@ from accounting.services.accounting_bridge_reconciliation_read_service import (
     BridgeReconciliationFilters,
     build_accounting_bridge_reconciliation,
 )
+from accounting.services.accounting_postability_service import canonicalize_bridge_readiness_payload
 from accounting.services.returns_damage_credit_bridge_readiness_service import (
     build_accounting_bridge_readiness_with_returns_damage_credit,
 )
@@ -22,6 +23,11 @@ class AccountingBridgeReconciliationQuerySerializer(serializers.Serializer):
     customer = serializers.CharField(required=False, allow_blank=True)
     vendor = serializers.CharField(required=False, allow_blank=True)
     partner = serializers.CharField(required=False, allow_blank=True)
+    financial_year = serializers.CharField(required=False, allow_blank=True)
+    accounting_period = serializers.CharField(required=False, allow_blank=True)
+    source_type = serializers.CharField(required=False, allow_blank=True)
+    source_model = serializers.CharField(required=False, allow_blank=True)
+    account = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -33,7 +39,8 @@ class AccountingBridgeReconciliationQuerySerializer(serializers.Serializer):
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated, IsAdmin])
 def accounting_bridge_readiness(request):
-    return Response(build_accounting_bridge_readiness_with_returns_damage_credit(), status=status.HTTP_200_OK)
+    payload = build_accounting_bridge_readiness_with_returns_damage_credit()
+    return Response(canonicalize_bridge_readiness_payload(payload, as_source_rows=False), status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
@@ -48,10 +55,15 @@ def accounting_bridge_reconciliation(request):
             event_key=(data.get("event_key") or "").strip() or None,
             date_from=data.get("date_from"),
             date_to=data.get("date_to"),
-            status=(data.get("status") or "").strip() or None,
+            status=(data.get("status") or "").strip().upper() or None,
             customer=(data.get("customer") or "").strip() or None,
             vendor=(data.get("vendor") or "").strip() or None,
             partner=(data.get("partner") or "").strip() or None,
+            financial_year=(data.get("financial_year") or "").strip() or None,
+            accounting_period=(data.get("accounting_period") or "").strip() or None,
+            source_type=(data.get("source_type") or "").strip() or None,
+            source_model=(data.get("source_model") or "").strip() or None,
+            account=(data.get("account") or "").strip() or None,
         )
     )
     return Response(payload, status=status.HTTP_200_OK)
