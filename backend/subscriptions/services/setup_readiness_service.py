@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.apps import apps
 from django.contrib.auth import get_user_model
 
 from accounting.models import (
@@ -12,6 +13,7 @@ from accounting.models import (
     FinanceAccountCoaMapping,
     FinanceAccountMappingPurpose,
 )
+from accounting.services.accounting_setup_catalog import CANONICAL_CHART_ACCOUNT_BY_KEY
 from accounting.services.accounting_setup_service import AccountingSetupService
 from accounting.services.finance_account_readiness import finance_account_readiness
 from accounts.models import UserRole
@@ -26,27 +28,38 @@ from subscriptions.services.policy_governance_service import build_policy_covera
 
 ReadinessStatus = str
 
-REQUIRED_FOR_COLLECTION = "REQUIRED_FOR_COLLECTION"
-REQUIRED_FOR_ACCOUNTING_POSTING = "REQUIRED_FOR_ACCOUNTING_POSTING"
-REQUIRED_FOR_DOCUMENTS = "REQUIRED_FOR_DOCUMENTS"
-REQUIRED_FOR_OPERATIONS = "REQUIRED_FOR_OPERATIONS"
-RECOMMENDED_FOR_GO_LIVE = "RECOMMENDED_FOR_GO_LIVE"
+CORE_REQUIRED = "CORE_REQUIRED"
+FINANCE_ACCOUNTING_REQUIRED = "FINANCE_ACCOUNTING_REQUIRED"
+RENT_LEASE_REQUIRED = "RENT_LEASE_REQUIRED"
+DIRECT_SALE_REQUIRED = "DIRECT_SALE_REQUIRED"
+SUBSCRIPTION_EMI_REQUIRED = "SUBSCRIPTION_EMI_REQUIRED"
+INVENTORY_REQUIRED = "INVENTORY_REQUIRED"
+STAFF_HR_PAYROLL_REQUIRED = "STAFF_HR_PAYROLL_REQUIRED"
+CRM_REQUIRED = "CRM_REQUIRED"
+RESET_DRY_RUN_REQUIRED = "RESET_DRY_RUN_REQUIRED"
 OPTIONAL_OR_FUTURE = "OPTIONAL_OR_FUTURE"
 
 CATEGORY_LABELS = {
-    REQUIRED_FOR_COLLECTION: "Required for collection",
-    REQUIRED_FOR_ACCOUNTING_POSTING: "Required for accounting posting",
-    REQUIRED_FOR_DOCUMENTS: "Documents and branding",
-    REQUIRED_FOR_OPERATIONS: "Required for operations",
-    RECOMMENDED_FOR_GO_LIVE: "Recommended for go-live",
-    OPTIONAL_OR_FUTURE: "Optional or future workflow",
+    CORE_REQUIRED: "Core Setup",
+    FINANCE_ACCOUNTING_REQUIRED: "Finance & Accounting",
+    RENT_LEASE_REQUIRED: "Rent / Lease Live Setup",
+    DIRECT_SALE_REQUIRED: "Direct Sale",
+    SUBSCRIPTION_EMI_REQUIRED: "Subscription EMI",
+    INVENTORY_REQUIRED: "Inventory",
+    STAFF_HR_PAYROLL_REQUIRED: "Staff / HR / Payroll",
+    CRM_REQUIRED: "CRM",
+    RESET_DRY_RUN_REQUIRED: "Reset / Dry Run",
+    OPTIONAL_OR_FUTURE: "Optional / Future",
 }
 
+# Core collection can become operational without fake stock or completed payroll/CRM enrichment.
 CORE_OPERATIONAL_CATEGORIES = {
-    REQUIRED_FOR_COLLECTION,
-    REQUIRED_FOR_ACCOUNTING_POSTING,
-    REQUIRED_FOR_DOCUMENTS,
-    REQUIRED_FOR_OPERATIONS,
+    CORE_REQUIRED,
+    FINANCE_ACCOUNTING_REQUIRED,
+    RENT_LEASE_REQUIRED,
+    DIRECT_SALE_REQUIRED,
+    SUBSCRIPTION_EMI_REQUIRED,
+    RESET_DRY_RUN_REQUIRED,
 }
 
 
@@ -83,12 +96,27 @@ def _section(
     }
 
 
-def _status_from(blockers: list[str], warnings: list[str]) -> ReadinessStatus:
+def _status_from(blockers: list[str], warnings: list[str], *, pending_status: str = "REQUIRED_PENDING") -> ReadinessStatus:
     if blockers:
         return "BLOCKED"
     if warnings:
-        return "NEEDS_SETUP"
+        return pending_status
     return "READY"
+
+
+def _model_exists(app_label: str, model_name: str) -> bool:
+    try:
+        apps.get_model(app_label, model_name)
+        return True
+    except LookupError:
+        return False
+
+
+def _active_system_account_exists(key: str) -> bool:
+    spec = CANONICAL_CHART_ACCOUNT_BY_KEY.get(key)
+    if spec is None:
+        return False
+    return ChartOfAccount.objects.filter(system_code=key, is_active=True).exists() or ChartOfAccount.objects.filter(code__iexact=spec.code, is_active=True).exists()
 
 
 def _document_numbering_ready() -> tuple[bool, dict[str, Any]]:
@@ -163,12 +191,12 @@ def _policy_governance_section() -> dict[str, Any]:
         warnings.append(f"{internal_missing} internal governance policy template(s) are missing.")
     if internal_draft:
         warnings.append(f"{internal_draft} internal governance policy template(s) are still draft.")
-    return _section(key="policy_governance", title="Policy Governance", status=_status_from(blockers, warnings), blockers=blockers, warnings=warnings, recommended_action="Seed missing templates, review policy text, publish required public policies, and approve/internalize governance policies before launch.", target_route="/admin/settings/policies", why_this_matters="Public launch must not expose draft/internal policies. Customer-facing policies require publication, while internal governance policies support audit and controls.", category=RECOMMENDED_FOR_GO_LIVE, optional_for_initial_start=True, metadata={"coverage_summary": coverage["summary"], "public_missing_count": public_missing, "public_not_published_count": public_not_published, "internal_missing_count": internal_missing, "internal_draft_count": internal_draft})
+    return _section(key="policy_governance", title="Policy Governance", status=_status_from(blockers, warnings), blockers=blockers, warnings=warnings, recommended_action="Seed missing templates, review policy text, publish required public policies, and approve/internalize governance policies before launch.", target_route="/admin/settings/policies", why_this_matters="Public launch must not expose draft/internal policies. Customer-facing policies require publication, while internal governance policies support audit and controls.", category=OPTIONAL_OR_FUTURE, optional_for_initial_start=True, metadata={"coverage_summary": coverage["summary"], "public_missing_count": public_missing, "public_not_published_count": public_not_published, "internal_missing_count": internal_missing, "internal_draft_count": internal_draft})
 
 
 def _business_compliance_section() -> dict[str, Any]:
     readiness = build_business_compliance_readiness()
-    return _section(key="business_compliance", title="Business Compliance", status=readiness["status"], blockers=readiness["blockers"], warnings=readiness["warnings"], recommended_action="Complete business profile, seed compliance checklist rows, upload real evidence, submit documents for review, approve required proof documents, and approve public-safe summaries separately.", target_route=readiness["route_hint"], why_this_matters="Shop identity, premises proof, tax identity, bank proof, and public-safe compliance summaries protect customer trust without exposing private documents.", category=RECOMMENDED_FOR_GO_LIVE, optional_for_initial_start=True, metadata={"missing_required_count": readiness["missing_required_count"], "pending_review_count": readiness["pending_review_count"], "approved_required_count": readiness["approved_required_count"], "required_count": readiness["required_count"], "recommended_missing_count": readiness["recommended_missing_count"], "rejected_count": readiness.get("rejected_count", 0), "expired_count": readiness.get("expired_count", 0), "missing_file_count": readiness.get("missing_file_count", 0), "public_summary_pending_count": readiness.get("public_summary_pending_count", 0), "route_hint": readiness["route_hint"], "privacy_rule": readiness["privacy_rule"], "required_checks": readiness["required_checks"], "recommended_checks": readiness["recommended_checks"]})
+    return _section(key="business_compliance", title="Business Documentation", status=readiness["status"], blockers=readiness["blockers"], warnings=readiness["warnings"], recommended_action="Complete business profile, GST/non-GST posture, MSME/Udyam/PAN evidence where available, print terms, and public-safe compliance summaries.", target_route=readiness["route_hint"], why_this_matters="Shop identity, premises proof, tax identity, bank proof, invoice footer, and public-safe compliance summaries protect customer trust without exposing private documents.", category=CORE_REQUIRED, optional_for_initial_start=True, metadata={"missing_required_count": readiness["missing_required_count"], "pending_review_count": readiness["pending_review_count"], "approved_required_count": readiness["approved_required_count"], "required_count": readiness["required_count"], "recommended_missing_count": readiness["recommended_missing_count"], "route_hint": readiness["route_hint"], "privacy_rule": readiness["privacy_rule"]})
 
 
 def _inventory_onboarding_section(active_products) -> dict[str, Any]:
@@ -177,29 +205,133 @@ def _inventory_onboarding_section(active_products) -> dict[str, Any]:
     opening_ledger_count = stock_ledgers.filter(movement_type=StockMovementType.OPENING_BALANCE_IN).count()
     product_count = active_products.count()
     profile_count = inventory_profiles.count()
-    status = "INFO"
-    warnings = ["Inventory opening stock is pending. You can start core operations and enter stock manually later."]
-    if profile_count and (opening_ledger_count or inventory_profiles.exclude(opening_stock_qty=0).exists()):
-        status = "READY"
-        warnings = []
+    stock_entered = bool(profile_count and (opening_ledger_count or inventory_profiles.exclude(opening_stock_qty=0).exists()))
+    status = "READY" if stock_entered else "REQUIRED_PENDING"
+    warnings = [] if stock_entered else [
+        "Inventory opening stock is pending. Stock CSV upload is an admin workflow but is not required for starting core collection.",
+        "Do not mark stock ready until manual opening stock or confirmed CSV import creates real stock records.",
+    ]
     return _section(
         key="inventory_onboarding",
-        title="Inventory Onboarding",
+        title="Inventory Opening Stock & CSV Onboarding",
         status=status,
         warnings=warnings,
-        recommended_action="Prepare inventory profiles now if useful. Capture opening stock manually later or use CSV import when the controlled import workflow is ready.",
+        recommended_action="Open inventory readiness, prepare inventory profiles, enter opening stock manually, or run CSV preview + confirmed import when available.",
         target_route="/admin/inventory/opening-stock",
-        why_this_matters="Shop stock is currently on pen and paper. Missing stock CSV must not block EMI, direct-sale, rent, or lease collection, but stock availability must not be faked.",
-        category=RECOMMENDED_FOR_GO_LIVE,
+        why_this_matters="Inventory is required as an admin workflow. Missing quantity must stay REQUIRED_PENDING; readiness must not fake stock availability or create StockLedger rows from setup/readiness.",
+        category=INVENTORY_REQUIRED,
         optional_for_initial_start=True,
         metadata={
-            "status_code": "ONBOARDING_PENDING" if status == "INFO" else status,
+            "status_code": "READY" if stock_entered else "REQUIRED_PENDING",
             "active_products": product_count,
             "inventory_profiles": profile_count,
             "stock_ledger_entries": stock_ledgers.count(),
             "opening_stock_ledger_entries": opening_ledger_count,
-            "csv_import_required_for_initial_start": False,
+            "csv_import_required_workflow": True,
+            "csv_import_required_for_initial_collection": False,
+            "manual_opening_stock_required_workflow": True,
             "creates_stock_ledger_from_readiness": False,
+            "action_routes": ["/admin/inventory/readiness", "/admin/inventory/opening-stock", "/admin/inventory/items", "/admin/inventory/ledger"],
+        },
+    )
+
+
+def _rent_lease_section() -> dict[str, Any]:
+    try:
+        from subscriptions.services.rent_lease_accounting_readiness_service import get_rent_lease_accounting_readiness
+
+        readiness = get_rent_lease_accounting_readiness(auto_create=False)
+    except Exception as exc:  # defensive: setup readiness must explain, not crash.
+        return _section(key="rent_lease_live", title="Rent / Lease Live Setup", status="BLOCKED", blockers=[f"Rent/lease readiness could not be loaded: {exc}"], recommended_action="Open rent/lease cockpit and accounting setup to resolve configuration.", target_route="/admin/rent-lease", why_this_matters="Rent/Lease is live for this business and must not be treated as optional or future.", category=RENT_LEASE_REQUIRED, repairable=True)
+    blockers = list(readiness.get("blockers") or [])
+    warnings: list[str] = []
+    if readiness.get("posting_mode") == "AUDIT_DEFERRED" or not readiness.get("posting_bridge_approved"):
+        warnings.append("Rent/lease collection workflow may be ready while bridge posting remains approval-gated.")
+    status = "READY" if readiness.get("mapping_ready") and readiness.get("collection_ready") and not blockers else "BLOCKED"
+    return _section(
+        key="rent_lease_live",
+        title="Rent / Lease Live Setup",
+        status=status,
+        blockers=blockers,
+        warnings=warnings,
+        recommended_action="Complete rent/lease income, lease income, security deposit liability, damage recovery, settlement FinanceAccount, monthly demand, deposit, and collection readiness.",
+        target_route="/admin/rent-lease",
+        why_this_matters="Rent/Lease is LIVE. Mapping, deposit workflow, monthly demand workflow, collection workflow, and bridge readiness must be visible and ready before live operation.",
+        category=RENT_LEASE_REQUIRED,
+        repairable=True,
+        metadata={
+            "mapping_ready": readiness.get("mapping_ready"),
+            "collection_ready": readiness.get("collection_ready"),
+            "posting_bridge_ready": readiness.get("posting_bridge_ready"),
+            "posting_bridge_approved": readiness.get("posting_bridge_approved"),
+            "posting_mode": readiness.get("posting_mode"),
+            "status": readiness.get("status"),
+            "deposit_workflow_route": "/admin/rent-lease",
+            "monthly_demand_workflow_route": "/admin/rent-lease",
+            "collection_workflow_route": "/admin/rent-lease",
+        },
+    )
+
+
+def _staff_hr_payroll_section(admin_count: int, cashier_count: int) -> dict[str, Any]:
+    salary_ready = _active_system_account_exists("SALARY_EXPENSE") and _active_system_account_exists("SALARY_PAYABLE")
+    staff_model_exists = _model_exists("accounts", "User")
+    blockers: list[str] = []
+    warnings: list[str] = []
+    if admin_count == 0:
+        blockers.append("Active admin user is missing.")
+    if not salary_ready:
+        warnings.append("Salary expense/payable COA readiness is pending.")
+    if cashier_count == 0:
+        warnings.append("No active cashier/staff login exists yet. Create staff login before assigning staff collection or attendance work.")
+    return _section(
+        key="staff_hr_payroll",
+        title="Staff / HR / Payroll / Payslip Readiness",
+        status=_status_from(blockers, warnings),
+        blockers=blockers,
+        warnings=warnings,
+        recommended_action="Open staff setup, create/activate staff login where needed, configure attendance, payroll, payslip readiness, and salary accounting accounts.",
+        target_route="/admin/hr/staff",
+        why_this_matters="Staff setup, staff login, attendance, payroll, and payslip readiness are required admin workflows. Setup must not create fake salary payments or payslips.",
+        category=STAFF_HR_PAYROLL_REQUIRED,
+        repairable=True,
+        metadata={
+            "admin_users": admin_count,
+            "cashier_users": cashier_count,
+            "staff_login_workflow_available": staff_model_exists,
+            "attendance_route": "/admin/hr/attendance",
+            "payroll_route": "/admin/hr/payroll",
+            "salary_payments_route": "/admin/hr/salary-payments",
+            "payslip_readiness": "WORKFLOW_REQUIRED",
+            "salary_accounting_ready": salary_ready,
+            "creates_salary_payments_from_setup": False,
+            "creates_payslips_from_setup": False,
+        },
+    )
+
+
+def _crm_section() -> dict[str, Any]:
+    party_model_exists = _model_exists("crm", "PartyMaster")
+    warnings: list[str] = []
+    if not party_model_exists:
+        warnings.append("CRM PartyMaster model was not detected; keep CRM enrichment pending until workflow is available.")
+    return _section(
+        key="crm_enrichment",
+        title="CRM Enrichment",
+        status="REQUIRED_PENDING" if warnings else "READY",
+        warnings=warnings,
+        recommended_action="Open CRM parties, leads, and follow-ups. Link customers, partners, and staff to PartyMaster where supported.",
+        target_route="/admin/crm/parties",
+        why_this_matters="CRM enrichment is required as an admin workflow for production setup, but setup must not create fake interactions or fake parties.",
+        category=CRM_REQUIRED,
+        repairable=False,
+        metadata={
+            "party_master_model_exists": party_model_exists,
+            "crm_route": "/admin/crm",
+            "party_route": "/admin/crm/parties",
+            "leads_route": "/admin/crm/leads",
+            "followups_route": "/admin/crm/follow-ups",
+            "creates_fake_interactions_from_setup": False,
         },
     )
 
@@ -234,45 +366,56 @@ def get_setup_readiness() -> dict[str, Any]:
     finance_warnings: list[str] = []
     if active_finance_blockers:
         finance_warnings.append(f"{active_finance_blockers} active finance account(s) are not collection-ready.")
+
+    direct_sale_ready = active_products.exists() and numbering_ready
+    subscription_ready = active_products.exists() and batches.exists() and lucky_ids.exists() and numbering_ready
+    inventory_account_ready = _active_system_account_exists("INVENTORY_ASSET") and _active_system_account_exists("PURCHASE_EXPENSE")
+
     sections = [
-        _section(key="business_profile", title="Business Profile", status="READY" if active_business_profile else "BLOCKED", blockers=[] if active_business_profile else ["Active business profile is missing."], recommended_action="Review legal name, trade name, address, phone, email, optional GST/PAN/Udyam/MSME details, and invoice defaults." if active_business_profile else "Configure the active business profile before live billing or customer onboarding.", target_route="/admin/settings/business-setup/profile", why_this_matters="Receipts, contracts, invoices, statements, public business data, and audit documents need a reliable business identity. GSTIN, PAN, Udyam/MSME, and website are optional unless your tax mode requires them.", category=REQUIRED_FOR_COLLECTION, repairable=False, metadata={"configured": bool(active_business_profile), "gstin_optional_for_non_gst": True, "website_optional": True}),
-        _section(key="print_branding", title="Print Branding", status="READY" if active_print_settings and (active_print_settings.business_name or active_print_settings.print_phone or active_print_settings.print_address) else "NEEDS_SETUP", warnings=[] if active_print_settings and (active_print_settings.business_name or active_print_settings.print_phone or active_print_settings.print_address) else ["Print branding is using fallback or incomplete display details."], recommended_action="Set print business name, phone/address, logo preference, signature labels, document terms, and print density.", target_route="/admin/settings/business-setup/print-branding", why_this_matters="Browser/PDF documents are evidence documents. Branding must not override backend truth, but it must be clear for customers and auditors.", category=REQUIRED_FOR_DOCUMENTS, repairable=True, metadata={"configured": bool(active_print_settings), "logo_present": bool(getattr(active_print_settings, "business_logo", None))}),
+        _section(key="admin_preserved", title="Admin Preserved", status="READY" if admin_users.exists() else "BLOCKED", blockers=[] if admin_users.exists() else ["Active admin user is missing."], recommended_action="Preserve admin user, especially username subidhafurniture where configured, before destructive reset or restore.", target_route="/admin/settings/users", why_this_matters="Setup/reset controls must remain admin-only and must preserve the primary business operator.", category=CORE_REQUIRED, repairable=False, metadata={"admin_users": admin_users.count(), "preserve_username": "subidhafurniture"}),
+        _section(key="business_profile", title="Business Profile", status="READY" if active_business_profile else "BLOCKED", blockers=[] if active_business_profile else ["Active business profile is missing."], recommended_action="Configure business name, legal name, optional GSTIN/PAN/Udyam/MSME, address, phone, email, website, GST/non-GST status, logo, terms, and footer text.", target_route="/admin/settings/business-setup/profile", why_this_matters="Receipts, contracts, invoices, statements, public business data, and audit documents need reliable business identity. GSTIN and website are optional in non-GST mode.", category=CORE_REQUIRED, repairable=False, metadata={"configured": bool(active_business_profile), "gstin_optional_for_non_gst": True, "website_optional": True}),
         _business_compliance_section(),
-        _policy_governance_section(),
-        _section(key="branch_cash_counter", title="Branch & Cash Counter", status="READY" if primary_branch_exists and active_counters.exists() else "BLOCKED", blockers=[] if primary_branch_exists and active_counters.exists() else ["Primary active branch or active cash counter is missing."], recommended_action="Create/activate the primary branch and at least one collection counter before cashier operations.", target_route="/admin/settings/business-setup/cash-desks", why_this_matters="Daily collection, cashier assignment, receipt source, and day-close need branch/counter context.", category=REQUIRED_FOR_COLLECTION, repairable=True, metadata={"active_branches": active_branches.count(), "primary_branch_exists": primary_branch_exists, "active_counters": active_counters.count()}),
-        _section(key="chart_of_accounts", title="Chart of Accounts", status="READY" if not required_coa_missing else "BLOCKED", blockers=[] if not required_coa_missing else [f"Missing required COA account(s): {', '.join(required_coa_missing)}"], recommended_action="Seed default accounting setup and review account names before live posting.", target_route="/admin/accounting/setup", why_this_matters="Payment collection, receipts, invoices, reversals, settlements, deposits, and reconciliation require stable posting accounts.", category=REQUIRED_FOR_ACCOUNTING_POSTING, repairable=True, metadata={"active_accounts": active_chart_accounts.count(), "missing_required_codes": required_coa_missing}),
-        _section(key="finance_accounts", title="Finance Accounts", status="READY" if ready_collection_account_exists and active_finance_blockers == 0 else ("NEEDS_SETUP" if ready_collection_account_exists else "BLOCKED"), blockers=[] if ready_collection_account_exists else ["No collection-ready cash/bank/UPI finance account is mapped to a posting-enabled leaf ASSET account."], warnings=finance_warnings, recommended_action="Map each active real cash, bank, and UPI account to a posting-enabled leaf ASSET chart account. At least one active collection account is enough to start controlled collection.", target_route="/admin/settings/business-setup/finance-accounts", why_this_matters="Cashier/admin collection selectors must show only accounts that can safely post, reconcile, and day-close.", category=REQUIRED_FOR_COLLECTION, repairable=True, metadata=finance_counts),
-        _section(key="document_templates", title="Document Templates & Numbering", status="READY" if numbering_ready and document_terms_configured else "NEEDS_SETUP", warnings=[] if numbering_ready and document_terms_configured else ["Document numbering or print terms are incomplete."], recommended_action="Configure invoice/receipt/contract numbering and print terms before launch.", target_route="/admin/settings/business-setup/document-numbering", why_this_matters="Contracts, receipts, invoices, delivery handovers, and statements need stable numbering and print terms.", category=REQUIRED_FOR_DOCUMENTS, repairable=True, metadata={**numbering_metadata, "document_terms_configured": document_terms_configured}),
-        _section(key="payment_collection", title="Payment Collection", status="READY" if ready_collection_account_exists else "BLOCKED", blockers=[] if ready_collection_account_exists else ["No collection-ready finance account exists for payment posting."], recommended_action="Configure at least one active cash/bank/UPI collection account and verify cashier collection selectors.", target_route="/admin/finance/collect", why_this_matters="Customer payment collection must post to valid accounts with receipt and reconciliation traceability.", category=REQUIRED_FOR_COLLECTION, metadata={"collection_ready_accounts": finance_counts["ready"], "collection_mappings": collection_mappings.count()}),
-        _section(key="accounting_reconciliation", title="Accounting Bridge & Reconciliation Readiness", status="READY" if not required_coa_missing and not required_mappings_missing and posting_profiles_count else "BLOCKED", blockers=[] if not required_coa_missing and not required_mappings_missing and posting_profiles_count else ["Accounting setup, posting profiles, or reconciliation mappings are incomplete."], recommended_action="Finish accounting setup, posting profiles, bridge readiness, and mapping diagnostics before controlled posting.", target_route="/admin/accounting/bridges", why_this_matters="Financial correctness depends on explicit posting profiles and reconciliation evidence. Bridge readiness is read-only and must not auto-post journals.", category=REQUIRED_FOR_ACCOUNTING_POSTING, repairable=True, metadata={"missing_mapping_purposes": required_mappings_missing, "posting_profiles": posting_profiles_count, "tax_profile_configured": bool(active_tax_profile)}),
-        _section(key="staff_roles", title="Staff & HR Setup", status="READY" if admin_users.exists() else "NEEDS_SETUP", warnings=[] if admin_users.exists() else ["Active admin user is missing."], recommended_action="Create staff profiles and staff logins only where needed. Payroll configuration is recommended, not required for first collections.", target_route="/admin/settings/business-setup/staff", why_this_matters="Role separation protects payment approval, cancellation, reversal, setup changes, and future payroll workflows.", category=RECOMMENDED_FOR_GO_LIVE, optional_for_initial_start=True, metadata={"admin_users": admin_users.count(), "cashier_users": cashier_users.count()}),
-        _section(key="product_catalog", title="Product Catalog", status="READY" if active_products.exists() else "BLOCKED", blockers=[] if active_products.exists() else ["No active products exist."], recommended_action="Create active products with correct base price before EMI/rent/lease/direct-sale workflows.", target_route="/admin/products", why_this_matters="Product base price is the contract price source for Lucky Plan EMI and supports future rent/lease asset mapping.", category=REQUIRED_FOR_OPERATIONS, metadata={"active_products": active_products.count()}),
-        _section(key="batch_lucky_ids", title="Batch & Lucky IDs", status="READY" if batches.exists() and lucky_ids.exists() else "NEEDS_SETUP", warnings=[] if batches.exists() and lucky_ids.exists() else ["Lucky Plan batch or Lucky IDs are not configured. Rent/lease and direct-sale flows do not require Lucky IDs."], recommended_action="Create batches and Lucky IDs before selling Lucky Plan subscriptions. Rent/lease flows do not require Lucky IDs.", target_route="/admin/batches", why_this_matters="Lucky Plan operations require controlled Lucky ID assignment and draw traceability.", category=RECOMMENDED_FOR_GO_LIVE, optional_for_initial_start=True, metadata={"batches": batches.count(), "lucky_ids": lucky_ids.count()}),
+        _section(key="branch_cash_counter", title="Branch & Counter / Cash Desk", status="READY" if primary_branch_exists and active_counters.exists() else "BLOCKED", blockers=[] if primary_branch_exists and active_counters.exists() else ["Primary active branch or active cash counter is missing."], recommended_action="Create/activate the primary branch and at least one cash/UPI/bank counter before cashier operations.", target_route="/admin/settings/business-setup/cash-desks", why_this_matters="Daily collection, cashier assignment, receipt source, and day-close need branch/counter context.", category=CORE_REQUIRED, repairable=True, metadata={"active_branches": active_branches.count(), "primary_branch_exists": primary_branch_exists, "active_counters": active_counters.count()}),
+        _section(key="finance_accounts", title="Cash / Bank / UPI Finance Accounts", status="READY" if ready_collection_account_exists and active_finance_blockers == 0 else ("REQUIRED_PENDING" if ready_collection_account_exists else "BLOCKED"), blockers=[] if ready_collection_account_exists else ["No collection-ready cash/bank/UPI finance account is mapped to a posting-enabled leaf ASSET account."], warnings=finance_warnings, recommended_action="Map each active real cash, bank, and UPI account to a posting-enabled leaf ASSET chart account. At least one active collection account is enough to start controlled collection.", target_route="/admin/settings/business-setup/finance-accounts", why_this_matters="Cashier/admin collection selectors must show only accounts that can safely post, reconcile, and day-close.", category=CORE_REQUIRED, repairable=True, metadata=finance_counts),
+        _section(key="chart_of_accounts", title="Chart of Accounts", status="READY" if not required_coa_missing else "BLOCKED", blockers=[] if not required_coa_missing else [f"Missing required COA account(s): {', '.join(required_coa_missing)}"], recommended_action="Seed default accounting setup and review account names before live posting.", target_route="/admin/accounting/setup", why_this_matters="Payment collection, receipts, invoices, reversals, settlements, deposits, and reconciliation require stable posting accounts.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"active_accounts": active_chart_accounts.count(), "missing_required_codes": required_coa_missing}),
+        _section(key="finance_account_coa_mapping", title="FinanceAccount to COA Mapping", status="READY" if not required_mappings_missing and collection_mappings.exists() else "BLOCKED", blockers=[] if not required_mappings_missing and collection_mappings.exists() else ["FinanceAccount to COA collection mappings are incomplete."], recommended_action="Complete cash/bank/UPI collection mappings and system posting profiles before controlled posting.", target_route="/admin/settings/business-setup/finance-accounts", why_this_matters="Collection accounts must map to real posting-enabled ASSET accounts; setup must not auto-post journals.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"missing_mapping_purposes": required_mappings_missing, "collection_mappings": collection_mappings.count()}),
+        _section(key="accounting_bridge", title="Accounting Bridge Readiness", status="READY" if not required_coa_missing and not required_mappings_missing and posting_profiles_count else "BLOCKED", blockers=[] if not required_coa_missing and not required_mappings_missing and posting_profiles_count else ["Accounting setup, posting profiles, or reconciliation mappings are incomplete."], warnings=["Bridge posting may remain approval-gated; no journals are auto-posted by setup."], recommended_action="Review mapping audit, bridge readiness, bridge reconciliation, and approval-gated posting workflows.", target_route="/admin/accounting/bridges", why_this_matters="Financial correctness depends on explicit posting profiles and reconciliation evidence. Bridge readiness is read-only and must not auto-post journals.", category=FINANCE_ACCOUNTING_REQUIRED, repairable=True, metadata={"posting_profiles": posting_profiles_count, "tax_profile_configured": bool(active_tax_profile), "bridge_reconciliation_route": "/admin/accounting/bridge-reconciliation"}),
+        _rent_lease_section(),
+        _section(key="direct_sale_setup", title="Direct Sale Setup", status="READY" if direct_sale_ready else "BLOCKED", blockers=[] if direct_sale_ready else ["Active products or direct-sale numbering/document readiness is missing."], recommended_action="Create active products, verify direct-sale route, numbering, invoice/receipt readiness, and bridge readiness.", target_route="/admin/billing/direct-sale", why_this_matters="Direct sale is a live selling path and must use real product, invoice, receipt, and bridge readiness without changing financial semantics.", category=DIRECT_SALE_REQUIRED, repairable=True, metadata={"active_products": active_products.count(), "document_numbering_ready": numbering_ready, "route": "/admin/billing/direct-sale"}),
+        _section(key="subscription_emi_setup", title="Subscription EMI / Lucky Plan Setup", status="READY" if subscription_ready else "REQUIRED_PENDING", warnings=[] if subscription_ready else ["Active products, batch/lucky IDs, or receipt/document readiness is incomplete."], recommended_action="Create active products, prepare Lucky Plan batches/Lucky IDs, verify EMI collection and receipt readiness, and keep bridge posting controlled.", target_route="/admin/subscriptions", why_this_matters="Lucky Plan EMI requires controlled product pricing, batch/Lucky ID readiness, receipts, waiver audit, and bridge readiness.", category=SUBSCRIPTION_EMI_REQUIRED, repairable=True, metadata={"active_products": active_products.count(), "batches": batches.count(), "lucky_ids": lucky_ids.count(), "document_numbering_ready": numbering_ready}),
+        _section(key="inventory_accounting", title="Inventory Accounting Setup", status="READY" if inventory_account_ready else "BLOCKED", blockers=[] if inventory_account_ready else ["Inventory asset / purchase / COGS accounting setup is incomplete."], recommended_action="Open accounting setup and mapping audit. Inventory stock quantities must still be entered through manual opening stock or CSV confirmation workflows.", target_route="/admin/accounting/setup", why_this_matters="Inventory is required as an admin workflow. Accounting accounts can be ready while stock quantity remains onboarding-pending.", category=INVENTORY_REQUIRED, repairable=True, metadata={"inventory_asset_ready": _active_system_account_exists("INVENTORY_ASSET"), "purchase_expense_ready": _active_system_account_exists("PURCHASE_EXPENSE")} ),
         _inventory_onboarding_section(active_products),
-        _section(key="amendment_recontract", title="Amendment / Product Recontract", status="READY" if ContractAmendment.objects.exists() or ContractRecontractEvent.objects.exists() else "INFO", warnings=[] if ContractAmendment.objects.exists() or ContractRecontractEvent.objects.exists() else ["No amendment/recontract records exist yet. This is normal before first use."], recommended_action="Use amendment workflow only after customer consent, admin approval, accounting bridge evidence, reconciliation evidence, and document evidence exist.", target_route="/admin/contract-amendments", why_this_matters="Product changes, Lucky ID/batch changes, and future EMI recalculation require strict audit and no silent source mutation.", category=OPTIONAL_OR_FUTURE, optional_for_initial_start=True, metadata={"contract_amendments": ContractAmendment.objects.count(), "recontract_events": ContractRecontractEvent.objects.count()}),
-        _section(key="staff_advance_future", title="Staff Advance Workflow", status="FUTURE", warnings=["Staff Advance is intentionally unsupported until a real source workflow exists."], recommended_action="Do not fake Staff Advance posting readiness. Implement the real workflow before enabling posting.", target_route="/admin/accounting/bridges", why_this_matters="Unsupported future workflows must stay visible and non-postable.", category=OPTIONAL_OR_FUTURE, optional_for_initial_start=True, metadata={"posting_supported": False}),
+        _staff_hr_payroll_section(admin_users.count(), cashier_users.count()),
+        _crm_section(),
+        _section(key="document_templates", title="Documents, Numbering & Print Branding", status="READY" if numbering_ready and document_terms_configured else "REQUIRED_PENDING", warnings=[] if numbering_ready and document_terms_configured else ["Document numbering, print terms, or branding are incomplete."], recommended_action="Configure invoice/receipt/contract numbering, print branding, footer text, and document terms before launch.", target_route="/admin/settings/business-setup/document-numbering", why_this_matters="Contracts, receipts, invoices, delivery handovers, and statements need stable numbering and print terms. Existing issued documents are never renumbered.", category=CORE_REQUIRED, repairable=True, metadata={**numbering_metadata, "document_terms_configured": document_terms_configured, "print_branding_configured": bool(active_print_settings)}),
+        _section(key="reset_dry_run", title="Reset / Dry Run / Backup / Restore", status="READY", recommended_action="Use dry-run previews before reset. Destructive reset/restore must require typed confirmation and preserve subidhafurniture where configured.", target_route="/admin/settings/business-setup/reset", why_this_matters="Fresh-start operations need safe preview, backup/restore job lists, and typed confirmation without fake data.", category=RESET_DRY_RUN_REQUIRED, metadata={"dry_run_route": "/admin/settings/business-setup/dry-runs", "reset_route": "/admin/settings/business-setup/reset", "preserve_username": "subidhafurniture"}),
+        _policy_governance_section(),
+        _section(key="amendment_recontract", title="Amendment / Product Recontract", status="INFO" if not (ContractAmendment.objects.exists() or ContractRecontractEvent.objects.exists()) else "READY", warnings=[] if ContractAmendment.objects.exists() or ContractRecontractEvent.objects.exists() else ["No amendment/recontract records exist yet. This is normal before first use."], recommended_action="Use amendment workflow only after customer consent, admin approval, accounting bridge evidence, reconciliation evidence, and document evidence exist.", target_route="/admin/contract-amendments", why_this_matters="Product changes, Lucky ID/batch changes, and future EMI recalculation require strict audit and no silent source mutation.", category=OPTIONAL_OR_FUTURE, optional_for_initial_start=True, metadata={"contract_amendments": ContractAmendment.objects.count(), "recontract_events": ContractRecontractEvent.objects.count()}),
+        _section(key="staff_advance_future", title="Staff Advance Workflow", status="FUTURE_UNSUPPORTED", warnings=["Staff Advance is intentionally unsupported until a real source workflow exists."], recommended_action="Do not fake Staff Advance posting readiness. Implement the real workflow before enabling posting.", target_route="/admin/accounting/bridges", why_this_matters="Unsupported future workflows must stay visible and non-postable.", category=OPTIONAL_OR_FUTURE, optional_for_initial_start=True, metadata={"posting_supported": False}),
     ]
     core_sections = [section for section in sections if section["category"] in CORE_OPERATIONAL_CATEGORIES]
     ready_count = sum(1 for section in sections if section["status"] == "READY")
-    warning_count = sum(1 for section in sections if section["status"] in {"NEEDS_SETUP", "INFO", "FUTURE", "OPTIONAL"})
+    warning_count = sum(1 for section in sections if section["status"] in {"REQUIRED_PENDING", "WARNING", "INFO", "FUTURE_UNSUPPORTED", "OPTIONAL", "APPROVAL_GATED"})
     blocker_count = sum(1 for section in core_sections if section["status"] == "BLOCKED")
     first_not_ready = next((section for section in core_sections if section["status"] == "BLOCKED"), None) or next((section for section in sections if section["status"] != "READY"), None)
     category_summary: dict[str, dict[str, int]] = {}
     for category in CATEGORY_LABELS:
         rows = [section for section in sections if section["category"] == category]
-        category_summary[category] = {"total": len(rows), "ready": sum(1 for row in rows if row["status"] == "READY"), "blocked": sum(1 for row in rows if row["status"] == "BLOCKED"), "info": sum(1 for row in rows if row["status"] in {"INFO", "NEEDS_SETUP", "FUTURE", "OPTIONAL"})}
+        category_summary[category] = {"total": len(rows), "ready": sum(1 for row in rows if row["status"] == "READY"), "blocked": sum(1 for row in rows if row["status"] == "BLOCKED"), "info": sum(1 for row in rows if row["status"] != "READY" and row["status"] != "BLOCKED")}
     launch_checklist = [
-        {"key": "can_create_customer", "label": "Can create customer", "ready": bool(active_business_profile), "source_section": "business_profile", "category": REQUIRED_FOR_COLLECTION},
-        {"key": "can_create_product", "label": "Can create product", "ready": active_products.exists(), "source_section": "product_catalog", "category": REQUIRED_FOR_OPERATIONS},
-        {"key": "can_collect_payment", "label": "Can collect payment", "ready": ready_collection_account_exists, "source_section": "payment_collection", "category": REQUIRED_FOR_COLLECTION},
-        {"key": "can_issue_receipt", "label": "Can issue receipt", "ready": ready_collection_account_exists and numbering_ready, "source_section": "document_templates", "category": REQUIRED_FOR_DOCUMENTS},
-        {"key": "can_print_documents", "label": "Can print documents", "ready": bool(active_print_settings), "source_section": "print_branding", "category": REQUIRED_FOR_DOCUMENTS},
-        {"key": "can_use_rent_lease_direct_sale_without_stock_csv", "label": "Can start core collection without stock CSV", "ready": ready_collection_account_exists and bool(active_business_profile), "source_section": "inventory_onboarding", "category": RECOMMENDED_FOR_GO_LIVE},
-        {"key": "inventory_opening_stock_pending", "label": "Inventory opening stock pending", "ready": True, "source_section": "inventory_onboarding", "category": RECOMMENDED_FOR_GO_LIVE},
-        {"key": "can_reconcile", "label": "Can review bridge readiness", "ready": not required_coa_missing and not required_mappings_missing and bool(posting_profiles_count), "source_section": "accounting_reconciliation", "category": REQUIRED_FOR_ACCOUNTING_POSTING},
-        {"key": "can_day_close", "label": "Can day-close after collections", "ready": ready_collection_account_exists and active_counters.exists(), "source_section": "branch_cash_counter", "category": REQUIRED_FOR_COLLECTION},
+        {"key": "can_create_customer", "label": "Can create customer", "ready": bool(active_business_profile), "source_section": "business_profile", "category": CORE_REQUIRED},
+        {"key": "can_create_product", "label": "Can create product", "ready": active_products.exists(), "source_section": "direct_sale_setup", "category": DIRECT_SALE_REQUIRED},
+        {"key": "can_collect_payment", "label": "Can collect payment", "ready": ready_collection_account_exists, "source_section": "finance_accounts", "category": CORE_REQUIRED},
+        {"key": "can_issue_receipt", "label": "Can issue receipt", "ready": ready_collection_account_exists and numbering_ready, "source_section": "document_templates", "category": CORE_REQUIRED},
+        {"key": "can_use_rent_lease", "label": "Rent/Lease live workflow visible", "ready": True, "source_section": "rent_lease_live", "category": RENT_LEASE_REQUIRED},
+        {"key": "can_use_rent_lease_direct_sale_without_stock_csv", "label": "Can start core collection without stock CSV", "ready": ready_collection_account_exists and bool(active_business_profile), "source_section": "inventory_onboarding", "category": INVENTORY_REQUIRED},
+        {"key": "inventory_opening_stock_required_pending", "label": "Inventory opening stock workflow visible", "ready": True, "source_section": "inventory_onboarding", "category": INVENTORY_REQUIRED},
+        {"key": "staff_payroll_workflows_visible", "label": "Staff/payroll workflows visible", "ready": True, "source_section": "staff_hr_payroll", "category": STAFF_HR_PAYROLL_REQUIRED},
+        {"key": "crm_enrichment_workflow_visible", "label": "CRM enrichment workflow visible", "ready": True, "source_section": "crm_enrichment", "category": CRM_REQUIRED},
+        {"key": "can_reconcile", "label": "Can review bridge readiness", "ready": not required_coa_missing and not required_mappings_missing and bool(posting_profiles_count), "source_section": "accounting_bridge", "category": FINANCE_ACCOUNTING_REQUIRED},
+        {"key": "can_day_close", "label": "Can day-close after collections", "ready": ready_collection_account_exists and active_counters.exists(), "source_section": "branch_cash_counter", "category": CORE_REQUIRED},
     ]
-    overall_status = "BLOCKED" if blocker_count else ("NEEDS_SETUP" if warning_count else "READY")
+    overall_status = "BLOCKED" if blocker_count else ("REQUIRED_PENDING" if warning_count else "READY")
     return {
         "summary": {"overall_status": overall_status, "ready_count": ready_count, "warning_count": warning_count, "blocker_count": blocker_count, "next_recommended_action": first_not_ready["recommended_action"] if first_not_ready else "Setup is ready for controlled live operations.", "next_target_route": first_not_ready["target_route"] if first_not_ready else "/admin", "category_summary": category_summary, "core_operational_ready": blocker_count == 0},
         "sections": sections,
@@ -280,5 +423,5 @@ def get_setup_readiness() -> dict[str, Any]:
         "launch_checklist": launch_checklist,
         "categories": [{"key": key, "label": label, **category_summary[key]} for key, label in CATEGORY_LABELS.items()],
         "read_only": True,
-        "mutation_policy": "This endpoint is read-only. It does not seed, repair, approve, post, reconcile, reset, create StockLedger, or mutate historical records.",
+        "mutation_policy": "This endpoint is read-only. It does not seed, repair, approve, post, reconcile, reset, create StockLedger, create salary payments, create payslips, or mutate historical records.",
     }
