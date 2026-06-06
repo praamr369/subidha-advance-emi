@@ -6,6 +6,8 @@ export type AccountingBridgeReadinessSummary = {
   warning_count: number;
   error_count: number;
   not_configured_count: number;
+  postable_count?: number;
+  blocked_count?: number;
 };
 
 export type AccountingBridgeReadinessAccount = {
@@ -41,7 +43,36 @@ export type AccountingBridgeReadinessEvent = {
 
 export type AccountingBridgeReadinessPayload = {
   summary: AccountingBridgeReadinessSummary;
+  financial_year_readiness?: AccountingBridgePeriodReadiness | null;
+  accounting_period_readiness?: AccountingBridgePeriodReadiness | null;
   events: AccountingBridgeReadinessEvent[];
+};
+
+export type AccountingBridgePeriodReadiness = {
+  reference_date?: string;
+  financial_year_ready?: boolean;
+  accounting_period_ready?: boolean;
+  journal_numbering_ready?: boolean;
+  posting_controls_ready?: boolean;
+  active_financial_year?: {
+    id: number;
+    code: string;
+    name?: string;
+    start_date?: string;
+    end_date?: string;
+    is_active?: boolean;
+  } | null;
+  current_period?: {
+    id: number;
+    code: string;
+    name?: string;
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+    is_locked?: boolean;
+  } | null;
+  blockers?: string[];
+  warnings?: string[];
 };
 
 export async function getAccountingBridgeReadiness(): Promise<AccountingBridgeReadinessPayload> {

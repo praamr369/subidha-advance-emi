@@ -15,6 +15,12 @@ export type AccountingBridgeReconciliationJournal = {
   entry_no?: string | null;
   entry_date?: string | null;
   status?: string | null;
+  financial_year?: number | null;
+  financial_year_code?: string | null;
+  accounting_period?: number | null;
+  accounting_period_code?: string | null;
+  accounting_period_name?: string | null;
+  accounting_period_status?: string | null;
 };
 
 export type AccountingBridgeReconciliationItem = {
@@ -23,6 +29,16 @@ export type AccountingBridgeReconciliationItem = {
   severity: string;
   exception_code?: string;
   exception_message?: string;
+};
+
+export type AccountingBridgePeriodReadiness = {
+  financial_year_ready?: boolean;
+  accounting_period_ready?: boolean;
+  journal_numbering_ready?: boolean;
+  posting_controls_ready?: boolean;
+  active_financial_year?: { code?: string; name?: string } | null;
+  current_period?: { code?: string; name?: string; status?: string } | null;
+  blockers?: string[];
 };
 
 export type AccountingBridgeReconciliationRow = {
@@ -48,6 +64,8 @@ export type AccountingBridgeReconciliationRow = {
 
 export type AccountingBridgeReconciliationPayload = {
   summary: AccountingBridgeReconciliationSummary;
+  financial_year_readiness?: AccountingBridgePeriodReadiness | null;
+  accounting_period_readiness?: AccountingBridgePeriodReadiness | null;
   results: AccountingBridgeReconciliationRow[];
 };
 

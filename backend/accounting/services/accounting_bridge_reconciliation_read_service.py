@@ -145,7 +145,11 @@ def _readiness_rows(readiness_payload: dict[str, Any], filters: BridgeReconcilia
 
 
 def _posted_rows(filters: BridgeReconciliationFilters) -> list[dict[str, Any]]:
-    queryset = AccountingBridgePosting.objects.select_related("journal_entry").order_by("-created_at", "-id")[:500]
+    queryset = AccountingBridgePosting.objects.select_related(
+        "journal_entry",
+        "journal_entry__financial_year",
+        "journal_entry__accounting_period",
+    ).order_by("-created_at", "-id")[:500]
     rows: list[dict[str, Any]] = []
     for posting in queryset:
         journal: JournalEntry | None = getattr(posting, "journal_entry", None)
@@ -186,6 +190,13 @@ def _posted_rows(filters: BridgeReconciliationFilters) -> list[dict[str, Any]]:
                 "entry_no": getattr(journal, "entry_no", None),
                 "entry_date": getattr(journal, "entry_date", None).isoformat() if getattr(journal, "entry_date", None) else None,
                 "status": getattr(journal, "status", None),
+                "financial_year": getattr(journal, "financial_year_id", None),
+                "financial_year_code": getattr(getattr(journal, "financial_year", None), "code", None),
+                "accounting_period": getattr(journal, "accounting_period_id", None),
+                "accounting_period_code": getattr(getattr(journal, "accounting_period", None), "code", None),
+                "accounting_period_name": getattr(getattr(journal, "accounting_period", None), "name", None)
+                or getattr(getattr(journal, "accounting_period", None), "label", None),
+                "accounting_period_status": getattr(getattr(journal, "accounting_period", None), "status", None),
             } if journal else None,
             "settlement_linked": settlement_linked,
             "reconciliation_linked": bool(rec_items),
@@ -221,4 +232,9 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "reconciled_count": sum(1 for row in rows if row["reconciliation_linked"]),
         "exception_count": sum(1 for row in rows if row["status"] == "EXCEPTION" or row["exception_reasons"]),
     }
-    return {"summary": summary, "results": rows}
+    return {
+        "summary": summary,
+        "financial_year_readiness": readiness_payload.get("financial_year_readiness"),
+        "accounting_period_readiness": readiness_payload.get("accounting_period_readiness"),
+        "results": rows,
+    }

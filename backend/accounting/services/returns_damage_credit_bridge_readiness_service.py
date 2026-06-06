@@ -222,7 +222,15 @@ def build_accounting_bridge_readiness_with_returns_damage_credit() -> dict[str, 
         if event.get("event_key") not in RETURNS_DAMAGE_CREDIT_EVENT_KEYS
     ]
     events = [*retained_events, *build_returns_damage_credit_readiness_events()]
+    summary = build_accounting_bridge_readiness_summary(events=events)
+    period_readiness = payload.get("accounting_period_readiness") or payload.get("financial_year_readiness") or {}
     return {
-        "summary": build_accounting_bridge_readiness_summary(events=events),
+        "summary": {
+            **summary,
+            "postable_count": sum(1 for row in events if row.get("status") == "READY" and period_readiness.get("posting_controls_ready")),
+            "blocked_count": sum(1 for row in events if row.get("status") != "READY") + (0 if period_readiness.get("posting_controls_ready") else summary["ready_count"]),
+        },
+        "financial_year_readiness": payload.get("financial_year_readiness"),
+        "accounting_period_readiness": payload.get("accounting_period_readiness"),
         "events": events,
     }

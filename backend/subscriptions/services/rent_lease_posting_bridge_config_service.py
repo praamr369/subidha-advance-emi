@@ -39,14 +39,15 @@ def get_rent_lease_posting_bridge_config() -> RentLeasePostingBridgeConfig:
 def get_rent_lease_posting_bridge_state(*, readiness: dict[str, Any] | None = None) -> dict[str, Any]:
     config = get_rent_lease_posting_bridge_config()
     mapping_ready = bool((readiness or {}).get("mapping_ready") or (readiness or {}).get("status") == "READY")
-    enabled_and_ready = bool(config.is_enabled and mapping_ready)
+    accounting_controls_ready = bool((readiness or {}).get("posting_controls_ready", mapping_ready))
+    enabled_and_ready = bool(config.is_enabled and mapping_ready and accounting_controls_ready)
     return {
         "config": _serialize_config(config),
         "is_enabled": config.is_enabled,
         "posting_bridge_approved": config.is_enabled,
         "posting_bridge_ready": enabled_and_ready,
         "posting_mode": POSTING_MODE_POSTING_ENABLED if enabled_and_ready else POSTING_MODE_AUDIT_DEFERRED,
-        "blocked_reason": "" if enabled_and_ready else "Rent/lease posting bridge is not approved." if not config.is_enabled else "Rent/lease accounting mapping is not ready.",
+        "blocked_reason": "" if enabled_and_ready else "Rent/lease posting bridge is not approved." if not config.is_enabled else "Rent/lease accounting period, financial year, or numbering setup is not ready." if mapping_ready and not accounting_controls_ready else "Rent/lease accounting mapping is not ready.",
     }
 
 
@@ -73,8 +74,8 @@ def enable_rent_lease_posting_bridge(actor, reason: str, confirmation: str) -> d
         expected_confirmation=ENABLE_RENT_LEASE_POSTING_CONFIRMATION,
     )
     readiness = _readiness_for_enable()
-    if readiness.get("status") != "READY" or not readiness.get("mapping_ready"):
-        raise ValidationError({"readiness": "Rent/lease COA, finance account, and mapping readiness must be valid before enabling posting."})
+    if readiness.get("status") != "READY" or not readiness.get("mapping_ready") or not readiness.get("posting_controls_ready"):
+        raise ValidationError({"readiness": "Rent/lease COA, finance account, financial year, accounting period, and journal numbering readiness must be valid before enabling posting."})
 
     config = RentLeasePostingBridgeConfig.objects.select_for_update().filter(pk=1).first()
     if config is None:

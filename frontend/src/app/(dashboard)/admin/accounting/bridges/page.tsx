@@ -165,7 +165,10 @@ export default function AccountingBridgeReadinessPage() {
     warning_count: 0,
     error_count: 0,
     not_configured_count: 0,
+    postable_count: 0,
+    blocked_count: 0,
   };
+  const periodReadiness = payload?.accounting_period_readiness ?? payload?.financial_year_readiness ?? null;
 
   return (
     <PortalPage
@@ -200,13 +203,36 @@ export default function AccountingBridgeReadinessPage() {
             </ActionButton>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
             <SummaryCard label="Ready" value={summary.ready_count} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+            <SummaryCard label="Postable" value={summary.postable_count ?? 0} tone="border-emerald-200 bg-white text-emerald-900" />
+            <SummaryCard label="Blocked" value={summary.blocked_count ?? 0} tone="border-amber-200 bg-amber-50 text-amber-950" />
             <SummaryCard label="Info" value={summary.info_count} tone="border-blue-200 bg-blue-50 text-blue-900" />
             <SummaryCard label="Warning" value={summary.warning_count} tone="border-amber-200 bg-amber-50 text-amber-950" />
             <SummaryCard label="Error" value={summary.error_count} tone="border-red-200 bg-red-50 text-red-900" />
             <SummaryCard label="Not configured" value={summary.not_configured_count} tone="border-slate-200 bg-slate-50 text-slate-900" />
           </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Active FY</div>
+              <div className="mt-1 font-semibold text-foreground">{periodReadiness?.active_financial_year?.code ?? "Not configured"}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting period</div>
+              <div className="mt-1 font-semibold text-foreground">{periodReadiness?.current_period?.code ?? "Not configured"}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Period status</div>
+              <span className={cx("mt-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(periodReadiness?.current_period?.status ?? "ERROR"))}>
+                {periodReadiness?.current_period?.status ?? "BLOCKED"}
+              </span>
+            </div>
+          </div>
+          {periodReadiness?.blockers?.length ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+              {periodReadiness.blockers[0]}
+            </div>
+          ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
             <Link href={ROUTES.admin.accountingBridgeReconciliation} className="rounded-xl border px-3 py-2 text-sm font-semibold">Bridge Reconciliation</Link>
             <Link href={ROUTES.admin.accountingSetup} className="rounded-xl border px-3 py-2 text-sm font-semibold">Accounting Setup</Link>

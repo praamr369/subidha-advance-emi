@@ -7,6 +7,10 @@ export type AccountingReadiness = {
   accounting_bridge_enabled: boolean;
   collection_ready?: boolean;
   mapping_ready?: boolean;
+  financial_year_ready?: boolean;
+  accounting_period_ready?: boolean;
+  journal_numbering_ready?: boolean;
+  posting_controls_ready?: boolean;
   posting_bridge_ready?: boolean;
   posting_bridge_approved?: boolean;
   posting_mode?: "AUDIT_DEFERRED" | "POSTING_ENABLED" | "MANUAL_APPROVAL_REQUIRED" | string;
@@ -14,9 +18,23 @@ export type AccountingReadiness = {
   operator_action?: string | null;
   blockers: string[];
   field_errors?: Record<string, string[]>;
+  financial_year_readiness?: BridgePeriodReadiness;
+  accounting_period_readiness?: BridgePeriodReadiness;
   mapping?: Record<string, unknown> | null;
   counters?: Record<string, number>;
   posting_bridge_config?: RentLeasePostingBridgeConfig;
+};
+
+export type BridgePeriodReadiness = {
+  reference_date?: string;
+  financial_year_ready?: boolean;
+  accounting_period_ready?: boolean;
+  journal_numbering_ready?: boolean;
+  posting_controls_ready?: boolean;
+  active_financial_year?: { id?: number; code?: string; name?: string; start_date?: string; end_date?: string } | null;
+  current_period?: { id?: number; code?: string; name?: string; status?: string; start_date?: string; end_date?: string } | null;
+  blockers?: string[];
+  warnings?: string[];
 };
 
 export type RentLeasePostingBridgeConfig = {
@@ -64,6 +82,15 @@ export type BridgePostingPreview = {
   source_reference: string;
   event_type: string;
   amount: string;
+  posting_date?: string;
+  financial_year?: number | null;
+  financial_year_code?: string | null;
+  accounting_period?: number | null;
+  accounting_period_code?: string | null;
+  accounting_period_name?: string | null;
+  accounting_period_status?: string | null;
+  period_postable?: boolean;
+  period_blocked_reason?: string;
   status: string;
   postable: boolean;
   blocked_reason: string;

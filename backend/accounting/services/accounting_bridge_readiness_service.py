@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from django.apps import apps
+from django.utils import timezone
 
 from accounting.models import (
     BusinessTaxProfile,
@@ -17,6 +18,12 @@ from accounting.models import (
     RentLeaseAccountingAccountMapping,
 )
 from accounting.services.accounting_setup_catalog import CANONICAL_CHART_ACCOUNT_BY_KEY
+from accounting.services.document_sequence_service import (
+    DocumentNumberingSetupError,
+    DocumentType,
+    validate_document_numbering_ready,
+)
+from accounting.services.period_service import build_accounting_period_readiness
 
 
 STATUS_READY = "READY"
@@ -819,7 +826,62 @@ def get_accounting_bridge_event_registry() -> list[dict[str, Any]]:
 def build_accounting_bridge_readiness() -> dict[str, Any]:
     events = [_validate_event_spec(spec) for spec in EVENT_REGISTRY if _source_model_exists(spec)]
     summary = build_accounting_bridge_readiness_summary(events=events)
-    return {"summary": summary, "events": events}
+    period_readiness = build_accounting_bridge_period_readiness()
+    return {
+        "summary": {
+            **summary,
+            "postable_count": sum(1 for row in events if row.get("status") == STATUS_READY and period_readiness["posting_controls_ready"]),
+            "blocked_count": sum(1 for row in events if row.get("status") != STATUS_READY) + (0 if period_readiness["posting_controls_ready"] else summary["ready_count"]),
+        },
+        "financial_year_readiness": period_readiness,
+        "accounting_period_readiness": period_readiness,
+        "events": events,
+    }
+
+
+def build_accounting_bridge_period_readiness() -> dict[str, Any]:
+    reference_date = timezone.localdate()
+    readiness = build_accounting_period_readiness(reference_date)
+    active_financial_year = readiness.get("active_financial_year")
+    current_period = readiness.get("current_period")
+    blockers = [str(error) for error in readiness.get("errors") or []]
+    journal_numbering_ready = False
+
+    if readiness.get("is_ready"):
+        try:
+            validate_document_numbering_ready(DocumentType.JOURNAL_ENTRY, reference_date)
+            journal_numbering_ready = True
+        except DocumentNumberingSetupError as exc:
+            blockers.append(str(exc))
+
+    return {
+        "reference_date": reference_date.isoformat(),
+        "financial_year_ready": active_financial_year is not None and not any(
+            "financial year" in reason.lower() for reason in blockers
+        ),
+        "accounting_period_ready": bool(readiness.get("is_ready")),
+        "journal_numbering_ready": journal_numbering_ready,
+        "posting_controls_ready": bool(readiness.get("is_ready") and journal_numbering_ready and not blockers),
+        "active_financial_year": {
+            "id": active_financial_year.id,
+            "code": active_financial_year.code,
+            "name": active_financial_year.name,
+            "start_date": active_financial_year.start_date.isoformat(),
+            "end_date": active_financial_year.end_date.isoformat(),
+            "is_active": active_financial_year.is_active,
+        } if active_financial_year else None,
+        "current_period": {
+            "id": current_period.id,
+            "code": current_period.code,
+            "name": current_period.name or current_period.label,
+            "start_date": current_period.start_date.isoformat(),
+            "end_date": current_period.end_date.isoformat(),
+            "status": current_period.status,
+            "is_locked": current_period.is_locked,
+        } if current_period else None,
+        "blockers": blockers,
+        "warnings": [str(warning) for warning in readiness.get("warnings") or []],
+    }
 
 
 def build_accounting_bridge_readiness_summary(events: list[dict[str, Any]] | None = None) -> dict[str, int]:

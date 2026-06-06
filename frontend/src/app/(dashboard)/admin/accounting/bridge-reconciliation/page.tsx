@@ -83,6 +83,7 @@ export default function AccountingBridgeReconciliationPage() {
 
   const exceptionRows = useMemo(() => (payload?.results ?? []).filter((row) => row.status === "EXCEPTION" || row.exception_reasons.length > 0), [payload?.results]);
   const rows = payload?.results ?? [];
+  const periodReadiness = payload?.accounting_period_readiness ?? payload?.financial_year_readiness ?? null;
   const summary = payload?.summary ?? {
     source_count: 0,
     ready_unposted_count: 0,
@@ -157,6 +158,27 @@ export default function AccountingBridgeReconciliationPage() {
             <SummaryCard label="Reconciled" value={summary.reconciled_count} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
             <SummaryCard label="Exceptions" value={summary.exception_count} tone="border-red-200 bg-red-50 text-red-900" />
           </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Active FY</div>
+              <div className="mt-1 font-semibold text-foreground">{periodReadiness?.active_financial_year?.code ?? "Not configured"}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current period</div>
+              <div className="mt-1 font-semibold text-foreground">{periodReadiness?.current_period?.code ?? "Not configured"}</div>
+            </div>
+            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Period status</div>
+              <span className={cx("mt-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(periodReadiness?.current_period?.status ?? "BLOCKED"))}>
+                {periodReadiness?.current_period?.status ?? "BLOCKED"}
+              </span>
+            </div>
+            <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Read-only readiness</div>
+              <div className="mt-1 font-semibold text-foreground">{periodReadiness?.posting_controls_ready ? "Postable controls ready" : "Posting blocked"}</div>
+            </div>
+          </div>
+          {periodReadiness?.blockers?.length ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">{periodReadiness.blockers[0]}</div> : null}
         </section>
 
         <WorkspaceSection title="Filters" description="Filter the read-only projection. Empty filters show readiness events and recent posted bridge rows.">
@@ -233,6 +255,11 @@ export default function AccountingBridgeReconciliationPage() {
                           {row.journal_entry.entry_no || `Journal #${row.journal_entry.id}`}
                         </Link>
                       ) : <span className="text-muted-foreground">Not posted</span>}
+                      {row.journal_entry?.accounting_period_code ? (
+                        <div className="mt-1 text-muted-foreground">
+                          FY {row.journal_entry.financial_year_code ?? "—"} · {row.journal_entry.accounting_period_code} · {row.journal_entry.accounting_period_status ?? "—"}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4 text-xs">{row.settlement_linked ? "Linked" : "Not linked"}</td>
                     <td className="px-4 py-4 text-xs">{row.reconciliation_linked ? `${row.reconciliation_items.length} item(s)` : "Not linked"}</td>
