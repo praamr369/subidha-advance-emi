@@ -33,10 +33,10 @@ function cx(...values: Array<string | false | null | undefined>) {
 
 function statusClass(status: string): string {
   const value = status.toUpperCase();
-  if (value === "RECONCILED" || value === "SETTLED" || value === "POSTED") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (value === "OPEN" || value === "RECONCILED" || value === "SETTLED" || value === "POSTED") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (value === "READY_UNPOSTED") return "border-blue-200 bg-blue-50 text-blue-900";
-  if (value.startsWith("BLOCKED")) return "border-amber-200 bg-amber-50 text-amber-950";
-  if (value === "EXCEPTION") return "border-red-200 bg-red-50 text-red-900";
+  if (value === "LOCKED" || value.startsWith("BLOCKED")) return "border-amber-200 bg-amber-50 text-amber-950";
+  if (value === "CLOSED" || value === "EXCEPTION") return "border-red-200 bg-red-50 text-red-900";
   return "border-slate-200 bg-slate-50 text-slate-900";
 }
 
@@ -83,7 +83,13 @@ export default function AccountingBridgeReconciliationPage() {
 
   const exceptionRows = useMemo(() => (payload?.results ?? []).filter((row) => row.status === "EXCEPTION" || row.exception_reasons.length > 0), [payload?.results]);
   const rows = payload?.results ?? [];
-  const periodReadiness = payload?.accounting_period_readiness ?? payload?.financial_year_readiness ?? null;
+  const payloadAny = payload as unknown as Record<string, any> | null;
+  const selectedFinancialYear = payloadAny?.selected_financial_year ?? payload?.accounting_period_readiness?.active_financial_year ?? payload?.financial_year_readiness?.active_financial_year ?? null;
+  const selectedPeriod = payloadAny?.selected_accounting_period ?? payload?.accounting_period_readiness?.current_period ?? payload?.financial_year_readiness?.current_period ?? null;
+  const readinessBlockers = (payloadAny?.readiness_blockers ?? payload?.accounting_period_readiness?.blockers ?? payload?.financial_year_readiness?.blockers ?? []) as string[];
+  const yearEndHint = payloadAny?.year_end_readiness_hint as string | undefined;
+  const availableFinancialYears = (payloadAny?.available_financial_years ?? []) as Array<{ id?: number; code?: string; name?: string }>;
+  const availablePeriods = (payloadAny?.available_accounting_periods ?? []) as Array<{ id?: number; code?: string; name?: string; status?: string }>;
   const summary = payload?.summary ?? {
     source_count: 0,
     ready_unposted_count: 0,
@@ -93,6 +99,7 @@ export default function AccountingBridgeReconciliationPage() {
     reconciled_count: 0,
     exception_count: 0,
   };
+  const summaryAny = summary as Record<string, number | undefined>;
 
   function setDraft(key: keyof AccountingBridgeReconciliationFilters, value: string) {
     setDraftFilters((current) => ({ ...current, [key]: value }));
@@ -120,7 +127,7 @@ export default function AccountingBridgeReconciliationPage() {
   return (
     <PortalPage
       title="Accounting Bridge Reconciliation"
-      subtitle="Read-only cockpit for source, mapping, journal, settlement, and reconciliation coverage across financial modules."
+      subtitle="Read-only cockpit for source, mapping, journal, settlement, and reconciliation coverage across financial year and accounting period controls."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
@@ -138,10 +145,10 @@ export default function AccountingBridgeReconciliationPage() {
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Universal reconciliation cockpit</div>
-              <h2 className="mt-1 text-xl font-semibold text-foreground">Source → mapping → journal → settlement → reconciliation</h2>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Financial-year reconciliation cockpit</div>
+              <h2 className="mt-1 text-xl font-semibold text-foreground">Financial year → period → source → journal → reconciliation</h2>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
-                This page reads readiness, bridge postings, settlement allocations, and reconciliation items. It does not post journals, allocate settlements, or create reconciliation exceptions.
+                This page is read-only. It reads readiness, bridge postings, settlement allocations, and reconciliation items. It does not post journals, allocate document numbers, allocate settlements, or create reconciliation exceptions.
               </p>
             </div>
             <ActionButton variant="secondary" onClick={() => void load(filters, { silent: true })} disabled={refreshing}>
@@ -149,51 +156,69 @@ export default function AccountingBridgeReconciliationPage() {
             </ActionButton>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
-            <SummaryCard label="Sources" value={summary.source_count} tone="border-slate-200 bg-slate-50 text-slate-900" />
-            <SummaryCard label="Ready unposted" value={summary.ready_unposted_count} tone="border-blue-200 bg-blue-50 text-blue-900" />
-            <SummaryCard label="Blocked" value={summary.blocked_count} tone="border-amber-200 bg-amber-50 text-amber-950" />
-            <SummaryCard label="Posted" value={summary.posted_count} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
-            <SummaryCard label="Settled" value={summary.settled_count} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
-            <SummaryCard label="Reconciled" value={summary.reconciled_count} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
-            <SummaryCard label="Exceptions" value={summary.exception_count} tone="border-red-200 bg-red-50 text-red-900" />
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <SummaryCard label="Invoices" value={Number(summaryAny.total_invoices ?? 0)} tone="border-slate-200 bg-slate-50 text-slate-900" />
+            <SummaryCard label="Receipts" value={Number(summaryAny.total_receipts ?? 0)} tone="border-slate-200 bg-slate-50 text-slate-900" />
+            <SummaryCard label="Journals" value={Number(summaryAny.total_journal_postings ?? summary.posted_count ?? 0)} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+            <SummaryCard label="Unposted bridge" value={Number(summaryAny.unposted_bridge_item_count ?? summary.ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" />
+            <SummaryCard label="Unreconciled" value={Number(summaryAny.unreconciled_money_movement_count ?? 0)} tone="border-amber-200 bg-amber-50 text-amber-950" />
+            <SummaryCard label="Exceptions" value={Number(summaryAny.reconciliation_exception_count ?? summary.exception_count ?? 0)} tone="border-red-200 bg-red-50 text-red-900" />
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Active FY</div>
-              <div className="mt-1 font-semibold text-foreground">{periodReadiness?.active_financial_year?.code ?? "Not configured"}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected FY</div>
+              <div className="mt-1 font-semibold text-foreground">{selectedFinancialYear?.code ?? "Not configured"}</div>
             </div>
             <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current period</div>
-              <div className="mt-1 font-semibold text-foreground">{periodReadiness?.current_period?.code ?? "Not configured"}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected period</div>
+              <div className="mt-1 font-semibold text-foreground">{selectedPeriod?.code ?? "Not configured"}</div>
             </div>
             <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Period status</div>
-              <span className={cx("mt-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(periodReadiness?.current_period?.status ?? "BLOCKED"))}>
-                {periodReadiness?.current_period?.status ?? "BLOCKED"}
+              <span className={cx("mt-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(selectedPeriod?.status ?? "BLOCKED"))}>
+                {selectedPeriod?.status ?? "BLOCKED"}
               </span>
             </div>
             <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Read-only readiness</div>
-              <div className="mt-1 font-semibold text-foreground">{periodReadiness?.posting_controls_ready ? "Postable controls ready" : "Posting blocked"}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Year-end hint</div>
+              <div className="mt-1 text-xs text-muted-foreground">{yearEndHint ?? "Clear unposted bridge items and reconciliation exceptions before year close."}</div>
             </div>
           </div>
-          {periodReadiness?.blockers?.length ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">{periodReadiness.blockers[0]}</div> : null}
+          {readinessBlockers.length ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">{readinessBlockers[0]}</div> : null}
         </section>
 
-        <WorkspaceSection title="Filters" description="Filter the read-only projection. Empty filters show readiness events and recent posted bridge rows.">
+        <WorkspaceSection title="Filters" description="Filter the read-only projection. Empty filters default to active financial year and current/open period where available.">
           <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm md:grid-cols-3 xl:grid-cols-6">
+            <select className="rounded-xl border border-border bg-background px-3 py-2 text-sm" value={(draftFilters as any).financial_year ?? ""} onChange={(event) => setDraft("financial_year" as keyof AccountingBridgeReconciliationFilters, event.target.value)}>
+              <option value="">Active financial year</option>
+              {availableFinancialYears.map((row) => <option key={row.id ?? row.code} value={String(row.id ?? row.code ?? "")}>{row.code} {row.is_active ? "(active)" : ""}</option>)}
+            </select>
+            <select className="rounded-xl border border-border bg-background px-3 py-2 text-sm" value={(draftFilters as any).accounting_period ?? ""} onChange={(event) => setDraft("accounting_period" as keyof AccountingBridgeReconciliationFilters, event.target.value)}>
+              <option value="">Current/open period</option>
+              {availablePeriods.map((row) => <option key={row.id ?? row.code} value={String(row.id ?? row.code ?? "")}>{row.code} · {row.status}</option>)}
+            </select>
             <input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Module" value={draftFilters.module ?? ""} onChange={(event) => setDraft("module", event.target.value)} />
             <input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Event key" value={draftFilters.event_key ?? ""} onChange={(event) => setDraft("event_key", event.target.value)} />
-            <input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" type="date" value={draftFilters.date_from ?? ""} onChange={(event) => setDraft("date_from", event.target.value)} />
-            <input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" type="date" value={draftFilters.date_to ?? ""} onChange={(event) => setDraft("date_to", event.target.value)} />
+            <input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Source model" value={(draftFilters as any).source_model ?? ""} onChange={(event) => setDraft("source_model" as keyof AccountingBridgeReconciliationFilters, event.target.value)} />
             <select className="rounded-xl border border-border bg-background px-3 py-2 text-sm" value={draftFilters.status ?? ""} onChange={(event) => setDraft("status", event.target.value)}>
               {STATUS_OPTIONS.map((option) => <option key={option || "all"} value={option}>{option || "All statuses"}</option>)}
             </select>
-            <div className="flex gap-2">
+            <input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" type="date" value={draftFilters.date_from ?? ""} onChange={(event) => setDraft("date_from", event.target.value)} />
+            <input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" type="date" value={draftFilters.date_to ?? ""} onChange={(event) => setDraft("date_to", event.target.value)} />
+            <input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Account code/name/id" value={(draftFilters as any).account ?? ""} onChange={(event) => setDraft("account" as keyof AccountingBridgeReconciliationFilters, event.target.value)} />
+            <div className="flex gap-2 xl:col-span-3">
               <ActionButton variant="primary" onClick={applyFilters}>Apply</ActionButton>
               <ActionButton variant="secondary" onClick={clearFilters}>Clear</ActionButton>
             </div>
+          </div>
+        </WorkspaceSection>
+
+        <WorkspaceSection title="Readiness checklist" description="Read-only blockers for the selected financial year and period.">
+          <div className="grid gap-2 rounded-2xl border border-border bg-card p-4 text-sm shadow-sm md:grid-cols-2">
+            {["FY selected", "Period selected", "Bridge postable", "Reconciliation clean"].map((label, index) => {
+              const ok = index === 0 ? Boolean(selectedFinancialYear) : index === 1 ? Boolean(selectedPeriod) : index === 2 ? Number(summaryAny.blocked_bridge_item_count ?? summary.blocked_count ?? 0) === 0 : Number(summaryAny.reconciliation_exception_count ?? summary.exception_count ?? 0) === 0;
+              return <div key={label} className={cx("rounded-xl border px-3 py-2", ok ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-950")}>{ok ? "✓" : "!"} {label}</div>;
+            })}
           </div>
         </WorkspaceSection>
 
