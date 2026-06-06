@@ -18,6 +18,8 @@
     "test:e2e:smoke:headed": "npm run build:smoke && playwright test --project=chromium-smoke --headed",
     "test:e2e:auth-smoke": "playwright test --project=chromium-auth-smoke",
     "test:e2e:auth-smoke:headed": "playwright test --project=chromium-auth-smoke --headed",
+    "test:e2e:accounting-visual": "playwright test --project=chromium-smoke tests/e2e/accounting_setup_visual_reference.spec.ts",
+    "docs:accounting-visual": "node scripts/build-accounting-visual-reference.mjs",
     "test:e2e:install": "playwright install chromium",
     "playwright:install": "playwright install chromium",
     "playwright:check": "node scripts/check-playwright-env.mjs",
