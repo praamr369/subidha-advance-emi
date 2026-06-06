@@ -19,6 +19,10 @@ from accounting.models import (
     TaxInvoice,
 )
 from accounting.services.bridge_posting_service import post_bridge_entry
+from accounting.services.document_sequence_service import (
+    DOCUMENT_TYPE_BY_SERIES_CODE,
+    preview_document_number,
+)
 from accounting.services.journal_posting_service import (
     _log_accounting_event,
 )
@@ -46,16 +50,34 @@ def ensure_document_sequence(
     prefix: str = "",
     padding: int = 5,
 ) -> DocumentSequence:
-    sequence, _ = DocumentSequence.objects.get_or_create(
-        series_code=series_code.strip().upper(),
+    cleaned_series = series_code.strip().upper()
+    document_type = DOCUMENT_TYPE_BY_SERIES_CODE.get(cleaned_series, cleaned_series[:40])
+    sequence, created = DocumentSequence.objects.get_or_create(
+        document_type=document_type,
+        financial_year=financial_year,
+        is_active=True,
         defaults={
-            "financial_year": financial_year,
+            "series_code": cleaned_series,
             "prefix": prefix,
+            "pattern": "{PREFIX}-{number}",
             "padding": padding,
             "next_number": 1,
-            "is_active": True,
         },
     )
+    if created:
+        return sequence
+    updates = []
+    if not sequence.series_code:
+        sequence.series_code = cleaned_series
+        updates.append("series_code")
+    if not sequence.prefix and prefix:
+        sequence.prefix = prefix
+        updates.append("prefix")
+    if not sequence.pattern:
+        sequence.pattern = "{PREFIX}-{number}"
+        updates.append("pattern")
+    if updates:
+        sequence.save(update_fields=updates + ["updated_at"])
     return sequence
 
 
@@ -122,12 +144,11 @@ def ensure_gst_system_accounts() -> dict[str, ChartOfAccount]:
 def _issue_document_number(sequence: DocumentSequence) -> str:
     locked_sequence = DocumentSequence.objects.select_for_update().get(pk=sequence.pk)
     number = locked_sequence.next_number
+    rendered = preview_document_number(sequence=locked_sequence)
     locked_sequence.next_number = number + 1
     locked_sequence.last_issued_at = timezone.now()
     locked_sequence.save(update_fields=["next_number", "last_issued_at", "updated_at"])
-    padded = str(number).zfill(locked_sequence.padding)
-    prefix = f"{locked_sequence.prefix}" if locked_sequence.prefix else locked_sequence.series_code
-    return f"{prefix}-{padded}"
+    return rendered
 
 
 def _tax_total(document) -> Decimal:

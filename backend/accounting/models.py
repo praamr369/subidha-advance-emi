@@ -83,6 +83,23 @@ def _transition_allowed(previous_status: str | None, next_status: str | None, al
     return (previous_status or "", next_status or "") in allowed
 
 
+def _document_type_for_series_code(series_code: str) -> str:
+    cleaned = (series_code or "").strip().upper()
+    return {
+        "DIRSALE": "DIRECT_SALE",
+        "DIRECT_SALE": "DIRECT_SALE",
+        "BILL_INV": "TAX_INVOICE",
+        "DIRECT_SALE_INVOICE": "TAX_INVOICE",
+        "BILL_RCT": "DIRECT_SALE_RECEIPT",
+        "EMI_RECEIPT": "EMI_RECEIPT",
+        "BILL_CN": "CREDIT_NOTE",
+        "GST_CN": "CREDIT_NOTE",
+        "BILL_DN": "DEBIT_NOTE",
+        "GST_DN": "DEBIT_NOTE",
+        "JOURNAL": "JOURNAL_ENTRY",
+    }.get(cleaned, cleaned[:40])
+
+
 def _is_cash_in_hand_chart(chart: "ChartOfAccount" | None) -> bool:
     if chart is None:
         return False
@@ -223,6 +240,12 @@ class AccountingPeriodStatus(models.TextChoices):
     OPEN = "OPEN", "Open"
     LOCKED = "LOCKED", "Locked"
     CLOSED = "CLOSED", "Closed"
+
+
+class DocumentSequenceResetPolicy(models.TextChoices):
+    NEVER = "NEVER", "Never"
+    YEARLY = "YEARLY", "Yearly"
+    MONTHLY = "MONTHLY", "Monthly"
 
 
 class AttendanceStatus(models.TextChoices):
@@ -718,25 +741,55 @@ class PostingLock(AccountingTimeStampedModel):
 
 
 class DocumentSequence(AccountingTimeStampedModel):
-    series_code = models.CharField(max_length=30, unique=True, db_index=True)
+    series_code = models.CharField(max_length=30, db_index=True)
+    document_type = models.CharField(max_length=40, blank=True, default="", db_index=True)
     financial_year = models.CharField(max_length=9, db_index=True)
+    financial_year_ref = models.ForeignKey(
+        FinancialYear,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="document_sequences",
+    )
     prefix = models.CharField(max_length=20, blank=True, default="")
+    suffix = models.CharField(max_length=40, blank=True, default="")
+    pattern = models.CharField(max_length=120, blank=True, default="")
+    reset_policy = models.CharField(
+        max_length=20,
+        choices=DocumentSequenceResetPolicy.choices,
+        default=DocumentSequenceResetPolicy.YEARLY,
+        db_index=True,
+    )
     next_number = models.PositiveIntegerField(default=1)
     padding = models.PositiveSmallIntegerField(default=5)
     last_issued_at = models.DateTimeField(null=True, blank=True, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
+    is_system_seeded = models.BooleanField(default=False)
 
     class Meta:
         db_table = "accounting_document_sequences"
-        ordering = ["series_code", "financial_year", "id"]
+        ordering = ["document_type", "series_code", "financial_year", "id"]
         indexes = [
             models.Index(fields=["financial_year", "is_active"]),
+            models.Index(fields=["document_type", "financial_year", "is_active"]),
+            models.Index(fields=["financial_year_ref", "is_active"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_type", "financial_year"],
+                condition=Q(is_active=True) & ~Q(document_type=""),
+                name="accounting_document_sequence_active_type_fy",
+            ),
         ]
 
     def save(self, *args, **kwargs):
         self.series_code = (self.series_code or "").strip().upper()
+        self.document_type = (self.document_type or "").strip().upper() or _document_type_for_series_code(self.series_code)
         self.financial_year = (self.financial_year or "").strip()
         self.prefix = (self.prefix or "").strip()
+        self.suffix = (self.suffix or "").strip()
+        self.pattern = (self.pattern or "").strip()
+        self.reset_policy = (self.reset_policy or DocumentSequenceResetPolicy.YEARLY).strip().upper()
         self.full_clean()
         super().save(*args, **kwargs)
 

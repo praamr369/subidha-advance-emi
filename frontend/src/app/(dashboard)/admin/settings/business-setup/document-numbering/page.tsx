@@ -17,7 +17,7 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Failed to load document numbering setup.";
 }
 
-type DraftState = Record<string, { prefix: string; next_number: string; padding: string }>;
+type DraftState = Record<string, { prefix: string; pattern: string; suffix: string; reset_policy: string; next_number: string; padding: string }>;
 
 function statusLabel(status: string): string {
   if (status === "ready") return "Ready";
@@ -37,12 +37,26 @@ function workflowLabel(sequence: DocumentNumberingSequence): string {
   return group ? group.replace(/\b\w/g, (char) => char.toUpperCase()) : "General";
 }
 
-function nextPreview(prefix: string, nextNumber: string, padding: string): string {
+const emptyDraft = { prefix: "", pattern: "{PREFIX}-{number}", suffix: "", reset_policy: "YEARLY", next_number: "1", padding: "5" };
+
+function nextPreview(pattern: string, prefix: string, suffix: string, fy: string, doc: string, nextNumber: string, padding: string): string {
   const safeNumber = Math.max(1, Number(nextNumber || "1"));
   const safePadding = Math.min(12, Math.max(1, Number(padding || "5")));
   const cleanPrefix = (prefix || "").trim().toUpperCase();
   if (!cleanPrefix || Number.isNaN(safeNumber) || Number.isNaN(safePadding)) return "Invalid draft";
-  return `${cleanPrefix}-${String(safeNumber).padStart(safePadding, "0")}`;
+  const legacyFy = (fy || "").replace(/^FY/i, "");
+  const yyyy = legacyFy.slice(0, 4);
+  const yy = yyyy.slice(-2);
+  const number = String(safeNumber).padStart(safePadding, "0");
+  return (pattern || "{PREFIX}-{number}")
+    .replaceAll("{PREFIX}", cleanPrefix)
+    .replaceAll("{FY}", legacyFy)
+    .replaceAll("{YYYY}", yyyy)
+    .replaceAll("{YY}", yy)
+    .replaceAll("{DOC}", doc || cleanPrefix)
+    .replace(/\{number(?::\d{1,2})?\}/gi, number)
+    .concat(suffix || "")
+    .toUpperCase();
 }
 
 export default function BusinessSetupDocumentNumberingPage() {
@@ -62,6 +76,9 @@ export default function BusinessSetupDocumentNumberingPage() {
         response.sequences.reduce<DraftState>((acc, sequence) => {
           acc[sequence.key] = {
             prefix: sequence.prefix || sequence.default_prefix || "",
+            pattern: sequence.pattern || sequence.default_pattern || "{PREFIX}-{number}",
+            suffix: sequence.suffix || "",
+            reset_policy: sequence.reset_policy || "YEARLY",
             next_number: String(sequence.next_number || sequence.min_safe_next_number || 1),
             padding: String(sequence.padding || sequence.default_padding || 5),
           };
@@ -96,6 +113,9 @@ export default function BusinessSetupDocumentNumberingPage() {
       const response = await updateDocumentNumbering({
         key: sequence.key,
         prefix: draft.prefix,
+        pattern: draft.pattern,
+        suffix: draft.suffix,
+        reset_policy: draft.reset_policy,
         next_number: nextNumber,
         padding,
       });
@@ -104,6 +124,9 @@ export default function BusinessSetupDocumentNumberingPage() {
         response.sequences.reduce<DraftState>((acc, row) => {
           acc[row.key] = {
             prefix: row.prefix || row.default_prefix || "",
+            pattern: row.pattern || row.default_pattern || "{PREFIX}-{number}",
+            suffix: row.suffix || "",
+            reset_policy: row.reset_policy || "YEARLY",
             next_number: String(row.next_number || row.min_safe_next_number || 1),
             padding: String(row.padding || row.default_padding || 5),
           };
@@ -130,6 +153,9 @@ export default function BusinessSetupDocumentNumberingPage() {
         latest = await updateDocumentNumbering({
           key: sequence.key,
           prefix: sequence.default_prefix || sequence.prefix,
+          pattern: sequence.default_pattern || sequence.pattern || "{PREFIX}-{number}",
+          suffix: sequence.suffix || "",
+          reset_policy: sequence.reset_policy || "YEARLY",
           next_number: Math.max(1, sequence.min_safe_next_number || 1),
           padding: sequence.default_padding || sequence.padding || 5,
         });
@@ -140,6 +166,9 @@ export default function BusinessSetupDocumentNumberingPage() {
           latest.sequences.reduce<DraftState>((acc, row) => {
             acc[row.key] = {
               prefix: row.prefix || row.default_prefix || "",
+              pattern: row.pattern || row.default_pattern || "{PREFIX}-{number}",
+              suffix: row.suffix || "",
+              reset_policy: row.reset_policy || "YEARLY",
               next_number: String(row.next_number || row.min_safe_next_number || 1),
               padding: String(row.padding || row.default_padding || 5),
             };
@@ -178,13 +207,27 @@ export default function BusinessSetupDocumentNumberingPage() {
         Numbering changes affect future documents only. Existing invoices, receipts, and audit trails are never renumbered from this setup page.
       </section>
 
+      {data?.setup_blockers?.length ? (
+        <section className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">
+          <div className="font-semibold">Readiness blockers</div>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {data.setup_blockers.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </section>
+      ) : null}
+
       {notice ? <section className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</section> : null}
       {error ? <section className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</section> : null}
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Financial year</div>
-          <div className="mt-2 text-2xl font-semibold text-foreground">{data?.financial_year || "…"}</div>
+          <div className="mt-2 text-2xl font-semibold text-foreground">{data?.active_financial_year_code || data?.financial_year || "…"}</div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {data?.active_financial_year_date_range?.start_date && data?.active_financial_year_date_range?.end_date
+              ? `${data.active_financial_year_date_range.start_date} to ${data.active_financial_year_date_range.end_date}`
+              : "No active FY configured"}
+          </div>
         </div>
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Ready</div>
@@ -197,6 +240,11 @@ export default function BusinessSetupDocumentNumberingPage() {
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Blocked</div>
           <div className="mt-2 text-2xl font-semibold text-foreground">{Number(summary.blocked_count || blockingRows.length)}</div>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="text-xs font-semibold uppercase text-muted-foreground">Current period</div>
+          <div className="mt-2 text-2xl font-semibold text-foreground">{data?.current_period?.status || "…"}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{data?.current_period?.name || "No period for today"}</div>
         </div>
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Issued docs</div>
@@ -245,7 +293,7 @@ export default function BusinessSetupDocumentNumberingPage() {
                         <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase text-amber-800">Required</span>
                       )}
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground">{sequence.series_code} · {sequence.financial_year} · {sequence.doc_kind || "document"}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{sequence.series_code} · {sequence.document_type || sequence.key} · {sequence.active_financial_year_code || sequence.financial_year} · {sequence.doc_kind || "document"}</div>
                     {sequence.description ? <p className="mt-2 text-sm text-muted-foreground">{sequence.description}</p> : null}
                   </div>
                   <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(sequence.status)}`}>
@@ -288,7 +336,7 @@ export default function BusinessSetupDocumentNumberingPage() {
                     Prefix
                     <input
                       value={draft?.prefix || ""}
-                      onChange={(event) => setDrafts((prev) => ({ ...prev, [sequence.key]: { ...(prev[sequence.key] || { prefix: "", next_number: "1", padding: "5" }), prefix: event.target.value.toUpperCase() } }))}
+                      onChange={(event) => setDrafts((prev) => ({ ...prev, [sequence.key]: { ...(prev[sequence.key] || emptyDraft), prefix: event.target.value.toUpperCase() } }))}
                       className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
                     />
                     {sequence.can_edit_prefix === false ? <span className="mt-1 block text-[11px] text-amber-700">Existing documents use this series. Change prefix only when intentionally starting a new future series.</span> : null}
@@ -299,7 +347,7 @@ export default function BusinessSetupDocumentNumberingPage() {
                       type="number"
                       min={minSafeNext}
                       value={draft?.next_number || ""}
-                      onChange={(event) => setDrafts((prev) => ({ ...prev, [sequence.key]: { ...(prev[sequence.key] || { prefix: "", next_number: "1", padding: "5" }), next_number: event.target.value } }))}
+                      onChange={(event) => setDrafts((prev) => ({ ...prev, [sequence.key]: { ...(prev[sequence.key] || emptyDraft), next_number: event.target.value } }))}
                       className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
                     />
                     <span className="mt-1 block text-[11px] text-muted-foreground">Must be ≥ {minSafeNext}</span>
@@ -311,27 +359,59 @@ export default function BusinessSetupDocumentNumberingPage() {
                       min={1}
                       max={12}
                       value={draft?.padding || ""}
-                      onChange={(event) => setDrafts((prev) => ({ ...prev, [sequence.key]: { ...(prev[sequence.key] || { prefix: "", next_number: "1", padding: "5" }), padding: event.target.value } }))}
+                      onChange={(event) => setDrafts((prev) => ({ ...prev, [sequence.key]: { ...(prev[sequence.key] || emptyDraft), padding: event.target.value } }))}
                       className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
                     />
                   </label>
                   <div className="text-xs text-muted-foreground">
                     Current preview
-                    <div className="mt-1 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">{sequence.next_number_preview || "Not configured"}</div>
+                    <div className="mt-1 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">{sequence.preview_number || sequence.next_number_preview || "Not configured"}</div>
                   </div>
                   <div className="text-xs text-muted-foreground">
                     Draft preview
                     <div className={`mt-1 rounded-lg border px-3 py-2 text-sm ${draftInvalid ? "border-rose-200 bg-rose-50 text-rose-800" : "border-border bg-muted text-foreground"}`}>
-                      {draft ? nextPreview(draft.prefix, draft.next_number, draft.padding) : "—"}
+                      {draft ? nextPreview(draft.pattern, draft.prefix, draft.suffix, sequence.active_financial_year_code || sequence.financial_year, sequence.document_type || sequence.key, draft.next_number, draft.padding) : "—"}
                     </div>
                   </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-6">
+                  <label className="text-xs text-muted-foreground md:col-span-3">
+                    Pattern
+                    <input
+                      value={draft?.pattern || ""}
+                      onChange={(event) => setDrafts((prev) => ({ ...prev, [sequence.key]: { ...(prev[sequence.key] || emptyDraft), pattern: event.target.value } }))}
+                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                    />
+                    <span className="mt-1 block text-[11px] text-muted-foreground">Tokens: {"{FY}"}, {"{YYYY}"}, {"{YY}"}, {"{DOC}"}, {"{number}"}</span>
+                  </label>
+                  <label className="text-xs text-muted-foreground">
+                    Suffix
+                    <input
+                      value={draft?.suffix || ""}
+                      onChange={(event) => setDrafts((prev) => ({ ...prev, [sequence.key]: { ...(prev[sequence.key] || emptyDraft), suffix: event.target.value.toUpperCase() } }))}
+                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                    />
+                  </label>
+                  <label className="text-xs text-muted-foreground md:col-span-2">
+                    Reset policy
+                    <select
+                      value={draft?.reset_policy || "YEARLY"}
+                      onChange={(event) => setDrafts((prev) => ({ ...prev, [sequence.key]: { ...(prev[sequence.key] || emptyDraft), reset_policy: event.target.value } }))}
+                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                    >
+                      <option value="YEARLY">Yearly</option>
+                      <option value="MONTHLY">Monthly</option>
+                      <option value="NEVER">Never</option>
+                    </select>
+                  </label>
                 </div>
 
                 <div className="flex flex-wrap justify-end gap-2">
                   {sequence.can_seed_default ? (
                     <button
                       type="button"
-                      onClick={() => setDrafts((prev) => ({ ...prev, [sequence.key]: { prefix: sequence.default_prefix || sequence.prefix, next_number: String(sequence.min_safe_next_number || 1), padding: String(sequence.default_padding || 5) } }))}
+                      onClick={() => setDrafts((prev) => ({ ...prev, [sequence.key]: { prefix: sequence.default_prefix || sequence.prefix, pattern: sequence.default_pattern || sequence.pattern || "{PREFIX}-{number}", suffix: sequence.suffix || "", reset_policy: sequence.reset_policy || "YEARLY", next_number: String(sequence.min_safe_next_number || 1), padding: String(sequence.default_padding || 5) } }))}
                       className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground hover:bg-accent"
                     >
                       Fill default

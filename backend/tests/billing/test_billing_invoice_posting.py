@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from accounting.models import AccountingPeriod, ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind
+from accounting.models import AccountingPeriod, AccountingPeriodStatus, ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind, FinancialYear
 from billing.models import BillingDocumentStatus, BillingInvoice, BillingInvoiceLine, ReceiptDocument, ReceiptType
 from billing.services.billing_service import approve_billing_invoice, post_billing_invoice
 from inventory.models import InventoryItem, StockLedger, StockMovementType
@@ -44,14 +44,39 @@ class BillingInvoicePostingTests(TestCase):
             chart_account=self.cash_chart,
             opening_balance=Decimal("0.00"),
         )
+        self.financial_year = FinancialYear.objects.create(
+            code="FY2026-27",
+            name="FY 2026-27",
+            start_date=date(2026, 4, 1),
+            end_date=date(2027, 3, 31),
+            is_active=True,
+            activated_by=self.admin,
+        )
         self.sequence = DocumentSequence.objects.create(
             series_code="BILL_INV",
             financial_year="2026-27",
             prefix="INV-2026-27",
             next_number=1,
         )
+        self.receipt_sequence = DocumentSequence.objects.create(
+            series_code="BILL_RCT",
+            financial_year="2026-27",
+            financial_year_ref=self.financial_year,
+            prefix="RCP",
+            pattern="RCP/FY{FY}/{number}",
+            next_number=1,
+        )
 
     def test_posting_invoice_creates_receipt_and_stock_ledger(self):
+        AccountingPeriod.objects.create(
+            code="FY2026-27-APR",
+            label="April 2026",
+            name="April 2026",
+            financial_year=self.financial_year,
+            start_date=date(2026, 4, 1),
+            end_date=date(2026, 4, 30),
+            status=AccountingPeriodStatus.OPEN,
+        )
         invoice = BillingInvoice.objects.create(
             invoice_date=date(2026, 4, 12),
             financial_year="2026-27",
@@ -109,9 +134,11 @@ class BillingInvoicePostingTests(TestCase):
         AccountingPeriod.objects.create(
             code="FY2026-27",
             label="2026-27",
+            name="2026-27",
+            financial_year=self.financial_year,
             start_date=date(2026, 4, 1),
             end_date=date(2027, 3, 31),
-            is_locked=True,
+            status=AccountingPeriodStatus.LOCKED,
             locked_by=self.admin,
         )
         invoice = BillingInvoice.objects.create(

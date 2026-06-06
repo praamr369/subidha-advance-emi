@@ -138,6 +138,9 @@ class BusinessSetupDocumentNumberingView(APIView):
             upsert_document_numbering(
                 key=key,
                 prefix=serializer.validated_data.get("prefix", sequence_row["prefix"]),
+                pattern=serializer.validated_data.get("pattern", sequence_row.get("pattern") or sequence_row.get("default_pattern") or ""),
+                suffix=serializer.validated_data.get("suffix", sequence_row.get("suffix") or ""),
+                reset_policy=serializer.validated_data.get("reset_policy", sequence_row.get("reset_policy") or "YEARLY"),
                 next_number=serializer.validated_data.get("next_number", sequence_row["next_number"]),
                 padding=serializer.validated_data.get("padding", sequence_row["padding"]),
                 performed_by=request.user,

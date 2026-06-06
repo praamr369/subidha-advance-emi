@@ -100,21 +100,32 @@ class DocumentNumberingSequenceSerializer(serializers.Serializer):
     key = serializers.CharField()
     name = serializers.CharField()
     series_code = serializers.CharField()
+    document_type = serializers.CharField(required=False, allow_blank=True)
     financial_year = serializers.CharField()
+    active_financial_year_code = serializers.CharField(required=False, allow_blank=True)
+    financial_year_ref = serializers.IntegerField(required=False, allow_null=True)
+    financial_year_name = serializers.CharField(required=False, allow_blank=True)
+    financial_year_date_range = serializers.DictField(required=False)
     workflow_group = serializers.CharField(required=False)
     doc_kind = serializers.CharField(required=False)
     description = serializers.CharField(required=False, allow_blank=True)
     required_for_go_live = serializers.BooleanField(required=False)
     configured = serializers.BooleanField()
     prefix = serializers.CharField()
+    pattern = serializers.CharField(required=False, allow_blank=True)
+    suffix = serializers.CharField(required=False, allow_blank=True)
+    reset_policy = serializers.CharField(required=False, allow_blank=True)
     next_number = serializers.IntegerField()
     padding = serializers.IntegerField()
+    preview_number = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     next_number_preview = serializers.CharField(allow_null=True)
     last_issued_number = serializers.CharField(allow_null=True)
     issued_count = serializers.IntegerField(required=False)
     max_issued_number = serializers.IntegerField(required=False)
     min_safe_next_number = serializers.IntegerField(required=False)
     duplicate_count = serializers.IntegerField(required=False)
+    inactive_duplicate_count = serializers.IntegerField(required=False)
+    setup_blockers = serializers.ListField(child=serializers.CharField(), required=False)
     status = serializers.CharField()
     warnings = serializers.ListField(child=serializers.CharField(), required=False)
     blockers = serializers.ListField(child=serializers.CharField(), required=False)
@@ -122,12 +133,21 @@ class DocumentNumberingSequenceSerializer(serializers.Serializer):
     can_edit_next_number = serializers.BooleanField(required=False)
     can_seed_default = serializers.BooleanField(required=False)
     default_prefix = serializers.CharField(required=False, allow_blank=True)
+    default_pattern = serializers.CharField(required=False, allow_blank=True)
     default_padding = serializers.IntegerField(required=False)
 
 
 class DocumentNumberingStateSerializer(serializers.Serializer):
     financial_year = serializers.CharField()
+    active_financial_year = serializers.DictField(required=False, allow_null=True)
+    active_financial_year_code = serializers.CharField(required=False, allow_blank=True)
+    active_financial_year_date_range = serializers.DictField(required=False)
+    current_period = serializers.DictField(required=False, allow_null=True)
     sequences = DocumentNumberingSequenceSerializer(many=True)
+    missing_required_profiles = serializers.ListField(child=serializers.CharField(), required=False)
+    inactive_duplicate_profiles = serializers.DictField(required=False)
+    duplicate_issued_number_warnings = serializers.DictField(required=False)
+    setup_blockers = serializers.ListField(child=serializers.CharField(), required=False)
     checks = serializers.DictField()
     summary = serializers.DictField(required=False)
     duplicate_issues = serializers.DictField()
@@ -137,13 +157,16 @@ class DocumentNumberingStateSerializer(serializers.Serializer):
 class DocumentNumberingUpdateSerializer(serializers.Serializer):
     key = serializers.CharField()
     prefix = serializers.CharField(required=False, allow_blank=True)
+    pattern = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    suffix = serializers.CharField(required=False, allow_blank=True, max_length=40)
+    reset_policy = serializers.ChoiceField(required=False, choices=("NEVER", "YEARLY", "MONTHLY"))
     next_number = serializers.IntegerField(required=False, min_value=1)
     padding = serializers.IntegerField(required=False, min_value=1, max_value=12)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        if not any(field in attrs for field in ("prefix", "next_number", "padding")):
-            raise serializers.ValidationError({"detail": "At least one field must be provided: prefix, next_number, or padding."})
+        if not any(field in attrs for field in ("prefix", "pattern", "suffix", "reset_policy", "next_number", "padding")):
+            raise serializers.ValidationError({"detail": "At least one field must be provided."})
         return attrs
 
 

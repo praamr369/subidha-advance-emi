@@ -134,21 +134,35 @@ export type DocumentNumberingSequence = {
   key: string;
   name: string;
   series_code: string;
+  document_type?: string;
   financial_year: string;
+  active_financial_year_code?: string;
+  financial_year_ref?: number | null;
+  financial_year_name?: string;
+  financial_year_date_range?: {
+    start_date?: string;
+    end_date?: string;
+  };
   workflow_group?: string;
   doc_kind?: "invoice" | string;
   description?: string;
   required_for_go_live?: boolean;
   configured: boolean;
   prefix: string;
+  pattern?: string;
+  suffix?: string;
+  reset_policy?: "NEVER" | "YEARLY" | "MONTHLY" | string;
   next_number: number;
   padding: number;
+  preview_number?: string | null;
   next_number_preview: string | null;
   last_issued_number: string | null;
   issued_count?: number;
   max_issued_number?: number;
   min_safe_next_number?: number;
   duplicate_count?: number;
+  inactive_duplicate_count?: number;
+  setup_blockers?: string[];
   status: "ready" | "needs_setup" | "duplicate_risk" | "blocked" | string;
   warnings?: string[];
   blockers?: string[];
@@ -156,12 +170,38 @@ export type DocumentNumberingSequence = {
   can_edit_next_number?: boolean;
   can_seed_default?: boolean;
   default_prefix?: string;
+  default_pattern?: string;
   default_padding?: number;
 };
 
 export type DocumentNumberingState = {
   financial_year: string;
+  active_financial_year?: {
+    id?: number;
+    code?: string;
+    name?: string;
+    start_date?: string;
+    end_date?: string;
+  } | null;
+  active_financial_year_code?: string;
+  active_financial_year_date_range?: {
+    start_date?: string;
+    end_date?: string;
+  };
+  current_period?: {
+    id?: number;
+    code?: string;
+    name?: string;
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+    is_locked?: boolean;
+  } | null;
   sequences: DocumentNumberingSequence[];
+  missing_required_profiles?: string[];
+  inactive_duplicate_profiles?: Record<string, number>;
+  duplicate_issued_number_warnings?: Record<string, number>;
+  setup_blockers?: string[];
   checks: Record<string, boolean>;
   summary?: Record<string, number>;
   duplicate_issues: Record<string, number>;
@@ -212,6 +252,9 @@ export async function getDocumentNumberingState(): Promise<DocumentNumberingStat
 export type DocumentNumberingUpdatePayload = {
   key: string;
   prefix?: string;
+  pattern?: string;
+  suffix?: string;
+  reset_policy?: "NEVER" | "YEARLY" | "MONTHLY" | string;
   next_number?: number;
   padding?: number;
 };

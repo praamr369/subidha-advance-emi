@@ -14,6 +14,7 @@ Verifies that:
 from __future__ import annotations
 
 import datetime
+from datetime import date
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -21,6 +22,8 @@ from django.utils import timezone
 from django.utils.crypto import get_random_string
 
 from accounts.models import User, UserRole
+from accounting.models import AccountingPeriod, AccountingPeriodStatus, FinancialYear
+from accounting.services.document_sequence_service import DocumentType, upsert_numbering_profile
 from billing.models import DirectSale, DirectSaleStatus
 from billing.services.billing_service import (
     _ensure_direct_sale_sequence,
@@ -54,6 +57,54 @@ def _minimal_payload(sale_date: datetime.date | None = None) -> dict:
     }
 
 
+def _legacy_fy(day: datetime.date) -> str:
+    if day.month >= 4:
+        return f"{day.year}-{str(day.year + 1)[-2:]}"
+    return f"{day.year - 1}-{str(day.year)[-2:]}"
+
+
+def _setup_direct_sale_numbering(admin: User, day: datetime.date | None = None):
+    reference_date = day or timezone.localdate()
+    if reference_date.month >= 4:
+        start_year = reference_date.year
+    else:
+        start_year = reference_date.year - 1
+    fy = FinancialYear.objects.create(
+        code=f"FY{start_year}-{str(start_year + 1)[-2:]}",
+        name=f"FY {start_year}-{str(start_year + 1)[-2:]}",
+        start_date=date(start_year, 4, 1),
+        end_date=date(start_year + 1, 3, 31),
+        is_active=True,
+        activated_by=admin,
+    )
+    AccountingPeriod.objects.create(
+        code=f"{fy.code}-CURRENT",
+        label="Current period",
+        name="Current period",
+        financial_year=fy,
+        start_date=reference_date,
+        end_date=reference_date,
+        status=AccountingPeriodStatus.OPEN,
+    )
+    upsert_numbering_profile(
+        document_type=DocumentType.DIRECT_SALE,
+        reference_date=reference_date,
+        prefix="SALE",
+        pattern="SALE/FY{FY}/{number}",
+        next_number=1,
+        padding=5,
+    )
+    upsert_numbering_profile(
+        document_type=DocumentType.TAX_INVOICE,
+        reference_date=reference_date,
+        prefix="INV",
+        pattern="INV/FY{FY}/{number}",
+        next_number=1,
+        padding=5,
+    )
+    return fy
+
+
 # ---------------------------------------------------------------------------
 # 1. New direct sales receive a unique SALE number
 # ---------------------------------------------------------------------------
@@ -61,6 +112,7 @@ def _minimal_payload(sale_date: datetime.date | None = None) -> dict:
 class DirectSaleNumberAssignmentTests(TestCase):
     def setUp(self):
         self.admin = _make_admin()
+        _setup_direct_sale_numbering(self.admin)
 
     def test_create_direct_sale_assigns_sale_no(self):
         """create_direct_sale always populates sale_no."""
@@ -69,11 +121,11 @@ class DirectSaleNumberAssignmentTests(TestCase):
         self.assertNotEqual(sale.sale_no, "")
 
     def test_sale_no_starts_with_sale_prefix(self):
-        """sale_no is prefixed with SALE-."""
+        """sale_no is prefixed with the active FY SALE pattern."""
         sale = create_direct_sale(payload=_minimal_payload(), created_by=self.admin)
         self.assertTrue(
-            sale.sale_no.startswith("SALE-"),
-            f"Expected sale_no to start with 'SALE-', got {sale.sale_no!r}",
+            sale.sale_no.startswith(f"SALE/FY{_legacy_fy(timezone.localdate())}/"),
+            f"Expected sale_no to use the active FY SALE pattern, got {sale.sale_no!r}",
         )
 
     def test_two_sales_have_different_numbers(self):
@@ -91,7 +143,7 @@ class DirectSaleNumberAssignmentTests(TestCase):
         dup = DirectSale(
             sale_no=sale1.sale_no,  # duplicate
             sale_date=timezone.localdate(),
-            financial_year="2025-26",
+            financial_year=_legacy_fy(timezone.localdate()),
             doc_series=seq,
             status=DirectSaleStatus.DRAFT,
             customer_name_snapshot="Walk-In Customer",
@@ -121,6 +173,7 @@ class DirectSaleNumberAssignmentTests(TestCase):
 class AssignDirectSaleNumberIdempotencyTests(TestCase):
     def setUp(self):
         self.admin = _make_admin()
+        _setup_direct_sale_numbering(self.admin)
 
     def test_idempotent_when_sale_no_already_set(self):
         """Calling assign_direct_sale_number on a sale that already has a number
@@ -152,6 +205,7 @@ class AssignDirectSaleNumberIdempotencyTests(TestCase):
 class BackfillNullSaleNoTests(TestCase):
     def setUp(self):
         self.admin = _make_admin()
+        _setup_direct_sale_numbering(self.admin)
 
     def _create_null_sale_no_row(self) -> DirectSale:
         """Create a DirectSale row with sale_no=NULL (simulates legacy data)."""
@@ -159,7 +213,7 @@ class BackfillNullSaleNoTests(TestCase):
         return DirectSale.objects.create(
             sale_no=None,
             sale_date=timezone.localdate(),
-            financial_year="2025-26",
+            financial_year=_legacy_fy(timezone.localdate()),
             doc_series=seq,
             status=DirectSaleStatus.DRAFT,
             customer_name_snapshot="Walk-In Customer",
@@ -173,7 +227,7 @@ class BackfillNullSaleNoTests(TestCase):
         number = assign_direct_sale_number(sale)
 
         self.assertIsNotNone(number)
-        self.assertTrue(number.startswith("SALE-"), f"Got {number!r}")
+        self.assertTrue(number.startswith(f"SALE/FY{_legacy_fy(timezone.localdate())}/"), f"Got {number!r}")
         sale.refresh_from_db()
         self.assertEqual(sale.sale_no, number)
 
@@ -257,6 +311,7 @@ class DoubleSubmitProtectionTests(TestCase):
 
     def setUp(self):
         self.admin = _make_admin()
+        _setup_direct_sale_numbering(self.admin)
 
     def test_sequential_double_submit_produces_unique_numbers(self):
         """Two sequential create_direct_sale calls yield distinct sale numbers."""

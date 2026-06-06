@@ -7,7 +7,8 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from accounting.services.bridge_posting_service import post_bridge_entry
-from accounting.services.gst_document_posting_service import ensure_document_sequence, financial_year_for
+from accounting.services.document_sequence_service import DocumentType, validate_document_numbering_ready
+from accounting.services.gst_document_posting_service import financial_year_for
 from accounting.services.journal_posting_service import _log_accounting_event
 from accounting.services.non_gst_document_service import build_non_gst_snapshot
 from accounting.services.tax_guard_service import (
@@ -90,53 +91,23 @@ def _issue_series_number(sequence, *, prefix_fallback: str) -> str:
 
 
 def _ensure_receipt_sequence(reference_date):
-    fy = financial_year_for(reference_date)
-    return ensure_document_sequence(
-        series_code="BILL_RCT",
-        financial_year=fy,
-        prefix=f"RCT-{fy}",
-        padding=5,
-    )
+    return validate_document_numbering_ready(DocumentType.DIRECT_SALE_RECEIPT, reference_date)
 
 
 def _ensure_invoice_sequence(reference_date):
-    fy = financial_year_for(reference_date)
-    return ensure_document_sequence(
-        series_code="BILL_INV",
-        financial_year=fy,
-        prefix=f"INV-{fy}",
-        padding=5,
-    )
+    return validate_document_numbering_ready(DocumentType.TAX_INVOICE, reference_date)
 
 
 def _ensure_credit_sequence(reference_date):
-    fy = financial_year_for(reference_date)
-    return ensure_document_sequence(
-        series_code="BILL_CN",
-        financial_year=fy,
-        prefix=f"CN-{fy}",
-        padding=5,
-    )
+    return validate_document_numbering_ready(DocumentType.CREDIT_NOTE, reference_date)
 
 
 def _ensure_debit_sequence(reference_date):
-    fy = financial_year_for(reference_date)
-    return ensure_document_sequence(
-        series_code="BILL_DN",
-        financial_year=fy,
-        prefix=f"DN-{fy}",
-        padding=5,
-    )
+    return validate_document_numbering_ready(DocumentType.DEBIT_NOTE, reference_date)
 
 
 def _ensure_direct_sale_sequence(reference_date):
-    fy = financial_year_for(reference_date)
-    return ensure_document_sequence(
-        series_code="DIRSALE",
-        financial_year=fy,
-        prefix=f"SALE-{fy}",
-        padding=5,
-    )
+    return validate_document_numbering_ready(DocumentType.DIRECT_SALE, reference_date)
 
 
 def _direct_sale_source_reference(sale: DirectSale) -> str:
