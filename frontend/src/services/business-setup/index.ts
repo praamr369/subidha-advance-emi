@@ -142,6 +142,15 @@ export type SetupReadinessPayload = {
   mutation_policy?: string;
 };
 
+export type FreshStartDocumentNumberingResult = {
+  financial_year?: string;
+  created_count?: number;
+  skipped_count?: number;
+  created?: Array<{ key?: string; series_code?: string; id?: number }>;
+  skipped?: Array<{ key?: string; series_code?: string; reason?: string }>;
+  sequences?: DocumentNumberingSequence[];
+};
+
 export type EnsureFreshStartSetupResult = {
   mode: "dry_run" | "executed" | "read_only_preview" | string;
   created_financial_records?: number;
@@ -157,6 +166,10 @@ export type EnsureFreshStartSetupResult = {
   readiness?: SetupReadinessPayload;
   accounting_defaults?: Record<string, unknown>;
   accounting_defaults_preview?: Record<string, unknown>;
+  document_numbering?: FreshStartDocumentNumberingResult;
+  document_numbering_preview?: DocumentNumberingState;
+  allowed_creations?: string[];
+  forbidden_creations?: string[];
 };
 
 export type DocumentNumberingSequence = {
@@ -258,69 +271,6 @@ export async function getDocumentNumberingState(): Promise<DocumentNumberingStat
   return apiFetch<DocumentNumberingState>("/admin/business-setup/document-numbering/");
 }
 
-export type DocumentNumberingUpdatePayload = {
-  key: string;
-  prefix?: string;
-  pattern?: string;
-  suffix?: string;
-  reset_policy?: "NEVER" | "YEARLY" | "MONTHLY" | string;
-  next_number?: number;
-  padding?: number;
-};
-
-export async function updateDocumentNumbering(payload: DocumentNumberingUpdatePayload): Promise<DocumentNumberingState> {
-  return apiFetch<DocumentNumberingState>("/admin/business-setup/document-numbering/", { method: "PATCH", body: payload });
+export async function updateDocumentNumbering(input: { key: string; prefix: string; pattern?: string; suffix?: string; reset_policy?: string; next_number: number; padding: number }): Promise<DocumentNumberingState> {
+  return apiFetch<DocumentNumberingState>("/admin/business-setup/document-numbering/", { method: "PATCH", body: input });
 }
-
-export async function getResetPreview(preserveUsername?: string): Promise<Record<string, unknown>> {
-  const query = preserveUsername ? `?preserve_username=${encodeURIComponent(preserveUsername)}` : "";
-  return apiFetch<Record<string, unknown>>(`/admin/business-setup/reset-preview/${query}`);
-}
-
-export type BusinessResetExecuteRequest = { confirm: boolean; preserve_username: string; delete_non_preserved_users?: boolean; clear_auth_artifacts?: boolean; dry_run?: boolean };
-
-export async function executeBusinessReset(payload: BusinessResetExecuteRequest): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/reset/", { method: "POST", body: payload });
-}
-
-export type ResetScope = { code: string; label: string; danger_level: string; requires_backup: boolean; model_labels: string[] };
-
-export async function getResetScopes(): Promise<{ scopes: ResetScope[] }> {
-  return apiFetch<{ scopes: ResetScope[] }>("/admin/business-setup/reset-scopes/");
-}
-
-export async function getModularResetPreview(payload: { scopes: string[]; preserve_username: string; preserve_user_ids?: number[] }): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/reset-preview-v2/", { method: "POST", body: payload });
-}
-
-export async function executeModularReset(payload: { scopes: string[]; preserve_username: string; confirmation_phrase: string; backup_job_id?: number }): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/reset-v2/", { method: "POST", body: payload });
-}
-
-export async function getBackupJobs(): Promise<{ results: unknown[]; jobs: unknown[] }> {
-  const payload = await apiFetch<{ results?: unknown[]; jobs?: unknown[] }>("/admin/business-setup/backups/");
-  const rows = payload.jobs ?? payload.results ?? [];
-  return { ...payload, results: rows, jobs: rows };
-}
-
-export async function createBackupJob(payload: { job_type: string; scopes: string[] }): Promise<Record<string, unknown> & { id?: number }> {
-  return apiFetch<Record<string, unknown> & { id?: number }>("/admin/business-setup/backups/", { method: "POST", body: payload });
-}
-
-export async function getRestoreJobs(): Promise<{ results: unknown[]; jobs: unknown[] }> {
-  const payload = await apiFetch<{ results?: unknown[]; jobs?: unknown[] }>("/admin/business-setup/restore-jobs/");
-  const rows = payload.jobs ?? payload.results ?? [];
-  return { ...payload, results: rows, jobs: rows };
-}
-
-export async function createRestorePreview(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/restore/preview/", { method: "POST", body: payload });
-}
-
-export async function executeRestore(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/restore/", { method: "POST", body: payload });
-}
-
-export const listBackupJobs = getBackupJobs;
-export const listRestoreJobs = getRestoreJobs;
-export const getRestorePreview = createRestorePreview;
