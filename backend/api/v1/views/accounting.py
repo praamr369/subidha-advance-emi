@@ -243,7 +243,11 @@ class FinanceAccountViewSet(AdminAccountingModelViewSet):
 
 
 class JournalEntryViewSet(AdminAccountingModelViewSet):
-    queryset = JournalEntry.objects.prefetch_related("lines", "lines__chart_account").all()
+    queryset = (
+        JournalEntry.objects.select_related("financial_year", "accounting_period")
+        .prefetch_related("lines", "lines__chart_account")
+        .all()
+    )
     serializer_class = JournalEntrySerializer
     search_fields = ["entry_no", "memo", "source_model", "source_id"]
     ordering_fields = ["entry_date", "created_at", "entry_no"]

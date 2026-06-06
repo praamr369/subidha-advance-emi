@@ -6,7 +6,7 @@ from django.utils import timezone
 from accounting.models import ChartOfAccount, ChartOfAccountType, JournalEntryType
 from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
 from accounting.services.reporting_service import build_trial_balance
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_journal_numbering_profile_for_date
 
 
 class ReportingTrialBalanceTests(TestCase):
@@ -26,6 +26,7 @@ class ReportingTrialBalanceTests(TestCase):
             name="Owner Capital",
             account_type=ChartOfAccountType.EQUITY,
         )
+        ensure_journal_numbering_profile_for_date(timezone.localdate(), performed_by=self.admin)
 
     def test_trial_balance_rolls_up_posted_journal_lines(self):
         journal = create_journal_entry(

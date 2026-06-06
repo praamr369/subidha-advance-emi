@@ -6,7 +6,7 @@ from django.utils import timezone
 from accounting.models import ChartOfAccount, ChartOfAccountType, JournalEntryType
 from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
 from accounting.services.reporting_service import build_profit_loss
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_journal_numbering_profile_for_date
 
 
 class ReportingProfitLossTests(TestCase):
@@ -31,6 +31,7 @@ class ReportingProfitLossTests(TestCase):
             name="Office Expense",
             account_type=ChartOfAccountType.EXPENSE,
         )
+        ensure_journal_numbering_profile_for_date(timezone.localdate(), performed_by=self.admin)
 
     def _post(self, lines):
         journal = create_journal_entry(

@@ -11,7 +11,7 @@ from accounting.services.export_pack_service import (
     generate_itr_export_pack,
 )
 from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_journal_numbering_profile_for_date
 
 
 class ItrExportPackTests(TestCase):
@@ -31,6 +31,7 @@ class ItrExportPackTests(TestCase):
             name="Capital",
             account_type=ChartOfAccountType.EQUITY,
         )
+        ensure_journal_numbering_profile_for_date(timezone.localdate(), performed_by=self.admin)
         journal = create_journal_entry(
             entry_date=timezone.localdate(),
             entry_type=JournalEntryType.MANUAL,

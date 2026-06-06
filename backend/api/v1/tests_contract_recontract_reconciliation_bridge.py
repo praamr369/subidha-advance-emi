@@ -52,7 +52,7 @@ from subscriptions.services.product_recontract_preview_service import (
     record_product_recontract_admin_approval,
     record_product_recontract_customer_consent,
 )
-from tests.helpers import ensure_open_accounting_period_for_date
+from tests.helpers import ensure_journal_numbering_profile_for_date
 
 
 class ContractRecontractReconciliationBridgeTests(TestCase):
@@ -112,7 +112,7 @@ class ContractRecontractReconciliationBridgeTests(TestCase):
                 entry_type=LedgerEntryType.EMI_PAYMENT,
                 entry_direction=LedgerDirection.CREDIT,
             )
-        ensure_open_accounting_period_for_date(timezone.localdate(), performed_by=self.admin)
+        ensure_journal_numbering_profile_for_date(timezone.localdate(), performed_by=self.admin)
 
     def _ensure_posting_profiles(self):
         self.receivable_account = ChartOfAccount.objects.create(

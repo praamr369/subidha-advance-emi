@@ -503,6 +503,11 @@ class JournalEntrySerializer(serializers.ModelSerializer):
     lines = JournalEntryLineSerializer(many=True)
     approved_by_username = serializers.CharField(source="approved_by.username", read_only=True)
     posted_by_username = serializers.CharField(source="posted_by.username", read_only=True)
+    financial_year_code = serializers.CharField(source="financial_year.code", read_only=True)
+    financial_year_name = serializers.CharField(source="financial_year.name", read_only=True)
+    accounting_period_code = serializers.CharField(source="accounting_period.code", read_only=True)
+    accounting_period_name = serializers.CharField(source="accounting_period.name", read_only=True)
+    accounting_period_status = serializers.CharField(source="accounting_period.status", read_only=True)
 
     class Meta:
         model = JournalEntry
@@ -518,6 +523,13 @@ class JournalEntrySerializer(serializers.ModelSerializer):
             "source_reference",
             "source_model",
             "source_id",
+            "financial_year",
+            "financial_year_code",
+            "financial_year_name",
+            "accounting_period",
+            "accounting_period_code",
+            "accounting_period_name",
+            "accounting_period_status",
             "approved_by",
             "approved_by_username",
             "approved_at",
@@ -533,6 +545,13 @@ class JournalEntrySerializer(serializers.ModelSerializer):
             "id",
             "entry_no",
             "status",
+            "financial_year",
+            "financial_year_code",
+            "financial_year_name",
+            "accounting_period",
+            "accounting_period_code",
+            "accounting_period_name",
+            "accounting_period_status",
             "approved_by",
             "approved_by_username",
             "approved_at",

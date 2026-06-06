@@ -46,7 +46,7 @@ from subscriptions.services.product_recontract_preview_service import (
     record_product_recontract_admin_approval,
     record_product_recontract_customer_consent,
 )
-from tests.helpers import ensure_open_accounting_period_for_date
+from tests.helpers import ensure_journal_numbering_profile_for_date
 
 
 class ContractRecontractExecutionTests(TestCase):
@@ -127,7 +127,7 @@ class ContractRecontractExecutionTests(TestCase):
             reason="Phase 6F.4 execute.",
             approved_by=self.admin,
         )
-        ensure_open_accounting_period_for_date(timezone.localdate(), performed_by=self.admin)
+        ensure_journal_numbering_profile_for_date(timezone.localdate(), performed_by=self.admin)
 
     def _ensure_posting_profiles(self):
         receivable_account = ChartOfAccount.objects.create(

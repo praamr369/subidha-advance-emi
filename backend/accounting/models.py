@@ -1264,6 +1264,20 @@ class JournalEntry(AccountingTimeStampedModel):
     voucher_type = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     source_type = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     source_reference = models.CharField(max_length=120, null=True, blank=True, db_index=True)
+    financial_year = models.ForeignKey(
+        FinancialYear,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="journal_entries",
+    )
+    accounting_period = models.ForeignKey(
+        AccountingPeriod,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="journal_entries",
+    )
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -1298,6 +1312,8 @@ class JournalEntry(AccountingTimeStampedModel):
             models.Index(fields=["source_model", "source_id"]),
             models.Index(fields=["voucher_type", "source_type"]),
             models.Index(fields=["status", "entry_date"]),
+            models.Index(fields=["financial_year", "status"]),
+            models.Index(fields=["accounting_period", "status"]),
         ]
 
     def clean(self):

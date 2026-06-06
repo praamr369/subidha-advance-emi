@@ -248,6 +248,11 @@ export default function AccountingJournalsPage() {
                           <div className="mt-1 text-xs text-muted-foreground">
                             {journal.entry_type} • {journal.status} • {formatDate(journal.entry_date)}
                           </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            FY {journal.financial_year_code || "pending"} • Period{" "}
+                            {journal.accounting_period_code || "resolved on posting"}
+                            {journal.accounting_period_status ? ` • ${journal.accounting_period_status}` : ""}
+                          </div>
                         </div>
                         <div className="text-right">
                           <div className="text-sm font-semibold text-foreground">

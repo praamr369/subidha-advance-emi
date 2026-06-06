@@ -20,7 +20,7 @@ from accounting.services.journal_posting_service import (
     post_journal_entry,
     reverse_journal_group,
 )
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_journal_numbering_profile_for_date
 
 
 class AccountingControlLayerTests(TestCase):
@@ -38,6 +38,7 @@ class AccountingControlLayerTests(TestCase):
             name="Control Income",
             account_type=ChartOfAccountType.INCOME,
         )
+        ensure_journal_numbering_profile_for_date(date(2026, 4, 30), performed_by=self.admin)
 
     def _create_balanced_group(self):
         entry = create_journal_entry(
@@ -110,4 +111,3 @@ class AccountingControlLayerTests(TestCase):
         trial = self.client.get("/api/v1/accounting/reports/trial-balance/")
         self.assertEqual(trial.status_code, 200, trial.data)
         self.assertTrue(trial.data.get("balanced"))
-

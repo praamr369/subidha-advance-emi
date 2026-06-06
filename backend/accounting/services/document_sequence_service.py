@@ -228,12 +228,15 @@ def validate_document_numbering_ready(document_type: str, document_date: date, b
         raise DocumentNumberingSetupError("The accounting period for the document date is locked or closed.")
     sequence = _sequence_queryset_for_type(document_type=document_type, financial_year=financial_year).order_by("-id").first()
     if sequence is None:
-        raise DocumentNumberingSetupError("No numbering profile is configured for this document type and financial year.")
+        raise DocumentNumberingSetupError(
+            f"No {document_type} numbering profile is configured for financial year {financial_year.code}."
+        )
     return sequence
 
 
 def _issued_queryset_for_document_type(document_type: str) -> tuple[QuerySet | None, str]:
     from billing.models import BillingCreditNote, BillingDebitNote, BillingInvoice, DirectSale, ReceiptDocument
+    from accounting.models import JournalEntry
 
     if document_type == DocumentType.DIRECT_SALE:
         return DirectSale.objects.exclude(sale_no__isnull=True).exclude(sale_no=""), "sale_no"
@@ -245,6 +248,8 @@ def _issued_queryset_for_document_type(document_type: str) -> tuple[QuerySet | N
         return BillingCreditNote.objects.exclude(note_no__isnull=True).exclude(note_no=""), "note_no"
     if document_type == DocumentType.DEBIT_NOTE:
         return BillingDebitNote.objects.exclude(note_no__isnull=True).exclude(note_no=""), "note_no"
+    if document_type == DocumentType.JOURNAL_ENTRY:
+        return JournalEntry.objects.exclude(entry_no__isnull=True).exclude(entry_no=""), "entry_no"
     return None, ""
 
 

@@ -108,6 +108,13 @@ export type JournalEntry = {
   source_reference?: string | null;
   source_model?: string | null;
   source_id?: string | null;
+  financial_year?: number | null;
+  financial_year_code?: string | null;
+  financial_year_name?: string | null;
+  accounting_period?: number | null;
+  accounting_period_code?: string | null;
+  accounting_period_name?: string | null;
+  accounting_period_status?: "OPEN" | "LOCKED" | "CLOSED" | string | null;
   approved_by?: number | null;
   approved_by_username?: string | null;
   approved_at?: string | null;

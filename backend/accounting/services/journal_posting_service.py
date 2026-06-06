@@ -14,6 +14,11 @@ from accounting.models import (
     JournalEntryStatus,
     JournalEntryType,
 )
+from accounting.services.document_sequence_service import (
+    DocumentNumberingSetupError,
+    DocumentType,
+    allocate_document_number,
+)
 from accounting.services.period_service import assert_accounting_period_open
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
@@ -160,7 +165,7 @@ def post_journal_entry(*, journal_entry_id: int, posted_by) -> tuple[JournalEntr
     if journal_entry.status == JournalEntryStatus.VOID:
         raise ValueError("Void journal entries cannot be posted.")
 
-    assert_accounting_period_open(
+    period = assert_accounting_period_open(
         reference_date=journal_entry.entry_date,
         performed_by=posted_by,
         instance=journal_entry,
@@ -177,6 +182,14 @@ def post_journal_entry(*, journal_entry_id: int, posted_by) -> tuple[JournalEntr
     ]
     _validate_line_payloads(line_payloads, entry_type=journal_entry.entry_type)
 
+    try:
+        journal_number = allocate_document_number(DocumentType.JOURNAL_ENTRY, journal_entry.entry_date)
+    except DocumentNumberingSetupError as exc:
+        raise ValueError(str(exc)) from exc
+
+    journal_entry.entry_no = journal_number
+    journal_entry.financial_year = period.financial_year
+    journal_entry.accounting_period = period
     journal_entry.status = JournalEntryStatus.POSTED
     journal_entry.posted_by = posted_by
     journal_entry.posted_at = timezone.now()
@@ -186,6 +199,9 @@ def post_journal_entry(*, journal_entry_id: int, posted_by) -> tuple[JournalEntr
     journal_entry.save(
         update_fields=[
             "status",
+            "entry_no",
+            "financial_year",
+            "accounting_period",
             "posted_by",
             "posted_at",
             "approved_by",

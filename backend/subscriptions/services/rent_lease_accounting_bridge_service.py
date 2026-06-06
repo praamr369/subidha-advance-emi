@@ -20,10 +20,10 @@ from accounting.models import (
     FinanceAccountCoaMapping,
     FinanceAccountMappingPurpose,
     JournalEntry,
-    JournalEntryLine,
     JournalEntryStatus,
     JournalEntryType,
 )
+from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
 from subscriptions.models import (
     AuditLog,
     CustomerAdvance,
@@ -233,36 +233,31 @@ def _execute_posting(
     if not preview.get("can_post"):
         raise ValidationError(preview.get("reason") or "Source is not postable.")
 
-    now = timezone.now()
-    entry = JournalEntry.objects.create(
+    entry = create_journal_entry(
         entry_date=timezone.localdate(),
         entry_type=JournalEntryType.SYSTEM_BRIDGE,
-        status=JournalEntryStatus.POSTED,
         memo=narration,
         source_model=source_model,
         source_id=str(source_id),
         voucher_type=BRIDGE_VOUCHER_TYPE,
         source_type=event,
         source_reference=source_reference,
-        approved_by=performed_by,
-        approved_at=now,
-        posted_by=performed_by,
-        posted_at=now,
+        lines=[
+            {
+                "chart_account": debit_account,
+                "description": debit_label,
+                "debit_amount": amount,
+                "credit_amount": MONEY_ZERO,
+            },
+            {
+                "chart_account": credit_account,
+                "description": credit_label,
+                "debit_amount": MONEY_ZERO,
+                "credit_amount": amount,
+            },
+        ],
     )
-    JournalEntryLine.objects.create(
-        journal_entry=entry,
-        chart_account=debit_account,
-        description=debit_label,
-        debit_amount=amount,
-        credit_amount=MONEY_ZERO,
-    )
-    JournalEntryLine.objects.create(
-        journal_entry=entry,
-        chart_account=credit_account,
-        description=credit_label,
-        debit_amount=MONEY_ZERO,
-        credit_amount=amount,
-    )
+    entry, _ = post_journal_entry(journal_entry_id=entry.id, posted_by=performed_by)
 
     if source_instance is not None:
         log_audit(

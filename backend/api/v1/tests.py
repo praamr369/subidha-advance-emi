@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from accounting.models import DocumentSequence, FinanceAccountKind
+from accounting.services.document_sequence_service import DocumentType
 from accounting.services.gst_document_posting_service import ensure_document_sequence, financial_year_for
 from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
 from accounting.models import EmployeeAttendance, EmployeeDocument, EmployeeProfile
@@ -37,6 +38,8 @@ from subscriptions.services.contract_reference_service import (
 )
 from tests.helpers import (
     ensure_default_payment_collection_accounts,
+    ensure_document_numbering_profile_for_date,
+    ensure_journal_numbering_profile_for_date,
     ensure_open_accounting_period_for_date,
     suppress_expected_request_logs,
 )
@@ -348,7 +351,12 @@ class Phase9FOperationalReadinessTests(TestCase):
             performed_by=self.admin,
         )
         self.reference = ContractReference.objects.get(subscription=self.subscription)
-        ensure_open_accounting_period_for_date(timezone.localdate(), performed_by=self.admin)
+        ensure_journal_numbering_profile_for_date(timezone.localdate(), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date(
+            DocumentType.DIRECT_SALE_RECEIPT,
+            timezone.localdate(),
+            performed_by=self.admin,
+        )
 
     def test_business_reset_requires_json_boolean_and_preserves_one_admin(self):
         self.client.force_authenticate(self.admin)
@@ -1011,7 +1019,7 @@ class RentLeaseContractWorkflowTests(TestCase):
             },
             format="json",
         )
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data["plan_type"], "RENT")
         self.assertIsNotNone(response.data.get("rent_profile"))
 
@@ -1039,7 +1047,7 @@ class RentLeaseContractWorkflowTests(TestCase):
             },
             format="json",
         )
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data["plan_type"], "LEASE")
         self.assertIsNotNone(response.data.get("lease_profile"))
 
@@ -1354,6 +1362,7 @@ class Phase9AContractReferenceApiTests(TestCase):
     def test_admin_receivables_collect_advances_emi_via_payment_service(self):
         accounts = ensure_default_payment_collection_accounts()
         cash_id = accounts[FinanceAccountKind.CASH].id
+        ensure_journal_numbering_profile_for_date(timezone.localdate(), performed_by=self.admin)
         self.client.force_authenticate(self.admin)
 
         response = self.client.post(
@@ -1369,7 +1378,7 @@ class Phase9AContractReferenceApiTests(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data.get("source_type"), "ADVANCE_EMI")
         self.assertIn("payment_id", response.data)
 
@@ -1476,6 +1485,7 @@ class Phase9AContractReferenceApiTests(TestCase):
     def test_unified_collect_idempotency_replays_identical_request(self):
         accounts = ensure_default_payment_collection_accounts()
         cash_id = accounts[FinanceAccountKind.CASH].id
+        ensure_journal_numbering_profile_for_date(timezone.localdate(), performed_by=self.admin)
         self.client.force_authenticate(self.admin)
         body = {
             "source_type": "ADVANCE_EMI",
@@ -1497,13 +1507,14 @@ class Phase9AContractReferenceApiTests(TestCase):
             body,
             format="json",
         )
-        self.assertEqual(first.status_code, 201)
+        self.assertEqual(first.status_code, 201, first.data)
         self.assertEqual(second.status_code, 200)
         self.assertEqual(first.data.get("payment_id"), second.data.get("payment_id"))
 
     def test_unified_collect_idempotency_rejects_conflicting_payload(self):
         accounts = ensure_default_payment_collection_accounts()
         cash_id = accounts[FinanceAccountKind.CASH].id
+        ensure_journal_numbering_profile_for_date(timezone.localdate(), performed_by=self.admin)
         self.client.force_authenticate(self.admin)
         base = {
             "source_type": "ADVANCE_EMI",
@@ -1517,7 +1528,7 @@ class Phase9AContractReferenceApiTests(TestCase):
             {**base, "amount": "10.00", "reference": "P9B-A"},
             format="json",
         )
-        self.assertEqual(first.status_code, 201)
+        self.assertEqual(first.status_code, 201, first.data)
         second = self.client.post(
             "/api/v1/admin/receivables/collect/",
             {**base, "amount": "11.00", "reference": "P9B-B"},

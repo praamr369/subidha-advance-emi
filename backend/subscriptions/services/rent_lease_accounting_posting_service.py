@@ -14,10 +14,9 @@ from accounting.models import (
     ChartOfAccountType,
     FinanceAccount,
     JournalEntry,
-    JournalEntryLine,
-    JournalEntryStatus,
     JournalEntryType,
 )
+from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
 from subscriptions.models import (
     RentLeaseBillingDemand,
     RentLeaseDemandStatus,
@@ -198,30 +197,26 @@ def _posting(idempotency_key: str) -> dict[str, Any] | None:
 
 
 def _create_journal(payload: dict[str, Any], actor=None) -> JournalEntry:
-    now = timezone.now()
-    journal = JournalEntry.objects.create(
+    journal = create_journal_entry(
         entry_date=timezone.localdate(),
         entry_type=JournalEntryType.SYSTEM_BRIDGE,
-        status=JournalEntryStatus.POSTED,
         memo=f"{payload['event_type']} bridge posting for {payload['source_reference']}",
         source_model=payload["source_model"],
         source_id=payload["source_id"],
         source_type=payload["event_type"],
         source_reference=payload["source_reference"],
-        approved_by=actor,
-        approved_at=now,
-        posted_by=actor,
-        posted_at=now,
+        lines=[
+            {
+                "chart_account": ChartOfAccount.objects.get(pk=line["account"]["id"]),
+                "description": line["description"],
+                "debit_amount": _money(line["debit"]),
+                "credit_amount": _money(line["credit"]),
+            }
+            for line in payload["lines"]
+        ],
     )
-    for line in payload["lines"]:
-        JournalEntryLine.objects.create(
-            journal_entry=journal,
-            chart_account_id=line["account"]["id"],
-            description=line["description"],
-            debit_amount=_money(line["debit"]),
-            credit_amount=_money(line["credit"]),
-        )
-    return journal
+    posted_journal, _ = post_journal_entry(journal_entry_id=journal.id, posted_by=actor)
+    return posted_journal
 
 
 def _execute(payload: dict[str, Any], actor=None) -> dict[str, Any]:

@@ -13,6 +13,7 @@ from accounting.models import (
     FinanceAccountMappingPurpose,
     FinancialYear,
 )
+from accounting.services.document_sequence_service import DocumentType, upsert_numbering_profile
 from accounts.models import User, UserRole
 from subscriptions.models import (
     Batch,
@@ -113,7 +114,32 @@ def ensure_open_accounting_period_for_date(reference_date: date, *, performed_by
     if period.financial_year_id != financial_year.id:
         period.financial_year = financial_year
         period.save(update_fields=["financial_year", "updated_at"])
+    if period.status != "OPEN" or period.is_locked:
+        period.status = "OPEN"
+        period.is_locked = False
+        period.locked_at = None
+        period.locked_by = None
+        period.lock_reason = ""
+        period.save(update_fields=["status", "is_locked", "locked_at", "locked_by", "lock_reason", "updated_at"])
     return financial_year, period
+
+
+def ensure_journal_numbering_profile_for_date(reference_date: date, *, performed_by=None):
+    ensure_open_accounting_period_for_date(reference_date, performed_by=performed_by)
+    return upsert_numbering_profile(
+        document_type=DocumentType.JOURNAL_ENTRY,
+        reference_date=reference_date,
+        performed_by=performed_by,
+    )
+
+
+def ensure_document_numbering_profile_for_date(document_type: str, reference_date: date, *, performed_by=None):
+    ensure_open_accounting_period_for_date(reference_date, performed_by=performed_by)
+    return upsert_numbering_profile(
+        document_type=document_type,
+        reference_date=reference_date,
+        performed_by=performed_by,
+    )
 
 
 def create_partner_user(username="partner_test", phone="9000000002", email=""):
