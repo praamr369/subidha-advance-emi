@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { authStatePath } from "./helpers/smoke-data";
 
@@ -9,7 +9,7 @@ test.use({ storageState: authStatePath("admin") });
 
 const screenshotDir = path.resolve(process.cwd(), "../docs/accounting/screenshots");
 
-async function saveScreenshot(page, name: string, fullPage = true) {
+async function saveScreenshot(page: Page, name: string, fullPage = true) {
   mkdirSync(screenshotDir, { recursive: true });
   await page.screenshot({ path: path.join(screenshotDir, name), fullPage });
 }
