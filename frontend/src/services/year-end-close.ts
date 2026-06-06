@@ -3,6 +3,12 @@ import { apiFetch } from "@/lib/api";
 export type YearEndIssue = {
   code: string;
   message: string;
+  blocker_code?: string;
+  blocker_label?: string;
+  blocker_count?: number;
+  recommended_action?: string;
+  action_href?: string | null;
+  is_acknowledgeable?: boolean;
 };
 
 export type YearEndFinancialYear = {
@@ -35,6 +41,7 @@ export type YearEndPeriodRow = {
 export type YearEndReadiness = {
   financial_year: YearEndFinancialYear | null;
   periods: YearEndPeriodRow[];
+  open_periods?: YearEndPeriodRow[];
   period_summary: { total_periods?: number; expected_periods?: number };
   open_period_count: number;
   locked_period_count: number;
@@ -43,6 +50,17 @@ export type YearEndReadiness = {
   gap_or_overlap_count: number;
   unposted_bridge_item_count: number;
   blocked_bridge_item_count: number;
+  bridge_event_counts?: Record<string, Record<string, number>>;
+  blocking_bridge_groups?: Array<{
+    event_key: string;
+    blocker_code: string;
+    blocker_label?: string | null;
+    count: number;
+    recommended_action?: string | null;
+    action_href?: string | null;
+    is_acknowledgeable?: boolean;
+    is_postable?: boolean;
+  }>;
   unreconciled_item_count: number;
   exception_count: number;
   missing_numbering_profile_count: number;
