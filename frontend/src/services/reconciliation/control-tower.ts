@@ -13,6 +13,8 @@ export type ReconciliationRunCreatePayload = {
   branch_id?: number | null;
   date_from?: string | null;
   date_to?: string | null;
+  financial_year?: string | null;
+  accounting_period?: string | null;
 };
 
 export type ReconciliationItemListQuery = {
@@ -45,6 +47,7 @@ export async function createReconciliationRun(payload: ReconciliationRunCreatePa
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    retryCount: 0,
   });
 }
 
@@ -71,6 +74,7 @@ export async function resolveReconciliationItem(id: number | string, payload: { 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    retryCount: 0,
   });
 }
 
@@ -79,5 +83,6 @@ export async function reopenReconciliationItem(id: number | string, payload: { n
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    retryCount: 0,
   });
 }
