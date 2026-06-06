@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 
 import { prepareProductInventoryProfile, updateProduct } from "@/services/products";
@@ -46,7 +46,7 @@ function supportedDefault(defaultValue: string | null | undefined, emi: boolean,
   return "EMI";
 }
 
-function Drawer({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+function Drawer({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={onClose}>
       <div className="h-full w-full max-w-xl overflow-y-auto border-l border-border bg-background p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
@@ -168,7 +168,7 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
       if (qty > 0) {
         throw new Error("Opening stock is not posted from quick prepare. Prepare the profile now, then use the controlled Opening Stock workflow for stock quantity.");
       }
-      const payload = await prepareProductInventoryProfile(product.id, { stock_tracking_enabled: trackStock });
+      const payload = await prepareProductInventoryProfile(product.id, { stock_tracking_enabled: trackStock, opening_stock_qty: openingStock });
       setMessage(payload.created ? `Inventory profile #${payload.inventory_profile.id} prepared.` : `Inventory profile #${payload.inventory_profile.id} already existed and was refreshed.`);
       setPrepareOpen(false);
       await onChanged?.();
@@ -204,13 +204,7 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
               <label className="text-sm text-muted-foreground">Base price<input className={fieldClass()} type="number" min="0" step="0.01" value={basePrice} onChange={(event) => setBasePrice(event.target.value)} required /></label>
               <label className="text-sm text-muted-foreground">Default plan<select className={fieldClass()} value={planTypeDefault} onChange={(event) => setPlanTypeDefault(event.target.value as "EMI" | "RENT" | "LEASE")}><option value="EMI">EMI</option><option value="RENT">Rent</option><option value="LEASE">Lease</option></select></label>
             </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              {checkboxLabel("Active", active, setActive)}
-              {checkboxLabel("EMI", emi, setEmi)}
-              {checkboxLabel("Rent", rent, setRent)}
-              {checkboxLabel("Lease", lease, setLease)}
-              {checkboxLabel("Direct Sale", directSale, setDirectSale)}
-            </div>
+            <div className="grid gap-2 md:grid-cols-2">{checkboxLabel("Active", active, setActive)}{checkboxLabel("EMI", emi, setEmi)}{checkboxLabel("Rent", rent, setRent)}{checkboxLabel("Lease", lease, setLease)}{checkboxLabel("Direct Sale", directSale, setDirectSale)}</div>
             <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditOpen(false)} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">Cancel</button><button type="submit" disabled={saving} className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60">{saving ? "Saving..." : "Save quick edit"}</button></div>
           </form>
         </Drawer>
@@ -219,12 +213,7 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
       {prepareOpen ? (
         <Drawer title="Prepare inventory profile" onClose={() => setPrepareOpen(false)}>
           <div className="space-y-4">
-            <div className="grid gap-2 rounded-xl border border-border bg-card p-3 text-sm">
-              <div><span className="text-muted-foreground">Product:</span> <span className="font-semibold">{product.name}</span></div>
-              <div><span className="text-muted-foreground">SKU/code:</span> {product.sku || product.product_code || "SKU pending"}</div>
-              <div><span className="text-muted-foreground">Unit:</span> {product.unit_of_measure || "PCS"}</div>
-              <div><span className="text-muted-foreground">Profile:</span> {product.inventory_profile_id ? `#${product.inventory_profile_id}` : "Not prepared"}</div>
-            </div>
+            <div className="grid gap-2 rounded-xl border border-border bg-card p-3 text-sm"><div><span className="text-muted-foreground">Product:</span> <span className="font-semibold">{product.name}</span></div><div><span className="text-muted-foreground">SKU/code:</span> {product.sku || product.product_code || "SKU pending"}</div><div><span className="text-muted-foreground">Unit:</span> {product.unit_of_measure || "PCS"}</div><div><span className="text-muted-foreground">Profile:</span> {product.inventory_profile_id ? `#${product.inventory_profile_id}` : "Not prepared"}</div></div>
             <div className="flex flex-wrap gap-2">{badges.map((badge) => <span key={badge} className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground">{badge}</span>)}</div>
             {checkboxLabel("Enable stock tracking on profile", trackStock, setTrackStock)}
             <label className="text-sm text-muted-foreground">Opening stock preview<input className={fieldClass()} type="number" min="0" step="0.001" value={openingStock} onChange={(event) => setOpeningStock(event.target.value)} /><span className="mt-1 block text-xs">Quick prepare does not create stock ledger movement. Use Opening Stock workflow after profile creation for non-zero stock.</span></label>
