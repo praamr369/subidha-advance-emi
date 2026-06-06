@@ -9,6 +9,7 @@ from accounting.models import FinanceAccount, FinanceAccountKind
 from accounting.services.setup_defaults_service import apply_accounting_setup_defaults, preview_accounting_setup_defaults
 from api.v1.permissions import IsAdmin
 from branch_control.models import Branch, BranchStatus, CashCounter
+from subscriptions.services.document_numbering_service import get_document_numbering_state, seed_default_document_numbering
 from subscriptions.services.document_print_settings_service import get_or_create_document_print_settings
 from subscriptions.services.setup_readiness_service import get_setup_readiness
 
@@ -35,6 +36,7 @@ class AdminFreshStartSetupView(APIView):
                     "default active branch when missing",
                     "default cash counter when a collection-ready cash FinanceAccount exists",
                     "minimal print branding settings object",
+                    "default document numbering setup profiles",
                     "accounting setup metadata only",
                 ],
                 "forbidden_creations": [
@@ -53,7 +55,9 @@ class AdminFreshStartSetupView(APIView):
                     "DirectSale invoice",
                 ],
                 "accounting_defaults_preview": preview_accounting_setup_defaults(),
+                "document_numbering_preview": get_document_numbering_state(),
                 "readiness": get_setup_readiness(),
+                "safety_contract": "Preview is read-only. It does not post, reconcile, invoice, receipt, pay, allocate stock, or create contracts.",
             },
             status=status.HTTP_200_OK,
         )
@@ -67,6 +71,7 @@ class AdminFreshStartSetupView(APIView):
 
         before = get_setup_readiness()
         accounting_result = apply_accounting_setup_defaults(performed_by=request.user) if not dry_run else preview_accounting_setup_defaults()
+        numbering_result = get_document_numbering_state() if dry_run else seed_default_document_numbering(performed_by=request.user)
         print_settings = None if dry_run else get_or_create_document_print_settings()
         branch_payload = self._ensure_default_branch(dry_run=dry_run)
         counter_payload = self._ensure_default_cash_counter(dry_run=dry_run)
@@ -80,6 +85,7 @@ class AdminFreshStartSetupView(APIView):
                 "stock_ledger_created": 0,
                 "reconciliation_items_created": 0,
                 "accounting_defaults": accounting_result,
+                "document_numbering": numbering_result,
                 "print_branding_settings_id": getattr(print_settings, "id", None),
                 "branch": branch_payload,
                 "cash_counter": counter_payload,
