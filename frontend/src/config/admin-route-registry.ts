@@ -47,39 +47,15 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Sales & Contracts", "Product Masters", ROUTES.admin.productsMasters, "Product category, subcategory, and UOM setup."),
   item("Sales & Contracts", "Advance EMI / Subscriptions", `${ROUTES.admin.subscriptions}?plan_type=EMI`, "Advance EMI subscription register."),
   item("Sales & Contracts", "Create Advance EMI Contract", ROUTES.admin.subscriptionsAdvanceEmiCreate, "Create an Advance EMI contract."),
-  item("Sales & Contracts", "Subscription Requests", ROUTES.admin.subscriptionRequests, "Admin subscription request queue.", {
-    badgeSource: "queue.subscription_requests_pending",
-  }),
-  item("Sales & Contracts", "Contract Amendments", ROUTES.admin.contractAmendments, "Admin decision register for amendment requests.", {
-    children: [
-      item("Sales & Contracts", "Product Recontract Report", ROUTES.admin.contractAmendmentsRecontractReport, "Read-only evidence report for recontract previews and addendum eligibility."),
-    ],
-  }),
+  item("Sales & Contracts", "Subscription Requests", ROUTES.admin.subscriptionRequests, "Admin subscription request queue.", { badgeSource: "queue.subscription_requests_pending" }),
+  item("Sales & Contracts", "Contract Amendments", ROUTES.admin.contractAmendments, "Admin decision register for amendment requests.", { children: [item("Sales & Contracts", "Product Recontract Report", ROUTES.admin.contractAmendmentsRecontractReport, "Read-only evidence report for recontract previews and addendum eligibility.")] }),
   item("Sales & Contracts", "Batches", ROUTES.admin.batches, "Batch lifecycle and draw scope."),
   item("Sales & Contracts", "Lucky IDs", ROUTES.admin.luckyIds, "Lucky ID register."),
   item("Sales & Contracts", "Lucky Draws", ROUTES.admin.luckyDraws, "Lucky draw schedule and execution."),
-  item("Sales & Contracts", "Partners", ROUTES.admin.partnersWorkspace, "Partner workflow for Advance EMI operations.", {
-    children: [
-      item("Sales & Contracts", "Partner Register", ROUTES.admin.partners, "Partner directory."),
-      item("Sales & Contracts", "Partner Payment Requests", ROUTES.admin.partnerPaymentRequests, "Partner payment request queue.", {
-        badgeSource: "queue.partner_payment_requests_pending",
-      }),
-      item("Sales & Contracts", "Partner Collections", ROUTES.admin.partnersCollectionRequests, "Partner collection queue.", {
-        badgeSource: "queue.partner_collection_requests_pending",
-      }),
-    ],
-  }),
+  item("Sales & Contracts", "Partners", ROUTES.admin.partnersWorkspace, "Partner workflow for Advance EMI operations."),
   item("Sales & Contracts", "Direct Sale", ROUTES.admin.billingDirectSaleWorkspace, "Direct-sale billing workspace and register."),
   item("Sales & Contracts", "Create Direct Sale Invoice", ROUTES.admin.billingDirectSaleCreate, "Open full-page direct-sale invoice creation."),
-  item("Sales & Contracts", "Billing / Invoices / Receipts", ROUTES.admin.billing, "Billing cockpit for invoices, receipts, document registers, and returns.", {
-    children: [
-      item("Sales & Contracts", "Invoices", ROUTES.admin.billingInvoices, "Invoice register."),
-      item("Sales & Contracts", "Receipts", ROUTES.admin.billingReceipts, "Receipt register."),
-      item("Sales & Contracts", "Document Register", ROUTES.admin.billingRegister, "Billing document register."),
-      item("Sales & Contracts", "Credit Notes", ROUTES.admin.billingCreditNotes, "Credit note register."),
-      item("Sales & Contracts", "Debit Notes", ROUTES.admin.billingDebitNotes, "Debit note register."),
-    ],
-  }),
+  item("Sales & Contracts", "Billing / Invoices / Receipts", ROUTES.admin.billing, "Billing cockpit for invoices, receipts, document registers, and returns."),
   item("Sales & Contracts", "Deliveries", ROUTES.admin.deliveries, "Delivery register for subscription and direct-sale handoffs."),
 
   item("Rent / Lease", "Rent/Lease Cockpit", ROUTES.admin.rentLease, "Rent and lease cockpit."),
@@ -91,47 +67,26 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Rent / Lease", "Unified Collection", `${ROUTES.admin.financeCollect}?workflow=rent-lease`, "Collect rent or lease demands through the existing collection workspace."),
   item("Rent / Lease", "Monthly Demands", `${ROUTES.admin.emis}?plan_type=RENT_LEASE`, "Rent and lease monthly demand visibility."),
   item("Rent / Lease", "Account Mapping / Deposit Mapping", ROUTES.admin.accountingSetup, "Finance account, COA, and deposit mapping setup."),
-  item("Rent / Lease", "Possession / Handover", `${ROUTES.admin.deliveries}?plan_type=RENT_LEASE`, "Rent and lease possession and handover queue."),
-  item("Rent / Lease", "Return Inspections", `${ROUTES.admin.serviceDeskReturns}?plan_type=RENT_LEASE`, "Rent and lease return inspection queue."),
-  item("Rent / Lease", "Delivery Documents", ROUTES.admin.deliveryWorkspace, "Handover and delivery document workflow."),
 
   item("Accounting & Finance", "Finance Workspace", ROUTES.admin.finance, "Finance operations workspace."),
   item("Accounting & Finance", "Collection", ROUTES.admin.financeCollect, "Unified collection workspace."),
   item("Accounting & Finance", "Payments", ROUTES.admin.payments, "Payment register."),
   item("Accounting & Finance", "Outstandings", ROUTES.admin.outstandings, "Unified collectible dues across EMI, rent, lease, direct sale, and invoices."),
   item("Accounting & Finance", "Settlements", ROUTES.admin.settlements, "Bank statement and UPI settlement evidence imports with manual allocations."),
-  item("Accounting & Finance", "Reconciliation", ROUTES.admin.financeCanonicalReconciliation, "Reconciliation queue.", {
-    badgeSource: "queue.reconciliation_pending",
-  }),
+  item("Accounting & Finance", "Reconciliation", ROUTES.admin.financeCanonicalReconciliation, "Reconciliation queue.", { badgeSource: "queue.reconciliation_pending" }),
   item("Accounting & Finance", "Accounting Control Center", ROUTES.admin.accountingControlCenter, "Accounting KPIs and controls."),
   item("Accounting & Finance", "Accounting Setup", ROUTES.admin.accountingSetup, "Finance account to COA mappings."),
   item("Accounting & Finance", "Chart of Accounts", ROUTES.admin.accountingChartOfAccounts, "Chart of accounts."),
   item("Accounting & Finance", "Finance Accounts", ROUTES.admin.accountingFinanceAccounts, "Finance account register."),
   item("Accounting & Finance", "Journals", ROUTES.admin.accountingJournals, "Journal entry register."),
-  item("Accounting & Finance", "Books", ROUTES.admin.accountingBooks, "Money movement control center.", {
-    children: [
-      item("Accounting & Finance", "Cash Book", ROUTES.admin.accountingBooksCash, "Cash book."),
-      item("Accounting & Finance", "Bank Book", ROUTES.admin.accountingBooksBank, "Bank book."),
-      item("Accounting & Finance", "UPI Book", ROUTES.admin.accountingBooksUpi, "UPI book."),
-      item("Accounting & Finance", "Sales Book", ROUTES.admin.accountingBooksSales, "Sales book."),
-      item("Accounting & Finance", "Purchase Book", ROUTES.admin.accountingBooksPurchase, "Purchase book."),
-    ],
-  }),
-  item("Accounting & Finance", "GST / Tax Invoices", ROUTES.admin.accountingGst, "GST workspace and tax invoice register.", {
-    children: [
-      item("Accounting & Finance", "Tax Invoices", ROUTES.admin.accountingTaxInvoices, "Tax invoice register."),
-      item("Accounting & Finance", "Credit Notes", ROUTES.admin.accountingCreditNotes, "Accounting credit note register."),
-      item("Accounting & Finance", "Debit Notes", ROUTES.admin.accountingDebitNotes, "Accounting debit note register."),
-    ],
-  }),
+  item("Accounting & Finance", "Books", ROUTES.admin.accountingBooks, "Money movement control center."),
+  item("Accounting & Finance", "GST / Tax Invoices", ROUTES.admin.accountingGst, "GST workspace and tax invoice register."),
   item("Accounting & Finance", "Trial Balance", ROUTES.admin.accountingTrialBalance, "Trial balance report."),
   item("Accounting & Finance", "Profit & Loss", ROUTES.admin.accountingProfitLoss, "Profit and loss report."),
   item("Accounting & Finance", "Balance Sheet", ROUTES.admin.accountingBalanceSheet, "Balance sheet report."),
   item("Accounting & Finance", "Commissions", ROUTES.admin.financeCommissions, "Commission register."),
   item("Accounting & Finance", "Payout Batches", ROUTES.admin.financePayoutBatches, "Partner payout batches."),
-  item("Accounting & Finance", "Deposits", ROUTES.admin.financeDeposits, "Security deposits and refunds.", {
-    badgeSource: "queue.deposit_refunds_pending",
-  }),
+  item("Accounting & Finance", "Deposits", ROUTES.admin.financeDeposits, "Security deposits and refunds.", { badgeSource: "queue.deposit_refunds_pending" }),
   item("Accounting & Finance", "Reversal Control", ROUTES.admin.financeReversalControl, "Audited admin pipeline for cancellation, reversal, returns, refunds, and customer-credit decisions."),
   item("Accounting & Finance", "Reversal Reconciliation", ROUTES.admin.financeReversalReconciliation, "Queue for unresolved reversal, refund, stock return, and delivery return links."),
 
@@ -159,12 +114,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Purchase & Vendors", "Vendor Outstanding", ROUTES.admin.vendorsOutstanding, "Vendor payable outstanding summary."),
   item("Purchase & Vendors", "Vendor Settlements", ROUTES.admin.accountingVendorSettlements, "Vendor settlement workflow."),
   item("Purchase & Vendors", "Vendor Returns", ROUTES.admin.purchaseVendorReturns, "Vendor return register."),
-  item("Purchase & Vendors", "Quotes / Sourcing", ROUTES.admin.vendorsQuotes, "Vendor quote requests and sourcing.", {
-    children: [
-      item("Purchase & Vendors", "Vendor Sourcing", ROUTES.admin.vendorsSourcing, "Read-only sourcing suggestions based on location and score."),
-      item("Purchase & Vendors", "Online Enquiries", ROUTES.admin.onlineEnquiries, "Customer purchase intents for sourcing and RFQs."),
-    ],
-  }),
+  item("Purchase & Vendors", "Quotes / Sourcing", ROUTES.admin.vendorsQuotes, "Vendor quote requests and sourcing."),
 
   item("Manufacturing", "Manufacturing Dashboard", ROUTES.admin.manufacturing, "Manufacturing operations."),
   item("Manufacturing", "BOMs", ROUTES.admin.manufacturingBoms, "Bill of materials."),
@@ -174,9 +124,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("CRM / Parties", "Leads", ROUTES.admin.crmLeads, "Lead register."),
   item("CRM / Parties", "Pipeline", ROUTES.admin.crmPipeline, "Lead pipeline."),
   item("CRM / Parties", "Follow-ups", ROUTES.admin.crmFollowUps, "Follow-up tasks."),
-  item("CRM / Parties", "KYC", ROUTES.admin.crmKyc, "KYC review queue.", {
-    badgeSource: "queue.customer_kyc_pending",
-  }),
+  item("CRM / Parties", "KYC", ROUTES.admin.crmKyc, "KYC review queue.", { badgeSource: "queue.customer_kyc_pending" }),
   item("CRM / Parties", "Party Master", ROUTES.admin.crmParties, "Party-centric 360 records across customers, partners, vendors, and staff."),
   item("CRM / Parties", "Online Enquiries", ROUTES.admin.onlineEnquiries, "Public enquiry queue."),
   item("CRM / Parties", "Support Requests", ROUTES.admin.supportRequests, "Customer support intake."),
@@ -210,7 +158,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Settings", "Staff Users", ROUTES.admin.settingsUsers, "Internal staff users."),
   item("Settings", "Roles & Permissions", ROUTES.admin.settingsRolesPermissions, "Role setup and access control."),
   item("Settings", "Business Profile", ROUTES.admin.settingsBusinessSetupProfile, "Business profile."),
-  item("Settings", "Business Setup", ROUTES.admin.settingsBusinessSetup, "Business setup entry point."),
+  item("Settings", "Business Setup", ROUTES.admin.settingsBusinessSetup, "Fresh-start readiness, finance setup, branch/counter setup, documents, inventory onboarding."),
   item("Settings", "Business Setup Checklist", ROUTES.admin.settingsBusinessSetupChecklist, "Setup readiness checklist."),
   item("Settings", "Branches", ROUTES.admin.branches, "Branch configuration."),
   item("Settings", "Counters / Cash Desks", ROUTES.admin.counters, "Cash counter and desk configuration."),
@@ -218,12 +166,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Settings", "Document Numbering", ROUTES.admin.settingsBusinessSetupDocumentNumbering, "Invoice and receipt sequence readiness and configuration."),
   item("Settings", "Public Site Settings", ROUTES.admin.settingsBusinessSetupPublicSite, "Public site settings."),
   item("Settings", "Brand & Business Data Center", ROUTES.admin.brandData, "Public business profile, social links, and media reference center."),
-  item("Settings", "Setup Readiness", ROUTES.admin.setupReadiness, "Business readiness center for master data, finance accounts, collections, documents, and recontract gates."),
   item("Settings", "Imports / Backups", ROUTES.admin.settingsImports, "Import, export, and readiness tools."),
   item("Settings", "Policies", ROUTES.admin.settingsPolicies, "Policy settings."),
 ];
 
 export const ADMIN_ROUTE_ALIASES: Record<string, string> = {
+  "/admin/setup/readiness": ROUTES.admin.settingsBusinessSetup,
   "/admin/workspace": ROUTES.admin.erp,
   "/admin/lucky-draw": ROUTES.admin.luckyDraws,
   "/admin/lucky-draw/history": ROUTES.admin.luckyDraws,
