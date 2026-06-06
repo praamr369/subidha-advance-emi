@@ -5,7 +5,6 @@ from decimal import Decimal
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, serializers, status
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -31,9 +30,7 @@ class AdminProductInventoryProfilePrepareSerializer(serializers.Serializer):
         if opening_stock_qty < Decimal("0.000"):
             raise serializers.ValidationError({"opening_stock_qty": "Opening stock cannot be negative."})
         if opening_stock_qty > Decimal("0.000"):
-            raise serializers.ValidationError({
-                "opening_stock_qty": "Quick inventory preparation does not create stock ledger movement. Prepare the profile now, then use the controlled Opening Stock workflow for non-zero stock."
-            })
+            raise serializers.ValidationError({"opening_stock_qty": "Quick inventory preparation does not create stock ledger movement. Prepare the profile now, then use the controlled Opening Stock workflow for non-zero stock."})
         return attrs
 
 
@@ -117,5 +114,5 @@ class AdminProductInventoryProfilePrepareView(APIView):
                 "historical_snapshots_preserved": True,
                 **readiness,
             },
-            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+            status=status.HTTP_200_OK,
         )
