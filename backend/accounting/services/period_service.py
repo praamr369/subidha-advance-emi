@@ -65,7 +65,6 @@ def generate_monthly_periods(financial_year_id: int, performed_by) -> dict:
     periods: list[AccountingPeriod] = []
     created_count = 0
     current = financial_year.start_date
-    sequence = 1
 
     while current <= financial_year.end_date:
         month_end = date(current.year, current.month, monthrange(current.year, current.month)[1])
@@ -91,7 +90,6 @@ def generate_monthly_periods(financial_year_id: int, performed_by) -> dict:
         created_count += 1 if created else 0
         periods.append(period)
         current = _next_month_start(current)
-        sequence += 1
 
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
@@ -106,6 +104,55 @@ def generate_monthly_periods(financial_year_id: int, performed_by) -> dict:
         },
     )
     return {"financial_year": financial_year, "periods": periods, "created_count": created_count}
+
+
+@transaction.atomic
+def generate_current_period(*, reference_date: date | None = None, performed_by=None) -> dict:
+    reference_date = reference_date or timezone.localdate()
+    financial_year = get_active_financial_year()
+    if financial_year is None:
+        raise ValueError("No active financial year is configured.")
+    if reference_date < financial_year.start_date or reference_date > financial_year.end_date:
+        raise ValueError(f"Posting date {reference_date.isoformat()} is outside active financial year {financial_year.code}.")
+    existing = AccountingPeriod.objects.filter(
+        financial_year=financial_year,
+        start_date__lte=reference_date,
+        end_date__gte=reference_date,
+    ).order_by("start_date", "id").first()
+    if existing is not None:
+        return {"created": False, "financial_year": financial_year, "period": existing, "detail": "Current accounting period already exists."}
+    month_start = date(reference_date.year, reference_date.month, 1)
+    month_end = date(reference_date.year, reference_date.month, monthrange(reference_date.year, reference_date.month)[1])
+    period_start = max(month_start, financial_year.start_date)
+    period_end = min(month_end, financial_year.end_date)
+    overlap = AccountingPeriod.objects.filter(start_date__lte=period_end, end_date__gte=period_start).first()
+    if overlap is not None:
+        raise ValueError(f"Cannot create current period because {overlap.code} overlaps the target range.")
+    code = f"{financial_year.code}-{period_start.year}{period_start.month:02d}"
+    name = f"{month_name[period_start.month]} {period_start.year}"
+    period = AccountingPeriod.objects.create(
+        financial_year=financial_year,
+        code=code,
+        name=name,
+        label=name,
+        start_date=period_start,
+        end_date=period_end,
+        status=AccountingPeriodStatus.OPEN,
+    )
+    log_audit(
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        instance=period,
+        performed_by=performed_by,
+        metadata={
+            "event": "ACCOUNTING_CURRENT_PERIOD_GENERATED",
+            "financial_year_id": financial_year.id,
+            "financial_year_code": financial_year.code,
+            "period_id": period.id,
+            "period_code": period.code,
+            "reference_date": reference_date.isoformat(),
+        },
+    )
+    return {"created": True, "financial_year": financial_year, "period": period, "detail": "Current accounting period generated."}
 
 
 def resolve_accounting_period(posting_date: date) -> AccountingPeriod:
@@ -146,11 +193,15 @@ def build_accounting_period_readiness(reference_date: date | None = None) -> dic
     current_period = None
     errors: list[str] = []
     warnings: list[str] = []
+    blocker_items: list[dict] = []
 
     if active_financial_year is None:
         errors.append("No active financial year is configured.")
+        blocker_items.append({"code": "NO_ACTIVE_FINANCIAL_YEAR", "label": "No active financial year", "recommended_action": "Open accounting periods and activate the correct financial year.", "action_href": "/admin/accounting/periods", "is_actionable": True})
     elif reference_date < active_financial_year.start_date or reference_date > active_financial_year.end_date:
-        errors.append(f"Today is outside active financial year {active_financial_year.code}.")
+        message = f"Today is outside active financial year {active_financial_year.code}."
+        errors.append(message)
+        blocker_items.append({"code": "DATE_OUTSIDE_ACTIVE_FINANCIAL_YEAR", "label": message, "recommended_action": "Activate or create the financial year covering the posting date.", "action_href": "/admin/accounting/periods", "is_actionable": True})
     else:
         current_period = (
             AccountingPeriod.objects.select_related("financial_year", "locked_by")
@@ -163,21 +214,31 @@ def build_accounting_period_readiness(reference_date: date | None = None) -> dic
             .first()
         )
         if current_period is None:
-            errors.append("No accounting period covers today's posting date.")
+            message = "No accounting period covers today's posting date."
+            errors.append(message)
+            blocker_items.append({"code": "NO_CURRENT_ACCOUNTING_PERIOD", "label": message, "recommended_action": "Generate missing periods or create the current period explicitly.", "action_href": "/admin/accounting/periods", "api_action": "/api/v1/accounting/periods/generate-current/", "is_actionable": True})
         elif current_period.status == AccountingPeriodStatus.CLOSED:
-            errors.append(f"Current accounting period {current_period.code} is closed.")
+            message = f"Current accounting period {current_period.code} is closed."
+            errors.append(message)
+            blocker_items.append({"code": "CURRENT_PERIOD_CLOSED", "label": message, "recommended_action": "Select an open period or review period governance.", "action_href": "/admin/accounting/periods", "is_actionable": False})
         elif current_period.status == AccountingPeriodStatus.LOCKED or current_period.is_locked:
-            errors.append(f"Current accounting period {current_period.code} is locked.")
+            message = f"Current accounting period {current_period.code} is locked."
+            errors.append(message)
+            blocker_items.append({"code": "CURRENT_PERIOD_LOCKED", "label": message, "recommended_action": "Posting is blocked while the accounting period is locked.", "action_href": "/admin/accounting/periods", "is_actionable": False})
 
         period_count = AccountingPeriod.objects.filter(financial_year=active_financial_year).count()
         if period_count == 0:
-            errors.append(f"No accounting periods have been generated for {active_financial_year.code}.")
+            message = f"No accounting periods have been generated for {active_financial_year.code}."
+            errors.append(message)
+            blocker_items.append({"code": "NO_ACCOUNTING_PERIODS", "label": message, "recommended_action": "Generate monthly periods for the active financial year.", "action_href": "/admin/accounting/periods", "is_actionable": True})
         elif period_count < 12:
             warnings.append(f"{active_financial_year.code} has only {period_count} configured period(s).")
 
     posting_lock = PostingLock.objects.filter(lock_date=reference_date).first()
     if posting_lock is not None:
-        errors.append(f"Posting lock exists for {reference_date.isoformat()}.")
+        message = f"Posting lock exists for {reference_date.isoformat()}."
+        errors.append(message)
+        blocker_items.append({"code": "POSTING_LOCK_EXISTS", "label": message, "recommended_action": "Remove the posting lock only through controlled accounting governance.", "action_href": "/admin/accounting/periods", "is_actionable": False})
 
     return {
         "reference_date": reference_date,
@@ -186,6 +247,8 @@ def build_accounting_period_readiness(reference_date: date | None = None) -> dic
         "is_ready": not errors,
         "errors": errors,
         "warnings": warnings,
+        "blocker_items": blocker_items,
+        "recommended_actions": blocker_items,
         "posting_lock": posting_lock,
     }
 
