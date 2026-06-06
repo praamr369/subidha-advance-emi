@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 
 from accounting.models import AccountingPeriod, AccountingPeriodStatus, DocumentSequence, FinancialYear, JournalEntry
 from accounting.services.year_end_close_service import YearEndCloseCommand, build_year_end_close_readiness, execute_year_end_close
-from backend.tests.helpers import create_admin_user, create_customer_user
+from tests.helpers import create_admin_user, create_customer_user
 
 
 def _month_starts(start: date, end: date):
@@ -19,12 +19,12 @@ def _month_starts(start: date, end: date):
         current = current.replace(year=current.year + 1, month=1, day=1) if current.month == 12 else current.replace(month=current.month + 1, day=1)
 
 
-def _make_financial_year(*, code="FY2026-27", is_active=True):
+def _make_financial_year(*, code="FY2026-27", is_active=True, start_date=date(2026, 4, 1), end_date=date(2027, 3, 31)):
     return FinancialYear.objects.create(
         code=code,
-        name="FY 2026-27",
-        start_date=date(2026, 4, 1),
-        end_date=date(2027, 3, 31),
+        name=f"FY {start_date.year}-{str(end_date.year)[-2:]}",
+        start_date=start_date,
+        end_date=end_date,
         is_active=is_active,
     )
 
@@ -101,8 +101,8 @@ class YearEndCloseReadinessTests(TestCase):
     @patch("accounting.services.year_end_close_service._bridge_counts", return_value=(0, 0))
     def test_close_closes_only_selected_financial_year_periods_and_is_idempotent(self, _bridge_counts):
         admin = create_admin_user(username="year_close_admin_execute")
-        selected = _make_financial_year(code="FY2026-27", is_active=True)
-        other = _make_financial_year(code="FY2027-28", is_active=False)
+        selected = _make_financial_year(code="FY2026-27", is_active=True, start_date=date(2026, 4, 1), end_date=date(2027, 3, 31))
+        other = _make_financial_year(code="FY2027-28", is_active=False, start_date=date(2027, 4, 1), end_date=date(2028, 3, 31))
         _make_periods(selected, status=AccountingPeriodStatus.LOCKED)
         _make_periods(other, status=AccountingPeriodStatus.LOCKED)
         _make_journal_numbering(selected)
