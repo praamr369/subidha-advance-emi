@@ -20,7 +20,6 @@ import { generateCurrentAccountingPeriod } from "@/services/accounting-period-ac
 
 const MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit";
 const DOCUMENT_NUMBERING_HREF = ROUTES.admin.settingsBusinessSetupDocumentNumbering;
-const CANONICAL_STATUSES = ["POSTABLE", "READY_UNPOSTED", "POSTED", "RECONCILED", "BLOCKED_BY_MAPPING", "BLOCKED_BY_PERIOD", "BLOCKED_BY_NUMBERING", "BLOCKED_BY_APPROVAL", "UNSUPPORTED_SOURCE"];
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
