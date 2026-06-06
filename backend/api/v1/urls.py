@@ -3,6 +3,12 @@ from django.urls import path, include
 from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
 from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
 from api.v1.views.accounting_bridge_reconciliation import AccountingBridgeReconciliationView
+from api.v1.views.accounting_mapping_audit import (
+    AccountingMappingAuditFixEventView,
+    AccountingMappingAuditSeedDefaultsView,
+    AccountingMappingAuditValidateView,
+    AccountingMappingAuditView,
+)
 from api.v1.views.accounting_mapping_remediation import (
     AccountingMappingRemediationAcknowledgeView,
     AccountingMappingRemediationApplyView,
@@ -21,6 +27,10 @@ urlpatterns = [
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/products/register/", AdminProductRegisterView.as_view()),
     path("admin/products/<int:pk>/prepare-inventory-profile/", AdminProductInventoryProfilePrepareView.as_view()),
+    path("admin/accounting/mapping-audit/", AccountingMappingAuditView.as_view()),
+    path("admin/accounting/mapping-audit/seed-safe-defaults/", AccountingMappingAuditSeedDefaultsView.as_view()),
+    path("admin/accounting/mapping-audit/fix-event/", AccountingMappingAuditFixEventView.as_view()),
+    path("admin/accounting/mapping-audit/validate/", AccountingMappingAuditValidateView.as_view()),
     path("admin/accounting/mapping-remediation/", AccountingMappingRemediationView.as_view()),
     path("admin/accounting/mapping-remediation/create-account/", AccountingMappingRemediationCreateAccountView.as_view()),
     path("admin/accounting/mapping-remediation/apply/", AccountingMappingRemediationApplyView.as_view()),
