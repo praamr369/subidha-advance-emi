@@ -26,10 +26,16 @@ const categoryOrder = [
 
 const primaryActions = [
   { label: "Open Business Profile", href: ROUTES.admin.settingsBusinessSetupProfile },
+  { label: "Open Checklist", href: ROUTES.admin.settingsBusinessSetupChecklist },
+  { label: "Open Dry-runs", href: ROUTES.admin.settingsBusinessSetupDryRuns },
+  { label: "Open Reset / Restore", href: ROUTES.admin.settingsBusinessSetupReset },
   { label: "Open Branch Setup", href: "/admin/settings/business-setup/branches" },
   { label: "Open Cash Counter Setup", href: "/admin/settings/business-setup/cash-desks" },
   { label: "Open Finance Accounts", href: "/admin/settings/business-setup/finance-accounts" },
+  { label: "Open Accounting Setup", href: ROUTES.admin.accountingSetup },
   { label: "Open Accounting Bridges", href: ROUTES.admin.accountingBridges },
+  { label: "Open Bridge Reconciliation", href: ROUTES.admin.accountingBridgeReconciliation },
+  { label: "Open Inventory Readiness", href: ROUTES.admin.inventoryReadiness },
   { label: "Open Inventory Opening Stock", href: ROUTES.admin.inventoryOpeningStock },
   { label: "Open Staff Setup", href: "/admin/settings/business-setup/staff" },
   { label: "Open Document Numbering", href: ROUTES.admin.settingsBusinessSetupDocumentNumbering },
@@ -66,9 +72,9 @@ function SectionCard({ section }: { section: SetupReadinessSection }) {
       </div>
       {section.blockers.length ? <div className="mt-3 rounded-xl border border-current/20 bg-white/60 px-3 py-2 text-sm"><div className="font-semibold">Blocked because</div><ul className="mt-1 list-disc space-y-1 pl-5">{section.blockers.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
       {section.warnings.length ? <div className="mt-3 rounded-xl border border-current/20 bg-white/60 px-3 py-2 text-sm"><div className="font-semibold">Notes</div><ul className="mt-1 list-disc space-y-1 pl-5">{section.warnings.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
-      {inventory ? <div className="mt-3 rounded-xl border border-blue-200 bg-white/70 px-3 py-2 text-sm text-blue-950"><div className="font-semibold">Inventory onboarding policy</div><p className="mt-1">Stock upload not required for initial system setup. You can enter opening stock manually later. CSV import is optional/future.</p><div className="mt-2 grid gap-2 text-xs md:grid-cols-3"><div>Profiles: {metadataNumber(section, "inventory_profiles")}</div><div>Opening ledgers: {metadataNumber(section, "opening_stock_ledger_entries")}</div><div>CSV initial blocker: No</div></div></div> : null}
+      {inventory ? <div className="mt-3 rounded-xl border border-blue-200 bg-white/70 px-3 py-2 text-sm text-blue-950"><div className="font-semibold">Inventory onboarding policy</div><p className="mt-1">Stock CSV upload is optional. Opening stock can be entered manually later. Missing stock does not block core business setup. Inventory readiness remains onboarding-pending until stock is captured.</p><div className="mt-2 grid gap-2 text-xs md:grid-cols-3"><div>Profiles: {metadataNumber(section, "inventory_profiles")}</div><div>Opening ledgers: {metadataNumber(section, "opening_stock_ledger_entries")}</div><div>CSV initial blocker: No</div></div></div> : null}
       <div className="mt-3 rounded-xl border border-current/20 bg-white/60 px-3 py-2 text-sm"><div className="font-semibold">Recommended action</div><p className="mt-1">{section.recommended_action}</p><div className="mt-2 flex flex-wrap gap-2 text-xs"><span>Repairable: {section.repairable ? "Yes" : "No"}</span><span>Initial start blocker: {section.optional_for_initial_start ? "No" : section.status === "BLOCKED" ? "Yes" : "No"}</span></div></div>
-      <Link href={section.target_route || ROUTES.admin.setupReadiness} className="mt-3 inline-flex rounded-xl border border-current/30 bg-white px-3 py-2 text-sm font-semibold">Open setup area</Link>
+      <Link href={section.target_route || ROUTES.admin.settingsBusinessSetup} className="mt-3 inline-flex rounded-xl border border-current/30 bg-white px-3 py-2 text-sm font-semibold">Open setup area</Link>
     </article>
   );
 }
@@ -147,23 +153,24 @@ export default function BusinessSetupOverviewPage() {
   }, [payload]);
 
   const collectionReady = Boolean(payload?.summary.core_operational_ready);
-  const nextHref = payload?.summary.next_target_route || ROUTES.admin.setupReadiness;
+  const nextHref = payload?.summary.next_target_route || ROUTES.admin.settingsBusinessSetup;
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Start from Zero Business Setup" description="Admin-only fresh-start cockpit for business profile, branch, counter, finance/accounting, documents, readiness, reset, and inventory onboarding." />
+      <PageHeader title="Business Setup" description="Fresh-start readiness, finance setup, branch/counter setup, documents, inventory onboarding." />
       <BusinessSetupLinks />
 
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</div> : null}
-      {loading ? <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">Loading fresh-start setup readiness…</div> : null}
+      {loading ? <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">Loading fresh-start business setup…</div> : null}
 
       {payload ? (
         <>
           <section className={`rounded-2xl border p-5 shadow-sm ${statusClass(payload.summary.overall_status)}`}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="text-sm font-semibold uppercase tracking-wide opacity-80">Fresh-start readiness</div>
+                <div className="text-sm font-semibold uppercase tracking-wide opacity-80">Fresh Start Setup</div>
                 <h2 className="mt-2 text-3xl font-semibold">{payload.summary.overall_status.replaceAll("_", " ")}</h2>
+                <p className="mt-2 max-w-4xl text-sm leading-6">COA, Finance Accounts, and mapping can become ready here. Bridge posting may remain approval-gated. No journals are auto-posted by setup.</p>
                 <p className="mt-2 max-w-4xl text-sm leading-6">Core collection readiness can become operational without stock CSV. Inventory opening stock remains onboarding-pending until manually captured or imported later.</p>
                 <p className="mt-2 max-w-4xl text-sm leading-6">Mutation policy: {payload.mutation_policy}</p>
               </div>
@@ -192,7 +199,7 @@ export default function BusinessSetupOverviewPage() {
 
           <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 text-blue-950 shadow-sm">
             <h2 className="text-base font-semibold">Inventory onboarding</h2>
-            <div className="mt-2 grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4"><div>Stock upload not required for initial system setup</div><div>Opening stock can be entered manually later</div><div>CSV import optional/future</div><div>Inventory accounting may remain onboarding-pending</div></div>
+            <div className="mt-2 grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4"><div>Stock CSV upload is optional</div><div>Opening stock can be entered manually later</div><div>Missing stock does not block core business setup</div><div>Inventory readiness remains onboarding-pending until stock is captured</div></div>
           </section>
 
           {groups.map((group) => (
