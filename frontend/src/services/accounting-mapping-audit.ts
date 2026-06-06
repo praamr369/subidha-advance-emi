@@ -7,6 +7,17 @@ export type AccountingMappingAuditRow = {
   module: string;
   source_model: string;
   supported: boolean;
+  source_workflow_exists?: boolean;
+  mapping_ready?: boolean;
+  coa_ready?: boolean;
+  finance_account_ready?: boolean;
+  posting_profile_ready?: boolean;
+  approval_ready?: boolean;
+  active_financial_year_ready?: boolean;
+  accounting_period_ready?: boolean;
+  journal_numbering_ready?: boolean;
+  reconciliation_ready?: boolean;
+  can_preview?: boolean;
   posting_enabled: boolean;
   posting_mode: string;
   debit_purpose?: string | null;
@@ -25,10 +36,12 @@ export type AccountingMappingAuditRow = {
   can_seed: boolean;
   can_apply_mapping: boolean;
   can_post: boolean;
+  can_reconcile?: boolean;
   blocker_code?: string | null;
   blocker_reason?: string | null;
   recommended_action?: string | null;
   setup_href?: string | null;
+  action_href?: string | null;
   details?: Record<string, unknown>;
 };
 
@@ -43,11 +56,17 @@ export type AccountingMappingAuditPayload = {
   summary: {
     total_events: number;
     ready: number;
+    postable?: number;
+    ready_unposted?: number;
+    posted?: number;
+    reconciled?: number;
     missing_mapping: number;
+    blocked_by_mapping?: number;
     conflicts: number;
     unsupported: number;
     blocked_by_period: number;
     blocked_by_numbering: number;
+    blocked_by_approval?: number;
   };
   events: AccountingMappingAuditRow[];
   ready_mappings: AccountingMappingAuditRow[];
