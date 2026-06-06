@@ -47,6 +47,8 @@ export type ReconciliationRun = {
   branch?: number | null;
   date_from?: string | null;
   date_to?: string | null;
+  financial_year?: string | null;
+  accounting_period?: string | null;
   status: ReconciliationRunStatus;
   started_by: number;
   started_by_username?: string | null;
@@ -103,6 +105,7 @@ export type ReconciliationItem = {
   exception_code: string;
   exception_message?: string;
   recommended_action?: string;
+  action_href?: string | null;
   assigned_to?: number | null;
   resolved_by?: number | null;
   resolved_at?: string | null;
@@ -120,6 +123,7 @@ export type ReconciliationModuleSummary = {
   module: string;
   open_count: number;
   high_risk_count: number;
+  exception_codes?: Array<{ exception_code: string; count: number }>;
 };
 
 export type PaginatedResponse<T> = {
@@ -128,4 +132,3 @@ export type PaginatedResponse<T> = {
   previous?: string | null;
   results: T[];
 };
-
