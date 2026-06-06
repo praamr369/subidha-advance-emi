@@ -33,10 +33,17 @@ def _profile_status(item: InventoryItem) -> str:
 
 
 @transaction.atomic
-def prepare_inventory_profile_for_product(*, product_id: int, actor) -> tuple[InventoryItem, bool]:
+def prepare_inventory_profile_for_product(*, product_id: int, actor=None, stock_tracking_enabled: bool = True) -> tuple[InventoryItem, bool]:
+    """Create or refresh the one inventory profile for a product.
+
+    This is intentionally idempotent. It never creates StockLedger rows and never mutates
+    subscription/contract pricing snapshots; it only creates or refreshes the product's
+    inventory profile metadata.
+    """
     product = Product.objects.select_for_update().get(pk=product_id)
     item = InventoryItem.objects.select_for_update().filter(product_id=product.id).first()
     created = False
+    requested_tracking = bool(stock_tracking_enabled)
 
     if item is None:
         sku = ((product.sku or product.product_code or "")).strip().upper() or None
@@ -45,9 +52,9 @@ def prepare_inventory_profile_for_product(*, product_id: int, actor) -> tuple[In
             inventory_code=_build_inventory_code(product),
             sku=sku,
             unit_of_measure=product.unit_of_measure or "PCS",
-            stock_tracking_enabled=True,
+            stock_tracking_enabled=requested_tracking,
             stock_item_type=InventoryItemType.FINISHED_GOOD,
-            delivery_stock_bridge_enabled=bool(product.is_emi_enabled),
+            delivery_stock_bridge_enabled=bool(product.is_emi_enabled or product.is_direct_sale_enabled),
             stock_tracking_status=InventoryItem.StockTrackingStatus.PREPARED_NO_STOCK,
             is_active=product.is_active,
         )
@@ -57,12 +64,22 @@ def prepare_inventory_profile_for_product(*, product_id: int, actor) -> tuple[In
         if not item.inventory_code:
             item.inventory_code = _build_inventory_code(product)
             update_fields.append("inventory_code")
-        if not item.sku and product.product_code:
-            item.sku = product.product_code
+        if not item.sku and (product.sku or product.product_code):
+            item.sku = (product.sku or product.product_code or "").strip().upper()
             update_fields.append("sku")
         if item.unit_of_measure != (product.unit_of_measure or "PCS"):
             item.unit_of_measure = product.unit_of_measure or "PCS"
             update_fields.append("unit_of_measure")
+        if item.stock_tracking_enabled != requested_tracking:
+            item.stock_tracking_enabled = requested_tracking
+            update_fields.append("stock_tracking_enabled")
+        expected_bridge = bool(product.is_emi_enabled or product.is_direct_sale_enabled)
+        if item.delivery_stock_bridge_enabled != expected_bridge:
+            item.delivery_stock_bridge_enabled = expected_bridge
+            update_fields.append("delivery_stock_bridge_enabled")
+        if item.is_active != product.is_active:
+            item.is_active = product.is_active
+            update_fields.append("is_active")
         next_status = _profile_status(item)
         if item.stock_tracking_status != next_status:
             item.stock_tracking_status = next_status
