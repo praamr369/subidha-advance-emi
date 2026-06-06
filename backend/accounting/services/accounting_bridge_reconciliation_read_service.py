@@ -1,42 +1,24 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
 from django.db.models import Q
 from django.utils import timezone
 
-from accounting.models import (
-    AccountingBridgePosting,
-    AccountingPeriod,
-    AccountingPeriodStatus,
-    FinancialYear,
-    JournalEntry,
-    MoneyMovement,
-)
-from accounting.services.returns_damage_credit_bridge_readiness_service import (
-    build_accounting_bridge_readiness_with_returns_damage_credit,
-)
+from accounting.models import AccountingBridgePosting, AccountingPeriod, AccountingPeriodStatus, FinancialYear, JournalEntry, MoneyMovement
+from accounting.services.returns_damage_credit_bridge_readiness_service import build_accounting_bridge_readiness_with_returns_damage_credit
 from billing.models import BillingInvoice, ReceiptDocument
 from reconciliation.models import ReconciliationItem
 from settlements.models import SettlementAllocation
 
-POSTING_APPROVAL_BLOCKED_PURPOSES = {
-    "COMMISSION_SETTLEMENT",
-    "COMMISSION_PAYOUT_BATCH",
-    "INVENTORY_POSTING",
-}
-
-EXCEPTION_STATUSES = {
-    "MISSING_LEDGER",
-    "MISSING_SOURCE",
-    "AMOUNT_MISMATCH",
-    "QUANTITY_MISMATCH",
-    "STATUS_MISMATCH",
-    "DUPLICATE_POSTING",
-    "WRONG_ACCOUNT",
-    "NEEDS_REVIEW",
-}
+POSTING_APPROVAL_BLOCKED_PURPOSES = {"COMMISSION_SETTLEMENT", "COMMISSION_PAYOUT_BATCH", "INVENTORY_POSTING"}
+EXCEPTION_STATUSES = {"MISSING_LEDGER", "MISSING_SOURCE", "AMOUNT_MISMATCH", "QUANTITY_MISMATCH", "STATUS_MISMATCH", "DUPLICATE_POSTING", "WRONG_ACCOUNT", "NEEDS_REVIEW"}
+SETUP_HREF = "/admin/accounting/setup"
+COA_HREF = "/admin/accounting/chart-of-accounts"
+FINANCE_ACCOUNT_HREF = "/admin/accounting/finance-accounts"
+BRIDGE_HREF = "/admin/accounting/bridges"
 
 
 @dataclass(frozen=True)
@@ -66,16 +48,12 @@ def _norm_key(value: Any) -> str:
 
 def _int_or_none(value: Any) -> int | None:
     text = _normalize(value)
-    if not text.isdigit():
-        return None
-    return int(text)
+    return int(text) if text.isdigit() else None
 
 
 def _posting_event_key(posting: AccountingBridgePosting) -> str:
     purpose = _normalize(getattr(posting, "purpose", ""))
-    if not purpose:
-        return _norm_key(getattr(posting, "source_type", "")) or "posted_bridge"
-    return _norm_key(purpose)
+    return _norm_key(purpose) if purpose else (_norm_key(getattr(posting, "source_type", "")) or "posted_bridge")
 
 
 def _posting_module(posting: AccountingBridgePosting) -> str:
@@ -96,34 +74,16 @@ def _posting_module(posting: AccountingBridgePosting) -> str:
 def _financial_year_payload(financial_year: FinancialYear | None) -> dict[str, Any] | None:
     if financial_year is None:
         return None
-    return {
-        "id": financial_year.id,
-        "code": financial_year.code,
-        "name": financial_year.name,
-        "start_date": financial_year.start_date.isoformat(),
-        "end_date": financial_year.end_date.isoformat(),
-        "is_active": financial_year.is_active,
-    }
+    return {"id": financial_year.id, "code": financial_year.code, "name": financial_year.name, "start_date": financial_year.start_date.isoformat(), "end_date": financial_year.end_date.isoformat(), "is_active": financial_year.is_active}
 
 
 def _period_payload(period: AccountingPeriod | None) -> dict[str, Any] | None:
     if period is None:
         return None
-    return {
-        "id": period.id,
-        "code": period.code,
-        "name": period.name or period.label,
-        "start_date": period.start_date.isoformat(),
-        "end_date": period.end_date.isoformat(),
-        "status": period.status,
-        "is_locked": period.is_locked,
-        "financial_year": period.financial_year_id,
-        "financial_year_code": getattr(period.financial_year, "code", None),
-    }
+    return {"id": period.id, "code": period.code, "name": period.name or period.label, "start_date": period.start_date.isoformat(), "end_date": period.end_date.isoformat(), "status": period.status, "is_locked": period.is_locked, "financial_year": period.financial_year_id, "financial_year_code": getattr(period.financial_year, "code", None)}
 
 
 def _resolve_financial_year(filters: BridgeReconciliationFilters) -> tuple[FinancialYear | None, list[str]]:
-    blockers: list[str] = []
     requested = _normalize(filters.financial_year)
     queryset = FinancialYear.objects.all().order_by("-start_date", "-id")
     if requested:
@@ -132,13 +92,9 @@ def _resolve_financial_year(filters: BridgeReconciliationFilters) -> tuple[Finan
         if numeric_id is not None:
             lookup |= Q(pk=numeric_id)
         financial_year = queryset.filter(lookup).first()
-        if financial_year is None:
-            blockers.append("Selected financial year is missing.")
-        return financial_year, blockers
+        return financial_year, [] if financial_year else ["Selected financial year is missing."]
     financial_year = queryset.filter(is_active=True).first()
-    if financial_year is None:
-        blockers.append("No active financial year is configured.")
-    return financial_year, blockers
+    return financial_year, [] if financial_year else ["No active financial year is configured."]
 
 
 def _resolve_period(filters: BridgeReconciliationFilters, financial_year: FinancialYear | None) -> tuple[AccountingPeriod | None, list[str]]:
@@ -147,9 +103,7 @@ def _resolve_period(filters: BridgeReconciliationFilters, financial_year: Financ
     if financial_year is not None:
         queryset = queryset.filter(financial_year=financial_year)
     if not queryset.exists():
-        blockers.append("No accounting periods are configured for the selected financial year." if financial_year else "No accounting periods are configured.")
-        return None, blockers
-
+        return None, ["No accounting periods are configured for the selected financial year." if financial_year else "No accounting periods are configured."]
     requested = _normalize(filters.accounting_period)
     if requested:
         numeric_id = _int_or_none(requested)
@@ -157,10 +111,7 @@ def _resolve_period(filters: BridgeReconciliationFilters, financial_year: Financ
         if numeric_id is not None:
             lookup |= Q(pk=numeric_id)
         period = queryset.filter(lookup).first()
-        if period is None:
-            blockers.append("Selected accounting period is missing.")
-        return period, blockers
-
+        return period, [] if period else ["Selected accounting period is missing."]
     today = timezone.localdate()
     period = queryset.filter(start_date__lte=today, end_date__gte=today).first()
     if period is None:
@@ -168,12 +119,7 @@ def _resolve_period(filters: BridgeReconciliationFilters, financial_year: Financ
     return period, blockers
 
 
-def _range_from_selection(
-    *,
-    filters: BridgeReconciliationFilters,
-    financial_year: FinancialYear | None,
-    period: AccountingPeriod | None,
-) -> tuple[Any, Any]:
+def _range_from_selection(*, filters: BridgeReconciliationFilters, financial_year: FinancialYear | None, period: AccountingPeriod | None) -> tuple[Any, Any]:
     start = filters.date_from
     end = filters.date_to
     if period is not None:
@@ -235,18 +181,57 @@ def _row_passes_filters(row: dict[str, Any], filters: BridgeReconciliationFilter
     return True
 
 
-def _readiness_rows(
-    readiness_payload: dict[str, Any],
-    filters: BridgeReconciliationFilters,
-    *,
-    financial_year: FinancialYear | None,
-    period: AccountingPeriod | None,
-) -> list[dict[str, Any]]:
+def _remediation_for_row(*, event_key: str, status: str, label: str | None, source_model: str | None, financial_year: FinancialYear | None, period: AccountingPeriod | None) -> dict[str, Any]:
+    normalized_event = _norm_key(event_key)
+    normalized_source = _normalize(source_model)
+    base = {
+        "blocker_code": None,
+        "blocker_label": None,
+        "blocker_count": 0,
+        "recommended_action": "Review this row in the accounting operations cockpit.",
+        "action_href": None,
+        "preview_action_href": None,
+        "post_action_href": None,
+        "source_action_href": None,
+        "is_acknowledgeable": False,
+        "is_postable": False,
+        "financial_year_id": getattr(financial_year, "id", None),
+        "accounting_period_id": getattr(period, "id", None),
+    }
+    if normalized_event == "staff_advance" or normalized_source == "StaffAdvance":
+        return {**base, "blocker_code": "UNSUPPORTED_STAFF_ADVANCE", "blocker_label": "Unsupported StaffAdvance source", "blocker_count": 1, "recommended_action": "Unsupported source model; hidden from posting until a real StaffAdvance workflow exists.", "is_acknowledgeable": True}
+    if status == "READY_UNPOSTED":
+        period_open = period is not None and period.status == AccountingPeriodStatus.OPEN
+        action = "Preview posting in Bridge Readiness. Posting requires an open accounting period and a real controlled bridge run endpoint."
+        if period is not None and period.status in {AccountingPeriodStatus.LOCKED, AccountingPeriodStatus.CLOSED}:
+            action = f"Selected period is {period.status}; open-period posting is required before bridge posting can run."
+        return {**base, "blocker_code": "READY_UNPOSTED", "blocker_label": "Ready but not posted", "blocker_count": 1, "recommended_action": action, "preview_action_href": BRIDGE_HREF, "is_postable": False if not period_open else False}
+    if status.startswith("BLOCKED"):
+        href = SETUP_HREF
+        action = "Open accounting setup and complete the missing bridge mapping before posting."
+        label_text = label or event_key
+        if normalized_event == "inventory_delivery_out":
+            href = FINANCE_ACCOUNT_HREF
+            action = "Configure inventory delivery-out / COGS expense mapping in Chart of Accounts and FinanceAccount mapping setup."
+        elif normalized_event == "manufacturing_wastage":
+            href = FINANCE_ACCOUNT_HREF
+            action = "Configure manufacturing wastage expense mapping in Chart of Accounts and FinanceAccount mapping setup."
+        elif "cogs" in label_text.lower():
+            href = COA_HREF
+            action = "Create or map the missing COGS expense account before posting."
+        return {**base, "blocker_code": "BLOCKED_BY_MAPPING", "blocker_label": "Blocked mapping", "blocker_count": 1, "recommended_action": action, "action_href": href, "is_acknowledgeable": True}
+    if status in {"POSTED", "SETTLED", "RECONCILED"}:
+        return {**base, "recommended_action": "Already posted. Review journal, settlement, and reconciliation evidence only."}
+    return base
+
+
+def _readiness_rows(readiness_payload: dict[str, Any], filters: BridgeReconciliationFilters, *, financial_year: FinancialYear | None, period: AccountingPeriod | None) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for event in readiness_payload.get("events") or []:
         status = _status_from_readiness(event)
         if event.get("event_key") in {"commission_payout", "commission_approval", "payout_batch_payment", "purchase_inventory_receive"} and status == "READY_UNPOSTED":
             status = "BLOCKED_BY_POSTING_APPROVAL"
+        remediation = _remediation_for_row(event_key=event.get("event_key"), status=status, label=event.get("label"), source_model=event.get("source_model"), financial_year=financial_year, period=period)
         row = {
             "row_type": "readiness_event",
             "event_key": event.get("event_key"),
@@ -260,7 +245,7 @@ def _readiness_rows(
             "status": status,
             "mapping_status": event.get("status"),
             "posting_mode": event.get("posting_mode"),
-            "can_post": False,
+            "can_post": remediation["is_postable"],
             "financial_year": _financial_year_payload(financial_year),
             "accounting_period": _period_payload(period),
             "period_status": getattr(period, "status", None),
@@ -269,7 +254,8 @@ def _readiness_rows(
             "reconciliation_linked": False,
             "reconciliation_items": [],
             "exception_reasons": event.get("blocking_reasons") or [],
-            "operator_action": event.get("operator_action"),
+            "operator_action": event.get("operator_action") or remediation["recommended_action"],
+            **remediation,
         }
         if _row_passes_filters(row, filters):
             rows.append(row)
@@ -301,11 +287,7 @@ def _apply_posted_filters(queryset, filters: BridgeReconciliationFilters, financ
 
 
 def _posted_rows(filters: BridgeReconciliationFilters, financial_year: FinancialYear | None, period: AccountingPeriod | None) -> list[dict[str, Any]]:
-    queryset = AccountingBridgePosting.objects.select_related(
-        "journal_entry",
-        "journal_entry__financial_year",
-        "journal_entry__accounting_period",
-    )
+    queryset = AccountingBridgePosting.objects.select_related("journal_entry", "journal_entry__financial_year", "journal_entry__accounting_period")
     queryset = _apply_posted_filters(queryset, filters, financial_year, period).order_by("-created_at", "-id")[:500]
     rows: list[dict[str, Any]] = []
     for posting in queryset:
@@ -327,6 +309,7 @@ def _posted_rows(filters: BridgeReconciliationFilters, financial_year: Financial
             status = "EXCEPTION"
         journal_fy = getattr(journal, "financial_year", None)
         journal_period = getattr(journal, "accounting_period", None)
+        remediation = _remediation_for_row(event_key=event_key, status=status, label=purpose or event_key, source_model=source_model, financial_year=journal_fy, period=journal_period)
         row = {
             "row_type": "posted_source",
             "event_key": event_key,
@@ -344,32 +327,13 @@ def _posted_rows(filters: BridgeReconciliationFilters, financial_year: Financial
             "financial_year": _financial_year_payload(journal_fy),
             "accounting_period": _period_payload(journal_period),
             "period_status": getattr(journal_period, "status", None),
-            "journal_entry": {
-                "id": getattr(journal, "id", None),
-                "entry_no": getattr(journal, "entry_no", None),
-                "entry_date": getattr(journal, "entry_date", None).isoformat() if getattr(journal, "entry_date", None) else None,
-                "status": getattr(journal, "status", None),
-                "financial_year": getattr(journal, "financial_year_id", None),
-                "financial_year_code": getattr(journal_fy, "code", None),
-                "accounting_period": getattr(journal, "accounting_period_id", None),
-                "accounting_period_code": getattr(journal_period, "code", None),
-                "accounting_period_name": getattr(journal_period, "name", None) or getattr(journal_period, "label", None),
-                "accounting_period_status": getattr(journal_period, "status", None),
-            } if journal else None,
+            "journal_entry": {"id": getattr(journal, "id", None), "entry_no": getattr(journal, "entry_no", None), "entry_date": getattr(journal, "entry_date", None).isoformat() if getattr(journal, "entry_date", None) else None, "status": getattr(journal, "status", None), "financial_year": getattr(journal, "financial_year_id", None), "financial_year_code": getattr(journal_fy, "code", None), "accounting_period": getattr(journal, "accounting_period_id", None), "accounting_period_code": getattr(journal_period, "code", None), "accounting_period_name": getattr(journal_period, "name", None) or getattr(journal_period, "label", None), "accounting_period_status": getattr(journal_period, "status", None)} if journal else None,
             "settlement_linked": settlement_linked,
             "reconciliation_linked": bool(rec_items),
-            "reconciliation_items": [
-                {
-                    "id": item.id,
-                    "status": item.status,
-                    "severity": item.severity,
-                    "exception_code": item.exception_code,
-                    "exception_message": item.exception_message,
-                }
-                for item in rec_items
-            ],
+            "reconciliation_items": [{"id": item.id, "status": item.status, "severity": item.severity, "exception_code": item.exception_code, "exception_message": item.exception_message} for item in rec_items],
             "exception_reasons": [item.exception_message or item.exception_code or item.status for item in exception_items],
             "operator_action": "Review posted journal, settlement, and reconciliation coverage. This cockpit is read-only.",
+            **remediation,
         }
         if _row_passes_filters(row, filters):
             rows.append(row)
@@ -403,29 +367,11 @@ def _document_counts(filters: BridgeReconciliationFilters, financial_year: Finan
         journal_qs = journal_qs.filter(entry_date__lte=end)
         movement_qs = movement_qs.filter(movement_date__lte=end)
     movement_ids = list(movement_qs.filter(status="POSTED").values_list("id", flat=True)[:5000])
-    linked_movement_ids = set(
-        SettlementAllocation.objects.filter(money_movement_id__in=movement_ids)
-        .exclude(money_movement_id__isnull=True)
-        .values_list("money_movement_id", flat=True)
-        .distinct()
-    )
-    return {
-        "total_invoices": invoice_qs.count(),
-        "total_receipts": receipt_qs.count(),
-        "total_journal_postings": journal_qs.count(),
-        "total_money_movements": movement_qs.count(),
-        "unreconciled_money_movement_count": len([item for item in movement_ids if item not in linked_movement_ids]),
-    }
+    linked_movement_ids = set(SettlementAllocation.objects.filter(money_movement_id__in=movement_ids).exclude(money_movement_id__isnull=True).values_list("money_movement_id", flat=True).distinct())
+    return {"total_invoices": invoice_qs.count(), "total_receipts": receipt_qs.count(), "total_journal_postings": journal_qs.count(), "total_money_movements": movement_qs.count(), "unreconciled_money_movement_count": len([item for item in movement_ids if item not in linked_movement_ids])}
 
 
-def _readiness_blockers(
-    *,
-    financial_year: FinancialYear | None,
-    period: AccountingPeriod | None,
-    resolver_blockers: list[str],
-    rows: list[dict[str, Any]],
-    counts: dict[str, int],
-) -> list[str]:
+def _readiness_blockers(*, financial_year: FinancialYear | None, period: AccountingPeriod | None, resolver_blockers: list[str], rows: list[dict[str, Any]], counts: dict[str, int]) -> list[str]:
     blockers = list(dict.fromkeys(resolver_blockers))
     if financial_year is None and "No active financial year is configured." not in blockers:
         blockers.append("No active financial year is configured.")
@@ -444,43 +390,44 @@ def _readiness_blockers(
     return list(dict.fromkeys(blockers))
 
 
+def _event_counts(rows: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    counts: dict[str, Counter] = {}
+    for row in rows:
+        key = row.get("event_key") or "unknown"
+        counts.setdefault(key, Counter())
+        counts[key][row.get("status") or "INFO"] += 1
+    return {key: dict(value) for key, value in counts.items()}
+
+
+def _blocking_groups(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        if not str(row.get("status", "")).startswith("BLOCKED"):
+            continue
+        key = (row.get("event_key") or "unknown", row.get("blocker_code") or "BLOCKED")
+        if key not in grouped:
+            grouped[key] = {"event_key": key[0], "blocker_code": key[1], "blocker_label": row.get("blocker_label"), "count": 0, "recommended_action": row.get("recommended_action"), "action_href": row.get("action_href"), "is_acknowledgeable": row.get("is_acknowledgeable", False), "is_postable": row.get("is_postable", False)}
+        grouped[key]["count"] += 1
+    return list(grouped.values())
+
+
 def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters | None = None) -> dict[str, Any]:
     active_filters = filters or BridgeReconciliationFilters()
     selected_financial_year, fy_blockers = _resolve_financial_year(active_filters)
     selected_period, period_blockers = _resolve_period(active_filters, selected_financial_year)
     resolver_blockers = [*fy_blockers, *period_blockers]
-
     readiness_payload = build_accounting_bridge_readiness_with_returns_damage_credit()
     rows = [
-        *_readiness_rows(
-            readiness_payload,
-            active_filters,
-            financial_year=selected_financial_year,
-            period=selected_period,
-        ),
+        *_readiness_rows(readiness_payload, active_filters, financial_year=selected_financial_year, period=selected_period),
         *_posted_rows(active_filters, selected_financial_year, selected_period),
     ]
     counts = _document_counts(active_filters, selected_financial_year, selected_period)
-
     ready_unposted_count = sum(1 for row in rows if row["status"] == "READY_UNPOSTED")
     blocked_count = sum(1 for row in rows if str(row["status"]).startswith("BLOCKED"))
     exception_count = sum(1 for row in rows if row["status"] == "EXCEPTION" or row["exception_reasons"])
-    locked_period_count = AccountingPeriod.objects.filter(
-        financial_year=selected_financial_year,
-        status=AccountingPeriodStatus.LOCKED,
-    ).count() if selected_financial_year else 0
-    closed_period_count = AccountingPeriod.objects.filter(
-        financial_year=selected_financial_year,
-        status=AccountingPeriodStatus.CLOSED,
-    ).count() if selected_financial_year else 0
-    readiness_blockers = _readiness_blockers(
-        financial_year=selected_financial_year,
-        period=selected_period,
-        resolver_blockers=resolver_blockers,
-        rows=rows,
-        counts=counts,
-    )
-
+    locked_period_count = AccountingPeriod.objects.filter(financial_year=selected_financial_year, status=AccountingPeriodStatus.LOCKED).count() if selected_financial_year else 0
+    closed_period_count = AccountingPeriod.objects.filter(financial_year=selected_financial_year, status=AccountingPeriodStatus.CLOSED).count() if selected_financial_year else 0
+    readiness_blockers = _readiness_blockers(financial_year=selected_financial_year, period=selected_period, resolver_blockers=resolver_blockers, rows=rows, counts=counts)
     summary = {
         "source_count": len(rows),
         "ready_unposted_count": ready_unposted_count,
@@ -497,10 +444,14 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "unreconciled_money_movement_count": counts["unreconciled_money_movement_count"],
         "reconciliation_exception_count": exception_count,
         "blocked_bridge_item_count": blocked_count,
+        "blocked_by_mapping_count": sum(1 for row in rows if row["status"] == "BLOCKED_BY_MAPPING"),
+        "ready_unposted_by_event": {key: value.get("READY_UNPOSTED", 0) for key, value in _event_counts(rows).items() if value.get("READY_UNPOSTED", 0)},
+        "blocked_by_mapping_by_event": {key: value.get("BLOCKED_BY_MAPPING", 0) for key, value in _event_counts(rows).items() if value.get("BLOCKED_BY_MAPPING", 0)},
+        "status_counts_by_event": _event_counts(rows),
+        "blocking_groups": _blocking_groups(rows),
         "locked_period_count": locked_period_count,
         "closed_period_count": closed_period_count,
     }
-    year_end_hint = "Year-end ready when all periods are closed, no unposted bridge items remain, and reconciliation exceptions are cleared."
     return {
         "summary": summary,
         "selected_financial_year": _financial_year_payload(selected_financial_year),
@@ -509,7 +460,7 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "available_financial_years": [_financial_year_payload(row) for row in FinancialYear.objects.order_by("-start_date", "-id")],
         "available_accounting_periods": _available_periods(selected_financial_year),
         "readiness_blockers": readiness_blockers,
-        "year_end_readiness_hint": year_end_hint,
+        "year_end_readiness_hint": "Year-end close is blocked until open periods, unposted bridge items, and reconciliation exceptions are resolved.",
         "financial_year_readiness": readiness_payload.get("financial_year_readiness"),
         "accounting_period_readiness": readiness_payload.get("accounting_period_readiness"),
         "results": rows,
