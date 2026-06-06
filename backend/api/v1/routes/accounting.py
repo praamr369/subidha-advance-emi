@@ -27,6 +27,7 @@ from api.v1.views.accounting_commission_payout_bridge import (
     CommissionSettlementBridgeRunView,
     PayoutBatchBridgeRunView,
 )
+from api.v1.views.accounting_period_actions import AccountingGenerateCurrentPeriodView
 from api.v1.views.accounting_phase2 import (
     BalanceSheetReportView,
     BridgeRunView,
@@ -125,6 +126,7 @@ urlpatterns = [
     path("imports/employees/post/", EmployeeImportPostView.as_view()),
     path("imports/vendors/preview/", VendorImportPreviewView.as_view()),
     path("imports/vendors/post/", VendorImportPostView.as_view()),
+    path("periods/generate-current/", AccountingGenerateCurrentPeriodView.as_view()),
     path("bridges/run/", BridgeRunView.as_view()),
     path("bridges/run-retail-sale/", RetailSaleBridgeRunView.as_view()),
     path("bridges/run-inventory-posting/", InventoryBridgeRunView.as_view()),
