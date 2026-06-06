@@ -55,8 +55,10 @@ def _mapping_status(row: dict[str, Any] | None) -> str:
     if row is None:
         return UNSUPPORTED_SOURCE
     raw = str(row.get("status") or "NOT_CONFIGURED").strip().upper()
+    if raw in {UNSUPPORTED_SOURCE, BLOCKED_BY_MAPPING}:
+        return raw
     if raw in CANONICAL_STATUSES:
-        return READY if raw in {READY, POSTABLE, READY_UNPOSTED, POSTED, RECONCILED} else raw
+        return READY
     if raw == "READY":
         return READY
     if raw in {"WARNING", "ERROR", "NOT_CONFIGURED"}:
@@ -196,67 +198,19 @@ def _recommended_action(status: str) -> str:
 
 
 def staff_advance_unsupported_event(period_readiness: dict[str, Any] | None = None) -> dict[str, Any]:
-    postability = evaluate_accounting_postability(
-        event_key="staff_advance",
-        event_label="Staff advance",
-        module="HR & Payroll",
-        source_model="StaffAdvance",
-        bridge_row=None,
-        period_readiness=period_readiness,
-        source_workflow_exists=False,
-    )
-    return {
-        "event_key": "staff_advance",
-        "label": "Staff advance",
-        "source_module": "accounting",
-        "source_model": "StaffAdvance",
-        "event_group": "HR & Payroll",
-        "posting_mode": "UNSUPPORTED",
-        "debit_requirements": [],
-        "credit_requirements": [],
-        "required_finance_account_kinds": [],
-        "required_coa_system_codes": [],
-        "required_mapping_purposes": [],
-        "debit_accounts": [],
-        "credit_accounts": [],
-        "finance_accounts": [],
-        "blocking_reasons": [postability["blocker_reason"]],
-        "operator_action": postability["recommended_action"],
-        **postability,
-    }
+    postability = evaluate_accounting_postability(event_key="staff_advance", event_label="Staff advance", module="HR & Payroll", source_model="StaffAdvance", bridge_row=None, period_readiness=period_readiness, source_workflow_exists=False)
+    return {"event_key": "staff_advance", "label": "Staff advance", "source_module": "accounting", "source_model": "StaffAdvance", "event_group": "HR & Payroll", "posting_mode": "UNSUPPORTED", "debit_requirements": [], "credit_requirements": [], "required_finance_account_kinds": [], "required_coa_system_codes": [], "required_mapping_purposes": [], "debit_accounts": [], "credit_accounts": [], "finance_accounts": [], "blocking_reasons": [postability["blocker_reason"]], "operator_action": postability["recommended_action"], **postability}
 
 
 def canonicalize_bridge_readiness_payload(payload: dict[str, Any], *, as_source_rows: bool = False, include_staff_advance: bool = True) -> dict[str, Any]:
     period = payload.get("accounting_period_readiness") or payload.get("financial_year_readiness") or build_accounting_bridge_period_readiness()
     rows: list[dict[str, Any]] = []
     for event in payload.get("events") or []:
-        postability = evaluate_accounting_postability(
-            event_key=str(event.get("event_key") or ""),
-            event_label=event.get("label"),
-            module=event.get("source_module") or event.get("event_group"),
-            source_model=event.get("source_model"),
-            bridge_row=event,
-            period_readiness=period,
-            source_workflow_exists=True,
-            as_source_row=as_source_rows,
-        )
+        postability = evaluate_accounting_postability(event_key=str(event.get("event_key") or ""), event_label=event.get("label"), module=event.get("source_module") or event.get("event_group"), source_model=event.get("source_model"), bridge_row=event, period_readiness=period, source_workflow_exists=True, as_source_row=as_source_rows)
         rows.append({**event, **postability, "operator_action": postability["recommended_action"], "blocking_reasons": event.get("blocking_reasons") or ([postability["blocker_reason"]] if postability.get("blocker_reason") else [])})
     if include_staff_advance and not any(row.get("event_key") == "staff_advance" for row in rows):
         rows.append(staff_advance_unsupported_event(period))
     status_counts = Counter(str(row.get("status") or "INFO") for row in rows)
     canonical_summary = {f"{status.lower()}_count": status_counts.get(status, 0) for status in CANONICAL_STATUSES}
-    canonical_summary.update(
-        {
-            "blocked_count": sum(count for status, count in status_counts.items() if status.startswith("BLOCKED") or status == UNSUPPORTED_SOURCE),
-            "source_count": len(rows),
-            "status_counts": dict(status_counts),
-        }
-    )
-    return {
-        **payload,
-        "summary": {**(payload.get("summary") or {}), **canonical_summary},
-        "financial_year_readiness": payload.get("financial_year_readiness") or period,
-        "accounting_period_readiness": payload.get("accounting_period_readiness") or period,
-        "events": rows,
-        "canonical_statuses": list(CANONICAL_STATUSES),
-    }
+    canonical_summary.update({"blocked_count": sum(count for status, count in status_counts.items() if status.startswith("BLOCKED") or status == UNSUPPORTED_SOURCE), "source_count": len(rows), "status_counts": dict(status_counts)})
+    return {**payload, "summary": {**(payload.get("summary") or {}), **canonical_summary}, "financial_year_readiness": payload.get("financial_year_readiness") or period, "accounting_period_readiness": payload.get("accounting_period_readiness") or period, "events": rows, "canonical_statuses": list(CANONICAL_STATUSES)}
