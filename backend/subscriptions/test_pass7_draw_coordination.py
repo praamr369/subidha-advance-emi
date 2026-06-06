@@ -43,6 +43,8 @@ from tests.helpers import (
     create_product,
     create_subscription,
     create_finance_account,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -228,7 +230,9 @@ class LuckyPlanCoordinationTests(TestCase):
 
     def test_only_future_unpaid_emis_waived_paid_untouched(self):
         admin = _make_user()
+        ensure_test_accounting_posting_prerequisites(posting_date=timezone.localdate(), performed_by=admin)
         fa = create_finance_account(code=f"TST-{get_random_string(6)}", name="Test Cash")
+        ensure_test_collection_purpose_mapping(finance_account=fa)
         batch = _batch_with_eligible_subscriptions(1)
         winner_sub = Subscription.objects.filter(batch=batch).first()
         freeze_draw_eligibility_snapshot(batch, user=admin)

@@ -35,12 +35,16 @@ from subscriptions.services.contract_reference_service import (
     search_receivables,
 )
 from subscriptions.services.payment_service import record_emi_payment
-from tests.helpers import ensure_default_payment_collection_accounts
+from tests.helpers import (
+    ensure_default_payment_collection_accounts,
+    ensure_test_accounting_posting_prerequisites,
+)
 
 
 class FinancialFlowTests(TestCase):
     def setUp(self):
         ensure_default_payment_collection_accounts()
+        ensure_test_accounting_posting_prerequisites()
         User = get_user_model()
         self.customer_user = User.objects.create_user(
             username="cust_fin", password="pass1234", role="CUSTOMER", phone="9800000011"
@@ -270,6 +274,7 @@ class ReconcileFinancialsCommandTests(FinancialFlowTests):
 class ContractReferenceServiceTests(TestCase):
     def setUp(self):
         self.accounts = ensure_default_payment_collection_accounts()
+        ensure_test_accounting_posting_prerequisites()
         User = get_user_model()
         self.admin = User.objects.create_user(
             username="admin_contract_refs",

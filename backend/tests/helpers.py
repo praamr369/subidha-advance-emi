@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from accounting.models import (
     AccountingPeriod,
+    AccountingPeriodStatus,
     ChartOfAccount,
     ChartOfAccountType,
     FinanceAccount,
@@ -13,6 +14,7 @@ from accounting.models import (
     FinanceAccountMappingPurpose,
     FinancialYear,
 )
+from accounting.services.period_service import financial_year_bounds, financial_year_code
 from accounting.services.document_sequence_service import DocumentType, upsert_numbering_profile
 from accounts.models import User, UserRole
 from subscriptions.models import (
@@ -67,20 +69,20 @@ def create_admin_user(username="admin_test", phone="9000000001", email=""):
     )
 
 
-def ensure_open_accounting_period_for_date(reference_date: date, *, performed_by=None):
-    if performed_by is None:
-        performed_by = create_admin_user(
-            username=f"period_admin_{reference_date.strftime('%Y%m%d')}",
-            phone=f"939{reference_date.strftime('%m%d%H%M')[:7]}",
-        )
-    if reference_date.month >= 4:
-        start_year = reference_date.year
-    else:
-        start_year = reference_date.year - 1
-    fy_start = date(start_year, 4, 1)
-    fy_end = date(start_year + 1, 3, 31)
-    fy_code = f"FY{fy_start.year}-{str(fy_end.year)[-2:]}"
-    FinancialYear.objects.filter(is_active=True).exclude(code=fy_code).update(is_active=False)
+def ensure_test_financial_year(reference_date: date | None = None, *, performed_by=None):
+    """
+    Ensure one active test financial year covers the reference date.
+
+    This mirrors production's single-active-FY invariant instead of weakening
+    posting validation in tests.
+    """
+    reference_date = reference_date or date.today()
+    fy_start, fy_end = financial_year_bounds(reference_date)
+    fy_code = financial_year_code(reference_date)
+    FinancialYear.objects.filter(is_active=True).exclude(code=fy_code).update(
+        is_active=False,
+        activated_by=None,
+    )
     financial_year, _ = FinancialYear.objects.get_or_create(
         code=fy_code,
         defaults={
@@ -91,10 +93,30 @@ def ensure_open_accounting_period_for_date(reference_date: date, *, performed_by
             "activated_by": performed_by,
         },
     )
+    updates = []
+    if financial_year.start_date != fy_start:
+        financial_year.start_date = fy_start
+        updates.append("start_date")
+    if financial_year.end_date != fy_end:
+        financial_year.end_date = fy_end
+        updates.append("end_date")
     if not financial_year.is_active:
         financial_year.is_active = True
+        updates.append("is_active")
+    if performed_by is not None and financial_year.activated_by_id != performed_by.id:
         financial_year.activated_by = performed_by
-        financial_year.save(update_fields=["is_active", "activated_by", "updated_at"])
+        updates.append("activated_by")
+    if updates:
+        financial_year.save(update_fields=[*updates, "updated_at"])
+    return financial_year
+
+
+def ensure_test_open_accounting_period(reference_date: date | None = None, *, performed_by=None):
+    reference_date = reference_date or date.today()
+    financial_year = ensure_test_financial_year(reference_date, performed_by=performed_by)
+    fy_code = financial_year.code
+    fy_end = financial_year.end_date
+
     period_start = date(reference_date.year, reference_date.month, 1)
     if reference_date.month == 12:
         next_month = date(reference_date.year + 1, 1, 1)
@@ -109,28 +131,60 @@ def ensure_open_accounting_period_for_date(reference_date: date, *, performed_by
             "code": f"{fy_code}-{reference_date.year}{reference_date.month:02d}",
             "label": reference_date.strftime("%B %Y"),
             "name": reference_date.strftime("%B %Y"),
+            "status": AccountingPeriodStatus.OPEN,
         },
     )
+    updates = []
     if period.financial_year_id != financial_year.id:
         period.financial_year = financial_year
-        period.save(update_fields=["financial_year", "updated_at"])
-    if period.status != "OPEN" or period.is_locked:
-        period.status = "OPEN"
+        updates.append("financial_year")
+    if period.status != AccountingPeriodStatus.OPEN:
+        period.status = AccountingPeriodStatus.OPEN
+        updates.append("status")
+    if period.is_locked:
         period.is_locked = False
+        updates.append("is_locked")
+    if period.locked_at is not None:
         period.locked_at = None
+        updates.append("locked_at")
+    if period.locked_by_id is not None:
         period.locked_by = None
+        updates.append("locked_by")
+    if period.lock_reason:
         period.lock_reason = ""
-        period.save(update_fields=["status", "is_locked", "locked_at", "locked_by", "lock_reason", "updated_at"])
+        updates.append("lock_reason")
+    if updates:
+        period.save(update_fields=[*updates, "updated_at"])
     return financial_year, period
 
 
-def ensure_journal_numbering_profile_for_date(reference_date: date, *, performed_by=None):
-    ensure_open_accounting_period_for_date(reference_date, performed_by=performed_by)
+def ensure_open_accounting_period_for_date(reference_date: date, *, performed_by=None):
+    return ensure_test_open_accounting_period(reference_date, performed_by=performed_by)
+
+
+def ensure_test_journal_numbering_profile(reference_date: date | None = None, *, performed_by=None):
+    reference_date = reference_date or date.today()
+    ensure_test_open_accounting_period(reference_date, performed_by=performed_by)
     return upsert_numbering_profile(
         document_type=DocumentType.JOURNAL_ENTRY,
         reference_date=reference_date,
         performed_by=performed_by,
     )
+
+
+def ensure_test_accounting_posting_prerequisites(reference_date: date | None = None, *, posting_date: date | None = None, performed_by=None):
+    posting_date = posting_date or reference_date or date.today()
+    financial_year, period = ensure_test_open_accounting_period(posting_date, performed_by=performed_by)
+    numbering_profile = ensure_test_journal_numbering_profile(posting_date, performed_by=performed_by)
+    return {
+        "financial_year": financial_year,
+        "accounting_period": period,
+        "journal_numbering_profile": numbering_profile,
+    }
+
+
+def ensure_journal_numbering_profile_for_date(reference_date: date, *, performed_by=None):
+    return ensure_test_journal_numbering_profile(reference_date, performed_by=performed_by)
 
 
 def ensure_document_numbering_profile_for_date(document_type: str, reference_date: date, *, performed_by=None):
@@ -386,6 +440,63 @@ def create_payment_collection_finance_account(
     )
 
 
+def ensure_test_collection_purpose_mapping(*, finance_account, purpose: str | None = None, is_default: bool = False):
+    purpose = purpose or {
+        FinanceAccountKind.CASH: FinanceAccountMappingPurpose.CASH_COLLECTION,
+        FinanceAccountKind.BANK: FinanceAccountMappingPurpose.BANK_COLLECTION,
+        FinanceAccountKind.UPI: FinanceAccountMappingPurpose.UPI_COLLECTION,
+    }.get(finance_account.kind)
+    if not purpose:
+        raise ValueError(f"No collection mapping purpose is defined for {finance_account.kind}.")
+
+    finance_updates = []
+    if not finance_account.is_active:
+        finance_account.is_active = True
+        finance_updates.append("is_active")
+    if not finance_account.is_real_settlement_account:
+        finance_account.is_real_settlement_account = True
+        finance_updates.append("is_real_settlement_account")
+    if finance_updates:
+        finance_account.save(update_fields=[*finance_updates, "updated_at"])
+
+    chart_account = finance_account.chart_account
+    chart_updates = []
+    if not chart_account.is_active:
+        chart_account.is_active = True
+        chart_updates.append("is_active")
+    if not chart_account.allow_manual_posting:
+        chart_account.allow_manual_posting = True
+        chart_updates.append("allow_manual_posting")
+    if chart_updates:
+        chart_account.save(update_fields=chart_updates)
+
+    if is_default:
+        FinanceAccountCoaMapping.objects.filter(
+            purpose=purpose,
+            is_active=True,
+            is_default=True,
+        ).exclude(finance_account=finance_account).update(is_default=False)
+
+    mapping, _ = FinanceAccountCoaMapping.objects.update_or_create(
+        finance_account=finance_account,
+        purpose=purpose,
+        defaults={
+            "chart_account": chart_account,
+            "is_active": True,
+            "is_default": is_default
+            or not FinanceAccountCoaMapping.objects.filter(
+                purpose=purpose,
+                is_active=True,
+                is_default=True,
+            )
+            .exclude(finance_account=finance_account)
+            .exists(),
+            "notes": "Test collection purpose mapping.",
+        },
+    )
+    return mapping
+
+
 def ensure_default_payment_collection_accounts():
     """
     Provide stable operational fallback accounts for legacy test fixtures.
@@ -450,22 +561,7 @@ def ensure_default_payment_collection_accounts():
             FinanceAccountKind.BANK: FinanceAccountMappingPurpose.BANK_COLLECTION,
             FinanceAccountKind.UPI: FinanceAccountMappingPurpose.UPI_COLLECTION,
         }[kind]
-        FinanceAccountCoaMapping.objects.update_or_create(
-            finance_account=finance_account,
-            purpose=purpose,
-            defaults={
-                "chart_account": chart_account,
-                "is_active": True,
-                "is_default": not FinanceAccountCoaMapping.objects.filter(
-                    purpose=purpose,
-                    is_active=True,
-                    is_default=True,
-                )
-                .exclude(finance_account=finance_account)
-                .exists(),
-                "notes": "Test default collection mapping.",
-            },
-        )
+        ensure_test_collection_purpose_mapping(finance_account=finance_account, purpose=purpose)
         accounts[kind] = finance_account
     return accounts
 
