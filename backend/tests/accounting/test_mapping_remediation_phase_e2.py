@@ -94,6 +94,7 @@ class AccountingMappingRemediationPhaseE2Tests(APITestCase):
 
     def test_generate_current_period_creates_only_missing_current_period(self):
         today = timezone.localdate()
+        FinancialYear.objects.update(is_active=False)
         fy = FinancialYear.objects.create(
             code=f"FY{today.year}-{str(today.year + 1)[-2:]}",
             name="Current Test FY",
