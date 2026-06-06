@@ -3,6 +3,7 @@ from django.urls import path, include
 from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
 from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
 from api.v1.views.accounting_bridge_reconciliation import AccountingBridgeReconciliationView
+from api.v1.views.accounting_year_end_close import AccountingYearEndCloseView, AccountingYearEndReadinessView
 
 urlpatterns = [
     path("health/", PublicApiHealthView.as_view()),
@@ -18,6 +19,8 @@ urlpatterns = [
     path("admin/", include("api.v1.routes.collection_control_center")),
     path("branch-control/", include("api.v1.routes.branch_control")),
     path("accounting/bridge-reconciliation/", AccountingBridgeReconciliationView.as_view()),
+    path("accounting/year-end/readiness/", AccountingYearEndReadinessView.as_view()),
+    path("accounting/year-end/close/", AccountingYearEndCloseView.as_view()),
     path("accounting/", include("api.v1.routes.accounting")),
     path("inventory/", include("api.v1.routes.inventory")),
     path("manufacturing/", include("api.v1.routes.manufacturing")),
