@@ -36,6 +36,8 @@ urlpatterns = [
     path("admin/accounting/mapping-remediation/apply/", AccountingMappingRemediationApplyView.as_view()),
     path("admin/accounting/mapping-remediation/seed-supported-defaults/", AccountingMappingRemediationSeedSupportedDefaultsView.as_view()),
     path("admin/accounting/mapping-remediation/acknowledge/", AccountingMappingRemediationAcknowledgeView.as_view()),
+    path("admin/accounting/year-end/readiness/", AccountingYearEndReadinessView.as_view()),
+    path("admin/accounting/year-end/close/", AccountingYearEndCloseView.as_view()),
     path("admin/", include("api.v1.routes.admin_accounting_bridge_readiness")),
     path("admin/", include("api.v1.routes.admin_rent_lease_accounting_bridge")),
     path("admin/", include("api.v1.routes.contract_amendments_admin")),

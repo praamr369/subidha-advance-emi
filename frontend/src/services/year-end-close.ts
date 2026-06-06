@@ -50,6 +50,11 @@ export type YearEndReadiness = {
   gap_or_overlap_count: number;
   unposted_bridge_item_count: number;
   blocked_bridge_item_count: number;
+  blocked_mapping_count: number;
+  blocked_period_count: number;
+  blocked_numbering_count: number;
+  blocked_approval_count: number;
+  unsupported_source_count: number;
   bridge_event_counts?: Record<string, Record<string, number>>;
   blocking_bridge_groups?: Array<{
     event_key: string;
@@ -62,15 +67,33 @@ export type YearEndReadiness = {
     is_postable?: boolean;
   }>;
   unreconciled_item_count: number;
+  unreconciled_exception_count: number;
   exception_count: number;
+  reconciliation_error_count: number;
   missing_numbering_profile_count: number;
   blocking_items: YearEndIssue[];
   warning_items: YearEndIssue[];
+  warning_count: number;
   ready_to_close: boolean;
   requires_acknowledgement: boolean;
   allowed_actions: string[];
+  action_links?: {
+    bridge_reconciliation?: string;
+    mapping_audit?: string;
+    reconciliation_runs?: string;
+    accounting_periods?: string;
+    document_numbering?: string;
+    finance_account_setup?: string;
+  };
   confirmation_text_required: string | null;
   historical_document_numbers_preserved: boolean;
+  read_only_contract?: {
+    readiness_creates_journals: boolean;
+    readiness_allocates_document_numbers: boolean;
+    close_auto_posts_bridge_items: boolean;
+    close_creates_adjustment_journals: boolean;
+    close_renumbers_historical_documents: boolean;
+  };
 };
 
 export type YearEndCloseResult = {
@@ -87,7 +110,7 @@ function query(financialYear?: string | number | null): string {
 }
 
 export function getYearEndReadiness(financialYear?: string | number | null) {
-  return apiFetch<YearEndReadiness>(`/accounting/year-end/readiness/${query(financialYear)}`);
+  return apiFetch<YearEndReadiness>(`/admin/accounting/year-end/readiness/${query(financialYear)}`);
 }
 
 export function runYearEndClose(payload: {
@@ -95,7 +118,7 @@ export function runYearEndClose(payload: {
   confirmation_text: string;
   acknowledge_warnings?: boolean;
 }) {
-  return apiFetch<YearEndCloseResult>("/accounting/year-end/close/", {
+  return apiFetch<YearEndCloseResult>("/admin/accounting/year-end/close/", {
     method: "POST",
     body: JSON.stringify(payload),
   });

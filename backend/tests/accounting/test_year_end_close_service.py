@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 from accounting.models import AccountingPeriod, AccountingPeriodStatus, DocumentSequence, FinancialYear, JournalEntry
 from accounting.services.accounting_bridge_reconciliation_read_service import BridgeReconciliationFilters, build_accounting_bridge_reconciliation
 from accounting.services.year_end_close_service import YearEndCloseCommand, build_year_end_close_readiness, execute_year_end_close
+from reconciliation.models import ReconciliationItem, ReconciliationRun, ReconciliationRunStatus
 from tests.helpers import create_admin_user, create_customer_user
 
 
@@ -44,8 +45,8 @@ def _mock_readiness_payload():
             {"event_key": "manufacturing_wastage", "label": "Manufacturing wastage", "source_module": "manufacturing", "event_group": "Manufacturing", "source_model": "ProductionJob", "status": "ERROR", "posting_mode": "AUTO", "blocking_reasons": ["Missing wastage expense account"], "operator_action": "Fix mapping."},
             {"event_key": "staff_advance", "label": "Staff advance", "source_module": "accounting", "event_group": "HR", "source_model": "StaffAdvance", "status": "ERROR", "posting_mode": "UNSUPPORTED", "blocking_reasons": ["Unsupported StaffAdvance source"], "operator_action": "Unsupported source model."},
         ],
-        "financial_year_readiness": {},
-        "accounting_period_readiness": {},
+        "financial_year_readiness": {"financial_year_ready": True, "accounting_period_ready": True, "journal_numbering_ready": True},
+        "accounting_period_readiness": {"financial_year_ready": True, "accounting_period_ready": True, "journal_numbering_ready": True},
     }
 
 
@@ -58,14 +59,17 @@ class BridgeReconciliationRemediationTests(TestCase):
         before_sequences = DocumentSequence.objects.count()
         payload = build_accounting_bridge_reconciliation(BridgeReconciliationFilters(financial_year=str(financial_year.id)))
         self.assertEqual(payload["summary"]["ready_unposted_count"], 1)
-        self.assertEqual(payload["summary"]["blocked_by_mapping_count"], 3)
+        self.assertEqual(payload["summary"]["blocked_by_mapping_count"], 2)
+        self.assertEqual(payload["summary"]["unsupported_source_count"], 1)
         self.assertIn("emi_payment", payload["summary"]["ready_unposted_by_event"])
         self.assertIn("inventory_delivery_out", payload["summary"]["blocked_by_mapping_by_event"])
         blocked = {row["event_key"]: row for row in payload["results"] if row["status"] == "BLOCKED_BY_MAPPING"}
         self.assertTrue(blocked["inventory_delivery_out"]["action_href"])
         self.assertTrue(blocked["manufacturing_wastage"]["action_href"])
-        self.assertEqual(blocked["staff_advance"]["blocker_code"], "UNSUPPORTED_STAFF_ADVANCE")
-        self.assertFalse(blocked["staff_advance"]["is_postable"])
+        staff_advance = {row["event_key"]: row for row in payload["results"]}["staff_advance"]
+        self.assertEqual(staff_advance["status"], "UNSUPPORTED_SOURCE")
+        self.assertEqual(staff_advance["blocker_code"], "UNSUPPORTED_SOURCE")
+        self.assertFalse(staff_advance["is_postable"])
         self.assertEqual(JournalEntry.objects.count(), before_journals)
         self.assertEqual(DocumentSequence.objects.count(), before_sequences)
 
@@ -106,6 +110,33 @@ class YearEndCloseReadinessTests(TestCase):
         self.assertTrue(payload["ready_to_close"])
         self.assertEqual(payload["open_period_count"], 0)
         self.assertEqual(payload["unposted_bridge_item_count"], 0)
+
+    @patch("accounting.services.year_end_close_service._bridge_payload", return_value={"summary": {"unposted_bridge_item_count": 0, "blocked_bridge_item_count": 0}, "results": []})
+    def test_readiness_blocked_when_reconciliation_errors_exist(self, _bridge_payload):
+        admin = create_admin_user(username="year_close_recon_admin")
+        financial_year = _make_financial_year()
+        _make_periods(financial_year, status=AccountingPeriodStatus.LOCKED)
+        _make_journal_numbering(financial_year)
+        run = ReconciliationRun.objects.create(
+            run_no=1,
+            scope="YEAR_END",
+            module="accounting",
+            status=ReconciliationRunStatus.COMPLETED,
+            started_by=admin,
+        )
+        ReconciliationItem.objects.create(
+            run=run,
+            module="accounting",
+            source_type="Payment",
+            source_id="phase-f-payment",
+            status="AMOUNT_MISMATCH",
+            exception_code="YEAR_END_AMOUNT_MISMATCH",
+            exception_message="Mismatch must block year-end close.",
+        )
+        payload = build_year_end_close_readiness(financial_year.id)
+        self.assertFalse(payload["ready_to_close"])
+        self.assertEqual(payload["reconciliation_error_count"], 1)
+        self.assertIn("RECONCILIATION_EXCEPTIONS", {item["code"] for item in payload["blocking_items"]})
 
     @patch("accounting.services.year_end_close_service._bridge_payload", return_value={"summary": {"unposted_bridge_item_count": 0, "blocked_bridge_item_count": 0}, "results": []})
     def test_close_requires_confirmation_text(self, _bridge_payload):
@@ -155,3 +186,13 @@ class YearEndCloseApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(JournalEntry.objects.count(), before_journals)
         self.assertEqual(DocumentSequence.objects.count(), before_sequences)
+
+    def test_admin_year_end_endpoint_aliases_are_available(self):
+        admin = create_admin_user(username="year_close_admin_alias")
+        client = APIClient()
+        client.force_authenticate(user=admin)
+        response = client.get("/api/v1/admin/accounting/year-end/readiness/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("action_links", response.data)
+        blocked = client.post("/api/v1/admin/accounting/year-end/close/", {"financial_year": "FY2026-27", "confirmation_text": "WRONG"}, format="json")
+        self.assertEqual(blocked.status_code, 400)

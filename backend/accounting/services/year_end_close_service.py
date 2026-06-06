@@ -24,6 +24,9 @@ SUPPORTED_NUMBERING_TYPES = {"DIRECT_SALE", "TAX_INVOICE", "DIRECT_SALE_RECEIPT"
 PERIODS_HREF = "/admin/accounting/periods"
 BRIDGE_RECONCILIATION_HREF = "/admin/accounting/bridge-reconciliation"
 DOCUMENT_NUMBERING_HREF = "/admin/settings/business-setup/document-numbering"
+MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit"
+RECONCILIATION_RUNS_HREF = "/admin/reconciliation/runs"
+FINANCE_ACCOUNTS_HREF = "/admin/accounting/finance-accounts"
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,60 @@ def _money(value: Any) -> str:
 
 def _issue(*, code: str, message: str, recommended_action: str, action_href: str | None = None, count: int = 1, is_acknowledgeable: bool = False) -> dict[str, Any]:
     return {"code": code, "message": message, "blocker_code": code, "blocker_label": code.replace("_", " ").title(), "blocker_count": count, "recommended_action": recommended_action, "action_href": action_href, "is_acknowledgeable": is_acknowledgeable}
+
+
+def _action_links(financial_year: FinancialYear | None) -> dict[str, str]:
+    suffix = f"?financial_year={financial_year.id}" if financial_year is not None else ""
+    return {
+        "bridge_reconciliation": f"{BRIDGE_RECONCILIATION_HREF}{suffix}",
+        "mapping_audit": MAPPING_AUDIT_HREF,
+        "reconciliation_runs": RECONCILIATION_RUNS_HREF,
+        "accounting_periods": PERIODS_HREF,
+        "document_numbering": DOCUMENT_NUMBERING_HREF,
+        "finance_account_setup": FINANCE_ACCOUNTS_HREF,
+    }
+
+
+def _empty_payload() -> dict[str, Any]:
+    return {
+        "financial_year": None,
+        "periods": [],
+        "period_summary": {},
+        "open_period_count": 0,
+        "locked_period_count": 0,
+        "closed_period_count": 0,
+        "missing_period_count": 1,
+        "gap_or_overlap_count": 0,
+        "unposted_bridge_item_count": 0,
+        "blocked_bridge_item_count": 0,
+        "blocked_mapping_count": 0,
+        "blocked_period_count": 0,
+        "blocked_numbering_count": 0,
+        "blocked_approval_count": 0,
+        "unsupported_source_count": 0,
+        "unreconciled_item_count": 0,
+        "unreconciled_exception_count": 0,
+        "exception_count": 0,
+        "reconciliation_error_count": 0,
+        "missing_numbering_profile_count": 0,
+        "bridge_event_counts": {},
+        "blocking_items": [_issue(code="NO_FINANCIAL_YEAR", message="No financial year is configured or selected.", recommended_action="Create or select a financial year before year-end close.", action_href=PERIODS_HREF)],
+        "warning_items": [],
+        "warning_count": 0,
+        "ready_to_close": False,
+        "requires_acknowledgement": False,
+        "allowed_actions": ["CONFIGURE_FINANCIAL_YEAR"],
+        "action_links": _action_links(None),
+        "confirmation_text_required": None,
+        "historical_document_numbers_preserved": True,
+        "read_only_contract": {
+            "readiness_creates_journals": False,
+            "readiness_allocates_document_numbers": False,
+            "close_auto_posts_bridge_items": False,
+            "close_creates_adjustment_journals": False,
+            "close_renumbers_historical_documents": False,
+        },
+    }
 
 
 def _financial_year(identifier: str | int | None):
@@ -120,7 +177,7 @@ def _event_counts_from_bridge(payload: dict[str, Any]) -> dict[str, dict[str, in
 def build_year_end_close_readiness(financial_year: str | int | None = None) -> dict[str, Any]:
     fy = _financial_year(financial_year)
     if fy is None:
-        return {"financial_year": None, "periods": [], "period_summary": {}, "open_period_count": 0, "locked_period_count": 0, "closed_period_count": 0, "missing_period_count": 1, "gap_or_overlap_count": 0, "unposted_bridge_item_count": 0, "blocked_bridge_item_count": 0, "unreconciled_item_count": 0, "exception_count": 0, "missing_numbering_profile_count": 0, "bridge_event_counts": {}, "blocking_items": [_issue(code="NO_FINANCIAL_YEAR", message="No financial year is configured or selected.", recommended_action="Create or select a financial year before year-end close.", action_href=PERIODS_HREF)], "warning_items": [], "ready_to_close": False, "requires_acknowledgement": False, "allowed_actions": ["CONFIGURE_FINANCIAL_YEAR"], "confirmation_text_required": None, "historical_document_numbers_preserved": True}
+        return _empty_payload()
 
     periods = list(AccountingPeriod.objects.filter(financial_year=fy).order_by("start_date", "id"))
     open_periods = [period for period in periods if period.status == AccountingPeriodStatus.OPEN]
@@ -143,24 +200,34 @@ def build_year_end_close_readiness(financial_year: str | int | None = None) -> d
         bridge_summary = bridge_payload.get("summary") or {}
         unposted_bridge_count = int(bridge_summary.get("unposted_bridge_item_count") or 0)
         blocked_bridge_count = int(bridge_summary.get("blocked_bridge_item_count") or 0)
+        blocked_mapping_count = int(bridge_summary.get("blocked_by_mapping_count") or 0)
+        blocked_period_count = int(bridge_summary.get("blocked_by_period_count") or 0)
+        blocked_numbering_count = int(bridge_summary.get("blocked_by_numbering_count") or 0)
+        blocked_approval_count = int(bridge_summary.get("blocked_by_approval_count") or 0)
+        unsupported_source_count = int(bridge_summary.get("unsupported_source_count") or bridge_summary.get("unsupported_count") or 0)
         bridge_event_counts = _event_counts_from_bridge(bridge_payload)
         blocking_groups = bridge_summary.get("blocking_groups") or []
     except Exception:
         unposted_bridge_count, blocked_bridge_count = 0, 1
+        blocked_mapping_count = 0
+        blocked_period_count = 0
+        blocked_numbering_count = 0
+        blocked_approval_count = 0
+        unsupported_source_count = 0
         bridge_event_counts = {}
         blocking_groups = []
-        warning_items.append(_issue(code="BRIDGE_READINESS_UNAVAILABLE", message="Bridge readiness could not be fully evaluated.", recommended_action="Open Bridge Reconciliation and resolve readiness errors before close.", action_href=BRIDGE_RECONCILIATION_HREF, is_acknowledgeable=True))
+        blocking_items.append(_issue(code="BRIDGE_READINESS_UNAVAILABLE", message="Bridge readiness could not be fully evaluated.", recommended_action="Open Bridge Reconciliation and resolve readiness errors before close.", action_href=BRIDGE_RECONCILIATION_HREF))
     if unposted_bridge_count:
         blocking_items.append(_issue(code="UNPOSTED_BRIDGE_ITEMS", count=unposted_bridge_count, message=f"{unposted_bridge_count} unposted bridge item(s) remain for {fy.code}.", recommended_action="Review unposted bridge items and post them through controlled bridge posting workflows.", action_href=f"{BRIDGE_RECONCILIATION_HREF}?financial_year={fy.id}&status=READY_UNPOSTED"))
     if blocked_bridge_count:
-        warning_items.append(_issue(code="BLOCKED_BRIDGE_ITEMS", count=blocked_bridge_count, message=f"{blocked_bridge_count} blocked bridge mapping item(s) require admin review.", recommended_action="Resolve supported mapping blockers or explicitly acknowledge unsupported/non-postable warnings.", action_href=f"{BRIDGE_RECONCILIATION_HREF}?financial_year={fy.id}&status=BLOCKED_BY_MAPPING", is_acknowledgeable=True))
+        blocking_items.append(_issue(code="BLOCKED_BRIDGE_ITEMS", count=blocked_bridge_count, message=f"{blocked_bridge_count} accounting bridge blocker(s) remain for {fy.code}.", recommended_action="Resolve mapping, period, numbering, approval, and unsupported-source blockers before close.", action_href=f"{BRIDGE_RECONCILIATION_HREF}?financial_year={fy.id}&status=BLOCKED_BY_MAPPING"))
 
     unreconciled_count = _unreconciled_money_movement_count(fy)
     exception_count = ReconciliationItem.objects.filter(status__in=RECONCILIATION_EXCEPTION_STATUSES, created_at__date__gte=fy.start_date, created_at__date__lte=fy.end_date).count()
     if unreconciled_count:
-        warning_items.append(_issue(code="UNRECONCILED_MONEY_MOVEMENTS", count=unreconciled_count, message=f"{unreconciled_count} unreconciled money movement(s) exist.", recommended_action="Review settlement and reconciliation evidence before acknowledging.", action_href=BRIDGE_RECONCILIATION_HREF, is_acknowledgeable=True))
+        blocking_items.append(_issue(code="UNRECONCILED_MONEY_MOVEMENTS", count=unreconciled_count, message=f"{unreconciled_count} unreconciled money movement(s) exist.", recommended_action="Resolve settlement and reconciliation evidence before close.", action_href=RECONCILIATION_RUNS_HREF))
     if exception_count:
-        warning_items.append(_issue(code="RECONCILIATION_EXCEPTIONS", count=exception_count, message=f"{exception_count} unresolved reconciliation exception(s) exist.", recommended_action="Review reconciliation exceptions before acknowledging.", action_href=BRIDGE_RECONCILIATION_HREF, is_acknowledgeable=True))
+        blocking_items.append(_issue(code="RECONCILIATION_EXCEPTIONS", count=exception_count, message=f"{exception_count} unresolved reconciliation exception(s) exist.", recommended_action="Resolve reconciliation exceptions before close.", action_href=RECONCILIATION_RUNS_HREF))
 
     missing_required = [item for item in REQUIRED_NUMBERING_TYPES if not _has_numbering(fy, item)]
     missing_supported = [item for item in SUPPORTED_NUMBERING_TYPES if not _has_numbering(fy, item)]
@@ -172,7 +239,7 @@ def build_year_end_close_readiness(financial_year: str | int | None = None) -> d
     status = "CLOSED" if _close_log_exists(fy) or (periods and closed_count == len(periods) and not fy.is_active) else ("ACTIVE" if fy.is_active else "INACTIVE")
     ready = bool(periods) and not blocking_items
     requires_ack = ready and any(item.get("is_acknowledgeable") for item in warning_items)
-    return {"financial_year": {"id": fy.id, "code": fy.code, "name": fy.name, "start_date": fy.start_date.isoformat(), "end_date": fy.end_date.isoformat(), "status": status, "is_active": fy.is_active, "closed": status == "CLOSED"}, "periods": [_period_row(period) for period in periods], "open_periods": [_period_row(period) for period in open_periods], "period_summary": {"total_periods": len(periods), "expected_periods": _month_count(fy)}, "open_period_count": open_count, "locked_period_count": locked_count, "closed_period_count": closed_count, "missing_period_count": missing_period_count, "gap_or_overlap_count": gap_count, "unposted_bridge_item_count": unposted_bridge_count, "blocked_bridge_item_count": blocked_bridge_count, "bridge_event_counts": bridge_event_counts, "blocking_bridge_groups": blocking_groups, "unreconciled_item_count": unreconciled_count, "exception_count": exception_count, "missing_numbering_profile_count": len(missing_required) + len(missing_supported), "blocking_items": blocking_items, "warning_items": warning_items, "ready_to_close": ready, "requires_acknowledgement": requires_ack, "allowed_actions": ["CLOSE_YEAR_WITH_ACKNOWLEDGEMENT" if requires_ack else "CLOSE_YEAR"] if ready else ["RESOLVE_BLOCKERS"], "confirmation_text_required": f"CLOSE {fy.code}", "historical_document_numbers_preserved": True}
+    return {"financial_year": {"id": fy.id, "code": fy.code, "name": fy.name, "start_date": fy.start_date.isoformat(), "end_date": fy.end_date.isoformat(), "status": status, "is_active": fy.is_active, "closed": status == "CLOSED"}, "periods": [_period_row(period) for period in periods], "open_periods": [_period_row(period) for period in open_periods], "period_summary": {"total_periods": len(periods), "expected_periods": _month_count(fy)}, "open_period_count": open_count, "locked_period_count": locked_count, "closed_period_count": closed_count, "missing_period_count": missing_period_count, "gap_or_overlap_count": gap_count, "unposted_bridge_item_count": unposted_bridge_count, "blocked_bridge_item_count": blocked_bridge_count, "blocked_mapping_count": blocked_mapping_count, "blocked_period_count": blocked_period_count, "blocked_numbering_count": blocked_numbering_count, "blocked_approval_count": blocked_approval_count, "unsupported_source_count": unsupported_source_count, "bridge_event_counts": bridge_event_counts, "blocking_bridge_groups": blocking_groups, "unreconciled_item_count": unreconciled_count, "unreconciled_exception_count": exception_count, "exception_count": exception_count, "reconciliation_error_count": exception_count, "missing_numbering_profile_count": len(missing_required) + len(missing_supported), "blocking_items": blocking_items, "warning_items": warning_items, "warning_count": len(warning_items), "ready_to_close": ready, "requires_acknowledgement": requires_ack, "allowed_actions": ["CLOSE_YEAR_WITH_ACKNOWLEDGEMENT" if requires_ack else "CLOSE_YEAR"] if ready else ["RESOLVE_BLOCKERS"], "action_links": _action_links(fy), "confirmation_text_required": f"CLOSE {fy.code}", "historical_document_numbers_preserved": True, "read_only_contract": {"readiness_creates_journals": False, "readiness_allocates_document_numbers": False, "close_auto_posts_bridge_items": False, "close_creates_adjustment_journals": False, "close_renumbers_historical_documents": False}}
 
 
 @transaction.atomic
