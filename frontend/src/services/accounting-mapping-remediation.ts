@@ -11,15 +11,17 @@ export type AccountingMappingRemediationRow = {
   action_type: string;
   action_label: string;
   action_href: string;
+  setup_route?: string;
   can_auto_create_account: boolean;
+  can_apply_mapping?: boolean;
   can_map_account: boolean;
   can_post: boolean;
   is_supported: boolean;
   is_acknowledgeable: boolean;
-  required_account_type: string;
-  required_account_code: string;
-  required_account_name: string;
-  required_account_system_code?: string;
+  required_account_type: string | null;
+  required_account_code: string | null;
+  required_account_name: string | null;
+  required_account_system_code?: string | null;
   existing_account_id?: number | null;
   existing_account_code?: string | null;
   existing_account_name?: string | null;
@@ -34,13 +36,24 @@ export type AccountingMappingRemediationPayload = {
   document_sequences_allocated: number;
   rows: AccountingMappingRemediationRow[];
   results: AccountingMappingRemediationRow[];
+  actions?: Record<string, string>;
   summary: {
     total: number;
     ready: number;
     missing_account: number;
     unmapped: number;
+    blocked?: number;
     unsupported: number;
   };
+};
+
+export type AccountingMappingSeedResponse = {
+  selected_event?: string | null;
+  defaults?: Record<string, unknown>;
+  special_results?: unknown[];
+  journal_entries_created: number;
+  document_sequences_allocated: number;
+  readiness: AccountingMappingRemediationPayload;
 };
 
 export async function getAccountingMappingRemediation(): Promise<AccountingMappingRemediationPayload> {
@@ -59,6 +72,14 @@ export async function applyAccountingMappingRemediation(eventType: string, accou
   return request<{ readiness: AccountingMappingRemediationPayload }>("/admin/accounting/mapping-remediation/apply/", {
     method: "POST",
     body: JSON.stringify({ event_type: eventType, account_id: accountId ?? null }),
+    retryCount: 0,
+  });
+}
+
+export async function seedSupportedAccountingMappings(): Promise<AccountingMappingSeedResponse> {
+  return request<AccountingMappingSeedResponse>("/admin/accounting/mapping-remediation/seed-supported-defaults/", {
+    method: "POST",
+    body: JSON.stringify({}),
     retryCount: 0,
   });
 }
