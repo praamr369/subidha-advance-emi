@@ -74,7 +74,16 @@ export type SetupChecklist = {
   counts?: Record<string, unknown>;
 };
 
-export type SetupReadinessStatus = "READY" | "NEEDS_SETUP" | "BLOCKED" | string;
+export type SetupReadinessStatus = "READY" | "NEEDS_SETUP" | "BLOCKED" | "INFO" | "OPTIONAL" | "FUTURE" | string;
+
+export type SetupReadinessCategory =
+  | "REQUIRED_FOR_COLLECTION"
+  | "REQUIRED_FOR_ACCOUNTING_POSTING"
+  | "REQUIRED_FOR_DOCUMENTS"
+  | "REQUIRED_FOR_OPERATIONS"
+  | "RECOMMENDED_FOR_GO_LIVE"
+  | "OPTIONAL_OR_FUTURE"
+  | string;
 
 export type SetupReadinessSection = {
   key: string;
@@ -85,6 +94,11 @@ export type SetupReadinessSection = {
   recommended_action: string;
   target_route: string;
   why_this_matters: string;
+  category?: SetupReadinessCategory;
+  category_label?: string;
+  repairable?: boolean;
+  optional_for_initial_start?: boolean;
+  last_checked?: string | null;
   metadata?: Record<string, unknown>;
 };
 
@@ -112,6 +126,16 @@ export type SetupLaunchChecklistItem = {
   label: string;
   ready: boolean;
   source_section: string;
+  category?: SetupReadinessCategory;
+};
+
+export type SetupReadinessCategorySummary = {
+  key: SetupReadinessCategory;
+  label: string;
+  total: number;
+  ready: number;
+  blocked: number;
+  info: number;
 };
 
 export type SetupReadinessPayload = {
@@ -122,12 +146,32 @@ export type SetupReadinessPayload = {
     blocker_count: number;
     next_recommended_action?: string;
     next_target_route?: string;
+    core_operational_ready?: boolean;
+    category_summary?: Record<string, { total: number; ready: number; blocked: number; info: number }>;
   };
   sections: SetupReadinessSection[];
   finance_accounts: SetupReadinessFinanceAccount[];
   launch_checklist: SetupLaunchChecklistItem[];
+  categories?: SetupReadinessCategorySummary[];
   read_only?: boolean;
   mutation_policy?: string;
+};
+
+export type EnsureFreshStartSetupResult = {
+  mode: "dry_run" | "executed" | "read_only_preview" | string;
+  created_financial_records?: number;
+  journal_entries_created?: number;
+  document_numbers_allocated?: number;
+  stock_ledger_created?: number;
+  reconciliation_items_created?: number;
+  branch?: Record<string, unknown>;
+  cash_counter?: Record<string, unknown>;
+  safety_contract?: string;
+  before?: SetupReadinessPayload;
+  after?: SetupReadinessPayload;
+  readiness?: SetupReadinessPayload;
+  accounting_defaults?: Record<string, unknown>;
+  accounting_defaults_preview?: Record<string, unknown>;
 };
 
 export type DocumentNumberingSequence = {
@@ -139,10 +183,7 @@ export type DocumentNumberingSequence = {
   active_financial_year_code?: string;
   financial_year_ref?: number | null;
   financial_year_name?: string;
-  financial_year_date_range?: {
-    start_date?: string;
-    end_date?: string;
-  };
+  financial_year_date_range?: { start_date?: string; end_date?: string };
   workflow_group?: string;
   doc_kind?: "invoice" | string;
   description?: string;
@@ -176,27 +217,10 @@ export type DocumentNumberingSequence = {
 
 export type DocumentNumberingState = {
   financial_year: string;
-  active_financial_year?: {
-    id?: number;
-    code?: string;
-    name?: string;
-    start_date?: string;
-    end_date?: string;
-  } | null;
+  active_financial_year?: { id?: number; code?: string; name?: string; start_date?: string; end_date?: string } | null;
   active_financial_year_code?: string;
-  active_financial_year_date_range?: {
-    start_date?: string;
-    end_date?: string;
-  };
-  current_period?: {
-    id?: number;
-    code?: string;
-    name?: string;
-    start_date?: string;
-    end_date?: string;
-    status?: string;
-    is_locked?: boolean;
-  } | null;
+  active_financial_year_date_range?: { start_date?: string; end_date?: string };
+  current_period?: { id?: number; code?: string; name?: string; start_date?: string; end_date?: string; status?: string; is_locked?: boolean } | null;
   sequences: DocumentNumberingSequence[];
   missing_required_profiles?: string[];
   inactive_duplicate_profiles?: Record<string, number>;
@@ -212,18 +236,13 @@ export async function getBusinessProfile(): Promise<BusinessProfile | null> {
   try {
     return await apiFetch<BusinessProfile>("/admin/business-profile/");
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return null;
-    }
+    if (error instanceof ApiError && error.status === 404) return null;
     throw error;
   }
 }
 
 export async function saveBusinessProfile(payload: Partial<BusinessProfile>): Promise<BusinessProfile> {
-  return apiFetch<BusinessProfile>("/admin/business-profile/", {
-    method: "PATCH",
-    body: payload,
-  });
+  return apiFetch<BusinessProfile>("/admin/business-profile/", { method: "PATCH", body: payload });
 }
 
 export async function getDocumentPrintSettings(): Promise<DocumentPrintSettings> {
@@ -231,10 +250,7 @@ export async function getDocumentPrintSettings(): Promise<DocumentPrintSettings>
 }
 
 export async function saveDocumentPrintSettings(payload: Partial<DocumentPrintSettings> | FormData): Promise<DocumentPrintSettings> {
-  return apiFetch<DocumentPrintSettings>("/admin/business-profile/?section=document-print-settings", {
-    method: "PATCH",
-    body: payload,
-  });
+  return apiFetch<DocumentPrintSettings>("/admin/business-profile/?section=document-print-settings", { method: "PATCH", body: payload });
 }
 
 export async function getSetupChecklist(): Promise<SetupChecklist> {
@@ -243,6 +259,17 @@ export async function getSetupChecklist(): Promise<SetupChecklist> {
 
 export async function getSetupReadiness(): Promise<SetupReadinessPayload> {
   return apiFetch<SetupReadinessPayload>("/admin/setup/readiness/");
+}
+
+export async function previewFreshStartSetup(): Promise<EnsureFreshStartSetupResult> {
+  return apiFetch<EnsureFreshStartSetupResult>("/admin/setup/ensure-fresh-start/");
+}
+
+export async function ensureFreshStartSetup(input: { dry_run?: boolean; confirm?: boolean } = {}): Promise<EnsureFreshStartSetupResult> {
+  return apiFetch<EnsureFreshStartSetupResult>("/admin/setup/ensure-fresh-start/", {
+    method: "POST",
+    body: { dry_run: Boolean(input.dry_run), confirm: Boolean(input.confirm) },
+  });
 }
 
 export async function getDocumentNumberingState(): Promise<DocumentNumberingState> {
@@ -260,91 +287,5 @@ export type DocumentNumberingUpdatePayload = {
 };
 
 export async function updateDocumentNumbering(payload: DocumentNumberingUpdatePayload): Promise<DocumentNumberingState> {
-  return apiFetch<DocumentNumberingState>("/admin/business-setup/document-numbering/", {
-    method: "PATCH",
-    body: payload,
-  });
+  return apiFetch<DocumentNumberingState>("/admin/business-setup/document-numbering/", { method: "PATCH", body: payload });
 }
-
-export async function getResetPreview(preserveUsername?: string): Promise<Record<string, unknown>> {
-  const query = preserveUsername ? `?preserve_username=${encodeURIComponent(preserveUsername)}` : "";
-  return apiFetch<Record<string, unknown>>(`/admin/business-setup/reset-preview/${query}`);
-}
-
-export type BusinessResetExecuteRequest = {
-  confirm: boolean;
-  preserve_username: string;
-  delete_non_preserved_users?: boolean;
-  clear_auth_artifacts?: boolean;
-  dry_run?: boolean;
-};
-
-export async function executeBusinessReset(payload: BusinessResetExecuteRequest): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/reset/", {
-    method: "POST",
-    body: payload,
-  });
-}
-
-export type ResetScope = {
-  code: string;
-  label: string;
-  danger_level: string;
-  requires_backup: boolean;
-  model_labels: string[];
-};
-
-export async function getResetScopes(): Promise<{ scopes: ResetScope[] }> {
-  return apiFetch<{ scopes: ResetScope[] }>("/admin/business-setup/reset-scopes/");
-}
-
-export async function getModularResetPreview(payload: { scopes: string[]; preserve_username: string; preserve_user_ids?: number[] }): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/reset-preview-v2/", {
-    method: "POST",
-    body: payload,
-  });
-}
-
-export async function executeModularReset(payload: { scopes: string[]; preserve_username: string; confirmation_phrase: string; backup_job_id?: number }): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/reset-v2/", {
-    method: "POST",
-    body: payload,
-  });
-}
-
-export async function getBackupJobs(): Promise<{ results: unknown[]; jobs: unknown[] }> {
-  const payload = await apiFetch<{ results?: unknown[]; jobs?: unknown[] }>("/admin/business-setup/backups/");
-  const rows = payload.jobs ?? payload.results ?? [];
-  return { ...payload, results: rows, jobs: rows };
-}
-
-export async function createBackupJob(payload: { job_type: string; scopes: string[] }): Promise<Record<string, unknown> & { id?: number }> {
-  return apiFetch<Record<string, unknown> & { id?: number }>("/admin/business-setup/backups/", {
-    method: "POST",
-    body: payload,
-  });
-}
-
-export async function getRestoreJobs(): Promise<{ results: unknown[]; jobs: unknown[] }> {
-  const payload = await apiFetch<{ results?: unknown[]; jobs?: unknown[] }>("/admin/business-setup/restore-jobs/");
-  const rows = payload.jobs ?? payload.results ?? [];
-  return { ...payload, results: rows, jobs: rows };
-}
-
-export async function createRestorePreview(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/restore/preview/", {
-    method: "POST",
-    body: payload,
-  });
-}
-
-export async function executeRestore(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-  return apiFetch<Record<string, unknown>>("/admin/business-setup/restore/", {
-    method: "POST",
-    body: payload,
-  });
-}
-
-export const listBackupJobs = getBackupJobs;
-export const listRestoreJobs = getRestoreJobs;
-export const getRestorePreview = createRestorePreview;
