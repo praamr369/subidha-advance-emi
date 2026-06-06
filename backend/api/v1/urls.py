@@ -56,4 +56,5 @@ urlpatterns = [
     path("notifications/", include("api.v1.routes.notifications")),
     path("public/", include("api.v1.routes.public")),
     path("executive/", include("api.v1.routes.executive")),
+    path("winner/", include("api.v1.route_modules.winner_urls")),
 ]
