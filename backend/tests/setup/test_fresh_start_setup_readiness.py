@@ -24,15 +24,39 @@ class FreshStartSetupReadinessTests(APITestCase):
             "document_sequences": DocumentSequence.objects.count(),
         }
 
-    def test_setup_readiness_inventory_is_not_core_blocker_without_stock(self):
+    def test_setup_readiness_returns_production_categories(self):
+        response = self.client.get("/api/v1/admin/setup/readiness/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        categories = {row["key"] for row in response.data["categories"]}
+        self.assertIn("CORE_REQUIRED", categories)
+        self.assertIn("FINANCE_ACCOUNTING_REQUIRED", categories)
+        self.assertIn("RENT_LEASE_REQUIRED", categories)
+        self.assertIn("INVENTORY_REQUIRED", categories)
+        self.assertIn("STAFF_HR_PAYROLL_REQUIRED", categories)
+        self.assertIn("CRM_REQUIRED", categories)
+        self.assertIn("RESET_DRY_RUN_REQUIRED", categories)
+
+    def test_setup_readiness_inventory_is_required_pending_without_fake_stock(self):
         response = self.client.get("/api/v1/admin/setup/readiness/")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         inventory = next(row for row in response.data["sections"] if row["key"] == "inventory_onboarding")
-        self.assertIn(inventory["status"], {"INFO", "READY"})
-        self.assertTrue(inventory["optional_for_initial_start"])
-        self.assertFalse(inventory["metadata"]["csv_import_required_for_initial_start"])
+        self.assertIn(inventory["status"], {"REQUIRED_PENDING", "READY"})
+        self.assertEqual(inventory["category"], "INVENTORY_REQUIRED")
+        self.assertTrue(inventory["metadata"]["csv_import_required_workflow"])
+        self.assertFalse(inventory["metadata"]["csv_import_required_for_initial_collection"])
+        self.assertTrue(inventory["metadata"]["manual_opening_stock_required_workflow"])
         self.assertFalse(inventory["metadata"]["creates_stock_ledger_from_readiness"])
-        self.assertTrue(any(item["key"] == "can_use_rent_lease_direct_sale_without_stock_csv" for item in response.data["launch_checklist"]))
+        self.assertTrue(any(item["key"] == "inventory_opening_stock_required_pending" for item in response.data["launch_checklist"]))
+
+    def test_setup_readiness_marks_rent_lease_staff_payroll_and_crm_as_production_workflows(self):
+        response = self.client.get("/api/v1/admin/setup/readiness/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        sections = {row["key"]: row for row in response.data["sections"]}
+        self.assertEqual(sections["rent_lease_live"]["category"], "RENT_LEASE_REQUIRED")
+        self.assertEqual(sections["staff_hr_payroll"]["category"], "STAFF_HR_PAYROLL_REQUIRED")
+        self.assertEqual(sections["crm_enrichment"]["category"], "CRM_REQUIRED")
+        self.assertEqual(sections["staff_advance_future"]["status"], "FUTURE_UNSUPPORTED")
+        self.assertFalse(sections["staff_advance_future"]["metadata"]["posting_supported"])
 
     def test_fresh_start_preview_is_read_only(self):
         before = self._counts()
