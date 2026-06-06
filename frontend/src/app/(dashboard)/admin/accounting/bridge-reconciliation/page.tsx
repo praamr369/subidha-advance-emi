@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
@@ -52,27 +51,28 @@ function rowKey(row: AccountingBridgeReconciliationRow): string {
   return `${row.row_type}-${row.event_key}-${row.source_model ?? "registry"}-${row.source_id ?? "none"}-${row.status}`;
 }
 
+function filtersFromLocation(): AccountingBridgeReconciliationFilters {
+  if (typeof window === "undefined") return {};
+  const params = new URLSearchParams(window.location.search);
+  return {
+    financial_year: params.get("financial_year") || undefined,
+    accounting_period: params.get("accounting_period") || undefined,
+    status: params.get("status") || undefined,
+    event_key: params.get("event_key") || undefined,
+    module: params.get("module") || undefined,
+    source_model: params.get("source_model") || undefined,
+  };
+}
+
 function rowAction(row: AccountingBridgeReconciliationRow) {
   if (row.blocker_code === "UNSUPPORTED_STAFF_ADVANCE") {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-        Unsupported source model. StaffAdvance remains non-postable until a real workflow exists.
-      </div>
-    );
+    return <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">Unsupported source model. StaffAdvance remains non-postable until a real workflow exists.</div>;
   }
   if (row.status === "READY_UNPOSTED") {
     return (
       <div className="flex flex-col gap-2 text-xs">
-        <Link href={row.preview_action_href || ROUTES.admin.accountingBridges} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-900">
-          Preview posting
-        </Link>
-        {row.post_action_href ? (
-          <Link href={row.post_action_href} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold text-emerald-900">
-            Post bridge item
-          </Link>
-        ) : (
-          <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">Post unavailable: no safe row-level endpoint.</span>
-        )}
+        <Link href={row.preview_action_href || ROUTES.admin.accountingBridges} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-900">Preview posting</Link>
+        {row.post_action_href ? <Link href={row.post_action_href} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold text-emerald-900">Post bridge item</Link> : <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">Post unavailable: no safe row-level endpoint.</span>}
         {row.source_action_href ? <Link href={row.source_action_href} className="underline underline-offset-4">Open source</Link> : null}
       </div>
     );
@@ -80,35 +80,19 @@ function rowAction(row: AccountingBridgeReconciliationRow) {
   if (row.status.startsWith("BLOCKED")) {
     return row.action_href ? (
       <div className="flex flex-col gap-2 text-xs">
-        <Link href={row.action_href} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 font-semibold text-amber-950">
-          Fix mapping / Open setup
-        </Link>
+        <Link href={row.action_href} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 font-semibold text-amber-950">Fix mapping / Open setup</Link>
         <span className="text-muted-foreground">{row.recommended_action || row.operator_action}</span>
       </div>
-    ) : (
-      <span className="text-xs text-muted-foreground">{row.recommended_action || row.operator_action || "Review setup."}</span>
-    );
+    ) : <span className="text-xs text-muted-foreground">{row.recommended_action || row.operator_action || "Review setup."}</span>;
   }
-  if (row.journal_entry?.id) {
-    return <Link href={`${ROUTES.admin.accountingJournals}/${row.journal_entry.id}`} className="text-xs font-semibold text-primary underline underline-offset-4">Open journal</Link>;
-  }
+  if (row.journal_entry?.id) return <Link href={`${ROUTES.admin.accountingJournals}/${row.journal_entry.id}`} className="text-xs font-semibold text-primary underline underline-offset-4">Open journal</Link>;
   return <span className="text-xs text-muted-foreground">No action required.</span>;
 }
 
 export default function AccountingBridgeReconciliationPage() {
-  const searchParams = useSearchParams();
-  const queryFilters = useMemo<AccountingBridgeReconciliationFilters>(() => ({
-    financial_year: searchParams.get("financial_year") || undefined,
-    accounting_period: searchParams.get("accounting_period") || undefined,
-    status: searchParams.get("status") || undefined,
-    event_key: searchParams.get("event_key") || undefined,
-    module: searchParams.get("module") || undefined,
-    source_model: searchParams.get("source_model") || undefined,
-  }), [searchParams]);
-
   const [payload, setPayload] = useState<AccountingBridgeReconciliationPayload | null>(null);
-  const [filters, setFilters] = useState<AccountingBridgeReconciliationFilters>(queryFilters);
-  const [draftFilters, setDraftFilters] = useState<AccountingBridgeReconciliationFilters>(queryFilters);
+  const [filters, setFilters] = useState<AccountingBridgeReconciliationFilters>({});
+  const [draftFilters, setDraftFilters] = useState<AccountingBridgeReconciliationFilters>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,10 +112,11 @@ export default function AccountingBridgeReconciliationPage() {
   }
 
   useEffect(() => {
-    setFilters(queryFilters);
-    setDraftFilters(queryFilters);
-    void load(queryFilters);
-  }, [queryFilters]);
+    const initial = filtersFromLocation();
+    setFilters(initial);
+    setDraftFilters(initial);
+    void load(initial);
+  }, []);
 
   const rows = payload?.results ?? [];
   const exceptionRows = rows.filter((row) => row.status === "EXCEPTION" || row.exception_reasons.length > 0 || row.status.startsWith("BLOCKED"));
@@ -162,11 +147,7 @@ export default function AccountingBridgeReconciliationPage() {
   }
 
   if (loading) {
-    return (
-      <PortalPage title="Accounting Bridge Reconciliation" subtitle="Guided accounting remediation across bridge readiness, posting, settlement, and reconciliation.">
-        <LoadingBlock label="Loading bridge reconciliation cockpit..." />
-      </PortalPage>
-    );
+    return <PortalPage title="Accounting Bridge Reconciliation" subtitle="Guided accounting remediation across bridge readiness, posting, settlement, and reconciliation."><LoadingBlock label="Loading bridge reconciliation cockpit..." /></PortalPage>;
   }
 
   return (
@@ -179,17 +160,11 @@ export default function AccountingBridgeReconciliationPage() {
     >
       <div className="space-y-6">
         {error ? <ErrorState title="Unable to load bridge reconciliation" description={error} onRetry={() => void load(filters)} /> : null}
-
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting operations path</div>
-              <h2 className="mt-1 text-xl font-semibold text-foreground">Resolve mapping → preview/post bridge → verify reconciliation → close year</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Read-only readiness remains read-only. Posting is only available through existing controlled bridge run pages; unsupported sources are not postable.</p>
-            </div>
+            <div><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting operations path</div><h2 className="mt-1 text-xl font-semibold text-foreground">Resolve mapping → preview/post bridge → verify reconciliation → close year</h2><p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Read-only readiness remains read-only. Posting is only available through existing controlled bridge run pages; unsupported sources are not postable.</p></div>
             <ActionButton variant="secondary" onClick={() => void load(filters, { silent: true })} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</ActionButton>
           </div>
-
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
             <SummaryCard label="Active FY" value={selectedFinancialYear?.code ? 1 : 0} tone="border-slate-200 bg-slate-50 text-slate-900" />
             <SummaryCard label="Ready unposted" value={Number(summary.unposted_bridge_item_count ?? summary.ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" href={unpostedHref} />
@@ -199,7 +174,6 @@ export default function AccountingBridgeReconciliationPage() {
             <SummaryCard label="Unreconciled" value={Number(summary.unreconciled_money_movement_count ?? 0)} tone="border-amber-200 bg-white text-amber-950" />
             <SummaryCard label="Exceptions" value={Number(summary.reconciliation_exception_count ?? summary.exception_count ?? 0)} tone="border-red-200 bg-red-50 text-red-900" />
           </div>
-
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected FY</div><div className="mt-1 font-semibold text-foreground">{selectedFinancialYear?.code ?? "Not configured"}</div></div>
             <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected period</div><div className="mt-1 font-semibold text-foreground">{selectedPeriod?.code ?? "Not configured"}</div></div>
@@ -232,41 +206,11 @@ export default function AccountingBridgeReconciliationPage() {
         </WorkspaceSection>
 
         <WorkspaceSection title="Blocked / exception rows" description="Actionable blockers, mapping gaps, and reconciliation exceptions.">
-          <div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm">
-            <table className="min-w-full divide-y divide-border text-sm">
-              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3 font-semibold">Event</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Reason</th><th className="px-4 py-3 font-semibold">Recommended action</th></tr></thead>
-              <tbody className="divide-y divide-border">
-                {exceptionRows.length === 0 ? <tr><td className="px-4 py-6 text-sm text-muted-foreground" colSpan={4}>No blocked or exception rows for the current filters.</td></tr> : exceptionRows.map((row) => (
-                  <tr key={rowKey(row)}>
-                    <td className="px-4 py-4"><div className="font-semibold text-foreground">{row.label}</div><div className="font-mono text-xs text-muted-foreground">{row.event_key}</div></td>
-                    <td className="px-4 py-4"><span className={cx("rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(row.status))}>{row.status}</span></td>
-                    <td className="px-4 py-4 text-xs text-red-800">{row.exception_reasons[0] || row.blocker_label || "Review required."}</td>
-                    <td className="px-4 py-4">{rowAction(row)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm"><table className="min-w-full divide-y divide-border text-sm"><thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3 font-semibold">Event</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Reason</th><th className="px-4 py-3 font-semibold">Recommended action</th></tr></thead><tbody className="divide-y divide-border">{exceptionRows.length === 0 ? <tr><td className="px-4 py-6 text-sm text-muted-foreground" colSpan={4}>No blocked or exception rows for the current filters.</td></tr> : exceptionRows.map((row) => <tr key={rowKey(row)}><td className="px-4 py-4"><div className="font-semibold text-foreground">{row.label}</div><div className="font-mono text-xs text-muted-foreground">{row.event_key}</div></td><td className="px-4 py-4"><span className={cx("rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(row.status))}>{row.status}</span></td><td className="px-4 py-4 text-xs text-red-800">{row.exception_reasons[0] || row.blocker_label || "Review required."}</td><td className="px-4 py-4">{rowAction(row)}</td></tr>)}</tbody></table></div>
         </WorkspaceSection>
 
         <WorkspaceSection title="Source event drilldown" description="Operational source coverage. Posting buttons appear only if a real safe endpoint exists for that source.">
-          <div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm">
-            <table className="min-w-full divide-y divide-border text-sm">
-              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3 font-semibold">Event</th><th className="px-4 py-3 font-semibold">Source</th><th className="px-4 py-3 font-semibold">Journal</th><th className="px-4 py-3 font-semibold">Settlement</th><th className="px-4 py-3 font-semibold">Reconciliation</th><th className="px-4 py-3 font-semibold">Admin action</th></tr></thead>
-              <tbody className="divide-y divide-border">
-                {rows.length === 0 ? <tr><td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>No rows for the current filters.</td></tr> : rows.map((row) => (
-                  <tr key={rowKey(row)} className="align-top">
-                    <td className="px-4 py-4"><div className="font-semibold text-foreground">{row.label}</div><div className="font-mono text-xs text-muted-foreground">{row.event_key}</div><span className={cx("mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(row.status))}>{row.status}</span></td>
-                    <td className="px-4 py-4 text-xs text-muted-foreground"><div>{sourceLabel(row)}</div>{row.source_reference ? <div>Ref: {row.source_reference}</div> : null}<div>{row.module}</div></td>
-                    <td className="px-4 py-4 text-xs">{row.journal_entry?.id ? <Link href={`${ROUTES.admin.accountingJournals}/${row.journal_entry.id}`} className="font-semibold text-primary underline underline-offset-4">{row.journal_entry.entry_no || `Journal #${row.journal_entry.id}`}</Link> : <span className="text-muted-foreground">Not posted</span>}{row.journal_entry?.accounting_period_code ? <div className="mt-1 text-muted-foreground">FY {row.journal_entry.financial_year_code ?? "—"} · {row.journal_entry.accounting_period_code} · {row.journal_entry.accounting_period_status ?? "—"}</div> : null}</td>
-                    <td className="px-4 py-4 text-xs">{row.settlement_linked ? "Linked" : "Not linked"}</td>
-                    <td className="px-4 py-4 text-xs">{row.reconciliation_linked ? `${row.reconciliation_items.length} item(s)` : "Not linked"}</td>
-                    <td className="px-4 py-4">{rowAction(row)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm"><table className="min-w-full divide-y divide-border text-sm"><thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3 font-semibold">Event</th><th className="px-4 py-3 font-semibold">Source</th><th className="px-4 py-3 font-semibold">Journal</th><th className="px-4 py-3 font-semibold">Settlement</th><th className="px-4 py-3 font-semibold">Reconciliation</th><th className="px-4 py-3 font-semibold">Admin action</th></tr></thead><tbody className="divide-y divide-border">{rows.length === 0 ? <tr><td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>No rows for the current filters.</td></tr> : rows.map((row) => <tr key={rowKey(row)} className="align-top"><td className="px-4 py-4"><div className="font-semibold text-foreground">{row.label}</div><div className="font-mono text-xs text-muted-foreground">{row.event_key}</div><span className={cx("mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(row.status))}>{row.status}</span></td><td className="px-4 py-4 text-xs text-muted-foreground"><div>{sourceLabel(row)}</div>{row.source_reference ? <div>Ref: {row.source_reference}</div> : null}<div>{row.module}</div></td><td className="px-4 py-4 text-xs">{row.journal_entry?.id ? <Link href={`${ROUTES.admin.accountingJournals}/${row.journal_entry.id}`} className="font-semibold text-primary underline underline-offset-4">{row.journal_entry.entry_no || `Journal #${row.journal_entry.id}`}</Link> : <span className="text-muted-foreground">Not posted</span>}{row.journal_entry?.accounting_period_code ? <div className="mt-1 text-muted-foreground">FY {row.journal_entry.financial_year_code ?? "—"} · {row.journal_entry.accounting_period_code} · {row.journal_entry.accounting_period_status ?? "—"}</div> : null}</td><td className="px-4 py-4 text-xs">{row.settlement_linked ? "Linked" : "Not linked"}</td><td className="px-4 py-4 text-xs">{row.reconciliation_linked ? `${row.reconciliation_items.length} item(s)` : "Not linked"}</td><td className="px-4 py-4">{rowAction(row)}</td></tr>)}</tbody></table></div>
         </WorkspaceSection>
       </div>
     </PortalPage>
