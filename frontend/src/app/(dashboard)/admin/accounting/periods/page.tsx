@@ -5,41 +5,23 @@ import Link from "next/link";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
-import {
-  AccountingNotice,
-  AccountingRefreshButton,
-  accountingDate,
-  accountingErrorMessage,
-  accountingFieldClassName,
-} from "@/components/accounting/shared";
+import { AccountingNotice, AccountingRefreshButton, accountingDate, accountingErrorMessage, accountingFieldClassName } from "@/components/accounting/shared";
 import { AccountingControlShell } from "@/components/layout/page-shells";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import PortalPage from "@/components/ui/PortalPage";
 import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import { generateCurrentAccountingPeriod } from "@/services/accounting-period-actions";
+import { seedSupportedAccountingMappings } from "@/services/accounting-mapping-remediation";
 import type { AccountingPeriod, AccountingPeriodReadiness, AccountingPeriodStatus, FinancialYear, PostingLock } from "@/services/accounting";
-import {
-  activateFinancialYear,
-  closeAccountingPeriod,
-  createFinancialYear,
-  createPostingLock,
-  generateAccountingPeriods,
-  getAccountingPeriodsReadiness,
-  listAccountingPeriods,
-  listFinancialYears,
-  listPostingLocks,
-  lockAccountingPeriod,
-  removePostingLock,
-  reopenAccountingPeriod,
-} from "@/services/accounting";
+import { activateFinancialYear, closeAccountingPeriod, createFinancialYear, createPostingLock, generateAccountingPeriods, getAccountingPeriodsReadiness, listAccountingPeriods, listFinancialYears, listPostingLocks, lockAccountingPeriod, removePostingLock, reopenAccountingPeriod } from "@/services/accounting";
 import YearEndClosePanel from "./YearEndClosePanel";
 
 const STATUS_LABEL: Record<AccountingPeriodStatus, string> = { OPEN: "Open", LOCKED: "Locked", CLOSED: "Closed" };
 
 function statusForPeriod(period: AccountingPeriod): AccountingPeriodStatus {
-  if (period.status) return period.status;
-  return period.is_locked ? "LOCKED" : "OPEN";
+  return period.status || (period.is_locked ? "LOCKED" : "OPEN");
 }
 
 function readinessItems(readiness: AccountingPeriodReadiness | null) {
@@ -59,12 +41,14 @@ export default function AccountingPeriodsPage() {
   const [readiness, setReadiness] = useState<AccountingPeriodReadiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [fyForm, setFyForm] = useState({ code: "", name: "", start_date: "", end_date: "", notes: "" });
   const [lockForm, setLockForm] = useState({ lock_date: new Date().toISOString().slice(0, 10), reason: "" });
 
   const activeFinancialYear = useMemo(() => readiness?.active_financial_year || financialYears.find((year) => year.is_active) || null, [financialYears, readiness]);
+  const currentPeriodMissing = Boolean(readiness?.errors?.some((item) => item.toLowerCase().includes("period") && item.toLowerCase().includes("posting date")) || (readiness && !readiness.current_period));
 
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
@@ -78,46 +62,33 @@ export default function AccountingPeriodsPage() {
       setError(null);
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to load accounting period controls."));
-      if (mode === "initial") {
-        setFinancialYears([]);
-        setPeriods([]);
-        setLocks([]);
-        setReadiness(null);
-      }
+      if (mode === "initial") { setFinancialYears([]); setPeriods([]); setLocks([]); setReadiness(null); }
     } finally {
       if (mode === "initial") setLoading(false);
       else setRefreshing(false);
     }
   }
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, []);
+  useEffect(() => { void loadPage("initial"); }, []);
 
   async function handleCreateFinancialYear(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    try {
-      await createFinancialYear(fyForm);
-      setNotice("Financial year created.");
-      setFyForm({ code: "", name: "", start_date: "", end_date: "", notes: "" });
-      await loadPage("refresh");
-    } catch (err) {
-      setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to create the financial year."));
-    }
+    try { await createFinancialYear(fyForm); setNotice("Financial year created."); setFyForm({ code: "", name: "", start_date: "", end_date: "", notes: "" }); await loadPage("refresh"); } catch (err) { setNotice(null); setError(accountingErrorMessage(err, "Failed to create the financial year.")); }
   }
 
   async function handleCreateLock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    try {
-      await createPostingLock(lockForm);
-      setNotice("Posting lock created.");
-      setLockForm((current) => ({ ...current, reason: "" }));
-      await loadPage("refresh");
-    } catch (err) {
-      setNotice(null);
-      setError(accountingErrorMessage(err, "Failed to create the posting lock."));
-    }
+    try { await createPostingLock(lockForm); setNotice("Posting lock created."); setLockForm((current) => ({ ...current, reason: "" })); await loadPage("refresh"); } catch (err) { setNotice(null); setError(accountingErrorMessage(err, "Failed to create the posting lock.")); }
+  }
+
+  async function handleGenerateCurrentPeriod() {
+    setActionBusy("period");
+    try { const result = await generateCurrentAccountingPeriod(); setNotice(result.detail || "Current accounting period generated or confirmed."); await loadPage("refresh"); } catch (err) { setNotice(null); setError(accountingErrorMessage(err, "Failed to generate current accounting period.")); } finally { setActionBusy(null); }
+  }
+
+  async function handleSeedMappings() {
+    setActionBusy("seed");
+    try { const result = await seedSupportedAccountingMappings(); setNotice(`Supported mappings seeded. Journals created: ${result.journal_entries_created}; document numbers allocated: ${result.document_sequences_allocated}.`); await loadPage("refresh"); } catch (err) { setNotice(null); setError(accountingErrorMessage(err, "Failed to seed supported mappings.")); } finally { setActionBusy(null); }
   }
 
   async function changePeriodStatus(period: AccountingPeriod, status: AccountingPeriodStatus) {
@@ -136,24 +107,7 @@ export default function AccountingPeriodsPage() {
     { key: "start_date", header: "Start", render: (row) => accountingDate(row.start_date) },
     { key: "end_date", header: "End", render: (row) => accountingDate(row.end_date) },
     { key: "status", header: "Status", render: (row) => { const status = statusForPeriod(row); const byline = row.locked_by_username ? ` by ${row.locked_by_username}` : ""; return status === "OPEN" ? "Open" : `${STATUS_LABEL[status]}${byline}`; } },
-    {
-      key: "actions",
-      header: "Actions",
-      render: (row) => {
-        const status = statusForPeriod(row);
-        const bridgeHref = `${ROUTES.admin.accountingBridgeReconciliation}?accounting_period=${row.id}`;
-        const readyHref = `${ROUTES.admin.accountingBridgeReconciliation}?accounting_period=${row.id}&status=READY_UNPOSTED`;
-        return (
-          <div className="flex flex-wrap gap-2">
-            {status !== "OPEN" ? <ConfirmActionButton label="Open" title={`Open ${row.code}?`} description="Opening restores posting into this accounting period. This is audited." onConfirm={() => changePeriodStatus(row, "OPEN")} variant="primary" /> : null}
-            {status !== "LOCKED" ? <ConfirmActionButton label="Lock" title={`Lock ${row.code}?`} description="Locking blocks accounting postings until an admin opens the period." onConfirm={() => changePeriodStatus(row, "LOCKED")} variant="secondary" /> : null}
-            {status !== "CLOSED" ? <ConfirmActionButton label="Close" title={`Close ${row.code}?`} description="Closing blocks accounting postings and marks the period as closed." onConfirm={() => changePeriodStatus(row, "CLOSED")} variant="destructive" /> : null}
-            <Link href={bridgeHref} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground">View reconciliation</Link>
-            <Link href={readyHref} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-900">View bridge items</Link>
-          </div>
-        );
-      },
-    },
+    { key: "actions", header: "Actions", render: (row) => { const status = statusForPeriod(row); const bridgeHref = `${ROUTES.admin.accountingBridgeReconciliation}?accounting_period=${row.id}`; const readyHref = `${ROUTES.admin.accountingBridgeReconciliation}?accounting_period=${row.id}&status=READY_UNPOSTED`; return <div className="flex flex-wrap gap-2">{status !== "OPEN" ? <ConfirmActionButton label="Open" title={`Open ${row.code}?`} description="Opening restores posting into this accounting period. This is audited." onConfirm={() => changePeriodStatus(row, "OPEN")} variant="primary" /> : null}{status !== "LOCKED" ? <ConfirmActionButton label="Lock" title={`Lock ${row.code}?`} description="Locking blocks accounting postings until an admin opens the period." onConfirm={() => changePeriodStatus(row, "LOCKED")} variant="secondary" /> : null}{status !== "CLOSED" ? <ConfirmActionButton label="Close" title={`Close ${row.code}?`} description="Closing blocks accounting postings and marks the period as closed." onConfirm={() => changePeriodStatus(row, "CLOSED")} variant="destructive" /> : null}<Link href={bridgeHref} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground">View reconciliation</Link><Link href={readyHref} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-900">View bridge items</Link></div>; } },
   ];
 
   const fyColumns: EnterpriseColumnDef<FinancialYear>[] = [
@@ -162,16 +116,7 @@ export default function AccountingPeriodsPage() {
     { key: "start_date", header: "Start", render: (row) => accountingDate(row.start_date) },
     { key: "end_date", header: "End", render: (row) => accountingDate(row.end_date) },
     { key: "is_active", header: "Status", render: (row) => (row.is_active ? "Active" : "Inactive") },
-    {
-      key: "actions",
-      header: "Actions",
-      render: (row) => (
-        <div className="flex flex-wrap gap-2">
-          {!row.is_active ? <ConfirmActionButton label="Activate" title={`Activate ${row.code}?`} description="This financial year becomes the source of truth for accounting posting validation." onConfirm={async () => { await activateFinancialYear(row.id); setNotice(`${row.code} activated.`); await loadPage("refresh"); }} variant="primary" /> : null}
-          <ConfirmActionButton label="Generate" title={`Generate monthly periods for ${row.code}?`} description="Only missing compatible monthly accounting periods are created or linked." onConfirm={async () => { const result = await generateAccountingPeriods(row.id); setNotice(`${result.created_count || 0} period(s) created for ${row.code}.`); await loadPage("refresh"); }} variant="secondary" />
-        </div>
-      ),
-    },
+    { key: "actions", header: "Actions", render: (row) => <div className="flex flex-wrap gap-2">{!row.is_active ? <ConfirmActionButton label="Activate" title={`Activate ${row.code}?`} description="This financial year becomes the source of truth for accounting posting validation." onConfirm={async () => { await activateFinancialYear(row.id); setNotice(`${row.code} activated.`); await loadPage("refresh"); }} variant="primary" /> : null}<ConfirmActionButton label="Generate" title={`Generate monthly periods for ${row.code}?`} description="Only missing compatible monthly accounting periods are created or linked." onConfirm={async () => { const result = await generateAccountingPeriods(row.id); setNotice(`${result.created_count || 0} period(s) created for ${row.code}.`); await loadPage("refresh"); }} variant="secondary" /></div> },
   ];
 
   const lockColumns: EnterpriseColumnDef<PostingLock>[] = [
@@ -182,68 +127,8 @@ export default function AccountingPeriodsPage() {
   ];
 
   return (
-    <PortalPage
-      title="Accounting Period Cockpit"
-      subtitle="Control the active financial year, monthly accounting periods, exact-date posting locks, and controlled year-end close."
-      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Periods" }]}
-      actions={[{ href: ROUTES.admin.accountingBooks, label: "Books", variant: "secondary" }, { href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge Reconciliation", variant: "secondary" }]}
-      statusBadge={{ label: "Admin Only", tone: "info" }}
-    >
-      <AccountingControlShell
-        readinessWarnings={
-          <div className="space-y-4">
-            <div className="flex justify-end"><AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} /></div>
-            {notice ? <AccountingNotice message={notice} /> : null}
-            {!loading ? <MetricStrip items={[{ label: "Financial years", value: String(financialYears.length) }, { label: "Periods", value: String(periods.length) }, { label: "Posting locks", value: String(locks.length) }]} /> : null}
-            <WorkspaceSection title="Active Financial Year" description="Posting validation resolves against this year.">
-              {activeFinancialYear ? (
-                <div className="grid gap-3 text-sm md:grid-cols-2">
-                  <div><p className="text-muted-foreground">Code</p><p className="font-medium text-foreground">{activeFinancialYear.code}</p></div>
-                  <div><p className="text-muted-foreground">Current period</p><p className="font-medium text-foreground">{readiness?.current_period?.code || "No current period"}</p></div>
-                  <div><p className="text-muted-foreground">Start</p><p className="font-medium text-foreground">{accountingDate(activeFinancialYear.start_date)}</p></div>
-                  <div><p className="text-muted-foreground">End</p><p className="font-medium text-foreground">{accountingDate(activeFinancialYear.end_date)}</p></div>
-                </div>
-              ) : <p className="text-sm text-muted-foreground">No active financial year is configured.</p>}
-            </WorkspaceSection>
-            <WorkspaceSection title="Readiness" description="These controls determine whether accounting posting can proceed today.">
-              <div className="grid gap-2">
-                {readinessItems(readiness).map((item) => <div key={item.label} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2 text-sm"><span className="font-medium text-foreground">{item.label}</span><span className={item.ok ? "text-emerald-700" : "text-destructive"}>{item.detail}</span></div>)}
-                {readiness?.errors.map((item) => <p key={item} className="text-sm text-destructive">{item}</p>)}
-                {readiness?.warnings.map((item) => <p key={item} className="text-sm text-amber-700">{item}</p>)}
-              </div>
-            </WorkspaceSection>
-            <YearEndClosePanel financialYears={financialYears} activeFinancialYear={activeFinancialYear} onChanged={() => loadPage("refresh")} />
-          </div>
-        }
-        primaryRegister={
-          <div className="space-y-6">
-            <EnterpriseDataTable data={periods} columns={periodColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No accounting periods configured" emptyDescription="Create a financial year and generate monthly periods before accounting posting can proceed." />
-            <WorkspaceSection title="Posting Locks" description="Exact-date locks remain available as a secondary posting control."><EnterpriseDataTable data={locks} columns={lockColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No posting locks configured" emptyDescription="Create exact-date posting locks for sensitive close dates or controlled correction windows." /></WorkspaceSection>
-          </div>
-        }
-        controlPanel={
-          <div className="space-y-4">
-            <WorkspaceSection title="Create Financial Year" description="Financial years are inactive until an admin activates one.">
-              <form className="grid gap-3" onSubmit={handleCreateFinancialYear}>
-                <label className="text-sm text-muted-foreground">Code<input className={accountingFieldClassName()} value={fyForm.code} onChange={(event) => setFyForm((current) => ({ ...current, code: event.target.value }))} required /></label>
-                <label className="text-sm text-muted-foreground">Name<input className={accountingFieldClassName()} value={fyForm.name} onChange={(event) => setFyForm((current) => ({ ...current, name: event.target.value }))} required /></label>
-                <label className="text-sm text-muted-foreground">Start date<input type="date" className={accountingFieldClassName()} value={fyForm.start_date} onChange={(event) => setFyForm((current) => ({ ...current, start_date: event.target.value }))} required /></label>
-                <label className="text-sm text-muted-foreground">End date<input type="date" className={accountingFieldClassName()} value={fyForm.end_date} onChange={(event) => setFyForm((current) => ({ ...current, end_date: event.target.value }))} required /></label>
-                <label className="text-sm text-muted-foreground">Notes<textarea className={accountingFieldClassName()} value={fyForm.notes} onChange={(event) => setFyForm((current) => ({ ...current, notes: event.target.value }))} /></label>
-                <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90">Create Financial Year</button>
-              </form>
-            </WorkspaceSection>
-            <WorkspaceSection title="Financial Years" description="Activate one financial year and generate monthly periods."><EnterpriseDataTable data={financialYears} columns={fyColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No financial years configured" emptyDescription="Create a financial year before generating periods." /></WorkspaceSection>
-            <WorkspaceSection title="Create Posting Lock" description="Exact-date locks block posting for one specific date.">
-              <form className="grid gap-3" onSubmit={handleCreateLock}>
-                <label className="text-sm text-muted-foreground">Lock date<input type="date" className={accountingFieldClassName()} value={lockForm.lock_date} onChange={(event) => setLockForm((current) => ({ ...current, lock_date: event.target.value }))} required /></label>
-                <label className="text-sm text-muted-foreground">Reason<textarea className={accountingFieldClassName()} value={lockForm.reason} onChange={(event) => setLockForm((current) => ({ ...current, reason: event.target.value }))} /></label>
-                <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90">Create Lock</button>
-              </form>
-            </WorkspaceSection>
-          </div>
-        }
-      />
+    <PortalPage title="Accounting Period Cockpit" subtitle="Control the active financial year, monthly accounting periods, exact-date posting locks, and controlled year-end close." breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Periods" }]} actions={[{ href: ROUTES.admin.accountingBooks, label: "Books", variant: "secondary" }, { href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge Reconciliation", variant: "secondary" }]} statusBadge={{ label: "Admin Only", tone: "info" }}>
+      <AccountingControlShell readinessWarnings={<div className="space-y-4"><div className="flex flex-wrap justify-end gap-2"><button type="button" disabled={Boolean(actionBusy)} onClick={() => void handleSeedMappings()} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{actionBusy === "seed" ? "Seeding..." : "Seed supported mappings"}</button>{currentPeriodMissing ? <button type="button" disabled={Boolean(actionBusy)} onClick={() => void handleGenerateCurrentPeriod()} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{actionBusy === "period" ? "Generating..." : "Generate missing current period"}</button> : null}<Link href={`${ROUTES.admin.accountingBridgeReconciliation}?status=READY_UNPOSTED`} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review unposted bridge items</Link><AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} /></div>{notice ? <AccountingNotice message={notice} /> : null}{!loading ? <MetricStrip items={[{ label: "Financial years", value: String(financialYears.length) }, { label: "Periods", value: String(periods.length) }, { label: "Posting locks", value: String(locks.length) }]} /> : null}<WorkspaceSection title="Active Financial Year" description="Posting validation resolves against this year.">{activeFinancialYear ? <div className="grid gap-3 text-sm md:grid-cols-2"><div><p className="text-muted-foreground">Code</p><p className="font-medium text-foreground">{activeFinancialYear.code}</p></div><div><p className="text-muted-foreground">Current period</p><p className="font-medium text-foreground">{readiness?.current_period?.code || "No current period"}</p></div><div><p className="text-muted-foreground">Start</p><p className="font-medium text-foreground">{accountingDate(activeFinancialYear.start_date)}</p></div><div><p className="text-muted-foreground">End</p><p className="font-medium text-foreground">{accountingDate(activeFinancialYear.end_date)}</p></div></div> : <p className="text-sm text-muted-foreground">No active financial year is configured.</p>}</WorkspaceSection><WorkspaceSection title="Remediation checklist" description="Close year remains blocked until real blockers are resolved."><div className="grid gap-2">{readinessItems(readiness).map((item) => <div key={item.label} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2 text-sm"><span className="font-medium text-foreground">{item.label}</span><span className={item.ok ? "text-emerald-700" : "text-destructive"}>{item.detail}</span></div>)}{readiness?.errors.map((item) => <p key={item} className="text-sm text-destructive">{item}</p>)}{readiness?.warnings.map((item) => <p key={item} className="text-sm text-amber-700">{item}</p>)}<div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">Cannot close because open periods and unposted bridge items remain until readiness is clean.</div></div></WorkspaceSection><YearEndClosePanel financialYears={financialYears} activeFinancialYear={activeFinancialYear} onChanged={() => loadPage("refresh")} /></div>} primaryRegister={<div className="space-y-6"><EnterpriseDataTable data={periods} columns={periodColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No accounting periods configured" emptyDescription="Create a financial year and generate monthly periods before accounting posting can proceed." /><WorkspaceSection title="Posting Locks" description="Exact-date locks remain available as a secondary posting control."><EnterpriseDataTable data={locks} columns={lockColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No posting locks configured" emptyDescription="Create exact-date posting locks for sensitive close dates or controlled correction windows." /></WorkspaceSection></div>} controlPanel={<div className="space-y-4"><WorkspaceSection title="Create Financial Year" description="Financial years are inactive until an admin activates one."><form className="grid gap-3" onSubmit={handleCreateFinancialYear}><label className="text-sm text-muted-foreground">Code<input className={accountingFieldClassName()} value={fyForm.code} onChange={(event) => setFyForm((current) => ({ ...current, code: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Name<input className={accountingFieldClassName()} value={fyForm.name} onChange={(event) => setFyForm((current) => ({ ...current, name: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Start date<input type="date" className={accountingFieldClassName()} value={fyForm.start_date} onChange={(event) => setFyForm((current) => ({ ...current, start_date: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">End date<input type="date" className={accountingFieldClassName()} value={fyForm.end_date} onChange={(event) => setFyForm((current) => ({ ...current, end_date: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Notes<textarea className={accountingFieldClassName()} value={fyForm.notes} onChange={(event) => setFyForm((current) => ({ ...current, notes: event.target.value }))} /></label><button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90">Create Financial Year</button></form></WorkspaceSection><WorkspaceSection title="Financial Years" description="Activate one financial year and generate monthly periods."><EnterpriseDataTable data={financialYears} columns={fyColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No financial years configured" emptyDescription="Create a financial year before generating periods." /></WorkspaceSection><WorkspaceSection title="Create Posting Lock" description="Exact-date locks block posting for one specific date."><form className="grid gap-3" onSubmit={handleCreateLock}><label className="text-sm text-muted-foreground">Lock date<input type="date" className={accountingFieldClassName()} value={lockForm.lock_date} onChange={(event) => setLockForm((current) => ({ ...current, lock_date: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Reason<textarea className={accountingFieldClassName()} value={lockForm.reason} onChange={(event) => setLockForm((current) => ({ ...current, reason: event.target.value }))} /></label><button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90">Create Lock</button></form></WorkspaceSection></div>} />
     </PortalPage>
   );
 }
