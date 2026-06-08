@@ -11,9 +11,15 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   getAccountingBridgeReconciliation,
+  postBridgeCandidate,
+  postBridgeCandidateBatch,
+  previewBridgeCandidate,
+  previewBridgeCandidateBatch,
+  verifyBridgeReconciliationItem,
   type AccountingBridgeReconciliationFilters,
   type AccountingBridgeReconciliationPayload,
   type AccountingBridgeReconciliationRow,
+  type BridgePostingPreview,
 } from "@/services/accounting-bridge-reconciliation";
 import {
   applyAccountingMappingRemediation,
@@ -84,6 +90,9 @@ export default function AccountingBridgeReconciliationPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
+  const [preview, setPreview] = useState<BridgePostingPreview | null>(null);
+  const [postingNote, setPostingNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -117,6 +126,7 @@ export default function AccountingBridgeReconciliationPage() {
   }, [remediation]);
 
   const rows = payload?.results ?? [];
+  const candidateRows = rows.filter((row) => row.row_type === "bridge_candidate" && row.bridge_candidate_id);
   const exceptionRows = rows.filter((row) => row.status === "EXCEPTION" || row.exception_reasons.length > 0 || row.status.startsWith("BLOCKED") || row.status === "UNSUPPORTED_SOURCE");
   const selectedFinancialYear = payload?.selected_financial_year ?? payload?.accounting_period_readiness?.active_financial_year ?? payload?.financial_year_readiness?.active_financial_year ?? null;
   const selectedPeriod = payload?.selected_accounting_period ?? payload?.accounting_period_readiness?.current_period ?? payload?.financial_year_readiness?.current_period ?? null;
@@ -124,6 +134,8 @@ export default function AccountingBridgeReconciliationPage() {
   const availableFinancialYears = payload?.available_financial_years ?? [];
   const availablePeriods = payload?.available_accounting_periods ?? [];
   const summary = payload?.summary ?? { source_count: 0, ready_unposted_count: 0, blocked_count: 0, posted_count: 0, settled_count: 0, reconciled_count: 0, exception_count: 0 };
+  const selectedCandidateRows = candidateRows.filter((row) => row.bridge_candidate_id && selectedCandidateIds.includes(row.bridge_candidate_id));
+  const selectedAllPostable = selectedCandidateRows.length > 0 && selectedCandidateRows.every(isConcretePostableCandidate);
 
   function statusHref(status: string) {
     return `${ROUTES.admin.accountingBridgeReconciliation}?${new URLSearchParams({ ...(selectedFinancialYear?.id ? { financial_year: String(selectedFinancialYear.id) } : {}), status }).toString()}`;
@@ -142,6 +154,90 @@ export default function AccountingBridgeReconciliationPage() {
     setDraftFilters({});
     setFilters({});
     void load({});
+  }
+
+  function isConcretePostableCandidate(row: AccountingBridgeReconciliationRow): boolean {
+    return row.row_type === "bridge_candidate" && Boolean(row.bridge_candidate_id && row.idempotency_key && row.can_post && row.status === "READY_UNPOSTED");
+  }
+
+  function toggleCandidate(candidateId: string, checked: boolean) {
+    setSelectedCandidateIds((current) => checked ? Array.from(new Set([...current, candidateId])) : current.filter((id) => id !== candidateId));
+  }
+
+  async function handlePreviewCandidate(candidateId: string) {
+    setActionBusy(`preview:${candidateId}`);
+    setError(null);
+    try {
+      setPreview(await previewBridgeCandidate(candidateId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to preview bridge candidate.");
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handlePostCandidate(candidateId: string, idempotencyKey?: string | null) {
+    if (!idempotencyKey) return;
+    setActionBusy(`post:${candidateId}`);
+    setError(null);
+    try {
+      const result = await postBridgeCandidate(candidateId, { idempotency_key: idempotencyKey, confirm: true, posting_note: postingNote });
+      setNotice(result.posted ? "Bridge journal posted. Reconciliation remains pending until checks and verification complete." : "Candidate was already posted with the same idempotency key.");
+      setPreview(null);
+      setSelectedCandidateIds((current) => current.filter((id) => id !== candidateId));
+      await load(filters, { silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to post bridge candidate.");
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleBatchPreview() {
+    if (selectedCandidateIds.length === 0) return;
+    setActionBusy("batch-preview");
+    setError(null);
+    try {
+      const result = await previewBridgeCandidateBatch(selectedCandidateIds);
+      setNotice(`Batch preview: ${result.postable_count} postable, ${result.blocked_count} blocked, total debit ${result.total_debit}, total credit ${result.total_credit}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to preview selected candidates.");
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleBatchPost() {
+    const selectedRows = candidateRows.filter((row) => row.bridge_candidate_id && selectedCandidateIds.includes(row.bridge_candidate_id));
+    if (selectedRows.length === 0 || !selectedRows.every(isConcretePostableCandidate)) return;
+    setActionBusy("batch-post");
+    setError(null);
+    try {
+      const idempotencyKeys = Object.fromEntries(selectedRows.map((row) => [row.bridge_candidate_id as string, row.idempotency_key as string]));
+      const result = await postBridgeCandidateBatch({ candidate_ids: selectedCandidateIds, idempotency_keys: idempotencyKeys, confirm: true, posting_note: postingNote });
+      setNotice(`Batch post complete: ${result.posted_count} posted, ${result.skipped_already_posted_count} already posted, ${result.blocked_count} blocked.`);
+      setSelectedCandidateIds([]);
+      await load(filters, { silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to post selected candidates.");
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleVerify(row: AccountingBridgeReconciliationRow) {
+    if (!row.existing_reconciliation_item_id) return;
+    setActionBusy(`verify:${row.existing_reconciliation_item_id}`);
+    setError(null);
+    try {
+      await verifyBridgeReconciliationItem(row.existing_reconciliation_item_id, { note: "Verified from bridge reconciliation cockpit." });
+      setNotice("Bridge reconciliation item verified.");
+      await load(filters, { silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to verify reconciliation item.");
+    } finally {
+      setActionBusy(null);
+    }
   }
 
   async function handleSeedDefaults() {
@@ -187,13 +283,17 @@ export default function AccountingBridgeReconciliationPage() {
   }
 
   function rowAction(row: AccountingBridgeReconciliationRow) {
+    if (row.row_type === "bridge_candidate") {
+      const candidateId = row.bridge_candidate_id || row.id;
+      const canPost = isConcretePostableCandidate(row);
+      return <div className="flex flex-col gap-2 text-xs"><button type="button" disabled={!candidateId || actionBusy === `preview:${candidateId}`} onClick={() => candidateId ? void handlePreviewCandidate(candidateId) : undefined} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left font-semibold text-blue-900">{actionBusy === `preview:${candidateId}` ? "Previewing..." : "Preview"}</button>{canPost ? <button type="button" disabled={actionBusy === `post:${candidateId}`} onClick={() => candidateId ? void handlePostCandidate(candidateId, row.idempotency_key) : undefined} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left font-semibold text-emerald-900">{actionBusy === `post:${candidateId}` ? "Posting..." : "Post"}</button> : <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">Post disabled: {row.blocker_reason || row.status}</span>}{row.journal_entry?.id ? <Link href={`${ROUTES.admin.accountingJournals}/${row.journal_entry.id}`} className="font-semibold text-primary underline underline-offset-4">View journal</Link> : null}{row.status === "POSTED" && row.existing_reconciliation_item_id ? <button type="button" disabled={actionBusy === `verify:${row.existing_reconciliation_item_id}`} onClick={() => void handleVerify(row)} className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-left font-semibold text-emerald-900">Verify</button> : null}</div>;
+    }
+    if ((row.status === "POSTABLE" || row.status === "READY_UNPOSTED") && row.row_type !== "bridge_candidate") {
+      return <div className="flex flex-col gap-2 text-xs"><Link href={`${ROUTES.admin.accountingBridgeReconciliation}?event_key=${encodeURIComponent(row.event_key)}&source_model=${encodeURIComponent(row.source_model || "")}`} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-900">View source items</Link><span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">Posting requires a concrete source item. Abstract event rows cannot be posted.</span></div>;
+    }
     const current = remediationByEvent.get(row.event_key);
     if (row.status === "UNSUPPORTED_SOURCE" || row.event_key === "staff_advance" || current?.status === "UNSUPPORTED_SOURCE") {
       return <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"><div className="font-semibold">Unsupported source</div><div>StaffAdvance workflow not enabled. No Post button is available.</div><Link href={MAPPING_AUDIT_HREF} className="mt-2 inline-flex underline underline-offset-4">Open mapping audit</Link></div>;
-    }
-    if (row.status === "POSTABLE" || row.status === "READY_UNPOSTED") {
-      const canPost = Boolean(row.post_action_href && row.can_post && row.period_status === "OPEN");
-      return <div className="flex flex-col gap-2 text-xs"><Link href={row.preview_action_href || ROUTES.admin.accountingBridges} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-900">Preview</Link>{canPost ? <Link href={row.post_action_href || ROUTES.admin.accountingBridges} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold text-emerald-900">Post</Link> : <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">Post disabled: {row.blocker_reason || row.recommended_action || "controlled posting gate is not ready."}</span>}{row.source_action_href ? <Link href={row.source_action_href} className="underline underline-offset-4">Open source</Link> : null}</div>;
     }
     if (row.status === "BLOCKED_BY_PERIOD") return <div className="flex flex-col gap-2 text-xs"><span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">{row.period_blocker_reason || row.blocker_reason || "Locked, closed, missing, outside-FY, or posting-lock period blocker."}</span><Link href={ROUTES.admin.accountingPeriods} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 font-semibold text-amber-950">Open accounting periods</Link></div>;
     if (row.status === "BLOCKED_BY_NUMBERING") return <Link href={DOCUMENT_NUMBERING_HREF} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950">Open document numbering</Link>;
@@ -220,11 +320,24 @@ export default function AccountingBridgeReconciliationPage() {
 
         <WorkspaceSection title="Filters" description="Filter the operational projection by FY, period, canonical status, event, module, or source."><div className="grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm md:grid-cols-3 xl:grid-cols-6"><select className="rounded-xl border border-border bg-background px-3 py-2 text-sm" value={draftFilters.financial_year ?? ""} onChange={(event) => setDraft("financial_year", event.target.value)}><option value="">Active financial year</option>{availableFinancialYears.map((row) => <option key={row.id ?? row.code} value={String(row.id ?? row.code ?? "")}>{row.code} {row.is_active ? "(active)" : ""}</option>)}</select><select className="rounded-xl border border-border bg-background px-3 py-2 text-sm" value={draftFilters.accounting_period ?? ""} onChange={(event) => setDraft("accounting_period", event.target.value)}><option value="">Current/open period</option>{availablePeriods.map((row) => <option key={row.id ?? row.code} value={String(row.id ?? row.code ?? "")}>{row.code} · {row.status}</option>)}</select><input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Module" value={draftFilters.module ?? ""} onChange={(event) => setDraft("module", event.target.value)} /><input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Event key" value={draftFilters.event_key ?? ""} onChange={(event) => setDraft("event_key", event.target.value)} /><input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Source model" value={draftFilters.source_model ?? ""} onChange={(event) => setDraft("source_model", event.target.value)} /><select className="rounded-xl border border-border bg-background px-3 py-2 text-sm" value={draftFilters.status ?? ""} onChange={(event) => setDraft("status", event.target.value)}>{STATUS_OPTIONS.map((option) => <option key={option || "all"} value={option}>{option || "All statuses"}</option>)}</select><div className="flex gap-2 xl:col-span-3"><ActionButton variant="primary" onClick={applyFilters}>Apply</ActionButton><ActionButton variant="secondary" onClick={clearFilters}>Clear</ActionButton></div></div></WorkspaceSection>
 
+        <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div><div className="font-semibold">{selectedCandidateIds.length} selected source item(s)</div><div className="text-xs">Posting creates accounting journal entries. It does not edit original source records.</div></div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input className="min-w-64 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs" placeholder="Optional posting note" value={postingNote} onChange={(event) => setPostingNote(event.target.value)} />
+              <ActionButton variant="secondary" onClick={() => void handleBatchPreview()} disabled={selectedCandidateIds.length === 0 || actionBusy === "batch-preview"}>{actionBusy === "batch-preview" ? "Previewing..." : "Preview selected"}</ActionButton>
+              <ActionButton variant="primary" onClick={() => void handleBatchPost()} disabled={!selectedAllPostable || actionBusy === "batch-post"}>{actionBusy === "batch-post" ? "Posting..." : "Post selected"}</ActionButton>
+            </div>
+          </div>
+        </section>
+
         <WorkspaceSection title="Mapping remediation" description="Supported blockers can create/map accounts or seed safe defaults. StaffAdvance remains non-postable."><div className="grid gap-3 md:grid-cols-3">{(remediation?.rows ?? []).map((row) => <div key={row.event_type} className="rounded-2xl border border-border bg-card p-4 text-sm shadow-sm"><div className="flex items-start justify-between gap-2"><div><div className="font-semibold text-foreground">{row.required_account_name || row.event_type}</div><div className="font-mono text-xs text-muted-foreground">{row.event_type}</div></div><span className={cx("rounded-full border px-2 py-1 text-xs font-semibold", statusClass(row.status))}>{row.status}</span></div><p className="mt-2 text-xs text-muted-foreground">{row.reason}</p><div className="mt-3 flex flex-wrap gap-2">{row.can_auto_create_account ? <button type="button" onClick={() => void handleCreateAccount(row.event_type)} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950">Create Account</button> : null}{row.can_map_account ? <button type="button" onClick={() => void handleApplyMapping(row.event_type, row.existing_account_id)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900">Apply Mapping</button> : null}<Link href={row.action_href || MAPPING_AUDIT_HREF} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground">Open Setup</Link>{!row.is_supported ? <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">Unsupported Source</span> : null}</div></div>)}</div></WorkspaceSection>
 
         <WorkspaceSection title="Blocked / exception rows" description="Grouped remediation covers missing JournalEntry numbering, locked/closed/missing periods, unsupported sources, approval gates, explicit bridge posting, and reconciliation verification."><div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm"><table className="min-w-full divide-y divide-border text-sm"><thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3 font-semibold">Event</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Reason</th><th className="px-4 py-3 font-semibold">Recommended action</th></tr></thead><tbody className="divide-y divide-border">{exceptionRows.length === 0 ? <tr><td className="px-4 py-6 text-sm text-muted-foreground" colSpan={4}>No blocked or exception rows for the current filters.</td></tr> : exceptionRows.map((row) => <tr key={rowKey(row)}><td className="px-4 py-4"><div className="font-semibold text-foreground">{row.label}</div><div className="font-mono text-xs text-muted-foreground">{row.event_key}</div></td><td className="px-4 py-4"><span className={cx("rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(row.status))}>{row.status}</span><div className="mt-1 font-mono text-[11px] text-muted-foreground">{row.period_blocker_code || row.blocker_code}</div></td><td className="px-4 py-4 text-xs text-red-800">{row.period_blocker_reason || row.blocker_reason || row.exception_reasons[0] || remediationByEvent.get(row.event_key)?.reason || "Review required."}</td><td className="px-4 py-4">{rowAction(row)}</td></tr>)}</tbody></table></div></WorkspaceSection>
 
-        <WorkspaceSection title="Source event drilldown" description="Post is enabled only when can_post is true and the controlled posting target exists."><div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm"><table className="min-w-full divide-y divide-border text-sm"><thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3 font-semibold">Event</th><th className="px-4 py-3 font-semibold">Source</th><th className="px-4 py-3 font-semibold">Journal</th><th className="px-4 py-3 font-semibold">Settlement</th><th className="px-4 py-3 font-semibold">Reconciliation</th><th className="px-4 py-3 font-semibold">Admin action</th></tr></thead><tbody className="divide-y divide-border">{rows.length === 0 ? <tr><td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>No rows for the current filters.</td></tr> : rows.map((row) => <tr key={rowKey(row)} className="align-top"><td className="px-4 py-4"><div className="font-semibold text-foreground">{row.label}</div><div className="font-mono text-xs text-muted-foreground">{row.event_key}</div><span className={cx("mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(row.status))}>{row.status}</span></td><td className="px-4 py-4 text-xs text-muted-foreground"><div>{sourceLabel(row)}</div>{row.source_reference ? <div>Ref: {row.source_reference}</div> : null}<div>{row.module}</div></td><td className="px-4 py-4 text-xs">{row.journal_entry?.id ? <Link href={`${ROUTES.admin.accountingJournals}/${row.journal_entry.id}`} className="font-semibold text-primary underline underline-offset-4">{row.journal_entry.entry_no || `Journal #${row.journal_entry.id}`}</Link> : <span className="text-muted-foreground">Not posted</span>}</td><td className="px-4 py-4 text-xs">{row.settlement_linked ? "Linked" : "Not linked"}</td><td className="px-4 py-4 text-xs">{row.reconciliation_linked ? `${row.reconciliation_items.length} item(s)` : "Not linked"}</td><td className="px-4 py-4">{rowAction(row)}</td></tr>)}</tbody></table></div></WorkspaceSection>
+        <WorkspaceSection title="Source event drilldown" description="Post is enabled only when can_post is true and the controlled posting target exists."><div className="overflow-x-auto rounded-2xl border border-border bg-background shadow-sm"><table className="min-w-full divide-y divide-border text-sm"><thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3 font-semibold">Select</th><th className="px-4 py-3 font-semibold">Event</th><th className="px-4 py-3 font-semibold">Source</th><th className="px-4 py-3 font-semibold">Amount</th><th className="px-4 py-3 font-semibold">Journal</th><th className="px-4 py-3 font-semibold">Settlement</th><th className="px-4 py-3 font-semibold">Reconciliation</th><th className="px-4 py-3 font-semibold">Admin action</th></tr></thead><tbody className="divide-y divide-border">{rows.length === 0 ? <tr><td className="px-4 py-6 text-sm text-muted-foreground" colSpan={8}>No rows for the current filters.</td></tr> : rows.map((row) => { const candidateId = row.bridge_candidate_id || row.id || ""; return <tr key={rowKey(row)} className="align-top"><td className="px-4 py-4"><input type="checkbox" className="h-4 w-4" disabled={!isConcretePostableCandidate(row)} checked={Boolean(candidateId && selectedCandidateIds.includes(candidateId))} onChange={(event) => toggleCandidate(candidateId, event.target.checked)} aria-label={`Select ${row.source_reference || row.event_key}`} /></td><td className="px-4 py-4"><div className="font-semibold text-foreground">{row.label}</div><div className="font-mono text-xs text-muted-foreground">{row.event_key}</div><span className={cx("mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(row.status))}>{row.status}</span></td><td className="px-4 py-4 text-xs text-muted-foreground"><div>{row.source_display || sourceLabel(row)}</div>{row.source_reference ? <div>Ref: {row.source_reference}</div> : null}{row.source_date ? <div>Date: {row.source_date}</div> : null}<div>{row.module}</div></td><td className="px-4 py-4 text-xs font-semibold">{row.amount ?? "-"}</td><td className="px-4 py-4 text-xs">{row.journal_entry?.id ? <Link href={`${ROUTES.admin.accountingJournals}/${row.journal_entry.id}`} className="font-semibold text-primary underline underline-offset-4">{row.journal_entry.entry_no || `Journal #${row.journal_entry.id}`}</Link> : <span className="text-muted-foreground">Not posted</span>}</td><td className="px-4 py-4 text-xs">{row.settlement_linked ? "Linked" : "Not linked"}</td><td className="px-4 py-4 text-xs">{row.reconciliation_linked ? `${row.reconciliation_items.length} item(s)` : "Not linked"}</td><td className="px-4 py-4">{rowAction(row)}</td></tr>; })}</tbody></table></div></WorkspaceSection>
+
+        {preview ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-background p-5 shadow-xl"><div className="flex items-start justify-between gap-4"><div><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posting preview</div><h3 className="mt-1 text-lg font-semibold text-foreground">{preview.source.display}</h3><p className="mt-1 text-xs text-muted-foreground">{preview.safety_text}</p></div><button type="button" onClick={() => setPreview(null)} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold">Close</button></div><div className="mt-4 grid gap-3 md:grid-cols-3"><div className="rounded-xl border border-border p-3 text-sm"><div className="text-xs text-muted-foreground">Journal date</div><div className="font-semibold">{preview.journal_date}</div></div><div className="rounded-xl border border-border p-3 text-sm"><div className="text-xs text-muted-foreground">Number preview</div><div className="font-semibold">{preview.journal_number_preview ?? "Blocked"}</div></div><div className="rounded-xl border border-border p-3 text-sm"><div className="text-xs text-muted-foreground">Balanced</div><div className="font-semibold">{preview.is_balanced ? "Yes" : "No"}</div></div></div><div className="mt-4 grid gap-4 md:grid-cols-2"><div><div className="mb-2 text-sm font-semibold">Debit lines</div>{preview.debit_lines.map((line, index) => <div key={`debit-${index}`} className="rounded-lg border border-border px-3 py-2 text-sm"><div className="font-semibold">{line.chart_account?.code} {line.chart_account?.name}</div><div className="text-xs text-muted-foreground">{line.description}</div><div>{line.debit_amount}</div></div>)}</div><div><div className="mb-2 text-sm font-semibold">Credit lines</div>{preview.credit_lines.map((line, index) => <div key={`credit-${index}`} className="rounded-lg border border-border px-3 py-2 text-sm"><div className="font-semibold">{line.chart_account?.code} {line.chart_account?.name}</div><div className="text-xs text-muted-foreground">{line.description}</div><div>{line.credit_amount}</div></div>)}</div></div>{preview.blockers.length ? <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">{preview.blockers.join(" ")}</div> : null}<div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><div className="text-sm font-semibold">Debit {preview.total_debit} · Credit {preview.total_credit}</div><ActionButton variant="primary" onClick={() => void handlePostCandidate(preview.candidate_id, preview.idempotency_key)} disabled={!preview.can_post || actionBusy === `post:${preview.candidate_id}`}>{actionBusy === `post:${preview.candidate_id}` ? "Posting..." : "Post after confirmation"}</ActionButton></div></div></div> : null}
       </div>
     </PortalPage>
   );

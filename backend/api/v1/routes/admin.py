@@ -173,6 +173,7 @@ from api.v1.views.admin_reconciliation_control_tower import (
     AdminReconciliationItemResolveView,
     AdminReconciliationModulesView,
     AdminReconciliationRunDetailView,
+    AdminReconciliationRunChecksView,
     AdminReconciliationRunListCreateView,
 )
 from api.v1.views.phase4_finance import (
@@ -696,6 +697,7 @@ urlpatterns = [
     path("finance-transfers/", AdminFinanceTransferView.as_view()),
     path("reconciliation/overview/", AdminReconciliationOverviewView.as_view()),
     path("reconciliation/modules/", AdminReconciliationModulesView.as_view()),
+    path("reconciliation/runs/run-checks/", AdminReconciliationRunChecksView.as_view()),
     path("reconciliation/runs/", AdminReconciliationRunListCreateView.as_view()),
     path("reconciliation/runs/<int:pk>/", AdminReconciliationRunDetailView.as_view()),
     path("reconciliation/items/", AdminReconciliationItemListView.as_view()),

@@ -2,7 +2,14 @@ from django.urls import path, include
 
 from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
 from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
-from api.v1.views.accounting_bridge_reconciliation import AccountingBridgeReconciliationView
+from api.v1.views.accounting_bridge_reconciliation import (
+    AccountingBridgeBatchPostView,
+    AccountingBridgeBatchPreviewView,
+    AccountingBridgeCandidatePostView,
+    AccountingBridgeCandidatePreviewView,
+    AccountingBridgeReconciliationItemVerifyView,
+    AccountingBridgeReconciliationView,
+)
 from api.v1.views.accounting_mapping_audit import (
     AccountingMappingAuditFixEventView,
     AccountingMappingAuditSeedDefaultsView,
@@ -36,6 +43,12 @@ urlpatterns = [
     path("admin/accounting/mapping-remediation/apply/", AccountingMappingRemediationApplyView.as_view()),
     path("admin/accounting/mapping-remediation/seed-supported-defaults/", AccountingMappingRemediationSeedSupportedDefaultsView.as_view()),
     path("admin/accounting/mapping-remediation/acknowledge/", AccountingMappingRemediationAcknowledgeView.as_view()),
+    path("admin/accounting/bridge-reconciliation/", AccountingBridgeReconciliationView.as_view()),
+    path("admin/accounting/bridge-reconciliation/candidates/<str:candidate_id>/preview/", AccountingBridgeCandidatePreviewView.as_view()),
+    path("admin/accounting/bridge-reconciliation/candidates/<str:candidate_id>/post/", AccountingBridgeCandidatePostView.as_view()),
+    path("admin/accounting/bridge-reconciliation/batch-preview/", AccountingBridgeBatchPreviewView.as_view()),
+    path("admin/accounting/bridge-reconciliation/batch-post/", AccountingBridgeBatchPostView.as_view()),
+    path("admin/accounting/bridge-reconciliation/items/<int:pk>/verify/", AccountingBridgeReconciliationItemVerifyView.as_view()),
     path("admin/accounting/year-end/readiness/", AccountingYearEndReadinessView.as_view()),
     path("admin/accounting/year-end/close/", AccountingYearEndCloseView.as_view()),
     path("admin/", include("api.v1.routes.admin_accounting_bridge_readiness")),
@@ -47,6 +60,11 @@ urlpatterns = [
     path("admin/", include("api.v1.routes.collection_control_center")),
     path("branch-control/", include("api.v1.routes.branch_control")),
     path("accounting/bridge-reconciliation/", AccountingBridgeReconciliationView.as_view()),
+    path("accounting/bridge-reconciliation/candidates/<str:candidate_id>/preview/", AccountingBridgeCandidatePreviewView.as_view()),
+    path("accounting/bridge-reconciliation/candidates/<str:candidate_id>/post/", AccountingBridgeCandidatePostView.as_view()),
+    path("accounting/bridge-reconciliation/batch-preview/", AccountingBridgeBatchPreviewView.as_view()),
+    path("accounting/bridge-reconciliation/batch-post/", AccountingBridgeBatchPostView.as_view()),
+    path("accounting/bridge-reconciliation/items/<int:pk>/verify/", AccountingBridgeReconciliationItemVerifyView.as_view()),
     path("accounting/year-end/readiness/", AccountingYearEndReadinessView.as_view()),
     path("accounting/year-end/close/", AccountingYearEndCloseView.as_view()),
     path("accounting/", include("api.v1.routes.accounting")),

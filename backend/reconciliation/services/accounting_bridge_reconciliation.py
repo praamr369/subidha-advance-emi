@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from django.db import models
-from django.db.models import Count, Exists, OuterRef, Q
+from decimal import Decimal
+
+from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.db.models.functions import Cast
 
 from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntryGroup
@@ -16,6 +18,10 @@ from reconciliation.models import (
 
 
 MODULE = "ACCOUNTING_BRIDGE_PHASE_F"
+
+
+def _money(value) -> Decimal:
+    return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
 
 
 def _date_range_filter(prefix: str, date_from, date_to):
@@ -58,6 +64,8 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
             metadata={
                 "payment_id": payment.id,
                 "payment_date": str(payment.payment_date),
+                "bridge_status": "NOT_POSTED",
+                "action_href": "/admin/accounting/bridge-reconciliation",
             },
         )
         ReconciliationEvidence.objects.create(
@@ -82,6 +90,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
 
     for bridge in bridges:
         journal = bridge.journal_entry
+        payment = Payment.objects.filter(pk=bridge.source_id).first()
         if not journal_id_matches_bridge(bridge, journal):
             item = ReconciliationItem.objects.create(
                 run=run,
@@ -121,6 +130,71 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
             )
             totals["exceptions"] += 1
             totals["high_risk"] += 1
+            continue
+        line_totals = journal.lines.aggregate(total_debit=Sum("debit_amount"), total_credit=Sum("credit_amount"))
+        total_debit = _money(line_totals["total_debit"])
+        total_credit = _money(line_totals["total_credit"])
+        if total_debit != total_credit:
+            item = ReconciliationItem.objects.create(
+                run=run,
+                module=MODULE,
+                source_type="Payment",
+                source_id=str(bridge.source_id),
+                source_label=bridge.source_reference or f"PAY-{bridge.source_id}",
+                severity=ReconciliationSeverity.CRITICAL,
+                status=ReconciliationItemStatus.AMOUNT_MISMATCH,
+                exception_code="JOURNAL_UNBALANCED",
+                exception_message="Posted bridge journal debit and credit totals do not balance.",
+                recommended_action="Investigate journal lines; resolve only through explicit accounting workflows.",
+                expected_amount=total_debit,
+                actual_amount=total_credit,
+                amount_delta=total_debit - total_credit,
+                metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id},
+            )
+            ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, status=journal.status)
+            totals["exceptions"] += 1
+            totals["high_risk"] += 1
+            continue
+        if payment is not None and total_debit != _money(payment.amount):
+            item = ReconciliationItem.objects.create(
+                run=run,
+                module=MODULE,
+                source_type="Payment",
+                source_id=str(payment.id),
+                source_label=payment.reference_no or f"PAY-{payment.id}",
+                severity=ReconciliationSeverity.HIGH,
+                status=ReconciliationItemStatus.AMOUNT_MISMATCH,
+                exception_code="AMOUNT_MISMATCH",
+                exception_message="Posted bridge journal amount does not match the source Payment.amount.",
+                recommended_action="Investigate payment amount and bridge journal; do not auto-correct.",
+                expected_amount=payment.amount,
+                actual_amount=total_debit,
+                amount_delta=total_debit - payment.amount,
+                metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "bridge_status": "AMOUNT_MISMATCH"},
+            )
+            ReconciliationEvidence.objects.create(item=item, evidence_type="Payment", object_id=str(payment.id), label=payment.reference_no or f"PAY-{payment.id}", amount=payment.amount)
+            ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, amount=total_debit, status=journal.status)
+            totals["exceptions"] += 1
+            continue
+        if payment is not None:
+            item = ReconciliationItem.objects.create(
+                run=run,
+                module=MODULE,
+                source_type="Payment",
+                source_id=str(payment.id),
+                source_label=payment.reference_no or f"PAY-{payment.id}",
+                severity=ReconciliationSeverity.LOW,
+                status=ReconciliationItemStatus.NEEDS_REVIEW,
+                exception_code="POSTED_UNVERIFIED",
+                exception_message="Bridge journal matches source amount and link checks, but explicit verification is still required.",
+                recommended_action="Verify from bridge reconciliation after operator review.",
+                expected_amount=payment.amount,
+                actual_amount=total_debit,
+                amount_delta=Decimal("0.00"),
+                metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "bridge_status": "POSTED_UNVERIFIED", "action_href": "/admin/accounting/bridge-reconciliation"},
+            )
+            ReconciliationEvidence.objects.create(item=item, evidence_type="Payment", object_id=str(payment.id), label=payment.reference_no or f"PAY-{payment.id}", amount=payment.amount)
+            ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, amount=total_debit, status=journal.status)
 
     # 7) Journal entry group unbalanced
     groups = JournalEntryGroup.objects.filter(is_balanced=False)

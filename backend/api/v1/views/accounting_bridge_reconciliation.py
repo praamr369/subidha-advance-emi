@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.utils.dateparse import parse_date
 from rest_framework import permissions
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -10,6 +11,50 @@ from accounting.services.accounting_bridge_reconciliation_read_service import (
     BridgeReconciliationFilters,
     build_accounting_bridge_reconciliation,
 )
+from accounting.services.accounting_bridge_candidate_service import (
+    batch_post_bridge_candidates,
+    batch_preview_bridge_candidates,
+    post_bridge_candidate,
+    preview_bridge_candidate,
+    verify_bridge_reconciliation_item,
+)
+
+
+class BridgeCandidatePostSerializer(serializers.Serializer):
+    idempotency_key = serializers.CharField(required=True, allow_blank=False, trim_whitespace=True)
+    confirm = serializers.BooleanField(required=False, default=False)
+    confirm_text = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    posting_note = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True, max_length=1000)
+
+    def validate(self, attrs):
+        confirmed = bool(attrs.get("confirm")) or (attrs.get("confirm_text") or "").strip().upper() in {"POST", "CONFIRM", "POST BRIDGE"}
+        if not confirmed:
+            raise serializers.ValidationError("Explicit confirm=true or confirm_text is required before posting.")
+        attrs["confirmed"] = confirmed
+        return attrs
+
+
+class BridgeBatchPreviewSerializer(serializers.Serializer):
+    candidate_ids = serializers.ListField(child=serializers.CharField(allow_blank=False), allow_empty=False, max_length=200)
+
+
+class BridgeBatchPostSerializer(BridgeBatchPreviewSerializer):
+    idempotency_keys = serializers.DictField(child=serializers.CharField(allow_blank=False), required=True)
+    confirm = serializers.BooleanField(required=False, default=False)
+    confirm_text = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    posting_note = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True, max_length=1000)
+
+    def validate(self, attrs):
+        confirmed = bool(attrs.get("confirm")) or (attrs.get("confirm_text") or "").strip().upper() in {"POST", "CONFIRM", "POST BRIDGE"}
+        if not confirmed:
+            raise serializers.ValidationError("Explicit confirm=true or confirm_text is required before batch posting.")
+        attrs["confirmed"] = confirmed
+        return attrs
+
+
+class BridgeVerifySerializer(serializers.Serializer):
+    note = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True, max_length=1000)
+    run_id = serializers.IntegerField(required=False, allow_null=True)
 
 
 class AccountingBridgeReconciliationView(APIView):
@@ -32,3 +77,78 @@ class AccountingBridgeReconciliationView(APIView):
             account=(request.query_params.get("account") or "").strip() or None,
         )
         return Response(build_accounting_bridge_reconciliation(filters))
+
+
+class AccountingBridgeCandidatePreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, candidate_id: str):
+        try:
+            return Response(preview_bridge_candidate(candidate_id))
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AccountingBridgeCandidatePostView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, candidate_id: str):
+        serializer = BridgeCandidatePostSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = post_bridge_candidate(
+                candidate_id=candidate_id,
+                idempotency_key=serializer.validated_data["idempotency_key"],
+                confirmed=serializer.validated_data["confirmed"],
+                posting_note=serializer.validated_data.get("posting_note") or "",
+                actor=request.user,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class AccountingBridgeBatchPreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        serializer = BridgeBatchPreviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(batch_preview_bridge_candidates(serializer.validated_data["candidate_ids"]))
+
+
+class AccountingBridgeBatchPostView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        serializer = BridgeBatchPostSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(
+            batch_post_bridge_candidates(
+                candidate_ids=serializer.validated_data["candidate_ids"],
+                idempotency_keys=serializer.validated_data["idempotency_keys"],
+                confirmed=serializer.validated_data["confirmed"],
+                posting_note=serializer.validated_data.get("posting_note") or "",
+                actor=request.user,
+            )
+        )
+
+
+class AccountingBridgeReconciliationItemVerifyView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        serializer = BridgeVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = verify_bridge_reconciliation_item(
+                item_id=pk,
+                actor=request.user,
+                note=serializer.validated_data.get("note") or "",
+                run_id=serializer.validated_data.get("run_id"),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=status.HTTP_200_OK)

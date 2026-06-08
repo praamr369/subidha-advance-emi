@@ -96,6 +96,53 @@ class AdminReconciliationRunListCreateView(generics.ListAPIView):
         return Response(ReconciliationRunSerializer(run).data, status=status.HTTP_201_CREATED)
 
 
+class AdminReconciliationRunChecksView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ReconciliationRunCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        run = start_and_run_phase_f(
+            request=PhaseFRunRequest(
+                scope=validated.get("scope") or "PHASE_F",
+                module=validated.get("module") or "CONTROL_TOWER",
+                branch_id=validated.get("branch_id"),
+                date_from=validated.get("date_from"),
+                date_to=validated.get("date_to"),
+                financial_year=validated.get("financial_year") or None,
+                accounting_period=validated.get("accounting_period") or None,
+            ),
+            started_by=request.user,
+        )
+        payload = ReconciliationRunSerializer(run).data
+        payload.update(
+            {
+                "run_id": run.id,
+                "total_checks": run.total_checked,
+                "passed": run.total_matched,
+                "warnings": [],
+                "errors": run.total_exceptions,
+                "module_open": run.total_exceptions > 0,
+                "exceptions": list(
+                    ReconciliationItem.objects.filter(run=run)
+                    .exclude(status=ReconciliationItemStatus.MATCHED)
+                    .values("id", "exception_code", "severity", "module", "source_type", "source_id", "source_label", "exception_message", "recommended_action")[:200]
+                ),
+                "action_routes": {
+                    "NOT_POSTED": "/admin/accounting/bridge-reconciliation",
+                    "MAPPING_MISSING": "/admin/accounting/setup/mapping-audit",
+                    "NUMBERING_MISSING": "/admin/settings/business-setup/document-numbering",
+                    "PERIOD_MISMATCH": "/admin/accounting/periods",
+                    "UNSUPPORTED_SOURCE": "/admin/accounting/setup/mapping-audit",
+                    "DUPLICATE_POSTING": "/admin/accounting/journals",
+                    "AMOUNT_MISMATCH": "/admin/reconciliation/runs",
+                },
+            }
+        )
+        return Response(payload, status=status.HTTP_201_CREATED)
+
+
 class AdminReconciliationRunDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
     serializer_class = ReconciliationRunSerializer

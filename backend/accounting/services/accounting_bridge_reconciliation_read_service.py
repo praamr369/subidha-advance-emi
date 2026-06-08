@@ -8,6 +8,11 @@ from django.db.models import Q
 from django.utils import timezone
 
 from accounting.models import AccountingBridgePosting, AccountingPeriod, AccountingPeriodStatus, FinancialYear, JournalEntry, MoneyMovement
+from accounting.services.accounting_bridge_candidate_service import (
+    BridgeCandidateFilters,
+    list_bridge_candidates,
+    summarize_candidate_statuses,
+)
 from accounting.services.accounting_postability_service import CANONICAL_STATUSES, canonicalize_bridge_readiness_payload, evaluate_accounting_postability
 from accounting.services.accounting_bridge_readiness_service import build_accounting_bridge_posting_period_readiness
 from accounting.services.returns_damage_credit_bridge_readiness_service import build_accounting_bridge_readiness_with_returns_damage_credit
@@ -189,7 +194,7 @@ def _row_action_hrefs(postability: dict[str, Any], *, event_key: str, period: Ac
         return {"action_href": BRIDGE_HREF, "setup_href": BRIDGE_HREF, "preview_action_href": BRIDGE_HREF, "post_action_href": None, "source_action_href": None, "is_acknowledgeable": False, "is_postable": False}
     if status in {"POSTABLE", "READY_UNPOSTED"}:
         period_open = period is not None and period.status == AccountingPeriodStatus.OPEN
-        return {"action_href": "/admin/accounting/bridge-reconciliation", "setup_href": SETUP_HREF, "preview_action_href": BRIDGE_HREF, "post_action_href": BRIDGE_HREF if period_open else None, "source_action_href": None, "is_acknowledgeable": False, "is_postable": bool(period_open and postability.get("can_post"))}
+        return {"action_href": "/admin/accounting/bridge-reconciliation", "setup_href": SETUP_HREF, "preview_action_href": None, "post_action_href": None, "source_action_href": "/admin/accounting/bridge-reconciliation", "is_acknowledgeable": False, "is_postable": False, "abstract_posting_blocked": True, "period_open": period_open}
     return {"action_href": "/admin/reconciliation/runs", "setup_href": SETUP_HREF, "preview_action_href": None, "post_action_href": None, "source_action_href": None, "is_acknowledgeable": False, "is_postable": False}
 
 
@@ -227,7 +232,7 @@ def _readiness_rows(readiness_payload: dict[str, Any], filters: BridgeReconcilia
             "mapping_status": "READY" if postability["mapping_ready"] else "BLOCKED_BY_MAPPING",
             "posting_mode": event.get("posting_mode"),
             "can_preview": postability["can_preview"],
-            "can_post": postability["can_post"] and action_meta["is_postable"],
+            "can_post": False,
             "can_reconcile": postability["can_reconcile"],
             "supported": postability["supported"],
             "financial_year": _financial_year_payload(financial_year),
@@ -246,6 +251,8 @@ def _readiness_rows(readiness_payload: dict[str, Any], filters: BridgeReconcilia
             "blocker_count": 1 if postability.get("blocker_code") else 0,
             "blocker_reason": postability["blocker_reason"],
             "recommended_action": postability["recommended_action"],
+            "source_item_action": "View source items",
+            "unsafe_abstract_posting_blocked": True,
             "financial_year_id": getattr(financial_year, "id", None),
             "accounting_period_id": getattr(period, "id", None),
             **action_meta,
@@ -440,7 +447,23 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         },
         as_source_rows=True,
     )
-    rows = [*_readiness_rows(readiness_payload, active_filters, financial_year=selected_financial_year, period=selected_period), *_posted_rows(active_filters, selected_financial_year, selected_period)]
+    candidate_rows = list_bridge_candidates(
+        BridgeCandidateFilters(
+            date_from=active_filters.date_from,
+            date_to=active_filters.date_to,
+            financial_year=active_filters.financial_year,
+            accounting_period=active_filters.accounting_period,
+            status=active_filters.status,
+            source_model=active_filters.source_model,
+            event_key=active_filters.event_key,
+            module=active_filters.module,
+        )
+    )
+    rows = [
+        *_readiness_rows(readiness_payload, active_filters, financial_year=selected_financial_year, period=selected_period),
+        *candidate_rows,
+        *_posted_rows(active_filters, selected_financial_year, selected_period),
+    ]
     counts = _document_counts(active_filters, selected_financial_year, selected_period)
     status_counts = Counter(str(row.get("status") or "INFO") for row in rows)
     exception_count = sum(1 for row in rows if row["status"] == "EXCEPTION" or row["exception_reasons"])
@@ -448,6 +471,7 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
     closed_period_count = AccountingPeriod.objects.filter(financial_year=selected_financial_year, status=AccountingPeriodStatus.CLOSED).count() if selected_financial_year else 0
     readiness_blockers = _readiness_blockers(financial_year=selected_financial_year, period=selected_period, resolver_blockers=resolver_blockers, rows=rows, counts=counts)
     canonical_summary = {f"{status.lower()}_count": status_counts.get(status, 0) for status in CANONICAL_STATUSES}
+    candidate_summary = summarize_candidate_statuses(candidate_rows)
     summary = {
         "source_count": len(rows),
         "ready_count": status_counts.get("READY", 0),
@@ -477,6 +501,7 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "blocking_groups": _blocking_groups(rows),
         "locked_period_count": locked_period_count,
         "closed_period_count": closed_period_count,
+        **candidate_summary,
         **canonical_summary,
     }
     return {
