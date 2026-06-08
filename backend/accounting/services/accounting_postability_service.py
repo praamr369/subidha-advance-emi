@@ -57,15 +57,21 @@ def _mapping_status(row: dict[str, Any] | None) -> str:
     raw = str(row.get("status") or "NOT_CONFIGURED").strip().upper()
     if raw in {UNSUPPORTED_SOURCE, BLOCKED_BY_MAPPING}:
         return raw
+    if raw.startswith("BLOCKED"):
+        return raw
     if raw in CANONICAL_STATUSES:
         return READY
     if raw == "READY":
         return READY
     if raw in {"WARNING", "ERROR", "NOT_CONFIGURED"}:
         return BLOCKED_BY_MAPPING
-    if raw.startswith("BLOCKED"):
-        return raw
     return BLOCKED_BY_MAPPING
+
+
+def _legacy_status_for(*, event_key: str, status: str) -> str:
+    if event_key == "staff_advance" and status == UNSUPPORTED_SOURCE:
+        return "NOT_CONFIGURED"
+    return status
 
 
 def evaluate_accounting_postability(
@@ -147,6 +153,7 @@ def evaluate_accounting_postability(
     if status in {POSTABLE, READY_UNPOSTED, POSTED, RECONCILED}:
         action_href = "/admin/accounting/bridge-reconciliation"
 
+    legacy_status = _legacy_status_for(event_key=key, status=status)
     return {
         "event_key": key,
         "event_label": event_label or (bridge_row or {}).get("label") or key.replace("_", " ").title(),
@@ -167,6 +174,8 @@ def evaluate_accounting_postability(
         "can_post": can_post,
         "can_reconcile": can_reconcile,
         "status": status,
+        "canonical_status": status,
+        "legacy_status": legacy_status,
         "blocker_code": blocker_code,
         "blocker_reason": blocker_reason,
         "recommended_action": _recommended_action(status),
@@ -211,7 +220,7 @@ def canonicalize_bridge_readiness_payload(payload: dict[str, Any], *, as_source_
             rows.append({**event, **postability, "operator_action": postability["recommended_action"], "blocking_reasons": event.get("blocking_reasons") or ([postability["blocker_reason"]] if postability.get("blocker_reason") else [])})
         else:
             status_override = {"status": UNSUPPORTED_SOURCE} if postability["status"] == UNSUPPORTED_SOURCE else {}
-            rows.append({**event, **status_override, "postability": postability, "canonical_status": postability["status"], "canonical_blocker_code": postability["blocker_code"], "canonical_blocker_reason": postability["blocker_reason"], "canonical_recommended_action": postability["recommended_action"]})
+            rows.append({**event, **status_override, "postability": postability, "canonical_status": postability["status"], "legacy_status": postability["legacy_status"], "canonical_blocker_code": postability["blocker_code"], "canonical_blocker_reason": postability["blocker_reason"], "canonical_recommended_action": postability["recommended_action"]})
     if include_staff_advance and not any(row.get("event_key") == "staff_advance" for row in rows):
         rows.append(staff_advance_unsupported_event(period))
     status_counts = Counter(str(row.get("canonical_status") or row.get("status") or "INFO") for row in rows)
