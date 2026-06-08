@@ -44,69 +44,6 @@ Current safe classification:
 - Cancelled or voided receipts are skipped. Void/reversal posting is not included in Phase F2.
 - Unsupported receipt shapes remain non-postable.
 
-## Preview contract
-
-Preview endpoint:
-
-```http
-GET /api/v1/admin/accounting/bridge-reconciliation/candidates/{candidate_id}/preview/
-```
-
-Preview must remain read-only. It must not create:
-
-- `JournalEntry`
-- `AccountingBridgePosting`
-- `ReconciliationItem`
-- document numbers
-- source ReceiptDocument mutations
-
-Preview returns the concrete source identity, journal-date context, accounting period, journal-number preview, debit lines, credit lines, totals, blockers, warnings, idempotency key, and safety copy.
-
-## Posting contract
-
-Post endpoint:
-
-```http
-POST /api/v1/admin/accounting/bridge-reconciliation/candidates/{candidate_id}/post/
-```
-
-Posting is:
-
-- admin-only
-- explicit confirmation only
-- transactional
-- idempotent per `ReceiptDocument` + event key + idempotency key
-- tied to a concrete source record
-
-Posting creates:
-
-- one posted `JournalEntry`
-- one `AccountingBridgePosting`
-- one pending/unverified `ReconciliationItem`
-
-Posting does not mutate original receipt financial fields. In particular, this bridge slice does not set `ReceiptDocument.posted_journal_entry` and does not change receipt amount, receipt number, status, source reference, finance account, Payment, EMI, Subscription, DirectSale, BillingInvoice, stock, commission, payout, delivery, or rent/lease source data.
-
-## Reconciliation contract
-
-After posting, the row remains pending/unverified until explicit reconciliation verification.
-
-Verification endpoint:
-
-```http
-POST /api/v1/admin/accounting/bridge-reconciliation/items/{id}/verify/
-```
-
-Verification is admin-only and applies only to clean `POSTED_UNVERIFIED` bridge reconciliation items. It does not mutate the source `ReceiptDocument`.
-
-## Period close impact
-
-ReceiptDocument bridge rows follow the same close posture as Payment bridge rows:
-
-- ready/unposted ReceiptDocument rows block close as unposted bridge work
-- posted/unverified ReceiptDocument rows block close as unreconciled work
-- verified/reconciled ReceiptDocument rows no longer block close as unreconciled
-- unsupported receipt shapes remain visible and non-postable
-
 ## Phase F3 — BillingInvoice bridge posting
 
 Phase F3 extends the controlled bridge workflow to concrete `BillingInvoice` source items only.
@@ -132,25 +69,113 @@ Current safe classification:
 - Proforma, demand note, subscription, rent/lease, and deposit/liability shapes are unsupported until a later phase defines their accounting treatment.
 - BillingInvoice posting resolves receivable, sales revenue, and output GST accounts from active posting profiles/canonical chart accounts. Missing receivable, revenue, tax, period, or journal numbering setup blocks posting with an exact reason.
 
-Invoice preview remains read-only. It does not create journals, bridge postings, reconciliation items, numbering consumption, source mutations, invoice status changes, tax recalculation, receipt allocation changes, or DirectSale mutations. The preview includes invoice identity, invoice number/reference, invoice date, invoice type/status, event key, amount, taxable amount, tax amount, journal date, accounting period, journal number preview, debit lines, credit lines, tax lines, balance status, blockers, warnings, idempotency key, and safety text.
+## Phase F4 — Credit Note / Sales Return bridge posting
 
-Invoice posting is explicit, admin-only, transactional, idempotent, and tied to:
+Phase F4 extends the controlled bridge workflow to concrete credit-note and return source records only.
+
+Supported source models:
 
 ```text
-source_model = BillingInvoice
-source_pk = invoice.id
-event_key = direct_sale_invoice or direct_sale_outstanding
+BillingCreditNote
+DirectSaleReturn
 ```
 
-Posting creates a posted `JournalEntry`, an `AccountingBridgePosting`, and a pending/unverified `ReconciliationItem`. It does not mutate `BillingInvoice` financial fields, `BillingInvoice.status`, `BillingInvoice.posted_journal_entry`, DirectSale, ReceiptDocument, Payment, EMI, Subscription, StockLedger, PurchaseBill, Commission, Payout, Delivery, or rent/lease source records.
+Supported event keys:
 
-Reconciliation remains pending until a run and/or explicit verification confirms the bridge item. Ready/unposted invoice rows block close as unposted bridge work. Posted/unverified invoice rows block close as unreconciled bridge work. Verified/reconciled invoice rows do not block close as unreconciled work. Unsupported invoice types remain visible separately and are never fake-posted.
+```text
+credit_note_issue
+sales_return
+customer_credit_adjustment
+direct_sale_return
+```
+
+Current safe classification:
+
+- `credit_note_issue` is used for approved concrete `BillingCreditNote` records without stock-return posture.
+- `sales_return` is used for approved concrete `BillingCreditNote` records that represent stock-effect or direct-sale-return posture.
+- `customer_credit_adjustment` is reserved for concrete credit-note shapes where the source clearly represents customer credit adjustment.
+- `direct_sale_return` is used only when the concrete source record is `DirectSaleReturn`.
+- Draft, cancelled, and voided credit notes are skipped as not applicable.
+- Cancelled DirectSaleReturn rows are skipped. DirectSaleReturn rows that require approval remain blocked by approval and are not postable.
+- Unsupported credit/return shapes remain visible and non-postable.
+
+Accounting shape:
+
+- Debit `SALES_RETURNS` for taxable sales-return / credit-note adjustment value.
+- Debit `OUTPUT_GST` only when the concrete source has a tax reversal amount and the active chart/posting setup supports output-GST reversal.
+- Credit `CUSTOMER_RECEIVABLE` for the full customer receivable reduction.
+
+Tax reversal is not guessed. If `OUTPUT_GST` cannot be resolved for a taxable credit/return source, the candidate is blocked by mapping and cannot post.
+
+## Preview contract
+
+Preview endpoint:
+
+```http
+GET /api/v1/admin/accounting/bridge-reconciliation/candidates/{candidate_id}/preview/
+```
+
+Preview must remain read-only. It must not create:
+
+- `JournalEntry`
+- `AccountingBridgePosting`
+- `ReconciliationItem`
+- document numbers
+- source Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, or DirectSaleReturn mutations
+
+Preview returns the concrete source identity, journal-date context, accounting period, journal-number preview, debit lines, credit lines, tax lines where supported, totals, blockers, warnings, idempotency key, and safety copy.
+
+## Posting contract
+
+Post endpoint:
+
+```http
+POST /api/v1/admin/accounting/bridge-reconciliation/candidates/{candidate_id}/post/
+```
+
+Posting is:
+
+- admin-only
+- explicit confirmation only
+- transactional
+- idempotent per concrete source + event key + idempotency key
+- tied to a concrete source record
+
+Posting creates:
+
+- one posted `JournalEntry`
+- one `AccountingBridgePosting`
+- one pending/unverified `ReconciliationItem`
+
+Posting does not mutate original source financial fields. In particular, this bridge workflow does not set `posted_journal_entry` on billing documents and does not change amount, status, document number, source reference, tax values, invoice/receipt allocation, DirectSale, Payment, EMI, Subscription, StockLedger, PurchaseBill, Commission, Payout, Delivery, or rent/lease source data.
+
+## Reconciliation contract
+
+After posting, the row remains pending/unverified until explicit reconciliation verification.
+
+Verification endpoint:
+
+```http
+POST /api/v1/admin/accounting/bridge-reconciliation/items/{id}/verify/
+```
+
+Verification is admin-only and applies only to clean `POSTED_UNVERIFIED` bridge reconciliation items. It does not mutate the source record.
+
+## Period close impact
+
+Bridge rows follow the same close posture across Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, and DirectSaleReturn:
+
+- ready/unposted concrete rows block close as unposted bridge work
+- posted/unverified rows block close as unreconciled work
+- verified/reconciled rows no longer block close as unreconciled
+- unsupported source shapes remain visible and non-postable
 
 ## Safety limits
 
-Phase F3 does not add bridge posting for:
+Phase F4 does not add bridge posting for:
 
-- DirectSale source records
+- DirectSale sale source records
+- BillingDebitNote
 - Rent/Lease source records
 - PurchaseBill
 - StockLedger
