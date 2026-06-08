@@ -8,7 +8,7 @@ from django.db.models.functions import Cast
 
 from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntryGroup
 from accounting.services.accounting_bridge_candidate_service import BridgeCandidateFilters, list_bridge_candidates
-from billing.models import ReceiptDocument
+from billing.models import BillingInvoice, ReceiptDocument
 from subscriptions.models import Payment
 
 from reconciliation.models import (
@@ -19,7 +19,7 @@ from reconciliation.models import (
 )
 
 MODULE = "ACCOUNTING_BRIDGE_PHASE_F"
-BRIDGE_SOURCE_MODELS = ("Payment", "ReceiptDocument")
+BRIDGE_SOURCE_MODELS = ("Payment", "ReceiptDocument", "BillingInvoice")
 
 
 def _money(value) -> Decimal:
@@ -42,6 +42,9 @@ def _source_amount(*, source_model: str, source_id: str) -> Decimal | None:
     if source_model == "ReceiptDocument":
         receipt = ReceiptDocument.objects.filter(pk=source_id).only("amount").first()
         return _money(receipt.amount) if receipt else None
+    if source_model == "BillingInvoice":
+        invoice = BillingInvoice.objects.filter(pk=source_id).only("grand_total").first()
+        return _money(invoice.grand_total) if invoice else None
     return None
 
 
@@ -54,6 +57,11 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
         if receipt:
             return receipt.receipt_no or receipt.source_reference or f"RCT-{source_id}"
         return f"RCT-{source_id}"
+    if source_model == "BillingInvoice":
+        invoice = BillingInvoice.objects.filter(pk=source_id).only("document_no", "source_reference").first()
+        if invoice:
+            return invoice.document_no or invoice.source_reference or f"INV-{source_id}"
+        return f"INV-{source_id}"
     return fallback or f"{source_model}-{source_id}"
 
 
@@ -103,16 +111,28 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
                 continue
         _create_missing_bridge_item(run=run, source_model="ReceiptDocument", source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"RCT-{row['source_pk']}", amount=_money(row.get("amount")), exception_code="RECEIPT_DOCUMENT_MISSING_ACCOUNTING_BRIDGE_POSTING", message="ReceiptDocument exists as a supported concrete bridge candidate but AccountingBridgePosting is missing.", metadata={"receipt_document_id": row["source_pk"], "event_key": row.get("event_key"), "receipt_type": row.get("receipt_type"), "source_date": row.get("source_date")}, totals=totals)
 
+    invoice_candidates = list_bridge_candidates(BridgeCandidateFilters(date_from=date_from, date_to=date_to, source_model="BillingInvoice"))
+    for row in invoice_candidates:
+        if row.get("status") != "READY_UNPOSTED":
+            continue
+        if branch_id:
+            invoice = BillingInvoice.objects.filter(pk=row.get("source_pk"), branch_id=branch_id).first()
+            if invoice is None:
+                continue
+        _create_missing_bridge_item(run=run, source_model="BillingInvoice", source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"INV-{row['source_pk']}", amount=_money(row.get("amount")), exception_code="BILLING_INVOICE_MISSING_ACCOUNTING_BRIDGE_POSTING", message="BillingInvoice exists as a supported concrete bridge candidate but AccountingBridgePosting is missing.", metadata={"billing_invoice_id": row["source_pk"], "event_key": row.get("event_key"), "invoice_type": row.get("invoice_type"), "invoice_status": row.get("invoice_status"), "taxable_amount": row.get("taxable_amount"), "tax_amount": row.get("tax_amount"), "source_date": row.get("source_date")}, totals=totals)
+
     bridges = AccountingBridgePosting.objects.filter(source_model__in=BRIDGE_SOURCE_MODELS).select_related("journal_entry")
     if date_from or date_to:
         bridges = bridges.filter(_date_range_filter("source_event_date", date_from, date_to))
     if branch_id:
         payment_source_ids = [str(pk) for pk in Payment.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
         receipt_source_ids = [str(pk) for pk in ReceiptDocument.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
+        invoice_source_ids = [str(pk) for pk in BillingInvoice.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
         bridges = bridges.filter(
             Q(trace_metadata__branch_id=branch_id)
             | Q(source_model="Payment", source_id__in=payment_source_ids)
             | Q(source_model="ReceiptDocument", source_id__in=receipt_source_ids)
+            | Q(source_model="BillingInvoice", source_id__in=invoice_source_ids)
         )
     totals["checked"] += bridges.count()
 

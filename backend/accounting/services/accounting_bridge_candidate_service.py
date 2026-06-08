@@ -10,7 +10,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from accounting.models import AccountingBridgePosting, AccountingPeriod, ChartOfAccount, FinanceAccount, JournalEntry, JournalEntryStatus
+from accounting.models import AccountingBridgePosting, AccountingPeriod, AccountingPostingProfile, ChartOfAccount, FinanceAccount, JournalEntry, JournalEntryStatus
 from accounting.services.accounting_bridge_readiness_service import build_accounting_bridge_posting_period_readiness
 from accounting.services.accounting_postability_service import evaluate_accounting_postability
 from accounting.services.bridge_posting_service import post_bridge_entry
@@ -18,7 +18,7 @@ from accounting.services.bridge_run_service import _resolve_collection_finance_a
 from accounting.services.document_sequence_service import DocumentNumberingSetupError, DocumentType, preview_document_number, validate_document_numbering_ready
 from accounting.services.journal_posting_service import _log_accounting_event
 from accounting.services.period_service import resolve_accounting_period
-from billing.models import BillingDocumentStatus, BillingSourceType, ReceiptDocument, ReceiptType
+from billing.models import BillingDocumentStatus, BillingInvoice, BillingInvoiceType, BillingSourceType, ReceiptDocument, ReceiptType
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationItemStatus, ReconciliationRun, ReconciliationRunStatus, ReconciliationSeverity
 from reconciliation.services.run_numbering import next_reconciliation_run_no
 from subscriptions.models import Payment
@@ -43,6 +43,19 @@ RECEIPT_LABEL_BY_EVENT = {
 }
 SKIPPED_RECEIPT_EVENT_KEY = "receipt_skipped_not_applicable"
 UNSUPPORTED_RECEIPT_EVENT_KEY = "unsupported_receipt"
+
+BILLING_INVOICE_SOURCE_MODEL = "BillingInvoice"
+BILLING_INVOICE_EVENT_KEYS = {"direct_sale_invoice", "direct_sale_outstanding"}
+BILLING_INVOICE_PURPOSE_BY_EVENT = {
+    "direct_sale_invoice": "DIRECT_SALE_INVOICE",
+    "direct_sale_outstanding": "DIRECT_SALE_OUTSTANDING",
+}
+BILLING_INVOICE_LABEL_BY_EVENT = {
+    "direct_sale_invoice": "Direct sale invoice",
+    "direct_sale_outstanding": "Direct sale outstanding",
+}
+SKIPPED_INVOICE_EVENT_KEY = "invoice_skipped_not_applicable"
+UNSUPPORTED_INVOICE_EVENT_KEY = "unsupported_invoice"
 
 
 @dataclass(frozen=True)
@@ -106,8 +119,20 @@ def _chart_by_system_code(system_code: str) -> ChartOfAccount | None:
     return ChartOfAccount.objects.filter(system_code=system_code, is_active=True).order_by("id").first()
 
 
+def _posting_profile_account(key: str) -> ChartOfAccount | None:
+    profile = (
+        AccountingPostingProfile.objects.select_related("chart_account")
+        .filter(key=key, is_active=True, chart_account__is_active=True)
+        .order_by("id")
+        .first()
+    )
+    if profile and profile.chart_account:
+        return profile.chart_account
+    return _chart_by_system_code(key)
+
+
 def _customer_receivable_account() -> ChartOfAccount | None:
-    return _chart_by_system_code("CUSTOMER_RECEIVABLE")
+    return _posting_profile_account("CUSTOMER_RECEIVABLE")
 
 
 def _customer_advance_account() -> ChartOfAccount | None:
@@ -115,7 +140,15 @@ def _customer_advance_account() -> ChartOfAccount | None:
 
 
 def _sales_return_account() -> ChartOfAccount | None:
-    return _chart_by_system_code("SALES_RETURNS") or _customer_receivable_account()
+    return _posting_profile_account("SALES_RETURNS") or _customer_receivable_account()
+
+
+def _sales_revenue_account() -> ChartOfAccount | None:
+    return _posting_profile_account("DIRECT_SALE_INCOME") or _posting_profile_account("SALES_REVENUE")
+
+
+def _output_gst_account() -> ChartOfAccount | None:
+    return _posting_profile_account("OUTPUT_GST")
 
 
 def _source_reference(payment: Payment) -> str:
@@ -124,6 +157,10 @@ def _source_reference(payment: Payment) -> str:
 
 def _receipt_reference(receipt: ReceiptDocument) -> str:
     return receipt.receipt_no or receipt.source_reference or f"RCT-{receipt.id}"
+
+
+def _invoice_reference(invoice: BillingInvoice) -> str:
+    return invoice.document_no or invoice.source_reference or f"INV-{invoice.id}"
 
 
 def _resolve_payment_finance_account(payment: Payment) -> tuple[FinanceAccount | None, str | None, list[int]]:
@@ -218,6 +255,57 @@ def _receipt_lines(receipt: ReceiptDocument, event_key: str) -> tuple[list[dict[
         return [{"chart_account": debit_account, "description": "Refund / customer credit adjustment", "debit_amount": amount, "credit_amount": Decimal("0.00")}, {"chart_account": finance_account.chart_account, "description": "Refund / credit paid", "debit_amount": Decimal("0.00"), "credit_amount": amount}], warnings, finance_account
     warnings.append("Unsupported ReceiptDocument event for Phase F2.")
     return [], warnings, finance_account
+
+
+def _classify_invoice_event(invoice: BillingInvoice) -> tuple[str, str, str | None]:
+    status = (invoice.status or "").strip().upper()
+    if status in {BillingDocumentStatus.DRAFT, BillingDocumentStatus.CANCELLED, BillingDocumentStatus.VOID}:
+        return SKIPPED_INVOICE_EVENT_KEY, "Invoice skipped", "Draft, cancelled, or voided invoices are skipped and are not bridge-postable."
+    if invoice.document_type != BillingInvoiceType.INVOICE:
+        return UNSUPPORTED_INVOICE_EVENT_KEY, "Unsupported invoice", "Only BillingInvoice document_type=INVOICE is supported in Phase F3."
+    if invoice.source_type == BillingSourceType.SUBSCRIPTION or invoice.subscription_id:
+        return UNSUPPORTED_INVOICE_EVENT_KEY, "Unsupported invoice", "Rent/lease/subscription invoice posting is deferred; deposit/liability rules are out of Phase F3 scope."
+    if invoice.source_type == BillingSourceType.DIRECT_SALE or invoice.direct_sale_id:
+        return "direct_sale_invoice", BILLING_INVOICE_LABEL_BY_EVENT["direct_sale_invoice"], None
+    if invoice.source_type == BillingSourceType.MANUAL and _money(invoice.balance_total) > Decimal("0.00"):
+        return "direct_sale_outstanding", BILLING_INVOICE_LABEL_BY_EVENT["direct_sale_outstanding"], None
+    return UNSUPPORTED_INVOICE_EVENT_KEY, "Unsupported invoice", "BillingInvoice source_type cannot be classified safely for Phase F3 bridge posting."
+
+
+def _invoice_lines(invoice: BillingInvoice, event_key: str) -> tuple[list[dict[str, Any]], list[str], None]:
+    warnings: list[str] = []
+    if event_key not in BILLING_INVOICE_EVENT_KEYS:
+        warnings.append("Unsupported BillingInvoice event for Phase F3.")
+        return [], warnings, None
+    amount = _money(invoice.grand_total)
+    taxable_amount = _money(invoice.taxable_total)
+    tax_amount = _money(invoice.tax_total)
+    if amount <= Decimal("0.00"):
+        warnings.append("BillingInvoice grand_total must be greater than zero.")
+        return [], warnings, None
+    if taxable_amount <= Decimal("0.00"):
+        taxable_amount = amount - tax_amount
+    if taxable_amount <= Decimal("0.00"):
+        warnings.append("BillingInvoice taxable amount cannot be resolved safely.")
+        return [], warnings, None
+    receivable_account = _customer_receivable_account()
+    revenue_account = _sales_revenue_account()
+    output_gst_account = _output_gst_account() if tax_amount > Decimal("0.00") else None
+    if receivable_account is None:
+        warnings.append("CUSTOMER_RECEIVABLE posting profile/chart account is missing or inactive.")
+    if revenue_account is None:
+        warnings.append("DIRECT_SALE_INCOME / SALES_REVENUE posting profile/chart account is missing or inactive.")
+    if tax_amount > Decimal("0.00") and output_gst_account is None:
+        warnings.append("OUTPUT_GST posting profile/chart account is missing or inactive for taxable invoice.")
+    if warnings:
+        return [], warnings, None
+    lines = [
+        {"chart_account": receivable_account, "description": f"Invoice receivable {_invoice_reference(invoice)}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
+        {"chart_account": revenue_account, "description": f"Invoice revenue {_invoice_reference(invoice)}", "debit_amount": Decimal("0.00"), "credit_amount": taxable_amount},
+    ]
+    if tax_amount > Decimal("0.00"):
+        lines.append({"chart_account": output_gst_account, "description": f"Output GST {_invoice_reference(invoice)}", "debit_amount": Decimal("0.00"), "credit_amount": tax_amount})
+    return lines, warnings, None
 
 
 def _preview_lines(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -326,6 +414,33 @@ def receipt_candidate(receipt: ReceiptDocument) -> dict[str, Any]:
     return payload
 
 
+def billing_invoice_candidate(invoice: BillingInvoice) -> dict[str, Any]:
+    event_key, event_label, classification_reason = _classify_invoice_event(invoice)
+    purpose = BILLING_INVOICE_PURPOSE_BY_EVENT.get(event_key, event_key.upper())
+    bridge = _existing_bridge_for(source_model=BILLING_INVOICE_SOURCE_MODEL, source_id=str(invoice.id), purpose=purpose)
+    journal = bridge.journal_entry if bridge else None
+    reconciliation_item = _latest_posting_reconciliation_item(source_model=BILLING_INVOICE_SOURCE_MODEL, source_id=str(invoice.id)) if journal else _latest_reconciliation_item(source_model=BILLING_INVOICE_SOURCE_MODEL, source_id=str(invoice.id))
+    period = getattr(journal, "accounting_period", None) or _source_period(invoice.invoice_date)
+    period_readiness = build_accounting_bridge_posting_period_readiness(reference_date=invoice.invoice_date, financial_year=getattr(period, "financial_year", None), period=period)
+    lines, line_warnings, finance_account = _invoice_lines(invoice, event_key) if event_key in BILLING_INVOICE_EVENT_KEYS else ([], [classification_reason] if classification_reason else [], None)
+    raw_status = "READY" if lines else "NOT_CONFIGURED"
+    if event_key == SKIPPED_INVOICE_EVENT_KEY:
+        raw_status = "SKIPPED_NOT_APPLICABLE"
+    elif event_key == UNSUPPORTED_INVOICE_EVENT_KEY:
+        raw_status = "UNSUPPORTED_SOURCE"
+    bridge_row = {"event_key": event_key, "status": raw_status, "label": event_label, "blocking_reasons": [item for item in [classification_reason, *line_warnings] if item]}
+    postability = evaluate_accounting_postability(event_key=event_key, event_label=event_label, module="billing", source_model=BILLING_INVOICE_SOURCE_MODEL, bridge_row=bridge_row, period_readiness=period_readiness, source_workflow_exists=event_key in BILLING_INVOICE_EVENT_KEYS, posted=bool(journal), reconciled=bool(reconciliation_item and reconciliation_item.status == ReconciliationItemStatus.MATCHED), as_source_row=not bool(journal))
+    if event_key == SKIPPED_INVOICE_EVENT_KEY:
+        postability = {**postability, "status": "SKIPPED_NOT_APPLICABLE", "canonical_status": "SKIPPED_NOT_APPLICABLE", "can_post": False, "can_preview": False, "blocker_code": "SKIPPED_NOT_APPLICABLE", "blocker_reason": classification_reason or "Invoice is not applicable for bridge posting.", "recommended_action": "No bridge posting action is required for this invoice."}
+    elif line_warnings and postability["status"] == "READY_UNPOSTED":
+        postability = {**postability, "status": "BLOCKED_BY_MAPPING", "canonical_status": "BLOCKED_BY_MAPPING", "can_post": False, "can_preview": False, "blocker_code": "MAPPING_NOT_READY", "blocker_reason": line_warnings[0], "recommended_action": "Fix invoice receivable, sales revenue, and tax mapping before posting."}
+    total_debit, total_credit = _line_totals(lines)
+    candidate_id = _candidate_id(source_model=BILLING_INVOICE_SOURCE_MODEL, source_pk=invoice.id, event_key=event_key)
+    payload = _candidate_payload(candidate_id=candidate_id, event_key=event_key, event_label=event_label, module="billing", source_model=BILLING_INVOICE_SOURCE_MODEL, source_pk=invoice.id, source_display=f"Invoice {_invoice_reference(invoice)}", source_reference=_invoice_reference(invoice), source_date=invoice.invoice_date, amount=invoice.grand_total, lines=lines, finance_account=finance_account, period=period, postability=postability, journal=journal, reconciliation_item=reconciliation_item, idempotency_key=f"bridge:{purpose}:BillingInvoice:{invoice.id}:{invoice.invoice_date.isoformat()}:{_money(invoice.grand_total):.2f}")
+    payload.update({"invoice_type": invoice.document_type, "invoice_status": invoice.status, "invoice_number": invoice.document_no, "taxable_amount": f"{_money(invoice.taxable_total):.2f}", "tax_amount": f"{_money(invoice.tax_total):.2f}", "unsupported_source": event_key == UNSUPPORTED_INVOICE_EVENT_KEY, "approval_required": False, "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit)})
+    return payload
+
+
 def _candidate_payload(*, candidate_id: str, event_key: str, event_label: str, module: str, source_model: str, source_pk: int, source_display: str, source_reference: str, source_date: date, amount: Any, lines: list[dict[str, Any]], finance_account: FinanceAccount | None, period: AccountingPeriod | None, postability: dict[str, Any], journal: JournalEntry | None, reconciliation_item: ReconciliationItem | None, idempotency_key: str) -> dict[str, Any]:
     total_debit, total_credit = _line_totals(lines)
     purpose = RECEIPT_PURPOSE_BY_EVENT.get(event_key, PAYMENT_COLLECTION_PURPOSE if source_model == "Payment" else event_key.upper())
@@ -349,6 +464,13 @@ def list_bridge_candidates(filters: BridgeCandidateFilters | None = None) -> lis
         if active_filters.event_key:
             receipt_rows = [row for row in receipt_rows if row["event_key"] == active_filters.event_key]
         rows.extend(receipt_rows)
+    if requested_model in {"", BILLING_INVOICE_SOURCE_MODEL} and (not active_filters.module or active_filters.module == "billing"):
+        queryset = BillingInvoice.objects.select_related("finance_account", "finance_account__chart_account", "direct_sale", "customer", "subscription").all()
+        queryset = _date_filter_qs(queryset, active_filters, date_field="invoice_date")
+        invoice_rows = [billing_invoice_candidate(invoice) for invoice in queryset.order_by("-invoice_date", "-id")[:500]]
+        if active_filters.event_key:
+            invoice_rows = [row for row in invoice_rows if row["event_key"] == active_filters.event_key]
+        rows.extend(invoice_rows)
     rows.sort(key=lambda row: (row.get("source_date") or "", str(row.get("source_id") or "")), reverse=True)
     if active_filters.status:
         rows = [row for row in rows if row["status"] == active_filters.status or row.get("reconciliation_state") == active_filters.status]
@@ -371,6 +493,15 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
         if candidate["event_key"] != event_key:
             raise ValueError("ReceiptDocument candidate event no longer matches current source state.")
         return candidate
+    if source_kind == "billinginvoice":
+        queryset = BillingInvoice.objects.select_related("finance_account", "finance_account__chart_account", "direct_sale", "customer", "subscription")
+        if for_update:
+            queryset = queryset.select_for_update()
+        invoice = queryset.get(pk=source_pk)
+        candidate = billing_invoice_candidate(invoice)
+        if candidate["event_key"] != event_key:
+            raise ValueError("BillingInvoice candidate event no longer matches current source state.")
+        return candidate
     raise ValueError("Unsupported bridge candidate source.")
 
 
@@ -390,6 +521,14 @@ def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
         lines, warnings, _finance_account = _receipt_lines(source, event_key) if event_key in RECEIPT_EVENT_KEYS else ([], [candidate.get("blocker_reason") or "Unsupported ReceiptDocument event."], None)
         journal_date = source.receipt_date
         source_model = RECEIPT_SOURCE_MODEL
+    elif source_kind == "billinginvoice":
+        source = BillingInvoice.objects.select_related("finance_account", "finance_account__chart_account", "direct_sale", "customer", "subscription").get(pk=source_pk)
+        candidate = billing_invoice_candidate(source)
+        if candidate["event_key"] != event_key:
+            raise ValueError("BillingInvoice candidate event no longer matches current source state.")
+        lines, warnings, _finance_account = _invoice_lines(source, event_key) if event_key in BILLING_INVOICE_EVENT_KEYS else ([], [candidate.get("blocker_reason") or "Unsupported BillingInvoice event."], None)
+        journal_date = source.invoice_date
+        source_model = BILLING_INVOICE_SOURCE_MODEL
     else:
         raise ValueError("Unsupported bridge candidate source.")
     blockers = []
@@ -402,11 +541,20 @@ def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
         journal_number_preview = None
         blockers.append(str(exc))
     total_debit, total_credit = _line_totals(lines)
-    return {"candidate": candidate, "candidate_id": candidate_id, "source": {"model": source_model, "pk": source.id, "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate["source_date"], "amount": candidate["amount"]}, "journal_date": journal_date.isoformat(), "accounting_period": candidate["accounting_period"], "journal_number_preview": journal_number_preview, "debit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if _money(line.get("debit_amount")) > 0], "credit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if _money(line.get("credit_amount")) > 0], "lines": _preview_lines(lines), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "tax_lines": [], "finance_account_line": candidate["finance_account"], "warnings": warnings, "blockers": list(dict.fromkeys([item for item in blockers if item])), "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers), "idempotency_key": candidate["idempotency_key"], "safety_text": SAFETY_TEXT}
+    tax_lines = [
+        _line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount"))
+        for line in lines
+        if _money(line.get("credit_amount")) > 0 and getattr(line.get("chart_account"), "system_code", "") == "OUTPUT_GST"
+    ]
+    source_payload = {"model": source_model, "pk": source.id, "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate["source_date"], "amount": candidate["amount"]}
+    if source_model == BILLING_INVOICE_SOURCE_MODEL:
+        source_payload.update({"invoice_number": candidate.get("invoice_number"), "invoice_type": candidate.get("invoice_type"), "invoice_status": candidate.get("invoice_status"), "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount")})
+    return {"candidate": candidate, "candidate_id": candidate_id, "source": source_payload, "journal_date": journal_date.isoformat(), "accounting_period": candidate["accounting_period"], "journal_number_preview": journal_number_preview, "debit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if _money(line.get("debit_amount")) > 0], "credit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if _money(line.get("credit_amount")) > 0], "lines": _preview_lines(lines), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "tax_lines": tax_lines, "finance_account_line": candidate["finance_account"], "warnings": warnings, "blockers": list(dict.fromkeys([item for item in blockers if item])), "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers), "idempotency_key": candidate["idempotency_key"], "safety_text": SAFETY_TEXT}
 
 
 def _create_pending_reconciliation_item(*, journal: JournalEntry, source_model: str, source_id: str, source_label: str, amount: Decimal, candidate_id: str, actor, note: str = "") -> ReconciliationItem:
-    run = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="BRIDGE_POSTING", module="ACCOUNTING_BRIDGE", date_from=journal.entry_date, date_to=journal.entry_date, status=ReconciliationRunStatus.COMPLETED, started_by=actor, started_at=timezone.now(), finished_at=timezone.now(), total_checked=1, total_matched=0, total_exceptions=1, high_risk_count=0, metadata={"phase": "F", "phase_slice": "F2" if source_model == RECEIPT_SOURCE_MODEL else "F", "system_created_after_bridge_post": True, "verification_required": True, "posting_note": note})
+    phase_slice = "F3" if source_model == BILLING_INVOICE_SOURCE_MODEL else ("F2" if source_model == RECEIPT_SOURCE_MODEL else "F")
+    run = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="BRIDGE_POSTING", module="ACCOUNTING_BRIDGE", date_from=journal.entry_date, date_to=journal.entry_date, status=ReconciliationRunStatus.COMPLETED, started_by=actor, started_at=timezone.now(), finished_at=timezone.now(), total_checked=1, total_matched=0, total_exceptions=1, high_risk_count=0, metadata={"phase": "F", "phase_slice": phase_slice, "system_created_after_bridge_post": True, "verification_required": True, "posting_note": note})
     item = ReconciliationItem.objects.create(run=run, module="ACCOUNTING_BRIDGE_PHASE_F", source_type=source_model, source_id=source_id, source_label=source_label, expected_amount=amount, actual_amount=amount, amount_delta=Decimal("0.00"), severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code="POSTED_UNVERIFIED", exception_message="Bridge journal was posted and is waiting for explicit reconciliation verification.", recommended_action="Run reconciliation checks, then verify this bridge item if no hard exception is reported.", metadata={"journal_entry_id": journal.id, "journal_entry_no": journal.entry_no, "bridge_candidate_id": candidate_id, "action_href": "/admin/accounting/bridge-reconciliation"})
     ReconciliationEvidence.objects.create(item=item, evidence_type=source_model, object_id=source_id, label=source_label, amount=amount, status="SOURCE")
     ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, amount=amount, status=journal.status)
@@ -425,6 +573,8 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
         return _post_payment_candidate(source_pk=source_pk, candidate_id=candidate_id, candidate_key=candidate_key, posting_note=posting_note, actor=actor)
     if source_kind == "receiptdocument" and event_key in RECEIPT_EVENT_KEYS:
         return _post_receipt_candidate(source_pk=source_pk, event_key=event_key, candidate_id=candidate_id, candidate_key=candidate_key, posting_note=posting_note, actor=actor)
+    if source_kind == "billinginvoice" and event_key in BILLING_INVOICE_EVENT_KEYS:
+        return _post_billing_invoice_candidate(source_pk=source_pk, event_key=event_key, candidate_id=candidate_id, candidate_key=candidate_key, posting_note=posting_note, actor=actor)
     raise ValueError("Unsupported bridge candidate source.")
 
 
@@ -481,6 +631,32 @@ def _post_receipt_candidate(*, source_pk: str, event_key: str, candidate_id: str
     if created and not (reconciliation_item and reconciliation_item.exception_code == "POSTED_UNVERIFIED"):
         reconciliation_item = _create_pending_reconciliation_item(journal=journal, source_model=RECEIPT_SOURCE_MODEL, source_id=str(receipt.id), source_label=_receipt_reference(receipt), amount=receipt.amount, candidate_id=candidate_id, actor=actor, note=posting_note)
     _log_candidate_post(journal=journal, actor=actor, candidate_id=candidate_id, source_model=RECEIPT_SOURCE_MODEL, source_id=receipt.id, event_key=event_key, amount=receipt.amount, candidate_key=candidate_key, reconciliation_item=reconciliation_item)
+    return _post_result(created=created, journal=journal, reconciliation_item=reconciliation_item)
+
+
+def _post_billing_invoice_candidate(*, source_pk: str, event_key: str, candidate_id: str, candidate_key: str, posting_note: str, actor) -> dict[str, Any]:
+    invoice = BillingInvoice.objects.select_for_update().select_related("finance_account", "finance_account__chart_account", "direct_sale", "customer", "subscription").get(pk=source_pk)
+    candidate = billing_invoice_candidate(invoice)
+    if candidate["event_key"] != event_key:
+        raise ValueError("BillingInvoice candidate event no longer matches current source state.")
+    purpose = BILLING_INVOICE_PURPOSE_BY_EVENT[event_key]
+    existing = AccountingBridgePosting.objects.select_for_update().filter(source_model=BILLING_INVOICE_SOURCE_MODEL, source_id=str(invoice.id), purpose=purpose).select_related("journal_entry").first()
+    if existing is not None:
+        return _existing_key_or_error(existing, candidate_key, "This BillingInvoice event has already been posted with a different or legacy idempotency key.")
+    if candidate["idempotency_key"] != candidate_key:
+        raise ValueError("idempotency_key does not match the current source candidate.")
+    preview = preview_bridge_candidate(candidate_id)
+    if not preview["can_post"]:
+        raise ValueError("; ".join(preview["blockers"]) or "Candidate is not postable.")
+    lines, _warnings, _finance_account = _invoice_lines(invoice, event_key)
+    total_debit, total_credit = _line_totals(lines)
+    if not lines or total_debit != total_credit:
+        raise ValueError("Bridge posting preview is not balanced.")
+    journal, created = post_bridge_entry(source_instance=invoice, purpose=purpose, entry_date=invoice.invoice_date, memo=f"Bridge invoice posting {invoice.id} {event_key}", lines=lines, voucher_type=purpose, source_type=invoice.source_type or "BILLING_INVOICE", source_reference=_invoice_reference(invoice), source_document_no=invoice.document_no or "", source_event_date=invoice.invoice_date, trace_metadata={"event_key": event_key, "idempotency_key": candidate_key, "posting_note": posting_note, "billing_invoice_id": invoice.id, "direct_sale_id": invoice.direct_sale_id, "subscription_id": invoice.subscription_id, "customer_id": invoice.customer_id, "invoice_type": invoice.document_type, "invoice_status": invoice.status, "taxable_amount": f"{_money(invoice.taxable_total):.2f}", "tax_amount": f"{_money(invoice.tax_total):.2f}", "amount": f"{_money(invoice.grand_total):.2f}"}, posted_by=actor)
+    reconciliation_item = _latest_posting_reconciliation_item(source_model=BILLING_INVOICE_SOURCE_MODEL, source_id=str(invoice.id))
+    if created and not (reconciliation_item and reconciliation_item.exception_code == "POSTED_UNVERIFIED"):
+        reconciliation_item = _create_pending_reconciliation_item(journal=journal, source_model=BILLING_INVOICE_SOURCE_MODEL, source_id=str(invoice.id), source_label=_invoice_reference(invoice), amount=invoice.grand_total, candidate_id=candidate_id, actor=actor, note=posting_note)
+    _log_candidate_post(journal=journal, actor=actor, candidate_id=candidate_id, source_model=BILLING_INVOICE_SOURCE_MODEL, source_id=invoice.id, event_key=event_key, amount=invoice.grand_total, candidate_key=candidate_key, reconciliation_item=reconciliation_item)
     return _post_result(created=created, journal=journal, reconciliation_item=reconciliation_item)
 
 
@@ -558,6 +734,8 @@ def summarize_candidate_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
     counts = Counter(row.get("status") or "INFO" for row in rows)
     receipt_counts = Counter(row.get("status") or "INFO" for row in rows if row.get("source_model") == RECEIPT_SOURCE_MODEL)
     payment_counts = Counter(row.get("status") or "INFO" for row in rows if row.get("source_model") == "Payment")
+    invoice_counts = Counter(row.get("status") or "INFO" for row in rows if row.get("source_model") == BILLING_INVOICE_SOURCE_MODEL)
     receipt_posted_unverified = sum(1 for row in rows if row.get("source_model") == RECEIPT_SOURCE_MODEL and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
     payment_posted_unverified = sum(1 for row in rows if row.get("source_model") == "Payment" and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
-    return {"candidate_count": len(rows), "ready_unposted_count": counts.get("READY_UNPOSTED", 0), "posted_count": counts.get("POSTED", 0), "reconciled_count": counts.get("RECONCILED", 0), "blocked_by_mapping_count": counts.get("BLOCKED_BY_MAPPING", 0), "blocked_by_period_count": counts.get("BLOCKED_BY_PERIOD", 0), "blocked_by_numbering_count": counts.get("BLOCKED_BY_NUMBERING", 0), "blocked_by_approval_count": counts.get("BLOCKED_BY_APPROVAL", 0), "unsupported_count": counts.get("UNSUPPORTED_SOURCE", 0), "receipt_ready_unposted_count": receipt_counts.get("READY_UNPOSTED", 0), "receipt_posted_count": receipt_counts.get("POSTED", 0), "receipt_posted_unverified_count": receipt_posted_unverified, "receipt_reconciled_count": receipt_counts.get("RECONCILED", 0), "payment_ready_unposted_count": payment_counts.get("READY_UNPOSTED", 0), "payment_posted_count": payment_counts.get("POSTED", 0), "payment_posted_unverified_count": payment_posted_unverified, "payment_reconciled_count": payment_counts.get("RECONCILED", 0)}
+    invoice_posted_unverified = sum(1 for row in rows if row.get("source_model") == BILLING_INVOICE_SOURCE_MODEL and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
+    return {"candidate_count": len(rows), "ready_unposted_count": counts.get("READY_UNPOSTED", 0), "posted_count": counts.get("POSTED", 0), "reconciled_count": counts.get("RECONCILED", 0), "blocked_by_mapping_count": counts.get("BLOCKED_BY_MAPPING", 0), "blocked_by_period_count": counts.get("BLOCKED_BY_PERIOD", 0), "blocked_by_numbering_count": counts.get("BLOCKED_BY_NUMBERING", 0), "blocked_by_approval_count": counts.get("BLOCKED_BY_APPROVAL", 0), "unsupported_count": counts.get("UNSUPPORTED_SOURCE", 0), "receipt_ready_unposted_count": receipt_counts.get("READY_UNPOSTED", 0), "receipt_posted_count": receipt_counts.get("POSTED", 0), "receipt_posted_unverified_count": receipt_posted_unverified, "receipt_reconciled_count": receipt_counts.get("RECONCILED", 0), "payment_ready_unposted_count": payment_counts.get("READY_UNPOSTED", 0), "payment_posted_count": payment_counts.get("POSTED", 0), "payment_posted_unverified_count": payment_posted_unverified, "payment_reconciled_count": payment_counts.get("RECONCILED", 0), "billing_invoice_ready_unposted_count": invoice_counts.get("READY_UNPOSTED", 0), "billing_invoice_posted_count": invoice_counts.get("POSTED", 0), "billing_invoice_posted_unverified_count": invoice_posted_unverified, "billing_invoice_reconciled_count": invoice_counts.get("RECONCILED", 0), "billing_invoice_blocked_count": sum(count for status, count in invoice_counts.items() if status.startswith("BLOCKED")), "billing_invoice_unsupported_count": invoice_counts.get("UNSUPPORTED_SOURCE", 0)}

@@ -107,11 +107,49 @@ ReceiptDocument bridge rows follow the same close posture as Payment bridge rows
 - verified/reconciled ReceiptDocument rows no longer block close as unreconciled
 - unsupported receipt shapes remain visible and non-postable
 
+## Phase F3 — BillingInvoice bridge posting
+
+Phase F3 extends the controlled bridge workflow to concrete `BillingInvoice` source items only.
+
+Supported source model:
+
+```text
+BillingInvoice
+```
+
+Supported event keys:
+
+```text
+direct_sale_invoice
+direct_sale_outstanding
+```
+
+Current safe classification:
+
+- `direct_sale_invoice` is used only when the concrete source record is `BillingInvoice` and its source posture is direct sale.
+- `direct_sale_outstanding` is allowed only when the concrete source record is `BillingInvoice` and the invoice has an outstanding receivable posture.
+- Draft, cancelled, and voided invoices are skipped as not applicable.
+- Proforma, demand note, subscription, rent/lease, and deposit/liability shapes are unsupported until a later phase defines their accounting treatment.
+- BillingInvoice posting resolves receivable, sales revenue, and output GST accounts from active posting profiles/canonical chart accounts. Missing receivable, revenue, tax, period, or journal numbering setup blocks posting with an exact reason.
+
+Invoice preview remains read-only. It does not create journals, bridge postings, reconciliation items, numbering consumption, source mutations, invoice status changes, tax recalculation, receipt allocation changes, or DirectSale mutations. The preview includes invoice identity, invoice number/reference, invoice date, invoice type/status, event key, amount, taxable amount, tax amount, journal date, accounting period, journal number preview, debit lines, credit lines, tax lines, balance status, blockers, warnings, idempotency key, and safety text.
+
+Invoice posting is explicit, admin-only, transactional, idempotent, and tied to:
+
+```text
+source_model = BillingInvoice
+source_pk = invoice.id
+event_key = direct_sale_invoice or direct_sale_outstanding
+```
+
+Posting creates a posted `JournalEntry`, an `AccountingBridgePosting`, and a pending/unverified `ReconciliationItem`. It does not mutate `BillingInvoice` financial fields, `BillingInvoice.status`, `BillingInvoice.posted_journal_entry`, DirectSale, ReceiptDocument, Payment, EMI, Subscription, StockLedger, PurchaseBill, Commission, Payout, Delivery, or rent/lease source records.
+
+Reconciliation remains pending until a run and/or explicit verification confirms the bridge item. Ready/unposted invoice rows block close as unposted bridge work. Posted/unverified invoice rows block close as unreconciled bridge work. Verified/reconciled invoice rows do not block close as unreconciled work. Unsupported invoice types remain visible separately and are never fake-posted.
+
 ## Safety limits
 
-Phase F2 does not add bridge posting for:
+Phase F3 does not add bridge posting for:
 
-- BillingInvoice
 - DirectSale source records
 - Rent/Lease source records
 - PurchaseBill

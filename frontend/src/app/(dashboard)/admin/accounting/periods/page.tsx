@@ -108,6 +108,9 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
   const receiptReady = summaryCount(summary, "receipt_ready_unposted_count");
   const receiptPostedUnverified = summaryCount(summary, "receipt_posted_unverified_count");
   const receiptReconciled = summaryCount(summary, "receipt_reconciled_count");
+  const invoiceReady = summaryCount(summary, "billing_invoice_ready_unposted_count");
+  const invoicePostedUnverified = summaryCount(summary, "billing_invoice_posted_unverified_count");
+  const invoiceReconciled = summaryCount(summary, "billing_invoice_reconciled_count");
   const otherRows = [
     { label: "Unsupported", value: summaryCount(summary, "unsupported_source_count", summaryCount(summary, "unsupported_count")), href: bridgeReviewHref({ status: "UNSUPPORTED" }) },
     { label: "Approval required", value: summaryCount(summary, "blocked_by_approval_count"), href: bridgeReviewHref({ status: "BLOCKED" }) },
@@ -137,11 +140,21 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
         { label: "Reconciled", value: receiptReconciled, detail: "Bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "ReceiptDocument", status: "RECONCILED" }) },
       ],
     },
+    {
+      title: "BillingInvoice bridge",
+      action: "Review invoice bridge items",
+      href: bridgeReviewHref({ source_model: "BillingInvoice" }),
+      rows: [
+        { label: "Ready unposted", value: invoiceReady, detail: "Invoice bridge setup is ready, but journal has not been posted.", href: bridgeReviewHref({ source_model: "BillingInvoice", status: "READY_UNPOSTED" }) },
+        { label: "Posted unverified", value: invoicePostedUnverified, detail: "Invoice journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "BillingInvoice", status: "POSTED_UNVERIFIED" }) },
+        { label: "Reconciled", value: invoiceReconciled, detail: "Invoice bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "BillingInvoice", status: "RECONCILED" }) },
+      ],
+    },
   ];
 
   return (
     <WorkspaceSection title="Bridge close readiness by source" description="Open periods are valid for posting. Period close still waits for posting and reconciliation to finish.">
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-4 xl:grid-cols-4">
         {sourceSections.map((section) => (
           <div key={section.title} className="rounded-xl border border-border bg-background p-4">
             <div className="flex items-start justify-between gap-3">
