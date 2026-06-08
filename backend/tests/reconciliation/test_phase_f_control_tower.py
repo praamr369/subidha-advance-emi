@@ -12,6 +12,7 @@ from billing.models import BillingDocumentStatus, ReceiptDocument, ReceiptType
 from branch_control.models import Branch
 from reconciliation.models import ReconciliationItem, ReconciliationResolution, ReconciliationRun
 from subscriptions.models import EmiStatus, Payment
+from tests.accounting.helpers import seed_bridge_ready_environment
 from tests.helpers import (
     create_admin_user,
     create_cashier_user,
@@ -32,6 +33,7 @@ class AdminReconciliationControlTowerPhaseFTests(APITestCase):
         self.partner = create_partner_user(username="partner_phase_f", phone="9010000002")
         self.cashier = create_cashier_user(username="cashier_phase_f", phone="9010000003")
         self.customer_user = create_customer_user(username="customer_phase_f", phone="9010000004")
+        self.bridge_env = seed_bridge_ready_environment(date(2026, 3, 8), performed_by=self.admin)
 
         self.branch = Branch.objects.order_by("id").first()
 
@@ -98,6 +100,7 @@ class AdminReconciliationControlTowerPhaseFTests(APITestCase):
             reference_no="PHF-PAY-001",
             payment_date=date(2026, 3, 8),
             branch=self.branch,
+            finance_account=self.bridge_env["finance_account"],
         )
         journal = JournalEntry.objects.create(
             entry_date=date(2026, 3, 8),
@@ -145,7 +148,6 @@ class AdminReconciliationControlTowerPhaseFTests(APITestCase):
     def test_phase_f_run_creates_expected_items(self):
         self.client.force_authenticate(user=self.admin)
 
-        # Payment linked to PENDING EMI -> STATUS_MISMATCH
         payment_pending = Payment.objects.create(
             customer=self.customer,
             subscription=self.subscription,
@@ -155,9 +157,9 @@ class AdminReconciliationControlTowerPhaseFTests(APITestCase):
             reference_no="PHF-PAY-PEND",
             payment_date=date(2026, 3, 8),
             branch=self.branch,
+            finance_account=self.bridge_env["finance_account"],
         )
 
-        # Receipt with invalid EMI payment receipt constraints: missing payment link
         ReceiptDocument.objects.create(
             receipt_no="PHF-RCT-001",
             receipt_type=ReceiptType.EMI_PAYMENT_RECEIPT,
@@ -170,7 +172,6 @@ class AdminReconciliationControlTowerPhaseFTests(APITestCase):
             amount=Decimal("1000.00"),
         )
 
-        # Payment without accounting bridge posting for PAYMENT_COLLECTION
         Payment.objects.create(
             customer=self.customer,
             subscription=self.subscription,
@@ -180,9 +181,9 @@ class AdminReconciliationControlTowerPhaseFTests(APITestCase):
             reference_no="PHF-PAY-NOBRIDGE",
             payment_date=date(2026, 3, 9),
             branch=self.branch,
+            finance_account=self.bridge_env["finance_account"],
         )
 
-        # Unbalanced journal group
         JournalEntryGroup.objects.create(
             source_module="tests.reconciliation",
             source_object_id="1",
@@ -193,7 +194,6 @@ class AdminReconciliationControlTowerPhaseFTests(APITestCase):
             created_by=self.admin,
         )
 
-        # Bridge posting with a journal that lacks source_model/source_id
         payment_for_bridge = Payment.objects.create(
             customer=self.customer,
             subscription=self.subscription,
@@ -203,6 +203,7 @@ class AdminReconciliationControlTowerPhaseFTests(APITestCase):
             reference_no="PHF-PAY-BRIDGE-BADJRN",
             payment_date=date(2026, 3, 11),
             branch=self.branch,
+            finance_account=self.bridge_env["finance_account"],
         )
         bad_journal = JournalEntry.objects.create(
             entry_date=date(2026, 3, 11),
