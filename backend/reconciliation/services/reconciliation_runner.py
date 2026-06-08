@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import date
 
 from django.db import transaction
-from django.db.models import Max
 from django.utils import timezone
 
 from reconciliation.models import (
@@ -18,6 +17,7 @@ from reconciliation.services.emi_reconciliation import run_emi_checks
 from reconciliation.services.inventory_stock_reconciliation import run_inventory_stock_checks
 from reconciliation.services.return_cancellation_reconciliation import run_return_cancellation_checks
 from reconciliation.services.settlement_allocation_reconciliation import run_settlement_allocation_checks
+from reconciliation.services.run_numbering import next_reconciliation_run_no
 from reconciliation.services.vendor_payable_reconciliation import run_vendor_payable_checks
 
 
@@ -34,9 +34,8 @@ class PhaseFRunRequest:
 
 @transaction.atomic
 def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> ReconciliationRun:
-    run_no = (ReconciliationRun.objects.aggregate(mx=Max("run_no"))["mx"] or 0) + 1
     run = ReconciliationRun.objects.create(
-        run_no=run_no,
+        run_no=next_reconciliation_run_no(),
         scope=request.scope,
         module=request.module,
         branch_id=request.branch_id,

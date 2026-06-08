@@ -248,7 +248,14 @@ def _ensure_collection_mappings(*, performed_by=None, finance_accounts: dict[str
             changes = {}
             if mapping.finance_account_id == target_finance.id and mapping.chart_account_id != target_chart.id:
                 changes["chart_account"] = target_chart
-            if not mapping.is_default:
+            if (
+                not mapping.is_default
+                and not FinanceAccountCoaMapping.objects.filter(
+                    purpose=purpose,
+                    is_active=True,
+                    is_default=True,
+                ).exclude(pk=mapping.pk).exists()
+            ):
                 changes["is_default"] = True
             if changes:
                 for field, value in changes.items():

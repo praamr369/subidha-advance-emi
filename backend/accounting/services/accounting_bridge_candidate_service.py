@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Q
 from django.utils import timezone
 
 from accounting.models import AccountingBridgePosting, AccountingPeriod, ChartOfAccount, FinanceAccount, JournalEntry, JournalEntryStatus
@@ -20,6 +20,7 @@ from accounting.services.journal_posting_service import _log_accounting_event
 from accounting.services.period_service import resolve_accounting_period
 from billing.models import BillingDocumentStatus, BillingSourceType, ReceiptDocument, ReceiptType
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationItemStatus, ReconciliationRun, ReconciliationRunStatus, ReconciliationSeverity
+from reconciliation.services.run_numbering import next_reconciliation_run_no
 from subscriptions.models import Payment
 
 PAYMENT_COLLECTION_EVENT_KEY = "subscription_emi_payment"
@@ -404,12 +405,8 @@ def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
     return {"candidate": candidate, "candidate_id": candidate_id, "source": {"model": source_model, "pk": source.id, "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate["source_date"], "amount": candidate["amount"]}, "journal_date": journal_date.isoformat(), "accounting_period": candidate["accounting_period"], "journal_number_preview": journal_number_preview, "debit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if _money(line.get("debit_amount")) > 0], "credit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if _money(line.get("credit_amount")) > 0], "lines": _preview_lines(lines), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "tax_lines": [], "finance_account_line": candidate["finance_account"], "warnings": warnings, "blockers": list(dict.fromkeys([item for item in blockers if item])), "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers), "idempotency_key": candidate["idempotency_key"], "safety_text": SAFETY_TEXT}
 
 
-def _next_run_no() -> int:
-    return (ReconciliationRun.objects.aggregate(mx=Max("run_no"))["mx"] or 0) + 1
-
-
 def _create_pending_reconciliation_item(*, journal: JournalEntry, source_model: str, source_id: str, source_label: str, amount: Decimal, candidate_id: str, actor, note: str = "") -> ReconciliationItem:
-    run = ReconciliationRun.objects.create(run_no=_next_run_no(), scope="BRIDGE_POSTING", module="ACCOUNTING_BRIDGE", date_from=journal.entry_date, date_to=journal.entry_date, status=ReconciliationRunStatus.COMPLETED, started_by=actor, started_at=timezone.now(), finished_at=timezone.now(), total_checked=1, total_matched=0, total_exceptions=1, high_risk_count=0, metadata={"phase": "F", "phase_slice": "F2" if source_model == RECEIPT_SOURCE_MODEL else "F", "system_created_after_bridge_post": True, "verification_required": True, "posting_note": note})
+    run = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="BRIDGE_POSTING", module="ACCOUNTING_BRIDGE", date_from=journal.entry_date, date_to=journal.entry_date, status=ReconciliationRunStatus.COMPLETED, started_by=actor, started_at=timezone.now(), finished_at=timezone.now(), total_checked=1, total_matched=0, total_exceptions=1, high_risk_count=0, metadata={"phase": "F", "phase_slice": "F2" if source_model == RECEIPT_SOURCE_MODEL else "F", "system_created_after_bridge_post": True, "verification_required": True, "posting_note": note})
     item = ReconciliationItem.objects.create(run=run, module="ACCOUNTING_BRIDGE_PHASE_F", source_type=source_model, source_id=source_id, source_label=source_label, expected_amount=amount, actual_amount=amount, amount_delta=Decimal("0.00"), severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code="POSTED_UNVERIFIED", exception_message="Bridge journal was posted and is waiting for explicit reconciliation verification.", recommended_action="Run reconciliation checks, then verify this bridge item if no hard exception is reported.", metadata={"journal_entry_id": journal.id, "journal_entry_no": journal.entry_no, "bridge_candidate_id": candidate_id, "action_href": "/admin/accounting/bridge-reconciliation"})
     ReconciliationEvidence.objects.create(item=item, evidence_type=source_model, object_id=source_id, label=source_label, amount=amount, status="SOURCE")
     ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, amount=amount, status=journal.status)

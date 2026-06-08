@@ -10,6 +10,7 @@ from accounting.services.document_sequence_service import DocumentType
 from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
 from reconciliation.models import ReconciliationItem, ReconciliationItemStatus, ReconciliationRun, ReconciliationRunStatus
 from reconciliation.services.accounting_bridge_reconciliation import run_accounting_bridge_checks
+from reconciliation.services.run_numbering import next_reconciliation_run_no
 from subscriptions.models import Payment, PaymentMethod
 from tests.helpers import (
     create_admin_user,
@@ -218,7 +219,7 @@ class AccountingBridgeCandidatePostingPhaseFTests(APITestCase):
 
     def test_reconciliation_run_reports_unposted_posted_duplicate_and_amount_mismatch_payment(self):
         run = ReconciliationRun.objects.create(
-            run_no=9001,
+            run_no=next_reconciliation_run_no(),
             scope="PHASE_F_TEST",
             module="ACCOUNTING_BRIDGE",
             date_from=self.payment.payment_date,
@@ -235,7 +236,7 @@ class AccountingBridgeCandidatePostingPhaseFTests(APITestCase):
         post_response = self.client.post(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/{self.candidate_id}/post/", {"idempotency_key": preview["idempotency_key"], "confirm": True}, format="json")
         journal = JournalEntry.objects.get(pk=post_response.data["journal_entry"]["id"])
         run2 = ReconciliationRun.objects.create(
-            run_no=9002,
+            run_no=next_reconciliation_run_no(),
             scope="PHASE_F_TEST",
             module="ACCOUNTING_BRIDGE",
             date_from=self.payment.payment_date,
@@ -250,7 +251,7 @@ class AccountingBridgeCandidatePostingPhaseFTests(APITestCase):
         first_debit.debit_amount = Decimal("999.00")
         first_debit.save(update_fields=["debit_amount", "updated_at"])
         run3 = ReconciliationRun.objects.create(
-            run_no=9003,
+            run_no=next_reconciliation_run_no(),
             scope="PHASE_F_TEST",
             module="ACCOUNTING_BRIDGE",
             date_from=self.payment.payment_date,

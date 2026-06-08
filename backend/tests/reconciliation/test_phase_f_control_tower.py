@@ -11,6 +11,7 @@ from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntr
 from billing.models import BillingDocumentStatus, ReceiptDocument, ReceiptType
 from branch_control.models import Branch
 from reconciliation.models import ReconciliationItem, ReconciliationResolution, ReconciliationRun
+from reconciliation.services.run_numbering import next_reconciliation_run_no
 from subscriptions.models import EmiStatus, Payment
 from tests.accounting.helpers import seed_bridge_ready_environment
 from tests.helpers import (
@@ -64,10 +65,23 @@ class AdminReconciliationControlTowerPhaseFTests(APITestCase):
         resp = self.client.post(endpoint, data={"date_from": "2026-03-01", "date_to": "2026-03-31"}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
 
+    def test_repeated_run_checks_allocate_unique_run_numbers(self):
+        self.client.force_authenticate(user=self.admin)
+        endpoint = "/api/v1/admin/reconciliation/runs/run-checks/"
+        payload = {"date_from": "2026-03-01", "date_to": "2026-03-31"}
+
+        first = self.client.post(endpoint, data=payload, format="json")
+        second = self.client.post(endpoint, data=payload, format="json")
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED, second.data)
+        self.assertNotEqual(first.data["run_no"], second.data["run_no"])
+        self.assertEqual(ReconciliationRun.objects.filter(run_no__in=[first.data["run_no"], second.data["run_no"]]).count(), 2)
+
     def test_resolve_requires_note(self):
         self.client.force_authenticate(user=self.admin)
         run = ReconciliationRun.objects.create(
-            run_no=1,
+            run_no=next_reconciliation_run_no(),
             scope="PHASE_F",
             module="CONTROL_TOWER",
             branch=self.branch,
@@ -112,7 +126,7 @@ class AdminReconciliationControlTowerPhaseFTests(APITestCase):
         )
 
         run = ReconciliationRun.objects.create(
-            run_no=2,
+            run_no=next_reconciliation_run_no(),
             scope="PHASE_F",
             module="CONTROL_TOWER",
             branch=self.branch,

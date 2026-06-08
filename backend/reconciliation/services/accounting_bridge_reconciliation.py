@@ -107,7 +107,13 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
     if date_from or date_to:
         bridges = bridges.filter(_date_range_filter("source_event_date", date_from, date_to))
     if branch_id:
-        bridges = bridges.filter(trace_metadata__branch_id=branch_id)
+        payment_source_ids = [str(pk) for pk in Payment.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
+        receipt_source_ids = [str(pk) for pk in ReceiptDocument.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
+        bridges = bridges.filter(
+            Q(trace_metadata__branch_id=branch_id)
+            | Q(source_model="Payment", source_id__in=payment_source_ids)
+            | Q(source_model="ReceiptDocument", source_id__in=receipt_source_ids)
+        )
     totals["checked"] += bridges.count()
 
     for bridge in bridges:
