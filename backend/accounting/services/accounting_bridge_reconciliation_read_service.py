@@ -60,6 +60,9 @@ def _int_or_none(value: Any) -> int | None:
 
 
 def _posting_event_key(posting: AccountingBridgePosting) -> str:
+    metadata = getattr(posting, "trace_metadata", None)
+    if isinstance(metadata, dict) and _normalize(metadata.get("event_key")):
+        return _norm_key(metadata.get("event_key"))
     purpose = _normalize(getattr(posting, "purpose", ""))
     return _norm_key(purpose) if purpose else (_norm_key(getattr(posting, "source_type", "")) or "posted_bridge")
 
@@ -289,13 +292,17 @@ def _posted_rows(filters: BridgeReconciliationFilters, financial_year: Financial
         source_id = _normalize(getattr(posting, "source_id", ""))
         source_reference = _normalize(getattr(posting, "source_reference", "")) or _normalize(getattr(journal, "source_reference", ""))
         rec_items = list(_reconciliation_items(source_model, source_id, source_reference))
-        exception_items = [item for item in rec_items if item.status in EXCEPTION_STATUSES]
+        matched_items = [item for item in rec_items if item.status == "MATCHED"]
+        pending_items = [item for item in rec_items if item.exception_code == "POSTED_UNVERIFIED" and item.status == "NEEDS_REVIEW"]
+        exception_items = [item for item in rec_items if item.status in EXCEPTION_STATUSES and item.exception_code != "POSTED_UNVERIFIED"]
         event_key = _posting_event_key(posting)
         purpose = _normalize(getattr(posting, "purpose", ""))
         status = "POSTED"
         settlement_linked = _has_settlement_link(source_model, source_id, source_reference)
-        if rec_items:
+        if matched_items:
             status = "RECONCILED"
+        elif pending_items:
+            status = "POSTED"
         if exception_items:
             status = "EXCEPTION"
         journal_fy = getattr(journal, "financial_year", None)
@@ -325,13 +332,15 @@ def _posted_rows(filters: BridgeReconciliationFilters, financial_year: Financial
             "settlement_linked": settlement_linked,
             "reconciliation_linked": bool(rec_items),
             "reconciliation_items": [{"id": item.id, "status": item.status, "severity": item.severity, "exception_code": item.exception_code, "exception_message": item.exception_message} for item in rec_items],
+            "existing_reconciliation_item_id": pending_items[0].id if pending_items else (rec_items[0].id if rec_items else None),
+            "posted_unverified": bool(pending_items),
             "exception_reasons": [item.exception_message or item.exception_code or item.status for item in exception_items],
-            "operator_action": "Review posted journal, settlement, and reconciliation coverage. This cockpit is read-only.",
+            "operator_action": "Verify the posted bridge item after checks pass." if pending_items else "Review posted journal, settlement, and reconciliation coverage. This cockpit is read-only.",
             "blocker_code": "RECONCILIATION_EXCEPTION" if exception_items else None,
             "blocker_label": "Reconciliation exception" if exception_items else None,
             "blocker_count": len(exception_items),
             "blocker_reason": "; ".join([item.exception_message or item.exception_code or item.status for item in exception_items]),
-            "recommended_action": "Open reconciliation runs and resolve exceptions." if exception_items else postability["recommended_action"],
+            "recommended_action": "Open reconciliation runs and resolve exceptions." if exception_items else ("Verify from bridge reconciliation after operator review." if pending_items else postability["recommended_action"]),
             "action_href": "/admin/reconciliation/runs" if exception_items else "/admin/accounting/bridge-reconciliation",
             "setup_href": SETUP_HREF,
             "preview_action_href": None,
@@ -492,6 +501,8 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "total_journal_postings": counts["total_journal_postings"],
         "total_money_movements": counts["total_money_movements"],
         "unposted_bridge_item_count": status_counts.get("READY_UNPOSTED", 0),
+        "posted_unreconciled_count": sum(1 for row in rows if row.get("status") == "POSTED" and (row.get("posted_unverified") or row.get("reconciliation_linked"))),
+        "posted_unverified_count": sum(1 for row in rows if row.get("posted_unverified")),
         "unreconciled_money_movement_count": counts["unreconciled_money_movement_count"],
         "reconciliation_exception_count": exception_count,
         "blocked_bridge_item_count": sum(count for status, count in status_counts.items() if status.startswith("BLOCKED") or status == "UNSUPPORTED_SOURCE"),

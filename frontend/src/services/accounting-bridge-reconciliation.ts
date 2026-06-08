@@ -21,6 +21,8 @@ export type AccountingBridgeReconciliationSummary = {
   total_journal_postings?: number;
   total_money_movements?: number;
   unposted_bridge_item_count?: number;
+  posted_unreconciled_count?: number;
+  posted_unverified_count?: number;
   unreconciled_money_movement_count?: number;
   reconciliation_exception_count?: number;
   blocked_bridge_item_count?: number;

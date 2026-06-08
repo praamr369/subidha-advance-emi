@@ -160,6 +160,10 @@ export default function AccountingBridgeReconciliationPage() {
     return row.row_type === "bridge_candidate" && Boolean(row.bridge_candidate_id && row.idempotency_key && row.can_post && row.status === "READY_UNPOSTED");
   }
 
+  function isConcretePreviewCandidate(row: AccountingBridgeReconciliationRow): boolean {
+    return row.row_type === "bridge_candidate" && Boolean(row.bridge_candidate_id && row.can_preview);
+  }
+
   function toggleCandidate(candidateId: string, checked: boolean) {
     setSelectedCandidateIds((current) => checked ? Array.from(new Set([...current, candidateId])) : current.filter((id) => id !== candidateId));
   }
@@ -178,6 +182,7 @@ export default function AccountingBridgeReconciliationPage() {
 
   async function handlePostCandidate(candidateId: string, idempotencyKey?: string | null) {
     if (!idempotencyKey) return;
+    if (!window.confirm("Post this bridge candidate now? This creates a JournalEntry and pending reconciliation item. Source payment, EMI, receipt, and invoice values are not changed.")) return;
     setActionBusy(`post:${candidateId}`);
     setError(null);
     try {
@@ -210,6 +215,7 @@ export default function AccountingBridgeReconciliationPage() {
   async function handleBatchPost() {
     const selectedRows = candidateRows.filter((row) => row.bridge_candidate_id && selectedCandidateIds.includes(row.bridge_candidate_id));
     if (selectedRows.length === 0 || !selectedRows.every(isConcretePostableCandidate)) return;
+    if (!window.confirm(`Post ${selectedRows.length} selected bridge candidate(s)? This creates accounting journals and pending reconciliation items only.`)) return;
     setActionBusy("batch-post");
     setError(null);
     try {
@@ -286,7 +292,7 @@ export default function AccountingBridgeReconciliationPage() {
     if (row.row_type === "bridge_candidate") {
       const candidateId = row.bridge_candidate_id || row.id;
       const canPost = isConcretePostableCandidate(row);
-      return <div className="flex flex-col gap-2 text-xs"><button type="button" disabled={!candidateId || actionBusy === `preview:${candidateId}`} onClick={() => candidateId ? void handlePreviewCandidate(candidateId) : undefined} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left font-semibold text-blue-900">{actionBusy === `preview:${candidateId}` ? "Previewing..." : "Preview"}</button>{canPost ? <button type="button" disabled={actionBusy === `post:${candidateId}`} onClick={() => candidateId ? void handlePostCandidate(candidateId, row.idempotency_key) : undefined} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left font-semibold text-emerald-900">{actionBusy === `post:${candidateId}` ? "Posting..." : "Post"}</button> : <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">Post disabled: {row.blocker_reason || row.status}</span>}{row.journal_entry?.id ? <Link href={`${ROUTES.admin.accountingJournals}/${row.journal_entry.id}`} className="font-semibold text-primary underline underline-offset-4">View journal</Link> : null}{row.status === "POSTED" && row.existing_reconciliation_item_id ? <button type="button" disabled={actionBusy === `verify:${row.existing_reconciliation_item_id}`} onClick={() => void handleVerify(row)} className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-left font-semibold text-emerald-900">Verify</button> : null}</div>;
+      return <div className="flex flex-col gap-2 text-xs"><button type="button" disabled={!candidateId || !isConcretePreviewCandidate(row) || actionBusy === `preview:${candidateId}`} onClick={() => candidateId ? void handlePreviewCandidate(candidateId) : undefined} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left font-semibold text-blue-900">{actionBusy === `preview:${candidateId}` ? "Previewing..." : "Preview"}</button>{canPost ? <button type="button" disabled={!candidateId || actionBusy === `preview:${candidateId}`} onClick={() => candidateId ? void handlePreviewCandidate(candidateId) : undefined} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left font-semibold text-emerald-900">Preview to post</button> : <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">Post disabled: {row.blocker_reason || row.status}</span>}{row.journal_entry?.id ? <Link href={`${ROUTES.admin.accountingJournals}/${row.journal_entry.id}`} className="font-semibold text-primary underline underline-offset-4">View journal</Link> : null}{row.status === "POSTED" && row.existing_reconciliation_item_id ? <button type="button" disabled={actionBusy === `verify:${row.existing_reconciliation_item_id}`} onClick={() => void handleVerify(row)} className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-left font-semibold text-emerald-900">Verify</button> : null}</div>;
     }
     if ((row.status === "POSTABLE" || row.status === "READY_UNPOSTED") && row.row_type !== "bridge_candidate") {
       return <div className="flex flex-col gap-2 text-xs"><Link href={`${ROUTES.admin.accountingBridgeReconciliation}?event_key=${encodeURIComponent(row.event_key)}&source_model=${encodeURIComponent(row.source_model || "")}`} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-900">View source items</Link><span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">Posting requires a concrete source item. Abstract event rows cannot be posted.</span></div>;
