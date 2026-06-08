@@ -7,6 +7,8 @@ from django.apps import apps
 from django.utils import timezone
 
 from accounting.models import (
+    AccountingPeriod,
+    AccountingPeriodStatus,
     BusinessTaxProfile,
     BusinessTaxRegistrationMode,
     ChartOfAccount,
@@ -840,14 +842,57 @@ def build_accounting_bridge_readiness() -> dict[str, Any]:
 
 
 def build_accounting_bridge_period_readiness() -> dict[str, Any]:
-    reference_date = timezone.localdate()
+    return build_accounting_bridge_posting_period_readiness()
+
+
+def build_accounting_bridge_posting_period_readiness(
+    *,
+    reference_date=None,
+    financial_year=None,
+    period: AccountingPeriod | None = None,
+) -> dict[str, Any]:
+    reference_date = reference_date or timezone.localdate()
     readiness = build_accounting_period_readiness(reference_date)
     active_financial_year = readiness.get("active_financial_year")
-    current_period = readiness.get("current_period")
-    blockers = [str(error) for error in readiness.get("errors") or []]
+    target_financial_year = financial_year or active_financial_year
+    current_period = period or readiness.get("current_period")
+    blockers: list[str] = []
+    period_blockers: list[dict[str, str]] = []
     journal_numbering_ready = False
 
-    if readiness.get("is_ready"):
+    def add_period_blocker(code: str, reason: str) -> None:
+        blockers.append(reason)
+        period_blockers.append({"code": code, "reason": reason})
+
+    if active_financial_year is None:
+        add_period_blocker("NO_ACTIVE_FINANCIAL_YEAR", "No active financial year is configured.")
+    elif target_financial_year is None:
+        add_period_blocker("NO_TARGET_FINANCIAL_YEAR", "No target financial year is selected.")
+    elif target_financial_year.pk != active_financial_year.pk:
+        add_period_blocker(
+            "OUTSIDE_ACTIVE_FINANCIAL_YEAR",
+            f"Selected financial year {target_financial_year.code} is not the active financial year {active_financial_year.code}.",
+        )
+    elif current_period is None:
+        add_period_blocker("MISSING_PERIOD", "No accounting period is selected for bridge posting.")
+    elif current_period.financial_year_id != active_financial_year.id:
+        add_period_blocker(
+            "OUTSIDE_ACTIVE_FINANCIAL_YEAR",
+            f"Selected accounting period {current_period.code} is outside active financial year {active_financial_year.code}.",
+        )
+    elif current_period.status == AccountingPeriodStatus.CLOSED:
+        add_period_blocker("CLOSED_PERIOD", f"Selected accounting period {current_period.code} is closed.")
+    elif current_period.status == AccountingPeriodStatus.LOCKED or current_period.is_locked:
+        add_period_blocker("LOCKED_PERIOD", f"Selected accounting period {current_period.code} is locked.")
+
+    for item in readiness.get("blocker_items") or []:
+        code = str(item.get("code") or "")
+        if code == "POSTING_LOCK_EXISTS":
+            add_period_blocker("POSTING_LOCK_ACTIVE", str(item.get("label") or "Posting lock is active."))
+
+    period_ready = not period_blockers
+
+    if period_ready:
         try:
             validate_document_numbering_ready(DocumentType.JOURNAL_ENTRY, reference_date)
             journal_numbering_ready = True
@@ -856,20 +901,20 @@ def build_accounting_bridge_period_readiness() -> dict[str, Any]:
 
     return {
         "reference_date": reference_date.isoformat(),
-        "financial_year_ready": active_financial_year is not None and not any(
+        "financial_year_ready": active_financial_year is not None and target_financial_year is not None and target_financial_year.pk == active_financial_year.pk and not any(
             "financial year" in reason.lower() for reason in blockers
         ),
-        "accounting_period_ready": bool(readiness.get("is_ready")),
+        "accounting_period_ready": period_ready,
         "journal_numbering_ready": journal_numbering_ready,
-        "posting_controls_ready": bool(readiness.get("is_ready") and journal_numbering_ready and not blockers),
+        "posting_controls_ready": bool(period_ready and journal_numbering_ready and not blockers),
         "active_financial_year": {
-            "id": active_financial_year.id,
-            "code": active_financial_year.code,
-            "name": active_financial_year.name,
-            "start_date": active_financial_year.start_date.isoformat(),
-            "end_date": active_financial_year.end_date.isoformat(),
-            "is_active": active_financial_year.is_active,
-        } if active_financial_year else None,
+            "id": target_financial_year.id,
+            "code": target_financial_year.code,
+            "name": target_financial_year.name,
+            "start_date": target_financial_year.start_date.isoformat(),
+            "end_date": target_financial_year.end_date.isoformat(),
+            "is_active": target_financial_year.is_active,
+        } if target_financial_year else None,
         "current_period": {
             "id": current_period.id,
             "code": current_period.code,
@@ -879,7 +924,10 @@ def build_accounting_bridge_period_readiness() -> dict[str, Any]:
             "status": current_period.status,
             "is_locked": current_period.is_locked,
         } if current_period else None,
-        "blockers": blockers,
+        "period_blocker_code": period_blockers[0]["code"] if period_blockers else None,
+        "period_blocker_reason": period_blockers[0]["reason"] if period_blockers else None,
+        "period_blockers": period_blockers,
+        "blockers": list(dict.fromkeys(blockers)),
         "warnings": [str(warning) for warning in readiness.get("warnings") or []],
     }
 

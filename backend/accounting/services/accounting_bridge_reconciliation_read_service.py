@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from accounting.models import AccountingBridgePosting, AccountingPeriod, AccountingPeriodStatus, FinancialYear, JournalEntry, MoneyMovement
 from accounting.services.accounting_postability_service import CANONICAL_STATUSES, canonicalize_bridge_readiness_payload, evaluate_accounting_postability
+from accounting.services.accounting_bridge_readiness_service import build_accounting_bridge_posting_period_readiness
 from accounting.services.returns_damage_credit_bridge_readiness_service import build_accounting_bridge_readiness_with_returns_damage_credit
 from billing.models import BillingInvoice, ReceiptDocument
 from reconciliation.models import ReconciliationItem
@@ -193,7 +194,11 @@ def _row_action_hrefs(postability: dict[str, Any], *, event_key: str, period: Ac
 
 
 def _readiness_rows(readiness_payload: dict[str, Any], filters: BridgeReconciliationFilters, *, financial_year: FinancialYear | None, period: AccountingPeriod | None) -> list[dict[str, Any]]:
-    period_payload = readiness_payload.get("accounting_period_readiness") or readiness_payload.get("financial_year_readiness") or {}
+    period_payload = readiness_payload.get("accounting_period_readiness") or readiness_payload.get("financial_year_readiness") or build_accounting_bridge_posting_period_readiness(
+        reference_date=period.start_date if period is not None else None,
+        financial_year=financial_year,
+        period=period,
+    )
     canonical = canonicalize_bridge_readiness_payload(readiness_payload, as_source_rows=True)
     rows: list[dict[str, Any]] = []
     for event in canonical.get("events") or []:
@@ -228,6 +233,8 @@ def _readiness_rows(readiness_payload: dict[str, Any], filters: BridgeReconcilia
             "financial_year": _financial_year_payload(financial_year),
             "accounting_period": _period_payload(period),
             "period_status": getattr(period, "status", None),
+            "period_blocker_code": period_payload.get("period_blocker_code"),
+            "period_blocker_reason": period_payload.get("period_blocker_reason"),
             "journal_entry": None,
             "settlement_linked": False,
             "reconciliation_linked": False,
@@ -410,7 +417,29 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
     selected_financial_year, fy_blockers = _resolve_financial_year(active_filters)
     selected_period, period_blockers = _resolve_period(active_filters, selected_financial_year)
     resolver_blockers = [*fy_blockers, *period_blockers]
-    readiness_payload = canonicalize_bridge_readiness_payload(build_accounting_bridge_readiness_with_returns_damage_credit(), as_source_rows=True)
+    selected_period_readiness = build_accounting_bridge_posting_period_readiness(
+        reference_date=selected_period.start_date if selected_period is not None else None,
+        financial_year=selected_financial_year,
+        period=selected_period,
+    )
+    if active_filters.accounting_period and selected_period is None:
+        selected_period_readiness = {
+            **selected_period_readiness,
+            "accounting_period_ready": False,
+            "posting_controls_ready": False,
+            "period_blocker_code": "MISSING_PERIOD",
+            "period_blocker_reason": period_blockers[0] if period_blockers else "Selected accounting period is missing.",
+            "period_blockers": [{"code": "MISSING_PERIOD", "reason": period_blockers[0] if period_blockers else "Selected accounting period is missing."}],
+            "blockers": list(dict.fromkeys([*(selected_period_readiness.get("blockers") or []), *(period_blockers or ["Selected accounting period is missing."])])),
+        }
+    readiness_payload = canonicalize_bridge_readiness_payload(
+        {
+            **build_accounting_bridge_readiness_with_returns_damage_credit(),
+            "financial_year_readiness": selected_period_readiness,
+            "accounting_period_readiness": selected_period_readiness,
+        },
+        as_source_rows=True,
+    )
     rows = [*_readiness_rows(readiness_payload, active_filters, financial_year=selected_financial_year, period=selected_period), *_posted_rows(active_filters, selected_financial_year, selected_period)]
     counts = _document_counts(active_filters, selected_financial_year, selected_period)
     status_counts = Counter(str(row.get("status") or "INFO") for row in rows)
@@ -459,8 +488,8 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "available_accounting_periods": _available_periods(selected_financial_year),
         "readiness_blockers": readiness_blockers,
         "year_end_readiness_hint": "Year-end close is blocked until open periods, unposted bridge items, and reconciliation exceptions are resolved.",
-        "financial_year_readiness": readiness_payload.get("financial_year_readiness"),
-        "accounting_period_readiness": readiness_payload.get("accounting_period_readiness"),
+        "financial_year_readiness": selected_period_readiness,
+        "accounting_period_readiness": selected_period_readiness,
         "canonical_statuses": list(CANONICAL_STATUSES),
         "results": rows,
     }

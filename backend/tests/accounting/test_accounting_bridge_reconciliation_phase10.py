@@ -3,11 +3,13 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntryStatus, JournalEntryType, MoneyMovement
+from accounting.models import AccountingBridgePosting, AccountingPeriodStatus, FinancialYear, JournalEntry, JournalEntryStatus, JournalEntryType, MoneyMovement
+from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
 from billing.models import ReceiptDocument
 from reconciliation.models import ReconciliationItem
 from settlements.models import SettlementAllocation
 from subscriptions.models import Payment
+from tests.helpers import ensure_test_accounting_posting_prerequisites
 
 
 User = get_user_model()
@@ -29,6 +31,11 @@ class AccountingBridgeReconciliationPhase10Tests(APITestCase):
         response = self.client.get(f"/api/v1/admin/accounting/bridge-reconciliation/{query}")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         return response.data
+
+    def _ready_period_context(self):
+        prereqs = ensure_test_accounting_posting_prerequisites(timezone.localdate(), performed_by=self.admin)
+        apply_accounting_setup_defaults(performed_by=self.admin)
+        return prereqs["financial_year"], prereqs["accounting_period"]
 
     def test_endpoint_loads(self):
         payload = self._get()
@@ -101,3 +108,69 @@ class AccountingBridgeReconciliationPhase10Tests(APITestCase):
             "reconciliation_items": ReconciliationItem.objects.count(),
         }
         self.assertEqual(after, before)
+
+    def test_open_selected_period_allows_bridge_postability(self):
+        financial_year, period = self._ready_period_context()
+
+        payload = self._get(f"?financial_year={financial_year.id}&accounting_period={period.id}")
+
+        self.assertEqual(payload["selected_accounting_period"]["status"], AccountingPeriodStatus.OPEN)
+        self.assertEqual(payload["summary"]["blocked_by_period_count"], 0)
+        self.assertTrue(
+            any(row["status"] in {"POSTABLE", "READY_UNPOSTED", "BLOCKED_BY_APPROVAL", "UNSUPPORTED_SOURCE"} for row in payload["results"])
+        )
+        self.assertFalse(
+            any(row["status"] == "BLOCKED_BY_PERIOD" and str(row.get("period_status")).upper() == AccountingPeriodStatus.OPEN for row in payload["results"])
+        )
+
+    def test_locked_selected_period_blocks_bridge_postability(self):
+        financial_year, period = self._ready_period_context()
+        period.status = AccountingPeriodStatus.LOCKED
+        period.is_locked = True
+        period.save(update_fields=["status", "is_locked", "updated_at"])
+
+        payload = self._get(f"?financial_year={financial_year.id}&accounting_period={period.id}&status=BLOCKED_BY_PERIOD")
+
+        self.assertGreater(payload["summary"]["blocked_by_period_count"], 0)
+        self.assertTrue(payload["results"])
+        self.assertTrue(all("locked" in (row.get("blocker_reason") or "").lower() for row in payload["results"]))
+
+    def test_closed_selected_period_blocks_bridge_postability(self):
+        financial_year, period = self._ready_period_context()
+        period.status = AccountingPeriodStatus.CLOSED
+        period.is_locked = True
+        period.save(update_fields=["status", "is_locked", "updated_at"])
+
+        payload = self._get(f"?financial_year={financial_year.id}&accounting_period={period.id}&status=BLOCKED_BY_PERIOD")
+
+        self.assertGreater(payload["summary"]["blocked_by_period_count"], 0)
+        self.assertTrue(payload["results"])
+        self.assertTrue(all("closed" in (row.get("blocker_reason") or "").lower() for row in payload["results"]))
+
+    def test_missing_selected_period_blocks_bridge_postability(self):
+        financial_year, _period = self._ready_period_context()
+
+        payload = self._get(f"?financial_year={financial_year.id}&accounting_period=999999&status=BLOCKED_BY_PERIOD")
+
+        self.assertGreater(payload["summary"]["blocked_by_period_count"], 0)
+        self.assertTrue(payload["results"])
+        self.assertTrue(all("missing" in (row.get("blocker_reason") or "").lower() for row in payload["results"]))
+
+    def test_inactive_financial_year_blocks_bridge_postability(self):
+        active_year, period = self._ready_period_context()
+        inactive_year = FinancialYear.objects.create(
+            code="FY2099-00",
+            name="FY 2099-00",
+            start_date=active_year.start_date,
+            end_date=active_year.end_date,
+            is_active=False,
+        )
+        period.financial_year = inactive_year
+        period.code = f"{inactive_year.code}-TEST"
+        period.save(update_fields=["financial_year", "code", "updated_at"])
+
+        payload = self._get(f"?financial_year={inactive_year.id}&accounting_period={period.id}&status=BLOCKED_BY_PERIOD")
+
+        self.assertGreater(payload["summary"]["blocked_by_period_count"], 0)
+        self.assertTrue(payload["results"])
+        self.assertTrue(all("active financial year" in (row.get("blocker_reason") or "").lower() for row in payload["results"]))

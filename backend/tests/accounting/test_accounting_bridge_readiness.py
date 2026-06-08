@@ -54,7 +54,7 @@ class AccountingBridgeReadinessTests(APITestCase):
             self.assertIn("label", event)
             self.assertIn("source_module", event)
             self.assertIn("event_group", event)
-            self.assertIn(event["status"], {"READY", "INFO", "WARNING", "ERROR", "NOT_CONFIGURED"})
+            self.assertIn(event["status"], {"READY", "INFO", "WARNING", "ERROR", "NOT_CONFIGURED", "UNSUPPORTED_SOURCE"})
             self.assertFalse(event["can_post"])
             self.assertEqual(event["posting_mode"], "AUDIT_DEFERRED")
             self.assertIsInstance(event["debit_accounts"], list)

@@ -14,6 +14,7 @@ from accounting.services.document_sequence_service import (
     upsert_numbering_profile,
 )
 from accounting.services.gst_document_posting_service import approve_tax_invoice, ensure_document_sequence
+from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
 from billing.models import DirectSale
 from tests.helpers import create_admin_user
 
@@ -89,8 +90,35 @@ class DocumentNumberingFinancialYearTests(TestCase):
         fy = self._activate_fy()
         self._open_period(fy)
 
-        with self.assertRaisesMessage(DocumentNumberingSetupError, "No numbering profile is configured"):
+        with self.assertRaisesMessage(DocumentNumberingSetupError, "No DIRECT_SALE numbering profile is configured"):
             allocate_document_number(DocumentType.DIRECT_SALE, date(2026, 4, 15))
+
+    def test_safe_defaults_create_missing_journal_entry_profile(self):
+        fy = self._activate_fy()
+        self._open_period(fy)
+
+        payload = apply_accounting_setup_defaults(performed_by=self.admin)
+
+        sequence = DocumentSequence.objects.get(document_type=DocumentType.JOURNAL_ENTRY, financial_year_ref=fy, is_active=True)
+        self.assertEqual(sequence.next_number, 1)
+        self.assertTrue(payload["document_numbering"]["journal_entry"]["created"])
+
+    def test_safe_defaults_do_not_overwrite_existing_journal_entry_profile(self):
+        fy = self._activate_fy()
+        self._open_period(fy)
+        sequence = upsert_numbering_profile(
+            document_type=DocumentType.JOURNAL_ENTRY,
+            prefix="CUSTOMJV",
+            next_number=42,
+            reference_date=date(2026, 4, 15),
+            performed_by=self.admin,
+        )
+
+        apply_accounting_setup_defaults(performed_by=self.admin)
+        sequence.refresh_from_db()
+
+        self.assertEqual(sequence.prefix, "CUSTOMJV")
+        self.assertEqual(sequence.next_number, 42)
 
     def test_duplicate_number_is_blocked_before_issue(self):
         fy = self._activate_fy()

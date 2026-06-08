@@ -196,6 +196,8 @@ def _audit_row(event_key: str, period: dict[str, Any], bridge: dict[str, Any] | 
         "credit_mapping_status": mapping_status,
         "finance_account_status": "READY" if postability["finance_account_ready"] else "BLOCKED_BY_MAPPING",
         "period_readiness": "READY" if postability["accounting_period_ready"] else "BLOCKED_BY_PERIOD",
+        "period_blocker_code": postability.get("blocker_code") if status_value == "BLOCKED_BY_PERIOD" else None,
+        "period_blocker_reason": postability.get("blocker_reason") if status_value == "BLOCKED_BY_PERIOD" else None,
         "numbering_readiness": "READY" if postability["journal_numbering_ready"] else "BLOCKED_BY_NUMBERING",
         "bridge_status": (bridge or {}).get("status"),
         "can_seed": event_key != "staff_advance" and postability["status"] in {"BLOCKED_BY_MAPPING", "BLOCKED_BY_PERIOD", "BLOCKED_BY_NUMBERING"},

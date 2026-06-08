@@ -106,6 +106,8 @@ export type AccountingBridgeReconciliationRow = {
   financial_year?: { id?: number; code?: string; name?: string; is_active?: boolean } | null;
   accounting_period?: { id?: number; code?: string; name?: string; status?: string } | null;
   period_status?: string | null;
+  period_blocker_code?: string | null;
+  period_blocker_reason?: string | null;
   journal_entry?: AccountingBridgeReconciliationJournal | null;
   settlement_linked: boolean;
   reconciliation_linked: boolean;

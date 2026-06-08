@@ -120,8 +120,8 @@ def evaluate_accounting_postability(
         blocker_reason = _first_reason(bridge_row) or (bridge_row or {}).get("operator_action") or "Complete COA, FinanceAccount, and posting profile mapping."
     elif not period_ready:
         status = BLOCKED_BY_PERIOD
-        blocker_code = "PERIOD_NOT_READY"
-        blocker_reason = "Active financial year and current open accounting period are required."
+        blocker_code = str(period.get("period_blocker_code") or "PERIOD_NOT_READY")
+        blocker_reason = str(period.get("period_blocker_reason") or "Active financial year and open target accounting period are required.")
     elif not journal_numbering_ready:
         status = BLOCKED_BY_NUMBERING
         blocker_code = "JOURNAL_NUMBERING_NOT_READY"
@@ -207,10 +207,14 @@ def canonicalize_bridge_readiness_payload(payload: dict[str, Any], *, as_source_
     rows: list[dict[str, Any]] = []
     for event in payload.get("events") or []:
         postability = evaluate_accounting_postability(event_key=str(event.get("event_key") or ""), event_label=event.get("label"), module=event.get("source_module") or event.get("event_group"), source_model=event.get("source_model"), bridge_row=event, period_readiness=period, source_workflow_exists=True, as_source_row=as_source_rows)
-        rows.append({**event, **postability, "operator_action": postability["recommended_action"], "blocking_reasons": event.get("blocking_reasons") or ([postability["blocker_reason"]] if postability.get("blocker_reason") else [])})
+        if as_source_rows:
+            rows.append({**event, **postability, "operator_action": postability["recommended_action"], "blocking_reasons": event.get("blocking_reasons") or ([postability["blocker_reason"]] if postability.get("blocker_reason") else [])})
+        else:
+            status_override = {"status": UNSUPPORTED_SOURCE} if postability["status"] == UNSUPPORTED_SOURCE else {}
+            rows.append({**event, **status_override, "postability": postability, "canonical_status": postability["status"], "canonical_blocker_code": postability["blocker_code"], "canonical_blocker_reason": postability["blocker_reason"], "canonical_recommended_action": postability["recommended_action"]})
     if include_staff_advance and not any(row.get("event_key") == "staff_advance" for row in rows):
         rows.append(staff_advance_unsupported_event(period))
-    status_counts = Counter(str(row.get("status") or "INFO") for row in rows)
+    status_counts = Counter(str(row.get("canonical_status") or row.get("status") or "INFO") for row in rows)
     canonical_summary = {f"{status.lower()}_count": status_counts.get(status, 0) for status in CANONICAL_STATUSES}
     canonical_summary.update({"blocked_count": sum(count for status, count in status_counts.items() if status.startswith("BLOCKED") or status == UNSUPPORTED_SOURCE), "source_count": len(rows), "status_counts": dict(status_counts)})
     return {**payload, "summary": {**(payload.get("summary") or {}), **canonical_summary}, "financial_year_readiness": payload.get("financial_year_readiness") or period, "accounting_period_readiness": payload.get("accounting_period_readiness") or period, "events": rows, "canonical_statuses": list(CANONICAL_STATUSES)}

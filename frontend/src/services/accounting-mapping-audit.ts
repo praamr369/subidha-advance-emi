@@ -30,6 +30,8 @@ export type AccountingMappingAuditRow = {
   credit_mapping_status: string;
   finance_account_status: string;
   period_readiness: string;
+  period_blocker_code?: string | null;
+  period_blocker_reason?: string | null;
   numbering_readiness: string;
   status: string;
   bridge_status?: string | null;

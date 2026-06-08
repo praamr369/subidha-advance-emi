@@ -112,7 +112,7 @@ function missingLabel(row: AccountingMappingAuditRow): string {
   if (row.credit_mapping_status !== "READY") missing.push(`Credit: ${row.credit_mapping_status}`);
   if (row.finance_account_status !== "READY") missing.push(`Finance account: ${row.finance_account_status}`);
   if (row.numbering_readiness !== "READY") missing.push(`Numbering: ${row.numbering_readiness}`);
-  if (row.period_readiness !== "READY") missing.push(`Period: ${row.period_readiness}`);
+  if (row.period_readiness !== "READY") missing.push(`Period: ${row.period_blocker_reason || row.period_readiness}`);
   return missing.join(" · ") || "No missing setup reported";
 }
 
@@ -156,7 +156,7 @@ export default function AccountingMappingAuditPage() {
     try {
       const result = await seedAccountingMappingSafeDefaults();
       setPayload(result.after);
-      setNotice(`Safe defaults seeded. Journals created: ${result.journal_entries_created}; document numbers allocated: ${result.document_sequences_allocated}.`);
+      setNotice(`Safe defaults seeded. Journals created: ${result.journal_entries_created}; numbering profiles created: ${result.document_sequences_allocated}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to seed safe defaults.");
     } finally {
@@ -225,7 +225,7 @@ export default function AccountingMappingAuditPage() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping audit remediation</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Bridge impact: {payload?.bridge_impact ?? "Not loaded"}</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. Explicit setup actions may create setup metadata only; they do not post journals or mutate source money records.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. Open periods are valid for posting; only locked, closed, missing, outside-FY, or posting-locked periods block posting. Unsupported sources are not mapping problems.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <ActionButton variant="primary" onClick={() => void seedDefaults()} disabled={Boolean(busy)}>{busy === "seed" ? "Seeding..." : "Seed Safe Defaults"}</ActionButton>
@@ -248,7 +248,7 @@ export default function AccountingMappingAuditPage() {
             <Link href={ROUTES.admin.settingsBusinessSetupDocumentNumbering} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold">Open Document Numbering</Link>
             <Link href={ROUTES.admin.accountingPeriods} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold">Open Periods</Link>
           </div>
-          <div className="mt-4 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">Active FY: {String((period.active_financial_year as { code?: string } | undefined)?.code ?? "Missing")} · Current period: {String((period.current_period as { code?: string } | undefined)?.code ?? "Missing")}</div>
+          <div className="mt-4 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">Active FY: {String((period.active_financial_year as { code?: string } | undefined)?.code ?? "Missing")} · Current period: {String((period.current_period as { code?: string } | undefined)?.code ?? "Missing")} · Unsupported source is not a mapping problem; implement or enable the source workflow before posting.</div>
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">

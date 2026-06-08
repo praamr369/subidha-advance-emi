@@ -11,6 +11,7 @@ from django.utils import timezone
 from accounting.models import (
     AccountingPostingProfile,
     ChartOfAccount,
+    DocumentSequence,
     FinanceAccount,
     FinanceAccountCoaMapping,
     FinanceAccountKind,
@@ -25,6 +26,11 @@ from accounting.services.accounting_setup_catalog import (
 )
 from accounting.services.accounting_setup_service import (
     LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
+)
+from accounting.services.document_sequence_service import (
+    DocumentNumberingSetupError,
+    DocumentType,
+    get_or_create_sequence_for_document_type,
 )
 from accounting.services.system_accounts_service import ensure_system_account
 
@@ -183,6 +189,23 @@ def _deactivate_duplicate_finance_accounts_if_safe(*, kind: str) -> list[dict[st
     return [{"kind": kind, "status": "PRESERVED_MULTIPLE_ACTIVE_ACCOUNTS", "reason": "Multiple active finance accounts are supported and evaluated independently; defaults did not deactivate or remap them.", "active_finance_account_ids": [row.id for row in active]}]
 
 
+def _ensure_journal_entry_numbering_profile() -> dict[str, Any]:
+    try:
+        before = DocumentSequence.objects.count()
+        sequence = get_or_create_sequence_for_document_type(DocumentType.JOURNAL_ENTRY, timezone.localdate())
+    except DocumentNumberingSetupError as exc:
+        return {"created": False, "blocked": True, "detail": str(exc)}
+    return {
+        "created": DocumentSequence.objects.count() > before,
+        "blocked": False,
+        "id": sequence.id,
+        "document_type": sequence.document_type,
+        "series_code": sequence.series_code,
+        "financial_year": sequence.financial_year,
+        "next_number": sequence.next_number,
+    }
+
+
 def _ensure_collection_mappings(*, performed_by=None, finance_accounts: dict[str, FinanceAccount], chart_accounts: dict[str, ChartOfAccount], ledger_anchor: FinanceAccount) -> dict[str, Any]:
     purpose_to_target_chart_key: dict[str, str] = {
         FinanceAccountMappingPurpose.CASH_COLLECTION: "CASH_COLLECTION",
@@ -299,8 +322,9 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
                 profile.save()
                 profiles_updated.append({"id": profile.id, "key": profile.key})
     mappings_result = _ensure_collection_mappings(performed_by=performed_by, finance_accounts=finance_accounts, chart_accounts=chart_accounts, ledger_anchor=ledger_anchor)
+    journal_numbering = _ensure_journal_entry_numbering_profile()
     legacy_marked: list[dict[str, Any]] = []
     for cand in _legacy_duplicate_candidates():
         ChartOfAccount.objects.filter(pk=cand["id"]).update(is_legacy=True, legacy_reason=cand["reason"], superseded_by_id=cand["superseded_by_id"])
         legacy_marked.append({"id": cand["id"], "superseded_by_id": cand["superseded_by_id"]})
-    return {"applied_at": timezone.now().isoformat(), "canonical_accounts": canonical_results, "finance_accounts": {"seeded": {k: {"id": v.id, "name": v.name, "kind": v.kind, "is_active": v.is_active} for k, v in finance_accounts.items()}, "duplicate_actions": duplicate_actions, "ledger_anchor_id": ledger_anchor.id}, "posting_profiles": {"created": profiles_created, "updated": profiles_updated}, "mappings": mappings_result, "legacy": {"marked": legacy_marked}}
+    return {"applied_at": timezone.now().isoformat(), "canonical_accounts": canonical_results, "finance_accounts": {"seeded": {k: {"id": v.id, "name": v.name, "kind": v.kind, "is_active": v.is_active} for k, v in finance_accounts.items()}, "duplicate_actions": duplicate_actions, "ledger_anchor_id": ledger_anchor.id}, "posting_profiles": {"created": profiles_created, "updated": profiles_updated}, "document_numbering": {"journal_entry": journal_numbering}, "mappings": mappings_result, "legacy": {"marked": legacy_marked}}

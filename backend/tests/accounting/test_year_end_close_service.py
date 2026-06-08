@@ -34,7 +34,7 @@ def _make_periods(financial_year: FinancialYear, *, status=AccountingPeriodStatu
 
 
 def _make_journal_numbering(financial_year: FinancialYear):
-    return DocumentSequence.objects.create(series_code="JOURNAL", document_type="JOURNAL_ENTRY", financial_year=financial_year.code, financial_year_ref=financial_year, prefix="JE", padding=5, next_number=1, is_active=True)
+    return DocumentSequence.objects.create(series_code="JOURNAL", document_type="JOURNAL_ENTRY", financial_year=financial_year.code.removeprefix("FY"), financial_year_ref=financial_year, prefix="JE", padding=5, next_number=1, is_active=True)
 
 
 def _mock_readiness_payload():
@@ -55,6 +55,7 @@ class BridgeReconciliationRemediationTests(TestCase):
     def test_reconciliation_payload_includes_recommended_actions_and_counts(self, _readiness):
         financial_year = _make_financial_year()
         _make_periods(financial_year, status=AccountingPeriodStatus.OPEN)
+        _make_journal_numbering(financial_year)
         before_journals = JournalEntry.objects.count()
         before_sequences = DocumentSequence.objects.count()
         payload = build_accounting_bridge_reconciliation(BridgeReconciliationFilters(financial_year=str(financial_year.id)))
