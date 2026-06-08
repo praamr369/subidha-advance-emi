@@ -20,6 +20,22 @@ import { activateFinancialYear, closeAccountingPeriod, createFinancialYear, crea
 import YearEndClosePanel from "./YearEndClosePanel";
 
 const STATUS_LABEL: Record<AccountingPeriodStatus, string> = { OPEN: "Open", LOCKED: "Locked", CLOSED: "Closed" };
+const MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit";
+const RECONCILIATION_RUNS_HREF = "/admin/reconciliation/runs";
+
+function bridgeReviewHref(filters: { source_model?: string; status?: string; accounting_period?: number | string }) {
+  const params = new URLSearchParams();
+  if (filters.source_model) params.set("source_model", filters.source_model);
+  if (filters.status) params.set("status", filters.status);
+  if (filters.accounting_period) params.set("accounting_period", String(filters.accounting_period));
+  const query = params.toString();
+  return query ? `${ROUTES.admin.accountingBridgeReconciliation}?${query}` : ROUTES.admin.accountingBridgeReconciliation;
+}
+
+function summaryCount(summary: AccountingBridgeReconciliationSummary | null, key: keyof AccountingBridgeReconciliationSummary, fallback = 0) {
+  const value = summary?.[key];
+  return typeof value === "number" ? value : fallback;
+}
 
 function statusForPeriod(period: AccountingPeriod): AccountingPeriodStatus {
   return period.status || (period.is_locked ? "LOCKED" : "OPEN");
@@ -35,10 +51,16 @@ function readinessItems(readiness: AccountingPeriodReadiness | null) {
   ];
 }
 
-function blockerGroups(readiness: AccountingPeriodReadiness | null, locks: PostingLock[]) {
+function blockerGroups(readiness: AccountingPeriodReadiness | null, locks: PostingLock[], bridgeSummary: AccountingBridgeReconciliationSummary | null) {
   const errors = readiness?.errors ?? [];
   const warnings = readiness?.warnings ?? [];
   const text = [...errors, ...warnings].join(" ").toLowerCase();
+  const mappingBlocked = summaryCount(bridgeSummary, "blocked_by_mapping_count");
+  const periodBlocked = summaryCount(bridgeSummary, "blocked_by_period_count");
+  const numberingBlocked = summaryCount(bridgeSummary, "blocked_by_numbering_count");
+  const approvalRequired = summaryCount(bridgeSummary, "blocked_by_approval_count");
+  const unsupported = summaryCount(bridgeSummary, "unsupported_source_count", summaryCount(bridgeSummary, "unsupported_count"));
+  const exceptions = summaryCount(bridgeSummary, "reconciliation_exception_count", summaryCount(bridgeSummary, "exception_count"));
   return [
     {
       title: "Setup blockers",
@@ -49,28 +71,114 @@ function blockerGroups(readiness: AccountingPeriodReadiness | null, locks: Posti
     {
       title: "Mapping blockers",
       detail: "Open mapping audit to resolve posting profile and COA blockers before close.",
-      count: text.includes("mapping") ? 1 : 0,
-      href: "/admin/accounting/setup/mapping-audit",
+      count: mappingBlocked || (text.includes("mapping") ? 1 : 0),
+      href: MAPPING_AUDIT_HREF,
     },
     {
       title: "Bridge posting blockers",
-      detail: "Open periods are valid for bridge posting; review mapping, numbering, approval, and locked/closed/missing period blockers.",
-      count: text.includes("reconciliation") || text.includes("unposted") ? 1 : 0,
+      detail: "Open periods are valid for posting. Period close still waits for posting and reconciliation to finish.",
+      count: summaryCount(bridgeSummary, "ready_unposted_count") + summaryCount(bridgeSummary, "posted_unverified_count"),
       href: ROUTES.admin.accountingBridgeReconciliation,
     },
     {
       title: "Numbering blockers",
       detail: text.includes("number") ? "Document or journal numbering is incomplete." : "No numbering blocker exposed.",
-      count: text.includes("number") ? 1 : 0,
+      count: numberingBlocked || (text.includes("number") ? 1 : 0),
       href: ROUTES.admin.settingsBusinessSetupDocumentNumbering,
     },
     {
       title: "Period lock blockers",
       detail: readiness?.posting_lock ? `Posting is locked for ${readiness.posting_lock.lock_date}.` : `${locks.length} configured lock(s).`,
-      count: readiness?.posting_lock ? 1 : 0,
+      count: periodBlocked || (readiness?.posting_lock ? 1 : 0),
       href: ROUTES.admin.accountingPeriods,
     },
+    {
+      title: "Other bridge blockers",
+      detail: `${unsupported} unsupported, ${approvalRequired} approval required, ${exceptions} exception(s).`,
+      count: unsupported + approvalRequired + exceptions,
+      href: ROUTES.admin.accountingBridgeReconciliation,
+    },
   ];
+}
+
+function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeReconciliationSummary | null }) {
+  const paymentReady = summaryCount(summary, "payment_ready_unposted_count");
+  const paymentPostedUnverified = summaryCount(summary, "payment_posted_unverified_count");
+  const paymentReconciled = summaryCount(summary, "payment_reconciled_count");
+  const receiptReady = summaryCount(summary, "receipt_ready_unposted_count");
+  const receiptPostedUnverified = summaryCount(summary, "receipt_posted_unverified_count");
+  const receiptReconciled = summaryCount(summary, "receipt_reconciled_count");
+  const otherRows = [
+    { label: "Unsupported", value: summaryCount(summary, "unsupported_source_count", summaryCount(summary, "unsupported_count")), href: bridgeReviewHref({ status: "UNSUPPORTED" }) },
+    { label: "Approval required", value: summaryCount(summary, "blocked_by_approval_count"), href: bridgeReviewHref({ status: "BLOCKED" }) },
+    { label: "Mapping blocked", value: summaryCount(summary, "blocked_by_mapping_count"), href: MAPPING_AUDIT_HREF },
+    { label: "Period blocked", value: summaryCount(summary, "blocked_by_period_count"), href: ROUTES.admin.accountingPeriods },
+    { label: "Numbering blocked", value: summaryCount(summary, "blocked_by_numbering_count"), href: ROUTES.admin.settingsBusinessSetupDocumentNumbering },
+    { label: "Exceptions", value: summaryCount(summary, "reconciliation_exception_count", summaryCount(summary, "exception_count")), href: RECONCILIATION_RUNS_HREF },
+  ];
+  const sourceSections = [
+    {
+      title: "Payment bridge",
+      action: "Review Payment bridge items",
+      href: bridgeReviewHref({ source_model: "Payment" }),
+      rows: [
+        { label: "Ready unposted", value: paymentReady, detail: "Setup is ready, but journal has not been posted.", href: bridgeReviewHref({ source_model: "Payment", status: "READY_UNPOSTED" }) },
+        { label: "Posted unverified", value: paymentPostedUnverified, detail: "Journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "Payment", status: "POSTED_UNVERIFIED" }) },
+        { label: "Reconciled", value: paymentReconciled, detail: "Bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "Payment", status: "RECONCILED" }) },
+      ],
+    },
+    {
+      title: "Receipt bridge",
+      action: "Review Receipt bridge items",
+      href: bridgeReviewHref({ source_model: "ReceiptDocument" }),
+      rows: [
+        { label: "Ready unposted", value: receiptReady, detail: "Setup is ready, but journal has not been posted.", href: bridgeReviewHref({ source_model: "ReceiptDocument", status: "READY_UNPOSTED" }) },
+        { label: "Posted unverified", value: receiptPostedUnverified, detail: "Journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "ReceiptDocument", status: "POSTED_UNVERIFIED" }) },
+        { label: "Reconciled", value: receiptReconciled, detail: "Bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "ReceiptDocument", status: "RECONCILED" }) },
+      ],
+    },
+  ];
+
+  return (
+    <WorkspaceSection title="Bridge close readiness by source" description="Open periods are valid for posting. Period close still waits for posting and reconciliation to finish.">
+      <div className="grid gap-4 xl:grid-cols-3">
+        {sourceSections.map((section) => (
+          <div key={section.title} className="rounded-xl border border-border bg-background p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="font-semibold text-foreground">{section.title}</div>
+              <Link href={section.href} className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground">{section.action}</Link>
+            </div>
+            <div className="mt-3 grid gap-2">
+              {section.rows.map((row) => (
+                <Link key={`${section.title}-${row.label}`} href={row.href} className="rounded-lg border border-border/70 px-3 py-2 text-sm hover:bg-muted/40">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-foreground">{row.label}</span>
+                    <span className="text-lg font-semibold text-foreground">{row.value}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">{row.detail}</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="rounded-xl border border-border bg-background p-4">
+          <div className="font-semibold text-foreground">Other bridge</div>
+          <div className="mt-3 grid gap-2">
+            {otherRows.map((row) => (
+              <Link key={row.label} href={row.href} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2 text-sm hover:bg-muted/40">
+                <span className="font-medium text-foreground">{row.label}</span>
+                <span className={row.value ? "font-semibold text-amber-800" : "font-semibold text-muted-foreground"}>{row.value}</span>
+              </Link>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href={bridgeReviewHref({ status: "POSTED_UNVERIFIED" })} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-900">Review posted unverified</Link>
+            <Link href={RECONCILIATION_RUNS_HREF} className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground">Run reconciliation checks</Link>
+          </div>
+        </div>
+      </div>
+    </WorkspaceSection>
+  );
 }
 
 export default function AccountingPeriodsPage() {
@@ -89,7 +197,7 @@ export default function AccountingPeriodsPage() {
 
   const activeFinancialYear = useMemo(() => readiness?.active_financial_year || financialYears.find((year) => year.is_active) || null, [financialYears, readiness]);
   const currentPeriodMissing = Boolean(readiness?.errors?.some((item) => item.toLowerCase().includes("period") && item.toLowerCase().includes("posting date")) || (readiness && !readiness.current_period));
-  const groupedBlockers = useMemo(() => blockerGroups(readiness, locks), [locks, readiness]);
+  const groupedBlockers = useMemo(() => blockerGroups(readiness, locks, bridgeSummary), [bridgeSummary, locks, readiness]);
 
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true);
@@ -170,7 +278,7 @@ export default function AccountingPeriodsPage() {
 
   return (
     <PortalPage title="Accounting Period Cockpit" subtitle="Control the active financial year, monthly accounting periods, exact-date posting locks, and controlled year-end close." breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Periods" }]} actions={[{ href: ROUTES.admin.accountingBooks, label: "Books", variant: "secondary" }, { href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge Reconciliation", variant: "secondary" }]} statusBadge={{ label: "Admin Only", tone: "info" }}>
-      <AccountingControlShell readinessWarnings={<div className="space-y-4"><div className="flex flex-wrap justify-end gap-2"><button type="button" disabled={Boolean(actionBusy)} onClick={() => void handleSeedMappings()} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{actionBusy === "seed" ? "Seeding..." : "Seed supported mappings"}</button>{currentPeriodMissing ? <button type="button" disabled={Boolean(actionBusy)} onClick={() => void handleGenerateCurrentPeriod()} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{actionBusy === "period" ? "Generating..." : "Generate missing current period"}</button> : null}<Link href={ROUTES.admin.accountingBridgeReconciliation} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review bridge reconciliation</Link><Link href="/admin/accounting/setup/mapping-audit" className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground">Open mapping audit</Link><Link href={ROUTES.admin.settingsBusinessSetupDocumentNumbering} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground">Open document numbering</Link><Link href={`${ROUTES.admin.accountingBridgeReconciliation}?status=READY_UNPOSTED`} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">View bridge items</Link><AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} /></div>{notice ? <AccountingNotice message={notice} /> : null}{!loading ? <MetricStrip items={[{ label: "Financial years", value: String(financialYears.length) }, { label: "Periods", value: String(periods.length) }, { label: "Posting locks", value: String(locks.length) }, { label: "Unposted bridge items", value: String(bridgeSummary?.unposted_bridge_item_count ?? 0) }, { label: "Posted unreconciled", value: String(bridgeSummary?.posted_unreconciled_count ?? bridgeSummary?.posted_unverified_count ?? 0) }, { label: "Unsupported sources", value: String(bridgeSummary?.unsupported_source_count ?? bridgeSummary?.unsupported_count ?? 0) }, { label: "Approval required", value: String(bridgeSummary?.blocked_by_approval_count ?? 0) }]} /> : null}<WorkspaceSection title="Active Financial Year" description="Posting validation resolves against this year.">{activeFinancialYear ? <div className="grid gap-3 text-sm md:grid-cols-2"><div><p className="text-muted-foreground">Code</p><p className="font-medium text-foreground">{activeFinancialYear.code}</p></div><div><p className="text-muted-foreground">Current period</p><p className="font-medium text-foreground">{readiness?.current_period?.code || "No current period"}</p></div><div><p className="text-muted-foreground">Start</p><p className="font-medium text-foreground">{accountingDate(activeFinancialYear.start_date)}</p></div><div><p className="text-muted-foreground">End</p><p className="font-medium text-foreground">{accountingDate(activeFinancialYear.end_date)}</p></div></div> : <p className="text-sm text-muted-foreground">No active financial year is configured.</p>}</WorkspaceSection><WorkspaceSection title="Close blocker groups" description="Posting blockers and close blockers are shown separately. Open periods can accept bridge postings during daily operations; month/year close can still require clean bridge and reconciliation readiness."><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">{groupedBlockers.map((group) => <div key={group.title} className={group.count ? "rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" : "rounded-xl border border-border bg-background p-3 text-sm text-muted-foreground"}><div className="font-semibold text-foreground">{group.title}</div><div className="mt-1 text-xs">{group.detail}</div><Link href={group.href} className="mt-3 inline-flex rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground">Open fixing page</Link></div>)}</div></WorkspaceSection><WorkspaceSection title="Remediation checklist" description="Close year remains blocked until real blockers are resolved."><div className="grid gap-2">{readinessItems(readiness).map((item) => <div key={item.label} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2 text-sm"><span className="font-medium text-foreground">{item.label}</span><span className={item.ok ? "text-emerald-700" : "text-destructive"}>{item.detail}</span></div>)}{readiness?.errors.map((item) => <p key={item} className="text-sm text-destructive">{item}</p>)}{readiness?.warnings.map((item) => <p key={item} className="text-sm text-amber-700">{item}</p>)}<div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">Open periods are a close-readiness blocker only when month-end or year-end rules require closure; they do not block bridge posting by themselves.</div></div></WorkspaceSection><YearEndClosePanel financialYears={financialYears} activeFinancialYear={activeFinancialYear} onChanged={() => loadPage("refresh")} /></div>} primaryRegister={<div className="space-y-6"><EnterpriseDataTable data={periods} columns={periodColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No accounting periods configured" emptyDescription="Create a financial year and generate monthly periods before accounting posting can proceed." /><WorkspaceSection title="Posting Locks" description="Exact-date locks remain available as a secondary posting control."><EnterpriseDataTable data={locks} columns={lockColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No posting locks configured" emptyDescription="Create exact-date posting locks for sensitive close dates or controlled correction windows." /></WorkspaceSection></div>} controlPanel={<div className="space-y-4"><WorkspaceSection title="Create Financial Year" description="Financial years are inactive until an admin activates one."><form className="grid gap-3" onSubmit={handleCreateFinancialYear}><label className="text-sm text-muted-foreground">Code<input className={accountingFieldClassName()} value={fyForm.code} onChange={(event) => setFyForm((current) => ({ ...current, code: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Name<input className={accountingFieldClassName()} value={fyForm.name} onChange={(event) => setFyForm((current) => ({ ...current, name: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Start date<input type="date" className={accountingFieldClassName()} value={fyForm.start_date} onChange={(event) => setFyForm((current) => ({ ...current, start_date: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">End date<input type="date" className={accountingFieldClassName()} value={fyForm.end_date} onChange={(event) => setFyForm((current) => ({ ...current, end_date: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Notes<textarea className={accountingFieldClassName()} value={fyForm.notes} onChange={(event) => setFyForm((current) => ({ ...current, notes: event.target.value }))} /></label><button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90">Create Financial Year</button></form></WorkspaceSection><WorkspaceSection title="Financial Years" description="Activate one financial year and generate monthly periods."><EnterpriseDataTable data={financialYears} columns={fyColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No financial years configured" emptyDescription="Create a financial year before generating periods." /></WorkspaceSection><WorkspaceSection title="Create Posting Lock" description="Exact-date locks block posting for one specific date."><form className="grid gap-3" onSubmit={handleCreateLock}><label className="text-sm text-muted-foreground">Lock date<input type="date" className={accountingFieldClassName()} value={lockForm.lock_date} onChange={(event) => setLockForm((current) => ({ ...current, lock_date: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Reason<textarea className={accountingFieldClassName()} value={lockForm.reason} onChange={(event) => setLockForm((current) => ({ ...current, reason: event.target.value }))} /></label><button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90">Create Lock</button></form></WorkspaceSection></div>} />
+      <AccountingControlShell readinessWarnings={<div className="space-y-4"><div className="flex flex-wrap justify-end gap-2"><button type="button" disabled={Boolean(actionBusy)} onClick={() => void handleSeedMappings()} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{actionBusy === "seed" ? "Seeding..." : "Seed supported mappings"}</button>{currentPeriodMissing ? <button type="button" disabled={Boolean(actionBusy)} onClick={() => void handleGenerateCurrentPeriod()} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{actionBusy === "period" ? "Generating..." : "Generate missing current period"}</button> : null}<Link href={ROUTES.admin.accountingBridgeReconciliation} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review bridge reconciliation</Link><Link href={bridgeReviewHref({ source_model: "Payment" })} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review Payment bridge items</Link><Link href={bridgeReviewHref({ source_model: "ReceiptDocument" })} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review Receipt bridge items</Link><Link href={bridgeReviewHref({ status: "POSTED_UNVERIFIED" })} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review posted unverified</Link><Link href={RECONCILIATION_RUNS_HREF} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground">Run reconciliation checks</Link><Link href={MAPPING_AUDIT_HREF} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground">Open mapping audit</Link><Link href={ROUTES.admin.settingsBusinessSetupDocumentNumbering} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground">Open document numbering</Link><AccountingRefreshButton loading={loading} refreshing={refreshing} onClick={() => void loadPage("refresh")} /></div>{notice ? <AccountingNotice message={notice} /> : null}{!loading ? <MetricStrip items={[{ label: "Financial years", value: String(financialYears.length) }, { label: "Periods", value: String(periods.length) }, { label: "Posting locks", value: String(locks.length) }, { label: "Payment ready", value: String(bridgeSummary?.payment_ready_unposted_count ?? 0) }, { label: "Receipt ready", value: String(bridgeSummary?.receipt_ready_unposted_count ?? 0) }, { label: "Posted unverified", value: String(bridgeSummary?.posted_unverified_count ?? 0) }, { label: "Unsupported sources", value: String(bridgeSummary?.unsupported_source_count ?? bridgeSummary?.unsupported_count ?? 0) }]} /> : null}<BridgeCloseReadinessSplit summary={bridgeSummary} /><WorkspaceSection title="Active Financial Year" description="Posting validation resolves against this year.">{activeFinancialYear ? <div className="grid gap-3 text-sm md:grid-cols-2"><div><p className="text-muted-foreground">Code</p><p className="font-medium text-foreground">{activeFinancialYear.code}</p></div><div><p className="text-muted-foreground">Current period</p><p className="font-medium text-foreground">{readiness?.current_period?.code || "No current period"}</p></div><div><p className="text-muted-foreground">Start</p><p className="font-medium text-foreground">{accountingDate(activeFinancialYear.start_date)}</p></div><div><p className="text-muted-foreground">End</p><p className="font-medium text-foreground">{accountingDate(activeFinancialYear.end_date)}</p></div></div> : <p className="text-sm text-muted-foreground">No active financial year is configured.</p>}</WorkspaceSection><WorkspaceSection title="Close blocker groups" description="Posting blockers and close blockers are shown separately. Open periods can accept bridge postings during daily operations; month/year close can still require clean bridge and reconciliation readiness."><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">{groupedBlockers.map((group) => <div key={group.title} className={group.count ? "rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" : "rounded-xl border border-border bg-background p-3 text-sm text-muted-foreground"}><div className="font-semibold text-foreground">{group.title}</div><div className="mt-1 text-xs">{group.detail}</div><Link href={group.href} className="mt-3 inline-flex rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground">Open fixing page</Link></div>)}</div></WorkspaceSection><WorkspaceSection title="Remediation checklist" description="Close year remains blocked until real blockers are resolved."><div className="grid gap-2">{readinessItems(readiness).map((item) => <div key={item.label} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2 text-sm"><span className="font-medium text-foreground">{item.label}</span><span className={item.ok ? "text-emerald-700" : "text-destructive"}>{item.detail}</span></div>)}{readiness?.errors.map((item) => <p key={item} className="text-sm text-destructive">{item}</p>)}{readiness?.warnings.map((item) => <p key={item} className="text-sm text-amber-700">{item}</p>)}<div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">Open periods are valid for posting. Period close still waits for posting and reconciliation to finish.</div></div></WorkspaceSection><YearEndClosePanel financialYears={financialYears} activeFinancialYear={activeFinancialYear} onChanged={() => loadPage("refresh")} /></div>} primaryRegister={<div className="space-y-6"><EnterpriseDataTable data={periods} columns={periodColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No accounting periods configured" emptyDescription="Create a financial year and generate monthly periods before accounting posting can proceed." /><WorkspaceSection title="Posting Locks" description="Exact-date locks remain available as a secondary posting control."><EnterpriseDataTable data={locks} columns={lockColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No posting locks configured" emptyDescription="Create exact-date posting locks for sensitive close dates or controlled correction windows." /></WorkspaceSection></div>} controlPanel={<div className="space-y-4"><WorkspaceSection title="Create Financial Year" description="Financial years are inactive until an admin activates one."><form className="grid gap-3" onSubmit={handleCreateFinancialYear}><label className="text-sm text-muted-foreground">Code<input className={accountingFieldClassName()} value={fyForm.code} onChange={(event) => setFyForm((current) => ({ ...current, code: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Name<input className={accountingFieldClassName()} value={fyForm.name} onChange={(event) => setFyForm((current) => ({ ...current, name: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Start date<input type="date" className={accountingFieldClassName()} value={fyForm.start_date} onChange={(event) => setFyForm((current) => ({ ...current, start_date: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">End date<input type="date" className={accountingFieldClassName()} value={fyForm.end_date} onChange={(event) => setFyForm((current) => ({ ...current, end_date: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Notes<textarea className={accountingFieldClassName()} value={fyForm.notes} onChange={(event) => setFyForm((current) => ({ ...current, notes: event.target.value }))} /></label><button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90">Create Financial Year</button></form></WorkspaceSection><WorkspaceSection title="Financial Years" description="Activate one financial year and generate monthly periods."><EnterpriseDataTable data={financialYears} columns={fyColumns} loading={loading} error={error} onRetry={() => void loadPage("initial")} emptyTitle="No financial years configured" emptyDescription="Create a financial year before generating periods." /></WorkspaceSection><WorkspaceSection title="Create Posting Lock" description="Exact-date locks block posting for one specific date."><form className="grid gap-3" onSubmit={handleCreateLock}><label className="text-sm text-muted-foreground">Lock date<input type="date" className={accountingFieldClassName()} value={lockForm.lock_date} onChange={(event) => setLockForm((current) => ({ ...current, lock_date: event.target.value }))} required /></label><label className="text-sm text-muted-foreground">Reason<textarea className={accountingFieldClassName()} value={lockForm.reason} onChange={(event) => setLockForm((current) => ({ ...current, reason: event.target.value }))} /></label><button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90">Create Lock</button></form></WorkspaceSection></div>} />
     </PortalPage>
   );
 }

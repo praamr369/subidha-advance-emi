@@ -157,20 +157,20 @@ export function previewBridgeCandidate(candidateId: string) {
 }
 
 export function postBridgeCandidate(candidateId: string, payload: { idempotency_key: string; confirm?: boolean; confirm_text?: string; posting_note?: string }) {
-  return request<BridgePostResult>(`/admin/accounting/bridge-reconciliation/candidates/${encodeURIComponent(candidateId)}/post/`, { method: "POST", body: payload });
+  return request<BridgePostResult>(`/admin/accounting/bridge-reconciliation/candidates/${encodeURIComponent(candidateId)}/post/`, { method: "POST", body: JSON.stringify(payload) });
 }
 
 export function previewBridgeCandidateBatch(candidate_ids: string[]) {
-  return request<BridgeBatchPreviewResult>("/admin/accounting/bridge-reconciliation/batch-preview/", { method: "POST", body: { candidate_ids } });
+  return request<BridgeBatchPreviewResult>("/admin/accounting/bridge-reconciliation/batch-preview/", { method: "POST", body: JSON.stringify({ candidate_ids }) });
 }
 
 export function postBridgeCandidateBatch(payload: { candidate_ids: string[]; idempotency_keys: Record<string, string>; confirm?: boolean; confirm_text?: string; posting_note?: string }) {
-  return request<BridgeBatchPostResult>("/admin/accounting/bridge-reconciliation/batch-post/", { method: "POST", body: payload });
+  return request<BridgeBatchPostResult>("/admin/accounting/bridge-reconciliation/batch-post/", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export const batchPreviewBridgeCandidates = previewBridgeCandidateBatch;
 export const batchPostBridgeCandidates = postBridgeCandidateBatch;
 
 export function verifyBridgeReconciliationItem(itemId: number, payload: { note?: string; run_id?: number | null }) {
-  return request<ReconciliationVerificationResult>(`/admin/accounting/bridge-reconciliation/items/${itemId}/verify/`, { method: "POST", body: payload });
+  return request<ReconciliationVerificationResult>(`/admin/accounting/bridge-reconciliation/items/${itemId}/verify/`, { method: "POST", body: JSON.stringify(payload) });
 }
