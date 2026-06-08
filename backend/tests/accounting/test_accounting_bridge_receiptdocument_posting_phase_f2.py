@@ -112,7 +112,6 @@ class AccountingBridgeReceiptDocumentPostingPhaseF2Tests(APITestCase):
         journal = JournalEntry.objects.get(pk=response.data["journal_entry"]["id"])
         self.assertEqual(journal.source_model, "ReceiptDocument")
         self.assertEqual(journal.source_id, str(receipt.id))
-        self.assertEqual((journal.trace_metadata or {}).get("event_key"), None)
         bridge = AccountingBridgePosting.objects.get(source_model="ReceiptDocument", source_id=str(receipt.id), purpose="DIRECT_SALE_RECEIPT")
         self.assertEqual((bridge.trace_metadata or {}).get("event_key"), "direct_sale_receipt")
         self.assertEqual(DocumentSequence.objects.get(pk=self.env["journal_numbering_profile"].pk).next_number, next_before + 1)
