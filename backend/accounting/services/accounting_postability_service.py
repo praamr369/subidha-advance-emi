@@ -55,9 +55,7 @@ def _mapping_status(row: dict[str, Any] | None) -> str:
     if row is None:
         return UNSUPPORTED_SOURCE
     raw = str(row.get("status") or "NOT_CONFIGURED").strip().upper()
-    if raw in {UNSUPPORTED_SOURCE, BLOCKED_BY_MAPPING}:
-        return raw
-    if raw.startswith("BLOCKED"):
+    if raw in {UNSUPPORTED_SOURCE, BLOCKED_BY_MAPPING, BLOCKED_BY_PERIOD, BLOCKED_BY_NUMBERING, BLOCKED_BY_APPROVAL}:
         return raw
     if raw in CANONICAL_STATUSES:
         return READY
@@ -65,6 +63,8 @@ def _mapping_status(row: dict[str, Any] | None) -> str:
         return READY
     if raw in {"WARNING", "ERROR", "NOT_CONFIGURED"}:
         return BLOCKED_BY_MAPPING
+    if raw.startswith("BLOCKED"):
+        return raw
     return BLOCKED_BY_MAPPING
 
 
@@ -120,6 +120,18 @@ def evaluate_accounting_postability(
         status = POSTED
         blocker_code = None
         blocker_reason = "Already posted."
+    elif mapping_state == BLOCKED_BY_PERIOD:
+        status = BLOCKED_BY_PERIOD
+        blocker_code = "PERIOD_NOT_READY"
+        blocker_reason = _first_reason(bridge_row) or "Active financial year and open target accounting period are required."
+    elif mapping_state == BLOCKED_BY_NUMBERING:
+        status = BLOCKED_BY_NUMBERING
+        blocker_code = "JOURNAL_NUMBERING_NOT_READY"
+        blocker_reason = _first_reason(bridge_row) or "JOURNAL_ENTRY document numbering is required before posting."
+    elif mapping_state == BLOCKED_BY_APPROVAL:
+        status = BLOCKED_BY_APPROVAL
+        blocker_code = "APPROVAL_REQUIRED"
+        blocker_reason = _first_reason(bridge_row) or "Controlled bridge posting approval is required for this workflow."
     elif not mapping_ready:
         status = BLOCKED_BY_MAPPING
         blocker_code = "MAPPING_NOT_READY"
