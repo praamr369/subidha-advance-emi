@@ -33,9 +33,11 @@ export type AccountingBridgeReconciliationSummary = {
   status_counts_by_event?: Record<string, Record<string, number>>;
   receipt_ready_unposted_count?: number;
   receipt_posted_count?: number;
+  receipt_posted_unverified_count?: number;
   receipt_reconciled_count?: number;
   payment_ready_unposted_count?: number;
   payment_posted_count?: number;
+  payment_posted_unverified_count?: number;
   payment_reconciled_count?: number;
   blocking_groups?: Array<{ event_key: string; blocker_code: string; blocker_label?: string | null; count: number; recommended_action?: string | null; action_href?: string | null; is_acknowledgeable?: boolean; is_postable?: boolean }>;
 };
@@ -141,9 +143,7 @@ export type AccountingBridgeReconciliationFilters = { module?: string; event_key
 
 function toQuery(filters?: AccountingBridgeReconciliationFilters): string {
   const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(filters ?? {})) {
-    if (value !== undefined && value !== null && String(value).trim() !== "") search.set(key, String(value));
-  }
+  for (const [key, value] of Object.entries(filters ?? {})) if (value !== undefined && value !== null && String(value).trim() !== "") search.set(key, String(value));
   const query = search.toString();
   return query ? `?${query}` : "";
 }
