@@ -31,6 +31,12 @@ export type AccountingBridgeReconciliationSummary = {
   ready_unposted_by_event?: Record<string, number>;
   blocked_by_mapping_by_event?: Record<string, number>;
   status_counts_by_event?: Record<string, Record<string, number>>;
+  receipt_ready_unposted_count?: number;
+  receipt_posted_count?: number;
+  receipt_reconciled_count?: number;
+  payment_ready_unposted_count?: number;
+  payment_posted_count?: number;
+  payment_reconciled_count?: number;
   blocking_groups?: Array<{
     event_key: string;
     blocker_code: string;
@@ -74,6 +80,8 @@ export type AccountingBridgePeriodReadiness = {
   blockers?: string[];
 };
 
+export type BridgeSourceModel = "Payment" | "ReceiptDocument" | string;
+
 export type AccountingBridgeReconciliationRow = {
   id?: string;
   bridge_candidate_id?: string;
@@ -84,7 +92,7 @@ export type AccountingBridgeReconciliationRow = {
   module: string;
   source_module?: string;
   event_group?: string;
-  source_model?: string | null;
+  source_model?: BridgeSourceModel | null;
   source_type?: string | null;
   source_pk?: number | string | null;
   source_id?: string | null;
@@ -92,6 +100,10 @@ export type AccountingBridgeReconciliationRow = {
   source_reference_number?: string | null;
   source_date?: string | null;
   amount?: string | null;
+  receipt_type?: string | null;
+  receipt_status?: string | null;
+  reconciliation_state?: "POSTED_UNVERIFIED" | "RECONCILED" | string | null;
+  posted_unverified?: boolean;
   debit_account_preview?: BridgePostingLine[];
   credit_account_preview?: BridgePostingLine[];
   finance_account?: BridgeFinanceAccount | null;
@@ -128,6 +140,7 @@ export type AccountingBridgeReconciliationRow = {
   reconciliation_linked: boolean;
   reconciliation_items: AccountingBridgeReconciliationItem[];
   existing_journal_entry_id?: number | null;
+  existing_accounting_bridge_posting_id?: number | null;
   existing_money_movement_id?: number | null;
   existing_reconciliation_item_id?: number | null;
   idempotency_key?: string | null;
@@ -160,14 +173,7 @@ export type BridgeCandidate = AccountingBridgeReconciliationRow & {
 export type BridgePostingPreview = {
   candidate: AccountingBridgeReconciliationRow;
   candidate_id: string;
-  source: {
-    model: string;
-    pk: number | string;
-    display: string;
-    reference_number?: string | null;
-    date: string;
-    amount: string;
-  };
+  source: { model: BridgeSourceModel; pk: number | string; display: string; reference_number?: string | null; date: string; amount: string };
   journal_date: string;
   accounting_period?: AccountingBridgeReconciliationRow["accounting_period"];
   journal_number_preview?: string | null;
@@ -186,42 +192,10 @@ export type BridgePostingPreview = {
   safety_text: string;
 };
 
-export type BridgePostResult = {
-  posted: boolean;
-  already_posted: boolean;
-  journal_entry?: AccountingBridgeReconciliationJournal | null;
-  reconciliation_item?: { id: number; status: string; exception_code?: string } | null;
-  next_action?: string;
-};
-
-export type BridgeBatchPreviewResult = {
-  selected_count: number;
-  postable_count: number;
-  blocked_count: number;
-  total_debit: string;
-  total_credit: string;
-  previews: BridgePostingPreview[];
-  blockers: Record<string, string[]>;
-};
-
-export type BridgeBatchPostResult = {
-  posted_count: number;
-  skipped_already_posted_count: number;
-  blocked_count: number;
-  created_journal_ids: number[];
-  reconciliation_pending_count: number;
-  posted: BridgePostResult[];
-  already_posted: BridgePostResult[];
-  errors: Record<string, string[]>;
-};
-
-export type ReconciliationVerificationResult = {
-  id: number;
-  status: string;
-  verified: boolean;
-  verified_at?: string;
-  detail?: string;
-};
+export type BridgePostResult = { posted: boolean; already_posted: boolean; journal_entry?: AccountingBridgeReconciliationJournal | null; reconciliation_item?: { id: number; status: string; exception_code?: string } | null; next_action?: string };
+export type BridgeBatchPreviewResult = { selected_count: number; previewable_count?: number; postable_count: number; blocked_count: number; total_debit: string; total_credit: string; previews: BridgePostingPreview[]; blockers: Record<string, string[]> };
+export type BridgeBatchPostResult = { selected_count?: number; posted_count: number; already_posted_count?: number; skipped_already_posted_count: number; blocked_count: number; created_journal_ids: number[]; reconciliation_pending_count: number; posted: BridgePostResult[]; already_posted: BridgePostResult[]; errors: Record<string, string[]> };
+export type ReconciliationVerificationResult = { id: number; status: string; verified: boolean; verified_at?: string; detail?: string };
 
 export type AccountingBridgeReconciliationPayload = {
   summary: AccountingBridgeReconciliationSummary;
@@ -258,53 +232,33 @@ function toQuery(filters?: AccountingBridgeReconciliationFilters): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(filters ?? {})) {
     if (value !== undefined && value !== null && String(value).trim() !== "") {
-      search.set(key, String(value).trim());
+      search.set(key, String(value));
     }
   }
   const query = search.toString();
   return query ? `?${query}` : "";
 }
 
-export async function getAccountingBridgeReconciliation(filters?: AccountingBridgeReconciliationFilters): Promise<AccountingBridgeReconciliationPayload> {
-  return request<AccountingBridgeReconciliationPayload>("/accounting/bridge-reconciliation/" + toQuery(filters));
+export function getAccountingBridgeReconciliation(filters?: AccountingBridgeReconciliationFilters) {
+  return request<AccountingBridgeReconciliationPayload>(`/admin/accounting/bridge-reconciliation/${toQuery(filters)}`);
 }
 
-export async function previewBridgeCandidate(candidateId: string): Promise<BridgePostingPreview> {
-  return request<BridgePostingPreview>(`/accounting/bridge-reconciliation/candidates/${encodeURIComponent(candidateId)}/preview/`);
+export function previewBridgeCandidate(candidateId: string) {
+  return request<BridgePostingPreview>(`/admin/accounting/bridge-reconciliation/candidates/${encodeURIComponent(candidateId)}/preview/`);
 }
 
-export async function postBridgeCandidate(candidateId: string, payload: { idempotency_key: string; confirm?: boolean; confirm_text?: string; posting_note?: string }): Promise<BridgePostResult> {
-  return request<BridgePostResult>(`/accounting/bridge-reconciliation/candidates/${encodeURIComponent(candidateId)}/post/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    retryCount: 0,
-  });
+export function postBridgeCandidate(candidateId: string, payload: { idempotency_key: string; confirm?: boolean; confirm_text?: string; posting_note?: string }) {
+  return request<BridgePostResult>(`/admin/accounting/bridge-reconciliation/candidates/${encodeURIComponent(candidateId)}/post/`, { method: "POST", body: payload });
 }
 
-export async function previewBridgeCandidateBatch(candidateIds: string[]): Promise<BridgeBatchPreviewResult> {
-  return request<BridgeBatchPreviewResult>("/accounting/bridge-reconciliation/batch-preview/", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ candidate_ids: candidateIds }),
-    retryCount: 0,
-  });
+export function batchPreviewBridgeCandidates(candidate_ids: string[]) {
+  return request<BridgeBatchPreviewResult>("/admin/accounting/bridge-reconciliation/batch-preview/", { method: "POST", body: { candidate_ids } });
 }
 
-export async function postBridgeCandidateBatch(payload: { candidate_ids: string[]; idempotency_keys: Record<string, string>; confirm?: boolean; confirm_text?: string; posting_note?: string }): Promise<BridgeBatchPostResult> {
-  return request<BridgeBatchPostResult>("/accounting/bridge-reconciliation/batch-post/", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    retryCount: 0,
-  });
+export function batchPostBridgeCandidates(payload: { candidate_ids: string[]; idempotency_keys: Record<string, string>; confirm?: boolean; confirm_text?: string; posting_note?: string }) {
+  return request<BridgeBatchPostResult>("/admin/accounting/bridge-reconciliation/batch-post/", { method: "POST", body: payload });
 }
 
-export async function verifyBridgeReconciliationItem(itemId: number | string, payload: { note?: string; run_id?: number | null } = {}): Promise<ReconciliationVerificationResult> {
-  return request<ReconciliationVerificationResult>(`/accounting/bridge-reconciliation/items/${itemId}/verify/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    retryCount: 0,
-  });
+export function verifyBridgeReconciliationItem(itemId: number, payload: { note?: string; run_id?: number | null }) {
+  return request<ReconciliationVerificationResult>(`/admin/accounting/bridge-reconciliation/items/${itemId}/verify/`, { method: "POST", body: payload });
 }
