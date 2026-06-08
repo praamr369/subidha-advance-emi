@@ -48,6 +48,7 @@ CREDIT_RETURN_PURPOSE_BY_EVENT = {"credit_note_issue": "CREDIT_NOTE_ISSUE", "sal
 CREDIT_RETURN_LABEL_BY_EVENT = {"credit_note_issue": "Credit note issue", "sales_return": "Sales return", "customer_credit_adjustment": "Customer credit adjustment", "direct_sale_return": "Direct sale return"}
 SKIPPED_CREDIT_RETURN_EVENT_KEY = "credit_return_skipped_not_applicable"
 UNSUPPORTED_CREDIT_RETURN_EVENT_KEY = "unsupported_credit_return"
+NO_SAFE_RETURN_DATE_BLOCKER = "DirectSaleReturn has no approved_at, return_date, or created_at value; bridge posting date cannot be resolved safely."
 
 
 @dataclass(frozen=True)
@@ -66,12 +67,12 @@ def _money(value: Any) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
 
 
-def _as_date(value: Any) -> date:
+def _as_date(value: Any) -> date | None:
     if isinstance(value, datetime):
         return value.date()
     if isinstance(value, date):
         return value
-    return timezone.localdate()
+    return None
 
 
 def _candidate_id(*, source_model: str, source_pk: int | str, event_key: str) -> str:
@@ -156,6 +157,24 @@ def _credit_note_reference(note: BillingCreditNote) -> str:
 
 def _return_reference(row: DirectSaleReturn) -> str:
     return row.return_no or f"RET-{row.id}"
+
+
+def _direct_sale_return_operational_date(row: DirectSaleReturn) -> tuple[date | None, str | None]:
+    """
+    Resolve the safest existing operational date for a DirectSaleReturn without mutating it.
+    Priority: approved_at for approved returns, model return_date if later introduced, created_at fallback.
+    """
+    if row.status == DirectSaleReturnStatus.APPROVED:
+        approved_date = _as_date(row.approved_at)
+        if approved_date is not None:
+            return approved_date, None
+    return_date = _as_date(getattr(row, "return_date", None))
+    if return_date is not None:
+        return return_date, None
+    created_date = _as_date(getattr(row, "created_at", None))
+    if created_date is not None:
+        return created_date, None
+    return None, NO_SAFE_RETURN_DATE_BLOCKER
 
 
 def _resolve_payment_finance_account(payment: Payment) -> tuple[FinanceAccount | None, str | None, list[int]]:
@@ -262,8 +281,8 @@ def _invoice_lines(invoice: BillingInvoice, event_key: str) -> tuple[list[dict[s
     if event_key not in BILLING_INVOICE_EVENT_KEYS:
         return [], ["Unsupported BillingInvoice event for Phase F3."], None
     amount = _money(invoice.grand_total)
-    taxable = _money(invoice.taxable_total) or amount - _money(invoice.tax_total)
     tax = _money(invoice.tax_total)
+    taxable = _money(invoice.taxable_total) or amount - tax
     if amount <= Decimal("0.00"):
         warnings.append("BillingInvoice grand_total must be greater than zero.")
     if taxable <= Decimal("0.00"):
@@ -303,9 +322,9 @@ def _credit_note_lines(note: BillingCreditNote, event_key: str) -> tuple[list[di
     warnings: list[str] = []
     returns = _sales_return_account()
     receivable = _customer_receivable_account()
-    gst = _output_gst_account() if _money(note.tax_adjustment) > Decimal("0.00") else None
-    taxable = _money(note.taxable_adjustment)
     tax = _money(note.tax_adjustment)
+    gst = _output_gst_account() if tax > Decimal("0.00") else None
+    taxable = _money(note.taxable_adjustment)
     total = _money(note.total_adjustment)
     if total <= Decimal("0.00"):
         warnings.append("Credit note total adjustment must be greater than zero.")
@@ -336,9 +355,9 @@ def _return_lines(row: DirectSaleReturn, event_key: str) -> tuple[list[dict[str,
     warnings: list[str] = []
     returns = _sales_return_account()
     receivable = _customer_receivable_account()
-    gst = _output_gst_account() if _money(row.tax_total) > Decimal("0.00") else None
-    taxable = _money(row.subtotal)
     tax = _money(row.tax_total)
+    gst = _output_gst_account() if tax > Decimal("0.00") else None
+    taxable = _money(row.subtotal)
     total = _money(row.grand_total)
     if total <= Decimal("0.00"):
         warnings.append("DirectSaleReturn grand_total must be greater than zero.")
@@ -365,7 +384,9 @@ def _line_totals(lines: list[dict[str, Any]]) -> tuple[Decimal, Decimal]:
     return sum((_money(line.get("debit_amount")) for line in lines), Decimal("0.00")), sum((_money(line.get("credit_amount")) for line in lines), Decimal("0.00"))
 
 
-def _source_period(source_date: date) -> AccountingPeriod | None:
+def _source_period(source_date: date | None) -> AccountingPeriod | None:
+    if source_date is None:
+        return None
     try:
         return resolve_accounting_period(source_date)
     except ValueError:
@@ -397,6 +418,31 @@ def _date_filter_qs(queryset, filters: BridgeCandidateFilters, *, date_field: st
     return queryset
 
 
+def _row_matches_date_filters(row: dict[str, Any], filters: BridgeCandidateFilters) -> bool:
+    source_date_text = row.get("source_date")
+    if not source_date_text:
+        return not (filters.date_from or filters.date_to or filters.accounting_period or filters.financial_year)
+    source_date = date.fromisoformat(source_date_text)
+    if filters.date_from and source_date < filters.date_from:
+        return False
+    if filters.date_to and source_date > filters.date_to:
+        return False
+    if filters.accounting_period:
+        period_lookup = Q(code__iexact=filters.accounting_period)
+        if str(filters.accounting_period).isdigit():
+            period_lookup |= Q(pk=int(filters.accounting_period))
+        period = AccountingPeriod.objects.filter(period_lookup).first()
+        return bool(period and period.start_date <= source_date <= period.end_date)
+    if filters.financial_year:
+        from accounting.models import FinancialYear
+        year_lookup = Q(code__iexact=filters.financial_year)
+        if str(filters.financial_year).isdigit():
+            year_lookup |= Q(pk=int(filters.financial_year))
+        year = FinancialYear.objects.filter(year_lookup).first()
+        return bool(year and year.start_date <= source_date <= year.end_date)
+    return True
+
+
 def _reconciliation_qs(*, source_model: str, source_id: str):
     return ReconciliationItem.objects.filter(module="ACCOUNTING_BRIDGE_PHASE_F", source_type=source_model, source_id=source_id).order_by("-created_at", "-id")
 
@@ -414,7 +460,9 @@ def _existing_bridge_for(*, source_model: str, source_id: str, purpose: str) -> 
     return AccountingBridgePosting.objects.filter(source_model=source_model, source_id=source_id, purpose=purpose).select_related("journal_entry", "journal_entry__accounting_period", "journal_entry__financial_year").first()
 
 
-def _candidate_status_payload(*, event_key: str, event_label: str, module: str, source_model: str, raw_status: str, lines: list[dict[str, Any]], line_warnings: list[str], period: AccountingPeriod | None, source_date: date, journal: JournalEntry | None, reconciliation_item: ReconciliationItem | None, source_workflow_exists: bool, classification_reason: str | None = None, approval_required: bool = False) -> dict[str, Any]:
+def _candidate_status_payload(*, event_key: str, event_label: str, module: str, source_model: str, raw_status: str, lines: list[dict[str, Any]], line_warnings: list[str], period: AccountingPeriod | None, source_date: date | None, journal: JournalEntry | None, reconciliation_item: ReconciliationItem | None, source_workflow_exists: bool, classification_reason: str | None = None, approval_required: bool = False) -> dict[str, Any]:
+    if source_date is None:
+        return {"status": "BLOCKED_BY_PERIOD", "canonical_status": "BLOCKED_BY_PERIOD", "can_post": False, "can_preview": False, "can_reconcile": False, "blocker_code": "SOURCE_DATE_MISSING", "blocker_reason": classification_reason or NO_SAFE_RETURN_DATE_BLOCKER, "recommended_action": "Fix the source workflow date before bridge posting.", "setup_href": "/admin/accounting/periods"}
     period_readiness = build_accounting_bridge_posting_period_readiness(reference_date=source_date, financial_year=getattr(period, "financial_year", None), period=period)
     bridge_row = {"event_key": event_key, "status": raw_status, "label": event_label, "blocking_reasons": [item for item in [classification_reason, *line_warnings] if item]}
     postability = evaluate_accounting_postability(event_key=event_key, event_label=event_label, module=module, source_model=source_model, bridge_row=bridge_row, period_readiness=period_readiness, source_workflow_exists=source_workflow_exists, posted=bool(journal), reconciled=bool(reconciliation_item and reconciliation_item.status == ReconciliationItemStatus.MATCHED), as_source_row=not bool(journal))
@@ -439,12 +487,13 @@ def _purpose_for_event(source_model: str, event_key: str) -> str:
     return event_key.upper()
 
 
-def _candidate_payload(*, candidate_id: str, event_key: str, event_label: str, module: str, source_model: str, source_pk: int, source_display: str, source_reference: str, source_date: date, amount: Any, lines: list[dict[str, Any]], finance_account: FinanceAccount | None, period: AccountingPeriod | None, postability: dict[str, Any], journal: JournalEntry | None, reconciliation_item: ReconciliationItem | None, idempotency_key: str, taxable_amount: Any = None, tax_amount: Any = None, source_status: str | None = None, source_type: str | None = None) -> dict[str, Any]:
+def _candidate_payload(*, candidate_id: str, event_key: str, event_label: str, module: str, source_model: str, source_pk: int, source_display: str, source_reference: str, source_date: date | None, amount: Any, lines: list[dict[str, Any]], finance_account: FinanceAccount | None, period: AccountingPeriod | None, postability: dict[str, Any], journal: JournalEntry | None, reconciliation_item: ReconciliationItem | None, idempotency_key: str, taxable_amount: Any = None, tax_amount: Any = None, source_status: str | None = None, source_type: str | None = None) -> dict[str, Any]:
     total_debit, total_credit = _line_totals(lines)
     purpose = _purpose_for_event(source_model, event_key)
     existing_bridge = _existing_bridge_for(source_model=source_model, source_id=str(source_pk), purpose=purpose)
     posted_unverified = bool(journal and reconciliation_item and reconciliation_item.exception_code == "POSTED_UNVERIFIED" and reconciliation_item.status == ReconciliationItemStatus.NEEDS_REVIEW)
-    return {"id": candidate_id, "bridge_candidate_id": candidate_id, "row_type": "bridge_candidate", "event_key": event_key, "event_label": event_label, "label": event_label, "module": module, "source_module": module, "source_model": source_model, "source_pk": source_pk, "source_id": str(source_pk), "source_type": source_type or source_model, "source_display": source_display, "source_reference_number": source_reference, "source_reference": source_reference, "source_date": source_date.isoformat(), "source_status": source_status, "accounting_period_id": getattr(period, "id", None), "accounting_period_code": getattr(period, "code", None), "accounting_period": _period_payload(period), "financial_year": getattr(getattr(period, "financial_year", None), "code", None), "fiscal_year": getattr(getattr(period, "financial_year", None), "code", None), "financial_year_id": getattr(period, "financial_year_id", None), "amount": f"{_money(amount):.2f}", "taxable_amount": f"{_money(taxable_amount):.2f}" if taxable_amount is not None else None, "tax_amount": f"{_money(tax_amount):.2f}" if tax_amount is not None else None, "debit_account_preview": [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if _money(line.get("debit_amount")) > 0], "credit_account_preview": [_line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if _money(line.get("credit_amount")) > 0], "finance_account": _finance_account_payload(finance_account), "canonical_status": postability["status"], "status": postability["status"], "reconciliation_state": "RECONCILED" if reconciliation_item and reconciliation_item.status == ReconciliationItemStatus.MATCHED else ("POSTED_UNVERIFIED" if posted_unverified else None), "posted_unverified": posted_unverified, "can_preview": postability["can_preview"], "can_post": postability["can_post"], "can_reconcile": postability["can_reconcile"], "blocker_code": postability["blocker_code"], "blocker_reason": postability["blocker_reason"], "approval_required": postability["status"] == "BLOCKED_BY_APPROVAL", "unsupported_source": postability["status"] == "UNSUPPORTED_SOURCE", "existing_journal_entry_id": getattr(journal, "id", None), "existing_accounting_bridge_posting_id": getattr(existing_bridge, "id", None), "existing_money_movement_id": None, "existing_reconciliation_item_id": getattr(reconciliation_item, "id", None), "journal_entry": _journal_payload(journal), "settlement_linked": False, "reconciliation_linked": reconciliation_item is not None, "reconciliation_items": [{"id": reconciliation_item.id, "status": reconciliation_item.status, "severity": reconciliation_item.severity, "exception_code": reconciliation_item.exception_code, "exception_message": reconciliation_item.exception_message}] if reconciliation_item else [], "idempotency_key": idempotency_key, "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "exception_reasons": [postability["blocker_reason"]] if postability.get("blocker_code") else [], "operator_action": postability["recommended_action"], "recommended_action": postability["recommended_action"], "action_href": "/admin/accounting/bridge-reconciliation", "setup_href": postability["setup_href"], "preview_action_href": "/admin/accounting/bridge-reconciliation" if postability["can_preview"] else None, "post_action_href": "/admin/accounting/bridge-reconciliation" if postability["can_post"] else None, "source_action_href": None, "is_postable": postability["can_post"], "is_acknowledgeable": False}
+    source_date_text = source_date.isoformat() if source_date else None
+    return {"id": candidate_id, "bridge_candidate_id": candidate_id, "row_type": "bridge_candidate", "event_key": event_key, "event_label": event_label, "label": event_label, "module": module, "source_module": module, "source_model": source_model, "source_pk": source_pk, "source_id": str(source_pk), "source_type": source_type or source_model, "source_display": source_display, "source_reference_number": source_reference, "source_reference": source_reference, "source_date": source_date_text, "source_status": source_status, "accounting_period_id": getattr(period, "id", None), "accounting_period_code": getattr(period, "code", None), "accounting_period": _period_payload(period), "financial_year": getattr(getattr(period, "financial_year", None), "code", None), "fiscal_year": getattr(getattr(period, "financial_year", None), "code", None), "financial_year_id": getattr(period, "financial_year_id", None), "amount": f"{_money(amount):.2f}", "taxable_amount": f"{_money(taxable_amount):.2f}" if taxable_amount is not None else None, "tax_amount": f"{_money(tax_amount):.2f}" if tax_amount is not None else None, "debit_account_preview": [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if _money(line.get("debit_amount")) > 0], "credit_account_preview": [_line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if _money(line.get("credit_amount")) > 0], "finance_account": _finance_account_payload(finance_account), "canonical_status": postability["status"], "status": postability["status"], "reconciliation_state": "RECONCILED" if reconciliation_item and reconciliation_item.status == ReconciliationItemStatus.MATCHED else ("POSTED_UNVERIFIED" if posted_unverified else None), "posted_unverified": posted_unverified, "can_preview": postability["can_preview"], "can_post": postability["can_post"], "can_reconcile": postability["can_reconcile"], "blocker_code": postability["blocker_code"], "blocker_reason": postability["blocker_reason"], "approval_required": postability["status"] == "BLOCKED_BY_APPROVAL", "unsupported_source": postability["status"] == "UNSUPPORTED_SOURCE", "existing_journal_entry_id": getattr(journal, "id", None), "existing_accounting_bridge_posting_id": getattr(existing_bridge, "id", None), "existing_money_movement_id": None, "existing_reconciliation_item_id": getattr(reconciliation_item, "id", None), "journal_entry": _journal_payload(journal), "settlement_linked": False, "reconciliation_linked": reconciliation_item is not None, "reconciliation_items": [{"id": reconciliation_item.id, "status": reconciliation_item.status, "severity": reconciliation_item.severity, "exception_code": reconciliation_item.exception_code, "exception_message": reconciliation_item.exception_message}] if reconciliation_item else [], "idempotency_key": idempotency_key, "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "exception_reasons": [postability["blocker_reason"]] if postability.get("blocker_code") else [], "operator_action": postability["recommended_action"], "recommended_action": postability["recommended_action"], "action_href": "/admin/accounting/bridge-reconciliation", "setup_href": postability["setup_href"], "preview_action_href": "/admin/accounting/bridge-reconciliation" if postability["can_preview"] else None, "post_action_href": "/admin/accounting/bridge-reconciliation" if postability["can_post"] else None, "source_action_href": None, "is_postable": postability["can_post"], "is_acknowledgeable": False}
 
 
 def payment_candidate(payment: Payment) -> dict[str, Any]:
@@ -504,16 +553,18 @@ def billing_credit_note_candidate(note: BillingCreditNote) -> dict[str, Any]:
 
 def direct_sale_return_candidate(row: DirectSaleReturn) -> dict[str, Any]:
     event_key, event_label, reason = _classify_return_event(row)
+    source_date, date_reason = _direct_sale_return_operational_date(row)
+    classification_reason = date_reason or reason
     purpose = _purpose_for_event(DIRECT_SALE_RETURN_SOURCE_MODEL, event_key)
     bridge = _existing_bridge_for(source_model=DIRECT_SALE_RETURN_SOURCE_MODEL, source_id=str(row.id), purpose=purpose)
     journal = bridge.journal_entry if bridge else None
     item = _latest_posting_reconciliation_item(source_model=DIRECT_SALE_RETURN_SOURCE_MODEL, source_id=str(row.id)) if journal else _latest_reconciliation_item(source_model=DIRECT_SALE_RETURN_SOURCE_MODEL, source_id=str(row.id))
-    source_date = _as_date(row.approved_at or row.created_at)
     period = getattr(journal, "accounting_period", None) or _source_period(source_date)
-    lines, warnings, finance_account = _return_lines(row, event_key) if event_key == "direct_sale_return" else ([], [reason] if reason else [], None)
+    lines, warnings, finance_account = _return_lines(row, event_key) if event_key == "direct_sale_return" and source_date is not None else ([], [classification_reason] if classification_reason else [], None)
     raw = "SKIPPED_NOT_APPLICABLE" if event_key == SKIPPED_CREDIT_RETURN_EVENT_KEY else "READY" if lines else "NOT_CONFIGURED"
-    postability = _candidate_status_payload(event_key=event_key, event_label=event_label, module="billing", source_model=DIRECT_SALE_RETURN_SOURCE_MODEL, raw_status=raw, lines=lines, line_warnings=warnings, period=period, source_date=source_date, journal=journal, reconciliation_item=item, source_workflow_exists=True, classification_reason=reason, approval_required=row.status != DirectSaleReturnStatus.APPROVED and event_key == "direct_sale_return")
-    payload = _candidate_payload(candidate_id=_candidate_id(source_model=DIRECT_SALE_RETURN_SOURCE_MODEL, source_pk=row.id, event_key=event_key), event_key=event_key, event_label=event_label, module="billing", source_model=DIRECT_SALE_RETURN_SOURCE_MODEL, source_pk=row.id, source_display=f"Return {_return_reference(row)}", source_reference=_return_reference(row), source_date=source_date, amount=row.grand_total, taxable_amount=row.subtotal, tax_amount=row.tax_total, lines=lines, finance_account=finance_account, period=period, postability=postability, journal=journal, reconciliation_item=item, idempotency_key=f"bridge:{purpose}:DirectSaleReturn:{row.id}:{source_date.isoformat()}:{_money(row.grand_total):.2f}", source_status=row.status, source_type=row.return_kind)
+    postability = _candidate_status_payload(event_key=event_key, event_label=event_label, module="billing", source_model=DIRECT_SALE_RETURN_SOURCE_MODEL, raw_status=raw, lines=lines, line_warnings=warnings, period=period, source_date=source_date, journal=journal, reconciliation_item=item, source_workflow_exists=True, classification_reason=classification_reason, approval_required=row.status != DirectSaleReturnStatus.APPROVED and event_key == "direct_sale_return")
+    source_date_key = source_date.isoformat() if source_date else "NO_SAFE_DATE"
+    payload = _candidate_payload(candidate_id=_candidate_id(source_model=DIRECT_SALE_RETURN_SOURCE_MODEL, source_pk=row.id, event_key=event_key), event_key=event_key, event_label=event_label, module="billing", source_model=DIRECT_SALE_RETURN_SOURCE_MODEL, source_pk=row.id, source_display=f"Return {_return_reference(row)}", source_reference=_return_reference(row), source_date=source_date, amount=row.grand_total, taxable_amount=row.subtotal, tax_amount=row.tax_total, lines=lines, finance_account=finance_account, period=period, postability=postability, journal=journal, reconciliation_item=item, idempotency_key=f"bridge:{purpose}:DirectSaleReturn:{row.id}:{source_date_key}:{_money(row.grand_total):.2f}", source_status=row.status, source_type=row.return_kind)
     payload.update({"return_number": row.return_no, "return_status": row.status})
     return payload
 
@@ -535,7 +586,8 @@ def list_bridge_candidates(filters: BridgeCandidateFilters | None = None) -> lis
         qs = _date_filter_qs(BillingCreditNote.objects.select_related("original_invoice", "original_invoice__customer"), active_filters, date_field="note_date")
         rows.extend(billing_credit_note_candidate(item) for item in qs.order_by("-note_date", "-id")[:500])
     if requested_model in {"", DIRECT_SALE_RETURN_SOURCE_MODEL} and (not active_filters.module or active_filters.module == "billing"):
-        rows.extend(direct_sale_return_candidate(item) for item in DirectSaleReturn.objects.select_related("direct_sale", "original_invoice", "credit_note", "customer").order_by("-created_at", "-id")[:500])
+        return_rows = [direct_sale_return_candidate(item) for item in DirectSaleReturn.objects.select_related("direct_sale", "original_invoice", "credit_note", "customer").order_by("-created_at", "-id")[:1000]]
+        rows.extend(row for row in return_rows if _row_matches_date_filters(row, active_filters))
     if active_filters.event_key:
         rows = [row for row in rows if row["event_key"] == active_filters.event_key]
     if active_filters.status:
@@ -548,23 +600,28 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
     source_kind, source_pk, event_key = _parse_candidate_id(candidate_id)
     if source_kind == "payment" and event_key == PAYMENT_COLLECTION_EVENT_KEY:
         qs = Payment.objects.select_related("finance_account", "finance_account__chart_account", "customer", "subscription")
-        if for_update: qs = qs.select_for_update()
+        if for_update:
+            qs = qs.select_for_update()
         return payment_candidate(qs.get(pk=source_pk))
     if source_kind == "receiptdocument":
         qs = ReceiptDocument.objects.select_related("finance_account", "finance_account__chart_account", "billing_invoice", "direct_sale", "customer", "subscription", "payment")
-        if for_update: qs = qs.select_for_update()
+        if for_update:
+            qs = qs.select_for_update()
         candidate = receipt_candidate(qs.get(pk=source_pk))
     elif source_kind == "billinginvoice":
         qs = BillingInvoice.objects.select_related("finance_account", "finance_account__chart_account", "direct_sale", "customer", "subscription")
-        if for_update: qs = qs.select_for_update()
+        if for_update:
+            qs = qs.select_for_update()
         candidate = billing_invoice_candidate(qs.get(pk=source_pk))
     elif source_kind == "billingcreditnote":
         qs = BillingCreditNote.objects.select_related("original_invoice", "original_invoice__customer")
-        if for_update: qs = qs.select_for_update()
+        if for_update:
+            qs = qs.select_for_update()
         candidate = billing_credit_note_candidate(qs.get(pk=source_pk))
     elif source_kind == "directsalereturn":
         qs = DirectSaleReturn.objects.select_related("direct_sale", "original_invoice", "credit_note", "customer")
-        if for_update: qs = qs.select_for_update()
+        if for_update:
+            qs = qs.select_for_update()
         candidate = direct_sale_return_candidate(qs.get(pk=source_pk))
     else:
         raise ValueError("Unsupported bridge candidate source.")
@@ -577,31 +634,37 @@ def _lines_for_candidate(candidate: dict[str, Any]):
     model = candidate["source_model"]
     source_id = candidate["source_id"]
     event_key = candidate["event_key"]
-    if model == "Payment": return _payment_lines(Payment.objects.select_related("finance_account", "finance_account__chart_account").get(pk=source_id))
-    if model == RECEIPT_SOURCE_MODEL: return _receipt_lines(ReceiptDocument.objects.select_related("finance_account", "finance_account__chart_account").get(pk=source_id), event_key)
-    if model == BILLING_INVOICE_SOURCE_MODEL: return _invoice_lines(BillingInvoice.objects.get(pk=source_id), event_key)
-    if model == CREDIT_NOTE_SOURCE_MODEL: return _credit_note_lines(BillingCreditNote.objects.get(pk=source_id), event_key)
-    if model == DIRECT_SALE_RETURN_SOURCE_MODEL: return _return_lines(DirectSaleReturn.objects.get(pk=source_id), event_key)
+    if model == "Payment":
+        return _payment_lines(Payment.objects.select_related("finance_account", "finance_account__chart_account").get(pk=source_id))
+    if model == RECEIPT_SOURCE_MODEL:
+        return _receipt_lines(ReceiptDocument.objects.select_related("finance_account", "finance_account__chart_account").get(pk=source_id), event_key)
+    if model == BILLING_INVOICE_SOURCE_MODEL:
+        return _invoice_lines(BillingInvoice.objects.get(pk=source_id), event_key)
+    if model == CREDIT_NOTE_SOURCE_MODEL:
+        return _credit_note_lines(BillingCreditNote.objects.get(pk=source_id), event_key)
+    if model == DIRECT_SALE_RETURN_SOURCE_MODEL:
+        return _return_lines(DirectSaleReturn.objects.get(pk=source_id), event_key)
     return [], ["Unsupported source model."], None
 
 
 def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
     candidate = get_bridge_candidate(candidate_id)
-    lines, warnings, _finance_account = _lines_for_candidate(candidate)
+    lines, warnings, _finance_account = _lines_for_candidate(candidate) if candidate.get("source_date") else ([], [candidate.get("blocker_reason") or NO_SAFE_RETURN_DATE_BLOCKER], None)
     blockers = []
     if not candidate["can_post"]:
         blockers.append(candidate["blocker_reason"] or "Candidate is not postable.")
-    journal_date = date.fromisoformat(candidate["source_date"])
-    try:
-        sequence = validate_document_numbering_ready(DocumentType.JOURNAL_ENTRY, journal_date)
-        journal_number_preview = preview_document_number(sequence=sequence)
-    except DocumentNumberingSetupError as exc:
-        journal_number_preview = None
-        blockers.append(str(exc))
+    journal_date = date.fromisoformat(candidate["source_date"]) if candidate.get("source_date") else None
+    journal_number_preview = None
+    if journal_date is not None:
+        try:
+            sequence = validate_document_numbering_ready(DocumentType.JOURNAL_ENTRY, journal_date)
+            journal_number_preview = preview_document_number(sequence=sequence)
+        except DocumentNumberingSetupError as exc:
+            blockers.append(str(exc))
     total_debit, total_credit = _line_totals(lines)
     tax_lines = [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount"), credit=line.get("credit_amount")) for line in lines if getattr(line.get("chart_account"), "system_code", "") == "OUTPUT_GST"]
-    source_payload = {"model": candidate["source_model"], "pk": candidate["source_id"], "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate["source_date"], "amount": candidate["amount"], "source_status": candidate.get("source_status"), "source_type": candidate.get("source_type"), "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount")}
-    return {"candidate": candidate, "candidate_id": candidate_id, "source": source_payload, "journal_date": journal_date.isoformat(), "accounting_period": candidate["accounting_period"], "journal_number_preview": journal_number_preview, "debit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if _money(line.get("debit_amount")) > 0], "credit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if _money(line.get("credit_amount")) > 0], "lines": _preview_lines(lines), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "tax_lines": tax_lines, "finance_account_line": candidate["finance_account"], "warnings": warnings, "blockers": list(dict.fromkeys([item for item in blockers if item])), "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers), "idempotency_key": candidate["idempotency_key"], "safety_text": SAFETY_TEXT}
+    source_payload = {"model": candidate["source_model"], "pk": candidate["source_id"], "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate.get("source_date"), "amount": candidate["amount"], "source_status": candidate.get("source_status"), "source_type": candidate.get("source_type"), "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount")}
+    return {"candidate": candidate, "candidate_id": candidate_id, "source": source_payload, "journal_date": journal_date.isoformat() if journal_date else None, "accounting_period": candidate["accounting_period"], "journal_number_preview": journal_number_preview, "debit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if _money(line.get("debit_amount")) > 0], "credit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if _money(line.get("credit_amount")) > 0], "lines": _preview_lines(lines), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "tax_lines": tax_lines, "finance_account_line": candidate["finance_account"], "warnings": warnings, "blockers": list(dict.fromkeys([item for item in blockers if item])), "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers), "idempotency_key": candidate["idempotency_key"], "safety_text": SAFETY_TEXT}
 
 
 def _create_pending_reconciliation_item(*, journal: JournalEntry, source_model: str, source_id: str, source_label: str, amount: Decimal, candidate_id: str, actor, note: str = "") -> ReconciliationItem:
@@ -615,9 +678,11 @@ def _create_pending_reconciliation_item(*, journal: JournalEntry, source_model: 
 
 @transaction.atomic
 def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed: bool, posting_note: str = "", actor) -> dict[str, Any]:
-    if not confirmed: raise ValueError("Explicit confirmation is required before posting.")
+    if not confirmed:
+        raise ValueError("Explicit confirmation is required before posting.")
     candidate_key = (idempotency_key or "").strip()
-    if not candidate_key: raise ValueError("idempotency_key is required.")
+    if not candidate_key:
+        raise ValueError("idempotency_key is required.")
     candidate = get_bridge_candidate(candidate_id, for_update=True)
     supported = {"Payment": {PAYMENT_COLLECTION_EVENT_KEY}, RECEIPT_SOURCE_MODEL: RECEIPT_EVENT_KEYS, BILLING_INVOICE_SOURCE_MODEL: BILLING_INVOICE_EVENT_KEYS, CREDIT_NOTE_SOURCE_MODEL: {"credit_note_issue", "sales_return", "customer_credit_adjustment"}, DIRECT_SALE_RETURN_SOURCE_MODEL: {"direct_sale_return"}}
     if candidate["event_key"] not in supported.get(candidate["source_model"], set()):
@@ -639,7 +704,8 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
     if not lines or total_debit != total_credit:
         raise ValueError("Bridge posting preview is not balanced.")
     source_instance = _source_instance_for_candidate(candidate, for_update=True)
-    journal, created = post_bridge_entry(source_instance=source_instance, purpose=purpose, entry_date=date.fromisoformat(candidate["source_date"]), memo=f"Bridge posting {candidate['source_model']} {candidate['source_id']} {candidate['event_key']}", lines=lines, voucher_type=purpose, source_type=candidate.get("source_type") or candidate["source_model"].upper(), source_reference=candidate["source_reference"], source_document_no=candidate["source_reference"], source_event_date=date.fromisoformat(candidate["source_date"]), trace_metadata={"event_key": candidate["event_key"], "idempotency_key": candidate_key, "posting_note": posting_note, "source_model": candidate["source_model"], "source_id": candidate["source_id"], "finance_account_id": getattr(finance_account, "id", None), "amount": candidate["amount"], "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount")}, posted_by=actor)
+    entry_date = date.fromisoformat(candidate["source_date"])
+    journal, created = post_bridge_entry(source_instance=source_instance, purpose=purpose, entry_date=entry_date, memo=f"Bridge posting {candidate['source_model']} {candidate['source_id']} {candidate['event_key']}", lines=lines, voucher_type=purpose, source_type=candidate.get("source_type") or candidate["source_model"].upper(), source_reference=candidate["source_reference"], source_document_no=candidate["source_reference"], source_event_date=entry_date, trace_metadata={"event_key": candidate["event_key"], "idempotency_key": candidate_key, "posting_note": posting_note, "source_model": candidate["source_model"], "source_id": candidate["source_id"], "finance_account_id": getattr(finance_account, "id", None), "amount": candidate["amount"], "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount")}, posted_by=actor)
     item = _latest_posting_reconciliation_item(source_model=candidate["source_model"], source_id=candidate["source_id"])
     if created and not (item and item.exception_code == "POSTED_UNVERIFIED"):
         item = _create_pending_reconciliation_item(journal=journal, source_model=candidate["source_model"], source_id=candidate["source_id"], source_label=candidate["source_reference"], amount=_money(candidate["amount"]), candidate_id=candidate_id, actor=actor, note=posting_note)
@@ -650,7 +716,8 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
 def _source_instance_for_candidate(candidate: dict[str, Any], *, for_update: bool = False):
     model = {"Payment": Payment, RECEIPT_SOURCE_MODEL: ReceiptDocument, BILLING_INVOICE_SOURCE_MODEL: BillingInvoice, CREDIT_NOTE_SOURCE_MODEL: BillingCreditNote, DIRECT_SALE_RETURN_SOURCE_MODEL: DirectSaleReturn}[candidate["source_model"]]
     qs = model.objects
-    if for_update: qs = qs.select_for_update()
+    if for_update:
+        qs = qs.select_for_update()
     return qs.get(pk=candidate["source_id"])
 
 
@@ -673,7 +740,8 @@ def batch_preview_bridge_candidates(candidate_ids: list[str]) -> dict[str, Any]:
             previews.append(preview)
             total_debit += _money(preview["total_debit"])
             total_credit += _money(preview["total_credit"])
-            if not preview["can_post"]: blockers[candidate_id] = preview["blockers"]
+            if not preview["can_post"]:
+                blockers[candidate_id] = preview["blockers"]
         except Exception as exc:
             blockers[candidate_id] = [str(exc)]
     return {"selected_count": len(candidate_ids), "previewable_count": len(previews), "postable_count": sum(1 for item in previews if item["can_post"]), "blocked_count": len(blockers), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "previews": previews, "blockers": blockers}
@@ -695,14 +763,19 @@ def batch_post_bridge_candidates(*, candidate_ids: list[str], idempotency_keys: 
 @transaction.atomic
 def verify_bridge_reconciliation_item(*, item_id: int, actor, note: str = "", run_id: int | None = None) -> dict[str, Any]:
     item = ReconciliationItem.objects.select_for_update().get(pk=item_id)
-    if item.module != "ACCOUNTING_BRIDGE_PHASE_F": raise ValueError("Only accounting bridge reconciliation items can be verified here.")
-    if item.status == ReconciliationItemStatus.MATCHED: return {"id": item.id, "status": item.status, "verified": False, "detail": "Already verified."}
-    if item.exception_code != "POSTED_UNVERIFIED": raise ValueError("Cannot verify a bridge item that has a hard reconciliation exception.")
+    if item.module != "ACCOUNTING_BRIDGE_PHASE_F":
+        raise ValueError("Only accounting bridge reconciliation items can be verified here.")
+    if item.status == ReconciliationItemStatus.MATCHED:
+        return {"id": item.id, "status": item.status, "verified": False, "detail": "Already verified."}
+    if item.exception_code != "POSTED_UNVERIFIED":
+        raise ValueError("Cannot verify a bridge item that has a hard reconciliation exception.")
     journal_id = (item.metadata or {}).get("journal_entry_id")
     journal = JournalEntry.objects.filter(pk=journal_id, status=JournalEntryStatus.POSTED).first()
-    if journal is None: raise ValueError("Cannot verify an unposted or missing journal entry.")
+    if journal is None:
+        raise ValueError("Cannot verify an unposted or missing journal entry.")
     open_exceptions = ReconciliationItem.objects.filter(source_type=item.source_type, source_id=item.source_id).exclude(pk=item.pk).exclude(exception_code="POSTED_UNVERIFIED").exclude(status__in=[ReconciliationItemStatus.MATCHED, ReconciliationItemStatus.RESOLVED, ReconciliationItemStatus.FALSE_POSITIVE, ReconciliationItemStatus.WAIVED_BY_APPROVAL])
-    if open_exceptions.exists(): raise ValueError("Cannot verify while hard reconciliation exceptions remain for this source.")
+    if open_exceptions.exists():
+        raise ValueError("Cannot verify while hard reconciliation exceptions remain for this source.")
     item.status = ReconciliationItemStatus.MATCHED
     item.exception_code = ""
     item.exception_message = ""
