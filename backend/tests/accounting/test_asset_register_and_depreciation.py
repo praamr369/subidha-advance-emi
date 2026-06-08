@@ -5,13 +5,14 @@ from django.test import TestCase
 
 from accounting.models import Asset, AssetCategory, DepreciationRun, DepreciationRunStatus
 from accounting.services.depreciation_service import post_depreciation_run, run_depreciation
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_test_accounting_posting_prerequisites
 
 
 class AssetRegisterAndDepreciationTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="asset_depr_admin", phone="9381200001")
+        ensure_test_accounting_posting_prerequisites(date(2026, 4, 30), performed_by=self.admin)
         self.category = AssetCategory.objects.create(
             code="FURN-SET",
             name="Furniture Set",
@@ -22,8 +23,8 @@ class AssetRegisterAndDepreciationTests(TestCase):
         self.asset = Asset.objects.create(
             category=self.category,
             description="Showroom sofa",
-            acquisition_date=date(2026, 4, 1),
-            in_service_date=date(2026, 4, 5),
+            acquisition_date=date(2026, 3, 31),
+            in_service_date=date(2026, 3, 31),
             cost_amount=Decimal("30000.00"),
             salvage_value=Decimal("500.00"),
         )
@@ -36,6 +37,7 @@ class AssetRegisterAndDepreciationTests(TestCase):
         )
 
         run_obj, updated = run_depreciation(run_id=run_obj.id, performed_by=self.admin)
+        run_obj.refresh_from_db()
         self.assertTrue(updated)
         self.assertEqual(run_obj.status, DepreciationRunStatus.RUNNING)
         self.assertEqual(run_obj.lines.count(), 1)
@@ -51,4 +53,3 @@ class AssetRegisterAndDepreciationTests(TestCase):
         )
         self.asset.refresh_from_db()
         self.assertGreater(self.asset.accumulated_depreciation, Decimal("0.00"))
-

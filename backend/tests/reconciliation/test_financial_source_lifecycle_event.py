@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from django.utils import timezone
+
 from accounting.models import JournalEntry, JournalEntryType
 from billing.models import BillingDocumentStatus, ReceiptDocument, ReceiptType
 from reconciliation.models import FinancialSourceLifecycleEvent, ReconciliationItem
@@ -28,6 +30,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 from django.test import TestCase
 
@@ -35,6 +38,8 @@ from django.test import TestCase
 class FinancialSourceLifecycleEventServiceTests(TestCase):
     def setUp(self):
         self.admin = create_admin_user(username="admin_fle_test", phone="9030000005")
+        ensure_test_accounting_posting_prerequisites(date(2026, 5, 2), performed_by=self.admin)
+        ensure_test_accounting_posting_prerequisites(timezone.localdate(), performed_by=self.admin)
         self.customer = create_customer_profile(name="FLE Customer", phone="9030000105")
         self.product = create_product(name="FLE Product", product_code="FLE-P-001", base_price=Decimal("1000.00"))
         self.batch = create_batch(batch_code="FLEBATCH2026", duration_months=1, total_slots=100, draw_day=5, start_date=date(2026, 5, 1))

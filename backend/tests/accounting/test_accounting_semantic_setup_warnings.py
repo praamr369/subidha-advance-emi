@@ -11,12 +11,14 @@ from accounting.models import (
     FinanceAccountMappingPurpose,
 )
 from accounting.services.accounting_setup_service import AccountingSetupService
+from tests.accounting.helpers import seed_safe_chart_of_accounts
 
 
 class AccountingSemanticSetupWarningsTests(TestCase):
     def test_main_bank_account_mapped_to_cash_in_hand_creates_warning(self):
         AccountingSetupService.bootstrap(dry_run=False)
-        cash_hand = ChartOfAccount.objects.get(system_code="DEFAULT_ASSET_CASH_IN_HAND")
+        seed_safe_chart_of_accounts()
+        cash_hand = ChartOfAccount.objects.get(system_code="CASH_COLLECTION")
         main_bank = FinanceAccount.objects.get(name__iexact="Main Bank Account")
         FinanceAccount.objects.filter(pk=main_bank.pk).update(chart_account=cash_hand)
         warnings = AccountingSetupService.get_setup_warnings()
@@ -24,7 +26,8 @@ class AccountingSemanticSetupWarningsTests(TestCase):
 
     def test_upi_account_mapped_to_cash_in_hand_creates_warning(self):
         AccountingSetupService.bootstrap(dry_run=False)
-        cash_hand = ChartOfAccount.objects.get(system_code="DEFAULT_ASSET_CASH_IN_HAND")
+        seed_safe_chart_of_accounts()
+        cash_hand = ChartOfAccount.objects.get(system_code="CASH_COLLECTION")
         upi = FinanceAccount.objects.get(name__iexact="UPI Account")
         FinanceAccount.objects.filter(pk=upi.pk).update(chart_account=cash_hand)
         warnings = AccountingSetupService.get_setup_warnings()

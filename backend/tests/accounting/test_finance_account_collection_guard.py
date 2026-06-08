@@ -25,6 +25,8 @@ from tests.helpers import (
     create_payment_collection_finance_account,
     create_product,
     create_subscription,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -144,6 +146,12 @@ class FinanceAccountCollectionGuardTests(TestCase):
             purpose=FinanceAccountMappingPurpose.RENT_INCOME,
             is_active=True,
         )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=dirty,
+            chart_account=dirty_asset,
+            purpose=FinanceAccountMappingPurpose.BANK_COLLECTION,
+            is_active=True,
+        )
 
         with self.assertRaises(ValueError) as ctx:
             record_emi_payment(
@@ -152,11 +160,16 @@ class FinanceAccountCollectionGuardTests(TestCase):
                 collected_by=admin,
                 method="CASH",
                 finance_account_id=dirty.id,
+                idempotency_key="GUARD-EMI-RESERVED-001",
             )
         self.assertIn("operational ledger", str(ctx.exception).lower())
 
     def test_direct_sale_collection_rejects_reserved_finance_account(self):
         admin = create_admin_user(username="guard_ds_admin", phone="9389111103")
+        ensure_test_accounting_posting_prerequisites(date(2026, 4, 21), performed_by=admin)
+        ensure_document_numbering_profile_for_date("DIRECT_SALE", date(2026, 4, 21), performed_by=admin)
+        ensure_document_numbering_profile_for_date("TAX_INVOICE", date(2026, 4, 21), performed_by=admin)
+        ensure_document_numbering_profile_for_date("DIRECT_SALE_RECEIPT", date(2026, 4, 21), performed_by=admin)
         customer = create_customer_profile(name="Guard DS Customer", phone="7389111103")
         product = create_product(name="Guard DS Product", product_code="GUARD-DS-01", base_price=Decimal("12000.00"))
         from inventory.models import InventoryItem
@@ -194,6 +207,12 @@ class FinanceAccountCollectionGuardTests(TestCase):
             finance_account=dirty,
             chart_account=liability_chart,
             purpose=FinanceAccountMappingPurpose.COMMISSION_PAYABLE,
+            is_active=True,
+        )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=dirty,
+            chart_account=dirty_asset,
+            purpose=FinanceAccountMappingPurpose.BANK_COLLECTION,
             is_active=True,
         )
 

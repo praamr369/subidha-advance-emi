@@ -17,6 +17,7 @@ from accounting.services.salary_posting_service import (
 )
 from tests.helpers import create_admin_user
 from accounting.models import EmployeeProfile
+from tests.accounting.helpers import seed_bridge_ready_environment
 
 
 class AccountingSalaryPostingTests(TestCase):
@@ -26,6 +27,7 @@ class AccountingSalaryPostingTests(TestCase):
             username="accounting_salary_admin",
             phone="9340000003",
         )
+        seed_bridge_ready_environment(performed_by=self.admin)
         self.employee = EmployeeProfile.objects.create(
             employee_code="EMP-SAL-001",
             name="Salary Employee",

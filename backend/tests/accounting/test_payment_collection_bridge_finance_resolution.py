@@ -19,6 +19,7 @@ from tests.helpers import (
     create_product,
     create_subscription,
 )
+from tests.accounting.helpers import seed_bridge_ready_environment
 
 
 class PaymentCollectionBridgeFinanceResolutionTests(TestCase):
@@ -26,6 +27,8 @@ class PaymentCollectionBridgeFinanceResolutionTests(TestCase):
         super().setUp()
         self.today = timezone.localdate()
         self.admin = create_admin_user(username="bridge_fin_admin", phone="9364100001")
+        environment = seed_bridge_ready_environment(self.today, performed_by=self.admin)
+        self.finance_account = environment["finance_account"]
         customer = create_customer_profile(name="Bridge Finance Customer", phone="7364100001")
         product = create_product(name="Bridge Finance Product", product_code="BR-FIN-01", base_price=Decimal("1000.00"))
         batch = create_batch(
@@ -63,9 +66,14 @@ class PaymentCollectionBridgeFinanceResolutionTests(TestCase):
             reference_no="BR-FIN-PAY-001",
             payment_date=self.today - timedelta(days=1),
             collected_by=self.admin,
+            finance_account=self.finance_account,
         )
 
     def test_payment_collection_uses_finance_account_chart_not_legacy_brg_accounts(self):
+        FinanceAccount.objects.filter(
+            kind=FinanceAccountKind.CASH,
+            is_real_settlement_account=True,
+        ).exclude(pk=self.finance_account.pk).update(is_active=False)
         result = run_bridge_postings(
             start_date=self.today - timedelta(days=7),
             end_date=self.today,
@@ -85,6 +93,8 @@ class PaymentCollectionBridgeFinanceResolutionTests(TestCase):
         self.assertIn("EMI-2100", codes)
 
     def test_payment_collection_skips_when_missing_finance_account(self):
+        self.payment.finance_account = None
+        self.payment.save(update_fields=["finance_account"])
         FinanceAccount.objects.filter(kind=FinanceAccountKind.CASH, is_real_settlement_account=True).update(is_active=False)
         result = run_bridge_postings(
             start_date=self.today - timedelta(days=7),
@@ -98,6 +108,8 @@ class PaymentCollectionBridgeFinanceResolutionTests(TestCase):
         self.assertEqual(result["results"][0]["skipped"][0]["reason"], "MISSING_FINANCE_ACCOUNT")
 
     def test_payment_collection_skips_when_ambiguous_finance_account(self):
+        self.payment.finance_account = None
+        self.payment.save(update_fields=["finance_account"])
         # Create a second active CASH settlement finance account to force ambiguity.
         FinanceAccount.objects.create(
             name="Bridge Fin Extra Cash",

@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
@@ -151,11 +151,22 @@ def _posted_reference_guard(instance, *, label: str):
     if not instance.pk:
         return
 
-    existing = instance.__class__.objects.filter(pk=instance.pk).only("posted_journal_entry_id").first()
-    if existing is None or not getattr(existing, "posted_journal_entry_id", None):
+    journal_field = None
+    for candidate in ("posted_journal_entry_id", "journal_entry_id"):
+        try:
+            instance._meta.get_field(candidate.removesuffix("_id"))
+            journal_field = candidate
+            break
+        except FieldDoesNotExist:
+            continue
+    if journal_field is None:
         return
 
-    raise ValidationError({"posted_journal_entry": f"{label.capitalize()} is immutable once posted."})
+    existing = instance.__class__.objects.filter(pk=instance.pk).only(journal_field).first()
+    if existing is None or not getattr(existing, journal_field, None):
+        return
+
+    raise ValidationError({journal_field.removesuffix("_id"): f"{label.capitalize()} is immutable once posted."})
 
 
 class AccountingTimeStampedModel(models.Model):

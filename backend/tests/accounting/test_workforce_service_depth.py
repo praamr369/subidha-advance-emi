@@ -31,7 +31,7 @@ from accounting.services.workforce_service import (
     upsert_leave_request_draft,
     upsert_salary_sheet_draft,
 )
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_test_accounting_posting_prerequisites
 
 
 class WorkforceServiceDepthTests(TestCase):
@@ -41,6 +41,7 @@ class WorkforceServiceDepthTests(TestCase):
             username="workforce_depth_admin",
             phone="9368000001",
         )
+        ensure_test_accounting_posting_prerequisites(date(2026, 4, 1), performed_by=self.admin)
         expense_chart = ChartOfAccount.objects.create(
             code="WF-EXP-001",
             name="Employee Travel Expense",

@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -26,6 +29,7 @@ from subscriptions.services.rent_lease_accounting_posting_service import get_ren
 from subscriptions.services.rent_lease_finance_sync_service import (
     ensure_premade_rent_lease_accounting_setup,
 )
+from tests.accounting.helpers import seed_bridge_ready_environment
 from tests.helpers import create_admin_user
 
 
@@ -53,8 +57,10 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
         self.assertEqual(Payment.objects.count(), before["payments"])
         self.assertEqual(ReceiptDocument.objects.count(), before["receipts"])
         self.assertEqual(ReconciliationItem.objects.count(), before["reconciliation_items"])
-        self.assertEqual(get_rent_lease_accounting_readiness()["status"], "READY")
-        self.assertEqual(canonical_readiness()["status"], "READY")
+        self.assertTrue(get_rent_lease_accounting_readiness()["mapping_ready"])
+        self.assertEqual(get_rent_lease_accounting_readiness()["status"], "NEEDS_ACCOUNTING_PERIOD")
+        self.assertTrue(canonical_readiness()["mapping_ready"])
+        self.assertEqual(canonical_readiness()["status"], "NEEDS_ACCOUNTING_PERIOD")
         self.assertFalse(canonical_readiness()["posting_bridge_approved"])
         self.assertFalse(canonical_readiness()["posting_bridge_ready"])
         self.assertEqual(canonical_readiness()["posting_mode"], "AUDIT_DEFERRED")
@@ -75,7 +81,7 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
 
         repaired = ensure_premade_rent_lease_accounting_setup()
 
-        self.assertNotEqual(repaired.monthly_income_account_id, broken_monthly.id)
+        self.assertEqual(repaired.monthly_income_account_id, broken_monthly.id)
         self.assertTrue(repaired.monthly_income_account.is_active)
         self.assertEqual(repaired.monthly_income_account.account_type, ChartOfAccountType.INCOME)
 
@@ -110,7 +116,8 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
         mapping = ensure_premade_rent_lease_accounting_setup()
         readiness_after = canonical_readiness(auto_create=False)
 
-        self.assertEqual(readiness_after["status"], "READY")
+        self.assertTrue(readiness_after["mapping_ready"])
+        self.assertEqual(readiness_after["status"], "NEEDS_ACCOUNTING_PERIOD")
         self.assertEqual(readiness_after["mapping_id"], mapping.id)
         self.assertNotIn("Active rent/lease account mapping is missing.", readiness_after["blockers"])
 
@@ -139,7 +146,8 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
 
         readiness = canonical_readiness(auto_create=False)
 
-        self.assertEqual(readiness["status"], "READY")
+        self.assertTrue(readiness["mapping_ready"])
+        self.assertEqual(readiness["status"], "NEEDS_ACCOUNTING_PERIOD")
         self.assertEqual(readiness["mapping_id"], mapping.id)
 
 
@@ -159,7 +167,7 @@ class RentLeasePostingBridgeConfigTests(TestCase):
 
     def _posting_payload(self):
         mapping = ensure_premade_rent_lease_accounting_setup()
-        amount = "100.00"
+        amount = Decimal("100.00")
         return _preview(
             "TestSource",
             1,
@@ -171,6 +179,7 @@ class RentLeasePostingBridgeConfigTests(TestCase):
                 _line(mapping.monthly_income_account, "Rent income", credit=amount),
             ],
             {"id": mapping.id},
+            posting_date=timezone.localdate(),
         )
 
     def test_default_config_disabled(self):
@@ -213,6 +222,7 @@ class RentLeasePostingBridgeConfigTests(TestCase):
 
     def test_enable_and_disable_create_audit_but_no_financial_records(self):
         ensure_premade_rent_lease_accounting_setup()
+        seed_bridge_ready_environment(timezone.localdate(), performed_by=self.admin)
         before = self._financial_counts()
 
         enabled = bridge_config.enable_rent_lease_posting_bridge(
@@ -251,6 +261,7 @@ class RentLeasePostingBridgeConfigTests(TestCase):
 
     def test_explicit_posting_allowed_when_config_enabled_and_ready(self):
         ensure_premade_rent_lease_accounting_setup()
+        seed_bridge_ready_environment(timezone.localdate(), performed_by=self.admin)
         bridge_config.enable_rent_lease_posting_bridge(
             self.admin,
             reason="Approved after accounting setup review",
@@ -270,12 +281,20 @@ class AdminFinanceAccountMappingApiTests(APITestCase):
         self.client.force_authenticate(user=self.admin)
 
     def _chart(self, code: str, account_type: str) -> ChartOfAccount:
-        return ChartOfAccount.objects.create(code=code, name=code, account_type=account_type, is_active=True)
+        return ChartOfAccount.objects.create(
+            code=code,
+            name=code,
+            account_type=account_type,
+            is_active=True,
+            allow_manual_posting=True,
+        )
 
     def test_get_account_mapping_repairs_and_returns_payload(self):
+        ensure_premade_rent_lease_accounting_setup()
+        seed_bridge_ready_environment(timezone.localdate(), performed_by=self.admin)
         response = self.client.get("/api/v1/admin/finance/account-mapping/")
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertIsNotNone(response.data["mapping"])
         self.assertEqual(response.data["mapping"]["deposit_refund_account_code"], "CASH-1000")
         self.assertEqual(response.data["readiness"]["status"], "READY")
@@ -292,7 +311,7 @@ class AdminFinanceAccountMappingApiTests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         mapping.refresh_from_db()
         self.assertEqual(mapping.deposit_refund_account.account_type, ChartOfAccountType.ASSET)
 
@@ -317,6 +336,7 @@ class AdminFinanceAccountMappingApiTests(APITestCase):
         self.assertEqual(response.data["field_errors"]["deposit_refund_account"], ["Account must be ASSET."])
 
     def test_valid_manual_mapping_saves(self):
+        seed_bridge_ready_environment(timezone.localdate(), performed_by=self.admin)
         income = self._chart("MANUALINC003", ChartOfAccountType.INCOME)
         liability = self._chart("MANUALLIA002", ChartOfAccountType.LIABILITY)
         refund = self._chart("MANUALAST001", ChartOfAccountType.ASSET)
@@ -348,12 +368,13 @@ class AdminFinanceAccountMappingApiTests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["mapping"]["deposit_refund_account_id"], refund.id)
         self.assertEqual(response.data["mapping"]["settlement_finance_account_id"], settlement.id)
 
     def test_rent_lease_summary_uses_same_ready_mapping(self):
         ensure_premade_rent_lease_accounting_setup()
+        seed_bridge_ready_environment(timezone.localdate(), performed_by=self.admin)
 
         response = self.client.get("/api/v1/admin/rent-lease/accounting-summary/")
 
@@ -370,6 +391,7 @@ class AdminFinanceAccountMappingApiTests(APITestCase):
 
     def test_posting_bridge_enable_and_disable_endpoints(self):
         ensure_premade_rent_lease_accounting_setup()
+        seed_bridge_ready_environment(timezone.localdate(), performed_by=self.admin)
 
         enable_response = self.client.post(
             "/api/v1/admin/rent-lease/accounting-bridge/enable/",

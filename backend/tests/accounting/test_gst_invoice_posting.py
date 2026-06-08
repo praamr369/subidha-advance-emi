@@ -11,6 +11,7 @@ from accounting.services.gst_document_posting_service import (
     post_tax_invoice,
 )
 from tests.helpers import create_admin_user
+from tests.accounting.helpers import seed_bridge_ready_environment
 
 
 class GstInvoicePostingTests(TestCase):
@@ -20,6 +21,7 @@ class GstInvoicePostingTests(TestCase):
             username="gst_invoice_admin",
             phone="9364000005",
         )
+        seed_bridge_ready_environment(timezone.localdate(), performed_by=self.admin)
         self.invoice = TaxInvoice.objects.create(
             invoice_date=timezone.localdate(),
             doc_series=ensure_document_sequence(
@@ -60,7 +62,7 @@ class GstInvoicePostingTests(TestCase):
         before_count = JournalEntry.objects.count()
 
         with patch(
-            "accounting.services.gst_document_posting_service.post_journal_entry",
+            "accounting.services.gst_document_posting_service.post_bridge_entry",
             side_effect=RuntimeError("posting failed"),
         ):
             with self.assertRaisesMessage(RuntimeError, "posting failed"):

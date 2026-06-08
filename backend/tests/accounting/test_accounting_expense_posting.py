@@ -17,6 +17,7 @@ from accounting.services.expense_posting_service import (
 )
 from subscriptions.models import AuditLog
 from tests.helpers import create_admin_user
+from tests.accounting.helpers import seed_bridge_ready_environment
 
 
 class AccountingExpensePostingTests(TestCase):
@@ -26,6 +27,7 @@ class AccountingExpensePostingTests(TestCase):
             username="accounting_expense_admin",
             phone="9340000002",
         )
+        seed_bridge_ready_environment(performed_by=self.admin)
         self.cash_chart = ChartOfAccount.objects.create(
             code="ACC-CASH-002",
             name="Expense Cash",

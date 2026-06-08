@@ -9,7 +9,9 @@ from accounting.models import (
     ChartOfAccount,
     ChartOfAccountType,
     FinanceAccount,
+    FinanceAccountCoaMapping,
     FinanceAccountKind,
+    FinanceAccountMappingPurpose,
 )
 from accounting.services.bridge_run_service import (
     run_bridge_postings,
@@ -39,7 +41,9 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_document_numbering_profile_for_date,
 )
+from tests.accounting.helpers import seed_bridge_ready_environment
 
 
 class OperationalAccountingBridgePostingTests(TestCase):
@@ -50,6 +54,8 @@ class OperationalAccountingBridgePostingTests(TestCase):
             username="accounting_operational_admin",
             phone="9367000001",
         )
+        seed_bridge_ready_environment(self.today, performed_by=self.admin)
+        ensure_document_numbering_profile_for_date("DIRECT_SALE_RECEIPT", self.today, performed_by=self.admin)
 
     def _create_finance_account(self, *, code: str, name: str, kind: str):
         chart_account = ChartOfAccount.objects.create(
@@ -70,6 +76,17 @@ class OperationalAccountingBridgePostingTests(TestCase):
             is_active=True,
             is_real_settlement_account=True,
         ).exclude(pk=account.pk).update(is_active=False)
+        collection_purpose = {
+            FinanceAccountKind.CASH: FinanceAccountMappingPurpose.CASH_COLLECTION,
+            FinanceAccountKind.BANK: FinanceAccountMappingPurpose.BANK_COLLECTION,
+            FinanceAccountKind.UPI: FinanceAccountMappingPurpose.UPI_COLLECTION,
+        }[kind]
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=account,
+            chart_account=chart_account,
+            purpose=collection_purpose,
+            is_active=True,
+        )
         return account
 
     def _create_subscription_bundle(self, *, product_code: str, lucky_number: int, partner=None, tenure_months: int = 3):

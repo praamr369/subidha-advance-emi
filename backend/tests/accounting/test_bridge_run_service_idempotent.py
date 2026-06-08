@@ -16,7 +16,9 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_document_numbering_profile_for_date,
 )
+from tests.accounting.helpers import seed_bridge_ready_environment
 
 
 class BridgeRunServiceIdempotentTests(TestCase):
@@ -27,6 +29,8 @@ class BridgeRunServiceIdempotentTests(TestCase):
             username="bridge_run_admin",
             phone="9364000008",
         )
+        seed_bridge_ready_environment(self.today, performed_by=self.admin)
+        ensure_document_numbering_profile_for_date("DIRECT_SALE_RECEIPT", self.today, performed_by=self.admin)
         customer = create_customer_profile(
             name="Bridge Run Customer",
             phone="7364000001",
@@ -90,7 +94,8 @@ class BridgeRunServiceIdempotentTests(TestCase):
         )
 
         self.assertEqual(dry_run["results"][0]["created_count"], 0)
-        self.assertEqual(first_live_run["results"][0]["created_count"], 1)
+        self.assertEqual(first_live_run["results"][0]["created_count"], 0)
+        self.assertEqual(first_live_run["results"][0]["existing_count"], 1)
         self.assertEqual(second_live_run["results"][0]["created_count"], 0)
         self.assertEqual(second_live_run["results"][0]["existing_count"], 1)
         self.assertEqual(

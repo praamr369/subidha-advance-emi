@@ -8,13 +8,21 @@ from accounting.services.books_service import build_cash_book, build_daily_billi
 from billing.models import BillingInvoice, BillingInvoiceLine
 from billing.services.billing_service import approve_billing_invoice, post_billing_invoice
 from inventory.models import InventoryItem
-from tests.helpers import create_admin_user, create_customer_profile, create_product
+from tests.helpers import (
+    create_admin_user,
+    create_customer_profile,
+    create_product,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
+)
 
 
 class BooksDailyCashbookTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="books_admin", phone="9381400001")
+        ensure_test_accounting_posting_prerequisites(date(2026, 4, 22), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date("DIRECT_SALE_RECEIPT", date(2026, 4, 22), performed_by=self.admin)
         self.customer = create_customer_profile(name="Books Customer", phone="7381400001")
         product = create_product(name="Books Product", product_code="BOOK-001", base_price=Decimal("1500.00"))
         inventory_item = InventoryItem.objects.create(
@@ -88,4 +96,3 @@ class BooksDailyCashbookTests(TestCase):
         self.assertEqual(sales_book["rows"][0]["grand_total"], "1500.00")
         self.assertGreaterEqual(len(cash_book["rows"]), 1)
         self.assertEqual(cash_book["rows"][0]["finance_account_id"], self.finance_account.id)
-

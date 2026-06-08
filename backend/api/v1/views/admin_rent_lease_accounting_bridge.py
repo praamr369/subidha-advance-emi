@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.core.exceptions import ValidationError
 from django.db import connection
+from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -214,10 +215,16 @@ class AdminRentLeaseAccountMappingBridgeView(APIView):
                     SET customer_advance_liability_account_id = %s,
                         rent_income_account_id = %s,
                         lease_income_account_id = %s,
-                        updated_at = NOW()
+                        updated_at = %s
                     WHERE id = %s
                     """,
-                    [data.get("customer_advance_liability_account_id") or None, data.get("rent_income_account_id") or None, data.get("lease_income_account_id") or None, mapping.id],
+                    [
+                        data.get("customer_advance_liability_account_id") or None,
+                        data.get("rent_income_account_id") or None,
+                        data.get("lease_income_account_id") or None,
+                        timezone.now(),
+                        mapping.id,
+                    ],
                 )
         except ValidationError as exc:
             field_errors = getattr(exc, "message_dict", None)

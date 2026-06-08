@@ -61,7 +61,9 @@ class PayrollBridgeReadinessPhase7Tests(APITestCase):
 
     def test_staff_advance_is_not_configured_without_real_source_model(self):
         events = self._events()
-        self.assertEqual(events["staff_advance"]["status"], "NOT_CONFIGURED")
+        self.assertEqual(events["staff_advance"]["status"], "UNSUPPORTED_SOURCE")
+        self.assertEqual(events["staff_advance"].get("legacy_status"), "NOT_CONFIGURED")
+        self.assertFalse(events["staff_advance"]["can_post"])
         self.assertTrue(
             any("StaffAdvance" in reason for reason in events["staff_advance"]["blocking_reasons"])
         )

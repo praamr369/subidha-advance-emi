@@ -23,13 +23,14 @@ from inventory.models import (
     StockMovementType,
 )
 from inventory.services.stock_service import upsert_purchase_bill_draft
-from tests.helpers import create_admin_user, create_product
+from tests.helpers import create_admin_user, create_product, ensure_test_accounting_posting_prerequisites
 
 
 class PurchaseBillAndVendorSettlementTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="purchase_bill_admin", phone="9381300001")
+        ensure_test_accounting_posting_prerequisites(date(2026, 4, 20), performed_by=self.admin)
         product = create_product(name="Purchase Item", product_code="PB-001", base_price=Decimal("1000.00"))
         self.item = InventoryItem.objects.create(
             product=product,

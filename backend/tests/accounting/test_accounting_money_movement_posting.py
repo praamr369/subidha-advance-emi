@@ -13,6 +13,7 @@ from accounting.models import (
 )
 from accounting.services.money_movement_service import post_money_movement
 from tests.helpers import create_admin_user
+from tests.accounting.helpers import seed_bridge_ready_environment
 
 
 class AccountingMoneyMovementPostingTests(TestCase):
@@ -22,6 +23,7 @@ class AccountingMoneyMovementPostingTests(TestCase):
             username="accounting_movement_admin",
             phone="9340000004",
         )
+        seed_bridge_ready_environment(performed_by=self.admin)
         self.cash_account = ChartOfAccount.objects.create(
             code="ACC-CASH-003",
             name="Counter Cash",

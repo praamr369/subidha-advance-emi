@@ -11,6 +11,7 @@ from accounting.models import (
 from accounting.services.bridge_posting_service import post_bridge_entry
 from tests.helpers import create_admin_user
 from accounting.models import Vendor
+from tests.accounting.helpers import seed_bridge_ready_environment
 
 
 class AccountingBridgeIdempotencyTests(TestCase):
@@ -20,6 +21,7 @@ class AccountingBridgeIdempotencyTests(TestCase):
             username="accounting_bridge_admin",
             phone="9340000005",
         )
+        seed_bridge_ready_environment(performed_by=self.admin)
         self.asset_account = ChartOfAccount.objects.create(
             code="ACC-ASSET-004",
             name="Bridge Asset",

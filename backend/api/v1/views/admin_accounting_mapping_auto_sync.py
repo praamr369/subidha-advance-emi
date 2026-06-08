@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
+from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -98,13 +99,14 @@ class AdminRentLeaseAccountMappingAutoSyncView(APIView):
                     SET customer_advance_liability_account_id = %s,
                         rent_income_account_id = %s,
                         lease_income_account_id = %s,
-                        updated_at = NOW()
+                        updated_at = %s
                     WHERE id = %s
                     """,
                     [
                         accounts["customer_advance_liability_account"].id,
                         accounts["rent_income_account"].id,
                         accounts["lease_income_account"].id,
+                        timezone.now(),
                         mapping.id,
                     ],
                 )

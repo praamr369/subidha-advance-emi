@@ -150,7 +150,7 @@ class AccountingJournalPostingTests(TestCase):
         DocumentSequence.objects.filter(document_type="JOURNAL_ENTRY").delete()
         journal_entry = self._balanced_journal(entry_date)
 
-        with self.assertRaisesMessage(ValueError, "No numbering profile is configured"):
+        with self.assertRaisesMessage(ValueError, "No JOURNAL_ENTRY numbering profile is configured"):
             post_journal_entry(journal_entry_id=journal_entry.id, posted_by=self.admin)
 
     def test_existing_posted_journal_number_is_preserved(self):
