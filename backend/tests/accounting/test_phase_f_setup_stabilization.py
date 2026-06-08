@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.utils import timezone
 
-from accounting.models import AccountingBridgePosting, DocumentSequence, JournalEntry, FinanceAccountCoaMapping
+from accounting.models import AccountingBridgePosting, DocumentSequence, FinanceAccountCoaMapping, JournalEntry
 from accounting.services.accounting_postability_service import evaluate_accounting_postability
 from accounting.services.document_sequence_service import DocumentType
 from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
@@ -57,3 +57,18 @@ class PhaseFSetupStabilizationTests(TestCase):
         self.assertFalse(status["can_preview"])
         self.assertFalse(status["can_post"])
         self.assertEqual(JournalEntry.objects.count(), 0)
+
+    def test_canonical_blocker_statuses_are_not_collapsed_to_mapping(self):
+        period = {"financial_year_ready": True, "accounting_period_ready": True, "journal_numbering_ready": True}
+        for blocked_status in ("BLOCKED_BY_PERIOD", "BLOCKED_BY_NUMBERING", "BLOCKED_BY_APPROVAL"):
+            result = evaluate_accounting_postability(
+                event_key="commission_payout",
+                event_label="Commission payout",
+                module="subscriptions",
+                source_model="CommissionPayoutBatch",
+                bridge_row={"status": blocked_status, "blocking_reasons": [blocked_status]},
+                period_readiness=period,
+                source_workflow_exists=True,
+            )
+            self.assertEqual(result["status"], blocked_status)
+            self.assertFalse(result["can_post"])
