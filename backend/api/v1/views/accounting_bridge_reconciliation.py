@@ -7,17 +7,23 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
-from accounting.services.accounting_bridge_reconciliation_read_service import (
-    BridgeReconciliationFilters,
-    build_accounting_bridge_reconciliation,
-)
-from accounting.services.accounting_bridge_candidate_service import (
-    batch_post_bridge_candidates,
-    batch_preview_bridge_candidates,
-    post_bridge_candidate,
-    preview_bridge_candidate,
-    verify_bridge_reconciliation_item,
-)
+from accounting.services.accounting_bridge_reconciliation_read_service import BridgeReconciliationFilters, build_accounting_bridge_reconciliation
+from accounting.services.accounting_bridge_candidate_service import batch_post_bridge_candidates, batch_preview_bridge_candidates, post_bridge_candidate, preview_bridge_candidate, verify_bridge_reconciliation_item
+
+STATUS_ALIASES = {"POSTED_UNVERIFIED", "BLOCKED", "UNSUPPORTED"}
+
+
+def _row_matches_status_alias(row: dict, requested_status: str) -> bool:
+    value = (requested_status or "").strip().upper()
+    row_status = str(row.get("status") or "").strip().upper()
+    reconciliation_state = str(row.get("reconciliation_state") or "").strip().upper()
+    if value == "POSTED_UNVERIFIED":
+        return reconciliation_state == "POSTED_UNVERIFIED" or bool(row.get("posted_unverified"))
+    if value == "BLOCKED":
+        return row_status.startswith("BLOCKED")
+    if value == "UNSUPPORTED":
+        return row_status == "UNSUPPORTED_SOURCE"
+    return row_status == value
 
 
 class BridgeCandidatePostSerializer(serializers.Serializer):
@@ -61,12 +67,14 @@ class AccountingBridgeReconciliationView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
+        requested_status = (request.query_params.get("status") or "").strip().upper() or None
+        service_status = None if requested_status in STATUS_ALIASES else requested_status
         filters = BridgeReconciliationFilters(
             module=(request.query_params.get("module") or "").strip() or None,
             event_key=(request.query_params.get("event_key") or "").strip() or None,
             date_from=parse_date(request.query_params.get("date_from") or ""),
             date_to=parse_date(request.query_params.get("date_to") or ""),
-            status=(request.query_params.get("status") or "").strip().upper() or None,
+            status=service_status,
             customer=(request.query_params.get("customer") or "").strip() or None,
             vendor=(request.query_params.get("vendor") or "").strip() or None,
             partner=(request.query_params.get("partner") or "").strip() or None,
@@ -76,7 +84,10 @@ class AccountingBridgeReconciliationView(APIView):
             source_model=(request.query_params.get("source_model") or "").strip() or None,
             account=(request.query_params.get("account") or "").strip() or None,
         )
-        return Response(build_accounting_bridge_reconciliation(filters))
+        payload = build_accounting_bridge_reconciliation(filters)
+        if requested_status in STATUS_ALIASES:
+            payload = {**payload, "results": [row for row in payload.get("results", []) if _row_matches_status_alias(row, requested_status)]}
+        return Response(payload)
 
 
 class AccountingBridgeCandidatePreviewView(APIView):
@@ -98,13 +109,7 @@ class AccountingBridgeCandidatePostView(APIView):
         serializer = BridgeCandidatePostSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            result = post_bridge_candidate(
-                candidate_id=candidate_id,
-                idempotency_key=serializer.validated_data["idempotency_key"],
-                confirmed=serializer.validated_data["confirmed"],
-                posting_note=serializer.validated_data.get("posting_note") or "",
-                actor=request.user,
-            )
+            result = post_bridge_candidate(candidate_id=candidate_id, idempotency_key=serializer.validated_data["idempotency_key"], confirmed=serializer.validated_data["confirmed"], posting_note=serializer.validated_data.get("posting_note") or "", actor=request.user)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(result, status=status.HTTP_200_OK)
@@ -125,15 +130,7 @@ class AccountingBridgeBatchPostView(APIView):
     def post(self, request):
         serializer = BridgeBatchPostSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response(
-            batch_post_bridge_candidates(
-                candidate_ids=serializer.validated_data["candidate_ids"],
-                idempotency_keys=serializer.validated_data["idempotency_keys"],
-                confirmed=serializer.validated_data["confirmed"],
-                posting_note=serializer.validated_data.get("posting_note") or "",
-                actor=request.user,
-            )
-        )
+        return Response(batch_post_bridge_candidates(candidate_ids=serializer.validated_data["candidate_ids"], idempotency_keys=serializer.validated_data["idempotency_keys"], confirmed=serializer.validated_data["confirmed"], posting_note=serializer.validated_data.get("posting_note") or "", actor=request.user))
 
 
 class AccountingBridgeReconciliationItemVerifyView(APIView):
@@ -143,12 +140,7 @@ class AccountingBridgeReconciliationItemVerifyView(APIView):
         serializer = BridgeVerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            result = verify_bridge_reconciliation_item(
-                item_id=pk,
-                actor=request.user,
-                note=serializer.validated_data.get("note") or "",
-                run_id=serializer.validated_data.get("run_id"),
-            )
+            result = verify_bridge_reconciliation_item(item_id=pk, actor=request.user, note=serializer.validated_data.get("note") or "", run_id=serializer.validated_data.get("run_id"))
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(result, status=status.HTTP_200_OK)
