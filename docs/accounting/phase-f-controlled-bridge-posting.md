@@ -107,6 +107,42 @@ Accounting shape:
 
 Tax reversal is not guessed. If `OUTPUT_GST` cannot be resolved for a taxable credit/return source, the candidate is blocked by mapping and cannot post.
 
+## Phase F5 — BillingDebitNote bridge posting
+
+Phase F5 extends the controlled bridge workflow to concrete debit-note source records only.
+
+Supported source model:
+
+```text
+BillingDebitNote
+```
+
+Supported event keys:
+
+```text
+debit_note_issue
+customer_debit_adjustment
+damage_recovery
+additional_receivable_adjustment
+```
+
+Current safe classification:
+
+- `debit_note_issue` is the default event for approved concrete `BillingDebitNote` records.
+- `damage_recovery` is used only when the concrete `BillingDebitNote` reason indicates damage/recovery posture.
+- `customer_debit_adjustment` is used only when the concrete `BillingDebitNote` reason indicates adjustment posture.
+- `additional_receivable_adjustment` is used only when the concrete `BillingDebitNote` reason indicates additional/extra receivable posture.
+- Draft, cancelled, and voided debit notes are skipped as not applicable.
+- Unsupported debit-note shapes remain visible and non-postable.
+
+Accounting shape:
+
+- Debit `CUSTOMER_RECEIVABLE` for the full debit-note receivable increase.
+- Credit `DIRECT_SALE_INCOME` / `SALES_REVENUE` / mapped adjustment income for the taxable adjustment value.
+- Credit `OUTPUT_GST` only when the concrete source has a tax amount and the active chart/posting setup supports output-GST posting.
+
+Tax posting is not guessed. If `OUTPUT_GST` cannot be resolved for a taxable debit-note source, the candidate is blocked by mapping and cannot post.
+
 ## Preview contract
 
 Preview endpoint:
@@ -121,7 +157,7 @@ Preview must remain read-only. It must not create:
 - `AccountingBridgePosting`
 - `ReconciliationItem`
 - document numbers
-- source Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, or DirectSaleReturn mutations
+- source Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, BillingDebitNote, or DirectSaleReturn mutations
 
 Preview returns the concrete source identity, journal-date context, accounting period, journal-number preview, debit lines, credit lines, tax lines where supported, totals, blockers, warnings, idempotency key, and safety copy.
 
@@ -163,7 +199,7 @@ Verification is admin-only and applies only to clean `POSTED_UNVERIFIED` bridge 
 
 ## Period close impact
 
-Bridge rows follow the same close posture across Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, and DirectSaleReturn:
+Bridge rows follow the same close posture across Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, and BillingDebitNote:
 
 - ready/unposted concrete rows block close as unposted bridge work
 - posted/unverified rows block close as unreconciled work
@@ -172,10 +208,9 @@ Bridge rows follow the same close posture across Payment, ReceiptDocument, Billi
 
 ## Safety limits
 
-Phase F4 does not add bridge posting for:
+Phase F5 does not add bridge posting for:
 
 - DirectSale sale source records
-- BillingDebitNote
 - Rent/Lease source records
 - PurchaseBill
 - StockLedger
