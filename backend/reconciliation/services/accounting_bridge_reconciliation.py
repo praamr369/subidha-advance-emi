@@ -8,13 +8,13 @@ from django.db.models.functions import Cast
 
 from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntryGroup
 from accounting.services.accounting_bridge_candidate_service import BridgeCandidateFilters, list_bridge_candidates
-from billing.models import BillingCreditNote, BillingInvoice, DirectSaleReturn, ReceiptDocument
+from billing.models import BillingCreditNote, BillingDebitNote, BillingInvoice, DirectSaleReturn, ReceiptDocument
 from subscriptions.models import Payment
 
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationItemStatus, ReconciliationSeverity
 
 MODULE = "ACCOUNTING_BRIDGE_PHASE_F"
-BRIDGE_SOURCE_MODELS = ("Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn")
+BRIDGE_SOURCE_MODELS = ("Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote")
 
 
 def _money(value) -> Decimal:
@@ -43,6 +43,9 @@ def _source_amount(*, source_model: str, source_id: str) -> Decimal | None:
     if source_model == "BillingCreditNote":
         row = BillingCreditNote.objects.filter(pk=source_id).only("total_adjustment").first()
         return _money(row.total_adjustment) if row else None
+    if source_model == "BillingDebitNote":
+        row = BillingDebitNote.objects.filter(pk=source_id).only("total_adjustment").first()
+        return _money(row.total_adjustment) if row else None
     if source_model == "DirectSaleReturn":
         row = DirectSaleReturn.objects.filter(pk=source_id).only("grand_total").first()
         return _money(row.grand_total) if row else None
@@ -62,6 +65,9 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
     if source_model == "BillingCreditNote":
         row = BillingCreditNote.objects.filter(pk=source_id).only("note_no").first()
         return (row.note_no or f"CN-{source_id}") if row else f"CN-{source_id}"
+    if source_model == "BillingDebitNote":
+        row = BillingDebitNote.objects.filter(pk=source_id).only("note_no").first()
+        return (row.note_no or f"DN-{source_id}") if row else f"DN-{source_id}"
     if source_model == "DirectSaleReturn":
         row = DirectSaleReturn.objects.filter(pk=source_id).only("return_no").first()
         return (row.return_no or f"RET-{source_id}") if row else f"RET-{source_id}"
@@ -81,6 +87,7 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
         ("BillingInvoice", "BILLING_INVOICE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingInvoice exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("BillingCreditNote", "BILLING_CREDIT_NOTE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingCreditNote exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("DirectSaleReturn", "DIRECT_SALE_RETURN_MISSING_ACCOUNTING_BRIDGE_POSTING", "DirectSaleReturn exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
+        ("BillingDebitNote", "BILLING_DEBIT_NOTE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingDebitNote exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
     ]
     for source_model, code, message in specs:
         for row in list_bridge_candidates(BridgeCandidateFilters(date_from=date_from, date_to=date_to, source_model=source_model)):
@@ -91,6 +98,8 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
             if branch_id and source_model == "BillingInvoice" and not BillingInvoice.objects.filter(pk=row.get("source_pk"), branch_id=branch_id).exists():
                 continue
             if branch_id and source_model == "BillingCreditNote" and not BillingCreditNote.objects.filter(pk=row.get("source_pk"), original_invoice__branch_id=branch_id).exists():
+                continue
+            if branch_id and source_model == "BillingDebitNote" and not BillingDebitNote.objects.filter(pk=row.get("source_pk"), original_invoice__branch_id=branch_id).exists():
                 continue
             if branch_id and source_model == "DirectSaleReturn" and not DirectSaleReturn.objects.filter(pk=row.get("source_pk"), direct_sale__branch_id=branch_id).exists():
                 continue
@@ -120,8 +129,9 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         receipt_ids = [str(pk) for pk in ReceiptDocument.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
         invoice_ids = [str(pk) for pk in BillingInvoice.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
         credit_ids = [str(pk) for pk in BillingCreditNote.objects.filter(original_invoice__branch_id=branch_id).values_list("id", flat=True)]
+        debit_ids = [str(pk) for pk in BillingDebitNote.objects.filter(original_invoice__branch_id=branch_id).values_list("id", flat=True)]
         return_ids = [str(pk) for pk in DirectSaleReturn.objects.filter(direct_sale__branch_id=branch_id).values_list("id", flat=True)]
-        bridges = bridges.filter(Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids))
+        bridges = bridges.filter(Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids))
     totals["checked"] += bridges.count()
 
     for bridge in bridges:
@@ -131,9 +141,8 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         source_label = _source_label(source_model=source_model, source_id=source_id, fallback=bridge.source_reference)
         source_amount = _source_amount(source_model=source_model, source_id=source_id)
         if not journal_id_matches_bridge(bridge, journal):
-            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="AccountingBridgePosting", source_id=str(bridge.id), source_label=str(bridge), severity=ReconciliationSeverity.CRITICAL, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code="BRIDGE_JOURNAL_MISSING_SOURCE_REFERENCE", exception_message="Bridge posting journal entry is missing or mismatching source_model/source_id.", recommended_action="Investigate bridge posting integrity; do not edit posted journals without explicit operational workflow.", metadata={"bridge_posting_id": bridge.id, "bridge_source_model": bridge.source_model, "bridge_source_id": bridge.source_id, "bridge_purpose": bridge.purpose, "journal_entry_id": journal.id, "journal_source_model": journal.source_model, "journal_source_id": journal.source_id})
-            ReconciliationEvidence.objects.create(item=item, evidence_type="AccountingBridgePosting", object_id=str(bridge.id), label=str(bridge), metadata={"purpose": bridge.purpose})
-            ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, status=journal.status, metadata={})
+            ReconciliationItem.objects.create(run=run, module=MODULE, source_type="AccountingBridgePosting", source_id=str(bridge.id), source_label=str(bridge), severity=ReconciliationSeverity.CRITICAL, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code="BRIDGE_JOURNAL_MISSING_SOURCE_REFERENCE", exception_message="Bridge posting journal entry is missing or mismatching source_model/source_id.", recommended_action="Investigate bridge posting integrity; do not edit posted journals without explicit operational workflow.", metadata={"bridge_posting_id": bridge.id, "bridge_source_model": bridge.source_model, "bridge_source_id": bridge.source_id, "bridge_purpose": bridge.purpose, "journal_entry_id": getattr(journal, "id", None), "journal_source_model": getattr(journal, "source_model", None), "journal_source_id": getattr(journal, "source_id", None)})
+            ReconciliationEvidence.objects.create(item_id=ReconciliationItem.objects.latest("id").id, evidence_type="AccountingBridgePosting", object_id=str(bridge.id), label=str(bridge), metadata={"purpose": bridge.purpose})
             totals["exceptions"] += 1
             totals["high_risk"] += 1
             continue
@@ -178,6 +187,8 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
 
 
 def journal_id_matches_bridge(bridge: AccountingBridgePosting, journal: JournalEntry) -> bool:
+    if journal is None:
+        return False
     expected_model = (bridge.source_model or "").strip() or None
     expected_id = (bridge.source_id or "").strip() or None
     journal_model = (journal.source_model or "").strip() or None
