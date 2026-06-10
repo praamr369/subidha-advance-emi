@@ -143,6 +143,46 @@ Accounting shape:
 
 Tax posting is not guessed. If `OUTPUT_GST` cannot be resolved for a taxable debit-note source, the candidate is blocked by mapping and cannot post.
 
+## Phase F6 — PurchaseBill / Vendor Payable bridge posting
+
+Phase F6 extends the controlled bridge workflow to concrete `PurchaseBill` source records only.
+
+Supported source model:
+
+```text
+PurchaseBill
+```
+
+Supported event keys:
+
+```text
+purchase_bill_accrual
+vendor_payable_invoice
+input_tax_credit
+purchase_expense_accrual
+```
+
+Current safe classification:
+
+- `purchase_bill_accrual` is the default event for approved concrete `PurchaseBill` records.
+- Draft and cancelled purchase bills are skipped as not applicable.
+- Legacy `PurchaseBill.status=POSTED` rows that were processed by the old inventory stock service are not made bridge-postable unless an accounting bridge posting already exists, because the legacy path may have mutated stock/status/journal state.
+- Unsupported purchase bill shapes remain visible and non-postable.
+
+Accounting shape:
+
+- Debit `PURCHASE_EXPENSE` / `PURCHASE_CLEARING` / `INVENTORY_CLEARING` for the taxable purchase value.
+- Debit `INPUT_GST` only when the concrete source has tax and active setup supports input GST.
+- Credit `VENDOR_PAYABLE` / `ACCOUNTS_PAYABLE` for the full payable amount.
+
+Inventory boundary:
+
+- F6 does not create or mutate `StockLedger`.
+- F6 does not update `InventoryItem`, stock quantity, stock valuation, delivery demand, or COGS.
+- F6 does not call the legacy `post_purchase_bill` inventory service.
+
+Tax posting is not guessed. If `INPUT_GST` cannot be resolved for a taxable purchase bill, the candidate is blocked by mapping and cannot post.
+
 ## Preview contract
 
 Preview endpoint:
@@ -157,7 +197,8 @@ Preview must remain read-only. It must not create:
 - `AccountingBridgePosting`
 - `ReconciliationItem`
 - document numbers
-- source Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, BillingDebitNote, or DirectSaleReturn mutations
+- source Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, BillingDebitNote, PurchaseBill, or DirectSaleReturn mutations
+- StockLedger or inventory valuation mutations
 
 Preview returns the concrete source identity, journal-date context, accounting period, journal-number preview, debit lines, credit lines, tax lines where supported, totals, blockers, warnings, idempotency key, and safety copy.
 
@@ -183,7 +224,7 @@ Posting creates:
 - one `AccountingBridgePosting`
 - one pending/unverified `ReconciliationItem`
 
-Posting does not mutate original source financial fields. In particular, this bridge workflow does not set `posted_journal_entry` on billing documents and does not change amount, status, document number, source reference, tax values, invoice/receipt allocation, DirectSale, Payment, EMI, Subscription, StockLedger, PurchaseBill, Commission, Payout, Delivery, or rent/lease source data.
+Posting does not mutate original source financial fields. In particular, this bridge workflow does not set `posted_journal_entry` on billing or purchase documents and does not change amount, status, document number, source reference, tax values, invoice/receipt allocation, DirectSale, Payment, EMI, Subscription, StockLedger, PurchaseBill, Commission, Payout, Delivery, or rent/lease source data.
 
 ## Reconciliation contract
 
@@ -199,7 +240,7 @@ Verification is admin-only and applies only to clean `POSTED_UNVERIFIED` bridge 
 
 ## Period close impact
 
-Bridge rows follow the same close posture across Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, and BillingDebitNote:
+Bridge rows follow the same close posture across Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, and PurchaseBill:
 
 - ready/unposted concrete rows block close as unposted bridge work
 - posted/unverified rows block close as unreconciled work
@@ -208,14 +249,16 @@ Bridge rows follow the same close posture across Payment, ReceiptDocument, Billi
 
 ## Safety limits
 
-Phase F5 does not add bridge posting for:
+Phase F6 does not add bridge posting for:
 
 - DirectSale sale source records
 - Rent/Lease source records
-- PurchaseBill
 - StockLedger
+- GoodsReceipt
+- Vendor payment or settlement
+- Purchase return
 - Commission or payout
 - salary or payroll
 - StaffAdvance
 
-Do not auto-post, auto-reconcile, auto-close periods, create fake mappings, or fake Staff Advance readiness.
+Do not auto-post, auto-reconcile, auto-close periods, create fake mappings, mutate inventory, or fake Staff Advance readiness.
