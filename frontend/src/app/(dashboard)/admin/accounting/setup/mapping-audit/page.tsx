@@ -21,8 +21,11 @@ import {
 const FILTERS = ["All", "Blocked", "Unsupported", "Warnings", "Ready"] as const;
 type AuditFilter = (typeof FILTERS)[number];
 
+const READY_MAPPING_STATUSES = ["READY", "READY_UNPOSTED", "POSTABLE", "POSTED", "RECONCILED"];
+
 const GROUP_ORDER = [
   "Collection posting mappings",
+  "Debit note mappings",
   "Inventory mappings",
   "Manufacturing mappings",
   "Payments/refunds mappings",
@@ -39,6 +42,7 @@ function cx(...values: Array<string | false | null | undefined>) {
 function statusClass(status: string): string {
   const value = status.toUpperCase();
   if (["READY", "POSTABLE", "POSTED", "RECONCILED"].includes(value)) return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (value === "READY_UNPOSTED") return "border-blue-200 bg-blue-50 text-blue-900";
   if (value.includes("UNSUPPORTED") || value.includes("CONFLICT") || value.includes("ERROR")) return "border-red-200 bg-red-50 text-red-900";
   if (value.includes("WARNING") || value.includes("BLOCKED") || value.includes("MISSING") || value.includes("INACTIVE")) return "border-amber-200 bg-amber-50 text-amber-950";
   return "border-slate-200 bg-slate-50 text-slate-900";
@@ -57,8 +61,9 @@ function normalizedStatus(row: AccountingMappingAuditRow): string {
 }
 
 function groupName(row: AccountingMappingAuditRow): string {
-  const text = `${row.module ?? ""} ${row.event_key ?? ""} ${row.event_label ?? ""}`.toLowerCase();
+  const text = `${row.module ?? ""} ${row.event_key ?? ""} ${row.event_label ?? ""} ${row.source_model ?? ""}`.toLowerCase();
   if (text.includes("collection") || text.includes("cashier")) return "Collection posting mappings";
+  if (text.includes("billingdebitnote") || text.includes("debit_note") || text.includes("debit note")) return "Debit note mappings";
   if (text.includes("inventory") || text.includes("stock") || text.includes("purchase")) return "Inventory mappings";
   if (text.includes("manufacturing") || text.includes("production")) return "Manufacturing mappings";
   if (text.includes("payment") || text.includes("refund") || text.includes("receipt") || text.includes("settlement") || text.includes("bank") || text.includes("reversal") || text.includes("void")) return "Payments/refunds mappings";
@@ -71,10 +76,10 @@ function groupName(row: AccountingMappingAuditRow): string {
 function rowMatchesFilter(row: AccountingMappingAuditRow, filter: AuditFilter): boolean {
   const status = normalizedStatus(row);
   if (filter === "All") return true;
-  if (filter === "Blocked") return status.startsWith("BLOCKED") || status.includes("MISSING") || status.includes("INACTIVE") || row.blocker_code !== null;
+  if (filter === "Blocked") return !READY_MAPPING_STATUSES.includes(status) && (status.startsWith("BLOCKED") || status.includes("MISSING") || status.includes("INACTIVE") || row.blocker_code !== null);
   if (filter === "Unsupported") return status.includes("UNSUPPORTED") || row.supported === false;
   if (filter === "Warnings") return status.includes("WARNING") || status.includes("CONFLICT");
-  if (filter === "Ready") return ["READY", "POSTABLE", "POSTED", "RECONCILED"].includes(status);
+  if (filter === "Ready") return READY_MAPPING_STATUSES.includes(status);
   return true;
 }
 
@@ -99,7 +104,7 @@ function rowMatchesSearch(row: AccountingMappingAuditRow, search: string): boole
 function rowStats(rows: AccountingMappingAuditRow[]) {
   return {
     total: rows.length,
-    ready: rows.filter((row) => ["READY", "POSTABLE", "POSTED", "RECONCILED"].includes(normalizedStatus(row))).length,
+    ready: rows.filter((row) => READY_MAPPING_STATUSES.includes(normalizedStatus(row))).length,
     blocked: rows.filter((row) => rowMatchesFilter(row, "Blocked")).length,
     warning: rows.filter((row) => rowMatchesFilter(row, "Warnings")).length,
     unsupported: rows.filter((row) => rowMatchesFilter(row, "Unsupported")).length,
@@ -107,6 +112,8 @@ function rowStats(rows: AccountingMappingAuditRow[]) {
 }
 
 function missingLabel(row: AccountingMappingAuditRow): string {
+  const status = normalizedStatus(row);
+  if (READY_MAPPING_STATUSES.includes(status)) return status === "READY_UNPOSTED" ? "Setup is ready. Journal posting is still pending in bridge reconciliation." : "No missing setup reported";
   const missing = [];
   if (row.debit_mapping_status !== "READY") missing.push(`Debit: ${row.debit_mapping_status}`);
   if (row.credit_mapping_status !== "READY") missing.push(`Credit: ${row.credit_mapping_status}`);
@@ -225,7 +232,7 @@ export default function AccountingMappingAuditPage() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping audit remediation</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Bridge impact: {payload?.bridge_impact ?? "Not loaded"}</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. Open periods are valid for posting; only locked, closed, missing, outside-FY, or posting-locked periods block posting. Unsupported sources are not mapping problems.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. READY_UNPOSTED means mapping setup is ready and posting is pending in bridge reconciliation, not a mapping failure. Unsupported sources are source-classification issues, not fake mapping problems.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <ActionButton variant="primary" onClick={() => void seedDefaults()} disabled={Boolean(busy)}>{busy === "seed" ? "Seeding..." : "Seed Safe Defaults"}</ActionButton>
@@ -266,26 +273,30 @@ export default function AccountingMappingAuditPage() {
                 {Object.entries(stats).map(([label, value]) => <div key={`${name}-${label}`} className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold capitalize text-muted-foreground">{label}</div><div className="mt-1 text-lg font-semibold text-foreground">{value}</div></div>)}
               </div>
               <div className="grid gap-3">
-                {groupRows.map((row) => (
-                  <article key={row.event_key} className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold text-foreground">{row.event_label}</h3><MappingStatus value={row.status} /></div><div className="mt-1 text-xs text-muted-foreground">{row.module} · {row.source_model} · <span className="font-mono">{row.event_key}</span></div></div>
-                      <div className="flex flex-wrap gap-2">
-                        {row.supported && row.status !== "READY" ? <button type="button" disabled={busy === row.event_key} onClick={() => void fixEvent(row)} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{busy === row.event_key ? "Fixing..." : "Fix setup event"}</button> : null}
-                        <Link href={routeForRow(row)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold">Open suggested route</Link>
+                {groupRows.map((row) => {
+                  const status = normalizedStatus(row);
+                  const canFix = Boolean(row.supported && !READY_MAPPING_STATUSES.includes(status));
+                  return (
+                    <article key={row.event_key} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold text-foreground">{row.event_label}</h3><MappingStatus value={row.status} /></div><div className="mt-1 text-xs text-muted-foreground">{row.module} · {row.source_model} · <span className="font-mono">{row.event_key}</span></div></div>
+                        <div className="flex flex-wrap gap-2">
+                          {canFix ? <button type="button" disabled={busy === row.event_key} onClick={() => void fixEvent(row)} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{busy === row.event_key ? "Fixing..." : "Fix setup event"}</button> : null}
+                          <Link href={routeForRow(row)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold">Open suggested route</Link>
+                        </div>
                       </div>
-                    </div>
-                    <div className="mt-3 grid gap-3 md:grid-cols-5">
-                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Missing debit</div><p className="mt-1 text-muted-foreground">{row.debit_mapping_status === "READY" ? "No" : row.debit_mapping_status}</p></div>
-                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Missing credit</div><p className="mt-1 text-muted-foreground">{row.credit_mapping_status === "READY" ? "No" : row.credit_mapping_status}</p></div>
-                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Finance account</div><p className="mt-1 text-muted-foreground">{row.finance_account_status}</p></div>
-                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Numbering</div><p className="mt-1 text-muted-foreground">{row.numbering_readiness}</p></div>
-                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Period</div><p className="mt-1 text-muted-foreground">{row.period_readiness}</p></div>
-                    </div>
-                    <p className="mt-3 text-sm text-muted-foreground">{missingLabel(row)}</p>
-                    {row.blocker_reason || row.recommended_action ? <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">{row.blocker_reason || row.recommended_action}</p> : null}
-                  </article>
-                ))}
+                      <div className="mt-3 grid gap-3 md:grid-cols-5">
+                        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Missing debit</div><p className="mt-1 text-muted-foreground">{row.debit_mapping_status === "READY" ? "No" : row.debit_mapping_status}</p></div>
+                        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Missing credit</div><p className="mt-1 text-muted-foreground">{row.credit_mapping_status === "READY" ? "No" : row.credit_mapping_status}</p></div>
+                        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Finance account</div><p className="mt-1 text-muted-foreground">{row.finance_account_status}</p></div>
+                        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Numbering</div><p className="mt-1 text-muted-foreground">{row.numbering_readiness}</p></div>
+                        <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><div className="font-semibold">Period</div><p className="mt-1 text-muted-foreground">{row.period_readiness}</p></div>
+                      </div>
+                      <p className="mt-3 text-sm text-muted-foreground">{missingLabel(row)}</p>
+                      {row.blocker_reason || row.recommended_action ? <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">{row.blocker_reason || row.recommended_action}</p> : null}
+                    </article>
+                  );
+                })}
               </div>
             </WorkspaceSection>
           );
