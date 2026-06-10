@@ -122,6 +122,11 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
   const creditReturnReconciled = summaryCount(summary, "credit_return_reconciled_count");
   const creditReturnBlocked = summaryCount(summary, "credit_return_blocked_count");
   const creditReturnUnsupported = summaryCount(summary, "credit_return_unsupported_count");
+  const debitNoteReady = summaryCount(summary, "debit_note_ready_unposted_count");
+  const debitNotePostedUnverified = summaryCount(summary, "debit_note_posted_unverified_count");
+  const debitNoteReconciled = summaryCount(summary, "debit_note_reconciled_count");
+  const debitNoteBlocked = summaryCount(summary, "debit_note_blocked_count");
+  const debitNoteUnsupported = summaryCount(summary, "debit_note_unsupported_count");
 
   const sourceSections: BridgeSourceSection[] = [
     {
@@ -170,6 +175,23 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
         { label: "Review posted unverified", href: bridgeReviewHref({ status: "POSTED_UNVERIFIED" }) },
       ],
     },
+    {
+      title: "Debit Note bridge",
+      action: "Review debit-note bridge items",
+      href: bridgeReviewHref({ source_model: "BillingDebitNote" }),
+      rows: [
+        { label: "Ready unposted", value: debitNoteReady, detail: "Ready unposted means setup is ready, but journal posting is still pending.", href: bridgeReviewHref({ source_model: "BillingDebitNote", status: "READY_UNPOSTED" }) },
+        { label: "Posted unverified", value: debitNotePostedUnverified, detail: "Posted unverified means journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "BillingDebitNote", status: "POSTED_UNVERIFIED" }) },
+        { label: "Reconciled", value: debitNoteReconciled, detail: "Reconciled means the bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "BillingDebitNote", status: "RECONCILED" }) },
+        { label: "Blocked", value: debitNoteBlocked, detail: "Mapping, period, numbering, or approval blocker remains unresolved.", href: bridgeReviewHref({ source_model: "BillingDebitNote", status: "BLOCKED" }) },
+        { label: "Unsupported", value: debitNoteUnsupported, detail: "Debit-note source classification is visible but not postable in the current controlled bridge slice.", href: bridgeReviewHref({ source_model: "BillingDebitNote", status: "UNSUPPORTED" }) },
+      ],
+      extraActions: [
+        { label: "Review posted unverified", href: bridgeReviewHref({ status: "POSTED_UNVERIFIED" }) },
+        { label: "Run reconciliation checks", href: RECONCILIATION_RUNS_HREF },
+        { label: "Open mapping audit", href: MAPPING_AUDIT_HREF },
+      ],
+    },
   ];
 
   const otherRows = [
@@ -184,9 +206,9 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
   return (
     <WorkspaceSection title="Bridge close readiness by source" description="Open periods are valid for posting. Period close still waits for posting and reconciliation to finish.">
       <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
-        Ready unposted means setup is ready, but journal posting is still pending. Posted unverified means journal exists, but reconciliation verification is pending.
+        Ready unposted means setup is ready, but journal posting is still pending. Posted unverified means journal exists, but reconciliation verification is pending. Debit-note source records are not edited by bridge posting.
       </div>
-      <div className="grid gap-4 xl:grid-cols-5">
+      <div className="grid gap-4 xl:grid-cols-6">
         {sourceSections.map((section) => <BridgeSourceCard key={section.title} section={section} />)}
         <div className="rounded-xl border border-border bg-background p-4">
           <div className="font-semibold text-foreground">Other bridge</div>
@@ -352,6 +374,7 @@ export default function AccountingPeriodsPage() {
           <Link href={ROUTES.admin.accountingBridgeReconciliation} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review bridge reconciliation</Link>
           <Link href={bridgeReviewHref({ source_model: "BillingCreditNote" })} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review credit/return bridge items</Link>
           <Link href={bridgeReviewHref({ source_model: "DirectSaleReturn" })} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review DirectSaleReturn bridge items</Link>
+          <Link href={bridgeReviewHref({ source_model: "BillingDebitNote" })} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review debit-note bridge items</Link>
           <Link href={bridgeReviewHref({ status: "POSTED_UNVERIFIED" })} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">Review posted unverified</Link>
           <Link href={RECONCILIATION_RUNS_HREF} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground">Run reconciliation checks</Link>
           <Link href={MAPPING_AUDIT_HREF} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground">Open mapping audit</Link>
@@ -369,6 +392,8 @@ export default function AccountingPeriodsPage() {
             { label: "Posting locks", value: String(locks.length) },
             { label: "Credit/return ready", value: String(bridgeSummary?.credit_return_ready_unposted_count ?? 0) },
             { label: "Credit/return posted", value: String(bridgeSummary?.credit_return_posted_unverified_count ?? 0) },
+            { label: "Debit note ready", value: String(bridgeSummary?.debit_note_ready_unposted_count ?? 0) },
+            { label: "Debit note posted", value: String(bridgeSummary?.debit_note_posted_unverified_count ?? 0) },
             { label: "Unsupported sources", value: String(bridgeSummary?.unsupported_source_count ?? bridgeSummary?.unsupported_count ?? 0) },
           ]} />
         ) : null}
