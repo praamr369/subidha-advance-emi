@@ -57,6 +57,24 @@ test("public home loads with apply nav, live stats, and latest winner widget", a
   await expect(page.getByText("Latest winner")).toBeVisible();
 });
 
+test("public SEO metadata and global structured data are rendered", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.locator('meta[property="og:image"]').first()).toHaveAttribute(
+    "content",
+    /marketing\/generated\/hero-3d-showroom\.webp/
+  );
+  await expect(page.locator('meta[name="twitter:card"]').first()).toHaveAttribute(
+    "content",
+    "summary_large_image"
+  );
+
+  const structuredData = page.locator("script#public-global-structured-data");
+  await expect(structuredData).toHaveCount(1);
+  await expect(structuredData).toContainText("FurnitureStore");
+  await expect(structuredData).toContainText("WebSite");
+});
+
 test("public route smoke set renders without client error shell", async ({ page }) => {
   for (const route of publicRoutes) {
     await page.goto(route);
