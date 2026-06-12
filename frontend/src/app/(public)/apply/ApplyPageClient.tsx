@@ -43,6 +43,25 @@ function toOptionalString(value: string | null): string {
   return value?.trim() || "";
 }
 
+function normalizePlanInterest(value: string | null): PlanInterest | null {
+  const normalized = toOptionalString(value).toUpperCase().replace(/[\s-]+/g, "_");
+
+  if (normalized === "ADVANCE_EMI" || normalized === "LUCKY" || normalized === "LUCKY_EMI") {
+    return "LUCKY_PLAN";
+  }
+
+  const match = PLAN_OPTIONS.find((option) => option.value === normalized);
+  return match?.value ?? null;
+}
+
+function buildInitialPlanInterest(searchParams: Pick<ReadonlyURLSearchParams, "get">): PlanInterest {
+  return (
+    normalizePlanInterest(searchParams.get("plan_interest")) ||
+    normalizePlanInterest(searchParams.get("plan")) ||
+    "NOT_SURE"
+  );
+}
+
 function buildInitialInterestedProduct(
   searchParams: Pick<ReadonlyURLSearchParams, "get">
 ): string {
@@ -58,12 +77,14 @@ function buildLeadNotes({
   selectedProductId,
   selectedProductCode,
   selectedProductPrice,
+  selectedHandoffSource,
   notes,
 }: {
   planInterest: PlanInterest;
   selectedProductId: string;
   selectedProductCode: string;
   selectedProductPrice: string;
+  selectedHandoffSource: string;
   notes: string;
 }): string {
   const selectedPlan = PLAN_OPTIONS.find((option) => option.value === planInterest);
@@ -72,6 +93,7 @@ function buildLeadNotes({
     selectedProductId ? `Selected product ID: ${selectedProductId}` : "",
     selectedProductCode ? `Selected product code: ${selectedProductCode}` : "",
     selectedProductPrice ? `Listed catalogue price: ${selectedProductPrice}` : "",
+    selectedHandoffSource ? `Public handoff source: ${selectedHandoffSource}` : "",
     notes.trim() ? `Customer notes: ${notes.trim()}` : "",
   ].filter(Boolean);
 
@@ -85,18 +107,23 @@ export default function ApplyPageClient() {
     () => buildInitialInterestedProduct(searchParams),
     [searchParams]
   );
+  const initialPlanInterest = useMemo(
+    () => buildInitialPlanInterest(searchParams),
+    [searchParams]
+  );
 
   const selectedProductId = toOptionalString(searchParams.get("product"));
   const selectedProductName = toOptionalString(searchParams.get("product_name"));
   const selectedProductCode = toOptionalString(searchParams.get("product_code"));
   const selectedProductPrice = toOptionalString(searchParams.get("price"));
+  const selectedHandoffSource = toOptionalString(searchParams.get("source"));
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [city, setCity] = useState("");
   const [interestedProduct, setInterestedProduct] = useState(initialInterestedProduct);
-  const [planInterest, setPlanInterest] = useState<PlanInterest>("NOT_SURE");
+  const [planInterest, setPlanInterest] = useState<PlanInterest>(initialPlanInterest);
   const [preferredEmiAmount, setPreferredEmiAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -106,6 +133,10 @@ export default function ApplyPageClient() {
   useEffect(() => {
     setInterestedProduct(initialInterestedProduct);
   }, [initialInterestedProduct]);
+
+  useEffect(() => {
+    setPlanInterest(initialPlanInterest);
+  }, [initialPlanInterest]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -132,6 +163,7 @@ export default function ApplyPageClient() {
           selectedProductId,
           selectedProductCode,
           selectedProductPrice,
+          selectedHandoffSource,
           notes,
         }),
       });
@@ -147,7 +179,7 @@ export default function ApplyPageClient() {
       setEmail("");
       setCity("");
       setInterestedProduct(initialInterestedProduct);
-      setPlanInterest("NOT_SURE");
+      setPlanInterest(initialPlanInterest);
       setPreferredEmiAmount("");
       setNotes("");
     } catch (error) {
@@ -208,7 +240,7 @@ export default function ApplyPageClient() {
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Selected Product Context
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <div className="text-xs text-muted-foreground">Product</div>
               <div className="text-sm font-medium text-foreground">
@@ -227,9 +259,14 @@ export default function ApplyPageClient() {
                 {selectedProductPrice ? `₹${selectedProductPrice}` : "—"}
               </div>
             </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Plan Interest</div>
+              <div className="text-sm font-medium text-foreground">{selectedPlan.label}</div>
+            </div>
           </div>
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
             This context is sent with your enquiry. It does not reserve stock, lock price, create EMI, or confirm rent/lease availability.
+            {selectedHandoffSource ? ` Source: ${selectedHandoffSource}.` : ""}
           </p>
         </section>
       ) : null}
