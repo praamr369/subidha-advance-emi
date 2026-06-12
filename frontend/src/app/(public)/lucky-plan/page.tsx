@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 import CtaBanner from "@/components/public/CtaBanner";
 import FaqBlock from "@/components/public/FaqBlock";
+import LuckyPlanAnimatedHero from "@/components/public/LuckyPlanAnimatedHero";
+import LuckyPlanMechanicsPreview from "@/components/public/LuckyPlanMechanicsPreview";
 import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPolicySection from "@/components/public/PublicPolicySection";
@@ -10,7 +12,6 @@ import { ADVANCE_EMI_POLICY, LUCKY_PLAN_FAQ, PUBLIC_LEGAL_DISCLAIMER_POINTS, REA
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { buildPublicMetadata } from "@/lib/public-seo";
-import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -22,18 +23,14 @@ export const metadata: Metadata = buildPublicMetadata({
 export default async function LuckyPlanPage() {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
-  const banner = getPublicBannerWithFallback("luckyPlan");
+  const subtitle =
+    "Join a batch, receive a Lucky ID, pay monthly EMI, and follow transparent winner publication. Draws are run under published rules; participation does not guarantee a prize, and any waiver applies only to future EMI obligations as described in branch documents.";
+
   return (
     <PublicPageShell
       title={dictionary.common.luckyPlan}
-      subtitle="Join a batch, receive a Lucky ID, pay monthly EMI, and follow transparent winner publication. Draws are run under published rules; participation does not guarantee a prize, and any waiver applies only to future EMI obligations as described in branch documents."
-      hero={{
-        eyebrow: "Advance EMI and Lucky Draw",
-        imageSrc: banner.src,
-        imageAlt: "Lucky Plan public banner",
-        imageExists: banner.exists,
-        badges: ["Future EMI waiver only", "No retroactive edits", "Auditable flow"],
-      }}
+      subtitle={subtitle}
+      heroSlot={<LuckyPlanAnimatedHero title={dictionary.common.luckyPlan} subtitle={subtitle} />}
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.luckyPlan },
@@ -46,13 +43,15 @@ export default async function LuckyPlanPage() {
       <PublicMarketingBanner
         eyebrow="Plan benefits"
         title="Easy monthly plan with clear financial boundaries"
-        description="Winning waives remaining future EMI obligations only; already paid EMI stays recorded and valid."
+        description="Winning waives remaining future EMI obligations only; already paid EMI stays recorded and valid. The public page explains the plan, but does not create contracts or alter ledgers."
         items={[
           { title: "Deterministic schedule", description: "EMI schedule remains reproducible and auditable." },
           { title: "Transparent draw workflow", description: "Published winner records come from reveal events only." },
           { title: "No hidden retroactive edits", description: "Settled payment history is never silently rewritten." },
         ]}
       />
+
+      <LuckyPlanMechanicsPreview />
 
       <PublicDisclaimerBox title="Read before applying" points={READ_BEFORE_APPLY.advanceEmi} />
 
@@ -66,7 +65,7 @@ export default async function LuckyPlanPage() {
       <PublicMarketingBanner
         eyebrow="Winner transparency"
         title="Public winner proof with privacy protection"
-        description="Published winner records include batch, draw month/date, lucky ID, and commitment proof hash where available. Winner names are masked."
+        description="Published winner records include batch, draw month/date, lucky ID, and commitment proof hash where available. Winner names are masked. No public component can change a revealed draw result."
         items={[
           { title: "Batch + draw context", description: "Each published winner row is tied to the exact batch and draw month." },
           { title: "Proof hash visibility", description: "Commit/reveal proof references are shown when available." },
@@ -77,7 +76,7 @@ export default async function LuckyPlanPage() {
       <PublicMarketingBanner
         eyebrow="Operations clarity"
         title="Payment safety and delivery flow"
-        description="Receipt records and delivery tracking are visible in customer self-service without changing contract or reconciliation behavior."
+        description="Receipt records and delivery tracking are visible in customer self-service without changing contract or reconciliation behavior. Lucky Plan public content remains separate from operational posting."
         items={[
           { title: "Receipt-first payments", description: "Collected payments are receipted and visible in customer payment/receipt pages." },
           { title: "Delivery as separate workflow", description: "Delivery status is tracked separately from EMI and contract state." },
