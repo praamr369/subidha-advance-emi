@@ -31,7 +31,11 @@ export default function GeneratedMarketingVisual({
           className="object-cover object-center"
         />
       ) : (
-        <div aria-label={alt} className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_25%_20%,rgba(214,170,94,0.28),transparent_32%),radial-gradient(circle_at_86%_16%,rgba(112,72,42,0.2),transparent_34%),linear-gradient(145deg,rgba(255,255,255,0.72),rgba(244,237,226,0.88))] dark:bg-[radial-gradient(circle_at_25%_20%,rgba(214,170,94,0.12),transparent_32%),radial-gradient(circle_at_86%_16%,rgba(112,72,42,0.22),transparent_34%),linear-gradient(145deg,rgba(48,39,31,0.9),rgba(35,30,26,0.94))]">
+        <div
+          role="img"
+          aria-label={alt}
+          className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_25%_20%,rgba(214,170,94,0.28),transparent_32%),radial-gradient(circle_at_86%_16%,rgba(112,72,42,0.2),transparent_34%),linear-gradient(145deg,rgba(255,255,255,0.72),rgba(244,237,226,0.88))] dark:bg-[radial-gradient(circle_at_25%_20%,rgba(214,170,94,0.12),transparent_32%),radial-gradient(circle_at_86%_16%,rgba(112,72,42,0.22),transparent_34%),linear-gradient(145deg,rgba(48,39,31,0.9),rgba(35,30,26,0.94))]"
+        >
           <div className="absolute left-8 top-8 rounded-full border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_74%,transparent)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]">
             {label}
           </div>
