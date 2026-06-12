@@ -7,15 +7,48 @@ from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.db.models.functions import Cast
 
 from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntryGroup, SalaryPayment, SalarySheet
-from accounting.services.accounting_bridge_purchase_bill_service import BridgeCandidateFilters, list_bridge_candidates, stock_ledger_candidate
+from accounting.services.accounting_bridge_purchase_bill_service import stock_ledger_candidate
+from accounting.services.accounting_bridge_rent_lease_collection_service import BridgeCandidateFilters, list_bridge_candidates
+from accounting.services.period_service import resolve_accounting_period
 from billing.models import BillingCreditNote, BillingDebitNote, BillingInvoice, DirectSaleReturn, ReceiptDocument
 from inventory.models import PurchaseBill, StockLedger, VendorPayment
 from subscriptions.models import Commission, CommissionPayoutBatch, Payment, RentLeaseBillingDemand
+from subscriptions.models_rent_lease_collection import RentLeaseCollection
 
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationItemStatus, ReconciliationSeverity
 
 MODULE = "ACCOUNTING_BRIDGE_PHASE_F"
-BRIDGE_SOURCE_MODELS = ("Payment", "ReceiptDocument", "BillingInvoice", "RentLeaseBillingDemand", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission", "CommissionPayoutBatch", "SalarySheet", "SalaryPayment")
+BRIDGE_SOURCE_MODELS = (
+    "Payment",
+    "ReceiptDocument",
+    "BillingInvoice",
+    "RentLeaseBillingDemand",
+    "RentLeaseCollection",
+    "BillingCreditNote",
+    "DirectSaleReturn",
+    "BillingDebitNote",
+    "PurchaseBill",
+    "VendorPayment",
+    "StockLedger",
+    "Commission",
+    "CommissionPayoutBatch",
+    "SalarySheet",
+    "SalaryPayment",
+)
+
+F15C_CODES = {
+    "MISSING_POSTING": "RENT_LEASE_COLLECTION_MISSING_ACCOUNTING_BRIDGE_POSTING",
+    "POSTED_UNVERIFIED": "RENT_LEASE_COLLECTION_POSTED_UNVERIFIED",
+    "AMOUNT_MISMATCH": "RENT_LEASE_COLLECTION_AMOUNT_MISMATCH",
+    "PERIOD_MISMATCH": "RENT_LEASE_COLLECTION_PERIOD_MISMATCH",
+    "DUPLICATE_POSTING": "RENT_LEASE_COLLECTION_DUPLICATE_ACCOUNTING_BRIDGE_POSTING",
+    "SOURCE_LINK_MISSING": "RENT_LEASE_COLLECTION_SOURCE_LINK_MISSING",
+    "JOURNAL_UNBALANCED": "RENT_LEASE_COLLECTION_JOURNAL_UNBALANCED",
+    "MAPPING_MISSING": "RENT_LEASE_COLLECTION_MAPPING_MISSING",
+    "FINANCE_ACCOUNT_INACTIVE": "RENT_LEASE_COLLECTION_FINANCE_ACCOUNT_INACTIVE",
+    "NUMBERING_MISSING": "RENT_LEASE_COLLECTION_NUMBERING_MISSING",
+    "UNSUPPORTED_SOURCE": "RENT_LEASE_COLLECTION_UNSUPPORTED_SOURCE",
+}
 
 
 def _money(value) -> Decimal:
@@ -43,6 +76,9 @@ def _source_amount(*, source_model: str, source_id: str) -> Decimal | None:
         return _money(row.grand_total) if row else None
     if source_model == "RentLeaseBillingDemand":
         row = RentLeaseBillingDemand.objects.filter(pk=source_id).only("amount").first()
+        return _money(row.amount) if row else None
+    if source_model == "RentLeaseCollection":
+        row = RentLeaseCollection.objects.filter(pk=source_id).only("amount").first()
         return _money(row.amount) if row else None
     if source_model == "BillingCreditNote":
         row = BillingCreditNote.objects.filter(pk=source_id).only("total_adjustment").first()
@@ -83,7 +119,7 @@ def _source_amount(*, source_model: str, source_id: str) -> Decimal | None:
 def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> str:
     if source_model == "Payment":
         row = Payment.objects.filter(pk=source_id).only("reference_no").first()
-        return (row.reference_no if row and row.reference_no else f"PAY-{source_id}")
+        return row.reference_no if row and row.reference_no else f"PAY-{source_id}"
     if source_model == "ReceiptDocument":
         row = ReceiptDocument.objects.filter(pk=source_id).only("receipt_no", "source_reference").first()
         return (row.receipt_no or row.source_reference or f"RCT-{source_id}") if row else f"RCT-{source_id}"
@@ -93,6 +129,9 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
     if source_model == "RentLeaseBillingDemand":
         row = RentLeaseBillingDemand.objects.filter(pk=source_id).only("reference_key").first()
         return (row.reference_key or f"RLD-{source_id}") if row else f"RLD-{source_id}"
+    if source_model == "RentLeaseCollection":
+        row = RentLeaseCollection.objects.filter(pk=source_id).only("collection_number", "external_reference_no").first()
+        return (row.collection_number or row.external_reference_no or f"RLC-{source_id}") if row else f"RLC-{source_id}"
     if source_model == "BillingCreditNote":
         row = BillingCreditNote.objects.filter(pk=source_id).only("note_no").first()
         return (row.note_no or f"CN-{source_id}") if row else f"CN-{source_id}"
@@ -131,6 +170,24 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
     return fallback or f"{source_model}-{source_id}"
 
 
+def _code(source_model: str, generic: str) -> str:
+    if source_model != "RentLeaseCollection":
+        return generic
+    return F15C_CODES.get(generic, generic)
+
+
+def _expected_period_id(*, source_model: str, source_id: str):
+    if source_model != "RentLeaseCollection":
+        return None
+    row = RentLeaseCollection.objects.filter(pk=source_id).only("payment_date").first()
+    if row is None or row.payment_date is None:
+        return None
+    try:
+        return resolve_accounting_period(row.payment_date).id
+    except ValueError:
+        return None
+
+
 def _create_missing_bridge_item(*, run, source_model: str, source_id: str, source_label: str, amount, exception_code: str, message: str, metadata: dict, totals: dict):
     item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=str(source_id), source_label=source_label, severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.MISSING_SOURCE, exception_code=exception_code, exception_message=message, recommended_action="Open bridge reconciliation and post this concrete source item only after explicit admin review.", expected_amount=amount, actual_amount=Decimal("0.00"), amount_delta=amount, metadata={**metadata, "bridge_status": "NOT_POSTED", "action_href": "/admin/accounting/bridge-reconciliation"})
     ReconciliationEvidence.objects.create(item=item, evidence_type=source_model, object_id=str(source_id), label=source_label, amount=amount, metadata={})
@@ -143,6 +200,7 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
         ("ReceiptDocument", "RECEIPT_DOCUMENT_MISSING_ACCOUNTING_BRIDGE_POSTING", "ReceiptDocument exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("BillingInvoice", "BILLING_INVOICE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingInvoice exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("RentLeaseBillingDemand", "RENT_LEASE_REVENUE_MISSING_ACCOUNTING_BRIDGE_POSTING", "RentLeaseBillingDemand exists as a supported concrete rent/lease revenue bridge candidate but AccountingBridgePosting is missing."),
+        ("RentLeaseCollection", F15C_CODES["MISSING_POSTING"], "RentLeaseCollection exists as a supported concrete rent/lease collection settlement bridge candidate but AccountingBridgePosting is missing."),
         ("BillingCreditNote", "BILLING_CREDIT_NOTE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingCreditNote exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("DirectSaleReturn", "DIRECT_SALE_RETURN_MISSING_ACCOUNTING_BRIDGE_POSTING", "DirectSaleReturn exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("BillingDebitNote", "BILLING_DEBIT_NOTE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingDebitNote exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
@@ -163,6 +221,8 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
             if branch_id and source_model == "BillingInvoice" and not BillingInvoice.objects.filter(pk=row.get("source_pk"), branch_id=branch_id).exists():
                 continue
             if branch_id and source_model == "RentLeaseBillingDemand" and not RentLeaseBillingDemand.objects.filter(pk=row.get("source_pk"), subscription__branch_id=branch_id).exists():
+                continue
+            if branch_id and source_model == "RentLeaseCollection" and not RentLeaseCollection.objects.filter(pk=row.get("source_pk"), finance_account__branch_id=branch_id).exists():
                 continue
             if branch_id and source_model == "BillingCreditNote" and not BillingCreditNote.objects.filter(pk=row.get("source_pk"), original_invoice__branch_id=branch_id).exists():
                 continue
@@ -187,6 +247,26 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
             _create_missing_bridge_item(run=run, source_model=source_model, source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"{source_model}-{row['source_pk']}", amount=_money(row.get("amount")), exception_code=code, message=message, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "source_date": row.get("source_date"), "taxable_amount": row.get("taxable_amount"), "tax_amount": row.get("tax_amount")}, totals=totals)
 
 
+def _emit_rent_lease_collection_nonpostable(*, run, totals: dict, date_from, date_to, branch_id):
+    code_by_status = {
+        "BLOCKED_BY_MAPPING": F15C_CODES["MAPPING_MISSING"],
+        "BLOCKED_BY_FINANCE_ACCOUNT": F15C_CODES["FINANCE_ACCOUNT_INACTIVE"],
+        "BLOCKED_BY_NUMBERING": F15C_CODES["NUMBERING_MISSING"],
+        "BLOCKED_BY_PERIOD": F15C_CODES["PERIOD_MISMATCH"],
+        "UNSUPPORTED_SOURCE": F15C_CODES["UNSUPPORTED_SOURCE"],
+    }
+    for row in list_bridge_candidates(BridgeCandidateFilters(date_from=date_from, date_to=date_to, source_model="RentLeaseCollection")):
+        status = str(row.get("status") or "")
+        if status not in code_by_status:
+            continue
+        if branch_id and not RentLeaseCollection.objects.filter(pk=row.get("source_pk"), finance_account__branch_id=branch_id).exists():
+            continue
+        amount = _money(row.get("amount"))
+        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="RentLeaseCollection", source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"RLC-{row['source_pk']}", severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=code_by_status[status], exception_message=row.get("blocker_reason") or "RentLeaseCollection settlement candidate is not postable.", recommended_action=row.get("recommended_action") or "Resolve setup blockers, then use controlled bridge posting.", expected_amount=amount, actual_amount=Decimal("0.00"), amount_delta=amount, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "bridge_status": status, "blocker_code": row.get("blocker_code"), "action_href": row.get("action_href") or "/admin/accounting/bridge-reconciliation"})
+        ReconciliationEvidence.objects.create(item=item, evidence_type="RentLeaseCollection", object_id=str(row["source_pk"]), label=item.source_label, amount=amount, metadata={"status": status})
+        totals["exceptions"] += 1
+
+
 def _emit_stock_ledger_cogs_nonpostable(*, run, totals: dict, date_from, date_to, branch_id):
     for row in list_bridge_candidates(BridgeCandidateFilters(date_from=date_from, date_to=date_to, source_model="StockLedger")):
         event_key = row.get("event_key")
@@ -196,22 +276,7 @@ def _emit_stock_ledger_cogs_nonpostable(*, run, totals: dict, date_from, date_to
             continue
         code = "DEFERRED_COGS" if event_key == "deferred_cogs" else "UNSUPPORTED_SOURCE"
         message = row.get("blocker_reason") or row.get("value_blocker_reason") or "StockLedger row is not postable by the controlled COGS bridge."
-        item = ReconciliationItem.objects.create(
-            run=run,
-            module=MODULE,
-            source_type="StockLedger",
-            source_id=str(row["source_pk"]),
-            source_label=row.get("source_reference_number") or f"SL-{row['source_pk']}",
-            severity=ReconciliationSeverity.MEDIUM,
-            status=ReconciliationItemStatus.NEEDS_REVIEW,
-            exception_code=code,
-            exception_message=message,
-            recommended_action="Keep this COGS row non-postable until finalized source and persisted cost evidence are available.",
-            expected_amount=_money(row.get("amount")),
-            actual_amount=Decimal("0.00"),
-            amount_delta=_money(row.get("amount")),
-            metadata={"source_pk": row["source_pk"], "event_key": event_key, "movement_type": row.get("movement_type"), "reference_model": row.get("reference_model"), "reference_id": row.get("reference_id"), "bridge_status": code, "cogs_state": row.get("cogs_state"), "value_blocker_reason": row.get("value_blocker_reason")},
-        )
+        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="StockLedger", source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"SL-{row['source_pk']}", severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=code, exception_message=message, recommended_action="Keep this COGS row non-postable until finalized source and persisted cost evidence are available.", expected_amount=_money(row.get("amount")), actual_amount=Decimal("0.00"), amount_delta=_money(row.get("amount")), metadata={"source_pk": row["source_pk"], "event_key": event_key, "movement_type": row.get("movement_type"), "reference_model": row.get("reference_model"), "reference_id": row.get("reference_id"), "bridge_status": code, "cogs_state": row.get("cogs_state"), "value_blocker_reason": row.get("value_blocker_reason")})
         ReconciliationEvidence.objects.create(item=item, evidence_type="StockLedger", object_id=str(row["source_pk"]), label=item.source_label, amount=_money(row.get("amount")), metadata={"movement_type": row.get("movement_type")})
         totals["exceptions"] += 1
 
@@ -230,9 +295,10 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         _create_missing_bridge_item(run=run, source_model="Payment", source_id=str(payment.id), source_label=payment.reference_no or f"PAY-{payment.id}", amount=payment.amount, exception_code="PAYMENT_MISSING_ACCOUNTING_BRIDGE_POSTING", message="Payment exists but AccountingBridgePosting is missing for purpose PAYMENT_COLLECTION.", metadata={"payment_id": payment.id, "payment_date": str(payment.payment_date)}, totals=totals)
 
     _emit_ready_unposted_candidates(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
+    _emit_rent_lease_collection_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
     _emit_stock_ledger_cogs_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
 
-    bridges = AccountingBridgePosting.objects.filter(source_model__in=BRIDGE_SOURCE_MODELS).select_related("journal_entry")
+    bridges = AccountingBridgePosting.objects.filter(source_model__in=BRIDGE_SOURCE_MODELS).select_related("journal_entry", "journal_entry__accounting_period")
     if date_from or date_to:
         bridges = bridges.filter(_date_range_filter("source_event_date", date_from, date_to))
     if branch_id:
@@ -240,6 +306,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         receipt_ids = [str(pk) for pk in ReceiptDocument.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
         invoice_ids = [str(pk) for pk in BillingInvoice.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
         rent_lease_demand_ids = [str(pk) for pk in RentLeaseBillingDemand.objects.filter(subscription__branch_id=branch_id).values_list("id", flat=True)]
+        rent_lease_collection_ids = [str(pk) for pk in RentLeaseCollection.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
         credit_ids = [str(pk) for pk in BillingCreditNote.objects.filter(original_invoice__branch_id=branch_id).values_list("id", flat=True)]
         debit_ids = [str(pk) for pk in BillingDebitNote.objects.filter(original_invoice__branch_id=branch_id).values_list("id", flat=True)]
         return_ids = [str(pk) for pk in DirectSaleReturn.objects.filter(direct_sale__branch_id=branch_id).values_list("id", flat=True)]
@@ -250,7 +317,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         commission_payout_ids = [str(pk) for pk in CommissionPayoutBatch.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
         salary_sheet_ids = [str(pk) for pk in SalarySheet.objects.filter(employee__branch_id=branch_id).values_list("id", flat=True)]
         salary_payment_ids = [str(pk) for pk in SalaryPayment.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
-        bridges = bridges.filter(Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="RentLeaseBillingDemand", source_id__in=rent_lease_demand_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids) | Q(source_model="PurchaseBill", source_id__in=purchase_ids) | Q(source_model="VendorPayment", source_id__in=vendor_payment_ids) | Q(source_model="StockLedger", source_id__in=stock_ledger_ids) | Q(source_model="Commission", source_id__in=commission_ids) | Q(source_model="CommissionPayoutBatch", source_id__in=commission_payout_ids) | Q(source_model="SalarySheet", source_id__in=salary_sheet_ids) | Q(source_model="SalaryPayment", source_id__in=salary_payment_ids))
+        bridges = bridges.filter(Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="RentLeaseBillingDemand", source_id__in=rent_lease_demand_ids) | Q(source_model="RentLeaseCollection", source_id__in=rent_lease_collection_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids) | Q(source_model="PurchaseBill", source_id__in=purchase_ids) | Q(source_model="VendorPayment", source_id__in=vendor_payment_ids) | Q(source_model="StockLedger", source_id__in=stock_ledger_ids) | Q(source_model="Commission", source_id__in=commission_ids) | Q(source_model="CommissionPayoutBatch", source_id__in=commission_payout_ids) | Q(source_model="SalarySheet", source_id__in=salary_sheet_ids) | Q(source_model="SalaryPayment", source_id__in=salary_payment_ids))
     totals["checked"] += bridges.count()
 
     for bridge in bridges:
@@ -260,7 +327,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         source_label = _source_label(source_model=source_model, source_id=source_id, fallback=bridge.source_reference)
         source_amount = _source_amount(source_model=source_model, source_id=source_id)
         if not journal_id_matches_bridge(bridge, journal):
-            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="AccountingBridgePosting", source_id=str(bridge.id), source_label=str(bridge), severity=ReconciliationSeverity.CRITICAL, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code="BRIDGE_JOURNAL_MISSING_SOURCE_REFERENCE", exception_message="Bridge posting journal entry is missing or mismatching source_model/source_id.", recommended_action="Investigate bridge posting integrity; do not edit posted journals without explicit operational workflow.", metadata={"bridge_posting_id": bridge.id, "bridge_source_model": bridge.source_model, "bridge_source_id": bridge.source_id, "bridge_purpose": bridge.purpose, "journal_entry_id": getattr(journal, "id", None), "journal_source_model": getattr(journal, "source_model", None), "journal_source_id": getattr(journal, "source_id", None)})
+            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="AccountingBridgePosting", source_id=str(bridge.id), source_label=str(bridge), severity=ReconciliationSeverity.CRITICAL, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=_code(source_model, "SOURCE_LINK_MISSING"), exception_message="Bridge posting journal entry is missing or mismatching source_model/source_id.", recommended_action="Investigate bridge posting integrity; do not edit posted journals without explicit operational workflow.", metadata={"bridge_posting_id": bridge.id, "bridge_source_model": bridge.source_model, "bridge_source_id": bridge.source_id, "bridge_purpose": bridge.purpose, "journal_entry_id": getattr(journal, "id", None), "journal_source_model": getattr(journal, "source_model", None), "journal_source_id": getattr(journal, "source_id", None)})
             ReconciliationEvidence.objects.create(item=item, evidence_type="AccountingBridgePosting", object_id=str(bridge.id), label=str(bridge), metadata={"purpose": bridge.purpose})
             totals["exceptions"] += 1
             totals["high_risk"] += 1
@@ -269,18 +336,23 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         total_debit = _money(line_totals["total_debit"])
         total_credit = _money(line_totals["total_credit"])
         if total_debit != total_credit:
-            ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.CRITICAL, status=ReconciliationItemStatus.AMOUNT_MISMATCH, exception_code="JOURNAL_UNBALANCED", exception_message="Posted bridge journal debit and credit totals do not balance.", recommended_action="Investigate journal lines; resolve only through explicit accounting workflows.", expected_amount=total_debit, actual_amount=total_credit, amount_delta=total_debit - total_credit, metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id})
+            ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.CRITICAL, status=ReconciliationItemStatus.AMOUNT_MISMATCH, exception_code=_code(source_model, "JOURNAL_UNBALANCED"), exception_message="Posted bridge journal debit and credit totals do not balance.", recommended_action="Investigate journal lines; resolve only through explicit accounting workflows.", expected_amount=total_debit, actual_amount=total_credit, amount_delta=total_debit - total_credit, metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id})
             totals["exceptions"] += 1
             totals["high_risk"] += 1
             continue
+        expected_period_id = _expected_period_id(source_model=source_model, source_id=source_id)
+        if expected_period_id and journal.accounting_period_id and journal.accounting_period_id != expected_period_id:
+            ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=_code(source_model, "PERIOD_MISMATCH"), exception_message="Posted bridge journal accounting period does not match source event date period.", recommended_action="Investigate period assignment; do not auto-correct posted journals.", expected_amount=source_amount or Decimal("0.00"), actual_amount=total_debit, amount_delta=Decimal("0.00"), metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "expected_period_id": expected_period_id, "actual_period_id": journal.accounting_period_id})
+            totals["exceptions"] += 1
+            continue
         if source_amount is not None and total_debit != source_amount:
-            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.AMOUNT_MISMATCH, exception_code="AMOUNT_MISMATCH", exception_message=f"Posted bridge journal amount does not match the source {source_model} amount.", recommended_action="Investigate source amount and bridge journal; do not auto-correct.", expected_amount=source_amount, actual_amount=total_debit, amount_delta=total_debit - source_amount, metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "bridge_status": "AMOUNT_MISMATCH"})
+            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.AMOUNT_MISMATCH, exception_code=_code(source_model, "AMOUNT_MISMATCH"), exception_message=f"Posted bridge journal amount does not match the source {source_model} amount.", recommended_action="Investigate source amount and bridge journal; do not auto-correct.", expected_amount=source_amount, actual_amount=total_debit, amount_delta=total_debit - source_amount, metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "bridge_status": "AMOUNT_MISMATCH"})
             ReconciliationEvidence.objects.create(item=item, evidence_type=source_model, object_id=source_id, label=source_label, amount=source_amount)
             ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, amount=total_debit, status=journal.status)
             totals["exceptions"] += 1
             continue
         if source_amount is not None:
-            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.LOW, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code="POSTED_UNVERIFIED", exception_message="Bridge journal matches source amount and link checks, but explicit verification is still required.", recommended_action="Verify from bridge reconciliation after operator review.", expected_amount=source_amount, actual_amount=total_debit, amount_delta=Decimal("0.00"), metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "bridge_status": "POSTED_UNVERIFIED", "action_href": "/admin/accounting/bridge-reconciliation"})
+            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.LOW, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=_code(source_model, "POSTED_UNVERIFIED"), exception_message="Bridge journal matches source amount and link checks, but explicit verification is still required.", recommended_action="Verify from bridge reconciliation after operator review.", expected_amount=source_amount, actual_amount=total_debit, amount_delta=Decimal("0.00"), metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "bridge_status": "POSTED_UNVERIFIED", "action_href": "/admin/accounting/bridge-reconciliation"})
             ReconciliationEvidence.objects.create(item=item, evidence_type=source_model, object_id=source_id, label=source_label, amount=source_amount)
             ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, amount=total_debit, status=journal.status)
 
@@ -298,7 +370,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
     for row in journal_dupes:
         source_model = row["source_model"]
         source_id = str(row["source_id"])
-        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=_source_label(source_model=source_model, source_id=source_id), severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.DUPLICATE_POSTING, exception_code="DUPLICATE_JOURNAL_SOURCE_REFERENCE", exception_message=f"Multiple journal entries reference the same {source_model} source_model/source_id/voucher_type.", recommended_action="Investigate potential duplicate posting; confirm one is reversal/void and audit trail is intact.", metadata={"journal_count": row["journal_count"], "voucher_type": row["voucher_type"]})
+        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=_source_label(source_model=source_model, source_id=source_id), severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.DUPLICATE_POSTING, exception_code=_code(source_model, "DUPLICATE_POSTING"), exception_message=f"Multiple journal entries reference the same {source_model} source_model/source_id/voucher_type.", recommended_action="Investigate potential duplicate posting; confirm one is reversal/void and audit trail is intact.", metadata={"journal_count": row["journal_count"], "voucher_type": row["voucher_type"]})
         for journal in JournalEntry.objects.filter(source_model=source_model, source_id=source_id, voucher_type=row["voucher_type"], status="POSTED").only("id", "entry_no", "status", "entry_date")[:10]:
             ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, status=journal.status, metadata={"entry_date": str(journal.entry_date)})
         totals["exceptions"] += 1
