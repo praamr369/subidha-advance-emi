@@ -31,7 +31,7 @@ export default function PublicTrustStrip() {
       {points.map((point) => (
         <PublicAnimatedCard key={point.title} className="public-trust-badge p-4">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-slate-900 text-white">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_18%,var(--surface-card-elevated)_82%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
               <point.icon className="h-4 w-4" />
             </span>
             <div className="text-sm font-semibold text-foreground">{point.title}</div>
