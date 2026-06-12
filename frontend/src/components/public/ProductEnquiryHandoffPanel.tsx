@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, ClipboardCheck, PackageCheck, ReceiptText, ShieldCheck } from "lucide-react";
+import { ArrowRight, BadgeCheck, ClipboardCheck, PackageCheck, ReceiptText, ShieldCheck, type LucideIcon } from "lucide-react";
 
 import { formatCurrency } from "@/lib/format";
 import { ROUTES } from "@/lib/routes";
@@ -11,7 +11,7 @@ const planOptions: Array<{
   value: ProductPlanInterest;
   title: string;
   description: string;
-  icon: typeof BadgeCheck;
+  icon: LucideIcon;
 }> = [
   {
     value: "LUCKY_PLAN",
