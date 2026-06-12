@@ -4,6 +4,7 @@ import { ArrowRight, ClipboardCheck, PackageCheck, Undo2, Wallet } from "lucide-
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
 import SectionHeader from "@/components/public/SectionHeader";
+import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
 import { ROUTES } from "@/lib/routes";
 
 type RentLeaseMode = "rent" | "lease";
@@ -17,7 +18,6 @@ const modeCopy = {
     eyebrow: "Rent operations",
     title: "Flexible usage with monthly records and return checks",
     description: "Rent stays separate from Lucky Plan EMI. Public pages explain terms; operational collection, deposit handling, inspection, and return closure stay controlled inside the system.",
-    visualLabel: "Rent workflow visual",
     closingTitle: "Need help choosing rent?",
     closingDescription: "Use rent when the requirement is short-term or flexible and ownership is not the immediate goal.",
   },
@@ -25,7 +25,6 @@ const modeCopy = {
     eyebrow: "Lease operations",
     title: "Longer-term access with contract-backed checkpoints",
     description: "Lease stays separate from Lucky Plan EMI. Public pages explain terms; operational collection, deposit handling, inspection, renewal, and closure stay controlled inside the system.",
-    visualLabel: "Lease workflow visual",
     closingTitle: "Need lease planning support?",
     closingDescription: "Use lease when the requirement is longer-term and contract discipline matters more than short-term flexibility.",
   },
@@ -61,12 +60,7 @@ export default function RentLeaseWorkflowPreview({ mode }: RentLeaseWorkflowPrev
     <PublicSectionShell className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center">
       <div className="space-y-5">
         <SectionHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} />
-        <GeneratedMarketingVisual
-          src="/marketing/generated/rent-lease-3d-room.webp"
-          alt={`Decorative 3D ${mode} furniture workflow room visual`}
-          label={copy.visualLabel}
-          className="min-h-[18rem]"
-        />
+        <GeneratedMarketingVisual asset={PUBLIC_MARKETING_ASSETS.rentLeaseRoom} className="min-h-[18rem]" />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
