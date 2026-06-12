@@ -68,7 +68,6 @@ export default function PublicContentCarousel({
             key={`${baseId}-slide-${index}`}
             id={`${baseId}-slide-${index}`}
             aria-label={`Slide ${index + 1} of ${slideCount}`}
-            aria-hidden={index === activeIndex ? undefined : true}
           >
             {slide}
           </CarouselItem>
