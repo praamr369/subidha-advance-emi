@@ -64,6 +64,10 @@ function disabledActionLabel(row: UnifiedReceivableResult): string {
   return "Collection disabled";
 }
 
+function shouldShowRentLeaseEvidence(row: UnifiedReceivableResult): boolean {
+  return row.source_type === "RENT" || row.source_type === "LEASE";
+}
+
 export default function UnifiedReceivableSearchPanel({
   title,
   description,
@@ -187,6 +191,7 @@ export default function UnifiedReceivableSearchPanel({
             const canViewReceiptsRoute = row.primary_action === "VIEW_RECEIPTS" && Boolean(route);
             const disabledReason = row.reason_if_not_collectible || row.disabled_reason || "Collection is not available for this receivable.";
             const noAction = !canEmiInline && !canEmiRoute && !canDirectRoute && !canRentLeaseRoute && !canOpenSaleRoute && !canViewReceiptsRoute;
+            const showSourceEvidence = shouldShowRentLeaseEvidence(row);
 
             return (
               <div key={rowKey} className="rounded-2xl border border-border bg-background p-4 shadow-sm">
@@ -216,6 +221,22 @@ export default function UnifiedReceivableSearchPanel({
                     {row.source_type === "DIRECT_SALE" || row.source_type === "RENT" || row.source_type === "LEASE" ? (
                       <div className="mt-1 text-xs text-muted-foreground">
                         Paid {money(row.paid_amount)} of {money(row.total_amount)} · {row.payment_state || "UNPAID"}
+                      </div>
+                    ) : null}
+                    {showSourceEvidence ? (
+                      <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-950">
+                        <div className="font-semibold">Rent/lease source evidence</div>
+                        <div className="mt-1">
+                          Demand: {row.demand_id ? `#${row.demand_id}` : "—"} {row.demand_type ? `· ${row.demand_type}` : ""}
+                        </div>
+                        {row.latest_collection_number ? (
+                          <div className="mt-1 break-all">
+                            Latest evidence: {row.latest_collection_number} · {money(row.latest_collection_amount)} · {row.latest_collection_method || "method not exposed"} · {formatDate(row.latest_collection_date)}
+                          </div>
+                        ) : (
+                          <div className="mt-1">No monthly collection evidence recorded yet.</div>
+                        )}
+                        <div className="mt-1 text-blue-900/80">Accounting bridge posting remains deferred; this only displays the source contract.</div>
                       </div>
                     ) : null}
                   </div>
