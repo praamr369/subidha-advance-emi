@@ -41,6 +41,8 @@ type PublicNavClientProps = {
   language: PublicLanguage;
 };
 
+const MOBILE_MENU_ID = "public-mobile-navigation";
+
 export default function PublicNavClient({
   logoSrc,
   companyName,
@@ -75,7 +77,7 @@ export default function PublicNavClient({
 
   return (
     <nav className="public-nav" aria-label="Primary navigation">
-      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
         <div className="flex items-center justify-between gap-3">
           <Link href={ROUTES.public.home} className="min-w-0" onClick={() => setMobileOpen(false)}>
             <BrandLockup compact logoSrc={logoSrc} companyName={companyName} subtitle={brandSubtitle} />
@@ -88,8 +90,10 @@ export default function PublicNavClient({
             <button
               type="button"
               onClick={() => setMobileOpen((prev) => !prev)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_90%,transparent)] text-foreground shadow-[0_12px_26px_-18px_rgba(15,23,42,0.65)] transition hover:bg-[var(--surface-muted)] dark:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.45)]"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_90%,transparent)] text-foreground shadow-[0_12px_26px_-18px_rgba(15,23,42,0.65)] transition hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.45)]"
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileOpen}
+              aria-controls={MOBILE_MENU_ID}
             >
               {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
@@ -107,6 +111,7 @@ export default function PublicNavClient({
                       <Link
                         href={link.href}
                         className={cn(!active && "text-muted-foreground")}
+                        aria-current={active ? "page" : undefined}
                       >
                         {link.label}
                       </Link>
@@ -123,7 +128,7 @@ export default function PublicNavClient({
             {showWhatsApp ? (
               <Link
                 href={whatsappLink as string}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-[var(--surface-muted)] dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]"
               >
                 <MessageCircle className="h-4 w-4" />
                 {dictionary.whatsapp}
@@ -135,7 +140,7 @@ export default function PublicNavClient({
                 key={action.href}
                 href={action.href}
                 className={cn(
-                  "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]",
+                  "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]",
                   action.variant === "primary"
                     ? "border-primary/25 bg-primary text-primary-foreground hover:-translate-y-0.5"
                     : "border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] text-foreground hover:-translate-y-0.5 hover:bg-[var(--surface-muted)]"
@@ -151,7 +156,13 @@ export default function PublicNavClient({
           {trustBadge}
         </div>
 
-        <div className={cn("grid gap-3 lg:hidden", mobileOpen ? "grid" : "hidden")}>
+        <div
+          id={MOBILE_MENU_ID}
+          className={cn(
+            "grid max-h-[calc(100dvh-5.5rem)] gap-3 overflow-y-auto overscroll-contain rounded-[1.4rem] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)] p-2 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.68)] backdrop-blur lg:hidden",
+            mobileOpen ? "grid" : "hidden"
+          )}
+        >
           <div className="rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
             <LanguageSwitcher value={language} />
             <ThemeToggle variant="public" className="mt-2" />
@@ -162,21 +173,25 @@ export default function PublicNavClient({
               {dictionary.navigate}
             </div>
             <div className="mt-2 grid gap-1">
-              {links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    "rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-                    isActivePath(pathname, link.href)
-                      ? "bg-primary text-primary-foreground shadow-[0_10px_26px_-20px_rgba(15,23,42,0.8)] dark:shadow-[0_10px_26px_-20px_rgba(0,0,0,0.55)]"
-                      : "text-foreground hover:bg-[var(--surface-muted)]"
-                  )}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {links.map((link) => {
+                const active = isActivePath(pathname, link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileOpen(false)}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "min-h-11 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2",
+                      active
+                        ? "bg-primary text-primary-foreground shadow-[0_10px_26px_-20px_rgba(15,23,42,0.8)] dark:shadow-[0_10px_26px_-20px_rgba(0,0,0,0.55)]"
+                        : "text-foreground hover:bg-[var(--surface-muted)]"
+                    )}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
             </div>
           </div>
 
@@ -188,7 +203,7 @@ export default function PublicNavClient({
               <Link
                 href={whatsappLink as string}
                 onClick={() => setMobileOpen(false)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-card-elevated)] px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-card-elevated)] px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]"
               >
                 <MessageCircle className="h-4 w-4" />
                 {dictionary.whatsapp}
@@ -200,7 +215,7 @@ export default function PublicNavClient({
                 href={action.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-semibold shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]",
+                  "inline-flex min-h-11 items-center justify-center rounded-xl border px-4 text-sm font-semibold shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]",
                   action.variant === "primary"
                     ? "border-primary/25 bg-primary text-primary-foreground"
                     : "border-[var(--border)] bg-[var(--surface-card-elevated)] text-foreground"
