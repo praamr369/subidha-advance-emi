@@ -1,3 +1,4 @@
+import type { ComponentType, SVGProps } from "react";
 import Link from "next/link";
 import { Clock3, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 
@@ -7,16 +8,29 @@ type ContactBranchTrustPanelProps = {
   profile: ResolvedPublicBusinessProfile;
 };
 
+type ContactTrustRow = {
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  label: string;
+  value: string;
+  href?: string;
+  action?: string;
+  external?: boolean;
+};
+
 function cleanPhoneHref(phone?: string): string | null {
   const value = (phone || "").trim();
   if (!value) return null;
   return `tel:${value.replace(/\s+/g, "")}`;
 }
 
+function isContactTrustRow(row: ContactTrustRow | null): row is ContactTrustRow {
+  return row !== null;
+}
+
 export default function ContactBranchTrustPanel({ profile }: ContactBranchTrustPanelProps) {
   const phoneHref = cleanPhoneHref(profile.support_phone);
 
-  const rows = [
+  const rows: ContactTrustRow[] = [
     profile.address_text
       ? { icon: MapPin, label: "Address", value: profile.address_text, href: profile.map_url || undefined, action: profile.map_url ? "Open map" : undefined }
       : null,
@@ -32,7 +46,7 @@ export default function ContactBranchTrustPanel({ profile }: ContactBranchTrustP
     profile.resolved_whatsapp_link
       ? { icon: MessageCircle, label: "WhatsApp", value: "Message branch support", href: profile.resolved_whatsapp_link, action: "Open WhatsApp", external: true }
       : null,
-  ].filter(Boolean);
+  ].filter(isContactTrustRow);
 
   return (
     <section className="public-surface p-6">
@@ -45,7 +59,6 @@ export default function ContactBranchTrustPanel({ profile }: ContactBranchTrustP
       <div className="mt-5 grid gap-3">
         {rows.length > 0 ? (
           rows.map((row) => {
-            if (!row) return null;
             const Icon = row.icon;
             const content = (
               <>
