@@ -34,7 +34,7 @@ type PublicPageShellProps = {
 function buildBreadcrumbSchemaItems(breadcrumbs: ReadonlyArray<Breadcrumb>) {
   return breadcrumbs.map((crumb, index) => ({
     name: crumb.label,
-    path: crumb.href || (index === breadcrumbs.length - 1 ? "" : "/"),
+    path: crumb.href || (index === breadcrumbs.length - 1 ? undefined : "/"),
   }));
 }
 
@@ -55,8 +55,7 @@ export default function PublicPageShell({
     breadcrumbs.length > 1 ? buildBreadcrumbJsonLd(buildBreadcrumbSchemaItems(breadcrumbs)) : null;
 
   return (
-    <main
-      id="main-content"
+    <div
       className={cn(
         "mx-auto flex w-full flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10",
         className
@@ -118,6 +117,6 @@ export default function PublicPageShell({
       )}
 
       {children}
-    </main>
+    </div>
   );
 }
