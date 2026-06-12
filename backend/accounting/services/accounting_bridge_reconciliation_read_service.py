@@ -73,7 +73,7 @@ def _posting_module(posting: AccountingBridgePosting) -> str:
         return "subscriptions"
     if source_model in {"ReceiptDocument", "BillingInvoice", "BillingCreditNote", "BillingDebitNote", "DirectSale"}:
         return "billing"
-    if source_model in {"PurchaseBill", "StockLedger", "GoodsReceipt"}:
+    if source_model in {"PurchaseBill", "VendorPayment", "StockLedger", "GoodsReceipt"}:
         return "inventory"
     if source_model in {"ProductionJob", "ManufacturingBom"}:
         return "manufacturing"

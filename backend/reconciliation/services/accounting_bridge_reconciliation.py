@@ -9,13 +9,13 @@ from django.db.models.functions import Cast
 from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntryGroup
 from accounting.services.accounting_bridge_purchase_bill_service import BridgeCandidateFilters, list_bridge_candidates
 from billing.models import BillingCreditNote, BillingDebitNote, BillingInvoice, DirectSaleReturn, ReceiptDocument
-from inventory.models import PurchaseBill
+from inventory.models import PurchaseBill, VendorPayment
 from subscriptions.models import Payment
 
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationItemStatus, ReconciliationSeverity
 
 MODULE = "ACCOUNTING_BRIDGE_PHASE_F"
-BRIDGE_SOURCE_MODELS = ("Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill")
+BRIDGE_SOURCE_MODELS = ("Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment")
 
 
 def _money(value) -> Decimal:
@@ -53,6 +53,9 @@ def _source_amount(*, source_model: str, source_id: str) -> Decimal | None:
     if source_model == "PurchaseBill":
         row = PurchaseBill.objects.filter(pk=source_id).only("grand_total").first()
         return _money(row.grand_total) if row else None
+    if source_model == "VendorPayment":
+        row = VendorPayment.objects.filter(pk=source_id).only("amount").first()
+        return _money(row.amount) if row else None
     return None
 
 
@@ -78,6 +81,9 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
     if source_model == "PurchaseBill":
         row = PurchaseBill.objects.filter(pk=source_id).only("bill_no").first()
         return (row.bill_no or f"PB-{source_id}") if row else f"PB-{source_id}"
+    if source_model == "VendorPayment":
+        row = VendorPayment.objects.filter(pk=source_id).only("payment_no", "reference_no").first()
+        return (row.payment_no or row.reference_no or f"VP-{source_id}") if row else f"VP-{source_id}"
     return fallback or f"{source_model}-{source_id}"
 
 
@@ -96,6 +102,7 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
         ("DirectSaleReturn", "DIRECT_SALE_RETURN_MISSING_ACCOUNTING_BRIDGE_POSTING", "DirectSaleReturn exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("BillingDebitNote", "BILLING_DEBIT_NOTE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingDebitNote exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("PurchaseBill", "PURCHASE_BILL_MISSING_ACCOUNTING_BRIDGE_POSTING", "PurchaseBill exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
+        ("VendorPayment", "VENDOR_PAYMENT_MISSING_ACCOUNTING_BRIDGE_POSTING", "VendorPayment exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
     ]
     for source_model, code, message in specs:
         for row in list_bridge_candidates(BridgeCandidateFilters(date_from=date_from, date_to=date_to, source_model=source_model)):
@@ -112,6 +119,8 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
             if branch_id and source_model == "DirectSaleReturn" and not DirectSaleReturn.objects.filter(pk=row.get("source_pk"), direct_sale__branch_id=branch_id).exists():
                 continue
             if branch_id and source_model == "PurchaseBill" and not PurchaseBill.objects.filter(pk=row.get("source_pk"), branch_id=branch_id).exists():
+                continue
+            if branch_id and source_model == "VendorPayment" and not VendorPayment.objects.filter(pk=row.get("source_pk"), finance_account__branch_id=branch_id).exists():
                 continue
             _create_missing_bridge_item(run=run, source_model=source_model, source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"{source_model}-{row['source_pk']}", amount=_money(row.get("amount")), exception_code=code, message=message, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "source_date": row.get("source_date"), "taxable_amount": row.get("taxable_amount"), "tax_amount": row.get("tax_amount")}, totals=totals)
 
@@ -142,7 +151,8 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         debit_ids = [str(pk) for pk in BillingDebitNote.objects.filter(original_invoice__branch_id=branch_id).values_list("id", flat=True)]
         return_ids = [str(pk) for pk in DirectSaleReturn.objects.filter(direct_sale__branch_id=branch_id).values_list("id", flat=True)]
         purchase_ids = [str(pk) for pk in PurchaseBill.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
-        bridges = bridges.filter(Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids) | Q(source_model="PurchaseBill", source_id__in=purchase_ids))
+        vendor_payment_ids = [str(pk) for pk in VendorPayment.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
+        bridges = bridges.filter(Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids) | Q(source_model="PurchaseBill", source_id__in=purchase_ids) | Q(source_model="VendorPayment", source_id__in=vendor_payment_ids))
     totals["checked"] += bridges.count()
 
     for bridge in bridges:

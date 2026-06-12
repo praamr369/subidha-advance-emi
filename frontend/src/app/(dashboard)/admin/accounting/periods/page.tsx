@@ -143,6 +143,22 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
         { label: "Open mapping audit", href: MAPPING_AUDIT_HREF },
       ],
     },
+    {
+      title: "Vendor Payment bridge",
+      action: "Review vendor payment bridge items",
+      href: bridgeReviewHref({ source_model: "VendorPayment" }),
+      rows: [
+        { label: "Ready unposted", value: summaryCount(summary, "vendor_payment_ready_unposted_count"), detail: "Ready unposted means setup is ready, but journal posting is still pending.", href: bridgeReviewHref({ source_model: "VendorPayment", status: "READY_UNPOSTED" }) },
+        { label: "Posted unverified", value: summaryCount(summary, "vendor_payment_posted_unverified_count"), detail: "Posted unverified means journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "VendorPayment", status: "POSTED_UNVERIFIED" }) },
+        { label: "Reconciled", value: summaryCount(summary, "vendor_payment_reconciled_count"), detail: "Reconciled means the bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "VendorPayment", status: "RECONCILED" }) },
+        { label: "Blocked", value: summaryCount(summary, "vendor_payment_blocked_count"), detail: "Mapping, period, numbering, or finance-account blocker remains unresolved.", href: bridgeReviewHref({ source_model: "VendorPayment", status: "BLOCKED" }) },
+        { label: "Unsupported", value: summaryCount(summary, "vendor_payment_unsupported_count"), detail: "Vendor payment source classification is visible but not postable.", href: bridgeReviewHref({ source_model: "VendorPayment", status: "UNSUPPORTED" }) },
+      ],
+      extraActions: [
+        { label: "Run reconciliation checks", href: RECONCILIATION_RUNS_HREF },
+        { label: "Open mapping audit", href: MAPPING_AUDIT_HREF },
+      ],
+    },
   ];
 
   const otherRows = [

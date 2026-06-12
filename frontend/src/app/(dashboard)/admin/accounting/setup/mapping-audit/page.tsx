@@ -26,6 +26,7 @@ const READY_MAPPING_STATUSES = ["READY", "READY_UNPOSTED", "POSTABLE", "POSTED",
 const GROUP_ORDER = [
   "Collection posting mappings",
   "Debit note mappings",
+  "Vendor payment mappings",
   "Purchase bill mappings",
   "Inventory mappings",
   "Manufacturing mappings",
@@ -67,13 +68,19 @@ function rowSearchText(row: AccountingMappingAuditRow): string {
 
 function isPurchaseBillRow(row: AccountingMappingAuditRow): boolean {
   const text = rowSearchText(row);
-  return text.includes("purchasebill") || text.includes("purchase_bill") || text.includes("purchase bill") || text.includes("vendor_payable") || text.includes("vendor payable");
+  return text.includes("purchasebill") || text.includes("purchase_bill") || text.includes("purchase bill");
+}
+
+function isVendorPaymentRow(row: AccountingMappingAuditRow): boolean {
+  const text = rowSearchText(row);
+  return text.includes("vendorpayment") || text.includes("vendor_payment") || text.includes("vendor payment") || text.includes("supplier_payment") || text.includes("accounts_payable_payment") || (text.includes("vendor_payable") || text.includes("vendor payable")) && text.includes("payment");
 }
 
 function groupName(row: AccountingMappingAuditRow): string {
   const text = rowSearchText(row);
   if (text.includes("collection") || text.includes("cashier")) return "Collection posting mappings";
   if (text.includes("billingdebitnote") || text.includes("debit_note") || text.includes("debit note")) return "Debit note mappings";
+  if (isVendorPaymentRow(row)) return "Vendor payment mappings";
   if (isPurchaseBillRow(row)) return "Purchase bill mappings";
   if (text.includes("inventory") || text.includes("stock") || text.includes("purchase")) return "Inventory mappings";
   if (text.includes("manufacturing") || text.includes("production")) return "Manufacturing mappings";
@@ -135,6 +142,7 @@ function missingLabel(row: AccountingMappingAuditRow): string {
 }
 
 function routeForRow(row: AccountingMappingAuditRow): string {
+  if (isVendorPaymentRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=VendorPayment`;
   if (isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=PurchaseBill`;
   if (row.setup_href) return row.setup_href;
   if (row.finance_account_status !== "READY") return ROUTES.admin.accountingFinanceAccounts;
@@ -244,7 +252,7 @@ export default function AccountingMappingAuditPage() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping audit remediation</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Bridge impact: {payload?.bridge_impact ?? "Not loaded"}</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. READY_UNPOSTED means mapping setup is ready and posting is pending in bridge reconciliation, not a mapping failure. PurchaseBill rows are grouped separately from inventory stock posting because F6 posts payable/accrual only.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. READY_UNPOSTED means mapping setup is ready and posting is pending in bridge reconciliation, not a mapping failure. PurchaseBill and VendorPayment rows are grouped separately from inventory stock posting; VendorPayment needs Vendor Payable plus Cash/Bank/UPI finance-account mapping and JOURNAL_ENTRY numbering.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <ActionButton variant="primary" onClick={() => void seedDefaults()} disabled={Boolean(busy)}>{busy === "seed" ? "Seeding..." : "Seed Safe Defaults"}</ActionButton>
@@ -294,7 +302,7 @@ export default function AccountingMappingAuditPage() {
                         <div><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold text-foreground">{row.event_label}</h3><MappingStatus value={row.status} /></div><div className="mt-1 text-xs text-muted-foreground">{row.module} · {row.source_model} · <span className="font-mono">{row.event_key}</span></div></div>
                         <div className="flex flex-wrap gap-2">
                           {canFix ? <button type="button" disabled={busy === row.event_key} onClick={() => void fixEvent(row)} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{busy === row.event_key ? "Fixing..." : "Fix setup event"}</button> : null}
-                          <Link href={routeForRow(row)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold">{isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open PurchaseBill bridge rows" : "Open suggested route"}</Link>
+                          <Link href={routeForRow(row)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold">{isVendorPaymentRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open VendorPayment bridge rows" : isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open PurchaseBill bridge rows" : "Open suggested route"}</Link>
                         </div>
                       </div>
                       <div className="mt-3 grid gap-3 md:grid-cols-5">

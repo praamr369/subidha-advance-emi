@@ -329,14 +329,15 @@ class AccountingBridgeCreditNoteReturnPostingPhaseF4Tests(APITestCase):
 
         first_debit.debit_amount = Decimal("1000.00")
         first_debit.save(update_fields=["debit_amount", "updated_at"])
-        journal.source_id = "999999"
-        journal.save(update_fields=["source_id", "updated_at"])
+        bridge = AccountingBridgePosting.objects.get(source_model="DirectSaleReturn", source_id=str(row.id), purpose="DIRECT_SALE_RETURN")
+        bridge.source_id = "999999"
+        bridge.save(update_fields=["source_id", "updated_at"])
         run4 = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="PHASE_F4_RETURN_TEST", module="ACCOUNTING_BRIDGE", date_from=self.today, date_to=self.today, status=ReconciliationRunStatus.RUNNING, started_by=self.admin)
         run_accounting_bridge_checks(run=run4, totals={"checked": 0, "matched": 0, "exceptions": 0, "high_risk": 0})
         self.assertTrue(ReconciliationItem.objects.filter(run=run4, source_type="AccountingBridgePosting", exception_code="BRIDGE_JOURNAL_MISSING_SOURCE_REFERENCE").exists())
 
-        journal.source_id = str(row.id)
-        journal.save(update_fields=["source_id", "updated_at"])
+        bridge.source_id = str(row.id)
+        bridge.save(update_fields=["source_id", "updated_at"])
         lines = [{"chart_account": line.chart_account, "description": line.description, "debit_amount": line.debit_amount, "credit_amount": line.credit_amount} for line in journal.lines.all()]
         duplicate = create_journal_entry(entry_date=self.today, entry_type=JournalEntryType.SYSTEM_BRIDGE, memo="Duplicate return source test", source_model="DirectSaleReturn", source_id=str(row.id), voucher_type="DIRECT_SALE_RETURN", source_type="DELIVERED_RETURN", source_reference=row.return_no, lines=lines)
         post_journal_entry(journal_entry_id=duplicate.id, posted_by=self.admin)

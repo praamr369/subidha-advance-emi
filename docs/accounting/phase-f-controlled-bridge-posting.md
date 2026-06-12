@@ -183,6 +183,48 @@ Inventory boundary:
 
 Tax posting is not guessed. If `INPUT_GST` cannot be resolved for a taxable purchase bill, the candidate is blocked by mapping and cannot post.
 
+## Phase F7 — VendorPayment / payable settlement bridge posting
+
+Phase F7 extends the controlled bridge workflow to concrete `inventory.VendorPayment` source records only.
+
+Actual source model used:
+
+```text
+VendorPayment
+```
+
+Supported event keys:
+
+```text
+vendor_payment
+purchase_bill_payment
+vendor_payable_settlement
+accounts_payable_payment
+supplier_payment
+```
+
+Current safe classification:
+
+- `vendor_payment` is used for concrete `VendorPayment` records not linked to a purchase bill.
+- `purchase_bill_payment` is used for concrete `VendorPayment` records linked to a vendor bill / purchase bill record.
+- Cancelled vendor payments are skipped as not applicable.
+- Legacy `VendorPayment.status=POSTED` rows without an `AccountingBridgePosting` are skipped because the legacy vendor payment posting path may already have mutated source status, posted journal references, or vendor ledger evidence.
+- Unsupported vendor payment shapes remain visible and non-postable.
+
+Accounting shape:
+
+- Debit `VENDOR_PAYABLE` / `ACCOUNTS_PAYABLE` for the paid amount.
+- Credit the concrete `FinanceAccount.chart_account` used by the vendor payment.
+
+Safety boundary:
+
+- Preview is read-only and does not consume `JOURNAL_ENTRY` numbering.
+- Posting is explicit, admin-only, transactional, and idempotent.
+- Posting creates `JournalEntry`, `AccountingBridgePosting`, and a pending `ReconciliationItem`.
+- Posting does not mutate `VendorPayment`, `PurchaseBill`, `StockLedger`, or `InventoryItem`.
+- Posting does not create inventory valuation, COGS, purchase-return, commission, payroll, staff-advance, rent, or lease accounting.
+- Reconciliation remains pending until explicit verification.
+
 ## Preview contract
 
 Preview endpoint:
@@ -197,7 +239,7 @@ Preview must remain read-only. It must not create:
 - `AccountingBridgePosting`
 - `ReconciliationItem`
 - document numbers
-- source Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, BillingDebitNote, PurchaseBill, or DirectSaleReturn mutations
+- source Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, BillingDebitNote, PurchaseBill, VendorPayment, or DirectSaleReturn mutations
 - StockLedger or inventory valuation mutations
 
 Preview returns the concrete source identity, journal-date context, accounting period, journal-number preview, debit lines, credit lines, tax lines where supported, totals, blockers, warnings, idempotency key, and safety copy.
@@ -240,7 +282,7 @@ Verification is admin-only and applies only to clean `POSTED_UNVERIFIED` bridge 
 
 ## Period close impact
 
-Bridge rows follow the same close posture across Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, and PurchaseBill:
+Bridge rows follow the same close posture across Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, PurchaseBill, and VendorPayment:
 
 - ready/unposted concrete rows block close as unposted bridge work
 - posted/unverified rows block close as unreconciled work
@@ -249,16 +291,16 @@ Bridge rows follow the same close posture across Payment, ReceiptDocument, Billi
 
 ## Safety limits
 
-Phase F6 does not add bridge posting for:
+Phase F7 does not add bridge posting for:
 
 - DirectSale sale source records
 - Rent/Lease source records
 - StockLedger
 - GoodsReceipt
-- Vendor payment or settlement
+- VendorSettlement
 - Purchase return
 - Commission or payout
-- salary or payroll
-- StaffAdvance
+- Salary, payroll, or StaffAdvance
+- Inventory valuation or COGS
 
 Do not auto-post, auto-reconcile, auto-close periods, create fake mappings, mutate inventory, or fake Staff Advance readiness.

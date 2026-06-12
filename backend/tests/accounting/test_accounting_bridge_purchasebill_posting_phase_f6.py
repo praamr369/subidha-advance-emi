@@ -37,6 +37,15 @@ class AccountingBridgePurchaseBillPostingPhaseF6Tests(APITestCase):
         bill.refresh_from_db()
         return {"bill_no": bill.bill_no, "status": bill.status, "subtotal": bill.subtotal, "tax_total": bill.tax_total, "grand_total": bill.grand_total, "posted_journal_entry_id": bill.posted_journal_entry_id, "stock_ledger_count": StockLedger.objects.count()}
 
+    def _inventory_snapshot(self):
+        self.item.refresh_from_db()
+        return {
+            "current_stock_quantity": self.item.current_stock_quantity(),
+            "available_qty": self.item.available_qty(),
+            "standard_unit_cost": self.item.standard_unit_cost,
+            "purchase_unit_cost": self.item.purchase_unit_cost,
+        }
+
     def test_candidate_generation_for_concrete_purchase_bill(self):
         bill = self._bill(bill_no="F6-PB-GEN")
         response = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/?source_model=PurchaseBill")
@@ -123,7 +132,9 @@ class AccountingBridgePurchaseBillPostingPhaseF6Tests(APITestCase):
         bill = self._bill(bill_no="F6-PB-RUN")
         run = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="PHASE_F6_TEST", module="ACCOUNTING_BRIDGE", date_from=bill.bill_date, date_to=bill.bill_date, status=ReconciliationRunStatus.RUNNING, started_by=self.admin)
         run_accounting_bridge_checks(run=run, totals={"checked": 0, "matched": 0, "exceptions": 0, "high_risk": 0})
-        self.assertTrue(ReconciliationItem.objects.filter(run=run, source_type="PurchaseBill", source_id=str(bill.id), exception_code="PURCHASE_BILL_MISSING_ACCOUNTING_BRIDGE_POSTING").exists())
+        missing_item = ReconciliationItem.objects.get(run=run, source_type="PurchaseBill", source_id=str(bill.id), exception_code="PURCHASE_BILL_MISSING_ACCOUNTING_BRIDGE_POSTING")
+        missing_item.status = ReconciliationItemStatus.RESOLVED
+        missing_item.save(update_fields=["status", "updated_at"])
         candidate_id = self._candidate_id(bill)
         batch_preview = self.client.post("/api/v1/admin/accounting/bridge-reconciliation/batch-preview/", {"candidate_ids": [candidate_id]}, format="json")
         self.assertEqual(batch_preview.status_code, status.HTTP_200_OK, batch_preview.data)
@@ -131,6 +142,10 @@ class AccountingBridgePurchaseBillPostingPhaseF6Tests(APITestCase):
         batch_post = self.client.post("/api/v1/admin/accounting/bridge-reconciliation/batch-post/", {"candidate_ids": [candidate_id], "idempotency_keys": {candidate_id: key}, "confirm": True}, format="json")
         self.assertEqual(batch_post.status_code, status.HTTP_200_OK, batch_post.data)
         item_id = batch_post.data["posted"][0]["reconciliation_item"]["id"]
+        before_verify_source = self._snapshot(bill)
+        before_verify_inventory = self._inventory_snapshot()
         verify = self.client.post(f"/api/v1/admin/accounting/bridge-reconciliation/items/{item_id}/verify/", {"note": "verified"}, format="json")
         self.assertEqual(verify.status_code, status.HTTP_200_OK, verify.data)
         self.assertEqual(ReconciliationItem.objects.get(pk=item_id).status, ReconciliationItemStatus.MATCHED)
+        self.assertEqual(self._snapshot(bill), before_verify_source)
+        self.assertEqual(self._inventory_snapshot(), before_verify_inventory)

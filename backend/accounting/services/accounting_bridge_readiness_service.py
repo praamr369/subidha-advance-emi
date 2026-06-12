@@ -331,9 +331,9 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
     BridgeEventSpec(
         event_key="vendor_payment",
         label="Vendor payment",
-        source_module="accounting",
-        source_app="accounting",
-        source_model="VendorSettlement",
+        source_module="inventory",
+        source_app="inventory",
+        source_model="VendorPayment",
         event_group="Vendor / Inventory",
         debit_requirements=("ACCOUNTS_PAYABLE",),
         credit_requirements=("Cash / Bank / UPI FinanceAccount",),
