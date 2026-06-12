@@ -24,22 +24,24 @@ export default function PublicMarketingBanner({
   return (
     <section
       className={cn(
-        "relative overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(244,246,250,0.95))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)]",
+        "public-reveal relative overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(246,239,229,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(87,54,31,0.58)] dark:border-border/70 dark:bg-[linear-gradient(135deg,rgba(45,37,30,0.92),rgba(33,29,25,0.94))]",
         className
       )}
     >
-      <div className="pointer-events-none absolute -right-10 top-0 h-32 w-32 rounded-full bg-blue-100/60 blur-2xl" />
-      <div className="pointer-events-none absolute -left-12 bottom-0 h-28 w-28 rounded-full bg-amber-100/50 blur-2xl" />
-      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{eyebrow}</div>
-      <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h2>
-      <Typography className="mt-2 max-w-3xl sm:text-base">{description}</Typography>
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {items.map((item) => (
-          <article key={item.title} className="public-card-sm px-4 py-3">
-            <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
-          </article>
-        ))}
+      <div className="pointer-events-none absolute -right-10 top-0 h-36 w-36 rounded-full bg-[rgba(214,170,94,0.22)] blur-2xl" />
+      <div className="pointer-events-none absolute -left-12 bottom-0 h-32 w-32 rounded-full bg-[rgba(112,72,42,0.14)] blur-2xl" />
+      <div className="relative z-10">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{eyebrow}</div>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{title}</h2>
+        <Typography className="mt-2 max-w-3xl sm:text-base">{description}</Typography>
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {items.map((item) => (
+            <article key={item.title} className="public-card-sm public-card-animated px-4 py-3">
+              <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
+            </article>
+          ))}
+        </div>
       </div>
     </section>
   );
