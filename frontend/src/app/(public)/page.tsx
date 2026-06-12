@@ -15,7 +15,7 @@ import { asLocale, getPublicDictionary, getText, publicContent } from "@/lib/pub
 import { getPublicLanguage } from "@/lib/public-i18n.server";
 import { getPublicLatestWinner, getPublicStats, listPublicProducts } from "@/lib/public-api";
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
-import { buildOrganizationJsonLd, buildPublicMetadata } from "@/lib/public-seo";
+import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -41,17 +41,13 @@ export default async function PublicHome() {
     <PublicMarketingShell
       className="mx-auto w-full max-w-[1280px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10"
       hero={
-        <>
-          <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify(buildOrganizationJsonLd()) }} />
-
-          <HomeLandingHero
-            title={heroTitle}
-            subtitle={heroSubtitle}
-            companyName={profile.resolved_display_name}
-            tagline={profile.resolved_tagline}
-            stats={stats}
-          />
-        </>
+        <HomeLandingHero
+          title={heroTitle}
+          subtitle={heroSubtitle}
+          companyName={profile.resolved_display_name}
+          tagline={profile.resolved_tagline}
+          stats={stats}
+        />
       }
       trust={<PublicTrustStrip />}
       sections={
@@ -121,18 +117,16 @@ export default async function PublicHome() {
               />
             )}
           </PublicSectionShell>
+
+          <CtaBanner
+            title="Start with a product or talk to the branch"
+            description="Choose a product, send an enquiry, or contact the store. Public actions create leads only after you submit the form."
+            actions={[
+              { href: ROUTES.public.products, label: dictionary.common.products, variant: "secondary" },
+              { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },
+            ]}
+          />
         </>
-      }
-      cta={
-        <CtaBanner
-          title="Need guidance in your preferred language?"
-          description="Use the language switcher in the header for English, Hindi, or Bengali, then connect with the branch for assisted enrollment."
-          actions={[
-            { href: ROUTES.public.contact, label: "Contact us", variant: "secondary" },
-            { href: ROUTES.public.login, label: "Login to Customer Dashboard", variant: "secondary" },
-            { href: ROUTES.public.apply, label: "Start application", variant: "primary" },
-          ]}
-        />
       }
     />
   );
