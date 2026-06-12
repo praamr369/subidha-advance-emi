@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BadgeIndianRupee, ClipboardCheck, PackageCheck, ReceiptText } from "lucide-react";
+import { ArrowRight, ClipboardCheck, PackageCheck, ReceiptText, Wallet } from "lucide-react";
 
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
@@ -18,7 +18,7 @@ const steps = [
     description: "Advance EMI, rent, lease or direct-sale flow stays clearly separated.",
   },
   {
-    icon: BadgeIndianRupee,
+    icon: Wallet,
     title: "Pay monthly with records",
     description: "Customer-facing payment history and receipts stay inside the authenticated portal.",
   },
