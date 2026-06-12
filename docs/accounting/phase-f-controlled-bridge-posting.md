@@ -242,7 +242,7 @@ Preview must remain read-only. It must not create:
 - source Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, BillingDebitNote, PurchaseBill, VendorPayment, or DirectSaleReturn mutations
 - StockLedger or inventory valuation mutations
 
-Preview returns the concrete source identity, journal-date context, accounting period, journal-number preview, debit lines, credit lines, tax lines where supported, totals, blockers, warnings, idempotency key, and safety copy.
+Preview returns the concrete source identity, journal-date context, accounting period, journal-number preview, debit lines, credit lines, tax lines where supported, totals, blockers, warnings, idempotency key, and safety copy. For `StockLedger`, preview also returns movement type/date, item/product, stock location/branch, quantity, unit cost where safely resolved, and amount/value.
 
 ## Posting contract
 
@@ -266,7 +266,7 @@ Posting creates:
 - one `AccountingBridgePosting`
 - one pending/unverified `ReconciliationItem`
 
-Posting does not mutate original source financial fields. In particular, this bridge workflow does not set `posted_journal_entry` on billing or purchase documents and does not change amount, status, document number, source reference, tax values, invoice/receipt allocation, DirectSale, Payment, EMI, Subscription, StockLedger, PurchaseBill, Commission, Payout, Delivery, or rent/lease source data.
+Posting does not mutate original source financial fields. In particular, this bridge workflow does not set `posted_journal_entry` on billing, purchase, or stock ledger source records and does not change amount, status, document number, source reference, tax values, invoice/receipt allocation, DirectSale, Payment, EMI, Subscription, StockLedger, InventoryItem, PurchaseBill, VendorPayment, Commission, Payout, Delivery, stock quantity, stock valuation, or rent/lease source data.
 
 ## Reconciliation contract
 
@@ -282,20 +282,68 @@ Verification is admin-only and applies only to clean `POSTED_UNVERIFIED` bridge 
 
 ## Period close impact
 
-Bridge rows follow the same close posture across Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, PurchaseBill, and VendorPayment:
+Bridge rows follow the same close posture across Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, PurchaseBill, VendorPayment, and StockLedger:
 
 - ready/unposted concrete rows block close as unposted bridge work
 - posted/unverified rows block close as unreconciled work
 - verified/reconciled rows no longer block close as unreconciled
 - unsupported source shapes remain visible and non-postable
 
+## Phase F8 — StockLedger / inventory accounting bridge
+
+Phase F8 extends the controlled bridge workflow to concrete existing `StockLedger` rows only.
+
+Actual source model used:
+
+```text
+StockLedger
+```
+
+Supported event keys:
+
+```text
+inventory_purchase_receive
+inventory_adjustment_increase
+inventory_adjustment_decrease
+inventory_transfer_in
+inventory_transfer_out
+inventory_writeoff
+inventory_return_in
+inventory_return_out
+```
+
+Current safe classification:
+
+- `PURCHASE_IN` / `PURCHASE_RECEIVE` can become `inventory_purchase_receive` only when source cost can be resolved from a concrete receipt/bill line.
+- `ADJUSTMENT_IN` becomes `inventory_adjustment_increase` only when `StockAdjustmentLine` cost snapshots exist.
+- `ADJUSTMENT_OUT` becomes `inventory_adjustment_decrease` only when `StockAdjustmentLine` cost snapshots exist.
+- `DAMAGE` is classified as `inventory_writeoff`, but it remains blocked if no reliable source valuation exists.
+- same-entity transfers are `SKIPPED_NOT_APPLICABLE`; they are not posted.
+- sale, delivery, EMI delivery, and other COGS-like movements are `UNSUPPORTED_SOURCE` / deferred COGS unless the existing movement type and source metadata safely support a finalized sale/delivery cost event.
+- unsupported movement types remain visible and non-postable.
+
+Accounting shapes:
+
+- `inventory_purchase_receive`: debit `INVENTORY_ASSET`, credit `PURCHASE_CLEARING` / `INVENTORY_CLEARING`.
+- `inventory_adjustment_increase`: debit `INVENTORY_ASSET`, credit inventory adjustment gain/income/clearing account.
+- `inventory_adjustment_decrease`: debit inventory adjustment loss/expense account, credit `INVENTORY_ASSET`.
+- `inventory_writeoff`: debit inventory writeoff/stock loss account, credit `INVENTORY_ASSET`.
+
+Safety boundary:
+
+- F8 creates accounting bridge entries from existing `StockLedger` rows only.
+- F8 does not create, edit, reverse, delete, or recalculate stock movements.
+- F8 does not mutate `StockLedger`, `InventoryItem`, stock quantity, stock valuation/cost, `PurchaseBill`, or `VendorPayment`.
+- F8 does not call legacy purchase posting or inventory receipt/delivery logic.
+- F8 does not add purchase bill, vendor payment, purchase return, manufacturing/BOM, commission, payroll, rent/lease, staff advance, or COGS posting beyond the explicitly supported StockLedger accounting shapes above.
+- COGS is deferred until a later sub-phase defines a finalized sale/delivery cost source contract.
+
 ## Safety limits
 
-Phase F7 does not add bridge posting for:
+The controlled bridge still does not add posting for:
 
 - DirectSale sale source records
 - Rent/Lease source records
-- StockLedger
 - GoodsReceipt
 - VendorSettlement
 - Purchase return
