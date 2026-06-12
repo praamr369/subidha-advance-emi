@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowUpRight, ShoppingCart } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
+import ProductDetailWorkflowBoundary from "@/components/public/ProductDetailWorkflowBoundary";
+import ProductEnquiryHandoffPanel, { buildProductEnquiryHref } from "@/components/public/ProductEnquiryHandoffPanel";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import PublicProductDetailMedia from "@/components/public/PublicProductDetailMedia";
-import { formatCurrency } from "@/lib/format";
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { getPublicProductDetail } from "@/lib/public-api";
@@ -34,7 +35,7 @@ export async function generateMetadata({
       title: product.name,
       description:
         product.description ||
-        `${product.name} is available in the live Subidha Furniture public catalogue.`,
+        `${product.name} is available in the live Subidha Furniture public catalogue for enquiry handoff.`,
     };
   } catch {
     return {
@@ -42,21 +43,6 @@ export async function generateMetadata({
       description: "Live public product detail and enquiry handoff.",
     };
   }
-}
-
-function buildApplyHref(product: {
-  id: number;
-  name: string;
-  product_code: string;
-  base_price: string;
-}) {
-  const params = new URLSearchParams();
-  params.set("product", String(product.id));
-  params.set("product_name", product.name);
-  params.set("product_code", product.product_code);
-  params.set("price", product.base_price);
-
-  return `${ROUTES.public.apply}?${params.toString()}`;
 }
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
@@ -70,8 +56,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
 
-  const applyHref = buildApplyHref(product);
-  const mediaState = product.image ? "Uploaded product media" : "Media pending";
+  const applyHref = buildProductEnquiryHref(product);
+  const mediaState = product.image || (product.gallery_images?.length ?? 0) > 0 ? "Uploaded product media" : "Media pending";
   const factRows = [
     { label: "Product code", value: product.product_code || "Unassigned" },
     { label: "Category", value: product.category || "Not classified" },
@@ -84,7 +70,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       title={product.name}
       subtitle={
         product.description?.trim() ||
-        "This product is published in the live Subidha Furniture catalogue and can be carried into the Lucky Plan enquiry workflow."
+        "This product is published in the live Subidha Furniture catalogue and can be carried into a branch-reviewed enquiry workflow."
       }
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
@@ -131,35 +117,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             </div>
           </div>
 
-          <div className="space-y-5">
-            <div className="public-card p-6 shadow-[0_26px_62px_-40px_rgba(15,23,42,0.22)] dark:shadow-none">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Base price
-              </div>
-              <div className="mt-2 text-4xl font-semibold tracking-tight text-foreground">
-                {formatCurrency(product.base_price)}
-              </div>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                This is the catalogue base price from live product records. Taxes, offers, bundle terms, and EMI mapping are finalized with branch documentation—not inferred from this screen.
-              </p>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link href={applyHref} className="public-action-primary h-12 justify-center gap-2 !min-h-0 px-6">
-                  <ShoppingCart className="h-4 w-4" />
-                  Enquire Now
-                </Link>
-                <Link
-                  href={ROUTES.public.contact}
-                  className="public-action-secondary h-12 justify-center gap-2 !min-h-0 px-6"
-                >
-                  Contact branch
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-          </div>
+          <ProductEnquiryHandoffPanel product={product} />
         </div>
       </section>
+
+      <ProductDetailWorkflowBoundary />
     </PublicPageShell>
   );
 }
