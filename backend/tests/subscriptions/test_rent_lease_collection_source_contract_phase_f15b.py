@@ -244,7 +244,6 @@ class RentLeaseCollectionSourceContractPhaseF15BTests(TestCase):
             subscription=subscription,
             amount=Decimal("1000.00"),
             performed_by=self.admin,
-            reference_no="REF-F15B-001",
         )
         self.assertEqual(RentLeaseCollection.objects.count(), 0)
         self.assertGreaterEqual(RentLeaseDepositTransaction.objects.count(), 2)
