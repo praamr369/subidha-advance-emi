@@ -4,6 +4,7 @@ import { ArrowRight, ClipboardCheck, PackageCheck, ReceiptText, Wallet } from "l
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
 import SectionHeader from "@/components/public/SectionHeader";
+import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
 import { ROUTES } from "@/lib/routes";
 
 const steps = [
@@ -38,12 +39,7 @@ export default function HomePlanFlowPreview() {
           title="A modern public site, backed by controlled shop operations"
           description="The homepage can look premium and animated while system records remain authoritative. Public content never creates payments, winners, delivery proof, or stock claims."
         />
-        <GeneratedMarketingVisual
-          src="/marketing/generated/receipt-contract-3d.webp"
-          alt="3D decorative visual of a furniture contract and receipt concept"
-          label="Contract + receipt visual"
-          className="min-h-[18rem]"
-        />
+        <GeneratedMarketingVisual asset={PUBLIC_MARKETING_ASSETS.receiptContract} className="min-h-[18rem]" />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
