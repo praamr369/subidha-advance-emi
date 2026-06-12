@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import CtaBanner from "@/components/public/CtaBanner";
+import DrawEvidenceExplainer from "@/components/public/DrawEvidenceExplainer";
+import DrawTransparencyHero from "@/components/public/DrawTransparencyHero";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import { buildPublicMetadata } from "@/lib/public-seo";
@@ -56,7 +58,7 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[2rem] border border-white/75 bg-white/90 p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
+    <section className="public-card p-6">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{eyebrow}</div>
       <h3 className="mt-2 text-2xl font-semibold text-foreground">{title}</h3>
       <div className="mt-4">{children}</div>
@@ -72,9 +74,9 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div>
-      <div className="mt-2 break-words text-sm font-semibold text-slate-900">{value}</div>
+    <div className="public-card-sm px-4 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+      <div className="mt-2 break-words text-sm font-semibold text-foreground">{value}</div>
     </div>
   );
 }
@@ -107,6 +109,13 @@ export default async function FairDrawDetailPage({ params }: PageProps) {
     <PublicPageShell
       title={certificate ? `Fair Draw #${id}` : "Fair Draw Detail"}
       subtitle="Certificate, verification, and masked winner record."
+      heroSlot={
+        <DrawTransparencyHero
+          mode="certificate"
+          title={certificate ? `Fair Draw #${id}` : "Fair Draw Detail"}
+          subtitle="Read the public certificate, verification status, masked winner detail, and future-EMI-only boundary for this draw record."
+        />
+      }
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.luckyPlan, href: ROUTES.public.luckyPlan },
@@ -121,13 +130,15 @@ export default async function FairDrawDetailPage({ params }: PageProps) {
       <PublicMarketingBanner
         eyebrow="Public verification"
         title="Trust without exposing private customer data"
-        description="This page shows the published commitment, later verification record, and a masked winner summary only."
+        description="This page shows the published commitment, later verification record, and a masked winner summary only. It is read-only and cannot mutate any operational record."
         items={[
           { title: "No raw PII", description: "Public data never includes phone numbers, Aadhaar, KYC IDs, or internal customer identifiers." },
           { title: "Seed later", description: "The reveal seed appears only after the draw is revealed and the verification record is published." },
           { title: "Future EMI waiver only", description: "The winning benefit applies to future EMI obligations only." },
         ]}
       />
+
+      <DrawEvidenceExplainer />
 
       {error ? (
         <section className="rounded-[2rem] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
@@ -152,17 +163,17 @@ export default async function FairDrawDetailPage({ params }: PageProps) {
 
             <Panel eyebrow="Timeline" title="Lifecycle history">
               <ul className="space-y-3">
-                <li className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-sm font-semibold text-slate-900">Commitment Published</div>
-                  <div className="mt-1 text-xs text-slate-500">{formatDateTime(certificate.commitment_published_at || certificate.draw_date)}</div>
-                  <div className="mt-2 text-sm leading-6 text-slate-700">
+                <li className="public-card-sm px-4 py-3">
+                  <div className="text-sm font-semibold text-foreground">Commitment Published</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(certificate.commitment_published_at || certificate.draw_date)}</div>
+                  <div className="mt-2 text-sm leading-6 text-muted-foreground">
                     Public hash published before reveal so the draw can be checked later.
                   </div>
                 </li>
-                <li className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-sm font-semibold text-slate-900">Reveal Window</div>
-                  <div className="mt-1 text-xs text-slate-500">{formatDateTime(certificate.reveal_timestamp || verification?.reveal_timestamp)}</div>
-                  <div className="mt-2 text-sm leading-6 text-slate-700">
+                <li className="public-card-sm px-4 py-3">
+                  <div className="text-sm font-semibold text-foreground">Reveal Window</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(certificate.reveal_timestamp || verification?.reveal_timestamp)}</div>
+                  <div className="mt-2 text-sm leading-6 text-muted-foreground">
                     Verification is published after reveal; the seed is visible only after the approved flow completes.
                   </div>
                 </li>
@@ -199,14 +210,14 @@ export default async function FairDrawDetailPage({ params }: PageProps) {
           </div>
         </div>
       ) : (
-        <section className="rounded-[2rem] border border-white/75 bg-white/80 px-5 py-4 text-sm leading-6 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+        <section className="public-card-sm px-5 py-4 text-sm leading-6 text-muted-foreground">
           No public Fair Draw record was found for this identifier. The page stays honest and does not fabricate a draw.
         </section>
       )}
 
       <CtaBanner
         title="Understand the fair draw process"
-        description="Review the public explanation and browse related winner records."
+        description="Review the public explanation and browse related winner records. Public pages do not execute draw operations."
         actions={[
           { href: ROUTES.public.fairDraw, label: "Back to fair draw", variant: "secondary" },
           { href: ROUTES.public.winners, label: dictionary.common.winners, variant: "secondary" },
