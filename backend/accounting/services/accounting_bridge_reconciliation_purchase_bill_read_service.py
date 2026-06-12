@@ -6,8 +6,11 @@ from accounting.services.accounting_bridge_reconciliation_read_service import Br
 from accounting.services.accounting_bridge_purchase_bill_service import BridgeCandidateFilters, list_bridge_candidates, summarize_candidate_statuses
 
 
+EXTENDED_SOURCE_MODELS = {"PurchaseBill", "VendorPayment", "StockLedger", "SalarySheet"}
+
+
 def _candidate_filters(filters: BridgeReconciliationFilters) -> BridgeCandidateFilters:
-    source_model = filters.source_model if filters.source_model in {"PurchaseBill", "VendorPayment", "StockLedger"} else None
+    source_model = filters.source_model if filters.source_model in EXTENDED_SOURCE_MODELS else None
     return BridgeCandidateFilters(date_from=filters.date_from, date_to=filters.date_to, financial_year=filters.financial_year, accounting_period=filters.accounting_period, status=filters.status, source_model=source_model, event_key=filters.event_key, module=filters.module)
 
 
@@ -22,7 +25,7 @@ def _row_matches_vendor(row: dict[str, Any], vendor: str | None) -> bool:
 def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters | None = None) -> dict[str, Any]:
     active_filters = filters or BridgeReconciliationFilters()
     payload = build_base_reconciliation(active_filters)
-    if active_filters.source_model and active_filters.source_model not in {"PurchaseBill", "VendorPayment", "StockLedger"}:
+    if active_filters.source_model and active_filters.source_model not in EXTENDED_SOURCE_MODELS:
         return payload
     candidate_rows = list_bridge_candidates(_candidate_filters(active_filters))
     if active_filters.vendor:
@@ -30,7 +33,7 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
     if active_filters.status:
         candidate_rows = [row for row in candidate_rows if row.get("status") == active_filters.status or row.get("reconciliation_state") == active_filters.status]
     existing_results = payload.get("results", [])
-    if active_filters.source_model in {"PurchaseBill", "VendorPayment", "StockLedger"}:
+    if active_filters.source_model in EXTENDED_SOURCE_MODELS:
         results = candidate_rows
     else:
         # Avoid duplicating rows if the base service later gains first-class purchase/vendor support.

@@ -7,7 +7,7 @@ from typing import Any
 
 from django.db import transaction
 
-from accounting.models import AccountingBridgePosting, ChartOfAccount, FinanceAccount, JournalEntry
+from accounting.models import AccountingBridgePosting, ChartOfAccount, FinanceAccount, JournalEntry, SalaryPayment, SalarySheet, SalarySheetStatus
 from accounting.services import accounting_bridge_candidate_service as base
 from accounting.services.document_sequence_service import DocumentNumberingSetupError, DocumentType, preview_document_number, validate_document_numbering_ready
 from accounting.services.bridge_posting_service import post_bridge_entry
@@ -86,6 +86,22 @@ DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY = "deferred_cogs"
 STOCK_LEDGER_SAFETY_TEXT = "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation. It does not edit stock ledger, inventory quantity, valuation, sale/delivery, purchase bill, or vendor payment records."
 COGS_STOCK_LEDGER_EVENT_KEYS = {"cogs_sale_delivery", "cogs_direct_sale_delivery", "cogs_subscription_delivery", "inventory_sale_stock_out"}
 COGS_STOCK_OUT_MOVEMENT_TYPES = {StockMovementType.SALE_OUT, StockMovementType.EMI_DELIVERY_OUT, StockMovementType.DELIVERY_OUT}
+SALARY_SHEET_SOURCE_MODEL = "SalarySheet"
+SALARY_ACCRUAL_EVENT_KEY = "salary_accrual"
+SALARY_ACCRUAL_EVENT_KEYS = {"payroll_accrual", "salary_accrual", "staff_salary_accrual", "wages_accrual"}
+SALARY_ACCRUAL_PURPOSE_BY_EVENT = {key: key.upper() for key in SALARY_ACCRUAL_EVENT_KEYS}
+SALARY_ACCRUAL_LABEL_BY_EVENT = {
+    "payroll_accrual": "Payroll accrual",
+    "salary_accrual": "Salary accrual",
+    "staff_salary_accrual": "Staff salary accrual",
+    "wages_accrual": "Wages accrual",
+}
+SKIPPED_SALARY_ACCRUAL_EVENT_KEY = "salary_accrual_skipped_not_applicable"
+UNSUPPORTED_SALARY_ACCRUAL_EVENT_KEY = "unsupported_salary_accrual"
+SALARY_ACCRUAL_SAFETY_TEXT = (
+    "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation. "
+    "It does not edit payroll, staff, attendance, staff advance, or payment records."
+)
 
 BridgeCandidateFilters = base.BridgeCandidateFilters
 verify_bridge_reconciliation_item = base.verify_bridge_reconciliation_item
@@ -117,6 +133,105 @@ def _vendor_payment_reference(row: VendorPayment) -> str:
 
 def _stock_ledger_reference(row: StockLedger) -> str:
     return f"SL-{row.id}"
+
+
+def _salary_sheet_reference(row: SalarySheet) -> str:
+    employee_code = getattr(row.employee, "employee_code", None) or f"EMP-{row.employee_id}"
+    period_code = getattr(row.payroll_period, "code", None) or f"{row.year}-{row.month:02d}"
+    return f"SAL-{employee_code}-{period_code}"
+
+
+def _salary_sheet_period_label(row: SalarySheet) -> str:
+    if row.payroll_period_id:
+        return f"{row.payroll_period.code} ({row.payroll_period.start_date} to {row.payroll_period.end_date})"
+    return f"{row.year}-{row.month:02d}"
+
+
+def _salary_sheet_date(row: SalarySheet):
+    return row.payroll_period.end_date if row.payroll_period_id else None
+
+
+def _salary_sheet_snapshot(row: SalarySheet) -> dict[str, Any]:
+    return {
+        "employee_id": row.employee_id,
+        "payroll_period_id": row.payroll_period_id,
+        "year": row.year,
+        "month": row.month,
+        "gross_amount": row.gross_amount,
+        "deductions_amount": row.deductions_amount,
+        "net_amount": row.net_amount,
+        "status": row.status,
+        "posted_journal_entry_id": row.posted_journal_entry_id,
+    }
+
+
+def _employee_snapshot(row: SalarySheet) -> dict[str, Any]:
+    employee = row.employee
+    return {
+        "employee_code": employee.employee_code,
+        "name": employee.name,
+        "branch_id": employee.branch_id,
+        "base_salary": employee.base_salary,
+        "is_active": employee.is_active,
+        "employment_status": employee.employment_status,
+        "employment_type": employee.employment_type,
+        "payroll_eligible": employee.payroll_eligible,
+        "payment_mode": employee.payment_mode,
+        "payroll_expense_account_id": employee.payroll_expense_account_id,
+    }
+
+
+def _salary_expense_account(row: SalarySheet) -> ChartOfAccount | None:
+    account = getattr(row.employee, "payroll_expense_account", None)
+    if account is not None and account.is_active:
+        return account
+    return base._posting_profile_account("SALARY_EXPENSE") or base._posting_profile_account("WAGES_EXPENSE")
+
+
+def _salary_payable_account() -> ChartOfAccount | None:
+    return base._posting_profile_account("SALARY_PAYABLE") or base._chart_by_system_code("SALARY_PAYABLE")
+
+
+def _classify_salary_accrual_event(row: SalarySheet) -> tuple[str, str, str | None, bool]:
+    if row.status == SalarySheetStatus.DRAFT:
+        return SALARY_ACCRUAL_EVENT_KEY, SALARY_ACCRUAL_LABEL_BY_EVENT[SALARY_ACCRUAL_EVENT_KEY], "SalarySheet must be approved/finalized before accrual posting.", True
+    if row.status in {SalarySheetStatus.POSTED, SalarySheetStatus.PAID_PARTIAL, SalarySheetStatus.PAID}:
+        return SKIPPED_SALARY_ACCRUAL_EVENT_KEY, "Salary accrual skipped", "SalarySheet is already posted or paid through the legacy salary workflow; F12 will not duplicate or mutate it.", False
+    if row.status != SalarySheetStatus.APPROVED:
+        return UNSUPPORTED_SALARY_ACCRUAL_EVENT_KEY, "Unsupported salary accrual", "SalarySheet status cannot be safely classified for F12 accrual posting.", False
+    if not row.payroll_period_id or not row.payroll_period.end_date:
+        return UNSUPPORTED_SALARY_ACCRUAL_EVENT_KEY, "Unsupported salary accrual", "SalarySheet has no linked payroll period end date; accrual date cannot be resolved safely.", False
+    gross = base._money(row.gross_amount)
+    net = base._money(row.net_amount)
+    deductions = base._money(row.deductions_amount)
+    if gross <= Decimal("0.00") or net <= Decimal("0.00"):
+        return UNSUPPORTED_SALARY_ACCRUAL_EVENT_KEY, "Unsupported salary accrual", "SalarySheet amount must be greater than zero for accrual posting.", False
+    if deductions > Decimal("0.00") or gross != net:
+        return UNSUPPORTED_SALARY_ACCRUAL_EVENT_KEY, "Unsupported salary accrual", "SalarySheet has deductions; F12 supports only simple Dr Salary/Wages Expense and Cr Salary Payable without deduction clearing.", False
+    return SALARY_ACCRUAL_EVENT_KEY, SALARY_ACCRUAL_LABEL_BY_EVENT[SALARY_ACCRUAL_EVENT_KEY], None, False
+
+
+def _salary_accrual_lines(row: SalarySheet, event_key: str) -> tuple[list[dict[str, Any]], list[str], FinanceAccount | None]:
+    warnings: list[str] = []
+    if event_key not in SALARY_ACCRUAL_EVENT_KEYS:
+        return [], ["Unsupported SalarySheet accrual event for Phase F12."], None
+    amount = base._money(row.net_amount)
+    if amount <= Decimal("0.00"):
+        warnings.append("SalarySheet net_amount must be greater than zero.")
+    expense = _salary_expense_account(row)
+    payable = _salary_payable_account()
+    if expense is None:
+        warnings.append("SALARY_EXPENSE / WAGES_EXPENSE posting profile/chart account is missing or inactive.")
+    if payable is None:
+        warnings.append("SALARY_PAYABLE chart account is missing or inactive.")
+    if warnings:
+        return [], warnings, None
+    reference = _salary_sheet_reference(row)
+    employee_name = getattr(row.employee, "name", None) or f"Employee #{row.employee_id}"
+    return [
+        {"chart_account": expense, "description": f"Salary expense {employee_name} {reference}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
+        {"chart_account": payable, "description": f"Salary payable {employee_name} {reference}", "debit_amount": Decimal("0.00"), "credit_amount": amount},
+    ], warnings, None
 
 
 def _stock_ledger_snapshot(row: StockLedger) -> dict[str, Any]:
@@ -585,6 +700,50 @@ def stock_ledger_candidate(row: StockLedger) -> dict[str, Any]:
     return payload
 
 
+def salary_sheet_candidate(row: SalarySheet) -> dict[str, Any]:
+    event_key, event_label, reason, approval_required = _classify_salary_accrual_event(row)
+    purpose = SALARY_ACCRUAL_PURPOSE_BY_EVENT.get(event_key, event_key.upper())
+    bridge = base._existing_bridge_for(source_model=SALARY_SHEET_SOURCE_MODEL, source_id=str(row.id), purpose=purpose)
+    journal = bridge.journal_entry if bridge else None
+    item = base._latest_posting_reconciliation_item(source_model=SALARY_SHEET_SOURCE_MODEL, source_id=str(row.id)) if journal else base._latest_reconciliation_item(source_model=SALARY_SHEET_SOURCE_MODEL, source_id=str(row.id))
+    source_date = getattr(journal, "entry_date", None) or _salary_sheet_date(row)
+    period = getattr(journal, "accounting_period", None) or base._source_period(source_date)
+    lines, warnings, finance_account = _salary_accrual_lines(row, event_key) if event_key in SALARY_ACCRUAL_EVENT_KEYS else ([], [reason] if reason else [], None)
+    raw = "SKIPPED_NOT_APPLICABLE" if event_key == SKIPPED_SALARY_ACCRUAL_EVENT_KEY else "UNSUPPORTED_SOURCE" if event_key == UNSUPPORTED_SALARY_ACCRUAL_EVENT_KEY else "READY" if lines else "NOT_CONFIGURED"
+    postability = base._candidate_status_payload(event_key=event_key, event_label=event_label, module="accounting", source_model=SALARY_SHEET_SOURCE_MODEL, raw_status=raw, lines=lines, line_warnings=warnings, period=period, source_date=source_date, journal=journal, reconciliation_item=item, source_workflow_exists=event_key in SALARY_ACCRUAL_EVENT_KEYS, classification_reason=reason, approval_required=approval_required)
+    source_date_key = source_date.isoformat() if source_date else "NO_SAFE_DATE"
+    payload = base._candidate_payload(candidate_id=base._candidate_id(source_model=SALARY_SHEET_SOURCE_MODEL, source_pk=row.id, event_key=event_key), event_key=event_key, event_label=event_label, module="accounting", source_model=SALARY_SHEET_SOURCE_MODEL, source_pk=row.id, source_display=f"Salary sheet {_salary_sheet_reference(row)}", source_reference=_salary_sheet_reference(row), source_date=source_date, amount=row.net_amount, lines=lines, finance_account=finance_account, period=period, postability=postability, journal=journal, reconciliation_item=item, idempotency_key=f"bridge:{purpose}:SalarySheet:{row.id}:{source_date_key}:{base._money(row.net_amount):.2f}", source_status=row.status, source_type="SALARY_ACCRUAL")
+    if payload.get("reconciliation_state") == "POSTED_UNVERIFIED":
+        payload["status"] = "POSTED_UNVERIFIED"
+        payload["canonical_status"] = "POSTED_UNVERIFIED"
+    payroll_period = row.payroll_period
+    employee = row.employee
+    payload.update(
+        {
+            "salary_sheet_id": row.id,
+            "salary_reference": _salary_sheet_reference(row),
+            "salary_status": row.status,
+            "payroll_status": row.status,
+            "payroll_period": _salary_sheet_period_label(row),
+            "payroll_period_code": getattr(payroll_period, "code", None),
+            "payroll_period_start": payroll_period.start_date.isoformat() if payroll_period else None,
+            "payroll_period_end": payroll_period.end_date.isoformat() if payroll_period else None,
+            "staff_id": row.employee_id,
+            "staff_name": employee.name,
+            "employee_code": employee.employee_code,
+            "employee_name": employee.name,
+            "employment_type": employee.employment_type,
+            "gross_salary": f"{base._money(row.gross_amount):.2f}",
+            "gross_amount": f"{base._money(row.gross_amount):.2f}",
+            "deductions_amount": f"{base._money(row.deductions_amount):.2f}",
+            "payable_amount": f"{base._money(row.net_amount):.2f}",
+            "net_amount": f"{base._money(row.net_amount):.2f}",
+            "legacy_posted_journal_entry_id": row.posted_journal_entry_id,
+        }
+    )
+    return payload
+
+
 def _purchase_queryset(filters: BridgeCandidateFilters):
     qs = PurchaseBill.objects.select_related("vendor", "branch", "stock_location", "finance_account", "finance_account__chart_account")
     return base._date_filter_qs(qs, filters, date_field="bill_date")
@@ -606,6 +765,10 @@ def list_bridge_candidates(filters: BridgeCandidateFilters | None = None) -> lis
     rows: list[dict[str, Any]] = []
     if requested_model != PURCHASE_BILL_SOURCE_MODEL:
         rows.extend(base.list_bridge_candidates(active_filters))
+    if requested_model in {"", SALARY_SHEET_SOURCE_MODEL} and (not active_filters.module or active_filters.module in {"accounting", "payroll"}):
+        qs = SalarySheet.objects.select_related("employee", "employee__payroll_expense_account", "payroll_period")
+        salary_rows = [salary_sheet_candidate(item) for item in qs.order_by("-year", "-month", "-id")[:1000]]
+        rows.extend(row for row in salary_rows if base._row_matches_date_filters(row, active_filters))
     if requested_model in {"", PURCHASE_BILL_SOURCE_MODEL} and (not active_filters.module or active_filters.module in {"inventory", "purchase"}):
         qs = _purchase_queryset(active_filters)
         rows.extend(purchase_bill_candidate(item) for item in qs.order_by("-bill_date", "-id")[:500])
@@ -626,6 +789,14 @@ def list_bridge_candidates(filters: BridgeCandidateFilters | None = None) -> lis
 def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict[str, Any]:
     source_kind, source_pk, event_key = base._parse_candidate_id(candidate_id)
     if source_kind != "purchasebill":
+        if source_kind == "salarysheet":
+            qs = SalarySheet.objects.select_related("employee", "employee__payroll_expense_account", "payroll_period")
+            if for_update:
+                qs = qs.select_for_update()
+            candidate = salary_sheet_candidate(qs.get(pk=source_pk))
+            if candidate["event_key"] != event_key:
+                raise ValueError("SalarySheet candidate event no longer matches current source state.")
+            return candidate
         if source_kind == "stockledger":
             qs = StockLedger.objects.select_related("inventory_item", "inventory_item__product", "stock_location", "stock_location__branch")
             if for_update:
@@ -654,6 +825,9 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
 
 def _lines_for_candidate(candidate: dict[str, Any]):
     if candidate["source_model"] != PURCHASE_BILL_SOURCE_MODEL:
+        if candidate["source_model"] == SALARY_SHEET_SOURCE_MODEL:
+            row = SalarySheet.objects.select_related("employee", "employee__payroll_expense_account", "payroll_period").get(pk=candidate["source_id"])
+            return _salary_accrual_lines(row, candidate["event_key"])
         if candidate["source_model"] == STOCK_LEDGER_SOURCE_MODEL:
             row = StockLedger.objects.select_related("inventory_item", "inventory_item__product", "stock_location").get(pk=candidate["source_id"])
             return _stock_ledger_lines(row, candidate["event_key"])
@@ -668,6 +842,70 @@ def _lines_for_candidate(candidate: dict[str, Any]):
 def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
     candidate = get_bridge_candidate(candidate_id)
     if candidate.get("source_model") != PURCHASE_BILL_SOURCE_MODEL:
+        if candidate.get("source_model") == SALARY_SHEET_SOURCE_MODEL:
+            lines, warnings, _finance_account = _lines_for_candidate(candidate) if candidate.get("source_date") else ([], [candidate.get("blocker_reason") or "SalarySheet has no safe accrual date."], None)
+            blockers = []
+            if not candidate["can_post"]:
+                blockers.append(candidate["blocker_reason"] or "Candidate is not postable.")
+            journal_date = date.fromisoformat(candidate["source_date"]) if candidate.get("source_date") else None
+            journal_number_preview = None
+            if journal_date is not None:
+                try:
+                    sequence = validate_document_numbering_ready(DocumentType.JOURNAL_ENTRY, journal_date)
+                    journal_number_preview = preview_document_number(sequence=sequence)
+                except DocumentNumberingSetupError as exc:
+                    blockers.append(str(exc))
+            total_debit, total_credit = base._line_totals(lines)
+            return {
+                "candidate": candidate,
+                "candidate_id": candidate_id,
+                "source": {
+                    "model": SALARY_SHEET_SOURCE_MODEL,
+                    "pk": candidate.get("source_pk") or candidate["source_id"],
+                    "display": candidate["source_display"],
+                    "reference_number": candidate["source_reference_number"],
+                    "date": candidate.get("source_date"),
+                    "amount": candidate["amount"],
+                    "source_status": candidate.get("source_status"),
+                    "source_type": candidate.get("source_type"),
+                    "salary_sheet_id": candidate.get("salary_sheet_id"),
+                    "salary_reference": candidate.get("salary_reference"),
+                    "staff_name": candidate.get("staff_name"),
+                    "employee_code": candidate.get("employee_code"),
+                    "payroll_period": candidate.get("payroll_period"),
+                    "payroll_period_code": candidate.get("payroll_period_code"),
+                    "payroll_period_start": candidate.get("payroll_period_start"),
+                    "payroll_period_end": candidate.get("payroll_period_end"),
+                    "payroll_status": candidate.get("payroll_status"),
+                    "gross_salary": candidate.get("gross_salary"),
+                    "deductions_amount": candidate.get("deductions_amount"),
+                    "payable_amount": candidate.get("payable_amount"),
+                },
+                "payroll_identity": {
+                    "salary_sheet_id": candidate.get("salary_sheet_id"),
+                    "reference": candidate.get("salary_reference"),
+                    "staff_name": candidate.get("staff_name"),
+                    "employee_code": candidate.get("employee_code"),
+                    "period": candidate.get("payroll_period"),
+                    "status": candidate.get("payroll_status"),
+                },
+                "journal_date": journal_date.isoformat() if journal_date else None,
+                "accounting_period": candidate["accounting_period"],
+                "journal_number_preview": journal_number_preview,
+                "debit_lines": [base._line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if base._money(line.get("debit_amount")) > 0],
+                "credit_lines": [base._line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if base._money(line.get("credit_amount")) > 0],
+                "lines": base._preview_lines(lines),
+                "total_debit": f"{total_debit:.2f}",
+                "total_credit": f"{total_credit:.2f}",
+                "is_balanced": bool(lines and total_debit == total_credit),
+                "tax_lines": [],
+                "finance_account_line": None,
+                "warnings": warnings,
+                "blockers": list(dict.fromkeys([item for item in blockers if item])),
+                "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers),
+                "idempotency_key": candidate["idempotency_key"],
+                "safety_text": SALARY_ACCRUAL_SAFETY_TEXT,
+            }
         if candidate.get("source_model") == STOCK_LEDGER_SOURCE_MODEL:
             lines, warnings, _finance_account = _lines_for_candidate(candidate)
             blockers = []
@@ -714,6 +952,85 @@ def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
 def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed: bool, posting_note: str = "", actor) -> dict[str, Any]:
     candidate = get_bridge_candidate(candidate_id, for_update=True)
     if candidate.get("source_model") != PURCHASE_BILL_SOURCE_MODEL:
+        if candidate.get("source_model") == SALARY_SHEET_SOURCE_MODEL:
+            if not confirmed:
+                raise ValueError("Explicit confirmation is required before posting.")
+            key = (idempotency_key or "").strip()
+            if not key:
+                raise ValueError("idempotency_key is required.")
+            if candidate["event_key"] not in SALARY_ACCRUAL_EVENT_KEYS:
+                raise ValueError("Unsupported bridge candidate source.")
+            purpose = SALARY_ACCRUAL_PURPOSE_BY_EVENT[candidate["event_key"]]
+            existing = AccountingBridgePosting.objects.select_for_update().filter(source_model=SALARY_SHEET_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
+            if existing is not None:
+                existing_key = ((existing.trace_metadata or {}).get("idempotency_key") or "").strip()
+                if existing_key and existing_key == key:
+                    return {"posted": False, "already_posted": True, "journal_entry": base._journal_payload(existing.journal_entry), "reconciliation_item": base._reconciliation_payload(base._latest_posting_reconciliation_item(source_model=SALARY_SHEET_SOURCE_MODEL, source_id=candidate["source_id"])), "next_action": "Run reconciliation checks and verify the pending bridge item."}
+                raise ValueError("This source item has already been posted with a different or legacy idempotency key.")
+            if candidate["idempotency_key"] != key:
+                raise ValueError("idempotency_key does not match the current source candidate.")
+            preview = preview_bridge_candidate(candidate_id)
+            if not preview["can_post"]:
+                raise ValueError("; ".join(preview["blockers"]) or "Candidate is not postable.")
+            row = SalarySheet.objects.select_for_update().select_related("employee", "employee__payroll_expense_account", "payroll_period").get(pk=candidate["source_id"])
+            if row.status != SalarySheetStatus.APPROVED:
+                raise ValueError("SalarySheet must remain approved/finalized at posting time.")
+            salary_before = _salary_sheet_snapshot(row)
+            employee_before = _employee_snapshot(row)
+            salary_payment_count_before = SalaryPayment.objects.filter(salary_sheet_id=row.id).count()
+            lines, _warnings, finance_account = _lines_for_candidate(candidate)
+            total_debit, total_credit = base._line_totals(lines)
+            if not lines or total_debit != total_credit:
+                raise ValueError("Bridge posting preview is not balanced.")
+            entry_date = date.fromisoformat(candidate["source_date"])
+            journal, created = post_bridge_entry(
+                source_instance=row,
+                purpose=purpose,
+                entry_date=entry_date,
+                memo=f"Bridge posting SalarySheet {row.id} {candidate['event_key']}",
+                lines=lines,
+                voucher_type=purpose,
+                source_type="SALARY_ACCRUAL",
+                source_reference=_salary_sheet_reference(row),
+                source_document_no=_salary_sheet_reference(row),
+                source_event_date=entry_date,
+                trace_metadata={
+                    "event_key": candidate["event_key"],
+                    "idempotency_key": key,
+                    "posting_note": posting_note,
+                    "source_model": SALARY_SHEET_SOURCE_MODEL,
+                    "source_id": candidate["source_id"],
+                    "salary_sheet_id": row.id,
+                    "employee_id": row.employee_id,
+                    "employee_code": row.employee.employee_code,
+                    "payroll_period_id": row.payroll_period_id,
+                    "payroll_period_code": getattr(row.payroll_period, "code", None),
+                    "amount": candidate["amount"],
+                    "gross_amount": candidate.get("gross_salary"),
+                    "deductions_amount": candidate.get("deductions_amount"),
+                    "payable_amount": candidate.get("payable_amount"),
+                    "payroll_source_mutation": False,
+                    "staff_mutation": False,
+                    "attendance_mutation": False,
+                    "staff_advance_mutation": False,
+                    "payment_mutation": False,
+                    "salary_payment_posting": False,
+                },
+                posted_by=actor,
+            )
+            row.refresh_from_db()
+            row.employee.refresh_from_db()
+            if _salary_sheet_snapshot(row) != salary_before:
+                raise ValueError("SalarySheet source mutation detected; bridge posting rolled back.")
+            if _employee_snapshot(row) != employee_before:
+                raise ValueError("Staff source mutation detected; bridge posting rolled back.")
+            if SalaryPayment.objects.filter(salary_sheet_id=row.id).count() != salary_payment_count_before:
+                raise ValueError("Salary payment mutation detected; bridge posting rolled back.")
+            item = base._latest_posting_reconciliation_item(source_model=SALARY_SHEET_SOURCE_MODEL, source_id=candidate["source_id"])
+            if created and not (item and item.exception_code == "POSTED_UNVERIFIED"):
+                item = base._create_pending_reconciliation_item(journal=journal, source_model=SALARY_SHEET_SOURCE_MODEL, source_id=candidate["source_id"], source_label=_salary_sheet_reference(row), amount=base._money(candidate["amount"]), candidate_id=candidate_id, actor=actor, note=posting_note)
+            base._log_candidate_post(journal=journal, actor=actor, candidate_id=candidate_id, source_model=SALARY_SHEET_SOURCE_MODEL, source_id=int(candidate["source_id"]), event_key=candidate["event_key"], amount=base._money(candidate["amount"]), candidate_key=key, reconciliation_item=item)
+            return {"posted": created, "already_posted": not created, "journal_entry": base._journal_payload(journal), "reconciliation_item": base._reconciliation_payload(item), "next_action": "Run reconciliation checks and verify the pending bridge item."}
         if candidate.get("source_model") == STOCK_LEDGER_SOURCE_MODEL:
             if not confirmed:
                 raise ValueError("Explicit confirmation is required before posting.")
@@ -859,6 +1176,8 @@ def batch_post_bridge_candidates(*, candidate_ids: list[str], idempotency_keys: 
 
 def summarize_candidate_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
     summary = dict(base.summarize_candidate_statuses(rows))
+    payroll_counter = Counter(row.get("status") or "INFO" for row in rows if row.get("source_model") == SALARY_SHEET_SOURCE_MODEL)
+    payroll_posted_unverified = sum(1 for row in rows if row.get("source_model") == SALARY_SHEET_SOURCE_MODEL and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
     counter = Counter(row.get("status") or "INFO" for row in rows if row.get("source_model") == PURCHASE_BILL_SOURCE_MODEL)
     posted_unverified = sum(1 for row in rows if row.get("source_model") == PURCHASE_BILL_SOURCE_MODEL and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
     vendor_counter = Counter(row.get("status") or "INFO" for row in rows if row.get("source_model") == VENDOR_PAYMENT_SOURCE_MODEL)
@@ -867,5 +1186,5 @@ def summarize_candidate_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
     stock_posted_unverified = sum(1 for row in rows if row.get("source_model") == STOCK_LEDGER_SOURCE_MODEL and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
     cogs_rows = [row for row in rows if row.get("source_model") == STOCK_LEDGER_SOURCE_MODEL and (row.get("event_key") in COGS_STOCK_LEDGER_EVENT_KEYS or row.get("event_key") == DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY)]
     cogs_counter = Counter(row.get("status") or "INFO" for row in cogs_rows)
-    summary.update({"purchase_bill_ready_unposted_count": counter.get("READY_UNPOSTED", 0), "purchase_bill_posted_count": counter.get("POSTED", 0), "purchase_bill_posted_unverified_count": posted_unverified, "purchase_bill_reconciled_count": counter.get("RECONCILED", 0), "purchase_bill_blocked_count": sum(v for k, v in counter.items() if str(k).startswith("BLOCKED")), "purchase_bill_unsupported_count": counter.get("UNSUPPORTED_SOURCE", 0), "vendor_payment_ready_unposted_count": vendor_counter.get("READY_UNPOSTED", 0), "vendor_payment_posted_count": vendor_counter.get("POSTED", 0), "vendor_payment_posted_unverified_count": vendor_posted_unverified, "vendor_payment_reconciled_count": vendor_counter.get("RECONCILED", 0), "vendor_payment_blocked_count": sum(v for k, v in vendor_counter.items() if str(k).startswith("BLOCKED")), "vendor_payment_unsupported_count": vendor_counter.get("UNSUPPORTED_SOURCE", 0), "stock_ledger_ready_unposted_count": stock_counter.get("READY_UNPOSTED", 0), "stock_ledger_posted_count": stock_counter.get("POSTED", 0), "stock_ledger_posted_unverified_count": stock_posted_unverified, "stock_ledger_reconciled_count": stock_counter.get("RECONCILED", 0), "stock_ledger_blocked_count": sum(v for k, v in stock_counter.items() if str(k).startswith("BLOCKED")), "stock_ledger_unsupported_count": stock_counter.get("UNSUPPORTED_SOURCE", 0), "stock_ledger_deferred_cogs_count": sum(1 for row in cogs_rows if row.get("event_key") == DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY), "stock_ledger_cogs_ready_unposted_count": cogs_counter.get("READY_UNPOSTED", 0), "stock_ledger_cogs_posted_unverified_count": sum(1 for row in cogs_rows if row.get("reconciliation_state") == "POSTED_UNVERIFIED"), "stock_ledger_cogs_reconciled_count": cogs_counter.get("RECONCILED", 0), "stock_ledger_cogs_blocked_count": sum(v for k, v in cogs_counter.items() if str(k).startswith("BLOCKED")), "stock_ledger_cogs_unsupported_count": cogs_counter.get("UNSUPPORTED_SOURCE", 0)})
+    summary.update({"payroll_ready_unposted_count": payroll_counter.get("READY_UNPOSTED", 0), "payroll_posted_count": payroll_counter.get("POSTED", 0), "payroll_posted_unverified_count": payroll_posted_unverified, "payroll_reconciled_count": payroll_counter.get("RECONCILED", 0), "payroll_blocked_count": sum(v for k, v in payroll_counter.items() if str(k).startswith("BLOCKED")), "payroll_unsupported_count": payroll_counter.get("UNSUPPORTED_SOURCE", 0), "purchase_bill_ready_unposted_count": counter.get("READY_UNPOSTED", 0), "purchase_bill_posted_count": counter.get("POSTED", 0), "purchase_bill_posted_unverified_count": posted_unverified, "purchase_bill_reconciled_count": counter.get("RECONCILED", 0), "purchase_bill_blocked_count": sum(v for k, v in counter.items() if str(k).startswith("BLOCKED")), "purchase_bill_unsupported_count": counter.get("UNSUPPORTED_SOURCE", 0), "vendor_payment_ready_unposted_count": vendor_counter.get("READY_UNPOSTED", 0), "vendor_payment_posted_count": vendor_counter.get("POSTED", 0), "vendor_payment_posted_unverified_count": vendor_posted_unverified, "vendor_payment_reconciled_count": vendor_counter.get("RECONCILED", 0), "vendor_payment_blocked_count": sum(v for k, v in vendor_counter.items() if str(k).startswith("BLOCKED")), "vendor_payment_unsupported_count": vendor_counter.get("UNSUPPORTED_SOURCE", 0), "stock_ledger_ready_unposted_count": stock_counter.get("READY_UNPOSTED", 0), "stock_ledger_posted_count": stock_counter.get("POSTED", 0), "stock_ledger_posted_unverified_count": stock_posted_unverified, "stock_ledger_reconciled_count": stock_counter.get("RECONCILED", 0), "stock_ledger_blocked_count": sum(v for k, v in stock_counter.items() if str(k).startswith("BLOCKED")), "stock_ledger_unsupported_count": stock_counter.get("UNSUPPORTED_SOURCE", 0), "stock_ledger_deferred_cogs_count": sum(1 for row in cogs_rows if row.get("event_key") == DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY), "stock_ledger_cogs_ready_unposted_count": cogs_counter.get("READY_UNPOSTED", 0), "stock_ledger_cogs_posted_unverified_count": sum(1 for row in cogs_rows if row.get("reconciliation_state") == "POSTED_UNVERIFIED"), "stock_ledger_cogs_reconciled_count": cogs_counter.get("RECONCILED", 0), "stock_ledger_cogs_blocked_count": sum(v for k, v in cogs_counter.items() if str(k).startswith("BLOCKED")), "stock_ledger_cogs_unsupported_count": cogs_counter.get("UNSUPPORTED_SOURCE", 0)})
     return summary

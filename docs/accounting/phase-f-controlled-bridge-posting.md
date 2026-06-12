@@ -476,3 +476,60 @@ Safety boundary:
 - Inventory valuation or COGS
 
 Do not auto-post, auto-reconcile, auto-close periods, create fake mappings, mutate inventory, or fake Staff Advance readiness.
+
+## Phase F12 — Payroll / salary accrual accounting bridge
+
+Phase F12 extends the controlled bridge workflow to concrete payroll accrual source records only.
+
+Actual source model used:
+
+```text
+accounting.SalarySheet
+```
+
+Supported event keys:
+
+```text
+salary_accrual
+```
+
+Accepted aliases remain reserved for source-backed payroll accrual rows only:
+
+```text
+payroll_accrual
+staff_salary_accrual
+wages_accrual
+```
+
+Current safe classification:
+
+- `salary_accrual` is used only for concrete `SalarySheet` rows with `status=APPROVED`, a linked `PayrollPeriod`, a reliable payroll-period end date, positive `gross_amount`, positive `net_amount`, and no deductions.
+- `SalarySheet.status=DRAFT` is blocked by approval/finalization.
+- `SalarySheet.status=POSTED`, `PAID_PARTIAL`, or `PAID` is skipped as not applicable because the legacy salary workflow may already have posted or paid it.
+- Salary sheets with deductions are unsupported in F12 until deduction/tax/PF/ESI clearing mappings are explicitly defined.
+- Salary sheets without a reliable payroll-period end date are non-postable.
+
+Accounting shape:
+
+- Debit `SALARY_EXPENSE` / `WAGES_EXPENSE`.
+- Credit `SALARY_PAYABLE`.
+
+Safety boundary:
+
+- Preview is read-only and does not create `JournalEntry`, `AccountingBridgePosting`, `ReconciliationItem`, salary payment rows, payroll source changes, staff changes, attendance changes, StaffAdvance changes, or payment changes.
+- Preview does not consume `JOURNAL_ENTRY` numbering.
+- Posting is explicit, admin-only, transactional, and idempotent by concrete `SalarySheet` source/event/idempotency key.
+- Posting creates accounting entries only: one posted `JournalEntry`, one `AccountingBridgePosting`, and one pending `ReconciliationItem`.
+- Posting does not change `SalarySheet.status`, `gross_amount`, `deductions_amount`, `net_amount`, or `posted_journal_entry`.
+- Posting does not edit `EmployeeProfile`, staff payroll configuration, attendance rows, payroll periods, StaffAdvance records, or payment records.
+- Posting does not create salary payment/settlement records.
+- Reconciliation remains pending until explicit verification.
+
+Deferred to Phase F13:
+
+```text
+Dr Salary Payable
+Cr Cash / Bank / FinanceAccount
+```
+
+F12 must not post salary payment, payroll payout, StaffAdvance, commission, payout, inventory, COGS, rent, lease, auto-posting, auto-reconciliation, or period close.

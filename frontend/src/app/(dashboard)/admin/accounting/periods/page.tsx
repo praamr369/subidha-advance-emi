@@ -197,6 +197,22 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
         { label: "Open mapping audit", href: MAPPING_AUDIT_HREF },
       ],
     },
+    {
+      title: "Payroll bridge",
+      action: "Review payroll bridge items",
+      href: bridgeReviewHref({ source_model: "SalarySheet" }),
+      rows: [
+        { label: "Ready unposted", value: summaryCount(summary, "payroll_ready_unposted_count"), detail: "Ready unposted means salary accrual journal posting is still pending.", href: bridgeReviewHref({ source_model: "SalarySheet", status: "READY_UNPOSTED" }) },
+        { label: "Posted unverified", value: summaryCount(summary, "payroll_posted_unverified_count"), detail: "Journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "SalarySheet", status: "POSTED_UNVERIFIED" }) },
+        { label: "Reconciled", value: summaryCount(summary, "payroll_reconciled_count"), detail: "Bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "SalarySheet", status: "RECONCILED" }) },
+        { label: "Blocked", value: summaryCount(summary, "payroll_blocked_count"), detail: "Mapping, period, numbering, or approval blocker remains unresolved.", href: bridgeReviewHref({ source_model: "SalarySheet", status: "BLOCKED" }) },
+        { label: "Unsupported", value: summaryCount(summary, "payroll_unsupported_count"), detail: "Unapproved, legacy-posted, deducted, or date-unsafe salary sheets are not accrual-postable.", href: bridgeReviewHref({ source_model: "SalarySheet", status: "UNSUPPORTED" }) },
+      ],
+      extraActions: [
+        { label: "Run reconciliation checks", href: RECONCILIATION_RUNS_HREF },
+        { label: "Open mapping audit", href: MAPPING_AUDIT_HREF },
+      ],
+    },
   ];
 
   const otherRows = [
@@ -210,7 +226,7 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
 
   return (
     <WorkspaceSection title="Bridge close readiness by source" description="Open periods are valid for posting. Period close still waits for posting and reconciliation to finish.">
-      <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">Ready unposted means setup is ready, but journal posting is still pending. Posted unverified means journal exists, but reconciliation verification is pending. Purchase bill, inventory, commission, and payout records are not edited by bridge posting.</div>
+      <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">Ready unposted means setup is ready, but journal posting is still pending. Posted unverified means journal exists, but reconciliation verification is pending. Purchase bill, inventory, commission, payout, payroll, staff, attendance, StaffAdvance, and payment records are not edited by bridge posting.</div>
       <div className="grid gap-4 xl:grid-cols-4">{sourceSections.map((section) => <BridgeSourceCard key={section.title} section={section} />)}<div className="rounded-xl border border-border bg-background p-4"><div className="font-semibold text-foreground">Other bridge</div><div className="mt-3 grid gap-2">{otherRows.map((row) => <Link key={row.label} href={row.href} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2 text-sm hover:bg-muted/40"><span className="font-medium text-foreground">{row.label}</span><span className={row.value ? "font-semibold text-amber-800" : "font-semibold text-muted-foreground"}>{row.value}</span></Link>)}</div></div></div>
     </WorkspaceSection>
   );

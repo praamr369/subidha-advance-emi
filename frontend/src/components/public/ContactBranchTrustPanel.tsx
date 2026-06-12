@@ -29,7 +29,7 @@ function isContactTrustRow(row: ContactTrustRow | null): row is ContactTrustRow 
 export default function ContactBranchTrustPanel({ profile }: ContactBranchTrustPanelProps) {
   const phoneHref = cleanPhoneHref(profile.support_phone);
 
-  const rows: ContactTrustRow[] = [
+  const sourceRows: Array<ContactTrustRow | null> = [
     profile.address_text
       ? { icon: MapPin, label: "Address", value: profile.address_text, href: profile.map_url || undefined, action: profile.map_url ? "Open map" : undefined }
       : null,
@@ -45,7 +45,8 @@ export default function ContactBranchTrustPanel({ profile }: ContactBranchTrustP
     profile.resolved_whatsapp_link
       ? { icon: MessageCircle, label: "WhatsApp", value: "Message branch support", href: profile.resolved_whatsapp_link, action: "Open WhatsApp", external: true }
       : null,
-  ].filter(isContactTrustRow);
+  ];
+  const rows: ContactTrustRow[] = sourceRows.filter(isContactTrustRow);
 
   return (
     <section className="public-surface p-6">

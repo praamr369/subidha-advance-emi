@@ -21,6 +21,19 @@ from accounting.services.purchase_vendor_bridge_readiness_service import (
 
 PAYROLL_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
     BridgeEventSpec(
+        event_key="salary_accrual",
+        label="Salary accrual",
+        source_module="accounting",
+        source_app="accounting",
+        source_model="SalarySheet",
+        event_group="HR & Payroll",
+        debit_requirements=("SALARY_EXPENSE or WAGES_EXPENSE",),
+        credit_requirements=("SALARY_PAYABLE",),
+        debit_mapping_purposes=(FinanceAccountMappingPurpose.SALARY_EXPENSE,),
+        credit_coa_system_codes=("SALARY_PAYABLE",),
+        operator_action="Validate payroll accrual mapping only. Posting is explicit from concrete SalarySheet bridge candidates and does not edit payroll, staff, attendance, staff advance, or payment records.",
+    ),
+    BridgeEventSpec(
         event_key="salary_payable",
         label="Salary payable accrual",
         source_module="accounting",
@@ -85,7 +98,7 @@ def _not_configured_event(*, event_key: str, label: str, source_model: str, debi
 
 
 def _expense_claim_payment_event() -> dict[str, Any]:
-    base_spec = PAYROLL_SUPPLEMENTAL_EVENT_REGISTRY[1]
+    base_spec = next(spec for spec in PAYROLL_SUPPLEMENTAL_EVENT_REGISTRY if spec.event_key == "expense_claim_payment")
     event = _validate_event_spec(base_spec)
     active_expense_accounts = list(
         ChartOfAccount.objects.filter(account_type=ChartOfAccountType.EXPENSE, is_active=True)
