@@ -12,6 +12,7 @@ class SubscriptionsConfig(AppConfig):
         import subscriptions.models_contract_amendment  # noqa
         import subscriptions.models_business_compliance_review  # noqa
         import subscriptions.models_policy_governance  # noqa
+        import subscriptions.models_rent_lease_collection  # noqa
 
     def ready(self):
         import subscriptions.signals  # noqa
