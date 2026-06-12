@@ -45,7 +45,7 @@ export default function GeneratedMarketingVisual({
           alt={resolvedAlt}
           fill
           priority={priority}
-          loading={priority ? "eager" : "lazy"}
+          loading={priority ? undefined : "lazy"}
           quality={quality}
           sizes={sizes}
           className="object-cover object-center will-change-auto"
