@@ -33,7 +33,7 @@ export default function HomeFeaturedProductsShowcase({
   const withImages = featured.filter((product) => Boolean(product.image));
 
   const renderCard = (product: PublicProduct) => (
-    <article className="overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_24px_60px_-46px_rgba(15,23,42,0.72)]">
+    <article className="overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_24px_60px_-46px_rgba(15,23,42,0.72)] contain-paint">
       <div className="relative p-3">
         <AspectRatio ratio={4 / 3} className="w-full">
           <PublicProductMedia
@@ -41,6 +41,7 @@ export default function HomeFeaturedProductsShowcase({
             alt={product.name}
             badge={product.category || null}
             sizes="(max-width: 768px) 100vw, 33vw"
+            quality={70}
             className="absolute inset-0 size-full rounded-[1.7rem]"
             fallbackLabel="Media pending"
           />
