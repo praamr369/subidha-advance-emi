@@ -11,13 +11,14 @@ from decimal import Decimal
 from typing import Any
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from subscriptions.models import (
     AuditLog,
     ContractReferenceType,
     MONEY_ZERO,
+    PaymentMethod,
     PlanType,
     RentLeaseBillingDemand,
     RentLeaseDemandStatus,
@@ -27,6 +28,7 @@ from subscriptions.models import (
     Subscription,
     q2,
 )
+from subscriptions.models_rent_lease_collection import RentLeaseCollection, RentLeaseCollectionStatus
 from subscriptions.services import contract_reference_service as base_contract_reference_service
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.rent_lease_billing_service import (
@@ -57,6 +59,18 @@ def _json_date(value) -> str | None:
     return value.isoformat() if hasattr(value, "isoformat") else None
 
 
+def _normal_reference(value: str | None) -> str:
+    return (value or "").strip().upper()
+
+
+def _normal_method(value: str | None) -> str:
+    return (value or PaymentMethod.CASH).strip().upper()
+
+
+def _payment_date(value):
+    return value or timezone.localdate()
+
+
 def _collection_metadata(
     *,
     reference_no: str = "",
@@ -72,7 +86,7 @@ def _collection_metadata(
     metadata: dict[str, Any] = {
         "reference_no": (reference_no or "").strip(),
         "finance_account_id": finance_account_id,
-        "payment_method": (payment_method or "").strip().upper(),
+        "payment_method": _normal_method(payment_method),
         "payment_date": _json_date(payment_date),
         "branch_id": branch_id,
         "cash_counter_id": cash_counter_id,
@@ -113,6 +127,79 @@ def _outstanding_demands(subscription: Subscription):
         .exclude(status__in=[RentLeaseDemandStatus.CANCELLED, RentLeaseDemandStatus.WAIVED])
         .order_by("due_date", "id")
     )
+
+
+def _find_existing_monthly_collection(
+    *,
+    subscription: Subscription,
+    amount_q: Decimal,
+    payment_method: str,
+    finance_account_id,
+    payment_date=None,
+    reference_no: str = "",
+    idempotency_key: str = "",
+    demand_id=None,
+) -> RentLeaseCollection | None:
+    normalized_reference = _normal_reference(reference_no)
+    normalized_idempotency = (idempotency_key or "").strip()
+    if not normalized_reference and not normalized_idempotency:
+        return None
+
+    qs = RentLeaseCollection.objects.select_related("demand", "subscription").filter(status=RentLeaseCollectionStatus.ACTIVE)
+    existing = None
+    if normalized_idempotency:
+        existing = qs.filter(idempotency_key=normalized_idempotency).first()
+    if existing is None and normalized_reference:
+        existing = qs.filter(external_reference_no=normalized_reference).first()
+    if existing is None:
+        return None
+
+    errors = {}
+    if existing.subscription_id != subscription.id:
+        errors["subscription"] = "Existing rent/lease collection evidence belongs to another subscription."
+    if existing.plan_type != subscription.plan_type:
+        errors["plan_type"] = "Existing rent/lease collection evidence has a different plan type."
+    if _money(existing.amount) != amount_q:
+        errors["amount"] = "Existing rent/lease collection evidence has a different amount."
+    if existing.payment_method != payment_method:
+        errors["payment_method"] = "Existing rent/lease collection evidence has a different payment method."
+    if finance_account_id and existing.finance_account_id != int(finance_account_id):
+        errors["finance_account"] = "Existing rent/lease collection evidence has a different finance account."
+    if payment_date and existing.payment_date != payment_date:
+        errors["payment_date"] = "Existing rent/lease collection evidence has a different payment date."
+    if demand_id is not None and existing.demand_id != int(demand_id):
+        errors["demand"] = "Existing rent/lease collection evidence belongs to another demand."
+    if errors:
+        raise ValidationError(errors)
+    return existing
+
+
+def _latest_monthly_collection(subscription: Subscription) -> RentLeaseCollection | None:
+    return (
+        RentLeaseCollection.objects.filter(subscription=subscription)
+        .order_by("-payment_date", "-created_at", "-id")
+        .first()
+    )
+
+
+def _source_payload(collection: RentLeaseCollection | None) -> dict[str, object]:
+    if collection is None:
+        return {
+            "latest_collection_id": None,
+            "latest_collection_number": "",
+            "latest_collection_amount": "0.00",
+            "latest_collection_date": None,
+            "latest_collection_method": "",
+            "latest_collection_finance_account_id": None,
+        }
+    return {
+        "latest_collection_id": collection.id,
+        "latest_collection_number": collection.collection_number,
+        "latest_collection_amount": _money_string(collection.amount),
+        "latest_collection_date": collection.payment_date,
+        "latest_collection_method": collection.payment_method,
+        "latest_collection_finance_account_id": collection.finance_account_id,
+    }
 
 
 @transaction.atomic
@@ -212,13 +299,34 @@ def collect_rent_lease_monthly_demand(
     branch_id=None,
     cash_counter_id=None,
     note: str = "",
+    idempotency_key: str = "",
 ) -> RentLeaseBillingDemand:
     if subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
         raise ValidationError("Rent/lease monthly demand collection is available only for RENT/LEASE subscriptions.")
+    if not finance_account_id:
+        raise ValidationError({"finance_account": "Finance account is required for rent/lease collection evidence."})
 
     amount_q = _money(amount)
     if amount_q <= MONEY_ZERO:
         raise ValidationError({"amount": "Collected amount must be greater than zero."})
+
+    normalized_payment_method = _normal_method(payment_method)
+    resolved_payment_date = _payment_date(payment_date)
+    existing = _find_existing_monthly_collection(
+        subscription=subscription,
+        amount_q=amount_q,
+        payment_method=normalized_payment_method,
+        finance_account_id=finance_account_id,
+        payment_date=resolved_payment_date,
+        reference_no=reference_no,
+        idempotency_key=idempotency_key,
+        demand_id=demand_id,
+    )
+    if existing is not None:
+        demand = existing.demand
+        setattr(demand, "_rent_lease_collection", existing)
+        setattr(demand, "_rent_lease_collection_created", False)
+        return demand
 
     demand_types = _monthly_demand_types(subscription)
     qs = (
@@ -250,21 +358,62 @@ def collect_rent_lease_monthly_demand(
     metadata = _collection_metadata(
         reference_no=reference_no,
         finance_account_id=finance_account_id,
-        payment_method=payment_method,
-        payment_date=payment_date,
+        payment_method=normalized_payment_method,
+        payment_date=resolved_payment_date,
         branch_id=branch_id,
         cash_counter_id=cash_counter_id,
         note=note,
         demand=demand,
         amount=amount_q,
     )
+    contract_reference = base_contract_reference_service.ensure_contract_reference_for_subscription(subscription)
+    try:
+        collection = RentLeaseCollection.objects.create(
+            demand=demand,
+            subscription=subscription,
+            contract_reference=contract_reference,
+            customer=subscription.customer,
+            plan_type=subscription.plan_type,
+            amount=amount_q,
+            payment_date=resolved_payment_date,
+            payment_method=normalized_payment_method,
+            finance_account_id=finance_account_id,
+            external_reference_no=_normal_reference(reference_no),
+            idempotency_key=(idempotency_key or "").strip(),
+            note=note or "",
+            metadata=metadata,
+            created_by=performed_by,
+        )
+        created = True
+    except IntegrityError:
+        collection = _find_existing_monthly_collection(
+            subscription=subscription,
+            amount_q=amount_q,
+            payment_method=normalized_payment_method,
+            finance_account_id=finance_account_id,
+            payment_date=resolved_payment_date,
+            reference_no=reference_no,
+            idempotency_key=idempotency_key,
+            demand_id=demand.id,
+        )
+        if collection is None:
+            raise
+        created = False
+
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=subscription,
         performed_by=performed_by,
-        metadata={"event": "RENT_LEASE_MONTHLY_DEMAND_COLLECTED", **metadata},
+        metadata={
+            "event": "RENT_LEASE_MONTHLY_DEMAND_COLLECTED",
+            "rent_lease_collection_id": collection.id,
+            "rent_lease_collection_number": collection.collection_number,
+            **metadata,
+        },
     )
     sync_rent_lease_monthly_income(subscription=subscription, amount=amount_q, performed_by=performed_by)
+    setattr(demand, "_rent_lease_collection", collection)
+    setattr(demand, "_rent_lease_collection_created", created)
     return demand
 
 
@@ -296,6 +445,7 @@ def rent_lease_receivable_position(subscription: Subscription) -> dict[str, obje
     else:
         payment_state = "UNPAID"
 
+    latest_collection = _latest_monthly_collection(subscription)
     return {
         "due_amount": _money(next_amount),
         "overdue_amount": _money(overdue_amount),
@@ -311,6 +461,7 @@ def rent_lease_receivable_position(subscription: Subscription) -> dict[str, obje
         "disabled_reason": None if next_demand else "No collectible rent/lease demand is currently pending.",
         "is_collectible": bool(next_demand),
         "is_overdue": bool(overdue_amount > MONEY_ZERO),
+        **_source_payload(latest_collection),
     }
 
 
@@ -357,6 +508,12 @@ def _rent_lease_result(reference, *, audience: str = "admin") -> dict[str, objec
         "action_url": collection_route,
         "demand_id": position.get("demand_id"),
         "demand_type": position.get("demand_type"),
+        "latest_collection_id": position.get("latest_collection_id"),
+        "latest_collection_number": position.get("latest_collection_number"),
+        "latest_collection_amount": position.get("latest_collection_amount"),
+        "latest_collection_date": position.get("latest_collection_date"),
+        "latest_collection_method": position.get("latest_collection_method"),
+        "latest_collection_finance_account_id": position.get("latest_collection_finance_account_id"),
     }
 
 
