@@ -75,6 +75,14 @@ test("public SEO metadata and global structured data are rendered", async ({ pag
   await expect(structuredData).toContainText("WebSite");
 });
 
+test("public generated visuals expose stable performance markers", async ({ page }) => {
+  await page.goto("/");
+
+  const heroVisual = page.locator('[data-public-image="generated"]').first();
+  await expect(heroVisual).toBeVisible();
+  await expect(heroVisual.locator("img").first()).toHaveAttribute("sizes", /(100vw|46vw|50vw)/);
+});
+
 test("public route smoke set renders without client error shell", async ({ page }) => {
   for (const route of publicRoutes) {
     await page.goto(route);
