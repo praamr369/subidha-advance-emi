@@ -168,15 +168,41 @@ def route_collection(
         }
         if demand_type == RentLeaseDemandType.SECURITY_DEPOSIT:
             demand = collect_security_deposit_with_metadata(**common_kwargs)
-        else:
-            demand = collect_rent_lease_monthly_demand(demand_id=demand_id, **common_kwargs)
-        return {
+            return {
+                "source_type": source_type,
+                "created": True,
+                "subscription_id": subscription.id,
+                "demand_id": demand.id,
+                "demand_type": demand.demand_type,
+                "message": "Security deposit collection recorded against the separate deposit source workflow.",
+            }
+        demand = collect_rent_lease_monthly_demand(
+            demand_id=demand_id,
+            idempotency_key=idempotency_key or "",
+            **common_kwargs,
+        )
+        collection = getattr(demand, "_rent_lease_collection", None)
+        created = bool(getattr(demand, "_rent_lease_collection_created", True))
+        payload = {
             "source_type": source_type,
-            "created": True,
+            "created": created,
             "subscription_id": subscription.id,
             "demand_id": demand.id,
             "demand_type": demand.demand_type,
-            "message": "Rent/lease collection recorded against the authoritative demand source.",
+            "collection_source_model": "subscriptions.RentLeaseCollection",
+            "message": "Rent/lease monthly collection evidence recorded. Accounting posting remains deferred.",
         }
+        if collection is not None:
+            payload.update(
+                {
+                    "rent_lease_collection_id": collection.id,
+                    "rent_lease_collection_number": collection.collection_number,
+                    "collection_reference": collection.collection_number,
+                    "collection_status": collection.status,
+                    "payment_method": collection.payment_method,
+                    "finance_account_id": collection.finance_account_id,
+                }
+            )
+        return payload
 
     raise ValidationError({"source_type": f"Unsupported source type: {source_type}."})
