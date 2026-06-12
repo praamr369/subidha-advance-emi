@@ -8,6 +8,7 @@ const fallbackBaseUrl = "https://subidha.example.com";
 const defaultSiteName = "Subidha Furniture";
 const defaultDescription =
   "Subidha Furniture public site for Lucky Plan EMI, rent, lease, direct sale, product enquiry, policy reading, and winner transparency.";
+const productsSearchPath = "/products?search={search_term_string}";
 
 export function getPublicSiteUrl(): string {
   const raw = (process.env.NEXT_PUBLIC_SITE_URL || fallbackBaseUrl).trim();
@@ -15,7 +16,9 @@ export function getPublicSiteUrl(): string {
 }
 
 export function absolutePublicUrl(path = "/"): string {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const trimmed = path.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   return `${getPublicSiteUrl()}${normalizedPath}`;
 }
 
@@ -129,13 +132,11 @@ export function buildWebsiteJsonLd() {
     inLanguage: ["en-IN", "bn-IN", "hi-IN"],
     potentialAction: {
       "@type": "SearchAction",
-      target: `${url}${ROUTES_PLACEHOLDER_PRODUCTS_SEARCH}`,
+      target: `${url}${productsSearchPath}`,
       "query-input": "required name=search_term_string",
     },
   };
 }
-
-const ROUTES_PLACEHOLDER_PRODUCTS_SEARCH = "/products?search={search_term_string}";
 
 export function buildBreadcrumbJsonLd(items: Array<{ name: string; path: string }>) {
   return {
