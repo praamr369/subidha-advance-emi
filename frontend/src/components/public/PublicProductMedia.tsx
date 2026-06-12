@@ -14,6 +14,7 @@ type PublicProductMediaProps = {
   imageClassName?: string;
   sizes: string;
   priority?: boolean;
+  quality?: number;
   fallbackLabel?: string;
   badge?: string | null;
 };
@@ -25,6 +26,7 @@ export default function PublicProductMedia({
   imageClassName,
   sizes,
   priority = false,
+  quality = 74,
   fallbackLabel = "Media pending",
   badge,
 }: PublicProductMediaProps) {
@@ -36,9 +38,10 @@ export default function PublicProductMedia({
   return (
     <div
       className={cn(
-        "relative isolate overflow-hidden rounded-[1.7rem] border border-white/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(226,232,240,0.88))] shadow-[0_30px_72px_-54px_rgba(15,23,42,0.84)]",
+        "relative isolate overflow-hidden rounded-[1.7rem] border border-white/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(226,232,240,0.88))] shadow-[0_30px_72px_-54px_rgba(15,23,42,0.84)] contain-paint",
         className
       )}
+      data-public-image={shouldRenderImage ? "product" : "fallback"}
     >
       <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
       <div className="pointer-events-none absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-amber-200/30 blur-3xl" />
@@ -49,9 +52,11 @@ export default function PublicProductMedia({
           src={resolvedSrc as string}
           alt={alt}
           fill
-          className={cn("object-cover", imageClassName)}
+          className={cn("object-cover will-change-auto", imageClassName)}
           sizes={sizes}
           priority={priority}
+          loading={priority ? "eager" : "lazy"}
+          quality={quality}
           unoptimized={shouldBypassOptimization}
           onError={() => setFailedSrc(resolvedSrc)}
         />
