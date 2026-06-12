@@ -75,6 +75,7 @@ export type AccountingBridgeReconciliationRow = {
   subscription_id?: number | string | null;
   contract_reference?: string | null;
   payment_method?: string | null;
+  payment_date?: string | null;
   finance_account_name?: string | null;
   finance_account_active?: boolean | null;
   finance_account?: BridgeFinanceAccount | null;
@@ -137,11 +138,11 @@ export type AccountingBridgeReconciliationRow = {
   operator_action: string;
   unsafe_abstract_posting_blocked?: boolean;
   action_links?: BridgeActionLink[];
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 export type BridgeCandidate = AccountingBridgeReconciliationRow & { row_type: "bridge_candidate"; bridge_candidate_id: string; idempotency_key: string };
-export type BridgePostingPreview = { candidate: AccountingBridgeReconciliationRow; candidate_id: string; source: Record<string, any> & { model: BridgeSourceModel; pk: number | string; display: string; reference_number?: string | null; date: string | null; amount: string }; collection_identity?: Record<string, any>; journal_date: string | null; accounting_period?: AccountingBridgeReconciliationRow["accounting_period"]; journal_number_preview?: string | null; debit_lines: BridgePostingLine[]; credit_lines: BridgePostingLine[]; lines: BridgePostingLine[]; total_debit: string; total_credit: string; is_balanced: boolean; tax_lines?: BridgePostingLine[]; finance_account_line?: BridgeFinanceAccount | null; warnings: string[]; blockers: string[]; can_post: boolean; idempotency_key: string; safety_text: string };
+export type BridgePostingPreview = { candidate: AccountingBridgeReconciliationRow; candidate_id: string; source: Record<string, unknown> & { model: BridgeSourceModel; pk: number | string; display: string; reference_number?: string | null; date: string | null; amount: string }; collection_identity?: Record<string, unknown>; journal_date: string | null; accounting_period?: AccountingBridgeReconciliationRow["accounting_period"]; journal_number_preview?: string | null; debit_lines: BridgePostingLine[]; credit_lines: BridgePostingLine[]; lines: BridgePostingLine[]; total_debit: string; total_credit: string; is_balanced: boolean; tax_lines?: BridgePostingLine[]; finance_account_line?: BridgeFinanceAccount | null; warnings: string[]; blockers: string[]; can_post: boolean; idempotency_key: string; safety_text: string };
 export type BridgePostResult = { posted: boolean; already_posted: boolean; journal_entry?: AccountingBridgeReconciliationJournal | null; reconciliation_item?: { id: number; status: string; exception_code?: string } | null; next_action?: string };
 export type BridgeBatchPreviewResult = { selected_count: number; previewable_count?: number; postable_count: number; blocked_count: number; total_debit: string; total_credit: string; previews: BridgePostingPreview[]; blockers: Record<string, string[]> };
 export type BridgeBatchPostResult = { selected_count?: number; posted_count: number; already_posted_count?: number; skipped_already_posted_count: number; blocked_count: number; created_journal_ids: number[]; reconciliation_pending_count: number; posted: BridgePostResult[]; already_posted: BridgePostResult[]; errors: Record<string, string[]> };

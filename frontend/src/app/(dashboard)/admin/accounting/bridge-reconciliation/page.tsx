@@ -44,7 +44,6 @@ const SOURCE_MODEL_OPTIONS = [
 const CONCRETE_POST_MODELS = new Set(SOURCE_MODEL_OPTIONS.map((item) => item.value).filter(Boolean));
 const MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit";
 const RECONCILIATION_RUNS_HREF = "/admin/reconciliation/runs";
-const DOCUMENT_NUMBERING_HREF = ROUTES.admin.settingsBusinessSetupDocumentNumbering;
 const SAFETY_COPY = "Posting creates accounting entries only after explicit admin confirmation. It does not edit source business records, collection, demand, contract, customer, deposit, finance account, inventory, payroll, commission, payout, or StaffAdvance records.";
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -148,7 +147,8 @@ export default function AccountingBridgeReconciliationPage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async (nextFilters: AccountingBridgeReconciliationFilters = {}, opts: { silent?: boolean } = {}) => {
-    opts.silent ? setRefreshing(true) : setLoading(true);
+    if (opts.silent) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       setPayload(await getAccountingBridgeReconciliation(nextFilters));
@@ -167,7 +167,7 @@ export default function AccountingBridgeReconciliationPage() {
     void load(initial);
   }, [load]);
 
-  const rows = payload?.results ?? [];
+  const rows = useMemo(() => payload?.results ?? [], [payload?.results]);
   const summary = payload?.summary;
   const selectedRows = useMemo(() => rows.filter((row) => row.bridge_candidate_id && selectedIds.includes(row.bridge_candidate_id)), [rows, selectedIds]);
   const selectedAllPostable = selectedRows.length > 0 && selectedRows.every(rowCanPost);

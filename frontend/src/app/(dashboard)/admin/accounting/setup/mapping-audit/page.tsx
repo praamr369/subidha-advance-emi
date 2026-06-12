@@ -35,6 +35,8 @@ const GROUP_ORDER = [
   "Inventory mappings",
   "Manufacturing mappings",
   "Payments/refunds mappings",
+  "Rent/Lease collection settlement mappings",
+  "Rent/Lease revenue mappings",
   "Rent/lease monthly mappings",
   "Subscription/EMI mappings",
   "Unsupported/fallback mappings",
@@ -95,8 +97,19 @@ function isPayrollRow(row: AccountingMappingAuditRow): boolean {
   return text.includes("salarysheet") || text.includes("salarypayment") || text.includes("salary_sheet") || text.includes("salary_payment") || text.includes("salary payment") || text.includes("salary accrual") || text.includes("salary_accrual") || text.includes("payroll_accrual") || text.includes("payroll_payment") || text.includes("staff_salary_accrual") || text.includes("wages_accrual") || text.includes("wages_payment") || text.includes("salary_expense") || text.includes("wages_expense") || text.includes("salary_payable");
 }
 
+function isRentLeaseCollectionRow(row: AccountingMappingAuditRow): boolean {
+  const text = rowSearchText(row);
+  return text.includes("rentleasecollection") || text.includes("rent_lease_collection") || text.includes("rent lease collection") || text.includes("rent_lease_payment_settlement") || text.includes("lease_payment_settlement");
+}
+
+function rowHasMappingBlocker(row: AccountingMappingAuditRow): boolean {
+  const status = normalizedStatus(row);
+  return row.blocker_category === "mapping" || row.blocker_code === "BLOCKED_BY_MAPPING" || status === "BLOCKED_BY_MAPPING" || row.debit_mapping_status !== "READY" || row.credit_mapping_status !== "READY";
+}
+
 function groupName(row: AccountingMappingAuditRow): string {
   const text = rowSearchText(row);
+  if (isRentLeaseCollectionRow(row)) return "Rent/Lease collection settlement mappings";
   if (text.includes("rent_monthly_revenue") || text.includes("lease_monthly_revenue") || text.includes("rentleasebillingdemand")) return "Rent/Lease revenue mappings";
   if (text.includes("collection") || text.includes("cashier")) return "Collection posting mappings";
   if (isCommissionRow(row)) return "Commission mappings";
@@ -155,6 +168,11 @@ function rowStats(rows: AccountingMappingAuditRow[]) {
 
 function missingLabel(row: AccountingMappingAuditRow): string {
   const status = normalizedStatus(row);
+  if (isRentLeaseCollectionRow(row) && READY_MAPPING_STATUSES.includes(status)) return "Rent/lease collection settlement setup is ready. READY_UNPOSTED means bridge posting is pending, not a mapping failure.";
+  if (isRentLeaseCollectionRow(row) && row.finance_account_status !== "READY") return "Missing or inactive RentLeaseCollection finance account mapping is a finance-account blocker. Open Finance Accounts before posting.";
+  if (isRentLeaseCollectionRow(row) && row.numbering_readiness !== "READY") return "JOURNAL_ENTRY numbering is required before rent/lease collection settlement posting.";
+  if (isRentLeaseCollectionRow(row) && row.period_readiness !== "READY") return `Accounting period blocker: ${row.period_blocker_reason || row.period_readiness}.`;
+  if (isRentLeaseCollectionRow(row) && rowHasMappingBlocker(row)) return "Customer Receivable / Rent-Lease Receivable mapping is required before RentLeaseCollection settlement posting.";
   if (READY_MAPPING_STATUSES.includes(status)) return status === "READY_UNPOSTED" ? "Setup is ready. Journal posting is still pending in bridge reconciliation." : "No missing setup reported";
   if (isPayrollRow(row) && status === "READY_UNPOSTED") return "Payroll accrual setup is ready. Bridge posting is pending, not a mapping failure.";
   if (isPayrollRow(row) && row.numbering_readiness !== "READY") return "JOURNAL_ENTRY numbering is required before salary accrual posting.";
@@ -176,14 +194,20 @@ function missingLabel(row: AccountingMappingAuditRow): string {
 }
 
 function routeForRow(row: AccountingMappingAuditRow): string {
+  const status = normalizedStatus(row);
+  if (isRentLeaseCollectionRow(row) && READY_MAPPING_STATUSES.includes(status)) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=RentLeaseCollection`;
+  if (isRentLeaseCollectionRow(row) && row.finance_account_status !== "READY") return ROUTES.admin.accountingFinanceAccounts;
+  if (isRentLeaseCollectionRow(row) && row.period_readiness !== "READY") return ROUTES.admin.accountingPeriods;
+  if (isRentLeaseCollectionRow(row) && row.numbering_readiness !== "READY") return ROUTES.admin.settingsBusinessSetupDocumentNumbering;
+  if (isRentLeaseCollectionRow(row) && rowHasMappingBlocker(row)) return row.debit_account_code || row.credit_account_code ? ROUTES.admin.accountingSetup : ROUTES.admin.accountingChartOfAccounts;
   if (rowSearchText(row).includes("rentleasebillingdemand") || rowSearchText(row).includes("rent_monthly_revenue") || rowSearchText(row).includes("lease_monthly_revenue")) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=RentLeaseBillingDemand`;
   if (isPayrollRow(row) && rowSearchText(row).includes("salarypayment")) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=SalaryPayment`;
   if (isPayrollRow(row) && rowSearchText(row).includes("salary_payment")) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=SalaryPayment`;
-  if (isPayrollRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=SalarySheet`;
-  if (isCommissionRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=Commission`;
-  if (isStockLedgerRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=StockLedger`;
-  if (isVendorPaymentRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=VendorPayment`;
-  if (isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=PurchaseBill`;
+  if (isPayrollRow(row) && READY_MAPPING_STATUSES.includes(status)) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=SalarySheet`;
+  if (isCommissionRow(row) && READY_MAPPING_STATUSES.includes(status)) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=Commission`;
+  if (isStockLedgerRow(row) && READY_MAPPING_STATUSES.includes(status)) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=StockLedger`;
+  if (isVendorPaymentRow(row) && READY_MAPPING_STATUSES.includes(status)) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=VendorPayment`;
+  if (isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(status)) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=PurchaseBill`;
   if (row.setup_href) return row.setup_href;
   if (row.finance_account_status !== "READY") return ROUTES.admin.accountingFinanceAccounts;
   if (row.period_readiness !== "READY") return ROUTES.admin.accountingPeriods;
@@ -292,7 +316,7 @@ export default function AccountingMappingAuditPage() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping audit remediation</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Bridge impact: {payload?.bridge_impact ?? "Not loaded"}</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. READY_UNPOSTED means mapping setup is ready and posting is pending in bridge reconciliation, not a mapping failure. Payroll rows require Salary/Wages Expense and Salary Payable mappings plus JOURNAL_ENTRY numbering; payroll, staff, attendance, StaffAdvance, and payment records are not edited by accrual bridge posting.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. READY_UNPOSTED means mapping setup is ready and posting is pending in bridge reconciliation, not a mapping failure. RentLeaseCollection settlement rows are separate from RentLeaseBillingDemand revenue, ReceiptDocument, customer advance, security deposit, and direct sale receipt rows. Payroll rows require Salary/Wages Expense and Salary Payable mappings plus JOURNAL_ENTRY numbering; payroll, staff, attendance, StaffAdvance, and payment records are not edited by accrual bridge posting.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <ActionButton variant="primary" onClick={() => void seedDefaults()} disabled={Boolean(busy)}>{busy === "seed" ? "Seeding..." : "Seed Safe Defaults"}</ActionButton>
@@ -342,7 +366,7 @@ export default function AccountingMappingAuditPage() {
                         <div><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold text-foreground">{row.event_label}</h3><MappingStatus value={row.status} /></div><div className="mt-1 text-xs text-muted-foreground">{row.module} · {row.source_model} · <span className="font-mono">{row.event_key}</span></div></div>
                         <div className="flex flex-wrap gap-2">
                           {canFix ? <button type="button" disabled={busy === row.event_key} onClick={() => void fixEvent(row)} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{busy === row.event_key ? "Fixing..." : "Fix setup event"}</button> : null}
-                          <Link href={routeForRow(row)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold">{isPayrollRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open Payroll bridge rows" : isCommissionRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open Commission bridge rows" : isVendorPaymentRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open VendorPayment bridge rows" : isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open PurchaseBill bridge rows" : "Open suggested route"}</Link>
+                          <Link href={routeForRow(row)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold">{isRentLeaseCollectionRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open collection settlement rows" : isPayrollRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open Payroll bridge rows" : isCommissionRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open Commission bridge rows" : isVendorPaymentRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open VendorPayment bridge rows" : isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open PurchaseBill bridge rows" : "Open suggested route"}</Link>
                         </div>
                       </div>
                       <div className="mt-3 grid gap-3 md:grid-cols-5">

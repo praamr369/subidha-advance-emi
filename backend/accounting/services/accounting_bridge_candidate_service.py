@@ -130,7 +130,7 @@ def _money(value: Any) -> Decimal:
 
 def _as_date(value: Any) -> date | None:
     if isinstance(value, datetime):
-        return value.date()
+        return timezone.localdate(value) if timezone.is_aware(value) else value.date()
     if isinstance(value, date):
         return value
     return None

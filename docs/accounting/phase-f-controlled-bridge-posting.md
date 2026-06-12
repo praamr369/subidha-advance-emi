@@ -662,3 +662,18 @@ F15 safety boundary:
 - no auto-post, auto-reconcile, or auto-close
 
 F16 security deposit posting should not start until a concrete deposit receipt/refund source contract is defined separately from `RentLeaseDepositTransaction` history, or the existing transaction model is explicitly hardened as the authoritative deposit settlement source.
+
+## Phase F15B/F15C — Rent/lease collection settlement closeout
+
+F15B created `subscriptions.RentLeaseCollection` as concrete, immutable monthly rent/lease collection evidence. F15C uses that concrete source for settlement posting only:
+
+```text
+Dr RentLeaseCollection.finance_account.chart_account
+Cr Customer Receivable / Rent-Lease Receivable
+```
+
+F15C does not infer collection settlement from `RentLeaseBillingDemand.collected_amount` or `RentLeaseBillingDemand.status`. F14 rent/lease demand revenue and F15C collection settlement are separate bridge workflows.
+
+F15C preview is read-only. Posting is explicit, admin-only, idempotent, period-gated, numbering-gated, and reconciliation-pending. Posting creates accounting bridge evidence only and does not mutate `RentLeaseCollection`, `RentLeaseBillingDemand`, subscription, contract, customer, deposit, or finance-account records.
+
+Security deposit receipt/refund and customer advance posting remain separate future phases. F15C must not post deposits, refunds, advances, auto-post, auto-reconcile, or auto-close periods.

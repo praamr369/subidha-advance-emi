@@ -172,6 +172,10 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
 
 def _code(source_model: str, generic: str) -> str:
     if source_model != "RentLeaseCollection":
+        if generic == "SOURCE_LINK_MISSING":
+            return "BRIDGE_JOURNAL_MISSING_SOURCE_REFERENCE"
+        if generic == "DUPLICATE_POSTING":
+            return "DUPLICATE_JOURNAL_SOURCE_REFERENCE"
         return generic
     return F15C_CODES.get(generic, generic)
 
@@ -365,13 +369,13 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         totals["exceptions"] += 1
         totals["high_risk"] += 1
 
-    journal_dupes = JournalEntry.objects.filter(source_model__in=BRIDGE_SOURCE_MODELS, status="POSTED").exclude(source_id__isnull=True).values("source_model", "source_id", "voucher_type").annotate(journal_count=Count("id")).filter(journal_count__gt=1)
+    journal_dupes = JournalEntry.objects.filter(source_model__in=BRIDGE_SOURCE_MODELS, status="POSTED").exclude(source_id__isnull=True).values("source_model", "source_id").annotate(journal_count=Count("id")).filter(journal_count__gt=1)
     totals["checked"] += journal_dupes.count()
     for row in journal_dupes:
         source_model = row["source_model"]
         source_id = str(row["source_id"])
-        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=_source_label(source_model=source_model, source_id=source_id), severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.DUPLICATE_POSTING, exception_code=_code(source_model, "DUPLICATE_POSTING"), exception_message=f"Multiple journal entries reference the same {source_model} source_model/source_id/voucher_type.", recommended_action="Investigate potential duplicate posting; confirm one is reversal/void and audit trail is intact.", metadata={"journal_count": row["journal_count"], "voucher_type": row["voucher_type"]})
-        for journal in JournalEntry.objects.filter(source_model=source_model, source_id=source_id, voucher_type=row["voucher_type"], status="POSTED").only("id", "entry_no", "status", "entry_date")[:10]:
+        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=_source_label(source_model=source_model, source_id=source_id), severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.DUPLICATE_POSTING, exception_code=_code(source_model, "DUPLICATE_POSTING"), exception_message=f"Multiple journal entries reference the same {source_model} source_model/source_id.", recommended_action="Investigate potential duplicate posting; confirm one is reversal/void and audit trail is intact.", metadata={"journal_count": row["journal_count"]})
+        for journal in JournalEntry.objects.filter(source_model=source_model, source_id=source_id, status="POSTED").only("id", "entry_no", "status", "entry_date")[:10]:
             ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, status=journal.status, metadata={"entry_date": str(journal.entry_date)})
         totals["exceptions"] += 1
     return totals

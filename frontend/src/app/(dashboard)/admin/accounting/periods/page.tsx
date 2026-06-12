@@ -38,6 +38,10 @@ function summaryCount(summary: AccountingBridgeReconciliationSummary | null, key
   return typeof value === "number" ? value : fallback;
 }
 
+function summaryHasKey(summary: AccountingBridgeReconciliationSummary | null, key: keyof AccountingBridgeReconciliationSummary) {
+  return Boolean(summary && Object.prototype.hasOwnProperty.call(summary, key));
+}
+
 function statusForPeriod(period: AccountingPeriod): AccountingPeriodStatus {
   return period.status || (period.is_locked ? "LOCKED" : "OPEN");
 }
@@ -114,22 +118,23 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
         { label: "Unsupported", value: summaryCount(summary, "rent_lease_revenue_unsupported_count"), detail: "Ambiguous or non-monthly rent/lease demands are visible but not postable.", href: bridgeReviewHref({ source_model: "RentLeaseBillingDemand", status: "UNSUPPORTED" }) },
       ],
     },
-    {
-      title: "Rent/Lease payment settlement",
-      action: "Open bridge cockpit",
-      href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement" }),
+    ...(summaryHasKey(summary, "rent_lease_collection_ready_unposted_count") ? [{
+      title: "Rent/Lease Collection Settlement",
+      action: "Review settlement items",
+      href: bridgeReviewHref({ source_model: "RentLeaseCollection" }),
       rows: [
-        { label: "Ready unposted", value: summaryCount(summary, "rent_lease_payment_ready_unposted_count"), detail: "No concrete rent/lease payment source model is currently available, so settlement posting remains disabled.", href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement", status: "READY_UNPOSTED" }) },
-        { label: "Posted unverified", value: summaryCount(summary, "rent_lease_payment_posted_unverified_count"), detail: "Settlement rows cannot be posted until a concrete source record exists.", href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement", status: "POSTED_UNVERIFIED" }) },
-        { label: "Reconciled", value: summaryCount(summary, "rent_lease_payment_reconciled_count"), detail: "Settlement reconciliation remains unavailable without a concrete source record.", href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement", status: "RECONCILED" }) },
-        { label: "Blocked", value: summaryCount(summary, "rent_lease_payment_blocked_count"), detail: "F15 is blocked by missing concrete rent/lease payment source evidence.", href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement", status: "BLOCKED" }) },
-        { label: "Unsupported", value: summaryCount(summary, "rent_lease_payment_unsupported_count"), detail: "Demand collected_amount and audit metadata are not used as settlement posting sources.", href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement", status: "UNSUPPORTED" }) },
+        { label: "Ready unposted", value: summaryCount(summary, "rent_lease_collection_ready_unposted_count"), detail: "Concrete RentLeaseCollection evidence is ready; bridge posting is still pending.", href: bridgeReviewHref({ source_model: "RentLeaseCollection", status: "READY_UNPOSTED" }) },
+        { label: "Posted unverified", value: summaryCount(summary, "rent_lease_collection_posted_unverified_count"), detail: "Settlement journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "RentLeaseCollection", status: "POSTED_UNVERIFIED" }) },
+        { label: "Reconciled", value: summaryCount(summary, "rent_lease_collection_reconciled_count"), detail: "Settlement bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "RentLeaseCollection", status: "RECONCILED" }) },
+        { label: "Blocked", value: summaryCount(summary, "rent_lease_collection_blocked_count"), detail: "Finance-account, receivable mapping, period, or numbering blocker remains unresolved.", href: bridgeReviewHref({ source_model: "RentLeaseCollection", status: "BLOCKED" }) },
+        { label: "Unsupported", value: summaryCount(summary, "rent_lease_collection_unsupported_count"), detail: "Voided, reversed, ambiguous, or non-settlement collection rows stay non-postable.", href: bridgeReviewHref({ source_model: "RentLeaseCollection", status: "UNSUPPORTED" }) },
       ],
       extraActions: [
+        { label: "Run reconciliation checks", href: RECONCILIATION_RUNS_HREF },
         { label: "Open Finance Accounts", href: ROUTES.admin.settingsBusinessSetupFinanceAccounts },
         { label: "Open Mapping Audit", href: MAPPING_AUDIT_HREF },
       ],
-    },
+    }] : []),
     {
       title: "Credit / Return bridge",
       action: "Review credit/return bridge items",
@@ -259,7 +264,7 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
 
   return (
     <WorkspaceSection title="Bridge close readiness by source" description="Open periods are valid for posting. Period close still waits for posting and reconciliation to finish.">
-      <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">Ready unposted means setup is ready, but journal posting is still pending. Posted unverified means journal exists, but reconciliation verification is pending. Purchase bill, inventory, commission, payout, payroll, staff, attendance, StaffAdvance, and payment records are not edited by bridge posting.</div>
+      <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">Ready unposted means setup is ready, but journal posting is still pending. Posted unverified means journal exists, but reconciliation verification is pending. Rent/Lease Collection Settlement uses concrete RentLeaseCollection evidence. It does not edit collection, demand, contract, customer, deposit, or finance-account records. F14 rent/lease demand revenue and F15C collection settlement remain separate.</div>
       <div className="grid gap-4 xl:grid-cols-4">{sourceSections.map((section) => <BridgeSourceCard key={section.title} section={section} />)}<div className="rounded-xl border border-border bg-background p-4"><div className="font-semibold text-foreground">Other bridge</div><div className="mt-3 grid gap-2">{otherRows.map((row) => <Link key={row.label} href={row.href} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2 text-sm hover:bg-muted/40"><span className="font-medium text-foreground">{row.label}</span><span className={row.value ? "font-semibold text-amber-800" : "font-semibold text-muted-foreground"}>{row.value}</span></Link>)}</div></div></div>
     </WorkspaceSection>
   );

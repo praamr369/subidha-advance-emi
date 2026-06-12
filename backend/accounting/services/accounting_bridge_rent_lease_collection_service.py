@@ -77,6 +77,33 @@ def _lines(row: RentLeaseCollection, event_key: str):
     ], warnings, finance_account
 
 
+def _finance_account_blocker(row: RentLeaseCollection, finance_account) -> str | None:
+    if finance_account is None:
+        return "Finance account is missing for this rent/lease collection."
+    if not finance_account.is_active:
+        return "Finance account is inactive for this rent/lease collection."
+    if not finance_account.chart_account_id or not finance_account.chart_account.is_active:
+        return "Finance account is not mapped to an active chart account for this rent/lease collection."
+    return None
+
+
+def _normalize_postability_for_collection(row: RentLeaseCollection, postability: dict, finance_account) -> dict:
+    reason = _finance_account_blocker(row, finance_account)
+    if reason is None or postability.get("status") in {"POSTED", "RECONCILED", "SKIPPED_NOT_APPLICABLE", "UNSUPPORTED_SOURCE"}:
+        return postability
+    return {
+        **postability,
+        "status": "BLOCKED_BY_FINANCE_ACCOUNT",
+        "canonical_status": "BLOCKED_BY_FINANCE_ACCOUNT",
+        "can_post": False,
+        "can_preview": False,
+        "blocker_code": "FINANCE_ACCOUNT_NOT_READY",
+        "blocker_reason": reason,
+        "recommended_action": "Open Finance Accounts and activate/map the concrete RentLeaseCollection finance account before posting.",
+        "setup_href": "/admin/accounting/finance-accounts",
+    }
+
+
 def _qs():
     return RentLeaseCollection.objects.select_related("demand", "subscription", "customer", "contract_reference", "finance_account", "finance_account__chart_account")
 
@@ -91,6 +118,7 @@ def candidate_for(row: RentLeaseCollection) -> dict:
     lines, warnings, finance_account = _lines(row, event_key) if event_key in EVENT_KEYS else ([], [reason] if reason else [], row.finance_account)
     raw = "SKIPPED_NOT_APPLICABLE" if event_key == SKIPPED_EVENT_KEY else "UNSUPPORTED_SOURCE" if event_key == UNSUPPORTED_EVENT_KEY else "READY" if lines else "NOT_CONFIGURED"
     postability = base._candidate_status_payload(event_key=event_key, event_label=event_label, module="subscriptions", source_model=SOURCE_MODEL, raw_status=raw, lines=lines, line_warnings=warnings, period=period, source_date=row.payment_date, journal=journal, reconciliation_item=item, source_workflow_exists=True, classification_reason=reason, approval_required=approval_required)
+    postability = _normalize_postability_for_collection(row, postability, finance_account)
     reference = _ref(row)
     payload = base._candidate_payload(candidate_id=base._candidate_id(source_model=SOURCE_MODEL, source_pk=row.id, event_key=event_key), event_key=event_key, event_label=event_label, module="subscriptions", source_model=SOURCE_MODEL, source_pk=row.id, source_display=f"Rent/lease collection {reference}", source_reference=reference, source_date=row.payment_date, amount=row.amount, lines=lines, finance_account=finance_account, period=period, postability=postability, journal=journal, reconciliation_item=item, idempotency_key=f"bridge:{purpose}:RentLeaseCollection:{row.id}:{row.payment_date.isoformat()}:{base._money(row.amount):.2f}", source_status=row.status, source_type="RENT_LEASE_COLLECTION")
     demand_reference = getattr(row.demand, "reference_key", None) or f"RLD-{row.demand_id}"
