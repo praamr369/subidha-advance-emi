@@ -533,3 +533,72 @@ Cr Cash / Bank / FinanceAccount
 ```
 
 F12 must not post salary payment, payroll payout, StaffAdvance, commission, payout, inventory, COGS, rent, lease, auto-posting, auto-reconciliation, or period close.
+
+## Phase F14 — Rent/lease monthly revenue recognition bridge
+
+Phase F14 extends the controlled bridge workflow to concrete monthly rent/lease billing demand records only.
+
+Actual source model used:
+
+```text
+subscriptions.RentLeaseBillingDemand
+```
+
+Supported event keys:
+
+```text
+rent_monthly_revenue
+lease_monthly_revenue
+```
+
+Accepted aliases remain reserved for source-backed rent/lease invoice revenue rows only:
+
+```text
+rent_invoice_revenue
+lease_invoice_revenue
+rent_lease_invoice_revenue
+```
+
+Current safe classification:
+
+- `rent_monthly_revenue` is used only for `RentLeaseBillingDemand.demand_type=RENT_MONTHLY` linked to a `Subscription.plan_type=RENT`.
+- `lease_monthly_revenue` is used only for `RentLeaseBillingDemand.demand_type=LEASE_MONTHLY` linked to a `Subscription.plan_type=LEASE`.
+- `reference_key` is the invoice-like reference because the current concrete demand source has no separate invoice number field.
+- `due_date` is the source event date; `billing_period_start` / `billing_period_end` provide the service period.
+- `SECURITY_DEPOSIT`, `CANCELLED`, and `WAIVED` demands are skipped as not applicable.
+- Ambiguous demand type / plan type combinations remain unsupported and non-postable.
+- Positive source amount, open accounting period, journal numbering, receivable mapping, rent/lease revenue mapping, and output GST mapping when explicit tax exists are required before posting.
+
+Accounting shape:
+
+- Rent: debit `CUSTOMER_RECEIVABLE`; credit `RENT_INCOME`.
+- Lease: debit `CUSTOMER_RECEIVABLE`; credit `LEASE_INCOME`.
+- Credit `OUTPUT_GST` only when the concrete demand snapshot/metadata contains an explicit tax amount.
+
+Safety boundary:
+
+- Preview is read-only and does not create `JournalEntry`, `AccountingBridgePosting`, or `ReconciliationItem`.
+- Preview does not consume `JOURNAL_ENTRY` numbering.
+- Posting is explicit, admin-only, transactional, and idempotent by concrete demand source/event/idempotency key.
+- Posting creates accounting entries only: one posted `JournalEntry`, one `AccountingBridgePosting`, and one pending `ReconciliationItem`.
+- Posting does not mutate `RentLeaseBillingDemand`, `Subscription`, rent/lease contract profile, payment/receipt records, or security deposit records.
+- Posting does not mark a demand paid, revenue-recognized, reconciled, or closed.
+- Reconciliation remains pending until explicit verification.
+
+Deferred to later phases:
+
+```text
+rent/lease payment settlement
+security deposit receipt
+security deposit refund
+customer advance
+direct sale revenue
+lucky EMI revenue
+COGS
+payroll
+commission
+inventory
+vendor/purchase posting
+```
+
+F14 must not auto-post, auto-reconcile, auto-close periods, post collections, post deposits, mutate invoices/contracts/payments/receipts/deposits, or weaken earlier Phase F slices.

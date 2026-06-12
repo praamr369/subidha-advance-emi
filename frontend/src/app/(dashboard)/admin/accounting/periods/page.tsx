@@ -103,6 +103,18 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
       ],
     },
     {
+      title: "Rent/Lease revenue bridge",
+      action: "Review rent/lease revenue items",
+      href: bridgeReviewHref({ source_model: "RentLeaseBillingDemand" }),
+      rows: [
+        { label: "Ready unposted", value: summaryCount(summary, "rent_lease_revenue_ready_unposted_count"), detail: "Monthly rent/lease demand revenue is ready, but bridge journal posting is still pending.", href: bridgeReviewHref({ source_model: "RentLeaseBillingDemand", status: "READY_UNPOSTED" }) },
+        { label: "Posted unverified", value: summaryCount(summary, "rent_lease_revenue_posted_unverified_count"), detail: "Journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "RentLeaseBillingDemand", status: "POSTED_UNVERIFIED" }) },
+        { label: "Reconciled", value: summaryCount(summary, "rent_lease_revenue_reconciled_count"), detail: "Bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "RentLeaseBillingDemand", status: "RECONCILED" }) },
+        { label: "Blocked", value: summaryCount(summary, "rent_lease_revenue_blocked_count"), detail: "Receivable, rent/lease revenue, tax, period, or numbering blocker remains unresolved.", href: bridgeReviewHref({ source_model: "RentLeaseBillingDemand", status: "BLOCKED" }) },
+        { label: "Unsupported", value: summaryCount(summary, "rent_lease_revenue_unsupported_count"), detail: "Ambiguous or non-monthly rent/lease demands are visible but not postable.", href: bridgeReviewHref({ source_model: "RentLeaseBillingDemand", status: "UNSUPPORTED" }) },
+      ],
+    },
+    {
       title: "Credit / Return bridge",
       action: "Review credit/return bridge items",
       href: bridgeReviewHref({ source_model: "BillingCreditNote" }),

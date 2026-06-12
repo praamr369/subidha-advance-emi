@@ -97,6 +97,7 @@ function isPayrollRow(row: AccountingMappingAuditRow): boolean {
 
 function groupName(row: AccountingMappingAuditRow): string {
   const text = rowSearchText(row);
+  if (text.includes("rent_monthly_revenue") || text.includes("lease_monthly_revenue") || text.includes("rentleasebillingdemand")) return "Rent/Lease revenue mappings";
   if (text.includes("collection") || text.includes("cashier")) return "Collection posting mappings";
   if (isCommissionRow(row)) return "Commission mappings";
   if (isPayrollRow(row)) return "Payroll mappings";
@@ -175,6 +176,7 @@ function missingLabel(row: AccountingMappingAuditRow): string {
 }
 
 function routeForRow(row: AccountingMappingAuditRow): string {
+  if (rowSearchText(row).includes("rentleasebillingdemand") || rowSearchText(row).includes("rent_monthly_revenue") || rowSearchText(row).includes("lease_monthly_revenue")) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=RentLeaseBillingDemand`;
   if (isPayrollRow(row) && rowSearchText(row).includes("salarypayment")) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=SalaryPayment`;
   if (isPayrollRow(row) && rowSearchText(row).includes("salary_payment")) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=SalaryPayment`;
   if (isPayrollRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=SalarySheet`;

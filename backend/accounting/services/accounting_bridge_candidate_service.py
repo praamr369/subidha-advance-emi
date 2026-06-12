@@ -21,7 +21,7 @@ from accounting.services.period_service import resolve_accounting_period
 from billing.models import BillingCreditNote, BillingDebitNote, BillingDocumentStatus, BillingInvoice, BillingInvoiceType, BillingSourceType, DirectSaleReturn, DirectSaleReturnStatus, ReceiptDocument, ReceiptType
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationItemStatus, ReconciliationRun, ReconciliationRunStatus, ReconciliationSeverity
 from reconciliation.services.run_numbering import next_reconciliation_run_no
-from subscriptions.models import Commission, CommissionPayoutBatch, CommissionPayoutLine, CommissionStatus, Payment
+from subscriptions.models import Commission, CommissionPayoutBatch, CommissionPayoutLine, CommissionStatus, Payment, PlanType, RentLeaseBillingDemand, RentLeaseDemandStatus, RentLeaseDemandType
 
 PAYMENT_COLLECTION_EVENT_KEY = "subscription_emi_payment"
 PAYMENT_COLLECTION_PURPOSE = "PAYMENT_COLLECTION"
@@ -85,6 +85,23 @@ DEBIT_NOTE_PURPOSE_BY_EVENT = {"debit_note_issue": "DEBIT_NOTE_ISSUE", "customer
 DEBIT_NOTE_LABEL_BY_EVENT = {"debit_note_issue": "Debit note issue", "customer_debit_adjustment": "Customer debit adjustment", "damage_recovery": "Damage recovery", "additional_receivable_adjustment": "Additional receivable adjustment"}
 SKIPPED_DEBIT_NOTE_EVENT_KEY = "debit_note_skipped_not_applicable"
 UNSUPPORTED_DEBIT_NOTE_EVENT_KEY = "unsupported_debit_note"
+
+RENT_LEASE_DEMAND_SOURCE_MODEL = "RentLeaseBillingDemand"
+RENT_LEASE_REVENUE_EVENT_KEYS = {"rent_monthly_revenue", "lease_monthly_revenue", "rent_invoice_revenue", "lease_invoice_revenue", "rent_lease_invoice_revenue"}
+RENT_LEASE_REVENUE_PURPOSE_BY_EVENT = {key: key.upper() for key in RENT_LEASE_REVENUE_EVENT_KEYS}
+RENT_LEASE_REVENUE_LABEL_BY_EVENT = {
+    "rent_monthly_revenue": "Rent monthly revenue",
+    "lease_monthly_revenue": "Lease monthly revenue",
+    "rent_invoice_revenue": "Rent invoice revenue",
+    "lease_invoice_revenue": "Lease invoice revenue",
+    "rent_lease_invoice_revenue": "Rent/lease invoice revenue",
+}
+SKIPPED_RENT_LEASE_REVENUE_EVENT_KEY = "rent_lease_revenue_skipped_not_applicable"
+UNSUPPORTED_RENT_LEASE_REVENUE_EVENT_KEY = "unsupported_rent_lease_revenue"
+RENT_LEASE_REVENUE_SAFETY_TEXT = (
+    "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation. "
+    "It does not edit invoice, contract, payment, receipt, or security deposit records."
+)
 
 
 @dataclass(frozen=True)
@@ -191,6 +208,14 @@ def _output_gst_account() -> ChartOfAccount | None:
     return _posting_profile_account("OUTPUT_GST")
 
 
+def _rent_revenue_account() -> ChartOfAccount | None:
+    return _posting_profile_account("RENT_INCOME") or _posting_profile_account("RENT_REVENUE")
+
+
+def _lease_revenue_account() -> ChartOfAccount | None:
+    return _posting_profile_account("LEASE_INCOME") or _posting_profile_account("LEASE_REVENUE")
+
+
 def _source_reference(payment: Payment) -> str:
     return payment.reference_no or f"PAY-{payment.id}"
 
@@ -209,6 +234,10 @@ def _credit_note_reference(note: BillingCreditNote) -> str:
 
 def _debit_note_reference(note: BillingDebitNote) -> str:
     return note.note_no or f"DN-{note.id}"
+
+
+def _rent_lease_reference(demand: RentLeaseBillingDemand) -> str:
+    return demand.reference_key or f"RLD-{demand.id}"
 
 
 def _commission_reference(commission: Commission) -> str:
@@ -295,6 +324,25 @@ def _commission_payout_snapshot(batch: CommissionPayoutBatch) -> dict[str, Any]:
 
 def _commission_payout_lines_snapshot(batch: CommissionPayoutBatch) -> list[tuple[int, int, int, Decimal]]:
     return list(batch.lines.order_by("id").values_list("id", "commission_id", "partner_id", "amount"))
+
+
+def _rent_lease_demand_snapshot(demand: RentLeaseBillingDemand) -> dict[str, Any]:
+    return {
+        "subscription_id": demand.subscription_id,
+        "demand_type": demand.demand_type,
+        "status": demand.status,
+        "billing_period_start": demand.billing_period_start,
+        "billing_period_end": demand.billing_period_end,
+        "due_date": demand.due_date,
+        "amount": demand.amount,
+        "collected_amount": demand.collected_amount,
+        "held_amount": demand.held_amount,
+        "refundable_amount": demand.refundable_amount,
+        "deducted_amount": demand.deducted_amount,
+        "reference_key": demand.reference_key,
+        "metadata": demand.metadata,
+        "tax_profile_snapshot": demand.tax_profile_snapshot,
+    }
 
 
 def _direct_sale_return_operational_date(row: DirectSaleReturn) -> tuple[date | None, str | None]:
@@ -435,6 +483,64 @@ def _invoice_lines(invoice: BillingInvoice, event_key: str) -> tuple[list[dict[s
     lines = [{"chart_account": receivable, "description": f"Invoice receivable {_invoice_reference(invoice)}", "debit_amount": amount, "credit_amount": Decimal("0.00")}, {"chart_account": revenue, "description": f"Invoice revenue {_invoice_reference(invoice)}", "debit_amount": Decimal("0.00"), "credit_amount": taxable}]
     if tax > Decimal("0.00"):
         lines.append({"chart_account": gst, "description": f"Output GST {_invoice_reference(invoice)}", "debit_amount": Decimal("0.00"), "credit_amount": tax})
+    return lines, warnings, None
+
+
+def _rent_lease_tax_amount(demand: RentLeaseBillingDemand) -> Decimal:
+    snapshot = demand.tax_profile_snapshot or {}
+    metadata = demand.metadata or {}
+    for key in ("tax_amount", "tax_total", "gst_amount", "output_tax_amount"):
+        if key in snapshot:
+            return _money(snapshot.get(key))
+        if key in metadata:
+            return _money(metadata.get(key))
+    return Decimal("0.00")
+
+
+def _classify_rent_lease_revenue_event(demand: RentLeaseBillingDemand) -> tuple[str, str, str | None]:
+    if demand.demand_type == RentLeaseDemandType.SECURITY_DEPOSIT:
+        return SKIPPED_RENT_LEASE_REVENUE_EVENT_KEY, "Rent/lease revenue skipped", "Security deposit demand is outside Phase F14 revenue recognition."
+    if demand.status in {RentLeaseDemandStatus.CANCELLED, RentLeaseDemandStatus.WAIVED}:
+        return SKIPPED_RENT_LEASE_REVENUE_EVENT_KEY, "Rent/lease revenue skipped", "Cancelled or waived rent/lease demands are not revenue-recognition candidates."
+    if demand.demand_type == RentLeaseDemandType.RENT_MONTHLY and getattr(demand.subscription, "plan_type", None) == PlanType.RENT:
+        return "rent_monthly_revenue", RENT_LEASE_REVENUE_LABEL_BY_EVENT["rent_monthly_revenue"], None
+    if demand.demand_type == RentLeaseDemandType.LEASE_MONTHLY and getattr(demand.subscription, "plan_type", None) == PlanType.LEASE:
+        return "lease_monthly_revenue", RENT_LEASE_REVENUE_LABEL_BY_EVENT["lease_monthly_revenue"], None
+    return UNSUPPORTED_RENT_LEASE_REVENUE_EVENT_KEY, "Unsupported rent/lease revenue", "Rent/lease demand type and subscription plan_type cannot be safely classified."
+
+
+def _rent_lease_revenue_lines(demand: RentLeaseBillingDemand, event_key: str) -> tuple[list[dict[str, Any]], list[str], None]:
+    warnings: list[str] = []
+    if event_key not in RENT_LEASE_REVENUE_EVENT_KEYS:
+        return [], ["Unsupported RentLeaseBillingDemand revenue event for Phase F14."], None
+    amount = _money(demand.amount)
+    tax = _rent_lease_tax_amount(demand)
+    taxable = amount - tax
+    if amount <= Decimal("0.00"):
+        warnings.append("RentLeaseBillingDemand amount must be greater than zero.")
+    if tax < Decimal("0.00") or taxable <= Decimal("0.00"):
+        warnings.append("RentLeaseBillingDemand taxable amount cannot be resolved safely.")
+    receivable = _customer_receivable_account()
+    revenue = _rent_revenue_account() if event_key.startswith("rent_") else _lease_revenue_account()
+    gst = _output_gst_account() if tax > Decimal("0.00") else None
+    if receivable is None:
+        warnings.append("CUSTOMER_RECEIVABLE posting profile/chart account is missing or inactive.")
+    if revenue is None and event_key.startswith("rent_"):
+        warnings.append("RENT_INCOME / RENT_REVENUE posting profile/chart account is missing or inactive.")
+    if revenue is None and event_key.startswith("lease_"):
+        warnings.append("LEASE_INCOME / LEASE_REVENUE posting profile/chart account is missing or inactive.")
+    if tax > Decimal("0.00") and gst is None:
+        warnings.append("OUTPUT_GST posting profile/chart account is missing or inactive for taxable rent/lease demand.")
+    if warnings:
+        return [], warnings, None
+    reference = _rent_lease_reference(demand)
+    label = "Rent" if event_key.startswith("rent_") else "Lease"
+    lines = [
+        {"chart_account": receivable, "description": f"{label} receivable {reference}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
+        {"chart_account": revenue, "description": f"{label} revenue {reference}", "debit_amount": Decimal("0.00"), "credit_amount": taxable},
+    ]
+    if tax > Decimal("0.00"):
+        lines.append({"chart_account": gst, "description": f"Output GST {reference}", "debit_amount": Decimal("0.00"), "credit_amount": tax})
     return lines, warnings, None
 
 
@@ -749,6 +855,8 @@ def _purpose_for_event(source_model: str, event_key: str) -> str:
         return RECEIPT_PURPOSE_BY_EVENT.get(event_key, event_key.upper())
     if source_model == BILLING_INVOICE_SOURCE_MODEL:
         return BILLING_INVOICE_PURPOSE_BY_EVENT.get(event_key, event_key.upper())
+    if source_model == RENT_LEASE_DEMAND_SOURCE_MODEL:
+        return RENT_LEASE_REVENUE_PURPOSE_BY_EVENT.get(event_key, event_key.upper())
     if source_model in {CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL}:
         return CREDIT_RETURN_PURPOSE_BY_EVENT.get(event_key, event_key.upper())
     if source_model == DEBIT_NOTE_SOURCE_MODEL:
@@ -876,6 +984,49 @@ def billing_invoice_candidate(invoice: BillingInvoice) -> dict[str, Any]:
     return payload
 
 
+def rent_lease_revenue_candidate(demand: RentLeaseBillingDemand) -> dict[str, Any]:
+    event_key, event_label, reason = _classify_rent_lease_revenue_event(demand)
+    purpose = _purpose_for_event(RENT_LEASE_DEMAND_SOURCE_MODEL, event_key)
+    bridge = _existing_bridge_for(source_model=RENT_LEASE_DEMAND_SOURCE_MODEL, source_id=str(demand.id), purpose=purpose)
+    journal = bridge.journal_entry if bridge else None
+    item = _latest_posting_reconciliation_item(source_model=RENT_LEASE_DEMAND_SOURCE_MODEL, source_id=str(demand.id)) if journal else _latest_reconciliation_item(source_model=RENT_LEASE_DEMAND_SOURCE_MODEL, source_id=str(demand.id))
+    source_date = demand.due_date
+    period = getattr(journal, "accounting_period", None) or _source_period(source_date)
+    lines, warnings, finance_account = _rent_lease_revenue_lines(demand, event_key) if event_key in RENT_LEASE_REVENUE_EVENT_KEYS else ([], [reason] if reason else [], None)
+    raw = "SKIPPED_NOT_APPLICABLE" if event_key == SKIPPED_RENT_LEASE_REVENUE_EVENT_KEY else "UNSUPPORTED_SOURCE" if event_key == UNSUPPORTED_RENT_LEASE_REVENUE_EVENT_KEY else "READY" if lines else "NOT_CONFIGURED"
+    postability = _candidate_status_payload(event_key=event_key, event_label=event_label, module="subscriptions", source_model=RENT_LEASE_DEMAND_SOURCE_MODEL, raw_status=raw, lines=lines, line_warnings=warnings, period=period, source_date=source_date, journal=journal, reconciliation_item=item, source_workflow_exists=event_key in RENT_LEASE_REVENUE_EVENT_KEYS, classification_reason=reason)
+    tax = _rent_lease_tax_amount(demand)
+    taxable = _money(demand.amount) - tax
+    payload = _candidate_payload(candidate_id=_candidate_id(source_model=RENT_LEASE_DEMAND_SOURCE_MODEL, source_pk=demand.id, event_key=event_key), event_key=event_key, event_label=event_label, module="subscriptions", source_model=RENT_LEASE_DEMAND_SOURCE_MODEL, source_pk=demand.id, source_display=f"Rent/lease demand {_rent_lease_reference(demand)}", source_reference=_rent_lease_reference(demand), source_date=source_date, amount=demand.amount, taxable_amount=taxable, tax_amount=tax, lines=lines, finance_account=finance_account, period=period, postability=postability, journal=journal, reconciliation_item=item, idempotency_key=f"bridge:{purpose}:RentLeaseBillingDemand:{demand.id}:{source_date.isoformat()}:{_money(demand.amount):.2f}", source_status=demand.status, source_type=demand.demand_type)
+    if payload.get("reconciliation_state") == "POSTED_UNVERIFIED":
+        payload["status"] = "POSTED_UNVERIFIED"
+        payload["canonical_status"] = "POSTED_UNVERIFIED"
+    subscription = demand.subscription
+    customer = getattr(subscription, "customer", None)
+    payload.update(
+        {
+            "rent_lease_demand_id": demand.id,
+            "rent_lease_reference": _rent_lease_reference(demand),
+            "plan_type": getattr(subscription, "plan_type", None),
+            "demand_type": demand.demand_type,
+            "invoice_status": demand.status,
+            "billing_period_start": demand.billing_period_start.isoformat() if demand.billing_period_start else None,
+            "billing_period_end": demand.billing_period_end.isoformat() if demand.billing_period_end else None,
+            "billing_period": f"{demand.billing_period_start} to {demand.billing_period_end}" if demand.billing_period_start and demand.billing_period_end else None,
+            "billing_month": demand.billing_period_start.strftime("%Y-%m") if demand.billing_period_start else None,
+            "due_date": demand.due_date.isoformat() if demand.due_date else None,
+            "customer_id": getattr(customer, "id", None),
+            "customer_name": getattr(customer, "name", None) or getattr(customer, "full_name", None) or getattr(customer, "phone", None),
+            "subscription_id": demand.subscription_id,
+            "contract_reference": getattr(subscription, "subscription_number", None) or getattr(subscription, "contract_reference", None),
+            "collected_amount": f"{_money(demand.collected_amount):.2f}",
+            "outstanding_amount": f"{_money(demand.outstanding_amount()):.2f}",
+            "invoice_number": _rent_lease_reference(demand),
+        }
+    )
+    return payload
+
+
 def billing_credit_note_candidate(note: BillingCreditNote) -> dict[str, Any]:
     event_key, event_label, reason = _classify_credit_note_event(note)
     purpose = _purpose_for_event(CREDIT_NOTE_SOURCE_MODEL, event_key)
@@ -950,6 +1101,9 @@ def list_bridge_candidates(filters: BridgeCandidateFilters | None = None) -> lis
     if requested_model in {"", BILLING_INVOICE_SOURCE_MODEL} and (not active_filters.module or active_filters.module == "billing"):
         qs = _date_filter_qs(BillingInvoice.objects.select_related("finance_account", "finance_account__chart_account", "direct_sale", "customer", "subscription"), active_filters, date_field="invoice_date")
         rows.extend(billing_invoice_candidate(item) for item in qs.order_by("-invoice_date", "-id")[:500])
+    if requested_model in {"", RENT_LEASE_DEMAND_SOURCE_MODEL} and (not active_filters.module or active_filters.module == "subscriptions"):
+        qs = _date_filter_qs(RentLeaseBillingDemand.objects.select_related("subscription", "subscription__customer"), active_filters, date_field="due_date")
+        rows.extend(rent_lease_revenue_candidate(item) for item in qs.order_by("-due_date", "-id")[:500])
     if requested_model in {"", CREDIT_NOTE_SOURCE_MODEL} and (not active_filters.module or active_filters.module == "billing"):
         qs = _date_filter_qs(BillingCreditNote.objects.select_related("original_invoice", "original_invoice__customer"), active_filters, date_field="note_date")
         rows.extend(billing_credit_note_candidate(item) for item in qs.order_by("-note_date", "-id")[:500])
@@ -994,6 +1148,11 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
         if for_update:
             qs = qs.select_for_update()
         candidate = billing_invoice_candidate(qs.get(pk=source_pk))
+    elif source_kind == "rentleasebillingdemand":
+        qs = RentLeaseBillingDemand.objects.select_related("subscription", "subscription__customer")
+        if for_update:
+            qs = qs.select_for_update()
+        candidate = rent_lease_revenue_candidate(qs.get(pk=source_pk))
     elif source_kind == "billingcreditnote":
         qs = BillingCreditNote.objects.select_related("original_invoice", "original_invoice__customer")
         if for_update:
@@ -1030,6 +1189,8 @@ def _lines_for_candidate(candidate: dict[str, Any]):
         return _receipt_lines(ReceiptDocument.objects.select_related("finance_account", "finance_account__chart_account").get(pk=source_id), event_key)
     if model == BILLING_INVOICE_SOURCE_MODEL:
         return _invoice_lines(BillingInvoice.objects.get(pk=source_id), event_key)
+    if model == RENT_LEASE_DEMAND_SOURCE_MODEL:
+        return _rent_lease_revenue_lines(RentLeaseBillingDemand.objects.select_related("subscription").get(pk=source_id), event_key)
     if model == CREDIT_NOTE_SOURCE_MODEL:
         return _credit_note_lines(BillingCreditNote.objects.get(pk=source_id), event_key)
     if model == DEBIT_NOTE_SOURCE_MODEL:
@@ -1055,13 +1216,13 @@ def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
             blockers.append(str(exc))
     total_debit, total_credit = _line_totals(lines)
     tax_lines = [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount"), credit=line.get("credit_amount")) for line in lines if getattr(line.get("chart_account"), "system_code", "") == "OUTPUT_GST"]
-    source_payload = {"model": candidate["source_model"], "pk": candidate.get("source_pk") or candidate["source_id"], "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate.get("source_date"), "amount": candidate["amount"], "source_status": candidate.get("source_status"), "source_type": candidate.get("source_type"), "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount"), "debit_note_number": candidate.get("debit_note_number"), "debit_note_status": candidate.get("debit_note_status"), "commission_reference": candidate.get("commission_reference"), "partner_name": candidate.get("partner_name"), "customer_name": candidate.get("customer_name"), "subscription_id": candidate.get("subscription_id"), "payment_id": candidate.get("payment_id"), "payment_reference": candidate.get("payment_reference"), "emi_id": candidate.get("emi_id"), "commission_status": candidate.get("commission_status"), "payout_batch_id": candidate.get("payout_batch_id"), "payout_batch_code": candidate.get("payout_batch_code"), "payout_reference": candidate.get("payout_reference"), "payout_date": candidate.get("payout_date"), "payout_status": candidate.get("payout_status"), "payout_amount": candidate.get("payout_amount"), "payment_method": candidate.get("payment_method"), "finance_account_name": candidate.get("finance_account_name"), "related_commission_count": candidate.get("related_commission_count")}
-    safety_text = COMMISSION_PAYOUT_SAFETY_TEXT if candidate.get("source_model") == COMMISSION_PAYOUT_SOURCE_MODEL else COMMISSION_SAFETY_TEXT if candidate.get("source_model") == COMMISSION_SOURCE_MODEL else SAFETY_TEXT
+    source_payload = {"model": candidate["source_model"], "pk": candidate.get("source_pk") or candidate["source_id"], "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate.get("source_date"), "amount": candidate["amount"], "source_status": candidate.get("source_status"), "source_type": candidate.get("source_type"), "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount"), "debit_note_number": candidate.get("debit_note_number"), "debit_note_status": candidate.get("debit_note_status"), "commission_reference": candidate.get("commission_reference"), "partner_name": candidate.get("partner_name"), "customer_name": candidate.get("customer_name"), "subscription_id": candidate.get("subscription_id"), "contract_reference": candidate.get("contract_reference"), "payment_id": candidate.get("payment_id"), "payment_reference": candidate.get("payment_reference"), "emi_id": candidate.get("emi_id"), "commission_status": candidate.get("commission_status"), "payout_batch_id": candidate.get("payout_batch_id"), "payout_batch_code": candidate.get("payout_batch_code"), "payout_reference": candidate.get("payout_reference"), "payout_date": candidate.get("payout_date"), "payout_status": candidate.get("payout_status"), "payout_amount": candidate.get("payout_amount"), "payment_method": candidate.get("payment_method"), "finance_account_name": candidate.get("finance_account_name"), "related_commission_count": candidate.get("related_commission_count"), "rent_lease_reference": candidate.get("rent_lease_reference"), "rent_lease_demand_id": candidate.get("rent_lease_demand_id"), "plan_type": candidate.get("plan_type"), "demand_type": candidate.get("demand_type"), "billing_period": candidate.get("billing_period"), "billing_month": candidate.get("billing_month"), "billing_period_start": candidate.get("billing_period_start"), "billing_period_end": candidate.get("billing_period_end"), "due_date": candidate.get("due_date"), "collected_amount": candidate.get("collected_amount"), "outstanding_amount": candidate.get("outstanding_amount")}
+    safety_text = RENT_LEASE_REVENUE_SAFETY_TEXT if candidate.get("source_model") == RENT_LEASE_DEMAND_SOURCE_MODEL else COMMISSION_PAYOUT_SAFETY_TEXT if candidate.get("source_model") == COMMISSION_PAYOUT_SOURCE_MODEL else COMMISSION_SAFETY_TEXT if candidate.get("source_model") == COMMISSION_SOURCE_MODEL else SAFETY_TEXT
     return {"candidate": candidate, "candidate_id": candidate_id, "source": source_payload, "journal_date": journal_date.isoformat() if journal_date else None, "accounting_period": candidate["accounting_period"], "journal_number_preview": journal_number_preview, "debit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if _money(line.get("debit_amount")) > 0], "credit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if _money(line.get("credit_amount")) > 0], "lines": _preview_lines(lines), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "tax_lines": tax_lines, "finance_account_line": candidate["finance_account"], "warnings": warnings, "blockers": list(dict.fromkeys([item for item in blockers if item])), "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers), "idempotency_key": candidate["idempotency_key"], "safety_text": safety_text}
 
 
 def _create_pending_reconciliation_item(*, journal: JournalEntry, source_model: str, source_id: str, source_label: str, amount: Decimal, candidate_id: str, actor, note: str = "") -> ReconciliationItem:
-    phase_slice = "F11" if source_model == COMMISSION_PAYOUT_SOURCE_MODEL else "F10" if source_model == COMMISSION_SOURCE_MODEL else "F5" if source_model == DEBIT_NOTE_SOURCE_MODEL else "F4" if source_model in {CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL} else "F3" if source_model == BILLING_INVOICE_SOURCE_MODEL else "F2" if source_model == RECEIPT_SOURCE_MODEL else "F"
+    phase_slice = "F14" if source_model == RENT_LEASE_DEMAND_SOURCE_MODEL else "F11" if source_model == COMMISSION_PAYOUT_SOURCE_MODEL else "F10" if source_model == COMMISSION_SOURCE_MODEL else "F5" if source_model == DEBIT_NOTE_SOURCE_MODEL else "F4" if source_model in {CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL} else "F3" if source_model == BILLING_INVOICE_SOURCE_MODEL else "F2" if source_model == RECEIPT_SOURCE_MODEL else "F"
     run = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="BRIDGE_POSTING", module="ACCOUNTING_BRIDGE", date_from=journal.entry_date, date_to=journal.entry_date, status=ReconciliationRunStatus.COMPLETED, started_by=actor, started_at=timezone.now(), finished_at=timezone.now(), total_checked=1, total_matched=0, total_exceptions=1, high_risk_count=0, metadata={"phase": "F", "phase_slice": phase_slice, "system_created_after_bridge_post": True, "verification_required": True, "posting_note": note})
     item = ReconciliationItem.objects.create(run=run, module="ACCOUNTING_BRIDGE_PHASE_F", source_type=source_model, source_id=source_id, source_label=source_label, expected_amount=amount, actual_amount=amount, amount_delta=Decimal("0.00"), severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code="POSTED_UNVERIFIED", exception_message="Bridge journal was posted and is waiting for explicit reconciliation verification.", recommended_action="Run reconciliation checks, then verify this bridge item if no hard exception is reported.", metadata={"journal_entry_id": journal.id, "journal_entry_no": journal.entry_no, "bridge_candidate_id": candidate_id, "action_href": "/admin/accounting/bridge-reconciliation"})
     ReconciliationEvidence.objects.create(item=item, evidence_type=source_model, object_id=source_id, label=source_label, amount=amount, status="SOURCE")
@@ -1077,7 +1238,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
     if not candidate_key:
         raise ValueError("idempotency_key is required.")
     candidate = get_bridge_candidate(candidate_id, for_update=True)
-    supported = {COMMISSION_PAYOUT_SOURCE_MODEL: COMMISSION_PAYOUT_EVENT_KEYS, COMMISSION_SOURCE_MODEL: COMMISSION_EVENT_KEYS, "Payment": {PAYMENT_COLLECTION_EVENT_KEY}, RECEIPT_SOURCE_MODEL: RECEIPT_EVENT_KEYS, BILLING_INVOICE_SOURCE_MODEL: BILLING_INVOICE_EVENT_KEYS, CREDIT_NOTE_SOURCE_MODEL: {"credit_note_issue", "sales_return", "customer_credit_adjustment"}, DIRECT_SALE_RETURN_SOURCE_MODEL: {"direct_sale_return"}, DEBIT_NOTE_SOURCE_MODEL: DEBIT_NOTE_EVENT_KEYS}
+    supported = {COMMISSION_PAYOUT_SOURCE_MODEL: COMMISSION_PAYOUT_EVENT_KEYS, COMMISSION_SOURCE_MODEL: COMMISSION_EVENT_KEYS, "Payment": {PAYMENT_COLLECTION_EVENT_KEY}, RECEIPT_SOURCE_MODEL: RECEIPT_EVENT_KEYS, BILLING_INVOICE_SOURCE_MODEL: BILLING_INVOICE_EVENT_KEYS, RENT_LEASE_DEMAND_SOURCE_MODEL: RENT_LEASE_REVENUE_EVENT_KEYS, CREDIT_NOTE_SOURCE_MODEL: {"credit_note_issue", "sales_return", "customer_credit_adjustment"}, DIRECT_SALE_RETURN_SOURCE_MODEL: {"direct_sale_return"}, DEBIT_NOTE_SOURCE_MODEL: DEBIT_NOTE_EVENT_KEYS}
     if candidate["event_key"] not in supported.get(candidate["source_model"], set()):
         raise ValueError("Unsupported bridge candidate source.")
     purpose = _purpose_for_event(candidate["source_model"], candidate["event_key"])
@@ -1111,7 +1272,8 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
     if candidate["source_model"] == COMMISSION_SOURCE_MODEL:
         payout_line_count_before = CommissionPayoutLine.objects.filter(commission_id=source_instance.id).count()
     entry_date = date.fromisoformat(candidate["source_date"])
-    journal, created = post_bridge_entry(source_instance=source_instance, purpose=purpose, entry_date=entry_date, memo=f"Bridge posting {candidate['source_model']} {candidate['source_id']} {candidate['event_key']}", lines=lines, voucher_type=purpose, source_type=candidate.get("source_type") or candidate["source_model"].upper(), source_reference=candidate["source_reference"], source_document_no=candidate["source_reference"], source_event_date=entry_date, trace_metadata={"event_key": candidate["event_key"], "idempotency_key": candidate_key, "posting_note": posting_note, "source_model": candidate["source_model"], "source_id": candidate["source_id"], "finance_account_id": getattr(finance_account, "id", None), "amount": candidate["amount"], "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount"), "commission_mutation": False if candidate["source_model"] in {COMMISSION_SOURCE_MODEL, COMMISSION_PAYOUT_SOURCE_MODEL} else None, "commission_payout_mutation": False if candidate["source_model"] in {COMMISSION_SOURCE_MODEL, COMMISSION_PAYOUT_SOURCE_MODEL} else None, "commission_payout_posting": candidate["source_model"] == COMMISSION_PAYOUT_SOURCE_MODEL, "payout_batch_id": candidate.get("payout_batch_id"), "payout_batch_code": candidate.get("payout_batch_code"), "related_commission_count": candidate.get("related_commission_count")}, posted_by=actor)
+    rent_lease_before = _rent_lease_demand_snapshot(source_instance) if candidate["source_model"] == RENT_LEASE_DEMAND_SOURCE_MODEL else None
+    journal, created = post_bridge_entry(source_instance=source_instance, purpose=purpose, entry_date=entry_date, memo=f"Bridge posting {candidate['source_model']} {candidate['source_id']} {candidate['event_key']}", lines=lines, voucher_type=purpose, source_type=candidate.get("source_type") or candidate["source_model"].upper(), source_reference=candidate["source_reference"], source_document_no=candidate["source_reference"], source_event_date=entry_date, trace_metadata={"event_key": candidate["event_key"], "idempotency_key": candidate_key, "posting_note": posting_note, "source_model": candidate["source_model"], "source_id": candidate["source_id"], "finance_account_id": getattr(finance_account, "id", None), "amount": candidate["amount"], "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount"), "commission_mutation": False if candidate["source_model"] in {COMMISSION_SOURCE_MODEL, COMMISSION_PAYOUT_SOURCE_MODEL} else None, "commission_payout_mutation": False if candidate["source_model"] in {COMMISSION_SOURCE_MODEL, COMMISSION_PAYOUT_SOURCE_MODEL} else None, "rent_lease_demand_mutation": False if candidate["source_model"] == RENT_LEASE_DEMAND_SOURCE_MODEL else None, "contract_mutation": False if candidate["source_model"] == RENT_LEASE_DEMAND_SOURCE_MODEL else None, "payment_receipt_deposit_mutation": False if candidate["source_model"] == RENT_LEASE_DEMAND_SOURCE_MODEL else None, "rent_lease_revenue_posting": candidate["source_model"] == RENT_LEASE_DEMAND_SOURCE_MODEL, "plan_type": candidate.get("plan_type"), "billing_period": candidate.get("billing_period"), "payout_batch_id": candidate.get("payout_batch_id"), "payout_batch_code": candidate.get("payout_batch_code"), "related_commission_count": candidate.get("related_commission_count")}, posted_by=actor)
     item = _latest_posting_reconciliation_item(source_model=candidate["source_model"], source_id=candidate["source_id"])
     if created and not (item and item.exception_code == "POSTED_UNVERIFIED"):
         item = _create_pending_reconciliation_item(journal=journal, source_model=candidate["source_model"], source_id=candidate["source_id"], source_label=candidate["source_reference"], amount=_money(candidate["amount"]), candidate_id=candidate_id, actor=actor, note=posting_note)
@@ -1131,12 +1293,16 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
         for row in Commission.objects.filter(id__in=payout_commissions_before.keys()).order_by("id"):
             if _commission_snapshot(row) != payout_commissions_before[row.id]:
                 raise ValueError("Commission source mutation detected; bridge posting rolled back.")
+    if candidate["source_model"] == RENT_LEASE_DEMAND_SOURCE_MODEL:
+        source_instance.refresh_from_db()
+        if _rent_lease_demand_snapshot(source_instance) != rent_lease_before:
+            raise ValueError("Rent/lease demand source mutation detected; bridge posting rolled back.")
     _log_candidate_post(journal=journal, actor=actor, candidate_id=candidate_id, source_model=candidate["source_model"], source_id=int(candidate["source_id"]), event_key=candidate["event_key"], amount=_money(candidate["amount"]), candidate_key=candidate_key, reconciliation_item=item)
     return {"posted": created, "already_posted": not created, "journal_entry": _journal_payload(journal), "reconciliation_item": _reconciliation_payload(item), "next_action": "Run reconciliation checks and verify the pending bridge item."}
 
 
 def _source_instance_for_candidate(candidate: dict[str, Any], *, for_update: bool = False):
-    model = {COMMISSION_PAYOUT_SOURCE_MODEL: CommissionPayoutBatch, COMMISSION_SOURCE_MODEL: Commission, "Payment": Payment, RECEIPT_SOURCE_MODEL: ReceiptDocument, BILLING_INVOICE_SOURCE_MODEL: BillingInvoice, CREDIT_NOTE_SOURCE_MODEL: BillingCreditNote, DEBIT_NOTE_SOURCE_MODEL: BillingDebitNote, DIRECT_SALE_RETURN_SOURCE_MODEL: DirectSaleReturn}[candidate["source_model"]]
+    model = {COMMISSION_PAYOUT_SOURCE_MODEL: CommissionPayoutBatch, COMMISSION_SOURCE_MODEL: Commission, "Payment": Payment, RECEIPT_SOURCE_MODEL: ReceiptDocument, BILLING_INVOICE_SOURCE_MODEL: BillingInvoice, RENT_LEASE_DEMAND_SOURCE_MODEL: RentLeaseBillingDemand, CREDIT_NOTE_SOURCE_MODEL: BillingCreditNote, DEBIT_NOTE_SOURCE_MODEL: BillingDebitNote, DIRECT_SALE_RETURN_SOURCE_MODEL: DirectSaleReturn}[candidate["source_model"]]
     qs = model.objects
     if for_update:
         qs = qs.select_for_update()
@@ -1211,11 +1377,12 @@ def verify_bridge_reconciliation_item(*, item_id: int, actor, note: str = "", ru
 
 def summarize_candidate_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
     counts = Counter(row.get("status") or "INFO" for row in rows)
-    models = [COMMISSION_PAYOUT_SOURCE_MODEL, COMMISSION_SOURCE_MODEL, "Payment", RECEIPT_SOURCE_MODEL, BILLING_INVOICE_SOURCE_MODEL, CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL, DEBIT_NOTE_SOURCE_MODEL]
+    models = [COMMISSION_PAYOUT_SOURCE_MODEL, COMMISSION_SOURCE_MODEL, "Payment", RECEIPT_SOURCE_MODEL, BILLING_INVOICE_SOURCE_MODEL, RENT_LEASE_DEMAND_SOURCE_MODEL, CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL, DEBIT_NOTE_SOURCE_MODEL]
     by_model = {model: Counter(row.get("status") or "INFO" for row in rows if row.get("source_model") == model) for model in models}
     def posted_unverified(model: str) -> int:
         return sum(1 for row in rows if row.get("source_model") == model and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
     credit_models = [CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL]
     summary = {"candidate_count": len(rows), "ready_unposted_count": counts.get("READY_UNPOSTED", 0), "posted_count": counts.get("POSTED", 0), "reconciled_count": counts.get("RECONCILED", 0), "blocked_by_mapping_count": counts.get("BLOCKED_BY_MAPPING", 0), "blocked_by_period_count": counts.get("BLOCKED_BY_PERIOD", 0), "blocked_by_numbering_count": counts.get("BLOCKED_BY_NUMBERING", 0), "blocked_by_approval_count": counts.get("BLOCKED_BY_APPROVAL", 0), "unsupported_count": counts.get("UNSUPPORTED_SOURCE", 0), "commission_ready_unposted_count": by_model[COMMISSION_SOURCE_MODEL].get("READY_UNPOSTED", 0), "commission_posted_count": by_model[COMMISSION_SOURCE_MODEL].get("POSTED", 0), "commission_posted_unverified_count": posted_unverified(COMMISSION_SOURCE_MODEL), "commission_reconciled_count": by_model[COMMISSION_SOURCE_MODEL].get("RECONCILED", 0), "commission_blocked_count": sum(v for k, v in by_model[COMMISSION_SOURCE_MODEL].items() if str(k).startswith("BLOCKED")), "commission_unsupported_count": by_model[COMMISSION_SOURCE_MODEL].get("UNSUPPORTED_SOURCE", 0), "payment_ready_unposted_count": by_model["Payment"].get("READY_UNPOSTED", 0), "payment_posted_count": by_model["Payment"].get("POSTED", 0), "payment_posted_unverified_count": posted_unverified("Payment"), "payment_reconciled_count": by_model["Payment"].get("RECONCILED", 0), "receipt_ready_unposted_count": by_model[RECEIPT_SOURCE_MODEL].get("READY_UNPOSTED", 0), "receipt_posted_count": by_model[RECEIPT_SOURCE_MODEL].get("POSTED", 0), "receipt_posted_unverified_count": posted_unverified(RECEIPT_SOURCE_MODEL), "receipt_reconciled_count": by_model[RECEIPT_SOURCE_MODEL].get("RECONCILED", 0), "billing_invoice_ready_unposted_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("READY_UNPOSTED", 0), "billing_invoice_posted_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("POSTED", 0), "billing_invoice_posted_unverified_count": posted_unverified(BILLING_INVOICE_SOURCE_MODEL), "billing_invoice_reconciled_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("RECONCILED", 0), "billing_invoice_blocked_count": sum(v for k, v in by_model[BILLING_INVOICE_SOURCE_MODEL].items() if str(k).startswith("BLOCKED")), "billing_invoice_unsupported_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("UNSUPPORTED_SOURCE", 0), "credit_return_ready_unposted_count": sum(by_model[m].get("READY_UNPOSTED", 0) for m in credit_models), "credit_return_posted_count": sum(by_model[m].get("POSTED", 0) for m in credit_models), "credit_return_posted_unverified_count": sum(posted_unverified(m) for m in credit_models), "credit_return_reconciled_count": sum(by_model[m].get("RECONCILED", 0) for m in credit_models), "credit_return_blocked_count": sum(sum(v for k, v in by_model[m].items() if str(k).startswith("BLOCKED")) for m in credit_models), "credit_return_unsupported_count": sum(by_model[m].get("UNSUPPORTED_SOURCE", 0) for m in credit_models), "debit_note_ready_unposted_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("READY_UNPOSTED", 0), "debit_note_posted_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("POSTED", 0), "debit_note_posted_unverified_count": posted_unverified(DEBIT_NOTE_SOURCE_MODEL), "debit_note_reconciled_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("RECONCILED", 0), "debit_note_blocked_count": sum(v for k, v in by_model[DEBIT_NOTE_SOURCE_MODEL].items() if str(k).startswith("BLOCKED")), "debit_note_unsupported_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("UNSUPPORTED_SOURCE", 0)}
     summary.update({"commission_payout_ready_unposted_count": by_model[COMMISSION_PAYOUT_SOURCE_MODEL].get("READY_UNPOSTED", 0), "commission_payout_posted_count": by_model[COMMISSION_PAYOUT_SOURCE_MODEL].get("POSTED", 0), "commission_payout_posted_unverified_count": posted_unverified(COMMISSION_PAYOUT_SOURCE_MODEL), "commission_payout_reconciled_count": by_model[COMMISSION_PAYOUT_SOURCE_MODEL].get("RECONCILED", 0), "commission_payout_blocked_count": sum(v for k, v in by_model[COMMISSION_PAYOUT_SOURCE_MODEL].items() if str(k).startswith("BLOCKED")), "commission_payout_unsupported_count": by_model[COMMISSION_PAYOUT_SOURCE_MODEL].get("UNSUPPORTED_SOURCE", 0)})
+    summary.update({"rent_lease_revenue_ready_unposted_count": by_model[RENT_LEASE_DEMAND_SOURCE_MODEL].get("READY_UNPOSTED", 0), "rent_lease_revenue_posted_count": by_model[RENT_LEASE_DEMAND_SOURCE_MODEL].get("POSTED", 0), "rent_lease_revenue_posted_unverified_count": posted_unverified(RENT_LEASE_DEMAND_SOURCE_MODEL), "rent_lease_revenue_reconciled_count": by_model[RENT_LEASE_DEMAND_SOURCE_MODEL].get("RECONCILED", 0), "rent_lease_revenue_blocked_count": sum(v for k, v in by_model[RENT_LEASE_DEMAND_SOURCE_MODEL].items() if str(k).startswith("BLOCKED")), "rent_lease_revenue_unsupported_count": by_model[RENT_LEASE_DEMAND_SOURCE_MODEL].get("UNSUPPORTED_SOURCE", 0)})
     return summary
