@@ -73,10 +73,45 @@ F15B does not perform accounting posting. It only creates source evidence.
 
 Posting remains deferred to F15C. F15C should use `subscriptions.RentLeaseCollection` as the candidate source only after F15B tests pass.
 
+## Phase F15C — controlled collection settlement bridge
+
+F15C adds bridge candidates from concrete `subscriptions.RentLeaseCollection` rows only.
+
+Supported event keys:
+
+```text
+rent_payment_settlement
+lease_payment_settlement
+rent_lease_payment_settlement
+```
+
+Accounting shape:
+
+```text
+Dr RentLeaseCollection.finance_account.chart_account
+Cr Customer Receivable / Rent-Lease Receivable
+```
+
+F15C uses the concrete source finance account. It does not infer settlement from `RentLeaseBillingDemand.collected_amount` or demand status.
+
+F15C preview is read-only. F15C posting is explicit, admin-only, idempotent, period-gated, numbering-gated, and reconciliation-pending after posting.
+
+F15C does not edit:
+
+- `RentLeaseCollection`
+- `RentLeaseBillingDemand`
+- `Subscription`
+- customer records
+- deposit records
+- `FinanceAccount`
+
+Security deposit, refund, and advance posting remain separate phases.
+
 ## Required checks
 
 ```bash
 .venv/bin/python manage.py test tests.subscriptions.test_rent_lease_collection_source_contract_phase_f15b --verbosity=1
+.venv/bin/python manage.py test tests.accounting.test_accounting_bridge_rent_lease_collection_settlement_phase_f15c --verbosity=1
 .venv/bin/python manage.py test tests.accounting tests.reconciliation tests.subscriptions --verbosity=1
 cd frontend
 npm run typecheck
