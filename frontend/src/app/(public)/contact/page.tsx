@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
+import ContactBranchHero from "@/components/public/ContactBranchHero";
+import ContactBranchTrustPanel from "@/components/public/ContactBranchTrustPanel";
 import CtaBanner from "@/components/public/CtaBanner";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
-import SectionHeader from "@/components/public/SectionHeader";
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
 import { buildPublicMetadata } from "@/lib/public-seo";
-import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { ROUTES } from "@/lib/routes";
 import ContactLeadForm from "./ContactLeadForm";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Contact",
-  description: "Contact Subidha Furniture for product, batch, and easy monthly plan guidance.",
+  description: "Contact Subidha Furniture for product, branch, Lucky Plan, rent, lease, direct-sale, document, and delivery guidance.",
   path: "/contact",
 });
 
@@ -23,19 +22,12 @@ export default async function ContactPage() {
   const profile = await getResolvedPublicBusinessProfile();
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
-  const banner = getPublicBannerWithFallback("contact");
 
   return (
     <PublicPageShell
       title={dictionary.common.contact}
       subtitle="Call, visit, or send an enquiry. Our team will guide you in simple steps."
-      hero={{
-        eyebrow: "Contact and support",
-        imageSrc: banner.src,
-        imageAlt: "Subidha contact banner image",
-        imageExists: banner.exists,
-        badges: ["Phone support", "Branch help", "Enquiry follow-up"],
-      }}
+      heroSlot={<ContactBranchHero profile={profile} />}
       breadcrumbs={[{ label: dictionary.common.home, href: ROUTES.public.home }, { label: dictionary.common.contact }]}
       actions={[
         { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },
@@ -45,49 +37,33 @@ export default async function ContactPage() {
       <PublicMarketingBanner
         eyebrow="Help section"
         title="Talk to us in simple language"
-        description="Our branch team guides customers through products, plan options, required documents, and next steps."
+        description="Our branch team guides customers through products, plan options, required documents, delivery expectations, and next steps. Public support remains separate from operational posting."
         items={[
-          { title: "Plan clarity", description: "Understand monthly amount and tenure before joining." },
-          { title: "Document guidance", description: "Know what to carry for quicker onboarding." },
-          { title: "Follow-up support", description: "Get branch-level help after enquiry submission." },
+          { title: "Plan clarity", description: "Understand monthly comfort, tenure, Lucky Plan scope, rent, lease, or direct-sale suitability before joining." },
+          { title: "Document guidance", description: "Know what to carry for quicker onboarding and staff verification." },
+          { title: "Follow-up support", description: "Get branch-level help after enquiry submission without creating financial records publicly." },
         ]}
       />
 
       <PublicMarketingBanner
         eyebrow="Trust and policy help"
         title="Need clarity on rules, receipts, warranty, or delivery?"
-        description="Our support team can explain plan rules, payment safety, winner publication, and delivery/return workflow before and after enrollment."
+        description="Support can explain plan rules, payment safety, winner publication, rent/lease deposit boundaries, warranty support, and delivery/return workflow before and after enrollment."
         items={[
-          { title: "Plan and payment explanation", description: "Understand monthly amount, receipt flow, and customer self-service access." },
+          { title: "Plan and payment explanation", description: "Understand monthly amount, receipt flow, customer self-service access, and what happens only after staff approval." },
           { title: "Warranty / return policy", description: "Get product-level support guidance and escalation path." },
           { title: "Delivery process", description: "Confirm scheduling, handover expectations, and post-delivery support." },
         ]}
       />
 
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-        <section className="space-y-6">
-          <div className="public-surface p-6">
-            <SectionHeader eyebrow="Branch" title="Visit our store" description="Asansol, West Bengal" />
-            {profile.address_text ? <p className="mt-4 text-sm leading-6 text-muted-foreground">{profile.address_text}</p> : null}
-            <div className="mt-5 grid gap-2 text-sm text-muted-foreground">
-              {profile.support_phone ? <div className="public-card-sm px-4 py-3">Phone: {profile.support_phone}</div> : null}
-              {profile.support_email ? <div className="public-card-sm px-4 py-3">Email: {profile.support_email}</div> : null}
-              {profile.business_hours ? <div className="public-card-sm px-4 py-3">Hours: {profile.business_hours}</div> : null}
-              {profile.map_url ? (
-                <Link href={profile.map_url} className="public-card-sm px-4 py-3 transition hover:bg-[var(--surface-card-elevated)]">
-                  Open map
-                </Link>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
+        <ContactBranchTrustPanel profile={profile} />
         <ContactLeadForm />
       </section>
 
       <CtaBanner
         title="Need product-first assistance?"
-        description="Browse products first, then submit an enquiry with product context."
+        description="Browse products first, then submit an enquiry with product context. Product selection does not reserve stock or create financial records until branch review."
         actions={[
           { href: ROUTES.public.products, label: dictionary.common.products, variant: "secondary" },
           { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },
