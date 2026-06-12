@@ -6,7 +6,7 @@ from django.db import models
 from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.db.models.functions import Cast
 
-from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntryGroup, SalarySheet
+from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntryGroup, SalaryPayment, SalarySheet
 from accounting.services.accounting_bridge_purchase_bill_service import BridgeCandidateFilters, list_bridge_candidates, stock_ledger_candidate
 from billing.models import BillingCreditNote, BillingDebitNote, BillingInvoice, DirectSaleReturn, ReceiptDocument
 from inventory.models import PurchaseBill, StockLedger, VendorPayment
@@ -15,7 +15,7 @@ from subscriptions.models import Commission, CommissionPayoutBatch, Payment
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationItemStatus, ReconciliationSeverity
 
 MODULE = "ACCOUNTING_BRIDGE_PHASE_F"
-BRIDGE_SOURCE_MODELS = ("Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission", "CommissionPayoutBatch", "SalarySheet")
+BRIDGE_SOURCE_MODELS = ("Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission", "CommissionPayoutBatch", "SalarySheet", "SalaryPayment")
 
 
 def _money(value) -> Decimal:
@@ -71,6 +71,9 @@ def _source_amount(*, source_model: str, source_id: str) -> Decimal | None:
     if source_model == "SalarySheet":
         row = SalarySheet.objects.filter(pk=source_id).only("net_amount").first()
         return _money(row.net_amount) if row else None
+    if source_model == "SalaryPayment":
+        row = SalaryPayment.objects.filter(pk=source_id).only("amount").first()
+        return _money(row.amount) if row else None
     return None
 
 
@@ -116,6 +119,9 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
             return f"SAL-{source_id}"
         period = getattr(row.payroll_period, "code", None) if row.payroll_period_id else f"{row.year}-{row.month:02d}"
         return f"SAL-{row.employee.employee_code}-{period}"
+    if source_model == "SalaryPayment":
+        row = SalaryPayment.objects.filter(pk=source_id).only("reference_no").first()
+        return (row.reference_no or f"SALPAY-{source_id}") if row else f"SALPAY-{source_id}"
     return fallback or f"{source_model}-{source_id}"
 
 
@@ -139,6 +145,7 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
         ("Commission", "COMMISSION_MISSING_ACCOUNTING_BRIDGE_POSTING", "Commission exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("CommissionPayoutBatch", "COMMISSION_PAYOUT_MISSING_ACCOUNTING_BRIDGE_POSTING", "CommissionPayoutBatch exists as a supported concrete payout settlement bridge candidate but AccountingBridgePosting is missing."),
         ("SalarySheet", "SALARY_SHEET_MISSING_ACCOUNTING_BRIDGE_POSTING", "SalarySheet exists as a supported concrete payroll accrual bridge candidate but AccountingBridgePosting is missing."),
+        ("SalaryPayment", "SALARY_PAYMENT_MISSING_ACCOUNTING_BRIDGE_POSTING", "SalaryPayment exists as a supported concrete salary payment settlement bridge candidate but AccountingBridgePosting is missing."),
     ]
     for source_model, code, message in specs:
         for row in list_bridge_candidates(BridgeCandidateFilters(date_from=date_from, date_to=date_to, source_model=source_model)):
@@ -165,6 +172,8 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
             if branch_id and source_model == "CommissionPayoutBatch" and not CommissionPayoutBatch.objects.filter(pk=row.get("source_pk"), finance_account__branch_id=branch_id).exists():
                 continue
             if branch_id and source_model == "SalarySheet" and not SalarySheet.objects.filter(pk=row.get("source_pk"), employee__branch_id=branch_id).exists():
+                continue
+            if branch_id and source_model == "SalaryPayment" and not SalaryPayment.objects.filter(pk=row.get("source_pk"), branch_id=branch_id).exists():
                 continue
             _create_missing_bridge_item(run=run, source_model=source_model, source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"{source_model}-{row['source_pk']}", amount=_money(row.get("amount")), exception_code=code, message=message, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "source_date": row.get("source_date"), "taxable_amount": row.get("taxable_amount"), "tax_amount": row.get("tax_amount")}, totals=totals)
 
@@ -230,7 +239,8 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         commission_ids = [str(pk) for pk in Commission.objects.filter(payment__branch_id=branch_id).values_list("id", flat=True)]
         commission_payout_ids = [str(pk) for pk in CommissionPayoutBatch.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
         salary_sheet_ids = [str(pk) for pk in SalarySheet.objects.filter(employee__branch_id=branch_id).values_list("id", flat=True)]
-        bridges = bridges.filter(Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids) | Q(source_model="PurchaseBill", source_id__in=purchase_ids) | Q(source_model="VendorPayment", source_id__in=vendor_payment_ids) | Q(source_model="StockLedger", source_id__in=stock_ledger_ids) | Q(source_model="Commission", source_id__in=commission_ids) | Q(source_model="CommissionPayoutBatch", source_id__in=commission_payout_ids) | Q(source_model="SalarySheet", source_id__in=salary_sheet_ids))
+        salary_payment_ids = [str(pk) for pk in SalaryPayment.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
+        bridges = bridges.filter(Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids) | Q(source_model="PurchaseBill", source_id__in=purchase_ids) | Q(source_model="VendorPayment", source_id__in=vendor_payment_ids) | Q(source_model="StockLedger", source_id__in=stock_ledger_ids) | Q(source_model="Commission", source_id__in=commission_ids) | Q(source_model="CommissionPayoutBatch", source_id__in=commission_payout_ids) | Q(source_model="SalarySheet", source_id__in=salary_sheet_ids) | Q(source_model="SalaryPayment", source_id__in=salary_payment_ids))
     totals["checked"] += bridges.count()
 
     for bridge in bridges:

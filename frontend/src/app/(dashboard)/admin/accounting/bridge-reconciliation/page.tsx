@@ -26,8 +26,8 @@ const MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit";
 const DOCUMENT_NUMBERING_HREF = ROUTES.admin.settingsBusinessSetupDocumentNumbering;
 const RECONCILIATION_RUNS_HREF = "/admin/reconciliation/runs";
 const STATUS_OPTIONS = ["", "READY_UNPOSTED", "POSTED_UNVERIFIED", "POSTED", "RECONCILED", "BLOCKED", "BLOCKED_BY_MAPPING", "BLOCKED_BY_PERIOD", "BLOCKED_BY_NUMBERING", "BLOCKED_BY_APPROVAL", "UNSUPPORTED", "UNSUPPORTED_SOURCE", "EXCEPTION"];
-const SOURCE_MODEL_OPTIONS = ["", "Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission", "CommissionPayoutBatch", "SalarySheet"];
-const CONCRETE_POST_MODELS = new Set(["Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission", "CommissionPayoutBatch", "SalarySheet"]);
+const SOURCE_MODEL_OPTIONS = ["", "Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission", "CommissionPayoutBatch", "SalarySheet", "SalaryPayment"];
+const CONCRETE_POST_MODELS = new Set(["Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission", "CommissionPayoutBatch", "SalarySheet", "SalaryPayment"]);
 const PURCHASE_BILL_POSTING_COPY = "Posting creates accounting journal entries. It does not edit purchase bill, vendor payment, inventory, commission, payout, payroll, staff, attendance, StaffAdvance, or payment records.";
 const PURCHASE_BILL_PREVIEW_COPY = "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation. It does not edit purchase bill or inventory records.";
 const COMMISSION_PREVIEW_COPY = "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation. It does not edit commission or payout records.";
@@ -79,6 +79,7 @@ function rowKey(row: AccountingBridgeReconciliationRow): string {
 
 function sourceTitle(row: AccountingBridgeReconciliationRow): string {
   if (row.source_display) return row.source_display;
+  if (row.salary_payment_reference) return `Salary payment ${row.salary_payment_reference}`;
   if (row.salary_reference) return `Salary sheet ${row.salary_reference}`;
   if (row.commission_reference) return `Commission ${row.commission_reference}`;
   if (row.payout_reference) return `Payout ${row.payout_reference}`;
@@ -96,6 +97,8 @@ function sourceExtra(row: AccountingBridgeReconciliationRow) {
       {row.commission_reference ? <div>Commission: {row.commission_reference} · {row.commission_status}</div> : null}
       {row.payout_batch_code ? <div>Payout batch: {row.payout_batch_code} · {row.payout_status}</div> : null}
       {row.salary_reference ? <div>Payroll: {row.salary_reference} · {row.payroll_status ?? row.salary_status}</div> : null}
+      {row.salary_payment_reference ? <div>Salary payment: {row.salary_payment_reference} · {row.salary_payment_date ?? row.source_date}</div> : null}
+      {row.linked_salary_sheet_reference ? <div>Linked salary sheet: {row.linked_salary_sheet_reference}</div> : null}
       {row.staff_name || row.employee_code ? <div>Staff: {row.staff_name ?? row.employee_name ?? "-"} · {row.employee_code ?? "-"}</div> : null}
       {row.payroll_period ? <div>Payroll period: {row.payroll_period}</div> : null}
       {row.gross_salary || row.payable_amount ? <div>Gross/payable: {row.gross_salary ?? row.gross_amount ?? "0.00"} / {row.payable_amount ?? row.net_amount ?? row.amount ?? "0.00"}</div> : null}

@@ -92,7 +92,7 @@ function isCommissionRow(row: AccountingMappingAuditRow): boolean {
 
 function isPayrollRow(row: AccountingMappingAuditRow): boolean {
   const text = rowSearchText(row);
-  return text.includes("salarysheet") || text.includes("salary_sheet") || text.includes("salary accrual") || text.includes("salary_accrual") || text.includes("payroll_accrual") || text.includes("staff_salary_accrual") || text.includes("wages_accrual") || text.includes("salary_expense") || text.includes("wages_expense") || text.includes("salary_payable");
+  return text.includes("salarysheet") || text.includes("salarypayment") || text.includes("salary_sheet") || text.includes("salary_payment") || text.includes("salary payment") || text.includes("salary accrual") || text.includes("salary_accrual") || text.includes("payroll_accrual") || text.includes("payroll_payment") || text.includes("staff_salary_accrual") || text.includes("wages_accrual") || text.includes("wages_payment") || text.includes("salary_expense") || text.includes("wages_expense") || text.includes("salary_payable");
 }
 
 function groupName(row: AccountingMappingAuditRow): string {
@@ -175,6 +175,8 @@ function missingLabel(row: AccountingMappingAuditRow): string {
 }
 
 function routeForRow(row: AccountingMappingAuditRow): string {
+  if (isPayrollRow(row) && rowSearchText(row).includes("salarypayment")) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=SalaryPayment`;
+  if (isPayrollRow(row) && rowSearchText(row).includes("salary_payment")) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=SalaryPayment`;
   if (isPayrollRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=SalarySheet`;
   if (isCommissionRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=Commission`;
   if (isStockLedgerRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=StockLedger`;

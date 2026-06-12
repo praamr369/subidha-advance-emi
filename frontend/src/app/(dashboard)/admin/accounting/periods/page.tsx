@@ -207,8 +207,12 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
         { label: "Reconciled", value: summaryCount(summary, "payroll_reconciled_count"), detail: "Bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "SalarySheet", status: "RECONCILED" }) },
         { label: "Blocked", value: summaryCount(summary, "payroll_blocked_count"), detail: "Mapping, period, numbering, or approval blocker remains unresolved.", href: bridgeReviewHref({ source_model: "SalarySheet", status: "BLOCKED" }) },
         { label: "Unsupported", value: summaryCount(summary, "payroll_unsupported_count"), detail: "Unapproved, legacy-posted, deducted, or date-unsafe salary sheets are not accrual-postable.", href: bridgeReviewHref({ source_model: "SalarySheet", status: "UNSUPPORTED" }) },
+        { label: "Payment ready", value: summaryCount(summary, "salary_payment_ready_unposted_count"), detail: "Concrete salary payments ready for explicit payable-settlement posting.", href: bridgeReviewHref({ source_model: "SalaryPayment", status: "READY_UNPOSTED" }) },
+        { label: "Payment posted", value: summaryCount(summary, "salary_payment_posted_unverified_count"), detail: "Salary payment journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "SalaryPayment", status: "POSTED_UNVERIFIED" }) },
+        { label: "Payment blocked", value: summaryCount(summary, "salary_payment_blocked_count"), detail: "Salary payable, finance account, period, or numbering blocker remains unresolved.", href: bridgeReviewHref({ source_model: "SalaryPayment", status: "BLOCKED" }) },
       ],
       extraActions: [
+        { label: "Review salary payment bridge items", href: bridgeReviewHref({ source_model: "SalaryPayment" }) },
         { label: "Run reconciliation checks", href: RECONCILIATION_RUNS_HREF },
         { label: "Open mapping audit", href: MAPPING_AUDIT_HREF },
       ],

@@ -95,6 +95,12 @@ export type AccountingBridgeReconciliationSummary = {
   payroll_reconciled_count?: number;
   payroll_blocked_count?: number;
   payroll_unsupported_count?: number;
+  salary_payment_ready_unposted_count?: number;
+  salary_payment_posted_count?: number;
+  salary_payment_posted_unverified_count?: number;
+  salary_payment_reconciled_count?: number;
+  salary_payment_blocked_count?: number;
+  salary_payment_unsupported_count?: number;
   payment_ready_unposted_count?: number;
   payment_posted_count?: number;
   payment_posted_unverified_count?: number;
@@ -105,7 +111,7 @@ export type AccountingBridgeReconciliationSummary = {
 export type AccountingBridgeReconciliationJournal = { id?: number | null; entry_no?: string | null; entry_date?: string | null; status?: string | null; financial_year?: number | null; financial_year_code?: string | null; accounting_period?: number | null; accounting_period_code?: string | null; accounting_period_name?: string | null; accounting_period_status?: string | null };
 export type AccountingBridgeReconciliationItem = { id: number; status: string; severity: string; exception_code?: string; exception_message?: string };
 export type AccountingBridgePeriodReadiness = { financial_year_ready?: boolean; accounting_period_ready?: boolean; journal_numbering_ready?: boolean; posting_controls_ready?: boolean; active_financial_year?: { id?: number; code?: string; name?: string } | null; current_period?: { id?: number; code?: string; name?: string; status?: string } | null; blockers?: string[] };
-export type BridgeSourceModel = "Payment" | "ReceiptDocument" | "BillingInvoice" | "BillingCreditNote" | "DirectSaleReturn" | "BillingDebitNote" | "PurchaseBill" | "VendorPayment" | "StockLedger" | "Commission" | "CommissionPayoutBatch" | "SalarySheet" | string;
+export type BridgeSourceModel = "Payment" | "ReceiptDocument" | "BillingInvoice" | "BillingCreditNote" | "DirectSaleReturn" | "BillingDebitNote" | "PurchaseBill" | "VendorPayment" | "StockLedger" | "Commission" | "CommissionPayoutBatch" | "SalarySheet" | "SalaryPayment" | string;
 
 export type AccountingBridgeReconciliationRow = {
   id?: string;
@@ -149,6 +155,13 @@ export type AccountingBridgeReconciliationRow = {
   salary_sheet_id?: number | string | null;
   salary_reference?: string | null;
   salary_status?: string | null;
+  salary_payment_id?: number | string | null;
+  salary_payment_reference?: string | null;
+  salary_payment_date?: string | null;
+  salary_payment_amount?: string | null;
+  salary_payment_status?: string | null;
+  linked_salary_sheet_reference?: string | null;
+  legacy_posted_journal_entry_id?: number | string | null;
   payroll_status?: string | null;
   payroll_period?: string | null;
   payroll_period_code?: string | null;

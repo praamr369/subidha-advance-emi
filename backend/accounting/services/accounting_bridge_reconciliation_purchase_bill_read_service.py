@@ -6,7 +6,7 @@ from accounting.services.accounting_bridge_reconciliation_read_service import Br
 from accounting.services.accounting_bridge_purchase_bill_service import BridgeCandidateFilters, list_bridge_candidates, summarize_candidate_statuses
 
 
-EXTENDED_SOURCE_MODELS = {"PurchaseBill", "VendorPayment", "StockLedger", "SalarySheet"}
+EXTENDED_SOURCE_MODELS = {"PurchaseBill", "VendorPayment", "StockLedger", "SalarySheet", "SalaryPayment"}
 
 
 def _candidate_filters(filters: BridgeReconciliationFilters) -> BridgeCandidateFilters:
