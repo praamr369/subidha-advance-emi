@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from accounting.services.accounting_bridge_reconciliation_read_service import BridgeReconciliationFilters, build_accounting_bridge_reconciliation as build_base_reconciliation
-from accounting.services.accounting_bridge_purchase_bill_service import BridgeCandidateFilters, list_bridge_candidates, summarize_candidate_statuses
+from accounting.services.accounting_bridge_rent_lease_collection_service import BridgeCandidateFilters, list_bridge_candidates, summarize_candidate_statuses
 
 
-EXTENDED_SOURCE_MODELS = {"PurchaseBill", "VendorPayment", "StockLedger", "SalarySheet", "SalaryPayment"}
+EXTENDED_SOURCE_MODELS = {"PurchaseBill", "VendorPayment", "StockLedger", "SalarySheet", "SalaryPayment", "RentLeaseCollection"}
 
 
 def _candidate_filters(filters: BridgeReconciliationFilters) -> BridgeCandidateFilters:
@@ -36,7 +36,7 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
     if active_filters.source_model in EXTENDED_SOURCE_MODELS:
         results = candidate_rows
     else:
-        # Avoid duplicating rows if the base service later gains first-class purchase/vendor support.
+        # Avoid duplicating rows if the base service later gains first-class purchase/vendor/rent-lease support.
         existing_ids = {(row.get("source_model"), str(row.get("source_id") or row.get("source_pk") or ""), row.get("event_key")) for row in existing_results}
         results = [*existing_results, *[row for row in candidate_rows if (row.get("source_model"), str(row.get("source_id") or row.get("source_pk") or ""), row.get("event_key")) not in existing_ids]]
     summary = {**(payload.get("summary") or {}), **summarize_candidate_statuses(results)}
