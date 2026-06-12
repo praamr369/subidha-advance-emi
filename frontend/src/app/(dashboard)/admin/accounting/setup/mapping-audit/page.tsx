@@ -28,6 +28,8 @@ const GROUP_ORDER = [
   "Debit note mappings",
   "Vendor payment mappings",
   "Purchase bill mappings",
+  "Inventory / COGS mappings",
+  "Inventory / StockLedger mappings",
   "Inventory mappings",
   "Manufacturing mappings",
   "Payments/refunds mappings",
@@ -78,13 +80,14 @@ function isVendorPaymentRow(row: AccountingMappingAuditRow): boolean {
 
 function isStockLedgerRow(row: AccountingMappingAuditRow): boolean {
   const text = rowSearchText(row);
-  return text.includes("stockledger") || text.includes("stock ledger") || text.includes("inventory_purchase_receive") || text.includes("inventory_adjustment") || text.includes("inventory_writeoff") || text.includes("inventory_return");
+  return text.includes("stockledger") || text.includes("stock ledger") || text.includes("inventory_purchase_receive") || text.includes("inventory_adjustment") || text.includes("inventory_writeoff") || text.includes("inventory_return") || text.includes("cogs") || text.includes("cost_of_goods_sold");
 }
 
 function groupName(row: AccountingMappingAuditRow): string {
   const text = rowSearchText(row);
   if (text.includes("collection") || text.includes("cashier")) return "Collection posting mappings";
   if (text.includes("billingdebitnote") || text.includes("debit_note") || text.includes("debit note")) return "Debit note mappings";
+  if (text.includes("cogs") || text.includes("cost_of_goods_sold")) return "Inventory / COGS mappings";
   if (isStockLedgerRow(row)) return "Inventory / StockLedger mappings";
   if (isVendorPaymentRow(row)) return "Vendor payment mappings";
   if (isPurchaseBillRow(row)) return "Purchase bill mappings";
@@ -139,6 +142,7 @@ function missingLabel(row: AccountingMappingAuditRow): string {
   const status = normalizedStatus(row);
   if (READY_MAPPING_STATUSES.includes(status)) return status === "READY_UNPOSTED" ? "Setup is ready. Journal posting is still pending in bridge reconciliation." : "No missing setup reported";
   if (isStockLedgerRow(row) && status === "UNSUPPORTED_SOURCE") return "Unsupported StockLedger movement or deferred COGS source classification.";
+  if (isStockLedgerRow(row) && rowSearchText(row).includes("cogs")) return "Inventory Asset and COGS mappings are required before COGS stock-out posting.";
   const missing = [];
   if (row.debit_mapping_status !== "READY") missing.push(`Debit: ${row.debit_mapping_status}`);
   if (row.credit_mapping_status !== "READY") missing.push(`Credit: ${row.credit_mapping_status}`);

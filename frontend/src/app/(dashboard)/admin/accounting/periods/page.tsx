@@ -23,10 +23,11 @@ const MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit";
 const RECONCILIATION_RUNS_HREF = "/admin/reconciliation/runs";
 const DOCUMENT_NUMBERING_HREF = ROUTES.admin.settingsBusinessSetupDocumentNumbering;
 
-function bridgeReviewHref(filters: { source_model?: string; status?: string; accounting_period?: number | string }) {
+function bridgeReviewHref(filters: { source_model?: string; status?: string; event_key?: string; accounting_period?: number | string }) {
   const params = new URLSearchParams();
   if (filters.source_model) params.set("source_model", filters.source_model);
   if (filters.status) params.set("status", filters.status);
+  if (filters.event_key) params.set("event_key", filters.event_key);
   if (filters.accounting_period) params.set("accounting_period", String(filters.accounting_period));
   const query = params.toString();
   return query ? `${ROUTES.admin.accountingBridgeReconciliation}?${query}` : ROUTES.admin.accountingBridgeReconciliation;
@@ -165,10 +166,15 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
       href: bridgeReviewHref({ source_model: "StockLedger" }),
       rows: [
         { label: "Ready unposted", value: summaryCount(summary, "stock_ledger_ready_unposted_count"), detail: "Ready unposted means setup is ready, but journal posting is still pending.", href: bridgeReviewHref({ source_model: "StockLedger", status: "READY_UNPOSTED" }) },
+        ...(summary?.stock_ledger_cogs_ready_unposted_count !== undefined ? [{ label: "COGS ready", value: summaryCount(summary, "stock_ledger_cogs_ready_unposted_count"), detail: "COGS ready means finalized sale stock-out cost evidence is ready for explicit posting.", href: bridgeReviewHref({ source_model: "StockLedger", status: "READY_UNPOSTED" }) }] : []),
         { label: "Posted unverified", value: summaryCount(summary, "stock_ledger_posted_unverified_count"), detail: "Posted unverified means journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "StockLedger", status: "POSTED_UNVERIFIED" }) },
+        ...(summary?.stock_ledger_cogs_posted_unverified_count !== undefined ? [{ label: "COGS posted", value: summaryCount(summary, "stock_ledger_cogs_posted_unverified_count"), detail: "COGS posted means journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "StockLedger", status: "POSTED_UNVERIFIED" }) }] : []),
         { label: "Reconciled", value: summaryCount(summary, "stock_ledger_reconciled_count"), detail: "Reconciled means the bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "StockLedger", status: "RECONCILED" }) },
+        ...(summary?.stock_ledger_cogs_reconciled_count !== undefined ? [{ label: "COGS reconciled", value: summaryCount(summary, "stock_ledger_cogs_reconciled_count"), detail: "COGS reconciled means the bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "StockLedger", status: "RECONCILED" }) }] : []),
         { label: "Blocked", value: summaryCount(summary, "stock_ledger_blocked_count"), detail: "Mapping, period, numbering, or valuation blocker remains unresolved.", href: bridgeReviewHref({ source_model: "StockLedger", status: "BLOCKED" }) },
+        ...(summary?.stock_ledger_cogs_blocked_count !== undefined ? [{ label: "COGS blocked", value: summaryCount(summary, "stock_ledger_cogs_blocked_count"), detail: "COGS mapping, period, numbering, or cost evidence blocker remains unresolved.", href: bridgeReviewHref({ source_model: "StockLedger", status: "BLOCKED" }) }] : []),
         { label: "Unsupported", value: summaryCount(summary, "stock_ledger_unsupported_count"), detail: "Unsupported movement types and deferred COGS rows stay non-postable.", href: bridgeReviewHref({ source_model: "StockLedger", status: "UNSUPPORTED" }) },
+        ...(summary?.stock_ledger_deferred_cogs_count !== undefined ? [{ label: "COGS deferred", value: summaryCount(summary, "stock_ledger_deferred_cogs_count"), detail: "Deferred COGS rows lack finalized source or persisted cost evidence and cannot be posted.", href: bridgeReviewHref({ source_model: "StockLedger", event_key: "deferred_cogs" }) }] : []),
       ],
       extraActions: [
         { label: "Run reconciliation checks", href: RECONCILIATION_RUNS_HREF },

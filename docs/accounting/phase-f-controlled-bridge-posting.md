@@ -225,6 +225,88 @@ Safety boundary:
 - Posting does not create inventory valuation, COGS, purchase-return, commission, payroll, staff-advance, rent, or lease accounting.
 - Reconciliation remains pending until explicit verification.
 
+## Phase F8 — StockLedger inventory asset bridge posting
+
+Phase F8 extends the controlled bridge workflow to concrete `StockLedger` rows for inventory asset, clearing, adjustment, writeoff, and return movements.
+
+Supported source model:
+
+```text
+StockLedger
+```
+
+Supported event keys:
+
+```text
+inventory_purchase_receive
+inventory_adjustment_increase
+inventory_adjustment_decrease
+inventory_writeoff
+inventory_return_in
+inventory_return_out
+```
+
+Sale/delivery stock-out rows were intentionally deferred in F8 because the `StockLedger` row itself does not store reliable COGS value.
+
+Safety boundary:
+
+- F8 does not mutate `StockLedger`.
+- F8 does not mutate `InventoryItem`, stock quantity, or stock valuation.
+- F8 does not create stock movements or recalculate valuation.
+- Transfer rows are skipped as not applicable.
+- Unsupported rows remain visible and non-postable.
+
+## Phase F9 — Controlled COGS / sale stock-out bridge posting
+
+Phase F9 extends the same controlled bridge workflow to COGS-style accounting for existing finalized sale/delivery `StockLedger` stock-out rows only.
+
+Supported source model:
+
+```text
+StockLedger
+```
+
+Supported COGS event keys:
+
+```text
+cogs_sale_delivery
+cogs_direct_sale_delivery
+cogs_subscription_delivery
+inventory_sale_stock_out
+```
+
+Eligibility is intentionally narrow:
+
+- the row must be a concrete `StockLedger` row
+- movement must be a physical finalized stock-out: `SALE_OUT`, `EMI_DELIVERY_OUT`, or `DELIVERY_OUT`
+- source metadata must link to a supported finalized sale/delivery source such as `BillingInvoiceLine`, `DirectSaleLine`, or `SubscriptionDelivery`
+- the linked source snapshot must contain persisted cost evidence such as `cogs_unit_cost`, `cogs_amount`, `unit_cost_snapshot`, or `valuation_amount_snapshot`
+- the amount must be positive and balanced
+- the same source/event must not already be posted
+- the accounting period and `JOURNAL_ENTRY` numbering must be ready
+- COGS and Inventory Asset mappings must be active
+
+Accounting shape:
+
+- Debit `COGS` / `COST_OF_GOODS_SOLD`
+- Credit `INVENTORY_ASSET`
+
+Deferred / unsupported behavior:
+
+- Missing, ambiguous, zero, or guessed cost returns a non-postable `deferred_cogs` candidate.
+- Stock-out rows whose source cannot prove finalized sale/delivery return unsupported/deferred status and are not postable.
+- F9 never derives cost from live inventory state or current product cost as a guess.
+
+Safety boundary:
+
+- F9 does not mutate `StockLedger`.
+- F9 does not mutate `InventoryItem`, stock quantity, or valuation.
+- F9 does not mutate `BillingInvoice`, `DirectSale`, `SubscriptionDelivery`, `PurchaseBill`, or `VendorPayment`.
+- F9 does not create/delete stock movements, recalculate valuation, auto-post, auto-reconcile, or close periods.
+- F9 does not add rent/lease revenue, commission, payroll, or StaffAdvance posting.
+
+Reconciliation diagnostics now include ready unposted COGS candidates, posted-unverified COGS postings, amount/period/source/journal/duplicate mismatches through the existing bridge checks, and explicit `DEFERRED_COGS` / `UNSUPPORTED_SOURCE` items for non-postable stock-out rows.
+
 ## Preview contract
 
 Preview endpoint:
@@ -242,7 +324,7 @@ Preview must remain read-only. It must not create:
 - source Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, BillingDebitNote, PurchaseBill, VendorPayment, or DirectSaleReturn mutations
 - StockLedger or inventory valuation mutations
 
-Preview returns the concrete source identity, journal-date context, accounting period, journal-number preview, debit lines, credit lines, tax lines where supported, totals, blockers, warnings, idempotency key, and safety copy. For `StockLedger`, preview also returns movement type/date, item/product, stock location/branch, quantity, unit cost where safely resolved, and amount/value.
+Preview returns the concrete source identity, journal-date context, accounting period, journal-number preview, debit lines, credit lines, tax lines where supported, totals, blockers, warnings, idempotency key, and safety copy. For `StockLedger`, preview also returns movement type/date, item/product, stock location/branch, quantity, unit cost where safely resolved, amount/value, source reference, and COGS amount/state when applicable.
 
 ## Posting contract
 

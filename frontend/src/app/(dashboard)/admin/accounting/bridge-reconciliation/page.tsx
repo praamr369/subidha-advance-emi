@@ -100,7 +100,9 @@ function sourceExtra(row: AccountingBridgeReconciliationRow) {
       {row.movement_type ? <div>Movement: {row.movement_type}</div> : null}
       {row.item_name || row.product_name ? <div>Item: {row.item_name ?? row.product_name}</div> : null}
       {row.stock_location_name || row.branch_name ? <div>Location: {row.stock_location_name ?? "-"} · {row.branch_name ?? "-"}</div> : null}
-      {row.quantity || row.unit_cost ? <div>Qty/cost: {row.quantity ?? "-"} / {row.unit_cost ?? "-"}</div> : null}
+      {row.quantity || row.unit_cost ? <div>Qty/unit cost: {row.quantity_out ?? row.quantity ?? "-"} / {row.unit_cost ?? "-"}</div> : null}
+      {row.cogs_amount || row.cogs_state ? <div>COGS: {row.cogs_amount ?? "0.00"} · {row.cogs_state ?? row.status}</div> : null}
+      {row.cost_evidence ? <div>Cost evidence: {row.cost_evidence}</div> : null}
       {row.reference_model || row.reference_id ? <div>Source ref: {row.reference_model ?? "-"} · {row.reference_id ?? "-"}</div> : null}
       {row.return_number ? <div>Return: {row.return_number} · {row.return_status}</div> : null}
       {row.taxable_amount || row.tax_amount ? <div>Taxable/tax: {row.taxable_amount ?? "0.00"} / {row.tax_amount ?? "0.00"}</div> : null}
@@ -306,7 +308,7 @@ export default function AccountingBridgeReconciliationPage() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting operations path</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Preview source item → post explicitly → verify reconciliation</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Concrete candidates include Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, PurchaseBill, VendorPayment, and StockLedger. Abstract readiness rows show “View source items” and cannot post. Posting creates accounting entries only; it does not edit stock ledger, inventory quantity, valuation, purchase bill, or vendor payment records.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Concrete candidates include Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, PurchaseBill, VendorPayment, and StockLedger. Abstract readiness rows show “View source items” and cannot post. Posting creates accounting entries only; it does not edit stock ledger, inventory quantity, valuation, sale/delivery, purchase bill, or vendor payment records.</p>
             </div>
             <ActionButton variant="secondary" onClick={() => void load(filters, { silent: true })} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</ActionButton>
           </div>
@@ -319,6 +321,8 @@ export default function AccountingBridgeReconciliationPage() {
             <SummaryCard label="Purchase bill ready" value={Number(summary.purchase_bill_ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=PurchaseBill&status=READY_UNPOSTED`} />
             <SummaryCard label="Vendor payment ready" value={Number(summary.vendor_payment_ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=VendorPayment&status=READY_UNPOSTED`} />
             <SummaryCard label="Stock ledger ready" value={Number(summary.stock_ledger_ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=StockLedger&status=READY_UNPOSTED`} />
+            {summary.stock_ledger_cogs_ready_unposted_count !== undefined ? <SummaryCard label="COGS ready" value={Number(summary.stock_ledger_cogs_ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=StockLedger&status=READY_UNPOSTED`} /> : null}
+            {summary.stock_ledger_deferred_cogs_count !== undefined ? <SummaryCard label="COGS deferred" value={Number(summary.stock_ledger_deferred_cogs_count ?? 0)} tone="border-amber-200 bg-amber-50 text-amber-950" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=StockLedger&event_key=deferred_cogs`} /> : null}
             <SummaryCard label="Purchase posted" value={Number(summary.purchase_bill_posted_unverified_count ?? summary.purchase_bill_posted_count ?? 0)} tone="border-emerald-200 bg-white text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=POSTED_UNVERIFIED&source_model=PurchaseBill`} />
             <SummaryCard label="Vendor posted" value={Number(summary.vendor_payment_posted_unverified_count ?? summary.vendor_payment_posted_count ?? 0)} tone="border-emerald-200 bg-white text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=POSTED_UNVERIFIED&source_model=VendorPayment`} />
             <SummaryCard label="Stock posted" value={Number(summary.stock_ledger_posted_unverified_count ?? summary.stock_ledger_posted_count ?? 0)} tone="border-emerald-200 bg-white text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=POSTED_UNVERIFIED&source_model=StockLedger`} />

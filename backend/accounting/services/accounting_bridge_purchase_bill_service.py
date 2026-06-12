@@ -60,6 +60,10 @@ STOCK_LEDGER_EVENT_KEYS = {
     "inventory_writeoff",
     "inventory_return_in",
     "inventory_return_out",
+    "cogs_sale_delivery",
+    "cogs_direct_sale_delivery",
+    "cogs_subscription_delivery",
+    "inventory_sale_stock_out",
 }
 STOCK_LEDGER_PURPOSE_BY_EVENT = {key: key.upper() for key in STOCK_LEDGER_EVENT_KEYS}
 STOCK_LEDGER_LABEL_BY_EVENT = {
@@ -71,11 +75,17 @@ STOCK_LEDGER_LABEL_BY_EVENT = {
     "inventory_writeoff": "Inventory writeoff",
     "inventory_return_in": "Inventory return in",
     "inventory_return_out": "Inventory return out",
+    "cogs_sale_delivery": "COGS sale delivery",
+    "cogs_direct_sale_delivery": "COGS direct sale delivery",
+    "cogs_subscription_delivery": "COGS subscription delivery",
+    "inventory_sale_stock_out": "Inventory sale stock-out",
 }
 SKIPPED_STOCK_LEDGER_EVENT_KEY = "inventory_skipped_not_applicable"
 UNSUPPORTED_STOCK_LEDGER_EVENT_KEY = "unsupported_stockledger"
 DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY = "deferred_cogs"
-STOCK_LEDGER_SAFETY_TEXT = "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation. It does not edit stock ledger, inventory quantity, valuation, purchase bill, or vendor payment records."
+STOCK_LEDGER_SAFETY_TEXT = "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation. It does not edit stock ledger, inventory quantity, valuation, sale/delivery, purchase bill, or vendor payment records."
+COGS_STOCK_LEDGER_EVENT_KEYS = {"cogs_sale_delivery", "cogs_direct_sale_delivery", "cogs_subscription_delivery", "inventory_sale_stock_out"}
+COGS_STOCK_OUT_MOVEMENT_TYPES = {StockMovementType.SALE_OUT, StockMovementType.EMI_DELIVERY_OUT, StockMovementType.DELIVERY_OUT}
 
 BridgeCandidateFilters = base.BridgeCandidateFilters
 verify_bridge_reconciliation_item = base.verify_bridge_reconciliation_item
@@ -170,6 +180,90 @@ def _stock_ledger_source_cost(row: StockLedger) -> tuple[Decimal | None, Decimal
     return None, None, "StockLedger row has no reliable source valuation fields for accounting bridge posting."
 
 
+def _nested_snapshot_value(snapshot: Any, keys: set[str]) -> Any:
+    if not isinstance(snapshot, dict):
+        return None
+    stack = [snapshot]
+    while stack:
+        current = stack.pop()
+        for key, value in current.items():
+            normalized = str(key).strip().lower()
+            if normalized in keys and value not in (None, ""):
+                return value
+            if isinstance(value, dict):
+                stack.append(value)
+    return None
+
+
+def _cost_from_snapshot(snapshot: Any, quantity: Decimal) -> tuple[Decimal | None, Decimal | None, str | None]:
+    unit_keys = {"cogs_unit_cost", "unit_cost_snapshot", "cost_unit", "unit_cost", "stock_unit_cost"}
+    amount_keys = {"cogs_amount", "cogs_total", "valuation_amount_snapshot", "cost_amount", "stock_cost_amount", "total_cost"}
+    raw_unit = _nested_snapshot_value(snapshot, unit_keys)
+    raw_amount = _nested_snapshot_value(snapshot, amount_keys)
+    unit = base._money(raw_unit) if raw_unit not in (None, "") else None
+    amount = base._money(raw_amount) if raw_amount not in (None, "") else None
+    if amount is None and unit is not None and quantity > Decimal("0.000"):
+        amount = base._money(unit * quantity)
+    if unit is None and amount is not None and quantity > Decimal("0.000"):
+        unit = (amount / quantity).quantize(Decimal("0.01"))
+    if amount is None or unit is None:
+        return None, None, "Source snapshot does not contain persisted COGS/unit-cost evidence."
+    if amount <= Decimal("0.00") or unit <= Decimal("0.00"):
+        return None, None, "Source COGS evidence is zero or negative; COGS is deferred."
+    return unit, amount, None
+
+
+def _stock_ledger_cogs_evidence(row: StockLedger) -> tuple[str, str, Decimal | None, Decimal | None, str | None]:
+    ref_pk = _stock_ledger_ref_pk(row)
+    if ref_pk is None:
+        return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "StockLedger reference_id is not a resolvable concrete sale/delivery source id."
+    quantity = Decimal(str(row.quantity_out or "0.000"))
+    if row.movement_type not in COGS_STOCK_OUT_MOVEMENT_TYPES or row.quantity_out <= Decimal("0.000"):
+        return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "COGS bridge requires a finalized physical stock-out row."
+    if row.reference_model == "BillingInvoiceLine":
+        from billing.models import BillingDocumentStatus, BillingInvoiceLine
+
+        line = BillingInvoiceLine.objects.select_related("invoice", "invoice__direct_sale").filter(pk=ref_pk).first()
+        if line is None:
+            return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "Linked BillingInvoiceLine was not found."
+        finalized = line.invoice.status in {BillingDocumentStatus.APPROVED, BillingDocumentStatus.POSTED}
+        direct_sale_finalized = not line.invoice.direct_sale_id or getattr(line.invoice.direct_sale, "status", "") in {"DELIVERED", "INVOICED"}
+        if not finalized or not direct_sale_finalized:
+            return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "Linked invoice/direct sale is not finalized for COGS posting."
+        unit, amount, reason = _cost_from_snapshot(line.tax_profile_snapshot or line.invoice.tax_profile_snapshot, quantity)
+        if reason:
+            return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", unit, amount, reason
+        event_key = "cogs_direct_sale_delivery" if line.invoice.direct_sale_id else "cogs_sale_delivery"
+        return event_key, STOCK_LEDGER_LABEL_BY_EVENT[event_key], unit, amount, None
+    if row.reference_model == "DirectSaleLine":
+        from billing.models import DirectSaleLine
+
+        line = DirectSaleLine.objects.select_related("direct_sale").filter(pk=ref_pk).first()
+        if line is None:
+            return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "Linked DirectSaleLine was not found."
+        if line.direct_sale.status not in {"DELIVERED", "INVOICED"}:
+            return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "Linked direct sale is not delivered/invoiced."
+        unit, amount, reason = _cost_from_snapshot(line.direct_sale.tax_profile_snapshot, quantity)
+        if reason:
+            return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", unit, amount, reason
+        return "cogs_direct_sale_delivery", STOCK_LEDGER_LABEL_BY_EVENT["cogs_direct_sale_delivery"], unit, amount, None
+    if row.reference_model == "SubscriptionDelivery":
+        from subscriptions.models import DeliveryStatus, SubscriptionDelivery
+
+        delivery = SubscriptionDelivery.objects.select_related("subscription", "subscription__product").filter(pk=ref_pk).first()
+        if delivery is None:
+            return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "Linked SubscriptionDelivery was not found."
+        if delivery.status != DeliveryStatus.DELIVERED or not delivery.delivered_at:
+            return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "Linked subscription delivery is not finalized as delivered."
+        snapshots = [delivery.subscription.pricing_snapshot, delivery.subscription.product_snapshot, delivery.subscription.tax_profile_snapshot]
+        for snapshot in snapshots:
+            unit, amount, reason = _cost_from_snapshot(snapshot, quantity)
+            if not reason:
+                return "cogs_subscription_delivery", STOCK_LEDGER_LABEL_BY_EVENT["cogs_subscription_delivery"], unit, amount, None
+        return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", None, None, "Subscription delivery snapshots do not contain persisted COGS/unit-cost evidence."
+    return UNSUPPORTED_STOCK_LEDGER_EVENT_KEY, "Unsupported StockLedger movement", None, None, "Stock-out row does not link to a supported finalized sale/delivery source."
+
+
 def _inventory_asset_account() -> ChartOfAccount | None:
     return base._posting_profile_account("INVENTORY_ASSET")
 
@@ -190,6 +284,10 @@ def _inventory_writeoff_account() -> ChartOfAccount | None:
     return base._posting_profile_account("INVENTORY_WRITEOFF_EXPENSE") or base._posting_profile_account("STOCK_LOSS") or _inventory_adjustment_loss_account()
 
 
+def _cogs_account() -> ChartOfAccount | None:
+    return base._posting_profile_account("COGS") or base._posting_profile_account("COST_OF_GOODS_SOLD")
+
+
 def _classify_stock_ledger_event(row: StockLedger) -> tuple[str, str, str | None]:
     movement = row.movement_type
     if movement in {StockMovementType.PURCHASE_IN, StockMovementType.PURCHASE_RECEIVE}:
@@ -204,8 +302,9 @@ def _classify_stock_ledger_event(row: StockLedger) -> tuple[str, str, str | None
         return SKIPPED_STOCK_LEDGER_EVENT_KEY, "Stock transfer skipped", "Same-entity stock transfers have no accounting impact in this phase."
     if movement == StockMovementType.TRANSFER_OUT:
         return SKIPPED_STOCK_LEDGER_EVENT_KEY, "Stock transfer skipped", "Same-entity stock transfers have no accounting impact in this phase."
-    if movement in {StockMovementType.SALE_OUT, StockMovementType.EMI_DELIVERY_OUT, StockMovementType.DELIVERY_OUT}:
-        return DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY, "COGS deferred", "COGS posting is deferred because this StockLedger movement does not safely expose finalized sale/delivery cost metadata."
+    if movement in COGS_STOCK_OUT_MOVEMENT_TYPES:
+        event_key, event_label, _unit, _amount, reason = _stock_ledger_cogs_evidence(row)
+        return event_key, event_label, reason
     if movement in {StockMovementType.EMI_RETURN_IN, StockMovementType.CUSTOMER_RETURN, StockMovementType.SALE_RETURN_IN}:
         return "inventory_return_in", STOCK_LEDGER_LABEL_BY_EVENT["inventory_return_in"], None
     if movement in {StockMovementType.PURCHASE_RETURN_OUT, StockMovementType.VENDOR_RETURN}:
@@ -217,7 +316,10 @@ def _stock_ledger_lines(row: StockLedger, event_key: str) -> tuple[list[dict[str
     warnings: list[str] = []
     if event_key not in STOCK_LEDGER_EVENT_KEYS:
         return [], ["Unsupported StockLedger event for Phase F8."], None
-    unit_cost, amount, value_reason = _stock_ledger_source_cost(row)
+    if event_key in COGS_STOCK_LEDGER_EVENT_KEYS:
+        unit_cost, amount, value_reason = _stock_ledger_cogs_evidence(row)[2:]
+    else:
+        unit_cost, amount, value_reason = _stock_ledger_source_cost(row)
     if amount is None or amount <= Decimal("0.00"):
         return [], [value_reason or "StockLedger amount/value must be greater than zero."], None
     asset = _inventory_asset_account()
@@ -273,6 +375,16 @@ def _stock_ledger_lines(row: StockLedger, event_key: str) -> tuple[list[dict[str
         return [
             {"chart_account": asset, "description": f"Inventory return in {reference}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
             {"chart_account": gain, "description": f"Inventory return clearing {reference}", "debit_amount": Decimal("0.00"), "credit_amount": amount},
+        ], warnings, None
+    if event_key in COGS_STOCK_LEDGER_EVENT_KEYS:
+        cogs = _cogs_account()
+        if cogs is None:
+            warnings.append("COGS / COST_OF_GOODS_SOLD posting profile/chart account is missing or inactive.")
+        if warnings:
+            return [], warnings, None
+        return [
+            {"chart_account": cogs, "description": f"COGS stock-out {reference}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
+            {"chart_account": asset, "description": f"Inventory asset COGS relief {reference}", "debit_amount": Decimal("0.00"), "credit_amount": amount},
         ], warnings, None
     return [], ["Transfer movements are not postable in this phase."], None
 
@@ -433,9 +545,12 @@ def stock_ledger_candidate(row: StockLedger) -> dict[str, Any]:
     item = base._latest_posting_reconciliation_item(source_model=STOCK_LEDGER_SOURCE_MODEL, source_id=str(row.id)) if journal else base._latest_reconciliation_item(source_model=STOCK_LEDGER_SOURCE_MODEL, source_id=str(row.id))
     period = getattr(journal, "accounting_period", None) or base._source_period(row.movement_date)
     lines, warnings, finance_account = _stock_ledger_lines(row, event_key) if event_key in STOCK_LEDGER_EVENT_KEYS else ([], [reason] if reason else [], None)
-    raw = "SKIPPED_NOT_APPLICABLE" if event_key == SKIPPED_STOCK_LEDGER_EVENT_KEY else "UNSUPPORTED_SOURCE" if event_key in {UNSUPPORTED_STOCK_LEDGER_EVENT_KEY, DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY} else "READY" if lines else "NOT_CONFIGURED"
+    raw = "SKIPPED_NOT_APPLICABLE" if event_key == SKIPPED_STOCK_LEDGER_EVENT_KEY else "UNSUPPORTED_SOURCE" if event_key == UNSUPPORTED_STOCK_LEDGER_EVENT_KEY else "DEFERRED_COGS" if event_key == DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY else "READY" if lines else "NOT_CONFIGURED"
     postability = base._candidate_status_payload(event_key=event_key, event_label=event_label, module="inventory", source_model=STOCK_LEDGER_SOURCE_MODEL, raw_status=raw, lines=lines, line_warnings=warnings, period=period, source_date=row.movement_date, journal=journal, reconciliation_item=item, source_workflow_exists=event_key in STOCK_LEDGER_EVENT_KEYS, classification_reason=reason, approval_required=False)
-    unit_cost, amount, value_reason = _stock_ledger_source_cost(row)
+    if event_key in COGS_STOCK_LEDGER_EVENT_KEYS or event_key == DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY:
+        _cogs_event_key, _cogs_label, unit_cost, amount, value_reason = _stock_ledger_cogs_evidence(row)
+    else:
+        unit_cost, amount, value_reason = _stock_ledger_source_cost(row)
     quantity = row.quantity_in if row.quantity_in > Decimal("0.000") else row.quantity_out
     source_reference = _stock_ledger_reference(row)
     item_name = getattr(getattr(row.inventory_item, "product", None), "name", None) or str(row.inventory_item)
@@ -452,6 +567,9 @@ def stock_ledger_candidate(row: StockLedger) -> dict[str, Any]:
         "unit_cost": f"{unit_cost:.2f}" if unit_cost is not None else None,
         "amount": f"{base._money(amount or Decimal('0.00')):.2f}",
         "value_blocker_reason": value_reason,
+        "cogs_state": "READY" if event_key in COGS_STOCK_LEDGER_EVENT_KEYS else "DEFERRED_COGS" if event_key == DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY else None,
+        "cogs_amount": f"{base._money(amount or Decimal('0.00')):.2f}" if event_key in COGS_STOCK_LEDGER_EVENT_KEYS or event_key == DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY else None,
+        "cost_evidence": row.reference_model if unit_cost is not None and amount is not None else None,
         "inventory_item_id": row.inventory_item_id,
         "item_name": item_name,
         "product_name": item_name,
@@ -562,7 +680,7 @@ def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
                 journal_number_preview = None
                 blockers.append(str(exc))
             total_debit, total_credit = base._line_totals(lines)
-            return {"candidate": candidate, "candidate_id": candidate_id, "source": {"model": STOCK_LEDGER_SOURCE_MODEL, "pk": candidate.get("source_pk") or candidate["source_id"], "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate["source_date"], "amount": candidate["amount"], "source_status": candidate.get("source_status"), "source_type": candidate.get("source_type"), "stock_ledger_id": candidate.get("stock_ledger_id"), "movement_type": candidate.get("movement_type"), "movement_date": candidate.get("movement_date"), "item_name": candidate.get("item_name"), "product_name": candidate.get("product_name"), "stock_location_name": candidate.get("stock_location_name"), "branch_name": candidate.get("branch_name"), "quantity": candidate.get("quantity"), "unit_cost": candidate.get("unit_cost"), "reference_model": candidate.get("reference_model"), "reference_id": candidate.get("reference_id")}, "journal_date": candidate["source_date"], "accounting_period": candidate["accounting_period"], "journal_number_preview": journal_number_preview, "debit_lines": [base._line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if base._money(line.get("debit_amount")) > 0], "credit_lines": [base._line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if base._money(line.get("credit_amount")) > 0], "lines": base._preview_lines(lines), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "tax_lines": [], "finance_account_line": candidate.get("finance_account"), "warnings": warnings, "blockers": list(dict.fromkeys([item for item in blockers if item])), "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers), "idempotency_key": candidate["idempotency_key"], "safety_text": STOCK_LEDGER_SAFETY_TEXT}
+            return {"candidate": candidate, "candidate_id": candidate_id, "source": {"model": STOCK_LEDGER_SOURCE_MODEL, "pk": candidate.get("source_pk") or candidate["source_id"], "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate["source_date"], "amount": candidate["amount"], "source_status": candidate.get("source_status"), "source_type": candidate.get("source_type"), "stock_ledger_id": candidate.get("stock_ledger_id"), "movement_type": candidate.get("movement_type"), "movement_date": candidate.get("movement_date"), "item_name": candidate.get("item_name"), "product_name": candidate.get("product_name"), "stock_location_name": candidate.get("stock_location_name"), "branch_name": candidate.get("branch_name"), "quantity": candidate.get("quantity"), "quantity_out": candidate.get("quantity_out"), "unit_cost": candidate.get("unit_cost"), "cogs_amount": candidate.get("cogs_amount"), "cogs_state": candidate.get("cogs_state"), "cost_evidence": candidate.get("cost_evidence"), "reference_model": candidate.get("reference_model"), "reference_id": candidate.get("reference_id")}, "journal_date": candidate["source_date"], "accounting_period": candidate["accounting_period"], "journal_number_preview": journal_number_preview, "debit_lines": [base._line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if base._money(line.get("debit_amount")) > 0], "credit_lines": [base._line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if base._money(line.get("credit_amount")) > 0], "lines": base._preview_lines(lines), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "tax_lines": [], "finance_account_line": candidate.get("finance_account"), "warnings": warnings, "blockers": list(dict.fromkeys([item for item in blockers if item])), "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers), "idempotency_key": candidate["idempotency_key"], "safety_text": STOCK_LEDGER_SAFETY_TEXT}
         if candidate.get("source_model") == VENDOR_PAYMENT_SOURCE_MODEL:
             lines, warnings, _finance_account = _lines_for_candidate(candidate)
             blockers = []
@@ -623,7 +741,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
             total_debit, total_credit = base._line_totals(lines)
             if not lines or total_debit != total_credit:
                 raise ValueError("Bridge posting preview is not balanced.")
-            journal, created = post_bridge_entry(source_instance=row, purpose=purpose, entry_date=row.movement_date, memo=f"Bridge posting StockLedger {row.id} {candidate['event_key']}", lines=lines, voucher_type=purpose, source_type="STOCK_LEDGER", source_reference=_stock_ledger_reference(row), source_document_no=_stock_ledger_reference(row), source_event_date=row.movement_date, trace_metadata={"event_key": candidate["event_key"], "idempotency_key": key, "posting_note": posting_note, "source_model": STOCK_LEDGER_SOURCE_MODEL, "source_id": candidate["source_id"], "inventory_item_id": row.inventory_item_id, "stock_location_id": row.stock_location_id, "branch_id": getattr(row.stock_location, "branch_id", None), "movement_type": row.movement_type, "quantity": candidate.get("quantity"), "unit_cost": candidate.get("unit_cost"), "amount": candidate["amount"], "reference_model": row.reference_model, "reference_id": row.reference_id, "stock_ledger_mutation": False, "inventory_item_mutation": False, "quantity_mutation": False, "valuation_mutation": False, "purchase_bill_mutation": False, "vendor_payment_mutation": False, "cogs_posting": False}, posted_by=actor)
+            journal, created = post_bridge_entry(source_instance=row, purpose=purpose, entry_date=row.movement_date, memo=f"Bridge posting StockLedger {row.id} {candidate['event_key']}", lines=lines, voucher_type=purpose, source_type="STOCK_LEDGER", source_reference=_stock_ledger_reference(row), source_document_no=_stock_ledger_reference(row), source_event_date=row.movement_date, trace_metadata={"event_key": candidate["event_key"], "idempotency_key": key, "posting_note": posting_note, "source_model": STOCK_LEDGER_SOURCE_MODEL, "source_id": candidate["source_id"], "inventory_item_id": row.inventory_item_id, "stock_location_id": row.stock_location_id, "branch_id": getattr(row.stock_location, "branch_id", None), "movement_type": row.movement_type, "quantity": candidate.get("quantity"), "quantity_out": candidate.get("quantity_out"), "unit_cost": candidate.get("unit_cost"), "amount": candidate["amount"], "cogs_amount": candidate.get("cogs_amount"), "cost_evidence": candidate.get("cost_evidence"), "reference_model": row.reference_model, "reference_id": row.reference_id, "stock_ledger_mutation": False, "inventory_item_mutation": False, "quantity_mutation": False, "valuation_mutation": False, "sale_delivery_mutation": False, "purchase_bill_mutation": False, "vendor_payment_mutation": False, "cogs_posting": candidate["event_key"] in COGS_STOCK_LEDGER_EVENT_KEYS}, posted_by=actor)
             row.refresh_from_db()
             row.inventory_item.refresh_from_db()
             if _stock_ledger_snapshot(row) != source_before:
@@ -747,5 +865,7 @@ def summarize_candidate_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
     vendor_posted_unverified = sum(1 for row in rows if row.get("source_model") == VENDOR_PAYMENT_SOURCE_MODEL and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
     stock_counter = Counter(row.get("status") or "INFO" for row in rows if row.get("source_model") == STOCK_LEDGER_SOURCE_MODEL)
     stock_posted_unverified = sum(1 for row in rows if row.get("source_model") == STOCK_LEDGER_SOURCE_MODEL and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
-    summary.update({"purchase_bill_ready_unposted_count": counter.get("READY_UNPOSTED", 0), "purchase_bill_posted_count": counter.get("POSTED", 0), "purchase_bill_posted_unverified_count": posted_unverified, "purchase_bill_reconciled_count": counter.get("RECONCILED", 0), "purchase_bill_blocked_count": sum(v for k, v in counter.items() if str(k).startswith("BLOCKED")), "purchase_bill_unsupported_count": counter.get("UNSUPPORTED_SOURCE", 0), "vendor_payment_ready_unposted_count": vendor_counter.get("READY_UNPOSTED", 0), "vendor_payment_posted_count": vendor_counter.get("POSTED", 0), "vendor_payment_posted_unverified_count": vendor_posted_unverified, "vendor_payment_reconciled_count": vendor_counter.get("RECONCILED", 0), "vendor_payment_blocked_count": sum(v for k, v in vendor_counter.items() if str(k).startswith("BLOCKED")), "vendor_payment_unsupported_count": vendor_counter.get("UNSUPPORTED_SOURCE", 0), "stock_ledger_ready_unposted_count": stock_counter.get("READY_UNPOSTED", 0), "stock_ledger_posted_count": stock_counter.get("POSTED", 0), "stock_ledger_posted_unverified_count": stock_posted_unverified, "stock_ledger_reconciled_count": stock_counter.get("RECONCILED", 0), "stock_ledger_blocked_count": sum(v for k, v in stock_counter.items() if str(k).startswith("BLOCKED")), "stock_ledger_unsupported_count": stock_counter.get("UNSUPPORTED_SOURCE", 0)})
+    cogs_rows = [row for row in rows if row.get("source_model") == STOCK_LEDGER_SOURCE_MODEL and (row.get("event_key") in COGS_STOCK_LEDGER_EVENT_KEYS or row.get("event_key") == DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY)]
+    cogs_counter = Counter(row.get("status") or "INFO" for row in cogs_rows)
+    summary.update({"purchase_bill_ready_unposted_count": counter.get("READY_UNPOSTED", 0), "purchase_bill_posted_count": counter.get("POSTED", 0), "purchase_bill_posted_unverified_count": posted_unverified, "purchase_bill_reconciled_count": counter.get("RECONCILED", 0), "purchase_bill_blocked_count": sum(v for k, v in counter.items() if str(k).startswith("BLOCKED")), "purchase_bill_unsupported_count": counter.get("UNSUPPORTED_SOURCE", 0), "vendor_payment_ready_unposted_count": vendor_counter.get("READY_UNPOSTED", 0), "vendor_payment_posted_count": vendor_counter.get("POSTED", 0), "vendor_payment_posted_unverified_count": vendor_posted_unverified, "vendor_payment_reconciled_count": vendor_counter.get("RECONCILED", 0), "vendor_payment_blocked_count": sum(v for k, v in vendor_counter.items() if str(k).startswith("BLOCKED")), "vendor_payment_unsupported_count": vendor_counter.get("UNSUPPORTED_SOURCE", 0), "stock_ledger_ready_unposted_count": stock_counter.get("READY_UNPOSTED", 0), "stock_ledger_posted_count": stock_counter.get("POSTED", 0), "stock_ledger_posted_unverified_count": stock_posted_unverified, "stock_ledger_reconciled_count": stock_counter.get("RECONCILED", 0), "stock_ledger_blocked_count": sum(v for k, v in stock_counter.items() if str(k).startswith("BLOCKED")), "stock_ledger_unsupported_count": stock_counter.get("UNSUPPORTED_SOURCE", 0), "stock_ledger_deferred_cogs_count": sum(1 for row in cogs_rows if row.get("event_key") == DEFERRED_COGS_STOCK_LEDGER_EVENT_KEY), "stock_ledger_cogs_ready_unposted_count": cogs_counter.get("READY_UNPOSTED", 0), "stock_ledger_cogs_posted_unverified_count": sum(1 for row in cogs_rows if row.get("reconciliation_state") == "POSTED_UNVERIFIED"), "stock_ledger_cogs_reconciled_count": cogs_counter.get("RECONCILED", 0), "stock_ledger_cogs_blocked_count": sum(v for k, v in cogs_counter.items() if str(k).startswith("BLOCKED")), "stock_ledger_cogs_unsupported_count": cogs_counter.get("UNSUPPORTED_SOURCE", 0)})
     return summary

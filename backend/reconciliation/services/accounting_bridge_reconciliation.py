@@ -136,6 +136,35 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
             _create_missing_bridge_item(run=run, source_model=source_model, source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"{source_model}-{row['source_pk']}", amount=_money(row.get("amount")), exception_code=code, message=message, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "source_date": row.get("source_date"), "taxable_amount": row.get("taxable_amount"), "tax_amount": row.get("tax_amount")}, totals=totals)
 
 
+def _emit_stock_ledger_cogs_nonpostable(*, run, totals: dict, date_from, date_to, branch_id):
+    for row in list_bridge_candidates(BridgeCandidateFilters(date_from=date_from, date_to=date_to, source_model="StockLedger")):
+        event_key = row.get("event_key")
+        if event_key not in {"deferred_cogs", "unsupported_stockledger"}:
+            continue
+        if branch_id and not StockLedger.objects.filter(pk=row.get("source_pk"), stock_location__branch_id=branch_id).exists():
+            continue
+        code = "DEFERRED_COGS" if event_key == "deferred_cogs" else "UNSUPPORTED_SOURCE"
+        message = row.get("blocker_reason") or row.get("value_blocker_reason") or "StockLedger row is not postable by the controlled COGS bridge."
+        item = ReconciliationItem.objects.create(
+            run=run,
+            module=MODULE,
+            source_type="StockLedger",
+            source_id=str(row["source_pk"]),
+            source_label=row.get("source_reference_number") or f"SL-{row['source_pk']}",
+            severity=ReconciliationSeverity.MEDIUM,
+            status=ReconciliationItemStatus.NEEDS_REVIEW,
+            exception_code=code,
+            exception_message=message,
+            recommended_action="Keep this COGS row non-postable until finalized source and persisted cost evidence are available.",
+            expected_amount=_money(row.get("amount")),
+            actual_amount=Decimal("0.00"),
+            amount_delta=_money(row.get("amount")),
+            metadata={"source_pk": row["source_pk"], "event_key": event_key, "movement_type": row.get("movement_type"), "reference_model": row.get("reference_model"), "reference_id": row.get("reference_id"), "bridge_status": code, "cogs_state": row.get("cogs_state"), "value_blocker_reason": row.get("value_blocker_reason")},
+        )
+        ReconciliationEvidence.objects.create(item=item, evidence_type="StockLedger", object_id=str(row["source_pk"]), label=item.source_label, amount=_money(row.get("amount")), metadata={"movement_type": row.get("movement_type")})
+        totals["exceptions"] += 1
+
+
 def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
     date_from = run.date_from
     date_to = run.date_to
@@ -150,6 +179,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         _create_missing_bridge_item(run=run, source_model="Payment", source_id=str(payment.id), source_label=payment.reference_no or f"PAY-{payment.id}", amount=payment.amount, exception_code="PAYMENT_MISSING_ACCOUNTING_BRIDGE_POSTING", message="Payment exists but AccountingBridgePosting is missing for purpose PAYMENT_COLLECTION.", metadata={"payment_id": payment.id, "payment_date": str(payment.payment_date)}, totals=totals)
 
     _emit_ready_unposted_candidates(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
+    _emit_stock_ledger_cogs_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
 
     bridges = AccountingBridgePosting.objects.filter(source_model__in=BRIDGE_SOURCE_MODELS).select_related("journal_entry")
     if date_from or date_to:
