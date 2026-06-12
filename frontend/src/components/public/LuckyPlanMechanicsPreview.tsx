@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, ReceiptText, ShieldCheck, Sparkles, Wallet } from "lucide-react";
+import { ArrowRight, BadgeCheck, ShieldCheck, Sparkles, Wallet } from "lucide-react";
 
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
