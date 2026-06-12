@@ -36,7 +36,7 @@ export default function HomePlanFlowPreview() {
         <SectionHeader
           eyebrow="How Subidha works"
           title="A modern public site, backed by controlled shop operations"
-          description="The homepage can look premium and animated, but operational records still come from the core system only. No fake payments, no fake winners, no fake stock claims."
+          description="The homepage can look premium and animated while system records remain authoritative. Public content never creates payments, winners, delivery proof, or stock claims."
         />
         <GeneratedMarketingVisual
           src="/marketing/generated/receipt-contract-3d.webp"
