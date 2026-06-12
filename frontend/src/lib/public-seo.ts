@@ -138,7 +138,7 @@ export function buildWebsiteJsonLd() {
   };
 }
 
-export function buildBreadcrumbJsonLd(items: Array<{ name: string; path: string }>) {
+export function buildBreadcrumbJsonLd(items: Array<{ name: string; path?: string }>) {
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -146,7 +146,7 @@ export function buildBreadcrumbJsonLd(items: Array<{ name: string; path: string 
       "@type": "ListItem",
       position: index + 1,
       name: item.name,
-      item: absolutePublicUrl(item.path),
+      ...(item.path ? { item: absolutePublicUrl(item.path) } : {}),
     })),
   };
 }
