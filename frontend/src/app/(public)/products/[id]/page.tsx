@@ -10,6 +10,7 @@ import PublicProductDetailMedia from "@/components/public/PublicProductDetailMed
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { getPublicProductDetail } from "@/lib/public-api";
+import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
 type ProductDetailPageProps = {
@@ -25,23 +26,28 @@ export async function generateMetadata({
     const product = await getPublicProductDetail(id);
 
     if (!product) {
-      return {
+      return buildPublicMetadata({
         title: "Product Not Found",
         description: "The requested public product could not be found.",
-      };
+        path: `/products/${id}`,
+        noIndex: true,
+      });
     }
 
-    return {
+    return buildPublicMetadata({
       title: product.name,
       description:
         product.description ||
         `${product.name} is available in the live Subidha Furniture public catalogue for enquiry handoff.`,
-    };
+      path: `/products/${id}`,
+      imagePath: product.image || undefined,
+    });
   } catch {
-    return {
+    return buildPublicMetadata({
       title: "Product Detail",
       description: "Live public product detail and enquiry handoff.",
-    };
+      path: `/products/${id}`,
+    });
   }
 }
 
