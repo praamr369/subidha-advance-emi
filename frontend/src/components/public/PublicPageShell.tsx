@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 
 import PublicHeroBanner from "@/components/public/PublicHeroBanner";
+import { buildBreadcrumbJsonLd } from "@/lib/public-seo";
 import { cn } from "@/lib/utils";
 
 type Breadcrumb = { label: string; href?: string };
@@ -30,6 +31,13 @@ type PublicPageShellProps = {
   };
 };
 
+function buildBreadcrumbSchemaItems(breadcrumbs: ReadonlyArray<Breadcrumb>) {
+  return breadcrumbs.map((crumb, index) => ({
+    name: crumb.label,
+    path: crumb.href || (index === breadcrumbs.length - 1 ? "" : "/"),
+  }));
+}
+
 export default function PublicPageShell({
   title,
   subtitle,
@@ -43,15 +51,26 @@ export default function PublicPageShell({
 }: PublicPageShellProps) {
   const primaryAction = actions.find((action) => action.variant === "primary");
   const secondaryAction = actions.find((action) => action.variant !== "primary");
+  const breadcrumbJsonLd =
+    breadcrumbs.length > 1 ? buildBreadcrumbJsonLd(buildBreadcrumbSchemaItems(breadcrumbs)) : null;
 
   return (
     <main
+      id="main-content"
       className={cn(
         "mx-auto flex w-full flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10",
         className
       )}
       style={{ maxWidth }}
     >
+      {breadcrumbJsonLd ? (
+        <script
+          type="application/ld+json"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        />
+      ) : null}
+
       {breadcrumbs.length > 0 ? (
         <nav
           aria-label="Breadcrumb"
