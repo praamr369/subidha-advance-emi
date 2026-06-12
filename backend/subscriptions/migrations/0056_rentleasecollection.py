@@ -1,4 +1,5 @@
 import django.db.models.deletion
+import django.utils.timezone
 from django.conf import settings
 from django.db import migrations, models
 from django.db.models import Q
@@ -18,14 +19,14 @@ class Migration(migrations.Migration):
             name="RentLeaseCollection",
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("created_at", models.DateTimeField(db_index=True, auto_now_add=True)),
+                ("created_at", models.DateTimeField(db_index=True, default=django.utils.timezone.now)),
                 ("collection_number", models.CharField(db_index=True, default=subscriptions.models_rent_lease_collection.generate_rent_lease_collection_number, max_length=64, unique=True)),
                 ("external_reference_no", models.CharField(blank=True, db_index=True, default="", max_length=120)),
-                ("plan_type", models.CharField(db_index=True, max_length=10)),
+                ("plan_type", models.CharField(choices=[("EMI", "Advance EMI"), ("RENT", "Rent"), ("LEASE", "Lease")], db_index=True, max_length=10)),
                 ("amount", models.DecimalField(decimal_places=2, max_digits=12)),
                 ("payment_date", models.DateField(db_index=True)),
-                ("payment_method", models.CharField(db_index=True, max_length=10)),
-                ("status", models.CharField(db_index=True, default="ACTIVE", max_length=16)),
+                ("payment_method", models.CharField(choices=[("CASH", "Cash"), ("UPI", "UPI"), ("BANK", "Bank Transfer")], db_index=True, max_length=10)),
+                ("status", models.CharField(choices=[("ACTIVE", "Active"), ("VOIDED", "Voided"), ("REVERSED", "Reversed")], db_index=True, default="ACTIVE", max_length=16)),
                 ("idempotency_key", models.CharField(blank=True, db_index=True, default="", max_length=160)),
                 ("note", models.TextField(blank=True, default="")),
                 ("metadata", models.JSONField(blank=True, default=dict)),
