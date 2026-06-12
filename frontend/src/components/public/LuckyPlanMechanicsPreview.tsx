@@ -4,6 +4,7 @@ import { ArrowRight, BadgeCheck, ShieldCheck, Sparkles, Wallet } from "lucide-re
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
 import SectionHeader from "@/components/public/SectionHeader";
+import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
 import { ROUTES } from "@/lib/routes";
 
 const mechanics = [
@@ -38,12 +39,7 @@ export default function LuckyPlanMechanicsPreview() {
           title="A simple public explanation for a controlled financial workflow"
           description="Customers can understand the Lucky Plan visually, while actual contracts, payments, draw reveal, waiver posting, and audit evidence stay inside the production system."
         />
-        <GeneratedMarketingVisual
-          src="/marketing/generated/winner-draw-3d.webp"
-          alt="Decorative 3D winner draw card for Lucky Plan explanation"
-          label="Draw proof visual"
-          className="min-h-[18rem]"
-        />
+        <GeneratedMarketingVisual asset={PUBLIC_MARKETING_ASSETS.winnerDraw} className="min-h-[18rem]" />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
