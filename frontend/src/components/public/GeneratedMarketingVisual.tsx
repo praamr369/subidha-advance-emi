@@ -12,6 +12,7 @@ type GeneratedMarketingVisualProps = {
   className?: string;
   label?: string;
   sizes?: string;
+  quality?: number;
 };
 
 export default function GeneratedMarketingVisual({
@@ -23,6 +24,7 @@ export default function GeneratedMarketingVisual({
   className,
   label,
   sizes = "(max-width: 768px) 100vw, 50vw",
+  quality = 78,
 }: GeneratedMarketingVisualProps) {
   const resolvedSrc = asset?.src ?? src;
   const resolvedAlt = asset?.alt ?? alt ?? "Decorative generated public marketing visual";
@@ -30,16 +32,23 @@ export default function GeneratedMarketingVisual({
   const resolvedLabel = asset?.label ?? label ?? "Generated visual pending";
 
   return (
-    <div className={cn("public-card public-card-animated relative min-h-[18rem] overflow-hidden p-4", className)}>
+    <div
+      className={cn(
+        "public-card public-card-animated relative min-h-[18rem] overflow-hidden p-4 contain-paint",
+        className
+      )}
+      data-public-image={resolvedImageExists && resolvedSrc ? "generated" : "fallback"}
+    >
       {resolvedImageExists && resolvedSrc ? (
         <Image
           src={resolvedSrc}
           alt={resolvedAlt}
           fill
           priority={priority}
-          quality={82}
+          loading={priority ? "eager" : "lazy"}
+          quality={quality}
           sizes={sizes}
-          className="object-cover object-center"
+          className="object-cover object-center will-change-auto"
         />
       ) : (
         <div
