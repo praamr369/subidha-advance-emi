@@ -16,6 +16,7 @@ type PublicPageShellProps = {
   children: ReactNode;
   maxWidth?: number;
   className?: string;
+  heroSlot?: ReactNode;
   hero?: {
     eyebrow?: string;
     imageSrc?: string;
@@ -37,6 +38,7 @@ export default function PublicPageShell({
   children,
   maxWidth = 1280,
   className,
+  heroSlot,
   hero,
 }: PublicPageShellProps) {
   const primaryAction = actions.find((action) => action.variant === "primary");
@@ -78,21 +80,23 @@ export default function PublicPageShell({
         </nav>
       ) : null}
 
-      <PublicHeroBanner
-        title={title}
-        subtitle={subtitle}
-        eyebrow={hero?.eyebrow}
-        imageSrc={hero?.imageSrc}
-        imageAlt={hero?.imageAlt}
-        imageExists={hero?.imageExists}
-        imagePosition={hero?.imagePosition}
-        badges={hero?.badges}
-        compact={hero?.compact}
-        legalVariant={hero?.legalVariant}
-        imagePriority={hero?.imagePriority}
-        secondaryAction={secondaryAction}
-        primaryAction={primaryAction}
-      />
+      {heroSlot ?? (
+        <PublicHeroBanner
+          title={title}
+          subtitle={subtitle}
+          eyebrow={hero?.eyebrow}
+          imageSrc={hero?.imageSrc}
+          imageAlt={hero?.imageAlt}
+          imageExists={hero?.imageExists}
+          imagePosition={hero?.imagePosition}
+          badges={hero?.badges}
+          compact={hero?.compact}
+          legalVariant={hero?.legalVariant}
+          imagePriority={hero?.imagePriority}
+          secondaryAction={secondaryAction}
+          primaryAction={primaryAction}
+        />
+      )}
 
       {children}
     </main>
