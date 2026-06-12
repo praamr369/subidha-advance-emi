@@ -11,6 +11,7 @@ type GeneratedMarketingVisualProps = {
   priority?: boolean;
   className?: string;
   label?: string;
+  sizes?: string;
 };
 
 export default function GeneratedMarketingVisual({
@@ -21,6 +22,7 @@ export default function GeneratedMarketingVisual({
   priority = false,
   className,
   label,
+  sizes = "(max-width: 768px) 100vw, 50vw",
 }: GeneratedMarketingVisualProps) {
   const resolvedSrc = asset?.src ?? src;
   const resolvedAlt = asset?.alt ?? alt ?? "Decorative generated public marketing visual";
@@ -35,7 +37,8 @@ export default function GeneratedMarketingVisual({
           alt={resolvedAlt}
           fill
           priority={priority}
-          sizes="(max-width: 768px) 100vw, 50vw"
+          quality={82}
+          sizes={sizes}
           className="object-cover object-center"
         />
       ) : (
