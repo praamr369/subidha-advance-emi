@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import ProductCatalogueHero from "@/components/public/ProductCatalogueHero";
+import ProductCategoryDiscovery, { type ProductCategorySummary } from "@/components/public/ProductCategoryDiscovery";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import { getPublicDictionary } from "@/lib/public-i18n";
@@ -8,7 +10,6 @@ import { getPublicLocale } from "@/lib/public-i18n.server";
 import { ROUTES } from "@/lib/routes";
 import { listPublicProducts, type PublicProduct } from "@/lib/public-api";
 import { buildPublicMetadata } from "@/lib/public-seo";
-import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import ProductGrid from "./ProductGrid";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -17,10 +18,26 @@ export const metadata: Metadata = buildPublicMetadata({
   path: "/products",
 });
 
+function buildCategorySummaries(products: PublicProduct[]): ProductCategorySummary[] {
+  const map = new Map<string, { count: number; mediaReadyCount: number; samples: string[] }>();
+
+  for (const product of products) {
+    const name = product.category?.trim() || "Unclassified";
+    const current = map.get(name) ?? { count: 0, mediaReadyCount: 0, samples: [] };
+    current.count += 1;
+    if (product.image) current.mediaReadyCount += 1;
+    if (current.samples.length < 3) current.samples.push(product.name);
+    map.set(name, current);
+  }
+
+  return Array.from(map.entries())
+    .map(([name, value]) => ({ name, ...value }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
 export default async function ProductsPage() {
   const locale = await getPublicLocale();
   const dictionary = getPublicDictionary(locale);
-  const banner = getPublicBannerWithFallback("products");
 
   let products: PublicProduct[] = [];
   let count = 0;
@@ -35,18 +52,21 @@ export default async function ProductsPage() {
   }
 
   const mediaReadyCount = products.filter((product) => Boolean(product.image)).length;
+  const categorySummaries = buildCategorySummaries(products);
 
   return (
     <PublicPageShell
       title={dictionary.common.products}
       subtitle="Browse the live catalogue and enquire with your preferred product in one flow."
-      hero={{
-        eyebrow: "Live catalogue",
-        imageSrc: banner.src,
-        imageAlt: "Subidha Furniture products banner",
-        imageExists: banner.exists,
-        badges: ["Real endpoint data", "No mock prices", "No fake stock"],
-      }}
+      heroSlot={
+        <ProductCatalogueHero
+          title={dictionary.common.products}
+          subtitle="Browse the live catalogue and enquire with your preferred product in one controlled flow. Public product pages help selection only; final stock, plan type, documents, and financial records are confirmed by the branch."
+          count={count}
+          mediaReadyCount={mediaReadyCount}
+          categoryCount={categorySummaries.length}
+        />
+      }
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.products },
@@ -56,10 +76,12 @@ export default async function ProductsPage() {
         { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },
       ]}
     >
+      <ProductCategoryDiscovery categories={categorySummaries} />
+
       <PublicMarketingBanner
         eyebrow="Category bands"
         title="Browse realistic home categories"
-        description="Find sofas, beds, wardrobes, dining sets, refrigerators, washing machines, TVs, and kitchen appliances."
+        description="Find sofas, beds, wardrobes, dining sets, refrigerators, washing machines, TVs, and kitchen appliances from the published catalogue. Category cards are derived from live product records only."
         items={[
           { title: "Furniture essentials", description: "Sofas, beds, wardrobes, and dining sets." },
           { title: "Electronics", description: "TV and household electronics for daily needs." },
@@ -70,7 +92,7 @@ export default async function ProductsPage() {
       <PublicMarketingBanner
         eyebrow="Purchase confidence"
         title="Warranty, return policy, and payment safety"
-        description="Final terms depend on product and contract type, but policy support and document visibility are available for every customer."
+        description="Final terms depend on product and contract type, but policy support and document visibility are available for every customer. This public catalogue does not reserve stock or create a financial transaction."
         items={[
           { title: "Warranty visibility", description: "Warranty/coverage terms are confirmed at contract and document stage." },
           { title: "Return support flow", description: "Return/issue handling is routed through customer support with status tracking." },
@@ -85,11 +107,11 @@ export default async function ProductsPage() {
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="public-card p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Published products</div>
-            <div className="mt-2 text-3xl font-semibold text-foreground">{count}</div>
+            <div className="mt-2 text-3xl font-semibold text-foreground">{count.toLocaleString("en-IN")}</div>
           </div>
           <div className="public-card p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Media-ready cards</div>
-            <div className="mt-2 text-3xl font-semibold text-foreground">{mediaReadyCount}</div>
+            <div className="mt-2 text-3xl font-semibold text-foreground">{mediaReadyCount.toLocaleString("en-IN")}</div>
           </div>
           <div className="public-card p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Workflow</div>
@@ -110,7 +132,7 @@ export default async function ProductsPage() {
 
       <section className="public-surface p-6">
         <p className="text-sm leading-7 text-muted-foreground">
-          Listed amounts come from the same product records shown here. Stock, batch seats, tenure, and monthly EMI are confirmed only after branch review—not from this page alone.
+          Listed amounts come from the same product records shown here. Stock, batch seats, tenure, monthly EMI, rent, lease, and direct-sale terms are confirmed only after branch review—not from this page alone.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href={ROUTES.public.apply} className="public-action-primary h-10 !min-h-0">
