@@ -23,6 +23,7 @@ type PublicHeroBannerProps = {
   legalVariant?: boolean;
   compact?: boolean;
   imagePriority?: boolean;
+  imageSizes?: string;
 };
 
 const positionMap = {
@@ -45,11 +46,12 @@ export default function PublicHeroBanner({
   legalVariant = false,
   compact = false,
   imagePriority = false,
+  imageSizes = "(max-width: 640px) 100vw, 48vw",
 }: PublicHeroBannerProps) {
   return (
     <section
       className={cn(
-        "public-hero-banner public-hero group relative overflow-hidden p-6 sm:p-8",
+        "public-hero-banner public-hero group relative overflow-hidden p-6 sm:p-8 contain-paint",
         legalVariant ? "ring-1 ring-border/60" : "ring-1 ring-border/50",
         compact ? "min-h-[14rem]" : "min-h-[20rem]"
       )}
@@ -62,9 +64,11 @@ export default function PublicHeroBanner({
               alt={imageAlt || "Subidha Furniture public banner"}
               fill
               priority={imagePriority}
-              sizes="(max-width: 640px) 100vw, 48vw"
+              loading={imagePriority ? "eager" : "lazy"}
+              quality={78}
+              sizes={imageSizes}
               className={cn(
-                "public-hero-image-motion opacity-45 mix-blend-multiply saturate-110",
+                "public-hero-image-motion opacity-45 mix-blend-multiply saturate-110 will-change-auto",
                 positionMap[imagePosition]
               )}
             />
