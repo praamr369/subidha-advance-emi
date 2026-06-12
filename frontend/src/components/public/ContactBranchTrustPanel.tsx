@@ -1,6 +1,5 @@
-import type { ComponentType, SVGProps } from "react";
 import Link from "next/link";
-import { Clock3, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import { Clock3, Mail, MapPin, MessageCircle, Phone, type LucideIcon } from "lucide-react";
 
 import type { ResolvedPublicBusinessProfile } from "@/lib/public-profile";
 
@@ -9,7 +8,7 @@ type ContactBranchTrustPanelProps = {
 };
 
 type ContactTrustRow = {
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  icon: LucideIcon;
   label: string;
   value: string;
   href?: string;
