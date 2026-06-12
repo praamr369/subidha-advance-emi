@@ -64,7 +64,7 @@ export default function PublicHeroBanner({
               alt={imageAlt || "Subidha Furniture public banner"}
               fill
               priority={imagePriority}
-              loading={imagePriority ? "eager" : "lazy"}
+              loading={imagePriority ? undefined : "lazy"}
               quality={78}
               sizes={imageSizes}
               className={cn(
