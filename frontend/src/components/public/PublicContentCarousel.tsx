@@ -58,7 +58,7 @@ export default function PublicContentCarousel({
     <Carousel
       setApi={setApi}
       opts={{ loop: false, align: "start" }}
-      className={cn("relative", className)}
+      className={cn("relative contain-paint", className)}
       aria-label={ariaLabel}
       tabIndex={0}
     >
@@ -68,6 +68,7 @@ export default function PublicContentCarousel({
             key={`${baseId}-slide-${index}`}
             id={`${baseId}-slide-${index}`}
             aria-label={`Slide ${index + 1} of ${slideCount}`}
+            aria-hidden={index === activeIndex ? undefined : true}
           >
             {slide}
           </CarouselItem>
