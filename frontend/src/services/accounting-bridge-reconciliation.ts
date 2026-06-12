@@ -10,6 +10,7 @@ export type AccountingBridgeReconciliationSummary = {
   reconciled_count: number;
   blocked_count: number;
   blocked_by_mapping_count?: number;
+  blocked_by_finance_account_count?: number;
   blocked_by_period_count?: number;
   blocked_by_numbering_count?: number;
   blocked_by_approval_count?: number;
@@ -47,6 +48,11 @@ export type AccountingBridgeReconciliationSummary = {
   rent_lease_revenue_reconciled_count?: number;
   rent_lease_revenue_blocked_count?: number;
   rent_lease_revenue_unsupported_count?: number;
+  rent_lease_payment_ready_unposted_count?: number;
+  rent_lease_payment_posted_unverified_count?: number;
+  rent_lease_payment_reconciled_count?: number;
+  rent_lease_payment_blocked_count?: number;
+  rent_lease_payment_unsupported_count?: number;
   credit_return_ready_unposted_count?: number;
   credit_return_posted_count?: number;
   credit_return_posted_unverified_count?: number;
@@ -118,6 +124,7 @@ export type AccountingBridgeReconciliationJournal = { id?: number | null; entry_
 export type AccountingBridgeReconciliationItem = { id: number; status: string; severity: string; exception_code?: string; exception_message?: string };
 export type AccountingBridgePeriodReadiness = { financial_year_ready?: boolean; accounting_period_ready?: boolean; journal_numbering_ready?: boolean; posting_controls_ready?: boolean; active_financial_year?: { id?: number; code?: string; name?: string } | null; current_period?: { id?: number; code?: string; name?: string; status?: string } | null; blockers?: string[] };
 export type BridgeSourceModel = "Payment" | "ReceiptDocument" | "BillingInvoice" | "RentLeaseBillingDemand" | "BillingCreditNote" | "DirectSaleReturn" | "BillingDebitNote" | "PurchaseBill" | "VendorPayment" | "StockLedger" | "Commission" | "CommissionPayoutBatch" | "SalarySheet" | "SalaryPayment" | string;
+export type BridgeActionLink = { key: string; label: string; href: string; reason?: string | null; disabled?: boolean };
 
 export type AccountingBridgeReconciliationRow = {
   id?: string;
@@ -240,6 +247,7 @@ export type AccountingBridgeReconciliationRow = {
   debit_account_preview?: BridgePostingLine[];
   credit_account_preview?: BridgePostingLine[];
   finance_account?: BridgeFinanceAccount | null;
+  finance_account_active?: boolean | null;
   canonical_status?: string;
   source_reference?: string | null;
   supported?: boolean;
@@ -281,10 +289,11 @@ export type AccountingBridgeReconciliationRow = {
   operator_action: string;
   source_item_action?: string;
   unsafe_abstract_posting_blocked?: boolean;
+  action_links?: BridgeActionLink[];
 };
 
 export type BridgePostingLine = { chart_account?: { id?: number; code?: string; name?: string } | null; description?: string; debit_amount: string; credit_amount: string };
-export type BridgeFinanceAccount = { id?: number; name?: string; kind?: string; chart_account?: { id?: number; code?: string; name?: string } | null };
+export type BridgeFinanceAccount = { id?: number; name?: string; kind?: string; is_active?: boolean; chart_account?: { id?: number; code?: string; name?: string } | null };
 export type BridgeCandidate = AccountingBridgeReconciliationRow & { row_type: "bridge_candidate"; bridge_candidate_id: string; idempotency_key: string };
 export type BridgePostingPreview = { candidate: AccountingBridgeReconciliationRow; candidate_id: string; source: { model: BridgeSourceModel; pk: number | string; display: string; reference_number?: string | null; date: string | null; amount: string; source_status?: string | null; source_type?: string | null; commission_reference?: string | null; partner_name?: string | null; customer_name?: string | null; subscription_id?: number | string | null; contract_reference?: string | null; payment_id?: number | string | null; payment_reference?: string | null; emi_id?: number | string | null; commission_status?: string | null; payout_batch_id?: number | string | null; payout_batch_code?: string | null; payout_reference?: string | null; payout_date?: string | null; payout_status?: string | null; payout_amount?: string | null; related_commission_count?: number | string | null; salary_sheet_id?: number | string | null; salary_reference?: string | null; staff_name?: string | null; employee_code?: string | null; payroll_period?: string | null; payroll_period_code?: string | null; payroll_period_start?: string | null; payroll_period_end?: string | null; payroll_status?: string | null; gross_salary?: string | null; deductions_amount?: string | null; payable_amount?: string | null; invoice_number?: string | null; invoice_type?: string | null; invoice_status?: string | null; rent_lease_reference?: string | null; rent_lease_demand_id?: number | string | null; plan_type?: string | null; demand_type?: string | null; billing_period?: string | null; billing_month?: string | null; billing_period_start?: string | null; billing_period_end?: string | null; due_date?: string | null; collected_amount?: string | null; outstanding_amount?: string | null; debit_note_number?: string | null; debit_note_status?: string | null; purchase_bill_number?: string | null; vendor_payment_number?: string | null; vendor_name?: string | null; payment_method?: string | null; finance_account_name?: string | null; taxable_amount?: string | null; tax_amount?: string | null; stock_ledger_id?: number | string | null; movement_type?: string | null; movement_date?: string | null; item_name?: string | null; product_name?: string | null; stock_location_name?: string | null; branch_name?: string | null; quantity?: string | null; quantity_out?: string | null; unit_cost?: string | null; cogs_amount?: string | null; cogs_state?: string | null; cost_evidence?: string | null; reference_model?: string | null; reference_id?: string | null }; payroll_identity?: { salary_sheet_id?: number | string | null; reference?: string | null; staff_name?: string | null; employee_code?: string | null; period?: string | null; status?: string | null }; journal_date: string | null; accounting_period?: AccountingBridgeReconciliationRow["accounting_period"]; journal_number_preview?: string | null; debit_lines: BridgePostingLine[]; credit_lines: BridgePostingLine[]; lines: BridgePostingLine[]; total_debit: string; total_credit: string; is_balanced: boolean; tax_lines?: BridgePostingLine[]; finance_account_line?: BridgeFinanceAccount | null; warnings: string[]; blockers: string[]; can_post: boolean; idempotency_key: string; safety_text: string };
 export type BridgePostResult = { posted: boolean; already_posted: boolean; journal_entry?: AccountingBridgeReconciliationJournal | null; reconciliation_item?: { id: number; status: string; exception_code?: string } | null; next_action?: string };

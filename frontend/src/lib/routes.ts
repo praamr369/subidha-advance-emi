@@ -81,6 +81,7 @@ export const ROUTES = {
     settingsBusinessSetup: "/admin/settings/business-setup",
     settingsBusinessSetupProfile: "/admin/settings/business-setup/profile",
     settingsBusinessSetupChecklist: "/admin/settings/business-setup/checklist",
+    settingsBusinessSetupFinanceAccounts: "/admin/settings/business-setup/finance-accounts",
     settingsBusinessSetupDocumentNumbering: "/admin/settings/business-setup/document-numbering",
     settingsBusinessSetupPublicSite: "/admin/settings/business-setup/public-site",
     settingsBusinessSetupDryRuns: "/admin/settings/business-setup/dry-runs",

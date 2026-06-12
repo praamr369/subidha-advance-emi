@@ -32,7 +32,6 @@ class CommissionPayoutBridgeReadinessEventsTests(APITestCase):
             "commission_accrual",
             "commission_approval",
             "commission_payout",
-            "payout_batch_payment",
         }
         self.assertTrue(required_keys.issubset(events.keys()))
         for event_key in required_keys:

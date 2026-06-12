@@ -115,6 +115,22 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
       ],
     },
     {
+      title: "Rent/Lease payment settlement",
+      action: "Open bridge cockpit",
+      href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement" }),
+      rows: [
+        { label: "Ready unposted", value: summaryCount(summary, "rent_lease_payment_ready_unposted_count"), detail: "No concrete rent/lease payment source model is currently available, so settlement posting remains disabled.", href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement", status: "READY_UNPOSTED" }) },
+        { label: "Posted unverified", value: summaryCount(summary, "rent_lease_payment_posted_unverified_count"), detail: "Settlement rows cannot be posted until a concrete source record exists.", href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement", status: "POSTED_UNVERIFIED" }) },
+        { label: "Reconciled", value: summaryCount(summary, "rent_lease_payment_reconciled_count"), detail: "Settlement reconciliation remains unavailable without a concrete source record.", href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement", status: "RECONCILED" }) },
+        { label: "Blocked", value: summaryCount(summary, "rent_lease_payment_blocked_count"), detail: "F15 is blocked by missing concrete rent/lease payment source evidence.", href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement", status: "BLOCKED" }) },
+        { label: "Unsupported", value: summaryCount(summary, "rent_lease_payment_unsupported_count"), detail: "Demand collected_amount and audit metadata are not used as settlement posting sources.", href: bridgeReviewHref({ event_key: "rent_lease_payment_settlement", status: "UNSUPPORTED" }) },
+      ],
+      extraActions: [
+        { label: "Open Finance Accounts", href: ROUTES.admin.settingsBusinessSetupFinanceAccounts },
+        { label: "Open Mapping Audit", href: MAPPING_AUDIT_HREF },
+      ],
+    },
+    {
       title: "Credit / Return bridge",
       action: "Review credit/return bridge items",
       href: bridgeReviewHref({ source_model: "BillingCreditNote" }),
@@ -235,6 +251,7 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
     { label: "Unsupported", value: summaryCount(summary, "unsupported_source_count", summaryCount(summary, "unsupported_count")), href: bridgeReviewHref({ status: "UNSUPPORTED" }) },
     { label: "Approval required", value: summaryCount(summary, "blocked_by_approval_count"), href: bridgeReviewHref({ status: "BLOCKED" }) },
     { label: "Mapping blocked", value: summaryCount(summary, "blocked_by_mapping_count"), href: MAPPING_AUDIT_HREF },
+    { label: "Finance account blocked", value: summaryCount(summary, "blocked_by_finance_account_count"), href: ROUTES.admin.settingsBusinessSetupFinanceAccounts },
     { label: "Period blocked", value: summaryCount(summary, "blocked_by_period_count"), href: ROUTES.admin.accountingPeriods },
     { label: "Numbering blocked", value: summaryCount(summary, "blocked_by_numbering_count"), href: DOCUMENT_NUMBERING_HREF },
     { label: "Exceptions", value: summaryCount(summary, "reconciliation_exception_count", summaryCount(summary, "exception_count")), href: RECONCILIATION_RUNS_HREF },
@@ -263,6 +280,7 @@ function blockerGroups(readiness: AccountingPeriodReadiness | null, locks: Posti
   const warnings = readiness?.warnings ?? [];
   const text = [...errors, ...warnings].join(" ").toLowerCase();
   const mappingBlocked = summaryCount(bridgeSummary, "blocked_by_mapping_count");
+  const financeAccountBlocked = summaryCount(bridgeSummary, "blocked_by_finance_account_count");
   const periodBlocked = summaryCount(bridgeSummary, "blocked_by_period_count");
   const numberingBlocked = summaryCount(bridgeSummary, "blocked_by_numbering_count");
   const approvalRequired = summaryCount(bridgeSummary, "blocked_by_approval_count");
@@ -271,6 +289,7 @@ function blockerGroups(readiness: AccountingPeriodReadiness | null, locks: Posti
   return [
     { title: "Setup blockers", detail: text.includes("financial year") ? "Financial year setup is incomplete." : "No setup blocker exposed.", count: text.includes("financial year") ? 1 : 0, href: ROUTES.admin.accountingPeriods },
     { title: "Mapping blockers", detail: "Open mapping audit to resolve posting profile and COA blockers before close.", count: mappingBlocked || (text.includes("mapping") ? 1 : 0), href: MAPPING_AUDIT_HREF },
+    { title: "Finance account blockers", detail: "Open Finance Accounts to activate or map concrete collection accounts.", count: financeAccountBlocked, href: ROUTES.admin.settingsBusinessSetupFinanceAccounts },
     { title: "Bridge posting blockers", detail: "Open periods are valid for posting. Period close still waits for posting and reconciliation to finish.", count: summaryCount(bridgeSummary, "ready_unposted_count") + summaryCount(bridgeSummary, "posted_unverified_count"), href: ROUTES.admin.accountingBridgeReconciliation },
     { title: "Numbering blockers", detail: text.includes("number") ? "Document or journal numbering is incomplete." : "No numbering blocker exposed.", count: numberingBlocked || (text.includes("number") ? 1 : 0), href: DOCUMENT_NUMBERING_HREF },
     { title: "Period lock blockers", detail: readiness?.posting_lock ? `Posting is locked for ${readiness.posting_lock.lock_date}.` : `${locks.length} configured lock(s).`, count: periodBlocked || (readiness?.posting_lock ? 1 : 0), href: ROUTES.admin.accountingPeriods },

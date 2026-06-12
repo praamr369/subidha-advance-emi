@@ -11,6 +11,7 @@ READY_UNPOSTED = "READY_UNPOSTED"
 POSTED = "POSTED"
 RECONCILED = "RECONCILED"
 BLOCKED_BY_MAPPING = "BLOCKED_BY_MAPPING"
+BLOCKED_BY_FINANCE_ACCOUNT = "BLOCKED_BY_FINANCE_ACCOUNT"
 BLOCKED_BY_PERIOD = "BLOCKED_BY_PERIOD"
 BLOCKED_BY_NUMBERING = "BLOCKED_BY_NUMBERING"
 BLOCKED_BY_APPROVAL = "BLOCKED_BY_APPROVAL"
@@ -23,6 +24,7 @@ CANONICAL_STATUSES = (
     POSTED,
     RECONCILED,
     BLOCKED_BY_MAPPING,
+    BLOCKED_BY_FINANCE_ACCOUNT,
     BLOCKED_BY_PERIOD,
     BLOCKED_BY_NUMBERING,
     BLOCKED_BY_APPROVAL,
@@ -38,6 +40,7 @@ APPROVAL_REQUIRED_EVENTS = {
 
 ACTION_HREF_BY_BLOCKER = {
     BLOCKED_BY_MAPPING: "/admin/accounting/setup/mapping-audit",
+    BLOCKED_BY_FINANCE_ACCOUNT: "/admin/settings/business-setup/finance-accounts",
     BLOCKED_BY_PERIOD: "/admin/accounting/periods",
     BLOCKED_BY_NUMBERING: "/admin/settings/business-setup/document-numbering",
     BLOCKED_BY_APPROVAL: "/admin/accounting/bridges",
@@ -54,7 +57,7 @@ def _mapping_status(row: dict[str, Any] | None) -> str:
     if row is None:
         return UNSUPPORTED_SOURCE
     raw = str(row.get("status") or "NOT_CONFIGURED").strip().upper()
-    if raw in {UNSUPPORTED_SOURCE, BLOCKED_BY_MAPPING, BLOCKED_BY_PERIOD, BLOCKED_BY_NUMBERING, BLOCKED_BY_APPROVAL}:
+    if raw in {UNSUPPORTED_SOURCE, BLOCKED_BY_MAPPING, BLOCKED_BY_FINANCE_ACCOUNT, BLOCKED_BY_PERIOD, BLOCKED_BY_NUMBERING, BLOCKED_BY_APPROVAL}:
         return raw
     if raw in CANONICAL_STATUSES:
         return READY
@@ -119,6 +122,10 @@ def evaluate_accounting_postability(
         status = POSTED
         blocker_code = None
         blocker_reason = "Already posted."
+    elif mapping_state == BLOCKED_BY_FINANCE_ACCOUNT:
+        status = BLOCKED_BY_FINANCE_ACCOUNT
+        blocker_code = "FINANCE_ACCOUNT_NOT_READY"
+        blocker_reason = _first_reason(bridge_row) or "Payment finance account is missing, inactive, or not mapped to an active chart account."
     elif mapping_state == BLOCKED_BY_PERIOD:
         status = BLOCKED_BY_PERIOD
         blocker_code = "PERIOD_NOT_READY"
@@ -202,6 +209,8 @@ def _recommended_action(status: str) -> str:
         return "Open bridge reconciliation, preview the source row, then post through controlled posting."
     if status == BLOCKED_BY_MAPPING:
         return "Open mapping audit and fix COA, FinanceAccount, and posting profile blockers."
+    if status == BLOCKED_BY_FINANCE_ACCOUNT:
+        return "Open Finance Accounts and activate/map the concrete collection account."
     if status == BLOCKED_BY_PERIOD:
         return "Open accounting periods and create/open the required period."
     if status == BLOCKED_BY_NUMBERING:

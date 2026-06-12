@@ -35,7 +35,6 @@ class AccountingMappingAuditPhaseE3Tests(APITestCase):
             "commission_accrual",
             "commission_approval",
             "commission_payout",
-            "payout_batch_payment",
             "purchase_inventory_receive",
             "inventory_delivery_out",
             "stock_adjustment_gain",

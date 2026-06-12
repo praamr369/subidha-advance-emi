@@ -602,3 +602,63 @@ vendor/purchase posting
 ```
 
 F14 must not auto-post, auto-reconcile, auto-close periods, post collections, post deposits, mutate invoices/contracts/payments/receipts/deposits, or weaken earlier Phase F slices.
+
+## Phase F15A — Accounting setup/action-link hardening
+
+Bridge candidates and readiness screens now route operators to concrete setup pages:
+
+- Chart of Accounts: `/admin/accounting/chart-of-accounts`
+- Finance Accounts: `/admin/settings/business-setup/finance-accounts`
+- Mapping Audit: `/admin/accounting/setup/mapping-audit`
+- Accounting Periods: `/admin/accounting/periods`
+- Journal Entries: `/admin/accounting/journals`
+- Reconciliation Runs: `/admin/reconciliation/runs`
+- Bridge Posting: `/admin/accounting/bridge-reconciliation`
+- Journal Numbering: `/admin/settings/business-setup/document-numbering`
+
+Finance-account blockers are classified separately from generic mapping blockers. Missing, inactive, or unmapped concrete collection accounts should route staff to Finance Accounts first. Missing receivable/revenue/payable chart or posting profile setup remains a mapping/COA blocker.
+
+Refresh and diagnostics remain read-only. They must not post journals, reconcile items, close periods, create payment records, or mutate source records.
+
+## Phase F15 — Rent/lease payment settlement bridge status
+
+F15 cannot safely start from the current repository state because there is no concrete rent/lease payment settlement source model.
+
+Confirmed current source shape:
+
+- Monthly rent/lease collection is recorded by `subscriptions.services.rent_lease_collection_workflow_service.collect_rent_lease_monthly_demand`.
+- That workflow mutates `RentLeaseBillingDemand.collected_amount` and `status`.
+- It writes collection metadata into an audit event only.
+- Its module docstring explicitly states it does not create `Payment`, `ReceiptDocument`, `JournalEntry`, `MoneyMovement`, `SettlementAllocation`, or `ReconciliationItem` rows.
+- Security deposit collection creates `RentLeaseDepositTransaction`, but deposit receipt/refund posting is outside F15.
+
+Unsupported for F15 posting:
+
+- `RentLeaseBillingDemand` as a settlement source, because F14 already uses it for revenue and its collection state is an aggregate demand mutation, not a concrete settlement row.
+- `AuditLog` collection metadata as a settlement source, because it is not a payment/collection source model and does not provide a hardened finance settlement contract.
+- `RentLeaseDepositTransaction`, because deposits and refunds remain separate phases.
+
+Required future source before F15 can post:
+
+```text
+Dr concrete payment FinanceAccount.chart_account
+Cr Customer Receivable / Rent-Lease Receivable
+```
+
+The future source must persist, at minimum, source primary key, receipt/payment number, payment date, customer/party, linked demand/contract, `plan_type` RENT/LEASE evidence, positive amount, payment method, concrete `finance_account`, status, cancellation/void/reversal posture, and existing journal/bridge evidence.
+
+Until that exists, rent/lease payment settlement counters remain zero and the UI must not expose a Post button for F15 settlement.
+
+F15 safety boundary:
+
+- no payment/receipt mutation
+- no rent/lease demand mutation
+- no subscription/contract mutation
+- no customer/party mutation
+- no security deposit mutation
+- no finance-account mutation
+- no demand paid/contract paid mutation
+- no payment/receipt/deposit/refund record creation
+- no auto-post, auto-reconcile, or auto-close
+
+F16 security deposit posting should not start until a concrete deposit receipt/refund source contract is defined separately from `RentLeaseDepositTransaction` history, or the existing transaction model is explicitly hardened as the authoritative deposit settlement source.
