@@ -55,7 +55,7 @@ export default function PublicProductMedia({
           className={cn("object-cover will-change-auto", imageClassName)}
           sizes={sizes}
           priority={priority}
-          loading={priority ? "eager" : "lazy"}
+          loading={priority ? undefined : "lazy"}
           quality={quality}
           unoptimized={shouldBypassOptimization}
           onError={() => setFailedSrc(resolvedSrc)}
