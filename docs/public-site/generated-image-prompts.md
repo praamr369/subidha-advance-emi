@@ -10,6 +10,14 @@ frontend/public/marketing/generated/
 
 Do not include text, logos, phone numbers, customer names, payment amounts, receipt numbers, Lucky Draw results, or screenshots of the authenticated dashboard in generated images.
 
+After placing reviewed `.webp` files, activate them through the frontend manifest:
+
+```text
+frontend/src/lib/public-marketing-assets.ts
+```
+
+Set only the matching reviewed asset's `imageExists` value to `true`. Keep unknown, missing, or unreviewed files as `false` so the public UI uses the safe decorative fallback.
+
 ## Required files
 
 ```text
