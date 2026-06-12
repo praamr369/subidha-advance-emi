@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, ClipboardCheck, PackageCheck, ShieldCheck, Wallet } from "lucide-react";
 
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
+import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -16,8 +17,6 @@ type RentLeaseAnimatedHeroProps = {
 const modeCopy = {
   rent: {
     eyebrow: "Rent workflow",
-    visualLabel: "Rent visual",
-    visualSrc: "/marketing/generated/rent-lease-3d-room.webp",
     primaryCalloutTitle: "Short-term access",
     primaryCalloutText: "Usage without ownership",
     secondaryCalloutTitle: "Deposit control",
@@ -25,8 +24,6 @@ const modeCopy = {
   },
   lease: {
     eyebrow: "Lease workflow",
-    visualLabel: "Lease visual",
-    visualSrc: "/marketing/generated/rent-lease-3d-room.webp",
     primaryCalloutTitle: "Longer tenure",
     primaryCalloutText: "Contract-backed access",
     secondaryCalloutTitle: "Return checks",
@@ -92,12 +89,7 @@ export default function RentLeaseAnimatedHero({ mode, title, subtitle }: RentLea
         </div>
 
         <div className="relative">
-          <GeneratedMarketingVisual
-            src={copy.visualSrc}
-            alt={`Decorative 3D ${mode} and lease furniture room visual`}
-            label={copy.visualLabel}
-            className="min-h-[22rem] lg:min-h-[30rem]"
-          />
+          <GeneratedMarketingVisual asset={PUBLIC_MARKETING_ASSETS.rentLeaseRoom} className="min-h-[22rem] lg:min-h-[30rem]" />
           <div className="pointer-events-none absolute -left-3 top-8 hidden rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{copy.primaryCalloutTitle}</div>
             <div className="mt-1 text-sm font-semibold text-foreground">{copy.primaryCalloutText}</div>
