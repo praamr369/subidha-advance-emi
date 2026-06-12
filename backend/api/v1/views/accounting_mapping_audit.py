@@ -39,7 +39,6 @@ REQUIRED_EVENTS = {
     "commission_accrual": ("Commission accrual", "Commission / Payout", "Commission"),
     "commission_approval": ("Commission approval", "Commission / Payout", "Commission"),
     "commission_payout": ("Commission payout", "Commission / Payout", "CommissionPayoutBatch"),
-    "payout_batch_payment": ("Payout batch payment", "Commission / Payout", "CommissionPayoutBatch"),
     "purchase_inventory_receive": ("Purchase inventory receive", "Inventory", "StockLedger"),
     "inventory_delivery_out": ("Inventory delivery out", "Inventory", "StockLedger"),
     "stock_adjustment_gain": ("Stock adjustment gain", "Inventory", "StockLedger"),
@@ -65,7 +64,6 @@ ALIASES = {
     "lease_security_deposit": "security_deposit_collection",
     "purchase_inventory_receive": "inventory_purchase_receive",
     "commission_approval": "commission_accrual",
-    "payout_batch_payment": "commission_payout",
     "production_material_consume": "manufacturing_consumption",
     "production_output_receive": "manufacturing_output",
 }

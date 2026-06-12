@@ -28,8 +28,8 @@ COMMISSION_PAYOUT_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         operator_action="Validate approval-stage commission liability mapping only. Approval does not post journals from readiness.",
     ),
     BridgeEventSpec(
-        event_key="payout_batch_payment",
-        label="Payout batch payment",
+        event_key="commission_payout",
+        label="Commission payout",
         source_module="subscriptions",
         source_app="subscriptions",
         source_model="CommissionPayoutBatch",

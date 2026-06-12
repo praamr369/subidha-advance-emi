@@ -93,7 +93,6 @@ EVENT_ACTION_OVERRIDES: dict[str, dict[str, Any]] = {
     "commission_accrual": {"label": "Commission accrual", "module": "subscriptions", "action_href": FINANCE_ACCOUNT_HREF},
     "commission_approval": {"label": "Commission approval", "module": "subscriptions", "action_href": FINANCE_ACCOUNT_HREF},
     "commission_payout": {"label": "Commission payout", "module": "subscriptions", "action_href": FINANCE_ACCOUNT_HREF},
-    "payout_batch_payment": {"label": "Payout batch payment", "module": "subscriptions", "action_href": FINANCE_ACCOUNT_HREF},
     "inventory_purchase_receive": {"label": "Inventory purchase receive", "module": "inventory", "action_href": FINANCE_ACCOUNT_HREF},
     "purchase_inventory_receive": {"label": "Purchase inventory receive", "module": "inventory", "action_href": FINANCE_ACCOUNT_HREF},
     "rent_lease_monthly_collection": {"label": "Rent / lease monthly collection", "module": "subscriptions", "action_href": FINANCE_ACCOUNT_HREF},
@@ -129,8 +128,6 @@ def _readiness_events_by_key() -> dict[str, dict[str, Any]]:
     events = {str(row.get("event_key") or "").strip().lower(): row for row in payload.get("events") or []}
     if "inventory_purchase_receive" in events and "purchase_inventory_receive" not in events:
         events["purchase_inventory_receive"] = {**events["inventory_purchase_receive"], "event_key": "purchase_inventory_receive", "label": "Purchase inventory receive"}
-    if "commission_payout" in events and "payout_batch_payment" not in events:
-        events["payout_batch_payment"] = {**events["commission_payout"], "event_key": "payout_batch_payment", "label": "Payout batch payment"}
     if "commission_accrual" in events and "commission_approval" not in events:
         events["commission_approval"] = {**events["commission_accrual"], "event_key": "commission_approval", "label": "Commission approval"}
     return events

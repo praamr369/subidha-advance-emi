@@ -26,8 +26,8 @@ const MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit";
 const DOCUMENT_NUMBERING_HREF = ROUTES.admin.settingsBusinessSetupDocumentNumbering;
 const RECONCILIATION_RUNS_HREF = "/admin/reconciliation/runs";
 const STATUS_OPTIONS = ["", "READY_UNPOSTED", "POSTED_UNVERIFIED", "POSTED", "RECONCILED", "BLOCKED", "BLOCKED_BY_MAPPING", "BLOCKED_BY_PERIOD", "BLOCKED_BY_NUMBERING", "BLOCKED_BY_APPROVAL", "UNSUPPORTED", "UNSUPPORTED_SOURCE", "EXCEPTION"];
-const SOURCE_MODEL_OPTIONS = ["", "Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission"];
-const CONCRETE_POST_MODELS = new Set(["Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission"]);
+const SOURCE_MODEL_OPTIONS = ["", "Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission", "CommissionPayoutBatch"];
+const CONCRETE_POST_MODELS = new Set(["Payment", "ReceiptDocument", "BillingInvoice", "BillingCreditNote", "DirectSaleReturn", "BillingDebitNote", "PurchaseBill", "VendorPayment", "StockLedger", "Commission", "CommissionPayoutBatch"]);
 const PURCHASE_BILL_POSTING_COPY = "Posting creates accounting journal entries. It does not edit purchase bill, vendor payment, inventory, commission, or payout records.";
 const PURCHASE_BILL_PREVIEW_COPY = "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation. It does not edit purchase bill or inventory records.";
 const COMMISSION_PREVIEW_COPY = "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation. It does not edit commission or payout records.";
@@ -80,6 +80,7 @@ function rowKey(row: AccountingBridgeReconciliationRow): string {
 function sourceTitle(row: AccountingBridgeReconciliationRow): string {
   if (row.source_display) return row.source_display;
   if (row.commission_reference) return `Commission ${row.commission_reference}`;
+  if (row.payout_reference) return `Payout ${row.payout_reference}`;
   if (row.stock_ledger_reference) return `Stock ledger ${row.stock_ledger_reference}`;
   if (row.vendor_payment_number) return `Vendor payment ${row.vendor_payment_number}`;
   if (row.purchase_bill_number) return `Purchase bill ${row.purchase_bill_number}`;
@@ -92,6 +93,8 @@ function sourceExtra(row: AccountingBridgeReconciliationRow) {
     <>
       {row.receipt_type ? <div>Receipt: {row.receipt_type} · {row.receipt_status}</div> : null}
       {row.commission_reference ? <div>Commission: {row.commission_reference} · {row.commission_status}</div> : null}
+      {row.payout_batch_code ? <div>Payout batch: {row.payout_batch_code} · {row.payout_status}</div> : null}
+      {row.related_commission_count ? <div>Related commissions: {row.related_commission_count}</div> : null}
       {row.partner_name ? <div>Partner/staff: {row.partner_name}</div> : null}
       {row.customer_name ? <div>Customer: {row.customer_name}</div> : null}
       {row.subscription_id || row.payment_id || row.emi_id ? <div>Linked source: Sub {row.subscription_id ?? "-"} · Pay {row.payment_reference ?? row.payment_id ?? "-"} · EMI {row.emi_id ?? "-"}</div> : null}
@@ -305,7 +308,7 @@ export default function AccountingBridgeReconciliationPage() {
   if (loading) return <PortalPage title="Accounting Bridge Reconciliation" subtitle="Controlled bridge posting and reconciliation review."><LoadingBlock label="Loading bridge reconciliation cockpit..." /></PortalPage>;
 
   return (
-    <PortalPage title="Accounting Bridge Reconciliation" subtitle="Controlled Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, PurchaseBill, VendorPayment, StockLedger, and Commission bridge candidates. Posting is explicit; reconciliation is never automatic." breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Reconciliation" }]} actions={[{ href: MAPPING_AUDIT_HREF, label: "Mapping Audit", variant: "secondary" }, { href: ROUTES.admin.accountingPeriods, label: "Accounting Periods", variant: "secondary" }, { href: ROUTES.admin.accountingBridges, label: "Bridge Readiness", variant: "secondary" }, { href: RECONCILIATION_RUNS_HREF, label: "Reconciliation Runs", variant: "secondary" }]} statusBadge={{ label: "Read-only until explicit post", tone: "info" }}>
+    <PortalPage title="Accounting Bridge Reconciliation" subtitle="Controlled Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, PurchaseBill, VendorPayment, StockLedger, Commission, and CommissionPayoutBatch bridge candidates. Posting is explicit; reconciliation is never automatic." breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Reconciliation" }]} actions={[{ href: MAPPING_AUDIT_HREF, label: "Mapping Audit", variant: "secondary" }, { href: ROUTES.admin.accountingPeriods, label: "Accounting Periods", variant: "secondary" }, { href: ROUTES.admin.accountingBridges, label: "Bridge Readiness", variant: "secondary" }, { href: RECONCILIATION_RUNS_HREF, label: "Reconciliation Runs", variant: "secondary" }]} statusBadge={{ label: "Read-only until explicit post", tone: "info" }}>
       <div className="space-y-6">
         {error ? <ErrorState title="Unable to load bridge reconciliation" description={error} onRetry={() => void load(filters)} /> : null}
         {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
@@ -315,7 +318,7 @@ export default function AccountingBridgeReconciliationPage() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting operations path</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Preview source item → post explicitly → verify reconciliation</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Concrete candidates include Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, PurchaseBill, VendorPayment, StockLedger, and Commission. Abstract readiness rows show “View source items” and cannot post. Posting creates accounting entries only; it does not edit stock ledger, inventory quantity, valuation, sale/delivery, purchase bill, vendor payment, commission, or payout records.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Concrete candidates include Payment, ReceiptDocument, BillingInvoice, BillingCreditNote, DirectSaleReturn, BillingDebitNote, PurchaseBill, VendorPayment, StockLedger, Commission, and CommissionPayoutBatch. Abstract readiness rows show “View source items” and cannot post. Posting creates accounting entries only; it does not edit stock ledger, inventory quantity, valuation, sale/delivery, purchase bill, vendor payment, commission, or payout records.</p>
             </div>
             <ActionButton variant="secondary" onClick={() => void load(filters, { silent: true })} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</ActionButton>
           </div>
@@ -329,16 +332,19 @@ export default function AccountingBridgeReconciliationPage() {
             <SummaryCard label="Vendor payment ready" value={Number(summary.vendor_payment_ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=VendorPayment&status=READY_UNPOSTED`} />
             <SummaryCard label="Stock ledger ready" value={Number(summary.stock_ledger_ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=StockLedger&status=READY_UNPOSTED`} />
             <SummaryCard label="Commission ready" value={Number(summary.commission_ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=Commission&status=READY_UNPOSTED`} />
+            <SummaryCard label="Payout ready" value={Number(summary.commission_payout_ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=CommissionPayoutBatch&status=READY_UNPOSTED`} />
             {summary.stock_ledger_cogs_ready_unposted_count !== undefined ? <SummaryCard label="COGS ready" value={Number(summary.stock_ledger_cogs_ready_unposted_count ?? 0)} tone="border-blue-200 bg-blue-50 text-blue-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=StockLedger&status=READY_UNPOSTED`} /> : null}
             {summary.stock_ledger_deferred_cogs_count !== undefined ? <SummaryCard label="COGS deferred" value={Number(summary.stock_ledger_deferred_cogs_count ?? 0)} tone="border-amber-200 bg-amber-50 text-amber-950" href={`${ROUTES.admin.accountingBridgeReconciliation}?source_model=StockLedger&event_key=deferred_cogs`} /> : null}
             <SummaryCard label="Purchase posted" value={Number(summary.purchase_bill_posted_unverified_count ?? summary.purchase_bill_posted_count ?? 0)} tone="border-emerald-200 bg-white text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=POSTED_UNVERIFIED&source_model=PurchaseBill`} />
             <SummaryCard label="Vendor posted" value={Number(summary.vendor_payment_posted_unverified_count ?? summary.vendor_payment_posted_count ?? 0)} tone="border-emerald-200 bg-white text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=POSTED_UNVERIFIED&source_model=VendorPayment`} />
             <SummaryCard label="Stock posted" value={Number(summary.stock_ledger_posted_unverified_count ?? summary.stock_ledger_posted_count ?? 0)} tone="border-emerald-200 bg-white text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=POSTED_UNVERIFIED&source_model=StockLedger`} />
             <SummaryCard label="Commission posted" value={Number(summary.commission_posted_unverified_count ?? summary.commission_posted_count ?? 0)} tone="border-emerald-200 bg-white text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=POSTED_UNVERIFIED&source_model=Commission`} />
+            <SummaryCard label="Payout posted" value={Number(summary.commission_payout_posted_unverified_count ?? summary.commission_payout_posted_count ?? 0)} tone="border-emerald-200 bg-white text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=POSTED_UNVERIFIED&source_model=CommissionPayoutBatch`} />
             <SummaryCard label="Purchase reconciled" value={Number(summary.purchase_bill_reconciled_count ?? 0)} tone="border-emerald-200 bg-emerald-50 text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=RECONCILED&source_model=PurchaseBill`} />
             <SummaryCard label="Vendor reconciled" value={Number(summary.vendor_payment_reconciled_count ?? 0)} tone="border-emerald-200 bg-emerald-50 text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=RECONCILED&source_model=VendorPayment`} />
             <SummaryCard label="Stock reconciled" value={Number(summary.stock_ledger_reconciled_count ?? 0)} tone="border-emerald-200 bg-emerald-50 text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=RECONCILED&source_model=StockLedger`} />
             <SummaryCard label="Commission reconciled" value={Number(summary.commission_reconciled_count ?? 0)} tone="border-emerald-200 bg-emerald-50 text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=RECONCILED&source_model=Commission`} />
+            <SummaryCard label="Payout reconciled" value={Number(summary.commission_payout_reconciled_count ?? 0)} tone="border-emerald-200 bg-emerald-50 text-emerald-900" href={`${ROUTES.admin.accountingBridgeReconciliation}?status=RECONCILED&source_model=CommissionPayoutBatch`} />
             <SummaryCard label="Blocked" value={Number(summary.blocked_bridge_item_count ?? summary.blocked_count ?? 0)} tone="border-amber-200 bg-amber-50 text-amber-950" href={statusHref("BLOCKED")} />
             <SummaryCard label="Unsupported" value={Number(summary.unsupported_source_count ?? summary.unsupported_count ?? 0)} tone="border-red-200 bg-red-50 text-red-900" href={statusHref("UNSUPPORTED")} />
             <SummaryCard label="Exceptions" value={Number(summary.reconciliation_exception_count ?? summary.exception_count ?? 0)} tone="border-red-200 bg-red-50 text-red-900" />
@@ -422,6 +428,7 @@ function PreviewModal({ preview, onClose, onPost, busy }: { preview: BridgePosti
             <p className="mt-1 text-xs text-muted-foreground">{preview.source.model === "Commission" ? COMMISSION_PREVIEW_COPY : preview.source.model === "PurchaseBill" ? PURCHASE_BILL_PREVIEW_COPY : preview.safety_text}</p>
             <p className="mt-1 text-xs text-muted-foreground">Source model: {preview.source.model}. Posting does not mutate source financial fields, commission records, or payout records.</p>
             {preview.source.model === "Commission" ? <p className="mt-1 text-xs text-muted-foreground">Partner/staff: {preview.source.partner_name ?? "-"} · Commission status: {preview.source.commission_status ?? "-"}</p> : null}
+            {preview.source.model === "CommissionPayoutBatch" ? <p className="mt-1 text-xs text-muted-foreground">Partner/staff: {preview.source.partner_name ?? "-"} · Payout status: {preview.source.payout_status ?? "-"} · Account: {preview.source.payment_method ?? "-"} / {preview.source.finance_account_name ?? "-"}</p> : null}
           </div>
           <button type="button" onClick={onClose} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold">Close</button>
         </div>

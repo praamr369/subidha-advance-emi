@@ -7,8 +7,8 @@ export default function AdminFinancePayoutBatchesLayout({ children }: { children
     <div className="space-y-6">
       <CommissionPayoutBridgeReadinessPanel
         title="Payout accounting bridge readiness"
-        description="Read-only mapping posture for commission payout and payout batch payment. This indicator does not approve posting and does not create journals."
-        eventKeys={["commission_payout", "payout_batch_payment"]}
+        description="Read-only mapping posture for commission payout. This indicator does not approve posting and does not create journals."
+        eventKeys={["commission_payout"]}
       />
       {children}
     </div>

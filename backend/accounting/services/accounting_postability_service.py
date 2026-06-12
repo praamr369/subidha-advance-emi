@@ -32,7 +32,6 @@ CANONICAL_STATUSES = (
 APPROVAL_REQUIRED_EVENTS = {
     "commission_approval",
     "commission_payout",
-    "payout_batch_payment",
     "purchase_inventory_receive",
     "inventory_purchase_receive",
 }
