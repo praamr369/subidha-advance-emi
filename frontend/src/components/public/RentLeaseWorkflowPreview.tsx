@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ClipboardCheck, PackageCheck, ReceiptText, ShieldCheck, Undo2, Wallet } from "lucide-react";
+import { ArrowRight, ClipboardCheck, PackageCheck, Undo2, Wallet } from "lucide-react";
 
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
