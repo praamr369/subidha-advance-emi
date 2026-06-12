@@ -4,6 +4,7 @@ import { ArrowRight, Boxes, Image as ImageIcon, PackageCheck } from "lucide-reac
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
 import SectionHeader from "@/components/public/SectionHeader";
+import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
 import { ROUTES } from "@/lib/routes";
 
 export type ProductCategorySummary = {
@@ -26,12 +27,7 @@ export default function ProductCategoryDiscovery({ categories }: ProductCategory
           title="Browse by real published category"
           description="These category cards are derived from live public product records. They are discovery aids only; they do not imply stock reservation, delivery readiness, or plan approval."
         />
-        <GeneratedMarketingVisual
-          src="/marketing/generated/product-wall-3d.webp"
-          alt="Decorative 3D wall of furniture and appliance category tiles"
-          label="Category wall visual"
-          className="min-h-[18rem]"
-        />
+        <GeneratedMarketingVisual asset={PUBLIC_MARKETING_ASSETS.productWall} className="min-h-[18rem]" />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
