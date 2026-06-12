@@ -62,6 +62,12 @@ export type UnifiedReceivableResult = {
   due_date?: string | null;
   demand_id?: number | null;
   demand_type?: string;
+  latest_collection_id?: number | null;
+  latest_collection_number?: string;
+  latest_collection_amount?: string;
+  latest_collection_date?: string | null;
+  latest_collection_method?: string;
+  latest_collection_finance_account_id?: number | null;
   operational_state?: string;
   next_actions?: string[];
   blocking_reasons?: string[];
@@ -219,6 +225,15 @@ function normalizeReceivable(row: Record<string, unknown>): UnifiedReceivableRes
         : null,
     demand_id: toNumberOrNull(row.demand_id),
     demand_type: toStringValue(row.demand_type),
+    latest_collection_id: toNumberOrNull(row.latest_collection_id),
+    latest_collection_number: toStringValue(row.latest_collection_number),
+    latest_collection_amount: toMoneyString(row.latest_collection_amount),
+    latest_collection_date:
+      typeof row.latest_collection_date === "string" || row.latest_collection_date === null
+        ? row.latest_collection_date
+        : null,
+    latest_collection_method: toStringValue(row.latest_collection_method),
+    latest_collection_finance_account_id: toNumberOrNull(row.latest_collection_finance_account_id),
     operational_state: toStringValue(row.operational_state),
     next_actions: Array.isArray(row.next_actions) ? row.next_actions.map((item) => String(item)) : [],
     blocking_reasons: Array.isArray(row.blocking_reasons) ? row.blocking_reasons.map((item) => String(item)) : [],
@@ -262,26 +277,32 @@ export function resolveAdminContractReference(
   );
 }
 
-export function previewAdminReceivableAllocation(payload: {
+export function resolveCashierContractReference(
+  contractReferenceId: number
+): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>(
+    `/cashier/contract-references/${contractReferenceId}/resolve/`
+  );
+}
+
+export function previewAdminReceivableAllocation(input: {
   source_type: ReceivableSourceType;
   source_id: number;
-  amount: string;
+  amount: string | number;
 }): Promise<UnifiedReceivablePreviewResponse> {
   return request<UnifiedReceivablePreviewResponse>("/admin/receivables/preview/", {
     method: "POST",
-    body: JSON.stringify(payload),
-    headers: { "Content-Type": "application/json" },
-  } as RequestInit);
+    body: JSON.stringify(input),
+  });
 }
 
-export function previewCashierReceivableAllocation(payload: {
+export function previewCashierReceivableAllocation(input: {
   source_type: ReceivableSourceType;
   source_id: number;
-  amount: string;
+  amount: string | number;
 }): Promise<UnifiedReceivablePreviewResponse> {
   return request<UnifiedReceivablePreviewResponse>("/cashier/receivables/preview/", {
     method: "POST",
-    body: JSON.stringify(payload),
-    headers: { "Content-Type": "application/json" },
-  } as RequestInit);
+    body: JSON.stringify(input),
+  });
 }
