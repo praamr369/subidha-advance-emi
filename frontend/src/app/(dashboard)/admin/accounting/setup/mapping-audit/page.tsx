@@ -25,6 +25,7 @@ const READY_MAPPING_STATUSES = ["READY", "READY_UNPOSTED", "POSTABLE", "POSTED",
 
 const GROUP_ORDER = [
   "Collection posting mappings",
+  "Commission mappings",
   "Debit note mappings",
   "Vendor payment mappings",
   "Purchase bill mappings",
@@ -83,9 +84,15 @@ function isStockLedgerRow(row: AccountingMappingAuditRow): boolean {
   return text.includes("stockledger") || text.includes("stock ledger") || text.includes("inventory_purchase_receive") || text.includes("inventory_adjustment") || text.includes("inventory_writeoff") || text.includes("inventory_return") || text.includes("cogs") || text.includes("cost_of_goods_sold");
 }
 
+function isCommissionRow(row: AccountingMappingAuditRow): boolean {
+  const text = rowSearchText(row);
+  return text.includes("commission") || text.includes("commission_expense") || text.includes("commission_payable") || text.includes("partner_commission");
+}
+
 function groupName(row: AccountingMappingAuditRow): string {
   const text = rowSearchText(row);
   if (text.includes("collection") || text.includes("cashier")) return "Collection posting mappings";
+  if (isCommissionRow(row)) return "Commission mappings";
   if (text.includes("billingdebitnote") || text.includes("debit_note") || text.includes("debit note")) return "Debit note mappings";
   if (text.includes("cogs") || text.includes("cost_of_goods_sold")) return "Inventory / COGS mappings";
   if (isStockLedgerRow(row)) return "Inventory / StockLedger mappings";
@@ -141,6 +148,10 @@ function rowStats(rows: AccountingMappingAuditRow[]) {
 function missingLabel(row: AccountingMappingAuditRow): string {
   const status = normalizedStatus(row);
   if (READY_MAPPING_STATUSES.includes(status)) return status === "READY_UNPOSTED" ? "Setup is ready. Journal posting is still pending in bridge reconciliation." : "No missing setup reported";
+  if (isCommissionRow(row) && status === "READY_UNPOSTED") return "Commission accrual setup is ready. Bridge posting is pending, not a mapping failure.";
+  if (isCommissionRow(row) && row.numbering_readiness !== "READY") return "JOURNAL_ENTRY numbering is required before commission accrual posting.";
+  if (isCommissionRow(row) && row.period_readiness !== "READY") return `Accounting period blocker: ${row.period_blocker_reason || row.period_readiness}.`;
+  if (isCommissionRow(row)) return "Commission Expense and Commission Payable mappings are required before commission accrual posting.";
   if (isStockLedgerRow(row) && status === "UNSUPPORTED_SOURCE") return "Unsupported StockLedger movement or deferred COGS source classification.";
   if (isStockLedgerRow(row) && rowSearchText(row).includes("cogs")) return "Inventory Asset and COGS mappings are required before COGS stock-out posting.";
   const missing = [];
@@ -153,6 +164,7 @@ function missingLabel(row: AccountingMappingAuditRow): string {
 }
 
 function routeForRow(row: AccountingMappingAuditRow): string {
+  if (isCommissionRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=Commission`;
   if (isStockLedgerRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=StockLedger`;
   if (isVendorPaymentRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=VendorPayment`;
   if (isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(normalizedStatus(row))) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=PurchaseBill`;
@@ -264,7 +276,7 @@ export default function AccountingMappingAuditPage() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping audit remediation</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Bridge impact: {payload?.bridge_impact ?? "Not loaded"}</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. READY_UNPOSTED means mapping setup is ready and posting is pending in bridge reconciliation, not a mapping failure. PurchaseBill and VendorPayment rows are grouped separately from inventory stock posting; VendorPayment needs Vendor Payable plus Cash/Bank/UPI finance-account mapping and JOURNAL_ENTRY numbering.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. READY_UNPOSTED means mapping setup is ready and posting is pending in bridge reconciliation, not a mapping failure. Commission rows require Commission Expense and Commission Payable mappings plus JOURNAL_ENTRY numbering; commission and payout records are not edited by accrual bridge posting.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <ActionButton variant="primary" onClick={() => void seedDefaults()} disabled={Boolean(busy)}>{busy === "seed" ? "Seeding..." : "Seed Safe Defaults"}</ActionButton>
@@ -314,7 +326,7 @@ export default function AccountingMappingAuditPage() {
                         <div><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold text-foreground">{row.event_label}</h3><MappingStatus value={row.status} /></div><div className="mt-1 text-xs text-muted-foreground">{row.module} · {row.source_model} · <span className="font-mono">{row.event_key}</span></div></div>
                         <div className="flex flex-wrap gap-2">
                           {canFix ? <button type="button" disabled={busy === row.event_key} onClick={() => void fixEvent(row)} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{busy === row.event_key ? "Fixing..." : "Fix setup event"}</button> : null}
-                          <Link href={routeForRow(row)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold">{isVendorPaymentRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open VendorPayment bridge rows" : isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open PurchaseBill bridge rows" : "Open suggested route"}</Link>
+                          <Link href={routeForRow(row)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold">{isCommissionRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open Commission bridge rows" : isVendorPaymentRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open VendorPayment bridge rows" : isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open PurchaseBill bridge rows" : "Open suggested route"}</Link>
                         </div>
                       </div>
                       <div className="mt-3 grid gap-3 md:grid-cols-5">

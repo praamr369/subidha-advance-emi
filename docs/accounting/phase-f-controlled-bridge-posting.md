@@ -430,6 +430,48 @@ The controlled bridge still does not add posting for:
 - VendorSettlement
 - Purchase return
 - Commission or payout
+
+## Phase F10 — Commission accrual accounting bridge
+
+Phase F10 extends the controlled bridge workflow to concrete commission accrual source records only.
+
+Actual source model used:
+
+```text
+subscriptions.Commission
+```
+
+Supported event keys:
+
+```text
+commission_accrual
+partner_commission_accrual
+sales_commission_accrual
+```
+
+Current safe classification:
+
+- `commission_accrual` is the default event for concrete `Commission` records with `status=PENDING` and positive `commission_amount`.
+- `Commission.status=SETTLED` is treated as legacy paid/settled commission and skipped as not applicable for F10 accrual posting.
+- `Commission.status=REVERSED` is skipped as not applicable.
+- zero, negative, unknown, or ambiguous commission rows remain unsupported and non-postable.
+- The current `Commission` model has no separate approved/earned fields, so F10 does not invent an approval state.
+
+Accounting shape:
+
+- Debit `COMMISSION_EXPENSE`.
+- Credit `COMMISSION_PAYABLE`.
+
+Safety boundary:
+
+- Preview is read-only and does not consume `JOURNAL_ENTRY` numbering.
+- Posting is explicit, admin-only, transactional, and idempotent by source/event/idempotency key.
+- Posting creates `JournalEntry`, `AccountingBridgePosting`, and a pending `ReconciliationItem`.
+- Posting does not mutate `Commission` amount, status, source links, metadata, settlement date, or reversal fields.
+- Posting does not create or mutate `CommissionPayoutBatch` or `CommissionPayoutLine`.
+- Posting does not mark commission paid or settled.
+- Reconciliation remains pending until explicit verification.
+- Commission payout / settlement posting is deferred to Phase F11.
 - Salary, payroll, or StaffAdvance
 - Inventory valuation or COGS
 

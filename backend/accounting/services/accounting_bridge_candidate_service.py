@@ -21,11 +21,24 @@ from accounting.services.period_service import resolve_accounting_period
 from billing.models import BillingCreditNote, BillingDebitNote, BillingDocumentStatus, BillingInvoice, BillingInvoiceType, BillingSourceType, DirectSaleReturn, DirectSaleReturnStatus, ReceiptDocument, ReceiptType
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationItemStatus, ReconciliationRun, ReconciliationRunStatus, ReconciliationSeverity
 from reconciliation.services.run_numbering import next_reconciliation_run_no
-from subscriptions.models import Payment
+from subscriptions.models import Commission, CommissionPayoutLine, CommissionStatus, Payment
 
 PAYMENT_COLLECTION_EVENT_KEY = "subscription_emi_payment"
 PAYMENT_COLLECTION_PURPOSE = "PAYMENT_COLLECTION"
 SAFETY_TEXT = "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation."
+
+COMMISSION_SOURCE_MODEL = "Commission"
+COMMISSION_EVENT_KEY = "commission_accrual"
+COMMISSION_EVENT_KEYS = {"commission_accrual", "partner_commission_accrual", "sales_commission_accrual"}
+COMMISSION_PURPOSE_BY_EVENT = {key: key.upper() for key in COMMISSION_EVENT_KEYS}
+COMMISSION_LABEL_BY_EVENT = {
+    "commission_accrual": "Commission accrual",
+    "partner_commission_accrual": "Partner commission accrual",
+    "sales_commission_accrual": "Sales commission accrual",
+}
+SKIPPED_COMMISSION_EVENT_KEY = "commission_skipped_not_applicable"
+UNSUPPORTED_COMMISSION_EVENT_KEY = "unsupported_commission"
+COMMISSION_SAFETY_TEXT = "Preview is read-only. Posting creates accounting entries only after explicit admin confirmation. It does not edit commission or payout records."
 
 RECEIPT_SOURCE_MODEL = "ReceiptDocument"
 RECEIPT_EVENT_KEYS = {"direct_sale_receipt", "customer_advance", "customer_refund", "refund_customer_credit"}
@@ -134,6 +147,14 @@ def _customer_advance_account() -> ChartOfAccount | None:
     return _posting_profile_account("CUSTOMER_ADVANCE_UNEARNED_REVENUE")
 
 
+def _commission_expense_account() -> ChartOfAccount | None:
+    return _posting_profile_account("COMMISSION_EXPENSE") or _posting_profile_account("PARTNER_COMMISSION_EXPENSE")
+
+
+def _commission_payable_account() -> ChartOfAccount | None:
+    return _posting_profile_account("COMMISSION_PAYABLE") or _posting_profile_account("PARTNER_COMMISSION_PAYABLE")
+
+
 def _sales_return_account() -> ChartOfAccount | None:
     return _posting_profile_account("SALES_RETURNS") or _customer_receivable_account()
 
@@ -174,8 +195,52 @@ def _debit_note_reference(note: BillingDebitNote) -> str:
     return note.note_no or f"DN-{note.id}"
 
 
+def _commission_reference(commission: Commission) -> str:
+    if commission.payment_id and getattr(commission.payment, "reference_no", None):
+        return f"COMM-{commission.id}-{commission.payment.reference_no}"
+    return f"COMM-{commission.id}"
+
+
 def _return_reference(row: DirectSaleReturn) -> str:
     return row.return_no or f"RET-{row.id}"
+
+
+def _commission_date(commission: Commission) -> date | None:
+    payment_date = getattr(getattr(commission, "payment", None), "payment_date", None)
+    if isinstance(payment_date, date):
+        return payment_date
+    return _as_date(getattr(commission, "created_at", None))
+
+
+def _partner_display(commission: Commission) -> str:
+    partner = commission.partner
+    full_name = ""
+    if hasattr(partner, "get_full_name"):
+        full_name = partner.get_full_name()
+    return full_name or getattr(partner, "name", None) or getattr(partner, "username", None) or f"Partner #{commission.partner_id}"
+
+
+def _customer_display(commission: Commission) -> str | None:
+    if commission.subscription_id and getattr(commission.subscription, "customer", None):
+        return commission.subscription.customer.name
+    if commission.payment_id and getattr(commission.payment, "customer", None):
+        return commission.payment.customer.name
+    return None
+
+
+def _commission_snapshot(commission: Commission) -> dict[str, Any]:
+    return {
+        "partner_id": commission.partner_id,
+        "subscription_id": commission.subscription_id,
+        "payment_id": commission.payment_id,
+        "emi_id": commission.emi_id,
+        "commission_rate": commission.commission_rate,
+        "commission_amount": commission.commission_amount,
+        "status": commission.status,
+        "settlement_date": commission.settlement_date,
+        "reversal_reason": commission.reversal_reason,
+        "metadata": commission.metadata,
+    }
 
 
 def _direct_sale_return_operational_date(row: DirectSaleReturn) -> tuple[date | None, str | None]:
@@ -409,6 +474,42 @@ def _debit_note_lines(note: BillingDebitNote, event_key: str) -> tuple[list[dict
     return lines, warnings, None
 
 
+def _classify_commission_event(commission: Commission) -> tuple[str, str, str | None, bool]:
+    status = (commission.status or "").strip().upper()
+    if status == CommissionStatus.REVERSED:
+        return SKIPPED_COMMISSION_EVENT_KEY, "Commission skipped", "Reversed commissions have no accrual posting impact in Phase F10.", False
+    if status == CommissionStatus.SETTLED:
+        return SKIPPED_COMMISSION_EVENT_KEY, "Commission skipped", "Settled legacy commissions are treated as already paid/settled and are not accrual-posted in Phase F10.", False
+    if status != CommissionStatus.PENDING:
+        return UNSUPPORTED_COMMISSION_EVENT_KEY, "Unsupported commission", "Commission status cannot be safely classified for accrual posting.", False
+    amount = _money(commission.commission_amount)
+    if amount <= Decimal("0.00"):
+        return UNSUPPORTED_COMMISSION_EVENT_KEY, "Unsupported commission", "Commission amount must be greater than zero for accrual posting.", False
+    return COMMISSION_EVENT_KEY, COMMISSION_LABEL_BY_EVENT[COMMISSION_EVENT_KEY], None, False
+
+
+def _commission_lines(commission: Commission, event_key: str) -> tuple[list[dict[str, Any]], list[str], None]:
+    warnings: list[str] = []
+    if event_key not in COMMISSION_EVENT_KEYS:
+        return [], ["Unsupported Commission accrual event for Phase F10."], None
+    amount = _money(commission.commission_amount)
+    if amount <= Decimal("0.00"):
+        warnings.append("Commission amount must be greater than zero.")
+    expense = _commission_expense_account()
+    payable = _commission_payable_account()
+    if expense is None:
+        warnings.append("COMMISSION_EXPENSE posting profile/chart account is missing or inactive.")
+    if payable is None:
+        warnings.append("COMMISSION_PAYABLE posting profile/chart account is missing or inactive.")
+    if warnings:
+        return [], warnings, None
+    reference = _commission_reference(commission)
+    return [
+        {"chart_account": expense, "description": f"Commission expense {reference}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
+        {"chart_account": payable, "description": f"Commission payable {reference}", "debit_amount": Decimal("0.00"), "credit_amount": amount},
+    ], warnings, None
+
+
 def _classify_return_event(row: DirectSaleReturn) -> tuple[str, str, str | None]:
     if row.status == DirectSaleReturnStatus.CANCELLED:
         return SKIPPED_CREDIT_RETURN_EVENT_KEY, "Return skipped", "Cancelled direct-sale returns are skipped from controlled bridge posting."
@@ -542,6 +643,8 @@ def _candidate_status_payload(*, event_key: str, event_label: str, module: str, 
 
 
 def _purpose_for_event(source_model: str, event_key: str) -> str:
+    if source_model == COMMISSION_SOURCE_MODEL:
+        return COMMISSION_PURPOSE_BY_EVENT.get(event_key, event_key.upper())
     if source_model == "Payment":
         return PAYMENT_COLLECTION_PURPOSE
     if source_model == RECEIPT_SOURCE_MODEL:
@@ -572,6 +675,39 @@ def payment_candidate(payment: Payment) -> dict[str, Any]:
     lines, warnings, finance_account = _payment_lines(payment)
     postability = _candidate_status_payload(event_key=PAYMENT_COLLECTION_EVENT_KEY, event_label="Subscription EMI payment", module="subscriptions", source_model="Payment", raw_status="READY" if lines else "NOT_CONFIGURED", lines=lines, line_warnings=warnings, period=period, source_date=payment.payment_date, journal=journal, reconciliation_item=item, source_workflow_exists=True)
     return _candidate_payload(candidate_id=_candidate_id(source_model="Payment", source_pk=payment.id, event_key=PAYMENT_COLLECTION_EVENT_KEY), event_key=PAYMENT_COLLECTION_EVENT_KEY, event_label="Subscription EMI payment", module="subscriptions", source_model="Payment", source_pk=payment.id, source_display=f"Payment {_source_reference(payment)}", source_reference=_source_reference(payment), source_date=payment.payment_date, amount=payment.amount, lines=lines, finance_account=finance_account, period=period, postability=postability, journal=journal, reconciliation_item=item, idempotency_key=f"bridge:{PAYMENT_COLLECTION_PURPOSE}:Payment:{payment.id}:{payment.payment_date.isoformat()}:{_money(payment.amount):.2f}")
+
+
+def commission_candidate(commission: Commission) -> dict[str, Any]:
+    event_key, event_label, reason, approval_required = _classify_commission_event(commission)
+    purpose = _purpose_for_event(COMMISSION_SOURCE_MODEL, event_key)
+    bridge = _existing_bridge_for(source_model=COMMISSION_SOURCE_MODEL, source_id=str(commission.id), purpose=purpose)
+    journal = bridge.journal_entry if bridge else None
+    item = _latest_posting_reconciliation_item(source_model=COMMISSION_SOURCE_MODEL, source_id=str(commission.id)) if journal else _latest_reconciliation_item(source_model=COMMISSION_SOURCE_MODEL, source_id=str(commission.id))
+    source_date = _commission_date(commission)
+    period = getattr(journal, "accounting_period", None) or _source_period(source_date)
+    lines, warnings, finance_account = _commission_lines(commission, event_key) if event_key in COMMISSION_EVENT_KEYS else ([], [reason] if reason else [], None)
+    raw = "SKIPPED_NOT_APPLICABLE" if event_key == SKIPPED_COMMISSION_EVENT_KEY else "UNSUPPORTED_SOURCE" if event_key == UNSUPPORTED_COMMISSION_EVENT_KEY else "READY" if lines else "NOT_CONFIGURED"
+    postability = _candidate_status_payload(event_key=event_key, event_label=event_label, module="subscriptions", source_model=COMMISSION_SOURCE_MODEL, raw_status=raw, lines=lines, line_warnings=warnings, period=period, source_date=source_date, journal=journal, reconciliation_item=item, source_workflow_exists=event_key in COMMISSION_EVENT_KEYS, classification_reason=reason, approval_required=approval_required)
+    source_date_key = source_date.isoformat() if source_date else "NO_SAFE_DATE"
+    payload = _candidate_payload(candidate_id=_candidate_id(source_model=COMMISSION_SOURCE_MODEL, source_pk=commission.id, event_key=event_key), event_key=event_key, event_label=event_label, module="subscriptions", source_model=COMMISSION_SOURCE_MODEL, source_pk=commission.id, source_display=f"Commission {_commission_reference(commission)}", source_reference=_commission_reference(commission), source_date=source_date, amount=commission.commission_amount, lines=lines, finance_account=finance_account, period=period, postability=postability, journal=journal, reconciliation_item=item, idempotency_key=f"bridge:{purpose}:Commission:{commission.id}:{source_date_key}:{_money(commission.commission_amount):.2f}", source_status=commission.status, source_type="COMMISSION")
+    payload.update(
+        {
+            "commission_reference": _commission_reference(commission),
+            "commission_status": commission.status,
+            "commission_rate": f"{_money(commission.commission_rate):.2f}",
+            "commission_amount": f"{_money(commission.commission_amount):.2f}",
+            "partner_id": commission.partner_id,
+            "partner_name": _partner_display(commission),
+            "customer_name": _customer_display(commission),
+            "subscription_id": commission.subscription_id,
+            "payment_id": commission.payment_id,
+            "payment_reference": getattr(commission.payment, "reference_no", None),
+            "emi_id": commission.emi_id,
+            "settlement_date": commission.settlement_date.isoformat() if commission.settlement_date else None,
+            "payout_line_id": getattr(getattr(commission, "payout_line", None), "id", None),
+        }
+    )
+    return payload
 
 
 def receipt_candidate(receipt: ReceiptDocument) -> dict[str, Any]:
@@ -656,6 +792,12 @@ def list_bridge_candidates(filters: BridgeCandidateFilters | None = None) -> lis
     active_filters = filters or BridgeCandidateFilters()
     requested_model = (active_filters.source_model or "").strip()
     rows: list[dict[str, Any]] = []
+    if requested_model in {"", COMMISSION_SOURCE_MODEL} and (not active_filters.module or active_filters.module == "subscriptions"):
+        commission_rows = [
+            commission_candidate(item)
+            for item in Commission.objects.select_related("partner", "subscription", "subscription__customer", "payment", "payment__customer", "emi").order_by("-created_at", "-id")[:1000]
+        ]
+        rows.extend(row for row in commission_rows if _row_matches_date_filters(row, active_filters))
     if requested_model in {"", "Payment"} and (not active_filters.event_key or active_filters.event_key == PAYMENT_COLLECTION_EVENT_KEY) and (not active_filters.module or active_filters.module == "subscriptions"):
         qs = _date_filter_qs(Payment.objects.select_related("finance_account", "finance_account__chart_account", "customer", "subscription"), active_filters, date_field="payment_date")
         rows.extend(payment_candidate(item) for item in qs.order_by("-payment_date", "-id")[:500])
@@ -684,12 +826,17 @@ def list_bridge_candidates(filters: BridgeCandidateFilters | None = None) -> lis
 
 def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict[str, Any]:
     source_kind, source_pk, event_key = _parse_candidate_id(candidate_id)
-    if source_kind == "payment" and event_key == PAYMENT_COLLECTION_EVENT_KEY:
+    if source_kind == "commission":
+        qs = Commission.objects.select_related("partner", "subscription", "subscription__customer", "payment", "payment__customer", "emi")
+        if for_update:
+            qs = qs.select_for_update()
+        candidate = commission_candidate(qs.get(pk=source_pk))
+    elif source_kind == "payment" and event_key == PAYMENT_COLLECTION_EVENT_KEY:
         qs = Payment.objects.select_related("finance_account", "finance_account__chart_account", "customer", "subscription")
         if for_update:
             qs = qs.select_for_update()
         return payment_candidate(qs.get(pk=source_pk))
-    if source_kind == "receiptdocument":
+    elif source_kind == "receiptdocument":
         qs = ReceiptDocument.objects.select_related("finance_account", "finance_account__chart_account", "billing_invoice", "direct_sale", "customer", "subscription", "payment")
         if for_update:
             qs = qs.select_for_update()
@@ -725,6 +872,8 @@ def _lines_for_candidate(candidate: dict[str, Any]):
     model = candidate["source_model"]
     source_id = candidate["source_id"]
     event_key = candidate["event_key"]
+    if model == COMMISSION_SOURCE_MODEL:
+        return _commission_lines(Commission.objects.select_related("partner", "payment").get(pk=source_id), event_key)
     if model == "Payment":
         return _payment_lines(Payment.objects.select_related("finance_account", "finance_account__chart_account").get(pk=source_id))
     if model == RECEIPT_SOURCE_MODEL:
@@ -756,12 +905,12 @@ def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
             blockers.append(str(exc))
     total_debit, total_credit = _line_totals(lines)
     tax_lines = [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount"), credit=line.get("credit_amount")) for line in lines if getattr(line.get("chart_account"), "system_code", "") == "OUTPUT_GST"]
-    source_payload = {"model": candidate["source_model"], "pk": candidate.get("source_pk") or candidate["source_id"], "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate.get("source_date"), "amount": candidate["amount"], "source_status": candidate.get("source_status"), "source_type": candidate.get("source_type"), "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount"), "debit_note_number": candidate.get("debit_note_number"), "debit_note_status": candidate.get("debit_note_status")}
-    return {"candidate": candidate, "candidate_id": candidate_id, "source": source_payload, "journal_date": journal_date.isoformat() if journal_date else None, "accounting_period": candidate["accounting_period"], "journal_number_preview": journal_number_preview, "debit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if _money(line.get("debit_amount")) > 0], "credit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if _money(line.get("credit_amount")) > 0], "lines": _preview_lines(lines), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "tax_lines": tax_lines, "finance_account_line": candidate["finance_account"], "warnings": warnings, "blockers": list(dict.fromkeys([item for item in blockers if item])), "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers), "idempotency_key": candidate["idempotency_key"], "safety_text": SAFETY_TEXT}
+    source_payload = {"model": candidate["source_model"], "pk": candidate.get("source_pk") or candidate["source_id"], "display": candidate["source_display"], "reference_number": candidate["source_reference_number"], "date": candidate.get("source_date"), "amount": candidate["amount"], "source_status": candidate.get("source_status"), "source_type": candidate.get("source_type"), "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount"), "debit_note_number": candidate.get("debit_note_number"), "debit_note_status": candidate.get("debit_note_status"), "commission_reference": candidate.get("commission_reference"), "partner_name": candidate.get("partner_name"), "customer_name": candidate.get("customer_name"), "subscription_id": candidate.get("subscription_id"), "payment_id": candidate.get("payment_id"), "payment_reference": candidate.get("payment_reference"), "emi_id": candidate.get("emi_id"), "commission_status": candidate.get("commission_status")}
+    return {"candidate": candidate, "candidate_id": candidate_id, "source": source_payload, "journal_date": journal_date.isoformat() if journal_date else None, "accounting_period": candidate["accounting_period"], "journal_number_preview": journal_number_preview, "debit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), debit=line.get("debit_amount")) for line in lines if _money(line.get("debit_amount")) > 0], "credit_lines": [_line_payload(account=line["chart_account"], description=line.get("description", ""), credit=line.get("credit_amount")) for line in lines if _money(line.get("credit_amount")) > 0], "lines": _preview_lines(lines), "total_debit": f"{total_debit:.2f}", "total_credit": f"{total_credit:.2f}", "is_balanced": bool(lines and total_debit == total_credit), "tax_lines": tax_lines, "finance_account_line": candidate["finance_account"], "warnings": warnings, "blockers": list(dict.fromkeys([item for item in blockers if item])), "can_post": bool(candidate["can_post"] and lines and total_debit == total_credit and not blockers), "idempotency_key": candidate["idempotency_key"], "safety_text": COMMISSION_SAFETY_TEXT if candidate.get("source_model") == COMMISSION_SOURCE_MODEL else SAFETY_TEXT}
 
 
 def _create_pending_reconciliation_item(*, journal: JournalEntry, source_model: str, source_id: str, source_label: str, amount: Decimal, candidate_id: str, actor, note: str = "") -> ReconciliationItem:
-    phase_slice = "F5" if source_model == DEBIT_NOTE_SOURCE_MODEL else "F4" if source_model in {CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL} else "F3" if source_model == BILLING_INVOICE_SOURCE_MODEL else "F2" if source_model == RECEIPT_SOURCE_MODEL else "F"
+    phase_slice = "F10" if source_model == COMMISSION_SOURCE_MODEL else "F5" if source_model == DEBIT_NOTE_SOURCE_MODEL else "F4" if source_model in {CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL} else "F3" if source_model == BILLING_INVOICE_SOURCE_MODEL else "F2" if source_model == RECEIPT_SOURCE_MODEL else "F"
     run = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="BRIDGE_POSTING", module="ACCOUNTING_BRIDGE", date_from=journal.entry_date, date_to=journal.entry_date, status=ReconciliationRunStatus.COMPLETED, started_by=actor, started_at=timezone.now(), finished_at=timezone.now(), total_checked=1, total_matched=0, total_exceptions=1, high_risk_count=0, metadata={"phase": "F", "phase_slice": phase_slice, "system_created_after_bridge_post": True, "verification_required": True, "posting_note": note})
     item = ReconciliationItem.objects.create(run=run, module="ACCOUNTING_BRIDGE_PHASE_F", source_type=source_model, source_id=source_id, source_label=source_label, expected_amount=amount, actual_amount=amount, amount_delta=Decimal("0.00"), severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code="POSTED_UNVERIFIED", exception_message="Bridge journal was posted and is waiting for explicit reconciliation verification.", recommended_action="Run reconciliation checks, then verify this bridge item if no hard exception is reported.", metadata={"journal_entry_id": journal.id, "journal_entry_no": journal.entry_no, "bridge_candidate_id": candidate_id, "action_href": "/admin/accounting/bridge-reconciliation"})
     ReconciliationEvidence.objects.create(item=item, evidence_type=source_model, object_id=source_id, label=source_label, amount=amount, status="SOURCE")
@@ -777,7 +926,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
     if not candidate_key:
         raise ValueError("idempotency_key is required.")
     candidate = get_bridge_candidate(candidate_id, for_update=True)
-    supported = {"Payment": {PAYMENT_COLLECTION_EVENT_KEY}, RECEIPT_SOURCE_MODEL: RECEIPT_EVENT_KEYS, BILLING_INVOICE_SOURCE_MODEL: BILLING_INVOICE_EVENT_KEYS, CREDIT_NOTE_SOURCE_MODEL: {"credit_note_issue", "sales_return", "customer_credit_adjustment"}, DIRECT_SALE_RETURN_SOURCE_MODEL: {"direct_sale_return"}, DEBIT_NOTE_SOURCE_MODEL: DEBIT_NOTE_EVENT_KEYS}
+    supported = {COMMISSION_SOURCE_MODEL: COMMISSION_EVENT_KEYS, "Payment": {PAYMENT_COLLECTION_EVENT_KEY}, RECEIPT_SOURCE_MODEL: RECEIPT_EVENT_KEYS, BILLING_INVOICE_SOURCE_MODEL: BILLING_INVOICE_EVENT_KEYS, CREDIT_NOTE_SOURCE_MODEL: {"credit_note_issue", "sales_return", "customer_credit_adjustment"}, DIRECT_SALE_RETURN_SOURCE_MODEL: {"direct_sale_return"}, DEBIT_NOTE_SOURCE_MODEL: DEBIT_NOTE_EVENT_KEYS}
     if candidate["event_key"] not in supported.get(candidate["source_model"], set()):
         raise ValueError("Unsupported bridge candidate source.")
     purpose = _purpose_for_event(candidate["source_model"], candidate["event_key"])
@@ -797,17 +946,28 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
     if not lines or total_debit != total_credit:
         raise ValueError("Bridge posting preview is not balanced.")
     source_instance = _source_instance_for_candidate(candidate, for_update=True)
+    commission_before = _commission_snapshot(source_instance) if candidate["source_model"] == COMMISSION_SOURCE_MODEL else None
+    payout_line_count_before = 0
+    if candidate["source_model"] == COMMISSION_SOURCE_MODEL:
+        payout_line_count_before = CommissionPayoutLine.objects.filter(commission_id=source_instance.id).count()
     entry_date = date.fromisoformat(candidate["source_date"])
-    journal, created = post_bridge_entry(source_instance=source_instance, purpose=purpose, entry_date=entry_date, memo=f"Bridge posting {candidate['source_model']} {candidate['source_id']} {candidate['event_key']}", lines=lines, voucher_type=purpose, source_type=candidate.get("source_type") or candidate["source_model"].upper(), source_reference=candidate["source_reference"], source_document_no=candidate["source_reference"], source_event_date=entry_date, trace_metadata={"event_key": candidate["event_key"], "idempotency_key": candidate_key, "posting_note": posting_note, "source_model": candidate["source_model"], "source_id": candidate["source_id"], "finance_account_id": getattr(finance_account, "id", None), "amount": candidate["amount"], "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount")}, posted_by=actor)
+    journal, created = post_bridge_entry(source_instance=source_instance, purpose=purpose, entry_date=entry_date, memo=f"Bridge posting {candidate['source_model']} {candidate['source_id']} {candidate['event_key']}", lines=lines, voucher_type=purpose, source_type=candidate.get("source_type") or candidate["source_model"].upper(), source_reference=candidate["source_reference"], source_document_no=candidate["source_reference"], source_event_date=entry_date, trace_metadata={"event_key": candidate["event_key"], "idempotency_key": candidate_key, "posting_note": posting_note, "source_model": candidate["source_model"], "source_id": candidate["source_id"], "finance_account_id": getattr(finance_account, "id", None), "amount": candidate["amount"], "taxable_amount": candidate.get("taxable_amount"), "tax_amount": candidate.get("tax_amount"), "commission_mutation": False if candidate["source_model"] == COMMISSION_SOURCE_MODEL else None, "commission_payout_mutation": False if candidate["source_model"] == COMMISSION_SOURCE_MODEL else None, "commission_payout_posting": False if candidate["source_model"] == COMMISSION_SOURCE_MODEL else None}, posted_by=actor)
     item = _latest_posting_reconciliation_item(source_model=candidate["source_model"], source_id=candidate["source_id"])
     if created and not (item and item.exception_code == "POSTED_UNVERIFIED"):
         item = _create_pending_reconciliation_item(journal=journal, source_model=candidate["source_model"], source_id=candidate["source_id"], source_label=candidate["source_reference"], amount=_money(candidate["amount"]), candidate_id=candidate_id, actor=actor, note=posting_note)
+    if candidate["source_model"] == COMMISSION_SOURCE_MODEL:
+        source_instance.refresh_from_db()
+        if _commission_snapshot(source_instance) != commission_before:
+            raise ValueError("Commission source mutation detected; bridge posting rolled back.")
+        payout_line_count_after = CommissionPayoutLine.objects.filter(commission_id=source_instance.id).count()
+        if payout_line_count_after != payout_line_count_before:
+            raise ValueError("Commission payout mutation detected; bridge posting rolled back.")
     _log_candidate_post(journal=journal, actor=actor, candidate_id=candidate_id, source_model=candidate["source_model"], source_id=int(candidate["source_id"]), event_key=candidate["event_key"], amount=_money(candidate["amount"]), candidate_key=candidate_key, reconciliation_item=item)
     return {"posted": created, "already_posted": not created, "journal_entry": _journal_payload(journal), "reconciliation_item": _reconciliation_payload(item), "next_action": "Run reconciliation checks and verify the pending bridge item."}
 
 
 def _source_instance_for_candidate(candidate: dict[str, Any], *, for_update: bool = False):
-    model = {"Payment": Payment, RECEIPT_SOURCE_MODEL: ReceiptDocument, BILLING_INVOICE_SOURCE_MODEL: BillingInvoice, CREDIT_NOTE_SOURCE_MODEL: BillingCreditNote, DEBIT_NOTE_SOURCE_MODEL: BillingDebitNote, DIRECT_SALE_RETURN_SOURCE_MODEL: DirectSaleReturn}[candidate["source_model"]]
+    model = {COMMISSION_SOURCE_MODEL: Commission, "Payment": Payment, RECEIPT_SOURCE_MODEL: ReceiptDocument, BILLING_INVOICE_SOURCE_MODEL: BillingInvoice, CREDIT_NOTE_SOURCE_MODEL: BillingCreditNote, DEBIT_NOTE_SOURCE_MODEL: BillingDebitNote, DIRECT_SALE_RETURN_SOURCE_MODEL: DirectSaleReturn}[candidate["source_model"]]
     qs = model.objects
     if for_update:
         qs = qs.select_for_update()
@@ -882,9 +1042,9 @@ def verify_bridge_reconciliation_item(*, item_id: int, actor, note: str = "", ru
 
 def summarize_candidate_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
     counts = Counter(row.get("status") or "INFO" for row in rows)
-    models = ["Payment", RECEIPT_SOURCE_MODEL, BILLING_INVOICE_SOURCE_MODEL, CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL, DEBIT_NOTE_SOURCE_MODEL]
+    models = [COMMISSION_SOURCE_MODEL, "Payment", RECEIPT_SOURCE_MODEL, BILLING_INVOICE_SOURCE_MODEL, CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL, DEBIT_NOTE_SOURCE_MODEL]
     by_model = {model: Counter(row.get("status") or "INFO" for row in rows if row.get("source_model") == model) for model in models}
     def posted_unverified(model: str) -> int:
         return sum(1 for row in rows if row.get("source_model") == model and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
     credit_models = [CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL]
-    return {"candidate_count": len(rows), "ready_unposted_count": counts.get("READY_UNPOSTED", 0), "posted_count": counts.get("POSTED", 0), "reconciled_count": counts.get("RECONCILED", 0), "blocked_by_mapping_count": counts.get("BLOCKED_BY_MAPPING", 0), "blocked_by_period_count": counts.get("BLOCKED_BY_PERIOD", 0), "blocked_by_numbering_count": counts.get("BLOCKED_BY_NUMBERING", 0), "blocked_by_approval_count": counts.get("BLOCKED_BY_APPROVAL", 0), "unsupported_count": counts.get("UNSUPPORTED_SOURCE", 0), "payment_ready_unposted_count": by_model["Payment"].get("READY_UNPOSTED", 0), "payment_posted_count": by_model["Payment"].get("POSTED", 0), "payment_posted_unverified_count": posted_unverified("Payment"), "payment_reconciled_count": by_model["Payment"].get("RECONCILED", 0), "receipt_ready_unposted_count": by_model[RECEIPT_SOURCE_MODEL].get("READY_UNPOSTED", 0), "receipt_posted_count": by_model[RECEIPT_SOURCE_MODEL].get("POSTED", 0), "receipt_posted_unverified_count": posted_unverified(RECEIPT_SOURCE_MODEL), "receipt_reconciled_count": by_model[RECEIPT_SOURCE_MODEL].get("RECONCILED", 0), "billing_invoice_ready_unposted_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("READY_UNPOSTED", 0), "billing_invoice_posted_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("POSTED", 0), "billing_invoice_posted_unverified_count": posted_unverified(BILLING_INVOICE_SOURCE_MODEL), "billing_invoice_reconciled_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("RECONCILED", 0), "billing_invoice_blocked_count": sum(v for k, v in by_model[BILLING_INVOICE_SOURCE_MODEL].items() if str(k).startswith("BLOCKED")), "billing_invoice_unsupported_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("UNSUPPORTED_SOURCE", 0), "credit_return_ready_unposted_count": sum(by_model[m].get("READY_UNPOSTED", 0) for m in credit_models), "credit_return_posted_count": sum(by_model[m].get("POSTED", 0) for m in credit_models), "credit_return_posted_unverified_count": sum(posted_unverified(m) for m in credit_models), "credit_return_reconciled_count": sum(by_model[m].get("RECONCILED", 0) for m in credit_models), "credit_return_blocked_count": sum(sum(v for k, v in by_model[m].items() if str(k).startswith("BLOCKED")) for m in credit_models), "credit_return_unsupported_count": sum(by_model[m].get("UNSUPPORTED_SOURCE", 0) for m in credit_models), "debit_note_ready_unposted_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("READY_UNPOSTED", 0), "debit_note_posted_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("POSTED", 0), "debit_note_posted_unverified_count": posted_unverified(DEBIT_NOTE_SOURCE_MODEL), "debit_note_reconciled_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("RECONCILED", 0), "debit_note_blocked_count": sum(v for k, v in by_model[DEBIT_NOTE_SOURCE_MODEL].items() if str(k).startswith("BLOCKED")), "debit_note_unsupported_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("UNSUPPORTED_SOURCE", 0)}
+    return {"candidate_count": len(rows), "ready_unposted_count": counts.get("READY_UNPOSTED", 0), "posted_count": counts.get("POSTED", 0), "reconciled_count": counts.get("RECONCILED", 0), "blocked_by_mapping_count": counts.get("BLOCKED_BY_MAPPING", 0), "blocked_by_period_count": counts.get("BLOCKED_BY_PERIOD", 0), "blocked_by_numbering_count": counts.get("BLOCKED_BY_NUMBERING", 0), "blocked_by_approval_count": counts.get("BLOCKED_BY_APPROVAL", 0), "unsupported_count": counts.get("UNSUPPORTED_SOURCE", 0), "commission_ready_unposted_count": by_model[COMMISSION_SOURCE_MODEL].get("READY_UNPOSTED", 0), "commission_posted_count": by_model[COMMISSION_SOURCE_MODEL].get("POSTED", 0), "commission_posted_unverified_count": posted_unverified(COMMISSION_SOURCE_MODEL), "commission_reconciled_count": by_model[COMMISSION_SOURCE_MODEL].get("RECONCILED", 0), "commission_blocked_count": sum(v for k, v in by_model[COMMISSION_SOURCE_MODEL].items() if str(k).startswith("BLOCKED")), "commission_unsupported_count": by_model[COMMISSION_SOURCE_MODEL].get("UNSUPPORTED_SOURCE", 0), "payment_ready_unposted_count": by_model["Payment"].get("READY_UNPOSTED", 0), "payment_posted_count": by_model["Payment"].get("POSTED", 0), "payment_posted_unverified_count": posted_unverified("Payment"), "payment_reconciled_count": by_model["Payment"].get("RECONCILED", 0), "receipt_ready_unposted_count": by_model[RECEIPT_SOURCE_MODEL].get("READY_UNPOSTED", 0), "receipt_posted_count": by_model[RECEIPT_SOURCE_MODEL].get("POSTED", 0), "receipt_posted_unverified_count": posted_unverified(RECEIPT_SOURCE_MODEL), "receipt_reconciled_count": by_model[RECEIPT_SOURCE_MODEL].get("RECONCILED", 0), "billing_invoice_ready_unposted_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("READY_UNPOSTED", 0), "billing_invoice_posted_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("POSTED", 0), "billing_invoice_posted_unverified_count": posted_unverified(BILLING_INVOICE_SOURCE_MODEL), "billing_invoice_reconciled_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("RECONCILED", 0), "billing_invoice_blocked_count": sum(v for k, v in by_model[BILLING_INVOICE_SOURCE_MODEL].items() if str(k).startswith("BLOCKED")), "billing_invoice_unsupported_count": by_model[BILLING_INVOICE_SOURCE_MODEL].get("UNSUPPORTED_SOURCE", 0), "credit_return_ready_unposted_count": sum(by_model[m].get("READY_UNPOSTED", 0) for m in credit_models), "credit_return_posted_count": sum(by_model[m].get("POSTED", 0) for m in credit_models), "credit_return_posted_unverified_count": sum(posted_unverified(m) for m in credit_models), "credit_return_reconciled_count": sum(by_model[m].get("RECONCILED", 0) for m in credit_models), "credit_return_blocked_count": sum(sum(v for k, v in by_model[m].items() if str(k).startswith("BLOCKED")) for m in credit_models), "credit_return_unsupported_count": sum(by_model[m].get("UNSUPPORTED_SOURCE", 0) for m in credit_models), "debit_note_ready_unposted_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("READY_UNPOSTED", 0), "debit_note_posted_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("POSTED", 0), "debit_note_posted_unverified_count": posted_unverified(DEBIT_NOTE_SOURCE_MODEL), "debit_note_reconciled_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("RECONCILED", 0), "debit_note_blocked_count": sum(v for k, v in by_model[DEBIT_NOTE_SOURCE_MODEL].items() if str(k).startswith("BLOCKED")), "debit_note_unsupported_count": by_model[DEBIT_NOTE_SOURCE_MODEL].get("UNSUPPORTED_SOURCE", 0)}
