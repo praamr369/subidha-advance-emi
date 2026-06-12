@@ -5,8 +5,9 @@ import PublicBanner from "@/components/public/PublicBanner";
 import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicPolicySection from "@/components/public/PublicPolicySection";
 import PublicPageShell from "@/components/public/PublicPageShell";
+import RentLeaseAnimatedHero from "@/components/public/RentLeaseAnimatedHero";
+import RentLeaseWorkflowPreview from "@/components/public/RentLeaseWorkflowPreview";
 import { LEASE_POLICY, PUBLIC_LEGAL_DISCLAIMER_POINTS, READ_BEFORE_APPLY } from "@/lib/public-content";
-import { getPublicBannerWithFallback } from "@/lib/public-page-banners";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
@@ -17,18 +18,13 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default function LeasePolicyPage() {
-  const banner = getPublicBannerWithFallback("rentLease");
+  const subtitle = "Longer-term furniture access with contract-backed controls and approval checkpoints.";
+
   return (
     <PublicPageShell
       title="Lease policy"
-      subtitle="Longer-term furniture access with contract-backed controls and approval checkpoints."
-      hero={{
-        eyebrow: "Lease workflow",
-        imageSrc: banner.src,
-        imageAlt: "Lease policy banner image",
-        imageExists: banner.exists,
-        badges: ["Contract-backed terms", "Return and condition checks"],
-      }}
+      subtitle={subtitle}
+      heroSlot={<RentLeaseAnimatedHero mode="lease" title="Lease policy" subtitle={subtitle} />}
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Lease policy" },
@@ -41,8 +37,11 @@ export default function LeasePolicyPage() {
       <PublicBanner
         eyebrow="Read before applying"
         title="Lease renewal and upgrade are approval-based"
-        description="Please review these points carefully before enrollment."
+        description="Please review these points carefully before enrollment. Lease does not create Lucky ID participation, winner eligibility, or EMI waiver benefits."
       />
+
+      <RentLeaseWorkflowPreview mode="lease" />
+
       <PublicDisclaimerBox title="Read before applying" points={READ_BEFORE_APPLY.lease} />
       <PublicPolicySection id="lease-policy" title={LEASE_POLICY.title} intro={LEASE_POLICY.intro} cards={LEASE_POLICY.cards} />
       <PublicDisclaimerBox points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />
