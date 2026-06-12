@@ -57,7 +57,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const dictionary = getPublicDictionary(locale);
 
   const applyHref = buildProductEnquiryHref(product);
-  const mediaState = product.image || (product.gallery_images?.length ?? 0) > 0 ? "Uploaded product media" : "Media pending";
+  const hasMedia = Boolean(product.image) || (product.gallery_images?.length ?? 0) > 0;
+  const mediaState = hasMedia ? "Uploaded product media" : "Media pending";
   const factRows = [
     { label: "Product code", value: product.product_code || "Unassigned" },
     { label: "Category", value: product.category || "Not classified" },
