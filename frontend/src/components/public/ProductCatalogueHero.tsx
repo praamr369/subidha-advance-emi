@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, PackageCheck, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
 
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
+import { PUBLIC_MARKETING_ASSETS } from "@/lib/public-marketing-assets";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -90,12 +91,7 @@ export default function ProductCatalogueHero({
         </div>
 
         <div className="relative">
-          <GeneratedMarketingVisual
-            src="/marketing/generated/product-wall-3d.webp"
-            alt="Decorative 3D product category wall for furniture, electronics, and appliances"
-            label="Product wall visual"
-            className="min-h-[22rem] lg:min-h-[30rem]"
-          />
+          <GeneratedMarketingVisual asset={PUBLIC_MARKETING_ASSETS.productWall} className="min-h-[22rem] lg:min-h-[30rem]" />
           <div className="pointer-events-none absolute -left-3 top-8 hidden rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Furniture + appliances</div>
             <div className="mt-1 text-sm font-semibold text-foreground">Category discovery</div>
