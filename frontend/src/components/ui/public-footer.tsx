@@ -11,6 +11,9 @@ import { ROUTES } from "@/lib/routes";
 
 const productCategoryLinks = ["Sofas", "Beds", "Wardrobes", "Dining sets", "Refrigerators", "Washing machines", "TV & electronics", "Kitchen appliances"];
 
+const footerLinkClassName =
+  "inline-flex min-h-10 items-center rounded-xl px-3 py-2 text-muted-foreground transition hover:bg-[var(--surface-muted)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2";
+
 export default async function PublicFooter() {
   const [profile, locale] = await Promise.all([getResolvedPublicBusinessProfile(), getPublicLocale()]);
   const dictionary = getPublicDictionary(locale);
@@ -48,24 +51,24 @@ export default async function PublicFooter() {
         <PublicDisclaimerBox title="Public information notice" points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />
       </div>
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.2fr_0.8fr_0.9fr] lg:px-8">
-        <div className="public-card max-w-xl p-4 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
+        <div className="public-card min-w-0 max-w-xl p-4 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
           <BrandLockup logoSrc={profile.resolved_logo_src} companyName={profile.resolved_display_name} subtitle={profile.resolved_tagline} />
-          <p className="mt-2 text-xs font-medium text-slate-600">Advance EMI • Rent • Lease • Direct Sale</p>
+          <p className="mt-2 text-xs font-medium text-slate-600 dark:text-muted-foreground">Advance EMI • Rent • Lease • Direct Sale</p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Trusted local retail support for furniture, electronics, and home appliances in {brandConfig.publicBranchLocation}.
           </p>
-          <div className="mt-4 rounded-xl border border-white/75 bg-white/75 p-3 text-sm">
+          <div className="mt-4 rounded-xl border border-white/75 bg-white/75 p-3 text-sm dark:border-border/70 dark:bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)]">
             <div className="font-semibold text-foreground">{trustTitle}</div>
             <p className="mt-1 text-muted-foreground">{trustDescription}</p>
-            <p className="mt-2 text-xs text-slate-500">Language: {PUBLIC_LANGUAGE_LABELS[locale]}</p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-muted-foreground">Language: {PUBLIC_LANGUAGE_LABELS[locale]}</p>
           </div>
         </div>
 
-        <div className="public-card p-4 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
+        <div className="public-card min-w-0 p-4 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dictionary.footer.quickLinks}</div>
-          <div className="mt-3 grid gap-2 text-sm">
+          <div className="mt-3 grid gap-1 text-sm sm:grid-cols-2 lg:grid-cols-1">
             {footerLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="rounded-lg px-2 py-1.5 text-muted-foreground transition hover:bg-[var(--surface-muted)] hover:text-foreground">
+              <Link key={link.href} href={link.href} className={footerLinkClassName}>
                 {link.label}
               </Link>
             ))}
@@ -73,22 +76,22 @@ export default async function PublicFooter() {
           <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Popular categories</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {productCategoryLinks.map((category) => (
-              <span key={category} className="rounded-full border border-white/80 bg-white/80 px-3 py-1 text-xs text-slate-600">
+              <span key={category} className="rounded-full border border-white/80 bg-white/80 px-3 py-1 text-xs text-slate-600 dark:border-border/70 dark:bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] dark:text-muted-foreground">
                 {category}
               </span>
             ))}
           </div>
         </div>
 
-        <div className="public-card max-w-sm p-4 text-sm shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
+        <div className="public-card min-w-0 max-w-sm p-4 text-sm shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dictionary.footer.contact}</div>
           <div className="mt-3 grid gap-2 text-muted-foreground">
-            {profile.support_phone ? <div className="public-card-sm px-3 py-2">Phone: {profile.support_phone}</div> : null}
-            {profile.support_email ? <div className="public-card-sm px-3 py-2">Email: {profile.support_email}</div> : null}
-            {profile.business_hours ? <div className="public-card-sm px-3 py-2">Hours: {profile.business_hours}</div> : null}
-            {profile.address_text ? <div className="public-card-sm px-3 py-2">Address: {profile.address_text}</div> : null}
+            {profile.support_phone ? <div className="public-card-sm break-words px-3 py-2">Phone: {profile.support_phone}</div> : null}
+            {profile.support_email ? <div className="public-card-sm break-words px-3 py-2">Email: {profile.support_email}</div> : null}
+            {profile.business_hours ? <div className="public-card-sm break-words px-3 py-2">Hours: {profile.business_hours}</div> : null}
+            {profile.address_text ? <div className="public-card-sm break-words px-3 py-2">Address: {profile.address_text}</div> : null}
             {profile.resolved_whatsapp_link ? (
-              <Link href={profile.resolved_whatsapp_link} className="public-card-sm px-3 py-2 transition hover:bg-white">
+              <Link href={profile.resolved_whatsapp_link} className="public-card-sm inline-flex min-h-10 items-center px-3 py-2 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:hover:bg-[var(--surface-muted)]">
                 {dictionary.footer.whatsapp}
               </Link>
             ) : null}
@@ -97,10 +100,10 @@ export default async function PublicFooter() {
           {hasSocial ? (
             <div className="mt-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dictionary.footer.social}</div>
-              <div className="mt-2 grid gap-2 text-muted-foreground">
-                {profile.facebook_url ? <Link href={profile.facebook_url} className="rounded-lg px-2 py-1.5 transition hover:bg-[var(--surface-muted)] hover:text-foreground">Facebook</Link> : null}
-                {profile.instagram_url ? <Link href={profile.instagram_url} className="rounded-lg px-2 py-1.5 transition hover:bg-[var(--surface-muted)] hover:text-foreground">Instagram</Link> : null}
-                {profile.youtube_url ? <Link href={profile.youtube_url} className="rounded-lg px-2 py-1.5 transition hover:bg-[var(--surface-muted)] hover:text-foreground">YouTube</Link> : null}
+              <div className="mt-2 grid gap-1 text-muted-foreground">
+                {profile.facebook_url ? <Link href={profile.facebook_url} className={footerLinkClassName}>Facebook</Link> : null}
+                {profile.instagram_url ? <Link href={profile.instagram_url} className={footerLinkClassName}>Instagram</Link> : null}
+                {profile.youtube_url ? <Link href={profile.youtube_url} className={footerLinkClassName}>YouTube</Link> : null}
               </div>
             </div>
           ) : null}
