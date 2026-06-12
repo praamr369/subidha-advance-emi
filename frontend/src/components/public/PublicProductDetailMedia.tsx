@@ -20,22 +20,27 @@ export default function PublicProductDetailMedia({
   const urls = [...new Set([product.image, ...extras].filter(Boolean))] as string[];
   const badge = product.category || "Public catalogue";
 
-  const renderSlide = (src: string | null | undefined, index: number) => (
-    <AspectRatio ratio={5 / 4} className="w-full">
-      <PublicProductMedia
-        src={src}
-        alt={
-          index === 0 ? product.name : `${product.name} (${String(index + 1)})`
-        }
-        badge={badge}
-        sizes="(max-width: 1024px) 100vw, 54vw"
-        priority={index === 0}
-        className="absolute inset-0 size-full rounded-[1.7rem]"
-        imageClassName="transition duration-500 hover:scale-[1.02]"
-        fallbackLabel="Product media pending"
-      />
-    </AspectRatio>
-  );
+  const renderSlide = (src: string | null | undefined, index: number) => {
+    const isPrimaryImage = index === 0;
+
+    return (
+      <AspectRatio ratio={5 / 4} className="w-full">
+        <PublicProductMedia
+          src={src}
+          alt={
+            isPrimaryImage ? product.name : `${product.name} (${String(index + 1)})`
+          }
+          badge={badge}
+          sizes="(max-width: 1024px) 100vw, 54vw"
+          priority={isPrimaryImage}
+          quality={isPrimaryImage ? 78 : 70}
+          className="absolute inset-0 size-full rounded-[1.7rem]"
+          imageClassName="transition duration-500 hover:scale-[1.02]"
+          fallbackLabel="Product media pending"
+        />
+      </AspectRatio>
+    );
+  };
 
   if (urls.length >= 2) {
     return (
