@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ClipboardCheck, PackageCheck, ReceiptText, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowRight, ClipboardCheck, PackageCheck, ShieldCheck, Wallet } from "lucide-react";
 
 import GeneratedMarketingVisual from "@/components/public/GeneratedMarketingVisual";
 import { ROUTES } from "@/lib/routes";
