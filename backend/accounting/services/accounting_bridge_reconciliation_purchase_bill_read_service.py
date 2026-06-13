@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from accounting.services.accounting_bridge_reconciliation_read_service import BridgeReconciliationFilters, build_accounting_bridge_reconciliation as build_base_reconciliation
-from accounting.services.accounting_bridge_security_deposit_service import BridgeCandidateFilters, list_bridge_candidates, summarize_candidate_statuses
+from accounting.services.accounting_bridge_customer_advance_guard_service import BridgeCandidateFilters, list_bridge_candidates, summarize_candidate_statuses
 
 
 EXTENDED_SOURCE_MODELS = {"PurchaseBill", "VendorPayment", "StockLedger", "SalarySheet", "SalaryPayment", "RentLeaseCollection", "RentLeaseDepositTransaction"}
@@ -22,6 +22,10 @@ def _row_matches_vendor(row: dict[str, Any], vendor: str | None) -> bool:
     return text in haystack
 
 
+def _is_old_f1_advance_allocation_row(row: dict[str, Any], guarded_ids: set[tuple[str, str]]) -> bool:
+    return (row.get("source_model"), str(row.get("source_id") or row.get("source_pk") or "")) in guarded_ids and row.get("event_key") == "subscription_emi_payment"
+
+
 def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters | None = None) -> dict[str, Any]:
     active_filters = filters or BridgeReconciliationFilters()
     payload = build_base_reconciliation(active_filters)
@@ -33,6 +37,12 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
     if active_filters.status:
         candidate_rows = [row for row in candidate_rows if row.get("status") == active_filters.status or row.get("reconciliation_state") == active_filters.status]
     existing_results = payload.get("results", [])
+    guarded_payment_ids = {
+        (row.get("source_model"), str(row.get("source_id") or row.get("source_pk") or ""))
+        for row in candidate_rows
+        if row.get("source_model") == "Payment" and row.get("event_key") == "payment_skipped_not_applicable"
+    }
+    existing_results = [row for row in existing_results if not _is_old_f1_advance_allocation_row(row, guarded_payment_ids)]
     if active_filters.source_model in EXTENDED_SOURCE_MODELS:
         results = candidate_rows
     else:
