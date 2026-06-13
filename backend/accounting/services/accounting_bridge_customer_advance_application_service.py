@@ -114,7 +114,7 @@ def _linked_snapshot(row: CustomerAdvanceAllocation) -> dict[str, Any]:
     payment = row.payment
     emi = row.emi
     subscription = row.subscription
-    customer = subscription.customer if subscription_id := row.subscription_id else None
+    customer = subscription.customer if subscription else None
     return {
         "advance_amount": advance.amount,
         "advance_unapplied_amount": advance.unapplied_amount,

@@ -78,6 +78,49 @@ export type AccountingBridgePeriodReadiness = { financial_year_ready?: boolean; 
 
 export type BridgeSourceModel = "Payment" | "ReceiptDocument" | "BillingInvoice" | "RentLeaseBillingDemand" | "RentLeaseCollection" | "RentLeaseDepositTransaction" | "CustomerAdvance" | "CustomerAdvanceAllocation" | "CustomerAdvanceRefund" | "BillingCreditNote" | "DirectSaleReturn" | "BillingDebitNote" | "PurchaseBill" | "VendorPayment" | "StockLedger" | "Commission" | "CommissionPayoutBatch" | "SalarySheet" | "SalaryPayment" | string;
 export type BridgeActionLink = { key: string; label: string; href: string; reason?: string | null; disabled?: boolean };
+export type PhaseFSourceInventoryItem = {
+  phase: string;
+  domain: string;
+  source_model: BridgeSourceModel;
+  event_key?: string | null;
+  event_keys: string[];
+  accounting_shape: string;
+  source_owner: string;
+  status: "READY" | "POSTED_UNVERIFIED" | "RECONCILED" | "BLOCKED" | "UNSUPPORTED" | "DEFERRED" | string;
+  counts: {
+    ready_unposted?: number;
+    posted_unverified?: number;
+    reconciled?: number;
+    blocked?: number;
+    unsupported?: number;
+    skipped_deferred?: number;
+    exception?: number;
+  };
+  primary_blocker_type?: string | null;
+  can_post?: boolean;
+  action_links: BridgeActionLink[];
+};
+export type PhaseFControlTower = {
+  source_inventory: PhaseFSourceInventoryItem[];
+  groups: Record<string, Record<string, number>>;
+  phase_counts: Record<string, Record<string, number>>;
+  readiness: {
+    state: string;
+    states: string[];
+    ready_for_controlled_posting: boolean;
+    read_only: boolean;
+    creates_journal_entry: boolean;
+    creates_accounting_bridge_posting: boolean;
+    auto_posts: boolean;
+    auto_reconciles: boolean;
+    auto_closes_period: boolean;
+    mutates_sources: boolean;
+    counts: Record<string, number>;
+    blockers: string[];
+    posting_controls_ready: boolean;
+  };
+  guardrails: Record<string, boolean>;
+};
 export type BridgePostingLine = { chart_account?: { id?: number; code?: string; name?: string } | null; description?: string; debit_amount: string; credit_amount: string };
 export type BridgeFinanceAccount = { id?: number; name?: string; kind?: string; is_active?: boolean; chart_account?: { id?: number; code?: string; name?: string } | null };
 
@@ -237,6 +280,7 @@ export function getAccountingBridgeReconciliation(filters: AccountingBridgeRecon
 export type AccountingBridgeReconciliationPayload = {
   summary: AccountingBridgeReconciliationSummary;
   period_readiness?: AccountingBridgePeriodReadiness;
+  phase_f_control_tower?: PhaseFControlTower;
   results: AccountingBridgeReconciliationRow[];
 };
 

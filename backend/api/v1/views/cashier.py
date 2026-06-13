@@ -15,6 +15,7 @@ from api.v1.serializers.finance_operations import (
     CashierAdvanceCollectionSerializer,
     CashierPaymentCollectionSerializer,
 )
+from api.v1.serializers.billing import DirectSaleCollectionSerializer
 from billing.models import DirectSale
 from core.services.operational_visibility import invoice_active_q
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
@@ -303,6 +304,69 @@ class CashierCollectAdvance(APIView):
                 },
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class CashierCollectDirectSalePayment(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
+
+    @require_capability("billing.collect")
+    def post(self, request, *args, **kwargs):
+        direct_sale_id = request.data.get("direct_sale_id") or request.data.get("sale_id")
+        if direct_sale_id in (None, ""):
+            return Response({"detail": "direct_sale_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            direct_sale_id = int(direct_sale_id)
+        except (TypeError, ValueError):
+            return Response({"detail": "direct_sale_id must be a valid integer."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = DirectSaleCollectionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        try:
+            result = collect_direct_sale_payment(
+                direct_sale_id=direct_sale_id,
+                amount=validated["amount"],
+                collected_by=request.user,
+                receipt_date=validated.get("receipt_date"),
+                finance_account_id=validated.get("finance_account_id"),
+                branch_id=validated.get("branch_id"),
+                cash_counter_id=validated.get("cash_counter_id"),
+                reference_no=validated.get("reference_no") or None,
+                notes=validated.get("notes") or None,
+            )
+        except ValueError as exc:
+            return Response(_value_error_payload(exc), status=status.HTTP_400_BAD_REQUEST)
+
+        sale = result["direct_sale"]
+        receipt = result["receipt"]
+        invoice = result["invoice"]
+        response_status = status.HTTP_201_CREATED if result.get("created", True) else status.HTTP_200_OK
+        return Response(
+            {
+                "success": True,
+                "created": result.get("created", True),
+                "message": "Direct sale payment collected successfully." if result.get("created", True) else "Duplicate collection reference detected; existing receipt returned.",
+                "direct_sale": _serialize_cashier_direct_sale_result(sale),
+                "receipt": {
+                    "id": receipt.id,
+                    "receipt_no": getattr(receipt, "receipt_no", None),
+                    "amount": str(getattr(receipt, "amount", "")),
+                    "status": getattr(receipt, "status", None),
+                    "receipt_date": getattr(receipt, "receipt_date", None),
+                    "finance_account_id": getattr(receipt, "finance_account_id", None),
+                },
+                "invoice": {
+                    "id": getattr(invoice, "id", None),
+                    "document_no": getattr(invoice, "document_no", None),
+                    "status": getattr(invoice, "status", None),
+                    "received_total": str(getattr(invoice, "received_total", "")),
+                    "balance_total": str(getattr(invoice, "balance_total", "")),
+                },
+                "outstanding_before": str(result.get("outstanding_before")),
+                "outstanding_after": str(result.get("outstanding_after")),
+            },
+            status=response_status,
         )
 
 

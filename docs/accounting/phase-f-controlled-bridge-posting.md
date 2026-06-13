@@ -805,3 +805,9 @@ Safety boundary:
 - Posting does not mark deposits refunded/settled/posted, does not auto-reconcile, and does not close periods.
 
 F18 remains separate from F14 rent/lease revenue, F15C monthly collection settlement, F17 deposit receipts, customer advances, direct-sale receipts, and general customer refunds.
+
+## Phase F24 — Control-tower closeout
+
+F24 is documented in `docs/accounting/phase-f24-control-tower-closeout.md`.
+
+F24 is read-only readiness, diagnostics, source-inventory visibility, documentation, and regression coverage only. It does not add an accounting source model, does not add a posting source, does not create `JournalEntry` or `AccountingBridgePosting`, does not mutate source records, and does not auto-post, auto-reconcile, or auto-close periods.

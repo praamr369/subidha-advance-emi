@@ -20,6 +20,7 @@ import {
   type AccountingBridgeReconciliationPayload,
   type AccountingBridgeReconciliationRow,
   type BridgePostingPreview,
+  type PhaseFSourceInventoryItem,
 } from "@/services/accounting-bridge-reconciliation";
 
 const STATUS_OPTIONS = ["", "READY_UNPOSTED", "POSTED_UNVERIFIED", "POSTED", "RECONCILED", "BLOCKED", "BLOCKED_BY_MAPPING", "BLOCKED_BY_FINANCE_ACCOUNT", "BLOCKED_BY_PERIOD", "BLOCKED_BY_NUMBERING", "BLOCKED_BY_APPROVAL", "UNSUPPORTED", "UNSUPPORTED_SOURCE", "EXCEPTION"];
@@ -146,6 +147,74 @@ function SourceDetails({ row }: { row: AccountingBridgeReconciliationRow }) {
 function SummaryCard({ label, value, href, tone = "border-blue-200 bg-blue-50 text-blue-900" }: { label: string; value: number; href?: string; tone?: string }) {
   const body = <div className={cx("rounded-2xl border p-4 shadow-sm", tone)}><div className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</div><div className="mt-2 text-2xl font-semibold">{value}</div></div>;
   return href ? <Link href={href}>{body}</Link> : body;
+}
+
+function countText(item: PhaseFSourceInventoryItem): string {
+  const counts = item.counts ?? {};
+  const parts = [
+    ["ready", counts.ready_unposted],
+    ["posted unverified", counts.posted_unverified],
+    ["reconciled", counts.reconciled],
+    ["blocked", counts.blocked],
+    ["unsupported", counts.unsupported],
+    ["deferred", counts.skipped_deferred],
+  ].filter(([, value]) => Number(value ?? 0) > 0);
+  return parts.length ? parts.map(([label, value]) => `${label}: ${value}`).join(" · ") : "No current rows";
+}
+
+function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconciliationPayload }) {
+  const tower = payload.phase_f_control_tower;
+  const inventory = tower?.source_inventory ?? [];
+  const grouped = inventory.reduce<Record<string, PhaseFSourceInventoryItem[]>>((acc, item) => {
+    acc[item.domain] = [...(acc[item.domain] ?? []), item];
+    return acc;
+  }, {});
+  if (!tower || inventory.length === 0) return null;
+  return (
+    <WorkspaceSection title="Phase F Control Tower" description="Read-only source inventory and readiness summary. Posting remains row-level, explicit, and admin-controlled.">
+      <div className="space-y-4">
+        <div className="grid gap-3 lg:grid-cols-[280px_1fr]">
+          <div className={cx("rounded-xl border p-4", statusClass(tower.readiness.state))}>
+            <div className="text-xs font-semibold uppercase tracking-wide opacity-80">Readiness</div>
+            <div className="mt-2 text-lg font-semibold">{tower.readiness.state}</div>
+            <div className="mt-2 text-xs leading-5">Ready {tower.readiness.counts.ready_unposted ?? 0} · Posted unverified {tower.readiness.counts.posted_unverified ?? 0} · Blocked {tower.readiness.counts.blocked ?? 0} · Unsupported {tower.readiness.counts.unsupported ?? 0}</div>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+            <div className="font-semibold text-foreground">F24 guardrails</div>
+            <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              <span>No new source model</span>
+              <span>No new posting source</span>
+              <span>No source mutation</span>
+              <span>No auto-post/reconcile/close</span>
+            </div>
+            {tower.readiness.blockers?.length ? <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">{tower.readiness.blockers.join(" ")}</div> : null}
+          </div>
+        </div>
+        {Object.entries(grouped).map(([domain, items]) => (
+          <div key={domain} className="overflow-x-auto rounded-xl border border-border bg-background">
+            <table className="min-w-full divide-y divide-border text-sm">
+              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3 font-semibold" colSpan={6}>{domain}</th></tr><tr><th className="px-4 py-3 font-semibold">Phase</th><th className="px-4 py-3 font-semibold">Source</th><th className="px-4 py-3 font-semibold">Events</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Counts</th><th className="px-4 py-3 font-semibold">Setup / review</th></tr></thead>
+              <tbody className="divide-y divide-border">
+                {items.map((item) => {
+                  const visibleLinks = item.action_links.filter((link) => ["bridge_posting", "mapping_audit", "finance_accounts", "accounting_periods", "journal_numbering", "reconciliation"].includes(link.key));
+                  return (
+                    <tr key={`${item.phase}-${item.source_model}-${item.event_keys.join("-")}`} className="align-top">
+                      <td className="px-4 py-3 font-semibold">{item.phase}</td>
+                      <td className="px-4 py-3"><div className="font-semibold text-foreground">{modelLabel(item.source_model)}</div><div className="text-xs text-muted-foreground">{item.source_owner}</div><div className="mt-1 text-xs text-muted-foreground">{item.accounting_shape}</div></td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{item.event_keys.join(", ")}</td>
+                      <td className="px-4 py-3"><span className={cx("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(item.status))}>{item.status}</span>{item.primary_blocker_type ? <div className="mt-2 text-xs text-amber-900">Blocker: {item.primary_blocker_type}</div> : null}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{countText(item)}</td>
+                      <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5">{visibleLinks.map((link) => <Link key={`${item.phase}-${item.source_model}-${link.key}`} href={link.href} className="rounded-md border border-border bg-white px-2 py-1 text-xs font-semibold text-foreground hover:bg-muted/40">{link.label}</Link>)}</div></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </WorkspaceSection>
+  );
 }
 
 function rowCanPreview(row: AccountingBridgeReconciliationRow): boolean {
@@ -334,6 +403,8 @@ export default function AccountingBridgeReconciliationPage() {
             <SummaryCard label="Blocked" value={Number(summary?.blocked_bridge_item_count ?? summary?.blocked_count ?? 0)} href={`${ROUTES.admin.accountingBridgeReconciliation}?status=BLOCKED`} tone="border-amber-200 bg-amber-50 text-amber-950" />
           </div>
         </section>
+
+        {payload ? <ControlTowerInventory payload={payload} /> : null}
 
         <WorkspaceSection title="Filters" description="Filter by source model, status, event key, period, or reference. URL filters such as source_model=CustomerAdvanceRefund are supported.">
           <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm md:grid-cols-3 xl:grid-cols-6">

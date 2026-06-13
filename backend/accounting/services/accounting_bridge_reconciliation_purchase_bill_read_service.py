@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from accounting.services.accounting_bridge_reconciliation_read_service import BridgeReconciliationFilters, build_accounting_bridge_reconciliation as build_base_reconciliation
+from accounting.services.accounting_bridge_reconciliation_read_service import BridgeReconciliationFilters, _phase_f_control_tower, build_accounting_bridge_reconciliation as build_base_reconciliation
 from accounting.services.accounting_bridge_customer_advance_refund_service import BridgeCandidateFilters, list_bridge_candidates, summarize_candidate_statuses
 
 
@@ -50,4 +50,9 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         existing_ids = {(row.get("source_model"), str(row.get("source_id") or row.get("source_pk") or ""), row.get("event_key")) for row in existing_results}
         results = [*existing_results, *[row for row in candidate_rows if (row.get("source_model"), str(row.get("source_id") or row.get("source_pk") or ""), row.get("event_key")) not in existing_ids]]
     summary = {**(payload.get("summary") or {}), **summarize_candidate_statuses(results)}
-    return {**payload, "summary": summary, "results": results}
+    phase_f_control_tower = _phase_f_control_tower(
+        results,
+        payload.get("accounting_period_readiness") or payload.get("financial_year_readiness") or {},
+        payload.get("readiness_blockers") or [],
+    )
+    return {**payload, "summary": summary, "phase_f_control_tower": phase_f_control_tower, "results": results}

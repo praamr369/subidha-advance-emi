@@ -27,6 +27,49 @@ FINANCE_ACCOUNT_HREF = "/admin/accounting/finance-accounts"
 BRIDGE_HREF = "/admin/accounting/bridges"
 PERIODS_HREF = "/admin/accounting/periods"
 DOCUMENT_NUMBERING_HREF = "/admin/settings/business-setup/document-numbering"
+JOURNALS_HREF = "/admin/accounting/journals"
+RECONCILIATION_HREF = "/admin/reconciliation/runs"
+
+
+PHASE_F_ACTION_LINKS = (
+    ("bridge_posting", "Bridge Posting", "/admin/accounting/bridge-reconciliation"),
+    ("mapping_audit", "Mapping Audit", "/admin/accounting/setup/mapping-audit"),
+    ("finance_accounts", "Finance Accounts", "/admin/settings/business-setup/finance-accounts"),
+    ("accounting_periods", "Accounting Periods", "/admin/accounting/periods"),
+    ("journal_numbering", "Journal Numbering", "/admin/settings/business-setup/document-numbering"),
+    ("journals", "Journals", JOURNALS_HREF),
+    ("reconciliation", "Reconciliation", RECONCILIATION_HREF),
+)
+
+
+PHASE_F_SOURCE_SPECS: tuple[dict[str, Any], ...] = (
+    {"phase": "F1", "domain": "Cash/receipt/payment", "source_model": "Payment", "event_keys": ("subscription_emi_payment", "advance_emi_collection"), "accounting_shape": "Dr FinanceAccount chart account, Cr Customer receivable / EMI income", "source_owner": "subscriptions.Payment"},
+    {"phase": "F2", "domain": "Cash/receipt/payment", "source_model": "ReceiptDocument", "event_keys": ("direct_sale_receipt", "customer_advance", "customer_refund", "refund_customer_credit"), "accounting_shape": "Receipt-specific cash/bank/UPI settlement against receivable or customer credit", "source_owner": "billing.ReceiptDocument"},
+    {"phase": "F3", "domain": "Billing/invoice/returns", "source_model": "BillingInvoice", "event_keys": ("direct_sale_invoice", "direct_sale_outstanding"), "accounting_shape": "Dr Customer receivable, Cr Direct sale income / output tax when applicable", "source_owner": "billing.BillingInvoice"},
+    {"phase": "F4", "domain": "Billing/invoice/returns", "source_model": "BillingCreditNote", "event_keys": ("credit_note_issue", "sales_return", "customer_credit_adjustment", "direct_sale_return"), "accounting_shape": "Dr sales return/customer credit account, Cr customer receivable", "source_owner": "billing.BillingCreditNote"},
+    {"phase": "F4", "domain": "Billing/invoice/returns", "source_model": "DirectSaleReturn", "event_keys": ("direct_sale_return", "sales_return"), "accounting_shape": "Dr sales return / inventory-adjusted return account, Cr customer receivable", "source_owner": "billing.DirectSaleReturn"},
+    {"phase": "F5", "domain": "Billing/invoice/returns", "source_model": "BillingDebitNote", "event_keys": ("debit_note_issue", "customer_debit_adjustment", "damage_recovery", "additional_receivable_adjustment"), "accounting_shape": "Dr customer receivable, Cr damage recovery / adjustment income", "source_owner": "billing.BillingDebitNote"},
+    {"phase": "F6", "domain": "Purchase/vendor", "source_model": "PurchaseBill", "event_keys": ("purchase_bill_accrual", "purchase_bill"), "accounting_shape": "Dr inventory/expense/input tax, Cr vendor payable", "source_owner": "inventory.PurchaseBill"},
+    {"phase": "F7", "domain": "Purchase/vendor", "source_model": "VendorPayment", "event_keys": ("vendor_payment", "vendor_payment_settlement"), "accounting_shape": "Dr vendor payable, Cr concrete finance account", "source_owner": "inventory.VendorPayment"},
+    {"phase": "F8", "domain": "Inventory/COGS", "source_model": "StockLedger", "event_keys": ("stock_ledger_inventory_movement", "inventory_movement"), "accounting_shape": "Inventory movement between mapped stock accounts", "source_owner": "inventory.StockLedger"},
+    {"phase": "F9", "domain": "Inventory/COGS", "source_model": "StockLedger", "event_keys": ("cogs_stockout", "deferred_cogs"), "accounting_shape": "Dr COGS, Cr inventory asset", "source_owner": "inventory.StockLedger"},
+    {"phase": "F10", "domain": "Commission/payout", "source_model": "Commission", "event_keys": ("commission_accrual", "partner_commission_accrual", "sales_commission_accrual"), "accounting_shape": "Dr commission expense, Cr commission payable", "source_owner": "subscriptions.Commission"},
+    {"phase": "F11", "domain": "Commission/payout", "source_model": "CommissionPayoutBatch", "event_keys": ("commission_payout", "commission_settlement", "partner_commission_payout", "commission_payable_settlement"), "accounting_shape": "Dr commission payable, Cr concrete payout finance account", "source_owner": "subscriptions.CommissionPayoutBatch"},
+    {"phase": "F12", "domain": "Payroll/salary", "source_model": "SalarySheet", "event_keys": ("salary_accrual", "payroll_accrual"), "accounting_shape": "Dr salary expense, Cr salary payable", "source_owner": "hr.SalarySheet"},
+    {"phase": "F13", "domain": "Payroll/salary", "source_model": "SalaryPayment", "event_keys": ("salary_payment", "payroll_payment"), "accounting_shape": "Dr salary payable, Cr concrete finance account", "source_owner": "hr.SalaryPayment"},
+    {"phase": "F14", "domain": "Rent/lease", "source_model": "RentLeaseBillingDemand", "event_keys": ("rent_monthly_revenue", "lease_monthly_revenue", "rent_invoice_revenue", "lease_invoice_revenue", "rent_lease_invoice_revenue"), "accounting_shape": "Dr customer receivable, Cr rent/lease income / output tax when applicable", "source_owner": "subscriptions.RentLeaseBillingDemand"},
+    {"phase": "F15B", "domain": "Rent/lease", "source_model": "RentLeaseCollection", "event_keys": ("rent_lease_collection_source_contract",), "accounting_shape": "Source contract only; F15C owns controlled settlement posting", "source_owner": "subscriptions.RentLeaseCollection", "default_status": "DEFERRED"},
+    {"phase": "F15C", "domain": "Rent/lease", "source_model": "RentLeaseCollection", "event_keys": ("rent_lease_collection_settlement", "rent_lease_monthly_collection"), "accounting_shape": "Dr concrete finance account, Cr customer receivable / settlement account", "source_owner": "subscriptions.RentLeaseCollection"},
+    {"phase": "F16", "domain": "Security deposit", "source_model": "RentLeaseDepositTransaction", "event_keys": ("security_deposit_source_contract",), "accounting_shape": "Source contract only; F17/F18 own receipt/refund posting", "source_owner": "subscriptions.RentLeaseDepositTransaction", "default_status": "DEFERRED"},
+    {"phase": "F17", "domain": "Security deposit", "source_model": "RentLeaseDepositTransaction", "event_keys": ("security_deposit_receipt", "rent_security_deposit_receipt", "lease_security_deposit_receipt"), "accounting_shape": "Dr concrete finance account, Cr security deposit liability", "source_owner": "subscriptions.RentLeaseDepositTransaction"},
+    {"phase": "F18", "domain": "Security deposit", "source_model": "RentLeaseDepositTransaction", "event_keys": ("security_deposit_refund", "rent_security_deposit_refund", "lease_security_deposit_refund"), "accounting_shape": "Dr security deposit liability, Cr concrete finance account", "source_owner": "subscriptions.RentLeaseDepositTransaction"},
+    {"phase": "F19", "domain": "Customer advance", "source_model": "CustomerAdvance", "event_keys": ("customer_advance_source_contract",), "accounting_shape": "Source-contract hardening only; F20 owns receipt posting", "source_owner": "subscriptions.CustomerAdvance", "default_status": "DEFERRED"},
+    {"phase": "F20", "domain": "Customer advance", "source_model": "CustomerAdvance", "event_keys": ("customer_advance_receipt", "customer_advance"), "accounting_shape": "Dr concrete finance account, Cr customer advance liability", "source_owner": "subscriptions.CustomerAdvance"},
+    {"phase": "F21", "domain": "Customer advance", "source_model": "CustomerAdvanceAllocation", "event_keys": ("customer_advance_application", "advance_application"), "accounting_shape": "Dr customer advance liability, Cr customer receivable", "source_owner": "subscriptions.CustomerAdvanceAllocation"},
+    {"phase": "F22", "domain": "Customer advance", "source_model": "CustomerAdvanceRefund", "event_keys": ("customer_advance_refund_source_contract",), "accounting_shape": "Source-contract hardening only; F23 owns refund posting", "source_owner": "subscriptions.CustomerAdvanceRefund", "default_status": "DEFERRED"},
+    {"phase": "F23", "domain": "Customer advance", "source_model": "CustomerAdvanceRefund", "event_keys": ("customer_advance_refund",), "accounting_shape": "Dr customer advance liability, Cr concrete finance account", "source_owner": "subscriptions.CustomerAdvanceRefund"},
+    {"phase": "Deferred", "domain": "Payroll/salary", "source_model": "StaffAdvance", "event_keys": ("staff_advance",), "accounting_shape": "Unsupported boundary; no controlled bridge posting source exists", "source_owner": "HR/Payroll", "default_status": "UNSUPPORTED"},
+)
 
 
 @dataclass(frozen=True)
@@ -428,6 +471,190 @@ def _blocking_groups(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return list(grouped.values())
 
 
+def _phase_f_action_links(*, source_model: str, event_key: str | None = None) -> list[dict[str, Any]]:
+    links = []
+    for key, label, href in PHASE_F_ACTION_LINKS:
+        target = href
+        if key == "bridge_posting":
+            params = {"source_model": source_model}
+            if event_key:
+                params["event_key"] = event_key
+            from urllib.parse import urlencode
+            target = f"{href}?{urlencode(params)}"
+        links.append({"key": key, "label": label, "href": target})
+    return links
+
+
+def _phase_f_row_matches(row: dict[str, Any], spec: dict[str, Any]) -> bool:
+    if row.get("source_model") != spec["source_model"]:
+        return False
+    event_keys = set(spec.get("event_keys") or ())
+    return not event_keys or row.get("event_key") in event_keys
+
+
+def _phase_f_counts(rows: list[dict[str, Any]], spec: dict[str, Any]) -> dict[str, int]:
+    matched = [row for row in rows if _phase_f_row_matches(row, spec)]
+    return {
+        "ready_unposted": sum(1 for row in matched if row.get("status") == "READY_UNPOSTED"),
+        "posted_unverified": sum(1 for row in matched if row.get("posted_unverified") or row.get("reconciliation_state") == "POSTED_UNVERIFIED"),
+        "reconciled": sum(1 for row in matched if row.get("status") == "RECONCILED" or row.get("reconciliation_state") == "RECONCILED"),
+        "blocked": sum(1 for row in matched if str(row.get("status") or "").startswith("BLOCKED")),
+        "unsupported": sum(1 for row in matched if row.get("status") == "UNSUPPORTED_SOURCE"),
+        "skipped_deferred": sum(1 for row in matched if row.get("status") in {"SKIPPED_NOT_APPLICABLE", "DEFERRED"}),
+        "exception": sum(1 for row in matched if row.get("status") == "EXCEPTION" or bool(row.get("exception_reasons"))),
+    }
+
+
+def _phase_f_primary_blocker(rows: list[dict[str, Any]], spec: dict[str, Any]) -> str | None:
+    matched = [row for row in rows if _phase_f_row_matches(row, spec)]
+    for status, blocker_type in (
+        ("BLOCKED_BY_MAPPING", "mapping"),
+        ("BLOCKED_BY_FINANCE_ACCOUNT", "finance account"),
+        ("BLOCKED_BY_NUMBERING", "numbering"),
+        ("BLOCKED_BY_PERIOD", "period"),
+        ("UNSUPPORTED_SOURCE", "unsupported source"),
+        ("EXCEPTION", "duplicate source/event"),
+    ):
+        if any(row.get("status") == status for row in matched):
+            return blocker_type
+    for row in matched:
+        code = str(row.get("blocker_code") or "").upper()
+        if "UNBALANCED" in code:
+            return "unbalanced journal"
+        if "DUPLICATE" in code:
+            return "duplicate source/event"
+        if "NUMBER" in code:
+            return "numbering"
+        if "PERIOD" in code:
+            return "period"
+        if "FINANCE" in code:
+            return "finance account"
+        if "MAPPING" in code or "COA" in code:
+            return "mapping"
+    if spec.get("default_status") == "UNSUPPORTED":
+        return "unsupported source"
+    return None
+
+
+def _phase_f_status(counts: dict[str, int], spec: dict[str, Any]) -> str:
+    if spec.get("default_status") == "UNSUPPORTED":
+        return "UNSUPPORTED"
+    if counts["exception"] or counts["blocked"]:
+        return "BLOCKED"
+    if counts["posted_unverified"]:
+        return "POSTED_UNVERIFIED"
+    if counts["ready_unposted"]:
+        return "READY"
+    if counts["reconciled"]:
+        return "RECONCILED"
+    if counts["unsupported"]:
+        return "UNSUPPORTED"
+    if spec.get("default_status") == "DEFERRED":
+        return "DEFERRED"
+    return "READY"
+
+
+def _phase_f_inventory(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    inventory = []
+    for spec in PHASE_F_SOURCE_SPECS:
+        counts = _phase_f_counts(rows, spec)
+        event_keys = list(spec.get("event_keys") or ())
+        primary_event = event_keys[0] if event_keys else None
+        inventory.append(
+            {
+                "phase": spec["phase"],
+                "domain": spec["domain"],
+                "source_model": spec["source_model"],
+                "event_keys": event_keys,
+                "event_key": primary_event,
+                "accounting_shape": spec["accounting_shape"],
+                "source_owner": spec["source_owner"],
+                "status": _phase_f_status(counts, spec),
+                "counts": counts,
+                "primary_blocker_type": _phase_f_primary_blocker(rows, spec),
+                "can_post": False,
+                "action_links": _phase_f_action_links(source_model=spec["source_model"], event_key=primary_event),
+            }
+        )
+    return inventory
+
+
+def _phase_f_group_counts(inventory: list[dict[str, Any]], key: str) -> dict[str, dict[str, int]]:
+    grouped: dict[str, Counter] = {}
+    for item in inventory:
+        group = item[key]
+        grouped.setdefault(group, Counter())
+        counts = item.get("counts") or {}
+        for count_key, value in counts.items():
+            grouped[group][count_key] += int(value or 0)
+    return {group: dict(counts) for group, counts in grouped.items()}
+
+
+def _phase_f_readiness_contract(rows: list[dict[str, Any]], inventory: list[dict[str, Any]], period_readiness: dict[str, Any], readiness_blockers: list[str]) -> dict[str, Any]:
+    concrete_rows = [row for row in rows if row.get("row_type") in {"bridge_candidate", "posted_source"}]
+    ready_unposted = sum(1 for row in concrete_rows if row.get("status") == "READY_UNPOSTED")
+    posted_unverified = sum(1 for row in concrete_rows if row.get("posted_unverified") or row.get("reconciliation_state") == "POSTED_UNVERIFIED")
+    unsupported = sum(1 for row in concrete_rows if row.get("status") in {"UNSUPPORTED_SOURCE", "SKIPPED_NOT_APPLICABLE"})
+    blockers = sum(1 for row in concrete_rows if str(row.get("status") or "").startswith("BLOCKED"))
+    exceptions = sum(1 for row in concrete_rows if row.get("status") == "EXCEPTION" or bool(row.get("exception_reasons")))
+    setup_ready = bool(period_readiness.get("posting_controls_ready")) and not readiness_blockers
+    states: list[str] = []
+    if exceptions:
+        states.append("RECONCILIATION_EXCEPTIONS")
+    if blockers or any(not bool(period_readiness.get(flag)) for flag in ("financial_year_ready", "accounting_period_ready", "journal_numbering_ready")):
+        states.append("ACTION_REQUIRED")
+    if posted_unverified:
+        states.append("POSTED_UNVERIFIED_EXISTS")
+    if ready_unposted and setup_ready:
+        states.append("READY_FOR_CONTROLLED_POSTING")
+    if not concrete_rows:
+        states.append("NO_CANDIDATES")
+    if concrete_rows and unsupported == len(concrete_rows):
+        states.append("UNSUPPORTED_ONLY")
+    primary_state = states[0] if states else "NO_CANDIDATES"
+    return {
+        "state": primary_state,
+        "states": states,
+        "ready_for_controlled_posting": "READY_FOR_CONTROLLED_POSTING" in states,
+        "read_only": True,
+        "creates_journal_entry": False,
+        "creates_accounting_bridge_posting": False,
+        "auto_posts": False,
+        "auto_reconciles": False,
+        "auto_closes_period": False,
+        "mutates_sources": False,
+        "counts": {
+            "ready_unposted": ready_unposted,
+            "posted_unverified": posted_unverified,
+            "blocked": blockers,
+            "unsupported": unsupported,
+            "exceptions": exceptions,
+        },
+        "blockers": readiness_blockers,
+        "posting_controls_ready": bool(period_readiness.get("posting_controls_ready")),
+    }
+
+
+def _phase_f_control_tower(rows: list[dict[str, Any]], period_readiness: dict[str, Any], readiness_blockers: list[str]) -> dict[str, Any]:
+    inventory = _phase_f_inventory(rows)
+    return {
+        "source_inventory": inventory,
+        "groups": _phase_f_group_counts(inventory, "domain"),
+        "phase_counts": _phase_f_group_counts(inventory, "phase"),
+        "readiness": _phase_f_readiness_contract(rows, inventory, period_readiness, readiness_blockers),
+        "guardrails": {
+            "read_only": True,
+            "no_new_source_model": True,
+            "no_new_posting_source": True,
+            "no_source_mutation": True,
+            "no_auto_post": True,
+            "no_auto_reconcile": True,
+            "no_auto_close": True,
+            "admin_only_posting": True,
+        },
+    }
+
+
 def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters | None = None) -> dict[str, Any]:
     active_filters = filters or BridgeReconciliationFilters()
     selected_financial_year, fy_blockers = _resolve_financial_year(active_filters)
@@ -515,6 +742,7 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         **candidate_summary,
         **canonical_summary,
     }
+    phase_f_control_tower = _phase_f_control_tower(rows, selected_period_readiness, readiness_blockers)
     return {
         "summary": summary,
         "selected_financial_year": _financial_year_payload(selected_financial_year),
@@ -527,5 +755,6 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "financial_year_readiness": selected_period_readiness,
         "accounting_period_readiness": selected_period_readiness,
         "canonical_statuses": list(CANONICAL_STATUSES),
+        "phase_f_control_tower": phase_f_control_tower,
         "results": rows,
     }
