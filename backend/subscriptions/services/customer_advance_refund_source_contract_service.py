@@ -10,7 +10,7 @@ from accounting.models import AccountingBridgePosting, JournalEntry
 from accounting.services.finance_posting_service import FinancePostingService
 from branch_control.services.branch_service import assert_user_branch_access
 from reconciliation.models import ReconciliationItem
-from subscriptions.models import AuditLog, CustomerAdvance, CustomerAdvanceAllocation, CustomerAdvanceStatus, Payment
+from subscriptions.models import AuditLog, CustomerAdvance, CustomerAdvanceStatus
 from subscriptions.models_customer_advance_refund import CustomerAdvanceRefund, CustomerAdvanceRefundStatus
 from subscriptions.services.audit_service import log_audit
 
@@ -37,124 +37,21 @@ def _reference_from(*, reference_no: str | None, idempotency_key: str | None, ad
 
 def classify_customer_advance_refund_source(*, source_model: str | None, event_key: str | None = None, source_type: str | None = None, metadata: dict[str, Any] | None = None) -> bool:
     metadata = metadata if isinstance(metadata, dict) else {}
-    return bool(
-        source_model == SOURCE_MODEL
-        and (event_key in {None, "", EVENT_KEY})
-        and (source_type in {None, "", "CUSTOMER_ADVANCE_REFUND"})
-        and metadata.get("source_contract_phase") in {None, "F22"}
-    )
+    return bool(source_model == SOURCE_MODEL and (event_key in {None, "", EVENT_KEY}) and (source_type in {None, "", "CUSTOMER_ADVANCE_REFUND"}) and metadata.get("source_contract_phase") in {None, "F22"})
 
 
 def customer_advance_refund_source_matrix() -> list[dict[str, Any]]:
     return [
-        {
-            "source_model": "CustomerAdvance",
-            "event_type": "customer_advance_receipt",
-            "customer_evidence": True,
-            "advance_evidence": "self",
-            "amount": "receipt amount",
-            "date": "payment_date",
-            "finance_account": True,
-            "method": True,
-            "status": "UNAPPLIED/PARTIALLY_APPLIED/FULLY_APPLIED",
-            "idempotency_reference_evidence": "reference_no/allocation_metadata.source_idempotency_key",
-            "void_reversal_behavior": "not refund-specific",
-            "existing_accounting_behavior": "F20 receipt bridge",
-            "duplicate_posting_risk": "high if reused for refund",
-            "decision": "reject",
-            "recommended_next_phase": "Keep F20 only; do not use as refund source.",
-        },
-        {
-            "source_model": "CustomerAdvanceAllocation",
-            "event_type": "customer_advance_application",
-            "customer_evidence": True,
-            "advance_evidence": True,
-            "amount": "application amount",
-            "date": "allocation_date",
-            "finance_account": "via advance only",
-            "method": "linked ADVANCE_ALLOCATION Payment evidence",
-            "status": "none",
-            "idempotency_reference_evidence": "linked Payment allocation metadata",
-            "void_reversal_behavior": "not refund-specific",
-            "existing_accounting_behavior": "F21 application bridge",
-            "duplicate_posting_risk": "high if reused for refund",
-            "decision": "reject",
-            "recommended_next_phase": "Keep F21 only; do not use as refund source.",
-        },
-        {
-            "source_model": SOURCE_MODEL,
-            "event_type": EVENT_KEY,
-            "customer_evidence": True,
-            "advance_evidence": True,
-            "amount": True,
-            "date": "refund_date",
-            "finance_account": True,
-            "method": "payment_method",
-            "status": "ACTIVE/VOIDED/REVERSED",
-            "idempotency_reference_evidence": "refund_reference_no + idempotency_key",
-            "void_reversal_behavior": "source fields exist; accounting bridge remains deferred",
-            "existing_accounting_behavior": "none in F22",
-            "duplicate_posting_risk": "low after F22; F23 must use this source only",
-            "decision": "chosen",
-            "recommended_next_phase": "Use as the only F23 customer advance refund bridge source after F22 tests pass.",
-        },
-        {
-            "source_model": "RentLeaseDepositTransaction",
-            "event_type": "security_deposit_refund",
-            "customer_evidence": True,
-            "advance_evidence": False,
-            "amount": True,
-            "date": "transaction_date",
-            "finance_account": True,
-            "method": True,
-            "status": True,
-            "idempotency_reference_evidence": True,
-            "void_reversal_behavior": "deposit-specific",
-            "existing_accounting_behavior": "F18 security deposit refund bridge",
-            "duplicate_posting_risk": "must remain separate",
-            "decision": "reject",
-            "recommended_next_phase": "Never use for customer advance refund.",
-        },
-        {
-            "source_model": "DirectSaleReturn/BillingCreditNote/CustomerRefund/ReceiptDocument/Payment",
-            "event_type": "general refund or payment evidence",
-            "customer_evidence": "maybe",
-            "advance_evidence": False,
-            "amount": True,
-            "date": True,
-            "finance_account": "maybe",
-            "method": "maybe",
-            "status": True,
-            "idempotency_reference_evidence": "varies",
-            "void_reversal_behavior": "domain-specific",
-            "existing_accounting_behavior": "owned by direct sale, credit, receipt, or F1 flows",
-            "duplicate_posting_risk": "high",
-            "decision": "reject unless future proof explicitly ties it to CustomerAdvanceRefund",
-            "recommended_next_phase": "Do not use for F23.",
-        },
+        {"source_model": "CustomerAdvance", "event_type": "customer_advance_receipt", "customer_evidence": True, "advance_evidence": "self", "amount": "receipt amount", "date": "payment_date", "finance_account": True, "method": True, "status": "UNAPPLIED/PARTIALLY_APPLIED/FULLY_APPLIED", "idempotency_reference_evidence": "reference_no/allocation_metadata.source_idempotency_key", "void_reversal_behavior": "not refund-specific", "existing_accounting_behavior": "F20 receipt bridge", "duplicate_posting_risk": "high if reused for refund", "decision": "reject", "recommended_next_phase": "Keep F20 only; do not use as refund source."},
+        {"source_model": "CustomerAdvanceAllocation", "event_type": "customer_advance_application", "customer_evidence": True, "advance_evidence": True, "amount": "application amount", "date": "allocation_date", "finance_account": "via advance only", "method": "linked ADVANCE_ALLOCATION Payment evidence", "status": "none", "idempotency_reference_evidence": "linked Payment allocation metadata", "void_reversal_behavior": "not refund-specific", "existing_accounting_behavior": "F21 application bridge", "duplicate_posting_risk": "high if reused for refund", "decision": "reject", "recommended_next_phase": "Keep F21 only; do not use as refund source."},
+        {"source_model": SOURCE_MODEL, "event_type": EVENT_KEY, "customer_evidence": True, "advance_evidence": True, "amount": True, "date": "refund_date", "finance_account": True, "method": "payment_method", "status": "ACTIVE/VOIDED/REVERSED", "idempotency_reference_evidence": "refund_reference_no + idempotency_key", "void_reversal_behavior": "source fields exist; accounting bridge remains deferred", "existing_accounting_behavior": "none in F22", "duplicate_posting_risk": "low after F22; F23 must use this source only", "decision": "chosen", "recommended_next_phase": "Use as the only F23 customer advance refund bridge source after F22 tests pass."},
+        {"source_model": "RentLeaseDepositTransaction", "event_type": "security_deposit_refund", "customer_evidence": True, "advance_evidence": False, "amount": True, "date": "transaction_date", "finance_account": True, "method": True, "status": True, "idempotency_reference_evidence": True, "void_reversal_behavior": "deposit-specific", "existing_accounting_behavior": "F18 security deposit refund bridge", "duplicate_posting_risk": "must remain separate", "decision": "reject", "recommended_next_phase": "Never use for customer advance refund."},
+        {"source_model": "DirectSaleReturn/BillingCreditNote/CustomerRefund/ReceiptDocument/Payment", "event_type": "general refund or payment evidence", "customer_evidence": "maybe", "advance_evidence": False, "amount": True, "date": True, "finance_account": "maybe", "method": "maybe", "status": True, "idempotency_reference_evidence": "varies", "void_reversal_behavior": "domain-specific", "existing_accounting_behavior": "owned by direct sale, credit, receipt, or F1 flows", "duplicate_posting_risk": "high", "decision": "reject unless future proof explicitly ties it to CustomerAdvanceRefund", "recommended_next_phase": "Do not use for F23."},
     ]
 
 
-def _refund_matches(
-    refund: CustomerAdvanceRefund,
-    *,
-    advance_id: int,
-    customer_id: int,
-    amount: Decimal,
-    finance_account_id: int,
-    payment_method: str,
-    refund_date,
-) -> bool:
-    return all(
-        [
-            refund.advance_id == advance_id,
-            refund.customer_id == customer_id,
-            _money(refund.amount) == amount,
-            refund.finance_account_id == finance_account_id,
-            (refund.payment_method or "").strip().upper() == payment_method,
-            refund.refund_date == refund_date,
-        ]
-    )
+def _refund_matches(refund: CustomerAdvanceRefund, *, advance_id: int, customer_id: int, amount: Decimal, finance_account_id: int, payment_method: str, refund_date) -> bool:
+    return all([refund.advance_id == advance_id, refund.customer_id == customer_id, _money(refund.amount) == amount, refund.finance_account_id == finance_account_id, (refund.payment_method or "").strip().upper() == payment_method, refund.refund_date == refund_date])
 
 
 def serialize_customer_advance_refund(refund: CustomerAdvanceRefund) -> dict[str, Any]:
@@ -198,23 +95,8 @@ def list_customer_advance_refund_sources(*, customer_id: int | None = None, adva
 
 
 @transaction.atomic
-def record_customer_advance_refund(
-    *,
-    customer_advance_id: int,
-    amount,
-    refunded_by,
-    finance_account_id: int,
-    payment_method: str = "CASH",
-    refund_date,
-    refund_reference_no: str | None = None,
-    idempotency_key: str | None = None,
-    notes: str | None = None,
-) -> CustomerAdvanceRefund:
-    before_counts = {
-        "journals": JournalEntry.objects.count(),
-        "bridge_postings": AccountingBridgePosting.objects.count(),
-        "reconciliation_items": ReconciliationItem.objects.count(),
-    }
+def record_customer_advance_refund(*, customer_advance_id: int, amount, refunded_by, finance_account_id: int, payment_method: str = "CASH", refund_date, refund_reference_no: str | None = None, idempotency_key: str | None = None, notes: str | None = None) -> CustomerAdvanceRefund:
+    before_counts = {"journals": JournalEntry.objects.count(), "bridge_postings": AccountingBridgePosting.objects.count(), "reconciliation_items": ReconciliationItem.objects.count()}
     normalized_amount = _money(amount)
     if normalized_amount <= Decimal("0.00"):
         raise ValueError("Refund amount must be greater than zero.")
@@ -225,8 +107,6 @@ def record_customer_advance_refund(
     finance_account = FinancePostingService.resolve_operational_finance_account(finance_account_id=finance_account_id)
     if finance_account.branch_id:
         assert_user_branch_access(user=refunded_by, branch_id=finance_account.branch_id)
-    if normalized_amount > _money(advance.unapplied_amount):
-        raise ValueError("Refund amount cannot exceed unapplied customer advance balance.")
 
     normalized_reference = _reference_from(reference_no=refund_reference_no, idempotency_key=normalized_idempotency, advance_id=advance.id, refund_date=refund_date)
     duplicate_filter = Q(refund_reference_no=normalized_reference)
@@ -238,6 +118,8 @@ def record_customer_advance_refund(
             return existing
         raise ValueError("Customer advance refund reference/idempotency key already exists with different source evidence.")
 
+    if normalized_amount > _money(advance.unapplied_amount):
+        raise ValueError("Refund amount cannot exceed unapplied customer advance balance.")
     before_unapplied = _money(advance.unapplied_amount)
     refund = CustomerAdvanceRefund.objects.create(
         customer=advance.customer,
@@ -282,27 +164,8 @@ def record_customer_advance_refund(
     else:
         advance.status = CustomerAdvanceStatus.UNAPPLIED
     advance.save(update_fields=["unapplied_amount", "status", "updated_at"])
-    log_audit(
-        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
-        instance=refund,
-        performed_by=refunded_by,
-        metadata={
-            "event": "CUSTOMER_ADVANCE_REFUND_SOURCE_RECORDED",
-            "source_contract_phase": "F22",
-            "customer_advance_refund_id": refund.id,
-            "customer_advance_id": advance.id,
-            "customer_id": advance.customer_id,
-            "amount": f"{normalized_amount:.2f}",
-            "refund_reference_no": refund.refund_reference_no,
-            "accounting_bridge_posting_deferred": True,
-            "future_bridge_phase": FUTURE_BRIDGE_PHASE,
-        },
-    )
-    after_counts = {
-        "journals": JournalEntry.objects.count(),
-        "bridge_postings": AccountingBridgePosting.objects.count(),
-        "reconciliation_items": ReconciliationItem.objects.count(),
-    }
+    log_audit(action_type=AuditLog.ActionType.PAYMENT_FLAGGED, instance=refund, performed_by=refunded_by, metadata={"event": "CUSTOMER_ADVANCE_REFUND_SOURCE_RECORDED", "source_contract_phase": "F22", "customer_advance_refund_id": refund.id, "customer_advance_id": advance.id, "customer_id": advance.customer_id, "amount": f"{normalized_amount:.2f}", "refund_reference_no": refund.refund_reference_no, "accounting_bridge_posting_deferred": True, "future_bridge_phase": FUTURE_BRIDGE_PHASE})
+    after_counts = {"journals": JournalEntry.objects.count(), "bridge_postings": AccountingBridgePosting.objects.count(), "reconciliation_items": ReconciliationItem.objects.count()}
     if before_counts != after_counts:
         raise ValueError("Customer advance refund source contract attempted to create accounting/reconciliation records; rolled back.")
     return refund
