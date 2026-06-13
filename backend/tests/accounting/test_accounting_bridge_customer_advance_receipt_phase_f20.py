@@ -5,10 +5,12 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import AccountingBridgePosting, ChartOfAccount, DocumentSequence, FinanceAccount, JournalEntry
-from accounting.services.accounting_bridge_customer_advance_receipt_service import BridgeCandidateFilters, list_bridge_candidates, preview_bridge_candidate
+from accounting.models import AccountingBridgePosting, ChartOfAccount, DocumentSequence, FinanceAccount, JournalEntry, JournalEntryStatus, JournalEntryType
+from accounting.services.accounting_bridge_customer_advance_receipt_service import BridgeCandidateFilters, list_bridge_candidates
 from billing.models import BillingDocumentStatus, BillingSourceType, ReceiptDocument, ReceiptType
-from reconciliation.models import ReconciliationItem, ReconciliationItemStatus
+from reconciliation.models import ReconciliationItem, ReconciliationItemStatus, ReconciliationRun, ReconciliationRunStatus
+from reconciliation.services.accounting_bridge_reconciliation import run_accounting_bridge_checks
+from reconciliation.services.run_numbering import next_reconciliation_run_no
 from subscriptions.models import CustomerAdvance, CustomerAdvanceAllocation, Payment
 from subscriptions.services.customer_advance_service import CustomerAdvanceService
 from subscriptions.services.payment_allocation_service import PaymentAllocationService
@@ -74,6 +76,12 @@ class AccountingBridgeCustomerAdvanceReceiptPhaseF20Tests(APITestCase):
         response = self.client.post(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/{candidate_id}/post/", {"idempotency_key": preview["idempotency_key"], "confirm": True}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         return response.data
+
+    def _run_checks(self):
+        run = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="PHASE_F20_TEST", module="ACCOUNTING_BRIDGE", date_from=self.today, date_to=self.today, status=ReconciliationRunStatus.RUNNING, started_by=self.admin)
+        totals = {"checked": 0, "matched": 0, "exceptions": 0, "high_risk": 0}
+        run_accounting_bridge_checks(run=run, totals=totals)
+        return run
 
     def test_customer_advance_receipt_candidate_generation(self):
         advance = self._advance(suffix="CAND")
@@ -144,6 +152,8 @@ class AccountingBridgeCustomerAdvanceReceiptPhaseF20Tests(APITestCase):
         row = next(item for item in rows if str(item.get("source_id")) == str(payment.id))
         self.assertEqual(row["event_key"], "payment_skipped_not_applicable")
         self.assertFalse(row["can_post"])
+        run = self._run_checks()
+        self.assertFalse(ReconciliationItem.objects.filter(run=run, source_type="Payment", source_id=str(payment.id), exception_code="PAYMENT_MISSING_ACCOUNTING_BRIDGE_POSTING").exists())
 
     def test_mapping_finance_numbering_and_non_admin_blockers(self):
         advance = self._advance(suffix="BLOCK")
@@ -151,16 +161,25 @@ class AccountingBridgeCustomerAdvanceReceiptPhaseF20Tests(APITestCase):
         response = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/?source_model=CustomerAdvance")
         row = next(item for item in response.data["results"] if int(item["source_pk"]) == advance.id)
         self.assertEqual(row["status"], "BLOCKED_BY_FINANCE_ACCOUNT")
+        finance_run = self._run_checks()
+        self.assertTrue(ReconciliationItem.objects.filter(run=finance_run, source_type="CustomerAdvance", source_id=str(advance.id), exception_code="CUSTOMER_ADVANCE_RECEIPT_FINANCE_ACCOUNT_INACTIVE").exists())
+
         FinanceAccount.objects.filter(pk=self.finance_account.pk).update(is_active=True)
         ChartOfAccount.objects.filter(system_code="CUSTOMER_ADVANCE_UNEARNED_REVENUE").update(is_active=False)
         response = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/?source_model=CustomerAdvance")
         row = next(item for item in response.data["results"] if int(item["source_pk"]) == advance.id)
         self.assertEqual(row["status"], "BLOCKED_BY_MAPPING")
+        mapping_run = self._run_checks()
+        self.assertTrue(ReconciliationItem.objects.filter(run=mapping_run, source_type="CustomerAdvance", source_id=str(advance.id), exception_code="CUSTOMER_ADVANCE_RECEIPT_MAPPING_MISSING").exists())
+
         ChartOfAccount.objects.filter(system_code="CUSTOMER_ADVANCE_UNEARNED_REVENUE").update(is_active=True)
         DocumentSequence.objects.filter(document_type="JOURNAL_ENTRY").delete()
         response = self.client.get("/api/v1/admin/accounting/bridge-reconciliation/?source_model=CustomerAdvance")
         row = next(item for item in response.data["results"] if int(item["source_pk"]) == advance.id)
         self.assertEqual(row["status"], "BLOCKED_BY_NUMBERING")
+        numbering_run = self._run_checks()
+        self.assertTrue(ReconciliationItem.objects.filter(run=numbering_run, source_type="CustomerAdvance", source_id=str(advance.id), exception_code="CUSTOMER_ADVANCE_RECEIPT_NUMBERING_MISSING").exists())
+
         self.client.force_authenticate(user=self.cashier)
         post = self.client.post(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/{self._candidate_id(advance)}/post/", {"idempotency_key": row["idempotency_key"], "confirm": True}, format="json")
         self.assertIn(post.status_code, {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN})
@@ -186,3 +205,52 @@ class AccountingBridgeCustomerAdvanceReceiptPhaseF20Tests(APITestCase):
         self.assertEqual(by_id[receipt_owned.id]["status"], "SKIPPED_NOT_APPLICABLE")
         self.assertFalse(by_id[legacy.id]["can_post"])
         self.assertFalse(by_id[receipt_owned.id]["can_post"])
+        run = self._run_checks()
+        self.assertTrue(ReconciliationItem.objects.filter(run=run, source_type="CustomerAdvance", source_id=str(legacy.id), exception_code="CUSTOMER_ADVANCE_RECEIPT_UNSUPPORTED_SOURCE").exists())
+        self.assertTrue(ReconciliationItem.objects.filter(run=run, source_type="CustomerAdvance", source_id=str(receipt_owned.id), exception_code="CUSTOMER_ADVANCE_RECEIPT_DUPLICATE_F2_RECEIPTDOCUMENT_RISK").exists())
+
+    def test_reconciliation_run_reports_f20_states_and_no_source_mutation(self):
+        missing = self._advance(suffix="RUN-MISSING")
+        before_missing = self._snapshot(missing)
+        before_journals = JournalEntry.objects.count()
+        before_bridges = AccountingBridgePosting.objects.count()
+        missing_run = self._run_checks()
+        self.assertTrue(ReconciliationItem.objects.filter(run=missing_run, source_type="CustomerAdvance", source_id=str(missing.id), exception_code="CUSTOMER_ADVANCE_RECEIPT_MISSING_ACCOUNTING_BRIDGE_POSTING").exists())
+        self.assertEqual(JournalEntry.objects.count(), before_journals)
+        self.assertEqual(AccountingBridgePosting.objects.count(), before_bridges)
+        self.assertEqual(self._snapshot(missing), before_missing)
+
+        posted = self._advance(suffix="RUN-POSTED")
+        self._post_advance(posted)
+        posted_run = self._run_checks()
+        self.assertTrue(ReconciliationItem.objects.filter(run=posted_run, source_type="CustomerAdvance", source_id=str(posted.id), exception_code="CUSTOMER_ADVANCE_RECEIPT_POSTED_UNVERIFIED").exists())
+
+        amount = self._advance(suffix="RUN-AMOUNT")
+        self._post_advance(amount)
+        amount_journal = AccountingBridgePosting.objects.get(source_model="CustomerAdvance", source_id=str(amount.id), purpose="CUSTOMER_ADVANCE_RECEIPT").journal_entry
+        for line in amount_journal.lines.all():
+            line.__class__.objects.filter(pk=line.pk).update(debit_amount=Decimal("200.00") if line.debit_amount else Decimal("0.00"), credit_amount=Decimal("200.00") if line.credit_amount else Decimal("0.00"))
+        amount_run = self._run_checks()
+        self.assertTrue(ReconciliationItem.objects.filter(run=amount_run, source_type="CustomerAdvance", source_id=str(amount.id), exception_code="CUSTOMER_ADVANCE_RECEIPT_AMOUNT_MISMATCH").exists())
+
+        broken = self._advance(suffix="RUN-LINK")
+        self._post_advance(broken)
+        broken_journal = AccountingBridgePosting.objects.get(source_model="CustomerAdvance", source_id=str(broken.id), purpose="CUSTOMER_ADVANCE_RECEIPT").journal_entry
+        JournalEntry.objects.filter(pk=broken_journal.pk).update(source_id="broken-source")
+        link_run = self._run_checks()
+        self.assertTrue(ReconciliationItem.objects.filter(run=link_run, exception_code="CUSTOMER_ADVANCE_RECEIPT_SOURCE_LINK_MISSING").exists())
+
+        unbalanced = self._advance(suffix="RUN-UNBAL")
+        self._post_advance(unbalanced)
+        unbalanced_journal = AccountingBridgePosting.objects.get(source_model="CustomerAdvance", source_id=str(unbalanced.id), purpose="CUSTOMER_ADVANCE_RECEIPT").journal_entry
+        credit_line = unbalanced_journal.lines.filter(credit_amount__gt=0).first()
+        credit_line.__class__.objects.filter(pk=credit_line.pk).update(credit_amount=Decimal("299.00"))
+        unbalanced_run = self._run_checks()
+        self.assertTrue(ReconciliationItem.objects.filter(run=unbalanced_run, source_type="CustomerAdvance", source_id=str(unbalanced.id), exception_code="CUSTOMER_ADVANCE_RECEIPT_JOURNAL_UNBALANCED").exists())
+
+        duplicate = self._advance(suffix="RUN-DUP")
+        self._post_advance(duplicate)
+        original = AccountingBridgePosting.objects.get(source_model="CustomerAdvance", source_id=str(duplicate.id), purpose="CUSTOMER_ADVANCE_RECEIPT").journal_entry
+        JournalEntry.objects.create(entry_date=original.entry_date, entry_type=JournalEntryType.SYSTEM_BRIDGE, status=JournalEntryStatus.POSTED, memo="duplicate test", source_model="CustomerAdvance", source_id=str(duplicate.id), voucher_type=original.voucher_type, source_type=original.source_type, source_reference=original.source_reference, financial_year=original.financial_year, accounting_period=original.accounting_period, posted_by=self.admin, posted_at=timezone.now())
+        duplicate_run = self._run_checks()
+        self.assertTrue(ReconciliationItem.objects.filter(run=duplicate_run, source_type="CustomerAdvance", source_id=str(duplicate.id), exception_code="CUSTOMER_ADVANCE_RECEIPT_DUPLICATE_ACCOUNTING_BRIDGE_POSTING").exists())
