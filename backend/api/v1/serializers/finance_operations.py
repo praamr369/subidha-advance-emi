@@ -42,6 +42,7 @@ class CashierAdvanceCollectionSerializer(serializers.Serializer):
     reference_no = serializers.CharField(required=False, allow_blank=True, max_length=100)
     note = serializers.CharField(required=False, allow_blank=True)
     payment_date = serializers.DateField(required=False)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, max_length=160)
 
     def validate_amount(self, value):
         if _money(value) <= Decimal("0.00"):
