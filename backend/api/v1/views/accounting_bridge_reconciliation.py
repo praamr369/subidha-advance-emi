@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from accounting.services.accounting_bridge_reconciliation_purchase_bill_read_service import BridgeReconciliationFilters, build_accounting_bridge_reconciliation
-from accounting.services.accounting_bridge_customer_advance_receipt_service import batch_post_bridge_candidates, batch_preview_bridge_candidates, post_bridge_candidate, preview_bridge_candidate, verify_bridge_reconciliation_item
+from accounting.services.accounting_bridge_customer_advance_application_service import batch_post_bridge_candidates, batch_preview_bridge_candidates, post_bridge_candidate, preview_bridge_candidate, verify_bridge_reconciliation_item
 
 STATUS_ALIASES = {"POSTED_UNVERIFIED", "BLOCKED", "UNSUPPORTED"}
 
