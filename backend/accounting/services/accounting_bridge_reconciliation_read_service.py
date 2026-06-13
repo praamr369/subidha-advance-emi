@@ -72,6 +72,46 @@ PHASE_F_SOURCE_SPECS: tuple[dict[str, Any], ...] = (
 )
 
 
+F25_SAFETY_COPY = "Validation is read-only. Posting remains explicit, admin-only, idempotent, period-gated, numbering-gated, and reconciliation-controlled."
+
+
+F25_VALIDATION_WORKFLOWS: tuple[dict[str, Any], ...] = (
+    {"domain": "EMI / subscription", "workflow": "EMI payment collection", "source_model": "Payment", "event_key": "subscription_emi_payment", "accounting_shape": "Dr FinanceAccount chart account, Cr customer receivable / EMI income", "operator": "cashier/admin", "bridge_source_ownership": "F1 Payment bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Posted rows require operator verification before reconciled.", "validation_test_name": "test_emi_subscription_workflows_and_advance_allocation_boundary"},
+    {"domain": "EMI / subscription", "workflow": "EMI receipt", "source_model": "ReceiptDocument", "event_key": "direct_sale_receipt", "accounting_shape": "ReceiptDocument remains receipt evidence; EMI payment accounting remains owned by Payment F1.", "operator": "cashier/admin", "bridge_source_ownership": "F2 receipt bridge; EMI cash posting remains F1 Payment", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Receipt evidence is reviewed separately from EMI payment posting.", "validation_test_name": "test_emi_subscription_workflows_and_advance_allocation_boundary"},
+    {"domain": "EMI / subscription", "workflow": "Winner waiver remains future-EMI-only", "source_model": "WinnerHistory", "event_key": "future_emi_waiver", "accounting_shape": "Waiver is non-cash benefit; paid EMIs remain paid and future EMI rows may be waived by draw service only.", "operator": "admin/system", "bridge_source_ownership": "Lucky draw/waiver workflow; no new F25 posting source", "expected_candidate_status": "VALIDATION_ONLY", "expected_action_link": "lucky_draw", "expected_reconciliation_posture": "Waived EMI must remain distinguishable from paid EMI.", "validation_test_name": "test_emi_subscription_workflows_and_advance_allocation_boundary"},
+    {"domain": "EMI / subscription", "workflow": "ADVANCE_ALLOCATION Payment remains excluded from F1", "source_model": "Payment", "event_key": "ADVANCE_ALLOCATION", "accounting_shape": "Advance allocation is not Payment F1 cash collection; customer advance application remains F21.", "operator": "system/admin", "bridge_source_ownership": "Excluded from F1; F21 owns CustomerAdvanceAllocation application", "expected_candidate_status": "EXCLUDED", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "No Payment F1 reconciliation credit for advance allocation rows.", "validation_test_name": "test_emi_subscription_workflows_and_advance_allocation_boundary"},
+    {"domain": "Direct sale / billing", "workflow": "Direct-sale invoice", "source_model": "BillingInvoice", "event_key": "direct_sale_invoice", "accounting_shape": "Dr customer receivable, Cr direct sale income / output tax when applicable", "operator": "admin/system", "bridge_source_ownership": "F3 BillingInvoice bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Invoice posting must be verified before reconciled.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Direct sale / billing", "workflow": "Direct-sale receipt", "source_model": "ReceiptDocument", "event_key": "direct_sale_receipt", "accounting_shape": "Dr concrete finance account, Cr direct sale/customer receivable", "operator": "cashier/admin", "bridge_source_ownership": "F2 ReceiptDocument bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Receipt posting must be verified before reconciled.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Direct sale / billing", "workflow": "Credit note", "source_model": "BillingCreditNote", "event_key": "credit_note_issue", "accounting_shape": "Dr sales return/customer credit account, Cr customer receivable", "operator": "admin", "bridge_source_ownership": "F4 BillingCreditNote bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Credit note posting must be verified before reconciled.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Direct sale / billing", "workflow": "Debit note", "source_model": "BillingDebitNote", "event_key": "debit_note_issue", "accounting_shape": "Dr customer receivable, Cr damage recovery / adjustment income", "operator": "admin", "bridge_source_ownership": "F5 BillingDebitNote bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Debit note posting must be verified before reconciled.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Direct sale / billing", "workflow": "Direct-sale return", "source_model": "DirectSaleReturn", "event_key": "direct_sale_return", "accounting_shape": "Dr sales return / inventory-adjusted return account, Cr customer receivable", "operator": "admin/system", "bridge_source_ownership": "F4 DirectSaleReturn bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Return posting must be verified before reconciled.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Purchase / vendor", "workflow": "Purchase bill", "source_model": "PurchaseBill", "event_key": "purchase_bill_accrual", "accounting_shape": "Dr inventory/expense/input tax, Cr vendor payable", "operator": "admin/system", "bridge_source_ownership": "F6 PurchaseBill bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Purchase bill accrual requires bridge verification.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Purchase / vendor", "workflow": "Vendor payment", "source_model": "VendorPayment", "event_key": "vendor_payment", "accounting_shape": "Dr vendor payable, Cr concrete finance account", "operator": "admin", "bridge_source_ownership": "F7 VendorPayment bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Vendor payment settlement requires verification.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Inventory / COGS", "workflow": "Stock receive", "source_model": "StockLedger", "event_key": "stock_ledger_inventory_movement", "accounting_shape": "Inventory movement between mapped stock accounts", "operator": "system/admin", "bridge_source_ownership": "F8 StockLedger bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Stock receive accounting requires bridge verification.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Inventory / COGS", "workflow": "Stock adjustment", "source_model": "StockLedger", "event_key": "inventory_movement", "accounting_shape": "Inventory movement between mapped stock accounts", "operator": "system/admin", "bridge_source_ownership": "F8 StockLedger bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Adjustment accounting requires bridge verification.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Inventory / COGS", "workflow": "Stock-out / COGS", "source_model": "StockLedger", "event_key": "cogs_stockout", "accounting_shape": "Dr COGS, Cr inventory asset", "operator": "system/admin", "bridge_source_ownership": "F9 StockLedger COGS bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "COGS posting requires bridge verification.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Commission / payout", "workflow": "Commission accrual", "source_model": "Commission", "event_key": "commission_accrual", "accounting_shape": "Dr commission expense, Cr commission payable", "operator": "system/admin", "bridge_source_ownership": "F10 Commission bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Commission accrual requires bridge verification.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Commission / payout", "workflow": "Commission payout", "source_model": "CommissionPayoutBatch", "event_key": "partner_commission_payout", "accounting_shape": "Dr commission payable, Cr concrete payout finance account", "operator": "admin", "bridge_source_ownership": "F11 CommissionPayoutBatch bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Payout settlement requires bridge verification.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Payroll", "workflow": "Salary accrual", "source_model": "SalarySheet", "event_key": "salary_accrual", "accounting_shape": "Dr salary expense, Cr salary payable", "operator": "admin/system", "bridge_source_ownership": "F12 SalarySheet bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Salary accrual requires bridge verification.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Payroll", "workflow": "Salary payment", "source_model": "SalaryPayment", "event_key": "salary_payment", "accounting_shape": "Dr salary payable, Cr concrete finance account", "operator": "admin", "bridge_source_ownership": "F13 SalaryPayment bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Salary payment requires bridge verification.", "validation_test_name": "test_matrix_includes_all_required_operational_workflows"},
+    {"domain": "Rent/lease", "workflow": "Rent/lease revenue", "source_model": "RentLeaseBillingDemand", "event_key": "rent_monthly_revenue", "accounting_shape": "Dr customer receivable, Cr rent/lease income / output tax when applicable", "operator": "system/admin", "bridge_source_ownership": "F14 RentLeaseBillingDemand bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Revenue demand posting is separate from cash settlement.", "validation_test_name": "test_rent_lease_and_security_deposit_separation"},
+    {"domain": "Rent/lease", "workflow": "Rent/lease collection settlement", "source_model": "RentLeaseCollection", "event_key": "rent_lease_collection_settlement", "accounting_shape": "Dr concrete finance account, Cr customer receivable / settlement account", "operator": "cashier/admin", "bridge_source_ownership": "F15C RentLeaseCollection bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Collection settlement remains separate from F14 revenue demand.", "validation_test_name": "test_rent_lease_and_security_deposit_separation"},
+    {"domain": "Rent/lease", "workflow": "Security deposit receipt", "source_model": "RentLeaseDepositTransaction", "event_key": "security_deposit_receipt", "accounting_shape": "Dr concrete finance account, Cr security deposit liability", "operator": "cashier/admin", "bridge_source_ownership": "F17 RentLeaseDepositTransaction receipt bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Deposit receipt is liability, not income.", "validation_test_name": "test_rent_lease_and_security_deposit_separation"},
+    {"domain": "Rent/lease", "workflow": "Security deposit refund", "source_model": "RentLeaseDepositTransaction", "event_key": "security_deposit_refund", "accounting_shape": "Dr security deposit liability, Cr concrete finance account", "operator": "admin", "bridge_source_ownership": "F18 RentLeaseDepositTransaction refund bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Deposit refund remains separate from receipt and rent/lease revenue.", "validation_test_name": "test_rent_lease_and_security_deposit_separation"},
+    {"domain": "Customer advance", "workflow": "ReceiptDocument.customer_advance remains F2", "source_model": "ReceiptDocument", "event_key": "customer_advance", "accounting_shape": "ReceiptDocument customer advance evidence remains F2 receipt bridge.", "operator": "cashier/admin", "bridge_source_ownership": "F2 ReceiptDocument bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Kept separate from concrete CustomerAdvance F20 receipt posting.", "validation_test_name": "test_customer_advance_phase_separation"},
+    {"domain": "Customer advance", "workflow": "CustomerAdvance receipt remains F20", "source_model": "CustomerAdvance", "event_key": "customer_advance_receipt", "accounting_shape": "Dr concrete finance account, Cr customer advance liability", "operator": "cashier/admin", "bridge_source_ownership": "F20 CustomerAdvance bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "CustomerAdvance receipt is liability until applied.", "validation_test_name": "test_customer_advance_phase_separation"},
+    {"domain": "Customer advance", "workflow": "CustomerAdvanceAllocation application remains F21", "source_model": "CustomerAdvanceAllocation", "event_key": "customer_advance_application", "accounting_shape": "Dr customer advance liability, Cr customer receivable", "operator": "admin/system", "bridge_source_ownership": "F21 CustomerAdvanceAllocation bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Advance application is not F1 cash collection.", "validation_test_name": "test_customer_advance_phase_separation"},
+    {"domain": "Customer advance", "workflow": "CustomerAdvanceRefund refund remains F23", "source_model": "CustomerAdvanceRefund", "event_key": "customer_advance_refund", "accounting_shape": "Dr customer advance liability, Cr concrete finance account", "operator": "admin", "bridge_source_ownership": "F23 CustomerAdvanceRefund bridge", "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Refund remains separate from F22 source contract hardening.", "validation_test_name": "test_customer_advance_phase_separation"},
+    {"domain": "Control tower", "workflow": "Readiness source inventory", "source_model": "PhaseFControlTower", "event_key": "source_inventory", "accounting_shape": "Read-only inventory of supported, deferred, and unsupported Phase F source workflows.", "operator": "admin/system", "bridge_source_ownership": "F24/F25 validation payload", "expected_candidate_status": "VALIDATION_ONLY", "expected_action_link": "bridge_posting", "expected_reconciliation_posture": "Inventory does not mark posted-unverified rows reconciled.", "validation_test_name": "test_control_tower_validation_surfaces_and_no_mutation_contract"},
+    {"domain": "Control tower", "workflow": "Mapping blockers", "source_model": "PhaseFControlTower", "event_key": "mapping_blockers", "accounting_shape": "Read-only blocker routing to mapping audit.", "operator": "admin", "bridge_source_ownership": "F24/F25 validation payload", "expected_candidate_status": "BLOCKED_BY_MAPPING", "expected_action_link": "mapping_audit", "expected_reconciliation_posture": "Blocked rows remain unreconciled.", "validation_test_name": "test_control_tower_validation_surfaces_and_no_mutation_contract"},
+    {"domain": "Control tower", "workflow": "Finance-account blockers", "source_model": "PhaseFControlTower", "event_key": "finance_account_blockers", "accounting_shape": "Read-only blocker routing to finance account setup.", "operator": "admin", "bridge_source_ownership": "F24/F25 validation payload", "expected_candidate_status": "BLOCKED_BY_FINANCE_ACCOUNT", "expected_action_link": "finance_accounts", "expected_reconciliation_posture": "Blocked rows remain unreconciled.", "validation_test_name": "test_control_tower_validation_surfaces_and_no_mutation_contract"},
+    {"domain": "Control tower", "workflow": "Numbering blockers", "source_model": "PhaseFControlTower", "event_key": "numbering_blockers", "accounting_shape": "Read-only blocker routing to journal numbering setup.", "operator": "admin", "bridge_source_ownership": "F24/F25 validation payload", "expected_candidate_status": "BLOCKED_BY_NUMBERING", "expected_action_link": "journal_numbering", "expected_reconciliation_posture": "Blocked rows remain unreconciled.", "validation_test_name": "test_control_tower_validation_surfaces_and_no_mutation_contract"},
+    {"domain": "Control tower", "workflow": "Period blockers", "source_model": "PhaseFControlTower", "event_key": "period_blockers", "accounting_shape": "Read-only blocker routing to accounting periods.", "operator": "admin", "bridge_source_ownership": "F24/F25 validation payload", "expected_candidate_status": "BLOCKED_BY_PERIOD", "expected_action_link": "accounting_periods", "expected_reconciliation_posture": "Blocked rows remain unreconciled.", "validation_test_name": "test_control_tower_validation_surfaces_and_no_mutation_contract"},
+    {"domain": "Control tower", "workflow": "Unsupported source blockers", "source_model": "StaffAdvance", "event_key": "staff_advance", "accounting_shape": "Unsupported boundary; no controlled bridge posting source exists.", "operator": "admin/system", "bridge_source_ownership": "Unsupported boundary", "expected_candidate_status": "UNSUPPORTED", "expected_action_link": "mapping_audit", "expected_reconciliation_posture": "Unsupported rows are visible but never postable.", "validation_test_name": "test_staff_advance_and_unsupported_sources_remain_non_postable"},
+    {"domain": "Control tower", "workflow": "Posted-unverified not treated as reconciled", "source_model": "PhaseFControlTower", "event_key": "posted_unverified_review", "accounting_shape": "Posted journal exists, but bridge reconciliation verification is still pending.", "operator": "admin", "bridge_source_ownership": "Bridge reconciliation verification", "expected_candidate_status": "POSTED_UNVERIFIED", "expected_action_link": "reconciliation", "expected_reconciliation_posture": "POSTED_UNVERIFIED count must not increment reconciled count.", "validation_test_name": "test_posted_unverified_rows_are_not_reconciled"},
+)
+
+
 @dataclass(frozen=True)
 class BridgeReconciliationFilters:
     module: str | None = None
@@ -655,6 +695,135 @@ def _phase_f_control_tower(rows: list[dict[str, Any]], period_readiness: dict[st
     }
 
 
+def _f25_action_link(key: str, *, source_model: str | None = None, event_key: str | None = None) -> dict[str, Any]:
+    for link_key, label, href in PHASE_F_ACTION_LINKS:
+        if link_key != key:
+            continue
+        target = href
+        if key == "bridge_posting":
+            from urllib.parse import urlencode
+
+            params = {}
+            if source_model and source_model not in {"PhaseFControlTower", "WinnerHistory"}:
+                params["source_model"] = source_model
+            if event_key and event_key not in {"ADVANCE_ALLOCATION", "future_emi_waiver"}:
+                params["event_key"] = event_key
+            query = urlencode(params)
+            target = f"{href}?{query}" if query else href
+        return {"key": link_key, "label": label, "href": target}
+    if key == "lucky_draw":
+        return {"key": "lucky_draw", "label": "Lucky Draw", "href": "/admin/lucky-draws"}
+    return {"key": "bridge_posting", "label": "Bridge Posting", "href": "/admin/accounting/bridge-reconciliation"}
+
+
+def _f25_matching_rows(rows: list[dict[str, Any]], workflow: dict[str, Any]) -> list[dict[str, Any]]:
+    source_model = workflow["source_model"]
+    event_key = workflow["event_key"]
+    if source_model == "PhaseFControlTower":
+        if event_key == "mapping_blockers":
+            return [row for row in rows if row.get("status") == "BLOCKED_BY_MAPPING"]
+        if event_key == "finance_account_blockers":
+            return [row for row in rows if row.get("status") == "BLOCKED_BY_FINANCE_ACCOUNT"]
+        if event_key == "numbering_blockers":
+            return [row for row in rows if row.get("status") == "BLOCKED_BY_NUMBERING"]
+        if event_key == "period_blockers":
+            return [row for row in rows if row.get("status") == "BLOCKED_BY_PERIOD"]
+        if event_key == "posted_unverified_review":
+            return [row for row in rows if row.get("posted_unverified") or row.get("reconciliation_state") == "POSTED_UNVERIFIED"]
+        return rows
+    if event_key == "ADVANCE_ALLOCATION":
+        return [row for row in rows if row.get("source_model") == "Payment" and row.get("event_key") == "ADVANCE_ALLOCATION"]
+    return [row for row in rows if row.get("source_model") == source_model and row.get("event_key") == event_key]
+
+
+def _f25_status(workflow: dict[str, Any], matched_rows: list[dict[str, Any]]) -> str:
+    if workflow["event_key"] == "ADVANCE_ALLOCATION":
+        return "EXCLUDED" if not matched_rows else "BOUNDARY_VIOLATION"
+    if workflow["source_model"] == "WinnerHistory":
+        return "VALIDATION_ONLY"
+    if workflow["source_model"] == "StaffAdvance":
+        return "UNSUPPORTED"
+    if not matched_rows:
+        return workflow["expected_candidate_status"]
+    statuses = {str(row.get("status") or "") for row in matched_rows}
+    if "RECONCILED" in statuses and not any(row.get("posted_unverified") for row in matched_rows):
+        return "RECONCILED"
+    if any(row.get("posted_unverified") or row.get("reconciliation_state") == "POSTED_UNVERIFIED" for row in matched_rows):
+        return "POSTED_UNVERIFIED"
+    if any(status.startswith("BLOCKED") for status in statuses):
+        return sorted(status for status in statuses if status.startswith("BLOCKED"))[0]
+    if "READY_UNPOSTED" in statuses:
+        return "READY_UNPOSTED"
+    if "UNSUPPORTED_SOURCE" in statuses:
+        return "UNSUPPORTED"
+    return sorted(statuses)[0] if statuses else workflow["expected_candidate_status"]
+
+
+def _production_accounting_validation(rows: list[dict[str, Any]], phase_f_control_tower: dict[str, Any]) -> dict[str, Any]:
+    workflows = []
+    for workflow in F25_VALIDATION_WORKFLOWS:
+        matched_rows = _f25_matching_rows(rows, workflow)
+        status = _f25_status(workflow, matched_rows)
+        reconciled_count = sum(1 for row in matched_rows if row.get("status") == "RECONCILED" or row.get("reconciliation_state") == "RECONCILED")
+        posted_unverified_count = sum(1 for row in matched_rows if row.get("posted_unverified") or row.get("reconciliation_state") == "POSTED_UNVERIFIED")
+        action_link = _f25_action_link(workflow["expected_action_link"], source_model=workflow["source_model"], event_key=workflow["event_key"])
+        workflows.append(
+            {
+                **workflow,
+                "status": status,
+                "current_row_count": len(matched_rows),
+                "posted_unverified_count": posted_unverified_count,
+                "reconciled_count": reconciled_count,
+                "expected_action": action_link,
+                "expected_no_mutation_rule": "Validation must not create JournalEntry, AccountingBridgePosting, ReconciliationItem, or mutate source records.",
+                "can_post": False,
+                "read_only": True,
+            }
+        )
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in workflows:
+        grouped.setdefault(row["domain"], []).append(row)
+    return {
+        "title": "Production Accounting Validation",
+        "safety_copy": F25_SAFETY_COPY,
+        "read_only": True,
+        "creates_journal_entry": False,
+        "creates_accounting_bridge_posting": False,
+        "auto_posts": False,
+        "auto_reconciles": False,
+        "auto_closes_period": False,
+        "mutates_sources": False,
+        "workflow_count": len(workflows),
+        "groups": grouped,
+        "workflows": workflows,
+        "control_tower_readiness": phase_f_control_tower["readiness"],
+        "source_event_separation_checks": {
+            "advance_allocation_payment_excluded_from_f1": not any(row["source_model"] == "Payment" and row["event_key"] == "ADVANCE_ALLOCATION" for row in workflows if row["status"] != "EXCLUDED"),
+            "customer_advance_f2_f20_f21_f23_separated": all(
+                any(row["source_model"] == source_model and row["event_key"] == event_key for row in workflows)
+                for source_model, event_key in (
+                    ("ReceiptDocument", "customer_advance"),
+                    ("CustomerAdvance", "customer_advance_receipt"),
+                    ("CustomerAdvanceAllocation", "customer_advance_application"),
+                    ("CustomerAdvanceRefund", "customer_advance_refund"),
+                )
+            ),
+            "security_deposit_f17_f18_separated": all(
+                any(row["source_model"] == "RentLeaseDepositTransaction" and row["event_key"] == event_key for row in workflows)
+                for event_key in ("security_deposit_receipt", "security_deposit_refund")
+            ),
+            "rent_lease_revenue_and_collection_separated": all(
+                any(row["source_model"] == source_model and row["event_key"] == event_key for row in workflows)
+                for source_model, event_key in (
+                    ("RentLeaseBillingDemand", "rent_monthly_revenue"),
+                    ("RentLeaseCollection", "rent_lease_collection_settlement"),
+                )
+            ),
+            "staff_advance_unsupported": any(row["source_model"] == "StaffAdvance" and row["status"] == "UNSUPPORTED" for row in workflows),
+        },
+    }
+
+
 def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters | None = None) -> dict[str, Any]:
     active_filters = filters or BridgeReconciliationFilters()
     selected_financial_year, fy_blockers = _resolve_financial_year(active_filters)
@@ -743,6 +912,7 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         **canonical_summary,
     }
     phase_f_control_tower = _phase_f_control_tower(rows, selected_period_readiness, readiness_blockers)
+    production_validation = _production_accounting_validation(rows, phase_f_control_tower)
     return {
         "summary": summary,
         "selected_financial_year": _financial_year_payload(selected_financial_year),
@@ -756,5 +926,6 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "accounting_period_readiness": selected_period_readiness,
         "canonical_statuses": list(CANONICAL_STATUSES),
         "phase_f_control_tower": phase_f_control_tower,
+        "production_accounting_validation": production_validation,
         "results": rows,
     }

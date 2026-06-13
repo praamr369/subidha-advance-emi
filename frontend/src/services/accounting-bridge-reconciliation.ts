@@ -121,6 +121,42 @@ export type PhaseFControlTower = {
   };
   guardrails: Record<string, boolean>;
 };
+export type ProductionAccountingValidationWorkflow = {
+  domain: string;
+  workflow: string;
+  source_model: BridgeSourceModel;
+  event_key: string;
+  accounting_shape: string;
+  operator: string;
+  bridge_source_ownership: string;
+  expected_candidate_status: string;
+  expected_action_link: string;
+  expected_action: BridgeActionLink;
+  expected_no_mutation_rule: string;
+  expected_reconciliation_posture: string;
+  validation_test_name: string;
+  status: string;
+  current_row_count: number;
+  posted_unverified_count: number;
+  reconciled_count: number;
+  can_post: boolean;
+  read_only: boolean;
+};
+export type ProductionAccountingValidation = {
+  title: string;
+  safety_copy: string;
+  read_only: boolean;
+  creates_journal_entry: boolean;
+  creates_accounting_bridge_posting: boolean;
+  auto_posts: boolean;
+  auto_reconciles: boolean;
+  auto_closes_period: boolean;
+  mutates_sources: boolean;
+  workflow_count: number;
+  groups: Record<string, ProductionAccountingValidationWorkflow[]>;
+  workflows: ProductionAccountingValidationWorkflow[];
+  source_event_separation_checks: Record<string, boolean>;
+};
 export type BridgePostingLine = { chart_account?: { id?: number; code?: string; name?: string } | null; description?: string; debit_amount: string; credit_amount: string };
 export type BridgeFinanceAccount = { id?: number; name?: string; kind?: string; is_active?: boolean; chart_account?: { id?: number; code?: string; name?: string } | null };
 
@@ -281,6 +317,7 @@ export type AccountingBridgeReconciliationPayload = {
   summary: AccountingBridgeReconciliationSummary;
   period_readiness?: AccountingBridgePeriodReadiness;
   phase_f_control_tower?: PhaseFControlTower;
+  production_accounting_validation?: ProductionAccountingValidation;
   results: AccountingBridgeReconciliationRow[];
 };
 

@@ -144,7 +144,7 @@ function SourceDetails({ row }: { row: AccountingBridgeReconciliationRow }) {
   );
 }
 
-function SummaryCard({ label, value, href, tone = "border-blue-200 bg-blue-50 text-blue-900" }: { label: string; value: number; href?: string; tone?: string }) {
+function SummaryCard({ label, value, href, tone = "border-blue-200 bg-blue-50 text-blue-900" }: { label: string; value: number | string; href?: string; tone?: string }) {
   const body = <div className={cx("rounded-2xl border p-4 shadow-sm", tone)}><div className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</div><div className="mt-2 text-2xl font-semibold">{value}</div></div>;
   return href ? <Link href={href}>{body}</Link> : body;
 }
@@ -208,6 +208,50 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </WorkspaceSection>
+  );
+}
+
+function ProductionAccountingValidation({ payload }: { payload: AccountingBridgeReconciliationPayload }) {
+  const validation = payload.production_accounting_validation;
+  if (!validation?.workflows?.length) return null;
+  const groups = validation.groups ?? {};
+  return (
+    <WorkspaceSection title="Production Accounting Validation" description={validation.safety_copy}>
+      <div className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <SummaryCard label="Workflows" value={validation.workflow_count} tone="border-slate-200 bg-white text-slate-900" />
+          <SummaryCard label="Read only" value={validation.read_only ? "Yes" : "No"} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+          <SummaryCard label="Creates journals" value={validation.creates_journal_entry ? "Yes" : "No"} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+          <SummaryCard label="Auto posts" value={validation.auto_posts ? "Yes" : "No"} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+          <SummaryCard label="Auto reconciles" value={validation.auto_reconciles ? "Yes" : "No"} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+          <SummaryCard label="Mutates sources" value={validation.mutates_sources ? "Yes" : "No"} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+        </div>
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-950">{validation.safety_copy}</div>
+        {Object.entries(groups).map(([domain, workflows]) => (
+          <div key={domain} className="overflow-x-auto rounded-xl border border-border bg-background">
+            <table className="min-w-full divide-y divide-border text-sm">
+              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr><th className="px-4 py-3 font-semibold" colSpan={7}>{domain}</th></tr>
+                <tr><th className="px-4 py-3 font-semibold">Workflow</th><th className="px-4 py-3 font-semibold">Source / event</th><th className="px-4 py-3 font-semibold">Shape</th><th className="px-4 py-3 font-semibold">Operator</th><th className="px-4 py-3 font-semibold">Readiness</th><th className="px-4 py-3 font-semibold">Reconciliation</th><th className="px-4 py-3 font-semibold">Next action</th></tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {workflows.map((workflow) => (
+                  <tr key={`${domain}-${workflow.workflow}-${workflow.event_key}`} className="align-top">
+                    <td className="px-4 py-3"><div className="font-semibold text-foreground">{workflow.workflow}</div><div className="mt-1 text-xs text-muted-foreground">{workflow.bridge_source_ownership}</div></td>
+                    <td className="px-4 py-3"><div>{modelLabel(workflow.source_model)}</div><div className="mt-1 font-mono text-xs text-muted-foreground">{workflow.event_key}</div></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{workflow.accounting_shape}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{workflow.operator}</td>
+                    <td className="px-4 py-3"><span className={cx("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(workflow.status))}>{workflow.status}</span><div className="mt-2 text-xs text-muted-foreground">Rows {workflow.current_row_count} · Posted unverified {workflow.posted_unverified_count} · Reconciled {workflow.reconciled_count}</div></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{workflow.expected_reconciliation_posture}</td>
+                    <td className="px-4 py-3">{workflow.expected_action?.href ? <Link href={workflow.expected_action.href} className="rounded-md border border-border bg-white px-2 py-1 text-xs font-semibold text-foreground hover:bg-muted/40">{workflow.expected_action.label}</Link> : null}<div className="mt-2 text-xs text-muted-foreground">{workflow.expected_no_mutation_rule}</div></td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -405,6 +449,7 @@ export default function AccountingBridgeReconciliationPage() {
         </section>
 
         {payload ? <ControlTowerInventory payload={payload} /> : null}
+        {payload ? <ProductionAccountingValidation payload={payload} /> : null}
 
         <WorkspaceSection title="Filters" description="Filter by source model, status, event key, period, or reference. URL filters such as source_model=CustomerAdvanceRefund are supported.">
           <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm md:grid-cols-3 xl:grid-cols-6">
