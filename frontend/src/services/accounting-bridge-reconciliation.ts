@@ -45,6 +45,12 @@ export type AccountingBridgeReconciliationSummary = {
   customer_advance_receipt_reconciled_count?: number;
   customer_advance_receipt_blocked_count?: number;
   customer_advance_receipt_unsupported_count?: number;
+  customer_advance_application_ready_unposted_count?: number;
+  customer_advance_application_posted_count?: number;
+  customer_advance_application_posted_unverified_count?: number;
+  customer_advance_application_reconciled_count?: number;
+  customer_advance_application_blocked_count?: number;
+  customer_advance_application_unsupported_count?: number;
   [key: string]: number | string | boolean | null | undefined | Record<string, unknown> | Array<unknown>;
 };
 
@@ -64,7 +70,7 @@ export type AccountingBridgeReconciliationJournal = {
 export type AccountingBridgeReconciliationItem = { id: number; status: string; severity: string; exception_code?: string; exception_message?: string };
 export type AccountingBridgePeriodReadiness = { financial_year_ready?: boolean; accounting_period_ready?: boolean; journal_numbering_ready?: boolean; posting_controls_ready?: boolean; active_financial_year?: { id?: number; code?: string; name?: string } | null; current_period?: { id?: number; code?: string; name?: string; status?: string } | null; blockers?: string[] };
 
-export type BridgeSourceModel = "Payment" | "ReceiptDocument" | "BillingInvoice" | "RentLeaseBillingDemand" | "RentLeaseCollection" | "RentLeaseDepositTransaction" | "CustomerAdvance" | "BillingCreditNote" | "DirectSaleReturn" | "BillingDebitNote" | "PurchaseBill" | "VendorPayment" | "StockLedger" | "Commission" | "CommissionPayoutBatch" | "SalarySheet" | "SalaryPayment" | string;
+export type BridgeSourceModel = "Payment" | "ReceiptDocument" | "BillingInvoice" | "RentLeaseBillingDemand" | "RentLeaseCollection" | "RentLeaseDepositTransaction" | "CustomerAdvance" | "CustomerAdvanceAllocation" | "BillingCreditNote" | "DirectSaleReturn" | "BillingDebitNote" | "PurchaseBill" | "VendorPayment" | "StockLedger" | "Commission" | "CommissionPayoutBatch" | "SalarySheet" | "SalaryPayment" | string;
 export type BridgeActionLink = { key: string; label: string; href: string; reason?: string | null; disabled?: boolean };
 export type BridgePostingLine = { chart_account?: { id?: number; code?: string; name?: string } | null; description?: string; debit_amount: string; credit_amount: string };
 export type BridgeFinanceAccount = { id?: number; name?: string; kind?: string; is_active?: boolean; chart_account?: { id?: number; code?: string; name?: string } | null };
@@ -99,10 +105,24 @@ export type AccountingBridgeReconciliationRow = {
   finance_account_active?: boolean | null;
   finance_account?: BridgeFinanceAccount | null;
   customer_advance_id?: number | string | null;
+  customer_advance_allocation_id?: number | string | null;
+  allocation_id?: number | string | null;
+  allocation_reference?: string | null;
+  allocation_date?: string | null;
+  allocated_by_id?: number | string | null;
+  allocated_by_name?: string | null;
   advance_reference?: string | null;
   reference_no?: string | null;
   advance_status?: string | null;
   unapplied_amount?: string | null;
+  advance_unapplied_amount?: string | null;
+  emi_id?: number | string | null;
+  emi_reference?: string | null;
+  emi_status?: string | null;
+  linked_payment_id?: number | string | null;
+  payment_id?: number | string | null;
+  payment_reference?: string | null;
+  payment_allocation_metadata?: Record<string, unknown> | null;
   source_metadata?: Record<string, unknown> | null;
   collection_id?: number | string | null;
   collection_number?: string | null;
@@ -173,59 +193,66 @@ export type AccountingBridgeReconciliationRow = {
 };
 
 export type BridgeCandidate = AccountingBridgeReconciliationRow & { row_type: "bridge_candidate"; bridge_candidate_id: string; idempotency_key: string };
-export type BridgePostingPreview = { candidate: AccountingBridgeReconciliationRow; candidate_id: string; source: Record<string, unknown> & { model: BridgeSourceModel; pk: number | string; display: string; reference_number?: string | null; date: string | null; amount: string }; collection_identity?: Record<string, unknown>; advance_identity?: Record<string, unknown>; journal_date: string | null; accounting_period?: AccountingBridgeReconciliationRow["accounting_period"]; journal_number_preview?: string | null; debit_lines: BridgePostingLine[]; credit_lines: BridgePostingLine[]; lines: BridgePostingLine[]; total_debit: string; total_credit: string; is_balanced: boolean; tax_lines?: BridgePostingLine[]; finance_account_line?: BridgeFinanceAccount | null; warnings: string[]; blockers: string[]; can_post: boolean; idempotency_key: string; safety_text: string };
+export type BridgePostingPreview = { candidate: AccountingBridgeReconciliationRow; candidate_id: string; source: Record<string, unknown> & { model: BridgeSourceModel; pk: number | string; display: string; reference_number?: string | null; date: string | null; amount: string }; collection_identity?: Record<string, unknown>; advance_identity?: Record<string, unknown>; advance_application_identity?: Record<string, unknown>; journal_date: string | null; accounting_period?: AccountingBridgeReconciliationRow["accounting_period"]; journal_number_preview?: string | null; debit_lines: BridgePostingLine[]; credit_lines: BridgePostingLine[]; lines: BridgePostingLine[]; total_debit: string; total_credit: string; is_balanced: boolean; tax_lines?: BridgePostingLine[]; finance_account_line?: BridgeFinanceAccount | null; warnings: string[]; blockers: string[]; can_post: boolean; idempotency_key: string; safety_text: string };
 export type BridgePostResult = { posted: boolean; already_posted: boolean; journal_entry?: AccountingBridgeReconciliationJournal | null; reconciliation_item?: { id: number; status: string; exception_code?: string } | null; next_action?: string };
 export type BridgeBatchPreviewResult = { selected_count: number; previewable_count?: number; postable_count: number; blocked_count: number; total_debit: string; total_credit: string; previews: BridgePostingPreview[]; blockers: Record<string, string[]> };
 export type BridgeBatchPostResult = { selected_count?: number; posted_count: number; already_posted_count?: number; skipped_already_posted_count: number; blocked_count: number; created_journal_ids: number[]; reconciliation_pending_count: number; posted: BridgePostResult[]; already_posted: BridgePostResult[]; errors: Record<string, string[]> };
 export type ReconciliationVerificationResult = { id: number; status: string; verified: boolean; verified_at?: string; detail?: string };
 
-export type AccountingBridgeReconciliationPayload = {
-  summary: AccountingBridgeReconciliationSummary;
-  canonical_statuses?: string[];
-  selected_financial_year?: { id?: number; code?: string; name?: string; is_active?: boolean } | null;
-  selected_accounting_period?: { id?: number; code?: string; name?: string; status?: string } | null;
-  period_status?: string | null;
-  available_financial_years?: Array<{ id?: number; code?: string; name?: string; is_active?: boolean }>;
-  available_accounting_periods?: Array<{ id?: number; code?: string; name?: string; status?: string }>;
-  readiness_blockers?: string[];
-  year_end_readiness_hint?: string;
-  financial_year_readiness?: AccountingBridgePeriodReadiness | null;
-  accounting_period_readiness?: AccountingBridgePeriodReadiness | null;
-  results: AccountingBridgeReconciliationRow[];
+export type AccountingBridgeReconciliationFilters = {
+  financial_year?: string;
+  accounting_period?: string;
+  status?: string;
+  event_key?: string;
+  module?: string;
+  source_model?: string;
+  vendor?: string;
+  customer?: string;
 };
 
-export type AccountingBridgeReconciliationFilters = { module?: string; event_key?: string; date_from?: string; date_to?: string; status?: string; customer?: string; vendor?: string; partner?: string; financial_year?: string; accounting_period?: string; source_model?: string; source_type?: string; account?: string };
-
-function toQuery(filters?: AccountingBridgeReconciliationFilters): string {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(filters ?? {})) if (value !== undefined && value !== null && String(value).trim() !== "") search.set(key, String(value));
-  const query = search.toString();
-  return query ? `?${query}` : "";
+export function getAccountingBridgeReconciliation(filters: AccountingBridgeReconciliationFilters = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, String(value));
+  });
+  const query = params.toString();
+  return request<AccountingBridgeReconciliationPayload>(`/admin/accounting/bridge-reconciliation/${query ? `?${query}` : ""}`);
 }
 
-export function getAccountingBridgeReconciliation(filters?: AccountingBridgeReconciliationFilters) {
-  return request<AccountingBridgeReconciliationPayload>(`/admin/accounting/bridge-reconciliation/${toQuery(filters)}`);
-}
+export type AccountingBridgeReconciliationPayload = {
+  summary: AccountingBridgeReconciliationSummary;
+  period_readiness?: AccountingBridgePeriodReadiness;
+  results: AccountingBridgeReconciliationRow[];
+};
 
 export function previewBridgeCandidate(candidateId: string) {
   return request<BridgePostingPreview>(`/admin/accounting/bridge-reconciliation/candidates/${encodeURIComponent(candidateId)}/preview/`);
 }
 
-export function postBridgeCandidate(candidateId: string, payload: { idempotency_key: string; confirm?: boolean; confirm_text?: string; posting_note?: string }) {
-  return request<BridgePostResult>(`/admin/accounting/bridge-reconciliation/candidates/${encodeURIComponent(candidateId)}/post/`, { method: "POST", body: JSON.stringify(payload) });
+export function postBridgeCandidate(candidateId: string, payload: { idempotency_key: string; confirm: boolean; posting_note?: string }) {
+  return request<BridgePostResult>(`/admin/accounting/bridge-reconciliation/candidates/${encodeURIComponent(candidateId)}/post/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
-export function previewBridgeCandidateBatch(candidate_ids: string[]) {
-  return request<BridgeBatchPreviewResult>("/admin/accounting/bridge-reconciliation/batch-preview/", { method: "POST", body: JSON.stringify({ candidate_ids }) });
+export function previewBridgeCandidateBatch(candidateIds: string[]) {
+  return request<BridgeBatchPreviewResult>("/admin/accounting/bridge-reconciliation/batch-preview/", {
+    method: "POST",
+    body: JSON.stringify({ candidate_ids: candidateIds }),
+  });
 }
 
-export function postBridgeCandidateBatch(payload: { candidate_ids: string[]; idempotency_keys: Record<string, string>; confirm?: boolean; confirm_text?: string; posting_note?: string }) {
-  return request<BridgeBatchPostResult>("/admin/accounting/bridge-reconciliation/batch-post/", { method: "POST", body: JSON.stringify(payload) });
+export function postBridgeCandidateBatch(payload: { candidate_ids: string[]; idempotency_keys: Record<string, string>; confirm: boolean; posting_note?: string }) {
+  return request<BridgeBatchPostResult>("/admin/accounting/bridge-reconciliation/batch-post/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
-
-export const batchPreviewBridgeCandidates = previewBridgeCandidateBatch;
-export const batchPostBridgeCandidates = postBridgeCandidateBatch;
 
 export function verifyBridgeReconciliationItem(itemId: number, payload: { note?: string; run_id?: number | null }) {
-  return request<ReconciliationVerificationResult>(`/admin/accounting/bridge-reconciliation/items/${itemId}/verify/`, { method: "POST", body: JSON.stringify(payload) });
+  return request<ReconciliationVerificationResult>(`/admin/accounting/bridge-reconciliation/items/${itemId}/verify/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
