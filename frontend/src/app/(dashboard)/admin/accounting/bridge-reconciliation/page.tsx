@@ -77,7 +77,7 @@ function statusClass(status: string): string {
   if (["RECONCILED", "POSTED", "POSTABLE", "READY"].includes(value)) return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (["READY_UNPOSTED", "POSTED_UNVERIFIED"].includes(value)) return "border-blue-200 bg-blue-50 text-blue-900";
   if (value.startsWith("BLOCKED")) return "border-amber-200 bg-amber-50 text-amber-950";
-  if (["EXCEPTION", "UNSUPPORTED", "UNSUPPORTED_SOURCE", "DEFERRED", "SKIPPED_NOT_APPLICABLE"].includes(value)) return "border-red-200 bg-red-50 text-red-900";
+  if (["EXCEPTION", "UNSUPPORTED", "UNSUPPORTED_SOURCE", "UNSUPPORTED_BOUNDARY", "DEFERRED", "SOURCE_CONTRACT_ONLY", "SKIPPED_NOT_APPLICABLE"].includes(value)) return "border-red-200 bg-red-50 text-red-900";
   return "border-slate-200 bg-slate-50 text-slate-900";
 }
 
@@ -128,6 +128,51 @@ function actionCopy(row: AccountingBridgeReconciliationRow): string {
   return row.operator_action || row.recommended_action || "Review source readiness before posting.";
 }
 
+function inventoryActivityCount(item: PhaseFSourceInventoryItem): number {
+  return Object.values(item.counts ?? {}).reduce((total, value) => total + Number(value ?? 0), 0);
+}
+
+function inventoryDisplayStatus(item: PhaseFSourceInventoryItem): string {
+  const status = String(item.status || "UNKNOWN").toUpperCase();
+  if (status === "UNSUPPORTED") return "UNSUPPORTED_BOUNDARY";
+  if (status === "DEFERRED") return "SOURCE_CONTRACT_ONLY";
+  if (inventoryActivityCount(item) === 0) return "NO_CURRENT_ROWS";
+  return status;
+}
+
+function inventoryActionLinks(item: PhaseFSourceInventoryItem): BridgeActionLink[] {
+  const displayStatus = inventoryDisplayStatus(item);
+  if (["NO_CURRENT_ROWS", "SOURCE_CONTRACT_ONLY", "UNSUPPORTED_BOUNDARY"].includes(displayStatus)) return [];
+  return item.action_links ?? [];
+}
+
+function inventoryActionText(item: PhaseFSourceInventoryItem): string {
+  const displayStatus = inventoryDisplayStatus(item);
+  if (displayStatus === "NO_CURRENT_ROWS") return "No current source rows from backend payload.";
+  if (displayStatus === "SOURCE_CONTRACT_ONLY") return "Source-contract boundary. Not postable here.";
+  if (displayStatus === "UNSUPPORTED_BOUNDARY") return "Unsupported boundary. No posting workflow exists.";
+  return "Open only the relevant setup or review action.";
+}
+
+function workflowDisplayStatus(workflow: ProductionAccountingValidationWorkflow): string {
+  const status = String(workflow.status || "UNKNOWN").toUpperCase();
+  const rowCount = Number(workflow.current_row_count ?? 0);
+  const eventKey = String(workflow.event_key || "");
+  if (workflow.source_model === "WinnerHistory") return "VALIDATION_ONLY";
+  if (workflow.source_model === "StaffAdvance") return "UNSUPPORTED_BOUNDARY";
+  if (eventKey === "ADVANCE_ALLOCATION") return status;
+  if (rowCount === 0 && eventKey.endsWith("_blockers")) return "NO_CURRENT_BLOCKERS";
+  if (rowCount === 0 && eventKey === "posted_unverified_review") return "NO_CURRENT_POSTED_UNVERIFIED";
+  if (rowCount === 0 && String(workflow.expected_candidate_status || "").includes("READY_UNPOSTED")) return "NO_CURRENT_ROWS";
+  return status;
+}
+
+function workflowActionLinks(workflow: ProductionAccountingValidationWorkflow): BridgeActionLink[] {
+  const displayStatus = workflowDisplayStatus(workflow);
+  if (displayStatus.startsWith("NO_CURRENT") || displayStatus === "UNSUPPORTED_BOUNDARY") return [];
+  return workflow.expected_action ? [workflow.expected_action] : [];
+}
+
 function SummaryCard({ label, value, tone = "border-blue-200 bg-blue-50 text-blue-900" }: { label: string; value: number | string; tone?: string }) {
   return (
     <div className={cx("rounded-2xl border p-4 shadow-sm", tone)}>
@@ -141,22 +186,16 @@ function StatusBadge({ value }: { value: string }) {
   return <span className={cx("inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusClass(value))}>{value}</span>;
 }
 
-function ActionLinks({ links }: { links?: BridgeActionLink[] }) {
-  const visibleLinks = (links ?? []).filter((link) => link.label && !link.disabled).slice(0, 3);
-  if (!visibleLinks.length) return <span className="text-xs text-muted-foreground">No setup link</span>;
+function ActionLinks({ links, emptyText = "No current action" }: { links?: BridgeActionLink[]; emptyText?: string }) {
+  const visibleLinks = (links ?? []).filter((link) => link.label && !link.disabled && link.href).slice(0, 3);
+  if (!visibleLinks.length) return <span className="text-xs text-muted-foreground">{emptyText}</span>;
   return (
     <div className="flex flex-wrap gap-2">
-      {visibleLinks.map((link, index) =>
-        link.href ? (
-          <Link key={`${link.key ?? link.type ?? link.label}-${index}`} href={link.href} className="rounded-full border px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50">
-            {link.label}
-          </Link>
-        ) : (
-          <span key={`${link.key ?? link.type ?? link.label}-${index}`} className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">
-            {link.label}
-          </span>
-        ),
-      )}
+      {visibleLinks.map((link, index) => (
+        <Link key={`${link.key ?? link.type ?? link.label}-${index}`} href={String(link.href)} className="rounded-full border px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+          {link.label}
+        </Link>
+      ))}
     </div>
   );
 }
@@ -292,7 +331,7 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">Phase F Control Tower</h2>
-        <p className="text-sm text-muted-foreground">Read-only source inventory and readiness summary. Posting remains row-level, explicit, and admin-controlled.</p>
+        <p className="text-sm text-muted-foreground">Read-only source inventory and readiness summary. Empty rows are setup inventory only; they are not posting candidates.</p>
       </div>
       <div className="mb-4 grid gap-3 lg:grid-cols-[280px_1fr]">
         <div className={cx("rounded-xl border p-4", statusClass(readinessState))}>
@@ -318,19 +357,23 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
           <div key={domain} className="overflow-x-auto rounded-xl border border-border bg-background">
             <table className="min-w-full divide-y divide-border text-sm">
               <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="px-4 py-3" colSpan={5}>{domain}</th></tr>
-                <tr><th className="px-4 py-3">Phase</th><th className="px-4 py-3">Source</th><th className="px-4 py-3">Events</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Setup / review</th></tr>
+                <tr><th className="px-4 py-3" colSpan={6}>{domain}</th></tr>
+                <tr><th className="px-4 py-3">Phase</th><th className="px-4 py-3">Source</th><th className="px-4 py-3">Events</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">State</th><th className="px-4 py-3">Setup / review</th></tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {items.map((item) => (
-                  <tr key={`${item.phase}-${item.source_model}-${item.event_keys.join("-")}`} className="align-top">
-                    <td className="px-4 py-3 font-semibold">{item.phase}</td>
-                    <td className="px-4 py-3"><div className="font-medium">{modelLabel(item.source_model)}</div><div className="text-xs text-muted-foreground">{item.source_owner}</div></td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{item.event_keys.join(", ")}</td>
-                    <td className="px-4 py-3"><StatusBadge value={item.status} /></td>
-                    <td className="px-4 py-3"><ActionLinks links={item.action_links} /></td>
-                  </tr>
-                ))}
+                {items.map((item) => {
+                  const displayStatus = inventoryDisplayStatus(item);
+                  return (
+                    <tr key={`${item.phase}-${item.source_model}-${item.event_keys.join("-")}`} className="align-top">
+                      <td className="px-4 py-3 font-semibold">{item.phase}</td>
+                      <td className="px-4 py-3"><div className="font-medium">{modelLabel(item.source_model)}</div><div className="text-xs text-muted-foreground">{item.source_owner}</div></td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{item.event_keys.join(", ")}</td>
+                      <td className="px-4 py-3"><StatusBadge value={displayStatus} /></td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{inventoryActionText(item)}</td>
+                      <td className="px-4 py-3"><ActionLinks links={inventoryActionLinks(item)} emptyText="No current action" /></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -368,15 +411,18 @@ function ProductionValidation({ payload }: { payload: AccountingBridgeReconcilia
               <tr><th className="px-4 py-3">Workflow</th><th className="px-4 py-3">Source / event</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Rows</th><th className="px-4 py-3">Next action</th></tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {workflows.map((workflow: ProductionAccountingValidationWorkflow) => (
-                <tr key={`${workflow.domain}-${workflow.workflow}-${workflow.event_key}`} className="align-top">
-                  <td className="px-4 py-3 font-medium">{workflow.workflow}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{modelLabel(workflow.source_model)}<br />{workflow.event_key}</td>
-                  <td className="px-4 py-3"><StatusBadge value={workflow.status} /></td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">Rows {workflow.current_row_count ?? 0} · Posted unverified {workflow.posted_unverified_count ?? 0} · Reconciled {workflow.reconciled_count ?? 0}</td>
-                  <td className="px-4 py-3"><ActionLinks links={workflow.expected_action ? [workflow.expected_action] : []} /></td>
-                </tr>
-              ))}
+              {workflows.map((workflow: ProductionAccountingValidationWorkflow) => {
+                const displayStatus = workflowDisplayStatus(workflow);
+                return (
+                  <tr key={`${workflow.domain}-${workflow.workflow}-${workflow.event_key}`} className="align-top">
+                    <td className="px-4 py-3 font-medium">{workflow.workflow}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{modelLabel(workflow.source_model)}<br />{workflow.event_key}</td>
+                    <td className="px-4 py-3"><StatusBadge value={displayStatus} /></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">Rows {workflow.current_row_count ?? 0} · Posted unverified {workflow.posted_unverified_count ?? 0} · Reconciled {workflow.reconciled_count ?? 0}</td>
+                    <td className="px-4 py-3"><ActionLinks links={workflowActionLinks(workflow)} emptyText="No current action" /></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
