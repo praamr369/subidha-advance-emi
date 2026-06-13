@@ -286,6 +286,7 @@ class AdminFinanceDepositRefundRecordView(APIView):
         subscription_id = int(request.data.get("subscription_id") or 0)
         amount = request.data.get("amount")
         approval_transaction_id = request.data.get("approval_transaction_id")
+        finance_account_id = request.data.get("finance_account_id")
         subscription = Subscription.objects.filter(pk=subscription_id).first()
         if subscription is None:
             return Response({"detail": "Subscription not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -295,15 +296,24 @@ class AdminFinanceDepositRefundRecordView(APIView):
                 amount=amount,
                 performed_by=request.user,
                 approval_transaction_id=int(approval_transaction_id) if str(approval_transaction_id or "").isdigit() else None,
+                reference_no=(request.data.get("reference_no") or "").strip(),
+                finance_account_id=int(finance_account_id) if str(finance_account_id or "").isdigit() else None,
+                payment_method=(request.data.get("payment_method") or "CASH").strip().upper(),
+                payment_date=request.data.get("payment_date") or None,
+                idempotency_key=(request.data.get("idempotency_key") or "").strip(),
             )
         except Exception as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        tx = getattr(demand, "_deposit_source_transaction", None)
         return Response(
             {
                 "detail": "Deposit refund recorded.",
                 "subscription_id": subscription.id,
                 "reference_key": demand.reference_key,
                 "refundable_amount": f"{demand.refundable_amount:.2f}",
+                "deposit_source_transaction_id": getattr(tx, "id", None),
+                "deposit_source_reference": getattr(tx, "transaction_number", ""),
+                "deposit_source_type": getattr(tx, "transaction_type", ""),
             }
         )
 

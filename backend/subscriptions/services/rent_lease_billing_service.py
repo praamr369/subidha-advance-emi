@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
 
@@ -30,8 +30,6 @@ from subscriptions.models import (
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.rent_lease_finance_sync_service import (
     sync_damage_deduction_income,
-    sync_deposit_refund_liability_reduction,
-    sync_security_deposit_liability,
 )
 
 
@@ -85,6 +83,67 @@ def _demand_tax_snapshot(*, subscription: Subscription, document_date: date, doc
         party_id=subscription.customer_id,
         product_id=subscription.product_id,
     )
+
+
+def _normal_reference(value: str | None) -> str:
+    return (value or "").strip().upper()
+
+
+def _normal_method(value: str | None) -> str:
+    return (value or "CASH").strip().upper()
+
+
+def _payment_date(value):
+    return value or timezone.localdate()
+
+
+def _find_existing_deposit_source(
+    *,
+    subscription: Subscription,
+    transaction_type: str,
+    amount_q: Decimal,
+    payment_method: str,
+    finance_account_id,
+    transaction_date,
+    reference_no: str = "",
+    idempotency_key: str = "",
+    demand_id=None,
+) -> RentLeaseDepositTransaction | None:
+    normalized_reference = _normal_reference(reference_no)
+    normalized_idempotency = (idempotency_key or "").strip()
+    if not normalized_reference and not normalized_idempotency:
+        return None
+
+    qs = RentLeaseDepositTransaction.objects.select_related("demand", "subscription").filter(
+        status="ACTIVE",
+        transaction_type=transaction_type,
+    )
+    existing = None
+    if normalized_idempotency:
+        existing = qs.filter(idempotency_key=normalized_idempotency).first()
+    if existing is None and normalized_reference:
+        existing = qs.filter(external_reference_no=normalized_reference).first()
+    if existing is None:
+        return None
+
+    errors = {}
+    if existing.subscription_id != subscription.id:
+        errors["subscription"] = "Existing deposit source evidence belongs to another subscription."
+    if existing.plan_type != subscription.plan_type:
+        errors["plan_type"] = "Existing deposit source evidence has a different plan type."
+    if q2(existing.amount) != amount_q:
+        errors["amount"] = "Existing deposit source evidence has a different amount."
+    if existing.payment_method != payment_method:
+        errors["payment_method"] = "Existing deposit source evidence has a different payment method."
+    if finance_account_id and existing.finance_account_id != int(finance_account_id):
+        errors["finance_account"] = "Existing deposit source evidence has a different finance account."
+    if transaction_date and existing.transaction_date != transaction_date:
+        errors["transaction_date"] = "Existing deposit source evidence has a different transaction date."
+    if demand_id is not None and existing.demand_id != int(demand_id):
+        errors["demand"] = "Existing deposit source evidence belongs to another demand."
+    if errors:
+        raise ValidationError(errors)
+    return existing
 
 
 @transaction.atomic
@@ -297,11 +356,6 @@ def collect_security_deposit(
             "amount": str(amount_q),
         },
     )
-    sync_security_deposit_liability(
-        subscription=subscription,
-        amount=amount_q,
-        performed_by=performed_by,
-    )
     return demand
 
 
@@ -402,13 +456,41 @@ def approve_deposit_refund(
 
 @transaction.atomic
 def record_deposit_refund(
-    *, subscription: Subscription, amount: Decimal, performed_by=None, approval_transaction_id: int | None = None
+    *,
+    subscription: Subscription,
+    amount: Decimal,
+    performed_by=None,
+    approval_transaction_id: int | None = None,
+    reference_no: str = "",
+    finance_account_id=None,
+    payment_method: str = "",
+    payment_date=None,
+    idempotency_key: str = "",
 ) -> RentLeaseBillingDemand:
     demand = ensure_security_deposit_demand(subscription=subscription, performed_by=performed_by)
     profile = _require_rent_lease_profile(subscription)
     amount_q = q2(Decimal(str(amount or MONEY_ZERO)))
     if amount_q <= MONEY_ZERO:
         raise ValidationError({"amount": "Refund amount must be greater than zero."})
+    resolved_payment_method = _normal_method(payment_method)
+    resolved_payment_date = _payment_date(payment_date)
+    source_enabled = bool(finance_account_id)
+    if source_enabled:
+        existing = _find_existing_deposit_source(
+            subscription=subscription,
+            transaction_type=RentLeaseDepositTransactionType.DEPOSIT_REFUND,
+            amount_q=amount_q,
+            payment_method=resolved_payment_method,
+            finance_account_id=finance_account_id,
+            transaction_date=resolved_payment_date,
+            reference_no=reference_no,
+            idempotency_key=idempotency_key,
+            demand_id=demand.id,
+        )
+        if existing is not None:
+            setattr(demand, "_deposit_source_transaction", existing)
+            setattr(demand, "_deposit_source_transaction_created", False)
+            return demand
     if amount_q > demand.refundable_amount:
         raise ValidationError({"amount": "Refund cannot exceed refundable deposit."})
 
@@ -425,25 +507,73 @@ def record_deposit_refund(
     )
     profile.save(update_fields=["refund_amount", "refundable_security_deposit", "refund_status", "updated_at"])
 
-    RentLeaseDepositTransaction.objects.create(
-        subscription=subscription,
-        demand=demand,
-        transaction_type=RentLeaseDepositTransactionType.REFUNDED,
-        amount=amount_q,
-        performed_by=performed_by,
-        metadata={"approval_transaction_id": approval_transaction_id},
-    )
+    tx_defaults = {
+        "subscription": subscription,
+        "demand": demand,
+        "amount": amount_q,
+        "performed_by": performed_by,
+        "metadata": {"approval_transaction_id": approval_transaction_id},
+    }
+    if source_enabled:
+        tx_defaults.update(
+            {
+                "customer": subscription.customer,
+                "plan_type": subscription.plan_type,
+                "transaction_type": RentLeaseDepositTransactionType.DEPOSIT_REFUND,
+                "transaction_date": resolved_payment_date,
+                "payment_method": resolved_payment_method,
+                "finance_account_id": finance_account_id,
+                "external_reference_no": _normal_reference(reference_no),
+                "idempotency_key": (idempotency_key or "").strip(),
+                "created_by": performed_by,
+                "metadata": {
+                    "approval_transaction_id": approval_transaction_id,
+                    "reference_no": (reference_no or "").strip(),
+                    "finance_account_id": finance_account_id,
+                    "payment_method": resolved_payment_method,
+                    "payment_date": resolved_payment_date.isoformat() if hasattr(resolved_payment_date, "isoformat") else None,
+                    "amount": str(amount_q),
+                    "demand_id": demand.id,
+                    "demand_type": demand.demand_type,
+                    "reference_key": demand.reference_key,
+                },
+            }
+        )
+    else:
+        tx_defaults["transaction_type"] = RentLeaseDepositTransactionType.REFUNDED
+    try:
+        tx = RentLeaseDepositTransaction.objects.create(**tx_defaults)
+        created = True
+    except IntegrityError:
+        if not source_enabled:
+            raise
+        tx = _find_existing_deposit_source(
+            subscription=subscription,
+            transaction_type=RentLeaseDepositTransactionType.DEPOSIT_REFUND,
+            amount_q=amount_q,
+            payment_method=resolved_payment_method,
+            finance_account_id=finance_account_id,
+            transaction_date=resolved_payment_date,
+            reference_no=reference_no,
+            idempotency_key=idempotency_key,
+            demand_id=demand.id,
+        )
+        if tx is None:
+            raise
+        created = False
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=subscription,
         performed_by=performed_by,
-        metadata={"event": "RENT_LEASE_DEPOSIT_REFUNDED", "amount": str(amount_q)},
+        metadata={
+            "event": "RENT_LEASE_DEPOSIT_REFUNDED",
+            "amount": str(amount_q),
+            "deposit_source_transaction_id": tx.id,
+            "deposit_source_reference": tx.transaction_number,
+        },
     )
-    sync_deposit_refund_liability_reduction(
-        subscription=subscription,
-        amount=amount_q,
-        performed_by=performed_by,
-    )
+    setattr(demand, "_deposit_source_transaction", tx)
+    setattr(demand, "_deposit_source_transaction_created", created)
     return demand
 
 
@@ -455,7 +585,10 @@ def build_deposit_snapshot(*, subscription: Subscription) -> DepositSnapshot:
     refunded = (
         RentLeaseDepositTransaction.objects.filter(
             subscription=subscription,
-            transaction_type=RentLeaseDepositTransactionType.REFUNDED,
+            transaction_type__in=[
+                RentLeaseDepositTransactionType.REFUNDED,
+                RentLeaseDepositTransactionType.DEPOSIT_REFUND,
+            ],
         )
         .aggregate(total=Sum("amount"))
         .get("total")
@@ -490,6 +623,20 @@ def list_admin_deposit_register(*, subscription_id: int | None = None, limit: in
     if subscription_id:
         qs = qs.filter(subscription_id=subscription_id)
     rows = list(qs.order_by("-created_at", "-id")[:limit])
+    latest_sources = {}
+    for tx in (
+        RentLeaseDepositTransaction.objects.filter(
+            demand_id__in=[row.id for row in rows],
+            transaction_type__in=[
+                RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+                RentLeaseDepositTransactionType.DEPOSIT_REFUND,
+                RentLeaseDepositTransactionType.DEPOSIT_ADJUSTMENT,
+            ],
+        )
+        .select_related("finance_account")
+        .order_by("demand_id", "-transaction_date", "-created_at", "-id")
+    ):
+        latest_sources.setdefault(tx.demand_id, tx)
     return {
         "count": qs.count(),
         "results": [
@@ -508,6 +655,24 @@ def list_admin_deposit_register(*, subscription_id: int | None = None, limit: in
                 "deducted_amount": f"{q2(row.deducted_amount):.2f}",
                 "status": row.status,
                 "due_date": row.due_date,
+                "latest_transaction": (
+                    {
+                        "transaction_id": latest_sources[row.id].id,
+                        "transaction_number": latest_sources[row.id].transaction_number,
+                        "source_reference": latest_sources[row.id].transaction_number,
+                        "transaction_type": latest_sources[row.id].transaction_type,
+                        "amount": f"{q2(latest_sources[row.id].amount):.2f}",
+                        "reference_no": latest_sources[row.id].external_reference_no,
+                        "payment_method": latest_sources[row.id].payment_method,
+                        "payment_date": latest_sources[row.id].transaction_date,
+                        "finance_account_id": latest_sources[row.id].finance_account_id,
+                        "finance_account_name": getattr(latest_sources[row.id].finance_account, "name", None),
+                        "status": latest_sources[row.id].status,
+                        "created_at": latest_sources[row.id].created_at,
+                    }
+                    if row.id in latest_sources
+                    else None
+                ),
             }
             for row in rows
         ],

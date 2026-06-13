@@ -661,7 +661,7 @@ F15 safety boundary:
 - no payment/receipt/deposit/refund record creation
 - no auto-post, auto-reconcile, or auto-close
 
-F16 security deposit posting should not start until a concrete deposit receipt/refund source contract is defined separately from `RentLeaseDepositTransaction` history, or the existing transaction model is explicitly hardened as the authoritative deposit settlement source.
+F16 hardens `RentLeaseDepositTransaction` as the authoritative security-deposit receipt/refund source contract. Posting still must not start until F17/F18.
 
 ## Phase F15B/F15C — Rent/lease collection settlement closeout
 
@@ -677,3 +677,41 @@ F15C does not infer collection settlement from `RentLeaseBillingDemand.collected
 F15C preview is read-only. Posting is explicit, admin-only, idempotent, period-gated, numbering-gated, and reconciliation-pending. Posting creates accounting bridge evidence only and does not mutate `RentLeaseCollection`, `RentLeaseBillingDemand`, subscription, contract, customer, deposit, or finance-account records.
 
 Security deposit receipt/refund and customer advance posting remain separate future phases. F15C must not post deposits, refunds, advances, auto-post, auto-reconcile, or auto-close periods.
+
+## Phase F16 — Security deposit source contract
+
+F16 is source-contract only. It does not post accounting and does not create `JournalEntry`, `AccountingBridgePosting`, or `ReconciliationItem` rows.
+
+Authoritative source model:
+
+```text
+subscriptions.RentLeaseDepositTransaction
+```
+
+F16 source transaction types:
+
+```text
+DEPOSIT_RECEIPT
+DEPOSIT_REFUND
+DEPOSIT_ADJUSTMENT
+```
+
+Legacy transaction types such as `COLLECTED` and `REFUNDED` remain readable for historical compatibility, but new receipt/refund source evidence uses the F16 transaction types.
+
+The hardened source row preserves transaction number, external reference number, subscription, demand, customer, `plan_type`, amount, transaction date, payment method, finance account, status, idempotency key, creator, void/reversal fields, and metadata snapshot.
+
+F16 separation boundary:
+
+- Monthly rent/lease collection remains `RentLeaseCollection`.
+- Rent/lease revenue demand remains `RentLeaseBillingDemand`.
+- Security deposit receipt/refund source evidence is `RentLeaseDepositTransaction`.
+- Customer advance, direct-sale receipt, EMI payment, and customer refund remain separate sources.
+
+F16 must not auto-post, auto-reconcile, auto-close periods, mutate monthly collection evidence, treat deposits as rent/lease revenue, or treat deposits as customer advance.
+
+Deferred bridge shapes:
+
+```text
+F17 deposit receipt: Dr Cash / Bank / FinanceAccount, Cr Security Deposit Liability
+F18 deposit refund: Dr Security Deposit Liability, Cr Cash / Bank / FinanceAccount
+```

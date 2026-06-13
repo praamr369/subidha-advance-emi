@@ -24,7 +24,7 @@ import {
   type AdminDepositRow,
 } from "@/services/phase4-finance";
 
-const SOURCE_NOTE = "Security deposits are recorded against authoritative rent/lease demand records. Mapping readiness and posting mode are shown separately.";
+const SOURCE_NOTE = "Security deposits are recorded as concrete deposit source transactions. Mapping readiness is shown separately and bridge posting remains deferred.";
 const HISTORY_NOTE = "Refund actions do not rewrite historical collection, receipt, journal, settlement, or reconciliation records.";
 const MAPPING_NOTE = "Premade setup creates the required COA, Finance Account, and active rent/lease mapping. Manual override remains available for admin control.";
 const READY_NOTE = "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled.";
@@ -97,7 +97,15 @@ export default function AdminFinanceDepositsPage() {
   const [backendMappingFieldErrors, setBackendMappingFieldErrors] = useState<Record<string, string[]>>({});
   const [chartAccounts, setChartAccounts] = useState<Array<Record<string, unknown>>>([]);
   const [financeAccounts, setFinanceAccounts] = useState<Array<Record<string, unknown>>>([]);
-  const [form, setForm] = useState({ amount: "", reason: "", approval_transaction_id: "" });
+  const [form, setForm] = useState({
+    amount: "",
+    reason: "",
+    approval_transaction_id: "",
+    finance_account_id: "",
+    payment_method: "CASH",
+    payment_date: new Date().toISOString().slice(0, 10),
+    reference_no: "",
+  });
   const [mappingForm, setMappingForm] = useState({
     monthly_income_account_id: "",
     deposit_liability_account_id: "",
@@ -187,7 +195,7 @@ export default function AdminFinanceDepositsPage() {
   const validAmount = isPositive(form.amount);
   const canDeduct = Boolean(selected?.can_deduct && validAmount && form.reason.trim());
   const canApprove = Boolean(selected?.can_approve_refund && validAmount);
-  const canRecord = Boolean(selected?.can_record_refund && validAmount);
+  const canRecord = Boolean(selected?.can_record_refund && validAmount && form.finance_account_id);
   const accountById = useMemo(() => {
     const out = new Map<string, Record<string, unknown>>();
     chartAccounts.forEach((account) => out.set(String(account.id), account));
@@ -235,6 +243,11 @@ export default function AdminFinanceDepositsPage() {
           subscription_id: selected.subscription_id,
           amount: form.amount,
           approval_transaction_id: form.approval_transaction_id ? Number(form.approval_transaction_id) : undefined,
+          finance_account_id: Number(form.finance_account_id),
+          payment_method: form.payment_method,
+          payment_date: form.payment_date,
+          reference_no: form.reference_no,
+          idempotency_key: form.reference_no ? `DEPOSIT-REFUND:${form.reference_no}` : undefined,
         });
         setNotice("Deposit refund recorded and accounting bridge evaluated.");
       }
@@ -306,7 +319,7 @@ export default function AdminFinanceDepositsPage() {
         <Link href={ROUTES.admin.accountingSetup} className="rounded-xl border px-3 py-2 text-sm font-semibold">Accounting Setup</Link>
       </div>
 
-      <WorkspaceSection title="Deposit Register" description="Live rent/lease security deposit ledger from authoritative demand records.">
+      <WorkspaceSection title="Deposit Register" description="Live rent/lease security deposit ledger with latest concrete source evidence.">
         {rows.length === 0 ? <EmptyState title="No deposit rows" description="No rent/lease security deposit demands are available yet." /> : (
           <DataTableShell>
             <MobileSafeTable className="border-none bg-transparent">
@@ -331,7 +344,13 @@ export default function AdminFinanceDepositsPage() {
                       role="button"
                       onClick={() => {
                         setSelectedId(row.demand_id);
-                        setForm({ amount: "", reason: "", approval_transaction_id: "" });
+                        setForm((current) => ({
+                          ...current,
+                          amount: "",
+                          reason: "",
+                          approval_transaction_id: "",
+                          reference_no: "",
+                        }));
                       }}
                       className={`cursor-pointer border-t ${selectedId === row.demand_id ? "bg-muted/60" : "hover:bg-muted/40"}`}
                     >
@@ -373,6 +392,10 @@ export default function AdminFinanceDepositsPage() {
                 <div><dt className="text-muted-foreground">Held</dt><dd className="font-semibold">{money(selected.held_amount)}</dd></div>
                 <div><dt className="text-muted-foreground">Refundable</dt><dd className="font-semibold">{money(selected.refundable_amount)}</dd></div>
                 <div><dt className="text-muted-foreground">Deducted</dt><dd className="font-semibold">{money(selected.deducted_amount)}</dd></div>
+                <div><dt className="text-muted-foreground">Source ref</dt><dd className="font-semibold">{selected.latest_transaction?.source_reference || selected.latest_transaction?.transaction_number || "-"}</dd></div>
+                <div><dt className="text-muted-foreground">Source type</dt><dd className="font-semibold">{selected.latest_transaction?.transaction_type || "-"}</dd></div>
+                <div><dt className="text-muted-foreground">Method</dt><dd className="font-semibold">{selected.latest_transaction?.payment_method || "-"}</dd></div>
+                <div><dt className="text-muted-foreground">Finance account</dt><dd className="font-semibold">{selected.latest_transaction?.finance_account_name || selected.latest_transaction?.finance_account_id || "-"}</dd></div>
               </dl>
             </div>
             <div className="rounded-2xl border bg-card p-4">
@@ -381,6 +404,19 @@ export default function AdminFinanceDepositsPage() {
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Amount" value={form.amount} onChange={(e) => setForm((c) => ({ ...c, amount: e.target.value }))} />
                 <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Approval transaction ID" value={form.approval_transaction_id} onChange={(e) => setForm((c) => ({ ...c, approval_transaction_id: e.target.value }))} />
+                <select className="rounded-xl border px-3 py-2 text-sm" value={form.finance_account_id} onChange={(e) => setForm((c) => ({ ...c, finance_account_id: e.target.value }))}>
+                  <option value="">Refund finance account</option>
+                  {financeAccounts
+                    .filter(isSelectableSettlementFinanceAccount)
+                    .map((acc) => <option key={String(acc.id)} value={String(acc.id)}>{String(acc.name)} ({String(acc.kind)})</option>)}
+                </select>
+                <select className="rounded-xl border px-3 py-2 text-sm" value={form.payment_method} onChange={(e) => setForm((c) => ({ ...c, payment_method: e.target.value }))}>
+                  <option value="CASH">Cash</option>
+                  <option value="UPI">UPI</option>
+                  <option value="BANK">Bank</option>
+                </select>
+                <input className="rounded-xl border px-3 py-2 text-sm" type="date" value={form.payment_date} onChange={(e) => setForm((c) => ({ ...c, payment_date: e.target.value }))} />
+                <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Refund reference no." value={form.reference_no} onChange={(e) => setForm((c) => ({ ...c, reference_no: e.target.value }))} />
                 <input className="rounded-xl border px-3 py-2 text-sm md:col-span-2" placeholder="Reason (required for deduction)" value={form.reason} onChange={(e) => setForm((c) => ({ ...c, reason: e.target.value }))} />
               </div>
               <div className="mt-4 flex flex-wrap gap-2">

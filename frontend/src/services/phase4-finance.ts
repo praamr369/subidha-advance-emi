@@ -141,12 +141,17 @@ export type AdminDepositActionPosture = {
 
 export type AdminDepositLatestTransaction = {
   transaction_id?: number;
+  transaction_number?: string;
+  source_reference?: string;
   transaction_type?: string;
   amount?: Money;
   reason?: string;
   reference_no?: string;
   payment_method?: string;
   payment_date?: string | null;
+  finance_account_id?: number | null;
+  finance_account_name?: string | null;
+  status?: string;
   created_at?: string | null;
 };
 
@@ -201,8 +206,18 @@ export async function recordAdminDepositRefund(input: {
   subscription_id: number;
   amount: string | number;
   approval_transaction_id?: number;
+  finance_account_id?: number;
+  payment_method?: string;
+  payment_date?: string;
+  reference_no?: string;
+  idempotency_key?: string;
 }) {
-  return apiFetch<{ detail: string }>(`/admin/finance/deposits/refund/`, {
+  return apiFetch<{
+    detail: string;
+    deposit_source_transaction_id?: number | null;
+    deposit_source_reference?: string;
+    deposit_source_type?: string;
+  }>(`/admin/finance/deposits/refund/`, {
     method: "POST",
     body: JSON.stringify(input),
   });

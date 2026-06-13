@@ -167,15 +167,32 @@ def route_collection(
             "note": note or "",
         }
         if demand_type == RentLeaseDemandType.SECURITY_DEPOSIT:
-            demand = collect_security_deposit_with_metadata(**common_kwargs)
-            return {
+            demand = collect_security_deposit_with_metadata(
+                idempotency_key=idempotency_key or "",
+                **common_kwargs,
+            )
+            deposit_source = getattr(demand, "_deposit_source_transaction", None)
+            payload = {
                 "source_type": source_type,
-                "created": True,
+                "created": bool(getattr(demand, "_deposit_source_transaction_created", True)),
                 "subscription_id": subscription.id,
                 "demand_id": demand.id,
                 "demand_type": demand.demand_type,
+                "deposit_source_model": "subscriptions.RentLeaseDepositTransaction",
                 "message": "Security deposit collection recorded against the separate deposit source workflow.",
             }
+            if deposit_source is not None:
+                payload.update(
+                    {
+                        "deposit_source_transaction_id": deposit_source.id,
+                        "deposit_source_reference": deposit_source.transaction_number,
+                        "deposit_source_type": deposit_source.transaction_type,
+                        "deposit_source_status": deposit_source.status,
+                        "payment_method": deposit_source.payment_method,
+                        "finance_account_id": deposit_source.finance_account_id,
+                    }
+                )
+            return payload
         demand = collect_rent_lease_monthly_demand(
             demand_id=demand_id,
             idempotency_key=idempotency_key or "",

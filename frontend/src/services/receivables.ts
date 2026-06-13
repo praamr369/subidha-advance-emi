@@ -68,6 +68,14 @@ export type UnifiedReceivableResult = {
   latest_collection_date?: string | null;
   latest_collection_method?: string;
   latest_collection_finance_account_id?: number | null;
+  latest_deposit_source_id?: number | null;
+  latest_deposit_source_reference?: string;
+  latest_deposit_source_type?: string;
+  latest_deposit_source_amount?: string;
+  latest_deposit_source_date?: string | null;
+  latest_deposit_source_method?: string;
+  latest_deposit_source_finance_account_id?: number | null;
+  latest_deposit_source_status?: string;
   operational_state?: string;
   next_actions?: string[];
   blocking_reasons?: string[];
@@ -234,6 +242,17 @@ function normalizeReceivable(row: Record<string, unknown>): UnifiedReceivableRes
         : null,
     latest_collection_method: toStringValue(row.latest_collection_method),
     latest_collection_finance_account_id: toNumberOrNull(row.latest_collection_finance_account_id),
+    latest_deposit_source_id: toNumberOrNull(row.latest_deposit_source_id),
+    latest_deposit_source_reference: toStringValue(row.latest_deposit_source_reference),
+    latest_deposit_source_type: toStringValue(row.latest_deposit_source_type),
+    latest_deposit_source_amount: toMoneyString(row.latest_deposit_source_amount),
+    latest_deposit_source_date:
+      typeof row.latest_deposit_source_date === "string" || row.latest_deposit_source_date === null
+        ? row.latest_deposit_source_date
+        : null,
+    latest_deposit_source_method: toStringValue(row.latest_deposit_source_method),
+    latest_deposit_source_finance_account_id: toNumberOrNull(row.latest_deposit_source_finance_account_id),
+    latest_deposit_source_status: toStringValue(row.latest_deposit_source_status),
     operational_state: toStringValue(row.operational_state),
     next_actions: Array.isArray(row.next_actions) ? row.next_actions.map((item) => String(item)) : [],
     blocking_reasons: Array.isArray(row.blocking_reasons) ? row.blocking_reasons.map((item) => String(item)) : [],

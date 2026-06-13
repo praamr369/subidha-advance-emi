@@ -1980,12 +1980,31 @@ class RentLeaseBillingDemand(TimeStampedModel):
 class RentLeaseDepositTransactionType(models.TextChoices):
     DEMAND_CREATED = "DEMAND_CREATED", "Demand Created"
     COLLECTED = "COLLECTED", "Deposit Collected"
+    DEPOSIT_RECEIPT = "DEPOSIT_RECEIPT", "Deposit Receipt"
     REFUND_APPROVED = "REFUND_APPROVED", "Refund Approved"
     REFUNDED = "REFUNDED", "Refunded"
+    DEPOSIT_REFUND = "DEPOSIT_REFUND", "Deposit Refund"
     DEDUCTION = "DEDUCTION", "Deduction"
+    DEPOSIT_ADJUSTMENT = "DEPOSIT_ADJUSTMENT", "Deposit Adjustment"
+
+
+def generate_rent_lease_deposit_transaction_number() -> str:
+    return f"RLD-{timezone.now():%Y%m%d%H%M%S%f}-{uuid4().hex[:8].upper()}"
+
+
+class RentLeaseDepositTransactionStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Active"
+    VOIDED = "VOIDED", "Voided"
+    REVERSED = "REVERSED", "Reversed"
 
 
 class RentLeaseDepositTransaction(TimeStampedModel):
+    transaction_number = models.CharField(
+        max_length=64,
+        db_index=True,
+        default=generate_rent_lease_deposit_transaction_number,
+    )
+    external_reference_no = models.CharField(max_length=120, blank=True, default="", db_index=True)
     subscription = models.ForeignKey(
         Subscription,
         on_delete=models.PROTECT,
@@ -2005,12 +2024,48 @@ class RentLeaseDepositTransaction(TimeStampedModel):
         null=True,
         blank=True,
     )
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="rent_lease_deposit_transactions",
+        null=True,
+        blank=True,
+    )
+    plan_type = models.CharField(
+        max_length=10,
+        choices=PlanType.choices,
+        blank=True,
+        default="",
+        db_index=True,
+    )
     transaction_type = models.CharField(
         max_length=24,
         choices=RentLeaseDepositTransactionType.choices,
         db_index=True,
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    transaction_date = models.DateField(null=True, blank=True, db_index=True)
+    payment_method = models.CharField(
+        max_length=10,
+        choices=PaymentMethod.choices,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    finance_account = models.ForeignKey(
+        "accounting.FinanceAccount",
+        on_delete=models.PROTECT,
+        related_name="rent_lease_deposit_transactions",
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=RentLeaseDepositTransactionStatus.choices,
+        default=RentLeaseDepositTransactionStatus.ACTIVE,
+        db_index=True,
+    )
+    idempotency_key = models.CharField(max_length=160, blank=True, default="", db_index=True)
     reason = models.TextField(blank=True, default="")
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -2026,8 +2081,48 @@ class RentLeaseDepositTransaction(TimeStampedModel):
         blank=True,
         related_name="performed_deposit_transactions",
     )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_deposit_source_transactions",
+    )
     metadata = models.JSONField(default=dict, blank=True)
+    voided_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    voided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="voided_deposit_source_transactions",
+    )
+    void_reason = models.TextField(blank=True, default="")
+    reversal_reference = models.CharField(max_length=120, blank=True, default="", db_index=True)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    SOURCE_TRANSACTION_TYPES = (
+        RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+        RentLeaseDepositTransactionType.DEPOSIT_REFUND,
+        RentLeaseDepositTransactionType.DEPOSIT_ADJUSTMENT,
+    )
+
+    IMMUTABLE_FIELDS = (
+        "transaction_number",
+        "external_reference_no",
+        "subscription_id",
+        "demand_id",
+        "inspection_id",
+        "customer_id",
+        "plan_type",
+        "transaction_type",
+        "amount",
+        "transaction_date",
+        "payment_method",
+        "finance_account_id",
+        "idempotency_key",
+        "created_by_id",
+    )
 
     class Meta:
         db_table = "rent_lease_deposit_transactions"
@@ -2035,11 +2130,33 @@ class RentLeaseDepositTransaction(TimeStampedModel):
         indexes = [
             models.Index(fields=["subscription", "transaction_type"]),
             models.Index(fields=["created_at"]),
+            models.Index(fields=["customer", "transaction_date"]),
+            models.Index(fields=["plan_type", "status", "transaction_date"]),
+            models.Index(fields=["finance_account", "transaction_date"]),
         ]
         constraints = [
             models.CheckConstraint(
                 condition=Q(amount__gte=MONEY_ZERO),
                 name="chk_deposit_transaction_amount_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(plan_type="") | Q(plan_type=PlanType.RENT) | Q(plan_type=PlanType.LEASE),
+                name="chk_deposit_transaction_plan_type",
+            ),
+            models.UniqueConstraint(
+                fields=["transaction_number"],
+                condition=~Q(transaction_number=""),
+                name="uq_deposit_transaction_number",
+            ),
+            models.UniqueConstraint(
+                fields=["idempotency_key"],
+                condition=~Q(idempotency_key=""),
+                name="uq_deposit_transaction_idempotency_key",
+            ),
+            models.UniqueConstraint(
+                fields=["external_reference_no"],
+                condition=~Q(external_reference_no=""),
+                name="uq_deposit_transaction_external_ref",
             ),
         ]
 
@@ -2047,15 +2164,81 @@ class RentLeaseDepositTransaction(TimeStampedModel):
         errors = {}
         if self.subscription_id and self.subscription.plan_type not in {PlanType.RENT, PlanType.LEASE}:
             errors["subscription"] = "Deposit transactions are supported only for RENT/LEASE subscriptions."
+        if self.subscription_id:
+            if self.plan_type and self.subscription.plan_type != self.plan_type:
+                errors["subscription"] = "Subscription plan type mismatch."
+            if self.customer_id and self.subscription.customer_id != self.customer_id:
+                errors["customer"] = "Customer mismatch."
+        if self.demand_id:
+            if self.subscription_id and self.demand.subscription_id != self.subscription_id:
+                errors["demand"] = "Demand subscription mismatch."
+            if self.demand.demand_type != RentLeaseDemandType.SECURITY_DEPOSIT:
+                errors["demand"] = "Deposit transaction must link to a security deposit demand."
         if self.amount < MONEY_ZERO:
             errors["amount"] = "Amount cannot be negative."
-        if self.transaction_type == RentLeaseDepositTransactionType.DEDUCTION and not (self.reason or "").strip():
+        if self.transaction_type in {
+            RentLeaseDepositTransactionType.DEDUCTION,
+            RentLeaseDepositTransactionType.DEPOSIT_ADJUSTMENT,
+        } and not (self.reason or "").strip():
             errors["reason"] = "Deduction requires a reason."
+        if self.transaction_type in self.SOURCE_TRANSACTION_TYPES:
+            if self.amount <= MONEY_ZERO:
+                errors["amount"] = "Source transaction amount must be greater than zero."
+            if not self.transaction_date:
+                errors["transaction_date"] = "Source transaction date is required."
+            if not self.customer_id:
+                errors["customer"] = "Customer is required for deposit source evidence."
+            if not self.plan_type:
+                errors["plan_type"] = "Plan type is required for deposit source evidence."
+            if self.transaction_type in {
+                RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+                RentLeaseDepositTransactionType.DEPOSIT_REFUND,
+            }:
+                if not self.finance_account_id:
+                    errors["finance_account"] = "Finance account is required for deposit source evidence."
+                if not self.payment_method:
+                    errors["payment_method"] = "Payment method is required for deposit source evidence."
+        if self.status in {
+            RentLeaseDepositTransactionStatus.VOIDED,
+            RentLeaseDepositTransactionStatus.REVERSED,
+        }:
+            if not self.voided_at:
+                errors["voided_at"] = "Timestamp is required."
+            if not (self.void_reason or "").strip():
+                errors["void_reason"] = "Reason is required."
+        if self.pk:
+            existing = self.__class__.objects.filter(pk=self.pk).first()
+            if existing and existing.transaction_type in self.SOURCE_TRANSACTION_TYPES:
+                for field in self.IMMUTABLE_FIELDS:
+                    old_value = getattr(existing, field)
+                    new_value = getattr(self, field)
+                    if field == "amount":
+                        old_value = q2(Decimal(str(old_value or MONEY_ZERO)))
+                        new_value = q2(Decimal(str(new_value or MONEY_ZERO)))
+                    if old_value != new_value:
+                        errors[field.removesuffix("_id")] = "Deposit source evidence is immutable once created."
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        self.transaction_number = (self.transaction_number or generate_rent_lease_deposit_transaction_number()).strip().upper()
+        self.external_reference_no = (self.external_reference_no or "").strip().upper()
+        self.plan_type = (self.plan_type or "").strip().upper()
+        self.transaction_type = (self.transaction_type or "").strip().upper()
+        self.payment_method = (self.payment_method or "").strip().upper()
+        self.status = (self.status or RentLeaseDepositTransactionStatus.ACTIVE).strip().upper()
+        self.idempotency_key = (self.idempotency_key or "").strip()
         self.reason = (self.reason or "").strip()
+        self.void_reason = (self.void_reason or "").strip()
+        self.reversal_reference = (self.reversal_reference or "").strip().upper()
+        self.amount = q2(Decimal(str(self.amount or MONEY_ZERO)))
+        if self.subscription_id:
+            if not self.customer_id:
+                self.customer_id = self.subscription.customer_id
+            if not self.plan_type:
+                self.plan_type = self.subscription.plan_type
+        if self.transaction_type in self.SOURCE_TRANSACTION_TYPES and not self.transaction_date:
+            self.transaction_date = timezone.localdate()
         self.full_clean()
         super().save(*args, **kwargs)
 

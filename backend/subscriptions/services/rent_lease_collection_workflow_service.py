@@ -37,7 +37,6 @@ from subscriptions.services.rent_lease_billing_service import (
 )
 from subscriptions.services.rent_lease_finance_sync_service import (
     sync_rent_lease_monthly_income,
-    sync_security_deposit_liability,
 )
 
 COLLECT_RENT_LEASE = "COLLECT_RENT_LEASE"
@@ -174,10 +173,73 @@ def _find_existing_monthly_collection(
     return existing
 
 
+def _find_existing_deposit_transaction(
+    *,
+    subscription: Subscription,
+    transaction_type: str,
+    amount_q: Decimal,
+    payment_method: str,
+    finance_account_id,
+    transaction_date=None,
+    reference_no: str = "",
+    idempotency_key: str = "",
+    demand_id=None,
+) -> RentLeaseDepositTransaction | None:
+    normalized_reference = _normal_reference(reference_no)
+    normalized_idempotency = (idempotency_key or "").strip()
+    if not normalized_reference and not normalized_idempotency:
+        return None
+
+    qs = RentLeaseDepositTransaction.objects.select_related("demand", "subscription").filter(
+        status="ACTIVE",
+        transaction_type=transaction_type,
+    )
+    existing = None
+    if normalized_idempotency:
+        existing = qs.filter(idempotency_key=normalized_idempotency).first()
+    if existing is None and normalized_reference:
+        existing = qs.filter(external_reference_no=normalized_reference).first()
+    if existing is None:
+        return None
+
+    errors = {}
+    if existing.subscription_id != subscription.id:
+        errors["subscription"] = "Existing deposit source evidence belongs to another subscription."
+    if existing.plan_type != subscription.plan_type:
+        errors["plan_type"] = "Existing deposit source evidence has a different plan type."
+    if _money(existing.amount) != amount_q:
+        errors["amount"] = "Existing deposit source evidence has a different amount."
+    if existing.payment_method != payment_method:
+        errors["payment_method"] = "Existing deposit source evidence has a different payment method."
+    if finance_account_id and existing.finance_account_id != int(finance_account_id):
+        errors["finance_account"] = "Existing deposit source evidence has a different finance account."
+    if transaction_date and existing.transaction_date != transaction_date:
+        errors["transaction_date"] = "Existing deposit source evidence has a different transaction date."
+    if demand_id is not None and existing.demand_id != int(demand_id):
+        errors["demand"] = "Existing deposit source evidence belongs to another demand."
+    if errors:
+        raise ValidationError(errors)
+    return existing
+
+
 def _latest_monthly_collection(subscription: Subscription) -> RentLeaseCollection | None:
     return (
         RentLeaseCollection.objects.filter(subscription=subscription)
         .order_by("-payment_date", "-created_at", "-id")
+        .first()
+    )
+
+
+def _latest_deposit_source(subscription: Subscription) -> RentLeaseDepositTransaction | None:
+    return (
+        RentLeaseDepositTransaction.objects.filter(
+            subscription=subscription,
+            transaction_type__in=[
+                RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+                RentLeaseDepositTransactionType.DEPOSIT_REFUND,
+            ],
+        )
+        .order_by("-transaction_date", "-created_at", "-id")
         .first()
     )
 
@@ -202,6 +264,30 @@ def _source_payload(collection: RentLeaseCollection | None) -> dict[str, object]
     }
 
 
+def _deposit_source_payload(tx: RentLeaseDepositTransaction | None) -> dict[str, object]:
+    if tx is None:
+        return {
+            "latest_deposit_source_id": None,
+            "latest_deposit_source_reference": "",
+            "latest_deposit_source_type": "",
+            "latest_deposit_source_amount": "0.00",
+            "latest_deposit_source_date": None,
+            "latest_deposit_source_method": "",
+            "latest_deposit_source_finance_account_id": None,
+            "latest_deposit_source_status": "",
+        }
+    return {
+        "latest_deposit_source_id": tx.id,
+        "latest_deposit_source_reference": tx.transaction_number,
+        "latest_deposit_source_type": tx.transaction_type,
+        "latest_deposit_source_amount": _money_string(tx.amount),
+        "latest_deposit_source_date": tx.transaction_date,
+        "latest_deposit_source_method": tx.payment_method,
+        "latest_deposit_source_finance_account_id": tx.finance_account_id,
+        "latest_deposit_source_status": tx.status,
+    }
+
+
 @transaction.atomic
 def collect_security_deposit_with_metadata(
     *,
@@ -215,22 +301,42 @@ def collect_security_deposit_with_metadata(
     branch_id=None,
     cash_counter_id=None,
     note: str = "",
+    idempotency_key: str = "",
 ) -> RentLeaseBillingDemand:
     if subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
         raise ValidationError("Security deposit collection is available only for RENT/LEASE subscriptions.")
+    if not finance_account_id:
+        raise ValidationError({"finance_account": "Finance account is required for deposit source evidence."})
 
     ensure_security_deposit_demand(subscription=subscription, performed_by=performed_by)
-    demand = (
-        RentLeaseBillingDemand.objects.select_for_update()
-        .filter(subscription=subscription, demand_type=RentLeaseDemandType.SECURITY_DEPOSIT)
-        .first()
+    resolved_payment_method = _normal_method(payment_method)
+    resolved_payment_date = _payment_date(payment_date)
+    amount_q = _money(amount)
+    demand = RentLeaseBillingDemand.objects.select_for_update().get(
+        subscription=subscription,
+        demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
     )
     if demand is None:
         raise ValidationError("Security deposit demand was not found.")
-
-    amount_q = _money(amount)
     if amount_q <= MONEY_ZERO:
         raise ValidationError({"amount": "Collected deposit amount must be greater than zero."})
+
+    existing = _find_existing_deposit_transaction(
+        subscription=subscription,
+        transaction_type=RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+        amount_q=amount_q,
+        payment_method=resolved_payment_method,
+        finance_account_id=finance_account_id,
+        transaction_date=resolved_payment_date,
+        reference_no=reference_no,
+        idempotency_key=idempotency_key,
+        demand_id=demand.id,
+    )
+    if existing is not None:
+        setattr(demand, "_deposit_source_transaction", existing)
+        setattr(demand, "_deposit_source_transaction_created", False)
+        return demand
+
     outstanding = q2(demand.amount - demand.collected_amount)
     if amount_q > outstanding:
         raise ValidationError({"amount": "Collected amount exceeds deposit outstanding balance."})
@@ -259,29 +365,60 @@ def collect_security_deposit_with_metadata(
     metadata = _collection_metadata(
         reference_no=reference_no,
         finance_account_id=finance_account_id,
-        payment_method=payment_method,
-        payment_date=payment_date,
+        payment_method=resolved_payment_method,
+        payment_date=resolved_payment_date,
         branch_id=branch_id,
         cash_counter_id=cash_counter_id,
         note=note,
         demand=demand,
         amount=amount_q,
     )
-    RentLeaseDepositTransaction.objects.create(
-        subscription=subscription,
-        demand=demand,
-        transaction_type=RentLeaseDepositTransactionType.COLLECTED,
-        amount=amount_q,
-        performed_by=performed_by,
-        metadata=metadata,
-    )
+    try:
+        tx = RentLeaseDepositTransaction.objects.create(
+            subscription=subscription,
+            demand=demand,
+            customer=subscription.customer,
+            plan_type=subscription.plan_type,
+            transaction_type=RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+            amount=amount_q,
+            transaction_date=resolved_payment_date,
+            payment_method=resolved_payment_method,
+            finance_account_id=finance_account_id,
+            external_reference_no=_normal_reference(reference_no),
+            idempotency_key=(idempotency_key or "").strip(),
+            performed_by=performed_by,
+            created_by=performed_by,
+            metadata=metadata,
+        )
+        created = True
+    except IntegrityError:
+        tx = _find_existing_deposit_transaction(
+            subscription=subscription,
+            transaction_type=RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+            amount_q=amount_q,
+            payment_method=resolved_payment_method,
+            finance_account_id=finance_account_id,
+            transaction_date=resolved_payment_date,
+            reference_no=reference_no,
+            idempotency_key=idempotency_key,
+            demand_id=demand.id,
+        )
+        if tx is None:
+            raise
+        created = False
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=subscription,
         performed_by=performed_by,
-        metadata={"event": "RENT_LEASE_DEPOSIT_COLLECTED", **metadata},
+        metadata={
+            "event": "RENT_LEASE_DEPOSIT_COLLECTED",
+            "deposit_source_transaction_id": tx.id,
+            "deposit_source_reference": tx.transaction_number,
+            **metadata,
+        },
     )
-    sync_security_deposit_liability(subscription=subscription, amount=amount_q, performed_by=performed_by)
+    setattr(demand, "_deposit_source_transaction", tx)
+    setattr(demand, "_deposit_source_transaction_created", created)
     return demand
 
 
@@ -446,6 +583,7 @@ def rent_lease_receivable_position(subscription: Subscription) -> dict[str, obje
         payment_state = "UNPAID"
 
     latest_collection = _latest_monthly_collection(subscription)
+    latest_deposit_source = _latest_deposit_source(subscription)
     return {
         "due_amount": _money(next_amount),
         "overdue_amount": _money(overdue_amount),
@@ -462,6 +600,7 @@ def rent_lease_receivable_position(subscription: Subscription) -> dict[str, obje
         "is_collectible": bool(next_demand),
         "is_overdue": bool(overdue_amount > MONEY_ZERO),
         **_source_payload(latest_collection),
+        **_deposit_source_payload(latest_deposit_source),
     }
 
 
@@ -514,6 +653,14 @@ def _rent_lease_result(reference, *, audience: str = "admin") -> dict[str, objec
         "latest_collection_date": position.get("latest_collection_date"),
         "latest_collection_method": position.get("latest_collection_method"),
         "latest_collection_finance_account_id": position.get("latest_collection_finance_account_id"),
+        "latest_deposit_source_id": position.get("latest_deposit_source_id"),
+        "latest_deposit_source_reference": position.get("latest_deposit_source_reference"),
+        "latest_deposit_source_type": position.get("latest_deposit_source_type"),
+        "latest_deposit_source_amount": position.get("latest_deposit_source_amount"),
+        "latest_deposit_source_date": position.get("latest_deposit_source_date"),
+        "latest_deposit_source_method": position.get("latest_deposit_source_method"),
+        "latest_deposit_source_finance_account_id": position.get("latest_deposit_source_finance_account_id"),
+        "latest_deposit_source_status": position.get("latest_deposit_source_status"),
     }
 
 
