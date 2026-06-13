@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from accounting.services.accounting_bridge_reconciliation_read_service import BridgeReconciliationFilters, build_accounting_bridge_reconciliation as build_base_reconciliation
-from accounting.services.accounting_bridge_customer_advance_receipt_service import BridgeCandidateFilters, list_bridge_candidates, summarize_candidate_statuses
+from accounting.services.accounting_bridge_customer_advance_application_service import BridgeCandidateFilters, list_bridge_candidates, summarize_candidate_statuses
 
 
-EXTENDED_SOURCE_MODELS = {"PurchaseBill", "VendorPayment", "StockLedger", "SalarySheet", "SalaryPayment", "RentLeaseCollection", "RentLeaseDepositTransaction", "CustomerAdvance"}
+EXTENDED_SOURCE_MODELS = {"PurchaseBill", "VendorPayment", "StockLedger", "SalarySheet", "SalaryPayment", "RentLeaseCollection", "RentLeaseDepositTransaction", "CustomerAdvance", "CustomerAdvanceAllocation"}
 
 
 def _candidate_filters(filters: BridgeReconciliationFilters) -> BridgeCandidateFilters:
