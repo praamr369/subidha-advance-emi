@@ -1,66 +1,28 @@
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 import { request } from "@/services/api";
 
 export type AccountingBridgeReconciliationSummary = {
-  source_count: number;
+  source_count?: number;
   ready_count?: number;
   postable_count?: number;
-  ready_unposted_count: number;
-  posted_count: number;
-  settled_count: number;
-  reconciled_count: number;
-  blocked_count: number;
-  exception_count: number;
-  rent_lease_revenue_ready_unposted_count?: number;
-  rent_lease_revenue_posted_count?: number;
-  rent_lease_revenue_posted_unverified_count?: number;
-  rent_lease_revenue_reconciled_count?: number;
-  rent_lease_revenue_blocked_count?: number;
-  rent_lease_revenue_unsupported_count?: number;
-  rent_lease_payment_ready_unposted_count?: number;
-  rent_lease_payment_posted_unverified_count?: number;
-  rent_lease_payment_reconciled_count?: number;
-  rent_lease_payment_blocked_count?: number;
-  rent_lease_payment_unsupported_count?: number;
-  rent_lease_collection_ready_unposted_count?: number;
-  rent_lease_collection_posted_count?: number;
-  rent_lease_collection_posted_unverified_count?: number;
-  rent_lease_collection_reconciled_count?: number;
-  rent_lease_collection_blocked_count?: number;
-  rent_lease_collection_unsupported_count?: number;
-  security_deposit_receipt_ready_unposted_count?: number;
-  security_deposit_receipt_posted_count?: number;
-  security_deposit_receipt_posted_unverified_count?: number;
-  security_deposit_receipt_reconciled_count?: number;
-  security_deposit_receipt_blocked_count?: number;
-  security_deposit_receipt_unsupported_count?: number;
-  security_deposit_refund_ready_unposted_count?: number;
-  security_deposit_refund_posted_count?: number;
-  security_deposit_refund_posted_unverified_count?: number;
-  security_deposit_refund_reconciled_count?: number;
-  security_deposit_refund_blocked_count?: number;
-  security_deposit_refund_unsupported_count?: number;
-  customer_advance_receipt_ready_unposted_count?: number;
-  customer_advance_receipt_posted_count?: number;
-  customer_advance_receipt_posted_unverified_count?: number;
-  customer_advance_receipt_reconciled_count?: number;
-  customer_advance_receipt_blocked_count?: number;
-  customer_advance_receipt_unsupported_count?: number;
-  customer_advance_application_ready_unposted_count?: number;
-  customer_advance_application_posted_count?: number;
-  customer_advance_application_posted_unverified_count?: number;
-  customer_advance_application_reconciled_count?: number;
-  customer_advance_application_blocked_count?: number;
-  customer_advance_application_unsupported_count?: number;
-  customer_advance_refund_ready_unposted_count?: number;
-  customer_advance_refund_posted_count?: number;
-  customer_advance_refund_posted_unverified_count?: number;
-  customer_advance_refund_reconciled_count?: number;
-  customer_advance_refund_blocked_count?: number;
-  customer_advance_refund_unsupported_count?: number;
+  ready_unposted_count?: number;
+  posted_count?: number;
+  settled_count?: number;
+  reconciled_count?: number;
+  blocked_count?: number;
+  exception_count?: number;
+  unsupported_count?: number;
+  blocked_by_mapping_count?: number;
+  blocked_by_finance_account_count?: number;
+  blocked_by_period_count?: number;
+  blocked_by_numbering_count?: number;
+  blocked_by_approval_count?: number;
+  unposted_bridge_item_count?: number;
+  posted_unverified_count?: number;
+  reconciliation_exception_count?: number;
+  ready_unposted_by_event?: Record<string, number>;
+  blocked_by_mapping_by_event?: Record<string, number>;
+  status_counts_by_event?: Record<string, Record<string, number>>;
+  blocking_groups?: Array<Record<string, unknown>>;
   [key: string]: number | string | boolean | null | undefined | Record<string, unknown> | Array<unknown>;
 };
 
@@ -77,11 +39,56 @@ export type AccountingBridgeReconciliationJournal = {
   accounting_period_status?: string | null;
 };
 
-export type AccountingBridgeReconciliationItem = { id: number; status: string; severity: string; exception_code?: string; exception_message?: string };
-export type AccountingBridgePeriodReadiness = { financial_year_ready?: boolean; accounting_period_ready?: boolean; journal_numbering_ready?: boolean; posting_controls_ready?: boolean; active_financial_year?: { id?: number; code?: string; name?: string } | null; current_period?: { id?: number; code?: string; name?: string; status?: string } | null; blockers?: string[] };
+export type AccountingBridgeReconciliationItem = {
+  id: number;
+  status: string;
+  severity?: string;
+  exception_code?: string;
+  exception_message?: string;
+};
 
-export type BridgeSourceModel = "Payment" | "ReceiptDocument" | "BillingInvoice" | "RentLeaseBillingDemand" | "RentLeaseCollection" | "RentLeaseDepositTransaction" | "CustomerAdvance" | "CustomerAdvanceAllocation" | "CustomerAdvanceRefund" | "BillingCreditNote" | "DirectSaleReturn" | "BillingDebitNote" | "PurchaseBill" | "VendorPayment" | "StockLedger" | "Commission" | "CommissionPayoutBatch" | "SalarySheet" | "SalaryPayment" | string;
-export type BridgeActionLink = { key: string; label: string; href: string; reason?: string | null; disabled?: boolean };
+export type AccountingBridgePeriodReadiness = {
+  financial_year_ready?: boolean;
+  accounting_period_ready?: boolean;
+  journal_numbering_ready?: boolean;
+  posting_controls_ready?: boolean;
+  active_financial_year?: { id?: number; code?: string; name?: string } | null;
+  current_period?: { id?: number; code?: string; name?: string; status?: string } | null;
+  blockers?: string[];
+  [key: string]: unknown;
+};
+
+export type BridgeSourceModel =
+  | "Payment"
+  | "ReceiptDocument"
+  | "BillingInvoice"
+  | "RentLeaseBillingDemand"
+  | "RentLeaseCollection"
+  | "RentLeaseDepositTransaction"
+  | "CustomerAdvance"
+  | "CustomerAdvanceAllocation"
+  | "CustomerAdvanceRefund"
+  | "BillingCreditNote"
+  | "DirectSaleReturn"
+  | "BillingDebitNote"
+  | "PurchaseBill"
+  | "VendorPayment"
+  | "StockLedger"
+  | "Commission"
+  | "CommissionPayoutBatch"
+  | "SalarySheet"
+  | "SalaryPayment"
+  | string;
+
+export type BridgeActionLink = {
+  key?: string;
+  type?: string;
+  label: string;
+  href?: string | null;
+  reason?: string | null;
+  disabled?: boolean;
+};
+
 export type PhaseFSourceInventoryItem = {
   phase: string;
   domain: string;
@@ -99,32 +106,37 @@ export type PhaseFSourceInventoryItem = {
     unsupported?: number;
     skipped_deferred?: number;
     exception?: number;
+    [key: string]: number | undefined;
   };
   primary_blocker_type?: string | null;
   can_post?: boolean;
-  action_links: BridgeActionLink[];
+  action_links?: BridgeActionLink[];
 };
+
 export type PhaseFControlTower = {
-  source_inventory: PhaseFSourceInventoryItem[];
-  groups: Record<string, Record<string, number>>;
-  phase_counts: Record<string, Record<string, number>>;
-  readiness: {
-    state: string;
-    states: string[];
-    ready_for_controlled_posting: boolean;
-    read_only: boolean;
-    creates_journal_entry: boolean;
-    creates_accounting_bridge_posting: boolean;
-    auto_posts: boolean;
-    auto_reconciles: boolean;
-    auto_closes_period: boolean;
-    mutates_sources: boolean;
-    counts: Record<string, number>;
-    blockers: string[];
-    posting_controls_ready: boolean;
+  source_inventory?: PhaseFSourceInventoryItem[];
+  groups?: Record<string, Record<string, number>>;
+  phase_counts?: Record<string, Record<string, number>>;
+  readiness?: {
+    state?: string;
+    primary_state?: string;
+    states?: string[];
+    ready_for_controlled_posting?: boolean;
+    read_only?: boolean;
+    creates_journal_entry?: boolean;
+    creates_accounting_bridge_posting?: boolean;
+    auto_posts?: boolean;
+    auto_reconciles?: boolean;
+    auto_closes_period?: boolean;
+    mutates_sources?: boolean;
+    counts?: Record<string, number>;
+    blockers?: string[];
+    posting_controls_ready?: boolean;
+    [key: string]: unknown;
   };
-  guardrails: Record<string, boolean>;
+  guardrails?: Record<string, boolean>;
 };
+
 export type ProductionAccountingValidationWorkflow = {
   domain: string;
   workflow: string;
@@ -134,50 +146,64 @@ export type ProductionAccountingValidationWorkflow = {
   operator: string;
   bridge_source_ownership: string;
   expected_candidate_status: string;
-  expected_action_link: string;
-  expected_action: BridgeActionLink;
-  expected_no_mutation_rule: string;
+  expected_action_link?: string;
+  expected_action?: BridgeActionLink;
+  expected_no_mutation_rule?: string;
   expected_reconciliation_posture: string;
-  validation_test_name: string;
+  validation_test_name?: string;
   status: string;
-  current_row_count: number;
-  posted_unverified_count: number;
-  reconciled_count: number;
-  can_post: boolean;
-  read_only: boolean;
+  current_row_count?: number;
+  posted_unverified_count?: number;
+  reconciled_count?: number;
+  can_post?: boolean;
+  read_only?: boolean;
 };
+
 export type ProductionAccountingValidation = {
-  title: string;
-  safety_copy: string;
-  read_only: boolean;
-  creates_journal_entry: boolean;
-  creates_accounting_bridge_posting: boolean;
-  auto_posts: boolean;
-  auto_reconciles: boolean;
-  auto_closes_period: boolean;
-  mutates_sources: boolean;
-  workflow_count: number;
-  groups: Record<string, ProductionAccountingValidationWorkflow[]>;
-  workflows: ProductionAccountingValidationWorkflow[];
-  source_event_separation_checks: Record<string, boolean>;
+  title?: string;
+  safety_copy?: string;
+  read_only?: boolean;
+  creates_journal_entry?: boolean;
+  creates_accounting_bridge_posting?: boolean;
+  auto_posts?: boolean;
+  auto_reconciles?: boolean;
+  auto_closes_period?: boolean;
+  mutates_sources?: boolean;
+  workflow_count?: number;
+  groups?: Record<string, ProductionAccountingValidationWorkflow[]>;
+  workflows?: ProductionAccountingValidationWorkflow[];
+  source_event_separation_checks?: Record<string, boolean>;
 };
-export type BridgePostingLine = { chart_account?: { id?: number; code?: string; name?: string } | null; description?: string; debit_amount: string; credit_amount: string };
-export type BridgeFinanceAccount = { id?: number; name?: string; kind?: string; is_active?: boolean; chart_account?: { id?: number; code?: string; name?: string } | null };
+
+export type BridgePostingLine = {
+  chart_account?: { id?: number; code?: string; name?: string } | null;
+  description?: string;
+  debit_amount: string;
+  credit_amount: string;
+};
+
+export type BridgeFinanceAccount = {
+  id?: number;
+  name?: string;
+  kind?: string;
+  is_active?: boolean;
+  chart_account?: { id?: number; code?: string; name?: string } | null;
+};
 
 export type AccountingBridgeReconciliationRow = {
-  id?: string;
-  bridge_candidate_id?: string;
-  row_type: string;
-  event_key: string;
+  id?: string | number;
+  bridge_candidate_id?: string | number | null;
+  row_type?: string;
+  event_key?: string;
   event_label?: string;
-  label: string;
-  module: string;
+  label?: string;
+  module?: string;
   source_module?: string;
   event_group?: string;
   source_model?: BridgeSourceModel | null;
   source_type?: string | null;
   source_pk?: number | string | null;
-  source_id?: string | null;
+  source_id?: string | number | null;
   source_display?: string | null;
   source_reference_number?: string | null;
   source_reference?: string | null;
@@ -254,9 +280,9 @@ export type AccountingBridgeReconciliationRow = {
   credit_account_preview?: BridgePostingLine[];
   canonical_status?: string;
   supported?: boolean;
-  status: string;
+  status?: string;
   can_preview?: boolean;
-  can_post: boolean;
+  can_post?: boolean;
   can_reconcile?: boolean;
   is_postable?: boolean;
   is_acknowledgeable?: boolean;
@@ -275,26 +301,85 @@ export type AccountingBridgeReconciliationRow = {
   financial_year?: { id?: number; code?: string; name?: string; is_active?: boolean } | null;
   accounting_period?: { id?: number; code?: string; name?: string; status?: string } | null;
   journal_entry?: AccountingBridgeReconciliationJournal | null;
-  settlement_linked: boolean;
-  reconciliation_linked: boolean;
-  reconciliation_items: AccountingBridgeReconciliationItem[];
+  settlement_linked?: boolean;
+  reconciliation_linked?: boolean;
+  reconciliation_items?: AccountingBridgeReconciliationItem[];
   existing_journal_entry_id?: number | null;
   existing_accounting_bridge_posting_id?: number | null;
   existing_money_movement_id?: number | null;
   existing_reconciliation_item_id?: number | null;
   idempotency_key?: string | null;
-  exception_reasons: string[];
-  operator_action: string;
+  exception_reasons?: string[];
+  operator_action?: string;
   unsafe_abstract_posting_blocked?: boolean;
   action_links?: BridgeActionLink[];
   [key: string]: unknown;
 };
 
-export type BridgeCandidate = AccountingBridgeReconciliationRow & { row_type: "bridge_candidate"; bridge_candidate_id: string; idempotency_key: string };
-export type BridgePostingPreview = { candidate: AccountingBridgeReconciliationRow; candidate_id: string; source: Record<string, unknown> & { model: BridgeSourceModel; pk: number | string; display: string; reference_number?: string | null; date: string | null; amount: string }; collection_identity?: Record<string, unknown>; advance_identity?: Record<string, unknown>; advance_application_identity?: Record<string, unknown>; advance_refund_identity?: Record<string, unknown>; journal_date: string | null; accounting_period?: AccountingBridgeReconciliationRow["accounting_period"]; journal_number_preview?: string | null; debit_lines: BridgePostingLine[]; credit_lines: BridgePostingLine[]; lines: BridgePostingLine[]; total_debit: string; total_credit: string; is_balanced: boolean; tax_lines?: BridgePostingLine[]; finance_account_line?: BridgeFinanceAccount | null; warnings: string[]; blockers: string[]; can_post: boolean; idempotency_key: string; safety_text: string };
-export type BridgePostResult = { posted: boolean; already_posted: boolean; journal_entry?: AccountingBridgeReconciliationJournal | null; reconciliation_item?: { id: number; status: string; exception_code?: string } | null; next_action?: string };
-export type BridgeBatchPreviewResult = { selected_count: number; previewable_count?: number; postable_count: number; blocked_count: number; total_debit: string; total_credit: string; previews: BridgePostingPreview[]; blockers: Record<string, string[]> };
-export type BridgeBatchPostResult = { selected_count?: number; posted_count: number; already_posted_count?: number; skipped_already_posted_count: number; blocked_count: number; created_journal_ids: number[]; reconciliation_pending_count: number; posted: BridgePostResult[]; already_posted: BridgePostResult[]; errors: Record<string, string[]> };
+export type BridgeCandidate = AccountingBridgeReconciliationRow & {
+  row_type: "bridge_candidate";
+  bridge_candidate_id: string;
+  idempotency_key: string;
+};
+
+export type BridgePostingPreview = {
+  candidate: AccountingBridgeReconciliationRow;
+  candidate_id: string;
+  source: Record<string, unknown> & { model: BridgeSourceModel; pk: number | string; display: string; reference_number?: string | null; date: string | null; amount: string };
+  collection_identity?: Record<string, unknown>;
+  advance_identity?: Record<string, unknown>;
+  advance_application_identity?: Record<string, unknown>;
+  advance_refund_identity?: Record<string, unknown>;
+  journal_date: string | null;
+  accounting_period?: AccountingBridgeReconciliationRow["accounting_period"];
+  journal_number_preview?: string | null;
+  debit_lines: BridgePostingLine[];
+  credit_lines: BridgePostingLine[];
+  lines: BridgePostingLine[];
+  total_debit: string;
+  total_credit: string;
+  is_balanced: boolean;
+  tax_lines?: BridgePostingLine[];
+  finance_account_line?: BridgeFinanceAccount | null;
+  warnings: string[];
+  blockers: string[];
+  can_post: boolean;
+  idempotency_key: string;
+  safety_text: string;
+};
+
+export type BridgePostResult = {
+  posted: boolean;
+  already_posted: boolean;
+  journal_entry?: AccountingBridgeReconciliationJournal | null;
+  reconciliation_item?: { id: number; status: string; exception_code?: string } | null;
+  next_action?: string;
+};
+
+export type BridgeBatchPreviewResult = {
+  selected_count: number;
+  previewable_count?: number;
+  postable_count: number;
+  blocked_count: number;
+  total_debit: string;
+  total_credit: string;
+  previews: BridgePostingPreview[];
+  blockers: Record<string, string[]>;
+};
+
+export type BridgeBatchPostResult = {
+  selected_count?: number;
+  posted_count: number;
+  already_posted_count?: number;
+  skipped_already_posted_count: number;
+  blocked_count: number;
+  created_journal_ids: number[];
+  reconciliation_pending_count: number;
+  posted: BridgePostResult[];
+  already_posted: BridgePostResult[];
+  errors: Record<string, string[]>;
+};
+
 export type ReconciliationVerificationResult = { id: number; status: string; verified: boolean; verified_at?: string; detail?: string };
 
 export type AccountingBridgeReconciliationFilters = {
@@ -308,6 +393,45 @@ export type AccountingBridgeReconciliationFilters = {
   customer?: string;
 };
 
+export type AccountingBridgeReconciliationPayload = {
+  summary: AccountingBridgeReconciliationSummary;
+  period_readiness?: AccountingBridgePeriodReadiness;
+  financial_year_readiness?: AccountingBridgePeriodReadiness;
+  accounting_period_readiness?: AccountingBridgePeriodReadiness;
+  phase_f_control_tower?: PhaseFControlTower;
+  production_accounting_validation?: ProductionAccountingValidation;
+  results: AccountingBridgeReconciliationRow[];
+  readiness_blockers?: string[];
+  selected_financial_year?: Record<string, unknown> | null;
+  selected_accounting_period?: Record<string, unknown> | null;
+  available_financial_years?: Array<Record<string, unknown>>;
+  available_accounting_periods?: Array<Record<string, unknown>>;
+};
+
+export function isConcreteCandidate(row: AccountingBridgeReconciliationRow): boolean {
+  return row.row_type === "bridge_candidate" && Boolean(row.bridge_candidate_id);
+}
+
+export function isUnsupportedOrDeferredRow(row: AccountingBridgeReconciliationRow): boolean {
+  const status = String(row.status || "").toUpperCase();
+  return ["UNSUPPORTED_SOURCE", "UNSUPPORTED", "DEFERRED", "SKIPPED_NOT_APPLICABLE"].includes(status);
+}
+
+export function isBlockedOrExceptionRow(row: AccountingBridgeReconciliationRow): boolean {
+  const status = String(row.status || "").toUpperCase();
+  return (
+    status === "EXCEPTION" ||
+    status.startsWith("BLOCKED") ||
+    (Boolean(row.exception_reasons?.length) &&
+      !["READY_UNPOSTED", "POSTED_UNVERIFIED", "RECONCILED"].includes(status) &&
+      !isUnsupportedOrDeferredRow(row))
+  );
+}
+
+export function isConcreteSourceCandidate(row: AccountingBridgeReconciliationRow): boolean {
+  return isConcreteCandidate(row) && !isBlockedOrExceptionRow(row) && !isUnsupportedOrDeferredRow(row);
+}
+
 export function getAccountingBridgeReconciliation(filters: AccountingBridgeReconciliationFilters = {}) {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
@@ -316,14 +440,6 @@ export function getAccountingBridgeReconciliation(filters: AccountingBridgeRecon
   const query = params.toString();
   return request<AccountingBridgeReconciliationPayload>(`/admin/accounting/bridge-reconciliation/${query ? `?${query}` : ""}`);
 }
-
-export type AccountingBridgeReconciliationPayload = {
-  summary: AccountingBridgeReconciliationSummary;
-  period_readiness?: AccountingBridgePeriodReadiness;
-  phase_f_control_tower?: PhaseFControlTower;
-  production_accounting_validation?: ProductionAccountingValidation;
-  results: AccountingBridgeReconciliationRow[];
-};
 
 export function previewBridgeCandidate(candidateId: string) {
   return request<BridgePostingPreview>(`/admin/accounting/bridge-reconciliation/candidates/${encodeURIComponent(candidateId)}/preview/`);
@@ -355,76 +471,4 @@ export function verifyBridgeReconciliationItem(itemId: number, payload: { note?:
     method: "POST",
     body: JSON.stringify(payload),
   });
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-export type AccountingBridgeReconciliationRow = {
-  id?: string | number;
-  row_type?: string;
-  bridge_candidate_id?: string | number | null;
-  status?: string;
-  source_model?: string;
-  event_key?: string;
-  purpose?: string;
-  exception_reasons?: string[];
-  action_href?: string | null;
-  setup_href?: string | null;
-  recommended_action?: string;
-  can_post?: boolean;
-  can_preview?: boolean;
-  action_links?: Array<{ type: string; label: string; href?: string | null; disabled?: boolean }>;
-};
-
-export type AccountingBridgeReadinessContract = {
-  primary_state: string;
-  ready_for_controlled_posting: boolean;
-  read_only: boolean;
-  creates_journal_entries: boolean;
-  creates_bridge_postings: boolean;
-  mutates_source_records: boolean;
-  concrete_candidate_count?: number;
-  readiness_only_count?: number;
-  deferred_count?: number;
-  validation_only_count?: number;
-  rows: AccountingBridgeReconciliationRow[];
-};
-
-export function isConcreteCandidate(row: AccountingBridgeReconciliationRow): boolean {
-  return row.row_type === "bridge_candidate" && Boolean(row.bridge_candidate_id);
-}
-
-export function isUnsupportedOrDeferredRow(row: AccountingBridgeReconciliationRow): boolean {
-  const status = String(row.status || "").toUpperCase();
-  return ["UNSUPPORTED_SOURCE", "UNSUPPORTED", "DEFERRED", "SKIPPED_NOT_APPLICABLE"].includes(status);
-}
-
-export function isBlockedOrExceptionRow(row: AccountingBridgeReconciliationRow): boolean {
-  const status = String(row.status || "").toUpperCase();
-  return (
-    status === "EXCEPTION" ||
-    status.startsWith("BLOCKED") ||
-    (Boolean(row.exception_reasons?.length) &&
-      !["READY_UNPOSTED", "POSTED_UNVERIFIED", "RECONCILED"].includes(status) &&
-      !isUnsupportedOrDeferredRow(row))
-  );
-}
-
-export async function fetchAccountingBridgeReconciliation(): Promise<AccountingBridgeReadinessContract> {
-  const response = await fetch("/api/accounting/bridge-reconciliation/", { credentials: "include" });
-  if (!response.ok) throw new Error("Unable to load bridge reconciliation readiness.");
-  return response.json();
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 }
