@@ -112,8 +112,10 @@ class RentLeaseUnifiedCollectionRouterTests(APITestCase):
         tx = RentLeaseDepositTransaction.objects.filter(
             subscription=subscription,
             demand=demand,
-            transaction_type="COLLECTED",
+            transaction_type="DEPOSIT_RECEIPT",
         ).latest("id")
+        self.assertEqual(response.data["deposit_source_model"], "subscriptions.RentLeaseDepositTransaction")
+        self.assertEqual(response.data["deposit_source_transaction_id"], tx.id)
         self.assertEqual(tx.metadata["reference_no"], "RL-DEP-COLLECT-001")
         self.assertEqual(tx.metadata["finance_account_id"], self.finance_account.id)
         self.assertEqual(Payment.objects.count(), before["payments"])

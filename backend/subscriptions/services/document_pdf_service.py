@@ -377,7 +377,11 @@ def render_deposit_refund_pdf(*, refund_or_deposit_action) -> bytes:
 
     demand = refund_or_deposit_action
     subscription = demand.subscription
-    transactions = list(subscription.deposit_transactions.filter(transaction_type="REFUNDED").order_by("-created_at")[:1])
+    transactions = list(
+        subscription.deposit_transactions.filter(
+            transaction_type__in=["REFUNDED", "DEPOSIT_REFUND"]
+        ).order_by("-created_at")[:1]
+    )
     approved_transactions = list(
         subscription.deposit_transactions.filter(transaction_type="REFUND_APPROVED").order_by("-created_at")[:1]
     )
