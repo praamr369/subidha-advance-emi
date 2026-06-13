@@ -163,7 +163,7 @@ def record_customer_advance_refund(*, customer_advance_id: int, amount, refunded
         advance.status = CustomerAdvanceStatus.PARTIALLY_APPLIED
     else:
         advance.status = CustomerAdvanceStatus.UNAPPLIED
-    advance.save(update_fields=["unapplied_amount", "status", "updated_at"])
+    advance.save(update_fields=["unapplied_amount", "status"])
     log_audit(action_type=AuditLog.ActionType.PAYMENT_FLAGGED, instance=refund, performed_by=refunded_by, metadata={"event": "CUSTOMER_ADVANCE_REFUND_SOURCE_RECORDED", "source_contract_phase": "F22", "customer_advance_refund_id": refund.id, "customer_advance_id": advance.id, "customer_id": advance.customer_id, "amount": f"{normalized_amount:.2f}", "refund_reference_no": refund.refund_reference_no, "accounting_bridge_posting_deferred": True, "future_bridge_phase": FUTURE_BRIDGE_PHASE})
     after_counts = {"journals": JournalEntry.objects.count(), "bridge_postings": AccountingBridgePosting.objects.count(), "reconciliation_items": ReconciliationItem.objects.count()}
     if before_counts != after_counts:

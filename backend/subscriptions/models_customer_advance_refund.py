@@ -15,6 +15,9 @@ class CustomerAdvanceRefundStatus(models.TextChoices):
 
 
 class CustomerAdvanceRefund(TimeStampedModel):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     customer = models.ForeignKey(
         Customer,
         on_delete=models.PROTECT,
@@ -65,10 +68,10 @@ class CustomerAdvanceRefund(TimeStampedModel):
         db_table = "customer_advance_refunds"
         ordering = ["-refund_date", "-id"]
         indexes = [
-            models.Index(fields=["customer", "refund_date"]),
-            models.Index(fields=["advance", "refund_date"]),
-            models.Index(fields=["finance_account", "refund_date"]),
-            models.Index(fields=["status", "refund_date"]),
+            models.Index(fields=["customer", "refund_date"], name="customer_ad_custome_f70be8_idx"),
+            models.Index(fields=["advance", "refund_date"], name="customer_ad_advance_6d4199_idx"),
+            models.Index(fields=["finance_account", "refund_date"], name="customer_ad_finance_8fb87b_idx"),
+            models.Index(fields=["status", "refund_date"], name="customer_ad_status_9f6b9b_idx"),
         ]
         constraints = [
             models.UniqueConstraint(fields=["refund_reference_no"], name="uq_customer_advance_refund_ref"),

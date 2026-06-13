@@ -23,11 +23,12 @@ class AccountingBridgeCustomerAdvanceApplicationPhaseF21Tests(APITestCase):
         self.admin = create_admin_user(username="phase_f21_admin", phone="9305210001")
         self.cashier = create_cashier_user(username="phase_f21_cashier", phone="9305210002")
         self.customer = create_customer_profile(name="F21 Customer", phone="7305210001")
-        self.product = create_product(name="F21 Product", product_code="F21-PROD", base_price=Decimal("2400.00"))
-        self.batch = create_batch(batch_code="F21BATCH", duration_months=3, total_slots=100)
+        self.product = create_product(name="F21 Product", product_code="F21-PROD", base_price=Decimal("9600.00"))
+        self.batch = create_batch(batch_code="F21BATCH", duration_months=12, total_slots=100)
         self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=21)
-        self.subscription = create_subscription(customer=self.customer, product=self.product, batch=self.batch, lucky_id=self.lucky_id, total_amount=Decimal("2400.00"), monthly_amount=Decimal("800.00"), tenure_months=3)
+        self.subscription = create_subscription(customer=self.customer, product=self.product, batch=self.batch, lucky_id=self.lucky_id, total_amount=Decimal("9600.00"), monthly_amount=Decimal("800.00"), tenure_months=12)
         self.emi = create_emi(subscription=self.subscription, month_no=1, amount=Decimal("800.00"), due_date=date(2026, 5, 21))
+        self._allocation_month_no = 1
         self.today = timezone.localdate()
         self.env = seed_bridge_ready_environment(self.today, performed_by=self.admin)
         self.finance_account = self.env["finance_account"]
@@ -38,7 +39,17 @@ class AccountingBridgeCustomerAdvanceApplicationPhaseF21Tests(APITestCase):
 
     def _allocation(self, *, amount=Decimal("500.00"), suffix="001"):
         advance = self._advance(amount=amount, suffix=suffix)
-        result = PaymentAllocationService.allocate_customer_advance(customer_advance_id=advance.id, emi_id=self.emi.id, amount=amount, allocated_by=self.admin, reference_no=f"F21-ALLOC-{suffix}", allocation_date=self.today)
+        if self._allocation_month_no == 1:
+            emi = self.emi
+        else:
+            emi = create_emi(
+                subscription=self.subscription,
+                month_no=self._allocation_month_no,
+                amount=Decimal("800.00"),
+                due_date=date(2026, 5, 20 + self._allocation_month_no),
+            )
+        self._allocation_month_no += 1
+        result = PaymentAllocationService.allocate_customer_advance(customer_advance_id=advance.id, emi_id=emi.id, amount=amount, allocated_by=self.admin, reference_no=f"F21-ALLOC-{suffix}", allocation_date=self.today)
         return result["allocation"]
 
     def _candidate_id(self, allocation):

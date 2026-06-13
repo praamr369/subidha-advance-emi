@@ -44,19 +44,19 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="customeradvancerefund",
-            index=models.Index(fields=["customer", "refund_date"], name="customer_ad_customer_3f0b66_idx"),
+            index=models.Index(fields=["customer", "refund_date"], name="customer_ad_custome_f70be8_idx"),
         ),
         migrations.AddIndex(
             model_name="customeradvancerefund",
-            index=models.Index(fields=["advance", "refund_date"], name="customer_ad_advance_09df42_idx"),
+            index=models.Index(fields=["advance", "refund_date"], name="customer_ad_advance_6d4199_idx"),
         ),
         migrations.AddIndex(
             model_name="customeradvancerefund",
-            index=models.Index(fields=["finance_account", "refund_date"], name="customer_ad_finance_5dc2a1_idx"),
+            index=models.Index(fields=["finance_account", "refund_date"], name="customer_ad_finance_8fb87b_idx"),
         ),
         migrations.AddIndex(
             model_name="customeradvancerefund",
-            index=models.Index(fields=["status", "refund_date"], name="customer_ad_status_448ee3_idx"),
+            index=models.Index(fields=["status", "refund_date"], name="customer_ad_status_9f6b9b_idx"),
         ),
         migrations.AddConstraint(
             model_name="customeradvancerefund",

@@ -4,7 +4,7 @@ from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import AccountingBridgePosting, ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind, JournalEntry
+from accounting.models import AccountingBridgePosting, JournalEntry
 from accounting.services.accounting_bridge_candidate_service import receipt_candidate
 from accounting.services.accounting_bridge_customer_advance_guard_service import (
     ADVANCE_ALLOCATION_SKIP_REASON,
@@ -18,6 +18,7 @@ from reconciliation.models import ReconciliationItem
 from subscriptions.models import CustomerAdvance, CustomerAdvanceAllocation, Payment
 from subscriptions.services.customer_advance_service import CustomerAdvanceService
 from subscriptions.services.payment_allocation_service import PaymentAllocationService
+from tests.accounting.helpers import seed_bridge_ready_environment
 from tests.helpers import create_admin_user, create_batch, create_customer_profile, create_emi, create_lucky_id, create_product, create_subscription
 
 
@@ -31,7 +32,8 @@ class CustomerAdvanceSourceContractPhaseF19Tests(APITestCase):
         self.lucky_id = create_lucky_id(batch=self.batch, lucky_number=19)
         self.subscription = create_subscription(customer=self.customer, product=self.product, batch=self.batch, lucky_id=self.lucky_id, total_amount=Decimal("2400.00"), monthly_amount=Decimal("800.00"), tenure_months=3)
         self.emi = create_emi(subscription=self.subscription, month_no=1, amount=Decimal("800.00"), due_date=date(2026, 5, 20))
-        self.finance_account = FinanceAccount.objects.create(name="F19 Cash", kind=FinanceAccountKind.CASH, chart_account=ChartOfAccount.objects.create(code="F19-CASH", name="F19 Cash Account", account_type=ChartOfAccountType.ASSET), opening_balance=Decimal("0.00"))
+        self.env = seed_bridge_ready_environment(date(2026, 5, 21), performed_by=self.admin)
+        self.finance_account = self.env["finance_account"]
 
     def _counts(self):
         return {"journal": JournalEntry.objects.count(), "bridge": AccountingBridgePosting.objects.count(), "reconciliation": ReconciliationItem.objects.count()}

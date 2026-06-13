@@ -25,6 +25,7 @@ def _advance_matches(
     payment_date,
     branch_id: int | None,
 ) -> bool:
+    branch_matches = True if branch_id is None else (advance.branch_id or None) == branch_id
     return all(
         [
             advance.customer_id == customer_id,
@@ -32,7 +33,7 @@ def _advance_matches(
             advance.finance_account_id == finance_account_id,
             (advance.method or "").strip().upper() == method,
             advance.payment_date == payment_date,
-            (advance.branch_id or None) == (branch_id or None),
+            branch_matches,
         ]
     )
 

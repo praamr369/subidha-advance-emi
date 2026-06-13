@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import AccountingBridgePosting, ChartOfAccount, DocumentSequence, JournalEntry, JournalEntryStatus, JournalEntryType
+from accounting.models import AccountingBridgePosting, ChartOfAccount, ChartOfAccountType, DocumentSequence, JournalEntry, JournalEntryStatus, JournalEntryType
 from accounting.services.accounting_bridge_customer_advance_refund_service import BridgeCandidateFilters, list_bridge_candidates
 from billing.models import BillingDocumentStatus, BillingSourceType, ReceiptDocument, ReceiptType
 from reconciliation.models import ReconciliationItem, ReconciliationItemStatus, ReconciliationRun, ReconciliationRunStatus
@@ -145,12 +145,14 @@ class AccountingBridgeCustomerAdvanceRefundPhaseF23Tests(APITestCase):
         self.finance_account.save(update_fields=["is_active"])
         row = next(item for item in list_bridge_candidates(BridgeCandidateFilters(source_model="CustomerAdvanceRefund")) if int(item["source_pk"]) == refund.id)
         self.assertEqual(row["status"], "BLOCKED_BY_FINANCE_ACCOUNT")
+        active_cash = self.finance_account.chart_account
+        inactive_cash = ChartOfAccount.objects.create(code="F23-INACTIVE-CASH", name="F23 Inactive Cash", account_type=ChartOfAccountType.ASSET, is_active=False)
         self.finance_account.is_active = True
-        self.finance_account.chart_account = None
+        self.finance_account.chart_account = inactive_cash
         self.finance_account.save(update_fields=["is_active", "chart_account"])
         row = next(item for item in list_bridge_candidates(BridgeCandidateFilters(source_model="CustomerAdvanceRefund")) if int(item["source_pk"]) == refund.id)
         self.assertEqual(row["status"], "BLOCKED_BY_FINANCE_ACCOUNT")
-        self.finance_account.chart_account = self.env["cash_account"]
+        self.finance_account.chart_account = active_cash
         self.finance_account.save(update_fields=["chart_account"])
         DocumentSequence.objects.filter(document_type="JOURNAL_ENTRY").delete()
         row = next(item for item in list_bridge_candidates(BridgeCandidateFilters(source_model="CustomerAdvanceRefund")) if int(item["source_pk"]) == refund.id)

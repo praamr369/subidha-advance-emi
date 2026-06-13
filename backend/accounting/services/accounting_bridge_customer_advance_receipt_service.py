@@ -93,6 +93,19 @@ def _lines(row: CustomerAdvance, event_key: str):
     ], warnings, finance_account
 
 
+def _raw_status(*, event_key: str, lines: list[dict[str, Any]], warnings: list[str]) -> str:
+    if event_key == SKIPPED_EVENT_KEY:
+        return "SKIPPED_NOT_APPLICABLE"
+    if event_key == UNSUPPORTED_EVENT_KEY:
+        return "UNSUPPORTED_SOURCE"
+    if lines:
+        return "READY"
+    first_warning = (warnings[0] if warnings else "").lower()
+    if "finance account" in first_warning:
+        return "BLOCKED_BY_FINANCE_ACCOUNT"
+    return "BLOCKED_BY_MAPPING"
+
+
 def _source_snapshot(row: CustomerAdvance) -> dict[str, Any]:
     return {
         "customer_id": row.customer_id,
@@ -139,8 +152,8 @@ def candidate_for(row: CustomerAdvance) -> dict[str, Any]:
     item = base._latest_posting_reconciliation_item(source_model=SOURCE_MODEL, source_id=str(row.id)) if journal else base._latest_reconciliation_item(source_model=SOURCE_MODEL, source_id=str(row.id))
     period = getattr(journal, "accounting_period", None) or base._source_period(row.payment_date)
     lines, warnings, finance_account = _lines(row, event_key) if event_key == EVENT_KEY else ([], [reason] if reason else [], row.finance_account)
-    raw = "SKIPPED_NOT_APPLICABLE" if event_key == SKIPPED_EVENT_KEY else "UNSUPPORTED_SOURCE" if event_key == UNSUPPORTED_EVENT_KEY else "READY" if lines else "NOT_CONFIGURED"
-    postability = base._candidate_status_payload(event_key=event_key, event_label=event_label, module="subscriptions", source_model=SOURCE_MODEL, raw_status=raw, lines=lines, line_warnings=warnings, period=period, source_date=row.payment_date, journal=journal, reconciliation_item=item, source_workflow_exists=event_key in {EVENT_KEY, SKIPPED_EVENT_KEY, UNSUPPORTED_EVENT_KEY}, classification_reason=reason)
+    raw = _raw_status(event_key=event_key, lines=lines, warnings=warnings)
+    postability = base._candidate_status_payload(event_key=event_key, event_label=event_label, module="subscriptions", source_model=SOURCE_MODEL, raw_status=raw, lines=lines, line_warnings=warnings, period=period, source_date=row.payment_date, journal=journal, reconciliation_item=item, source_workflow_exists=event_key in {EVENT_KEY, SKIPPED_EVENT_KEY}, classification_reason=reason)
     source_date_key = row.payment_date.isoformat() if row.payment_date else "NO_SAFE_DATE"
     metadata = _metadata(row)
     source_idempotency_key = metadata.get("source_idempotency_key") or row.reference_no or row.id
