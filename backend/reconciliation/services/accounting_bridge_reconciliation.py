@@ -7,12 +7,12 @@ from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.db.models.functions import Cast
 
 from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntryGroup, SalaryPayment, SalarySheet
-from accounting.services.accounting_bridge_customer_advance_receipt_service import BridgeCandidateFilters, list_bridge_candidates
+from accounting.services.accounting_bridge_customer_advance_application_service import BridgeCandidateFilters, list_bridge_candidates
 from accounting.services.accounting_bridge_purchase_bill_service import stock_ledger_candidate
 from accounting.services.period_service import resolve_accounting_period
 from billing.models import BillingCreditNote, BillingDebitNote, BillingInvoice, DirectSaleReturn, ReceiptDocument
 from inventory.models import PurchaseBill, StockLedger, VendorPayment
-from subscriptions.models import Commission, CommissionPayoutBatch, CustomerAdvance, Payment, RentLeaseBillingDemand, RentLeaseDepositTransaction
+from subscriptions.models import Commission, CommissionPayoutBatch, CustomerAdvance, CustomerAdvanceAllocation, Payment, RentLeaseBillingDemand, RentLeaseDepositTransaction
 from subscriptions.models_rent_lease_collection import RentLeaseCollection
 
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationItemStatus, ReconciliationSeverity
@@ -26,6 +26,7 @@ BRIDGE_SOURCE_MODELS = (
     "RentLeaseCollection",
     "RentLeaseDepositTransaction",
     "CustomerAdvance",
+    "CustomerAdvanceAllocation",
     "BillingCreditNote",
     "DirectSaleReturn",
     "BillingDebitNote",
@@ -51,7 +52,6 @@ F15C_CODES = {
     "NUMBERING_MISSING": "RENT_LEASE_COLLECTION_NUMBERING_MISSING",
     "UNSUPPORTED_SOURCE": "RENT_LEASE_COLLECTION_UNSUPPORTED_SOURCE",
 }
-
 F17_CODES = {
     "MISSING_POSTING": "SECURITY_DEPOSIT_RECEIPT_MISSING_ACCOUNTING_BRIDGE_POSTING",
     "POSTED_UNVERIFIED": "SECURITY_DEPOSIT_RECEIPT_POSTED_UNVERIFIED",
@@ -65,7 +65,6 @@ F17_CODES = {
     "NUMBERING_MISSING": "SECURITY_DEPOSIT_RECEIPT_NUMBERING_MISSING",
     "UNSUPPORTED_SOURCE": "SECURITY_DEPOSIT_RECEIPT_UNSUPPORTED_SOURCE",
 }
-
 F18_CODES = {
     "MISSING_POSTING": "SECURITY_DEPOSIT_REFUND_MISSING_ACCOUNTING_BRIDGE_POSTING",
     "POSTED_UNVERIFIED": "SECURITY_DEPOSIT_REFUND_POSTED_UNVERIFIED",
@@ -79,7 +78,6 @@ F18_CODES = {
     "NUMBERING_MISSING": "SECURITY_DEPOSIT_REFUND_NUMBERING_MISSING",
     "UNSUPPORTED_SOURCE": "SECURITY_DEPOSIT_REFUND_UNSUPPORTED_SOURCE",
 }
-
 F20_CODES = {
     "MISSING_POSTING": "CUSTOMER_ADVANCE_RECEIPT_MISSING_ACCOUNTING_BRIDGE_POSTING",
     "POSTED_UNVERIFIED": "CUSTOMER_ADVANCE_RECEIPT_POSTED_UNVERIFIED",
@@ -94,12 +92,21 @@ F20_CODES = {
     "UNSUPPORTED_SOURCE": "CUSTOMER_ADVANCE_RECEIPT_UNSUPPORTED_SOURCE",
     "DUPLICATE_F2_RECEIPTDOCUMENT_RISK": "CUSTOMER_ADVANCE_RECEIPT_DUPLICATE_F2_RECEIPTDOCUMENT_RISK",
 }
-
-SECURITY_DEPOSIT_REFUND_EVENTS = {
-    "security_deposit_refund",
-    "rent_security_deposit_refund",
-    "lease_security_deposit_refund",
+F21_CODES = {
+    "MISSING_POSTING": "CUSTOMER_ADVANCE_APPLICATION_MISSING_ACCOUNTING_BRIDGE_POSTING",
+    "POSTED_UNVERIFIED": "CUSTOMER_ADVANCE_APPLICATION_POSTED_UNVERIFIED",
+    "AMOUNT_MISMATCH": "CUSTOMER_ADVANCE_APPLICATION_AMOUNT_MISMATCH",
+    "PERIOD_MISMATCH": "CUSTOMER_ADVANCE_APPLICATION_PERIOD_MISMATCH",
+    "DUPLICATE_POSTING": "CUSTOMER_ADVANCE_APPLICATION_DUPLICATE_ACCOUNTING_BRIDGE_POSTING",
+    "SOURCE_LINK_MISSING": "CUSTOMER_ADVANCE_APPLICATION_SOURCE_LINK_MISSING",
+    "JOURNAL_UNBALANCED": "CUSTOMER_ADVANCE_APPLICATION_JOURNAL_UNBALANCED",
+    "MAPPING_MISSING": "CUSTOMER_ADVANCE_APPLICATION_MAPPING_MISSING",
+    "NUMBERING_MISSING": "CUSTOMER_ADVANCE_APPLICATION_NUMBERING_MISSING",
+    "UNSUPPORTED_SOURCE": "CUSTOMER_ADVANCE_APPLICATION_UNSUPPORTED_SOURCE",
+    "PAYMENT_F1_DUPLICATE_RISK": "CUSTOMER_ADVANCE_APPLICATION_PAYMENT_F1_DUPLICATE_RISK",
 }
+
+SECURITY_DEPOSIT_REFUND_EVENTS = {"security_deposit_refund", "rent_security_deposit_refund", "lease_security_deposit_refund"}
 SECURITY_DEPOSIT_REFUND_PURPOSES = {event.upper() for event in SECURITY_DEPOSIT_REFUND_EVENTS}
 ADVANCE_ALLOCATION_COLLECTION_MODE = "ADVANCE_ALLOCATION"
 
@@ -118,61 +125,37 @@ def _date_range_filter(prefix: str, date_from, date_to):
 
 
 def _source_amount(*, source_model: str, source_id: str) -> Decimal | None:
-    if source_model == "Payment":
-        row = Payment.objects.filter(pk=source_id).only("amount").first()
-        return _money(row.amount) if row else None
-    if source_model == "ReceiptDocument":
-        row = ReceiptDocument.objects.filter(pk=source_id).only("amount").first()
-        return _money(row.amount) if row else None
-    if source_model == "BillingInvoice":
-        row = BillingInvoice.objects.filter(pk=source_id).only("grand_total").first()
-        return _money(row.grand_total) if row else None
-    if source_model == "RentLeaseBillingDemand":
-        row = RentLeaseBillingDemand.objects.filter(pk=source_id).only("amount").first()
-        return _money(row.amount) if row else None
-    if source_model == "RentLeaseCollection":
-        row = RentLeaseCollection.objects.filter(pk=source_id).only("amount").first()
-        return _money(row.amount) if row else None
-    if source_model == "RentLeaseDepositTransaction":
-        row = RentLeaseDepositTransaction.objects.filter(pk=source_id).only("amount").first()
-        return _money(row.amount) if row else None
-    if source_model == "CustomerAdvance":
-        row = CustomerAdvance.objects.filter(pk=source_id).only("amount").first()
-        return _money(row.amount) if row else None
-    if source_model == "BillingCreditNote":
-        row = BillingCreditNote.objects.filter(pk=source_id).only("total_adjustment").first()
-        return _money(row.total_adjustment) if row else None
-    if source_model == "BillingDebitNote":
-        row = BillingDebitNote.objects.filter(pk=source_id).only("total_adjustment").first()
-        return _money(row.total_adjustment) if row else None
-    if source_model == "DirectSaleReturn":
-        row = DirectSaleReturn.objects.filter(pk=source_id).only("grand_total").first()
-        return _money(row.grand_total) if row else None
-    if source_model == "PurchaseBill":
-        row = PurchaseBill.objects.filter(pk=source_id).only("grand_total").first()
-        return _money(row.grand_total) if row else None
-    if source_model == "VendorPayment":
-        row = VendorPayment.objects.filter(pk=source_id).only("amount").first()
-        return _money(row.amount) if row else None
+    lookups = {
+        "Payment": (Payment, "amount"),
+        "ReceiptDocument": (ReceiptDocument, "amount"),
+        "BillingInvoice": (BillingInvoice, "grand_total"),
+        "RentLeaseBillingDemand": (RentLeaseBillingDemand, "amount"),
+        "RentLeaseCollection": (RentLeaseCollection, "amount"),
+        "RentLeaseDepositTransaction": (RentLeaseDepositTransaction, "amount"),
+        "CustomerAdvance": (CustomerAdvance, "amount"),
+        "CustomerAdvanceAllocation": (CustomerAdvanceAllocation, "amount"),
+        "BillingCreditNote": (BillingCreditNote, "total_adjustment"),
+        "BillingDebitNote": (BillingDebitNote, "total_adjustment"),
+        "DirectSaleReturn": (DirectSaleReturn, "grand_total"),
+        "PurchaseBill": (PurchaseBill, "grand_total"),
+        "VendorPayment": (VendorPayment, "amount"),
+        "Commission": (Commission, "commission_amount"),
+        "CommissionPayoutBatch": (CommissionPayoutBatch, "total_amount"),
+        "SalarySheet": (SalarySheet, "net_amount"),
+        "SalaryPayment": (SalaryPayment, "amount"),
+    }
     if source_model == "StockLedger":
         row = StockLedger.objects.select_related("inventory_item", "inventory_item__product", "stock_location", "stock_location__branch").filter(pk=source_id).first()
         if row is None:
             return None
         candidate = stock_ledger_candidate(row)
         return _money(candidate.get("amount")) if candidate else None
-    if source_model == "Commission":
-        row = Commission.objects.filter(pk=source_id).only("commission_amount").first()
-        return _money(row.commission_amount) if row else None
-    if source_model == "CommissionPayoutBatch":
-        row = CommissionPayoutBatch.objects.filter(pk=source_id).only("total_amount").first()
-        return _money(row.total_amount) if row else None
-    if source_model == "SalarySheet":
-        row = SalarySheet.objects.filter(pk=source_id).only("net_amount").first()
-        return _money(row.net_amount) if row else None
-    if source_model == "SalaryPayment":
-        row = SalaryPayment.objects.filter(pk=source_id).only("amount").first()
-        return _money(row.amount) if row else None
-    return None
+    model_field = lookups.get(source_model)
+    if model_field is None:
+        return None
+    model, field = model_field
+    row = model.objects.filter(pk=source_id).only(field).first()
+    return _money(getattr(row, field)) if row else None
 
 
 def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> str:
@@ -197,6 +180,9 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
     if source_model == "CustomerAdvance":
         row = CustomerAdvance.objects.filter(pk=source_id).only("reference_no").first()
         return (row.reference_no or f"CA-{source_id}") if row else f"CA-{source_id}"
+    if source_model == "CustomerAdvanceAllocation":
+        row = CustomerAdvanceAllocation.objects.select_related("payment").filter(pk=source_id).only("id", "payment__reference_no").first()
+        return (row.payment.reference_no or f"CAA-{source_id}") if row and row.payment_id else f"CAA-{source_id}"
     if source_model == "BillingCreditNote":
         row = BillingCreditNote.objects.filter(pk=source_id).only("note_no").first()
         return (row.note_no or f"CN-{source_id}") if row else f"CN-{source_id}"
@@ -215,20 +201,12 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
     if source_model == "StockLedger":
         return f"SL-{source_id}"
     if source_model == "Commission":
-        row = Commission.objects.select_related("payment").filter(pk=source_id).only("id", "payment__reference_no").first()
-        if row is None:
-            return f"COMM-{source_id}"
-        reference = getattr(row.payment, "reference_no", None) if row.payment_id else None
-        return f"COMM-{source_id}-{reference}" if reference else f"COMM-{source_id}"
+        return f"COMM-{source_id}"
     if source_model == "CommissionPayoutBatch":
         row = CommissionPayoutBatch.objects.filter(pk=source_id).only("batch_code", "reference_no").first()
         return (row.reference_no or row.batch_code or f"CPB-{source_id}") if row else f"CPB-{source_id}"
     if source_model == "SalarySheet":
-        row = SalarySheet.objects.select_related("employee", "payroll_period").filter(pk=source_id).only("id", "year", "month", "employee__employee_code", "payroll_period__code").first()
-        if row is None:
-            return f"SAL-{source_id}"
-        period = getattr(row.payroll_period, "code", None) if row.payroll_period_id else f"{row.year}-{row.month:02d}"
-        return f"SAL-{row.employee.employee_code}-{period}"
+        return f"SAL-{source_id}"
     if source_model == "SalaryPayment":
         row = SalaryPayment.objects.filter(pk=source_id).only("reference_no").first()
         return (row.reference_no or f"SALPAY-{source_id}") if row else f"SALPAY-{source_id}"
@@ -257,6 +235,8 @@ def _code(source_model: str, generic: str, *, purpose: str | None = None, event_
         return F15C_CODES.get(generic, generic)
     if source_model == "CustomerAdvance":
         return F20_CODES.get(generic, generic)
+    if source_model == "CustomerAdvanceAllocation":
+        return F21_CODES.get(generic, generic)
     if generic == "SOURCE_LINK_MISSING":
         return "BRIDGE_JOURNAL_MISSING_SOURCE_REFERENCE"
     if generic == "DUPLICATE_POSTING":
@@ -274,6 +254,9 @@ def _expected_period_id(*, source_model: str, source_id: str):
     elif source_model == "CustomerAdvance":
         row = CustomerAdvance.objects.filter(pk=source_id).only("payment_date").first()
         source_date = getattr(row, "payment_date", None)
+    elif source_model == "CustomerAdvanceAllocation":
+        row = CustomerAdvanceAllocation.objects.filter(pk=source_id).only("allocation_date").first()
+        source_date = getattr(row, "allocation_date", None)
     else:
         return None
     if source_date is None:
@@ -306,6 +289,8 @@ def _branch_allows_candidate(*, source_model: str, source_pk, branch_id) -> bool
         return RentLeaseDepositTransaction.objects.filter(pk=source_pk, finance_account__branch_id=branch_id).exists()
     if source_model == "CustomerAdvance":
         return CustomerAdvance.objects.filter(pk=source_pk, finance_account__branch_id=branch_id).exists()
+    if source_model == "CustomerAdvanceAllocation":
+        return CustomerAdvanceAllocation.objects.filter(pk=source_pk, subscription__branch_id=branch_id).exists() or CustomerAdvanceAllocation.objects.filter(pk=source_pk, advance__finance_account__branch_id=branch_id).exists()
     if source_model == "BillingCreditNote":
         return BillingCreditNote.objects.filter(pk=source_pk, original_invoice__branch_id=branch_id).exists()
     if source_model == "BillingDebitNote":
@@ -337,6 +322,7 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
         ("RentLeaseCollection", F15C_CODES["MISSING_POSTING"], "RentLeaseCollection exists as a supported concrete rent/lease collection settlement bridge candidate but AccountingBridgePosting is missing."),
         ("RentLeaseDepositTransaction", F17_CODES["MISSING_POSTING"], "RentLeaseDepositTransaction exists as a supported concrete security deposit receipt bridge candidate but AccountingBridgePosting is missing."),
         ("CustomerAdvance", F20_CODES["MISSING_POSTING"], "CustomerAdvance exists as a supported concrete customer advance receipt bridge candidate but AccountingBridgePosting is missing."),
+        ("CustomerAdvanceAllocation", F21_CODES["MISSING_POSTING"], "CustomerAdvanceAllocation exists as a supported concrete customer advance application bridge candidate but AccountingBridgePosting is missing."),
         ("BillingCreditNote", "BILLING_CREDIT_NOTE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingCreditNote exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("DirectSaleReturn", "DIRECT_SALE_RETURN_MISSING_ACCOUNTING_BRIDGE_POSTING", "DirectSaleReturn exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("BillingDebitNote", "BILLING_DEBIT_NOTE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingDebitNote exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
@@ -365,7 +351,7 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
 def _emit_source_nonpostable(*, run, totals: dict, date_from, date_to, branch_id, source_model: str, codes: dict[str, str], message: str, evidence_type: str):
     code_by_status = {
         "BLOCKED_BY_MAPPING": codes["MAPPING_MISSING"],
-        "BLOCKED_BY_FINANCE_ACCOUNT": codes["FINANCE_ACCOUNT_INACTIVE"],
+        "BLOCKED_BY_FINANCE_ACCOUNT": codes.get("FINANCE_ACCOUNT_INACTIVE", codes.get("MAPPING_MISSING")),
         "BLOCKED_BY_NUMBERING": codes["NUMBERING_MISSING"],
         "BLOCKED_BY_PERIOD": codes["PERIOD_MISMATCH"],
         "UNSUPPORTED_SOURCE": codes["UNSUPPORTED_SOURCE"],
@@ -406,6 +392,10 @@ def _emit_customer_advance_receipt_nonpostable(*, run, totals: dict, date_from, 
     _emit_source_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id, source_model="CustomerAdvance", codes=F20_CODES, message="CustomerAdvance receipt candidate is not postable.", evidence_type="CustomerAdvance")
 
 
+def _emit_customer_advance_application_nonpostable(*, run, totals: dict, date_from, date_to, branch_id):
+    _emit_source_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id, source_model="CustomerAdvanceAllocation", codes=F21_CODES, message="CustomerAdvanceAllocation application candidate is not postable.", evidence_type="CustomerAdvanceAllocation")
+
+
 def _emit_customer_advance_duplicate_f2_risk(*, run, totals: dict, date_from, date_to, branch_id):
     for row in list_bridge_candidates(BridgeCandidateFilters(date_from=date_from, date_to=date_to, source_model="CustomerAdvance")):
         metadata = row.get("source_metadata") if isinstance(row.get("source_metadata"), dict) else {}
@@ -417,6 +407,21 @@ def _emit_customer_advance_duplicate_f2_risk(*, run, totals: dict, date_from, da
         item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="CustomerAdvance", source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"CA-{row['source_pk']}", severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=F20_CODES["DUPLICATE_F2_RECEIPTDOCUMENT_RISK"], exception_message="CustomerAdvance source metadata indicates ReceiptDocument ownership. F2 ReceiptDocument.customer_advance owns this posting path; F20 must not duplicate it.", recommended_action="Keep this row non-postable in F20 and review the F2 ReceiptDocument.customer_advance bridge path.", expected_amount=amount, actual_amount=Decimal("0.00"), amount_delta=amount, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "bridge_status": "SKIPPED_NOT_APPLICABLE", "receipt_document_id": metadata.get("receipt_document_id"), "action_href": "/admin/accounting/bridge-reconciliation?source_model=ReceiptDocument"})
         ReconciliationEvidence.objects.create(item=item, evidence_type="CustomerAdvance", object_id=str(row["source_pk"]), label=item.source_label, amount=amount, metadata={"receipt_document_id": metadata.get("receipt_document_id")})
         totals["exceptions"] += 1
+
+
+def _emit_customer_advance_application_payment_f1_risk(*, run, totals: dict, date_from, date_to, branch_id):
+    qs = CustomerAdvanceAllocation.objects.select_related("payment", "subscription", "advance", "advance__finance_account").filter(_date_range_filter("allocation_date", date_from, date_to))
+    if branch_id:
+        qs = qs.filter(Q(subscription__branch_id=branch_id) | Q(advance__finance_account__branch_id=branch_id))
+    for allocation in qs:
+        metadata = allocation.payment.allocation_metadata if allocation.payment_id and isinstance(allocation.payment.allocation_metadata, dict) else {}
+        if metadata.get("collection_mode") == ADVANCE_ALLOCATION_COLLECTION_MODE:
+            continue
+        amount = _money(allocation.amount)
+        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="CustomerAdvanceAllocation", source_id=str(allocation.id), source_label=(allocation.payment.reference_no if allocation.payment_id and allocation.payment.reference_no else f"CAA-{allocation.id}"), severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=F21_CODES["PAYMENT_F1_DUPLICATE_RISK"], exception_message="CustomerAdvanceAllocation linked Payment is not protected with ADVANCE_ALLOCATION metadata; it could be misclassified as F1 payment collection.", recommended_action="Repair allocation Payment metadata before any customer advance application posting.", expected_amount=amount, actual_amount=Decimal("0.00"), amount_delta=amount, metadata={"allocation_id": allocation.id, "payment_id": allocation.payment_id, "payment_metadata": metadata, "action_href": "/admin/accounting/bridge-reconciliation?source_model=CustomerAdvanceAllocation"})
+        ReconciliationEvidence.objects.create(item=item, evidence_type="CustomerAdvanceAllocation", object_id=str(allocation.id), label=item.source_label, amount=amount, metadata={"payment_id": allocation.payment_id})
+        totals["exceptions"] += 1
+        totals["high_risk"] += 1
 
 
 def _emit_stock_ledger_cogs_nonpostable(*, run, totals: dict, date_from, date_to, branch_id):
@@ -446,6 +451,7 @@ def _branch_scoped_bridge_filter(branch_id):
     rent_lease_collection_ids = [str(pk) for pk in RentLeaseCollection.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
     rent_lease_deposit_ids = [str(pk) for pk in RentLeaseDepositTransaction.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
     customer_advance_ids = [str(pk) for pk in CustomerAdvance.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
+    customer_advance_allocation_ids = [str(pk) for pk in CustomerAdvanceAllocation.objects.filter(Q(subscription__branch_id=branch_id) | Q(advance__finance_account__branch_id=branch_id)).values_list("id", flat=True)]
     credit_ids = [str(pk) for pk in BillingCreditNote.objects.filter(original_invoice__branch_id=branch_id).values_list("id", flat=True)]
     debit_ids = [str(pk) for pk in BillingDebitNote.objects.filter(original_invoice__branch_id=branch_id).values_list("id", flat=True)]
     return_ids = [str(pk) for pk in DirectSaleReturn.objects.filter(direct_sale__branch_id=branch_id).values_list("id", flat=True)]
@@ -456,7 +462,7 @@ def _branch_scoped_bridge_filter(branch_id):
     commission_payout_ids = [str(pk) for pk in CommissionPayoutBatch.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
     salary_sheet_ids = [str(pk) for pk in SalarySheet.objects.filter(employee__branch_id=branch_id).values_list("id", flat=True)]
     salary_payment_ids = [str(pk) for pk in SalaryPayment.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
-    return Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="RentLeaseBillingDemand", source_id__in=rent_lease_demand_ids) | Q(source_model="RentLeaseCollection", source_id__in=rent_lease_collection_ids) | Q(source_model="RentLeaseDepositTransaction", source_id__in=rent_lease_deposit_ids) | Q(source_model="CustomerAdvance", source_id__in=customer_advance_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids) | Q(source_model="PurchaseBill", source_id__in=purchase_ids) | Q(source_model="VendorPayment", source_id__in=vendor_payment_ids) | Q(source_model="StockLedger", source_id__in=stock_ledger_ids) | Q(source_model="Commission", source_id__in=commission_ids) | Q(source_model="CommissionPayoutBatch", source_id__in=commission_payout_ids) | Q(source_model="SalarySheet", source_id__in=salary_sheet_ids) | Q(source_model="SalaryPayment", source_id__in=salary_payment_ids)
+    return Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="RentLeaseBillingDemand", source_id__in=rent_lease_demand_ids) | Q(source_model="RentLeaseCollection", source_id__in=rent_lease_collection_ids) | Q(source_model="RentLeaseDepositTransaction", source_id__in=rent_lease_deposit_ids) | Q(source_model="CustomerAdvance", source_id__in=customer_advance_ids) | Q(source_model="CustomerAdvanceAllocation", source_id__in=customer_advance_allocation_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids) | Q(source_model="PurchaseBill", source_id__in=purchase_ids) | Q(source_model="VendorPayment", source_id__in=vendor_payment_ids) | Q(source_model="StockLedger", source_id__in=stock_ledger_ids) | Q(source_model="Commission", source_id__in=commission_ids) | Q(source_model="CommissionPayoutBatch", source_id__in=commission_payout_ids) | Q(source_model="SalarySheet", source_id__in=salary_sheet_ids) | Q(source_model="SalaryPayment", source_id__in=salary_payment_ids)
 
 
 def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
@@ -478,7 +484,9 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
     _emit_rent_lease_collection_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
     _emit_security_deposit_receipt_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
     _emit_customer_advance_receipt_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
+    _emit_customer_advance_application_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
     _emit_customer_advance_duplicate_f2_risk(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
+    _emit_customer_advance_application_payment_f1_risk(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
     _emit_stock_ledger_cogs_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
 
     bridges = AccountingBridgePosting.objects.filter(source_model__in=BRIDGE_SOURCE_MODELS).select_related("journal_entry", "journal_entry__accounting_period")
