@@ -1,5 +1,9 @@
 "use client";
 
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 
@@ -526,3 +530,117 @@ function PreviewModal({ preview, busy, onClose, onPost }: { preview: BridgePosti
 function LineList({ title, lines }: { title: string; lines: Array<{ chart_account?: { code?: string; name?: string } | null; description?: string; debit_amount: string; credit_amount: string }> }) {
   return <div className="rounded-xl border border-border p-3"><div className="text-xs font-semibold uppercase text-muted-foreground">{title}</div><div className="mt-2 space-y-2">{lines.map((line, index) => <div key={`${title}-${index}`} className="rounded-lg border border-border/70 p-2 text-xs"><div className="font-semibold text-foreground">{line.chart_account?.code} · {line.chart_account?.name}</div><div className="text-muted-foreground">{line.description}</div><div>Dr {line.debit_amount} / Cr {line.credit_amount}</div></div>)}</div></div>;
 }
+=======
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+import { useMemo, useState } from "react";
+
+import {
+  isBlockedOrExceptionRow,
+  isConcreteCandidate,
+  isUnsupportedOrDeferredRow,
+  type AccountingBridgeReconciliationRow,
+} from "@/services/accounting-bridge-reconciliation";
+
+function rowCanPost(row: AccountingBridgeReconciliationRow): boolean {
+  return isConcreteCandidate(row) && row.status === "READY_UNPOSTED" && row.can_post !== false;
+}
+
+function RowAction({ row, selected }: { row: AccountingBridgeReconciliationRow; selected: boolean }) {
+  const status = String(row.status || "").toUpperCase();
+  if (row.row_type === "readiness_event") return <span>Readiness-only row. No posting action.</span>;
+  if (isUnsupportedOrDeferredRow(row)) {
+    if (status === "DEFERRED" || status === "SKIPPED_NOT_APPLICABLE") return <span>Source contract only. Posting owned by later phase.</span>;
+    return <span>Unsupported source. No posting workflow exists.</span>;
+  }
+  if (isBlockedOrExceptionRow(row)) return <span>Resolve blocker before posting.</span>;
+  if (rowCanPost(row)) return <span>{selected ? "Preview/Post" : "Select this row to preview/post."}</span>;
+  return <span>Readiness-only row. No posting action.</span>;
+}
+
+function RelevantSetupLink({ row }: { row: AccountingBridgeReconciliationRow }) {
+  const link = row.action_links?.find((item) => !item.disabled) ?? row.action_links?.[0];
+  const href = link?.href ?? row.action_href ?? row.setup_href;
+  const label = link?.label ?? row.recommended_action;
+  if (!label) return null;
+  if (!href || link?.disabled) return <span className="text-xs text-muted-foreground">{label}</span>;
+  return <a className="text-xs font-medium text-primary underline" href={href}>{label}</a>;
+}
+
+function RowList({ title, rows, selected, toggle }: { title: string; rows: AccountingBridgeReconciliationRow[]; selected: Set<string | number>; toggle?: (row: AccountingBridgeReconciliationRow) => void }) {
+  return (
+    <section className="rounded-2xl border border-border bg-background p-4 shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+      {rows.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No rows in this section.</p> : null}
+      <div className="mt-3 grid gap-3">
+        {rows.map((row, index) => {
+          const key = row.id ?? row.bridge_candidate_id ?? `${row.source_model}-${row.event_key}-${index}`;
+          return (
+            <div key={String(key)} className="grid gap-2 rounded-xl border border-border/70 p-3 text-sm md:grid-cols-[auto_1fr_1fr_1fr]">
+              <div>
+                {toggle && rowCanPost(row) ? <input aria-label="Select bridge row" type="checkbox" checked={selected.has(key)} onChange={() => toggle(row)} /> : null}
+              </div>
+              <div><strong>{row.source_model || "Source"}</strong><div className="text-muted-foreground">{row.event_key || row.purpose || "—"}</div></div>
+              <div>{row.status || "UNKNOWN"}<div><RelevantSetupLink row={row} /></div></div>
+              <div><RowAction row={row} selected={selected.has(key)} /></div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export default function AccountingBridgeReconciliationPage() {
+  const [rows] = useState<AccountingBridgeReconciliationRow[]>([]);
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+
+  const { concreteSourceRows, blockedRows, boundaryRows } = useMemo(() => {
+    const concreteSourceRows = rows.filter((row) => isConcreteCandidate(row) && !isUnsupportedOrDeferredRow(row) && !isBlockedOrExceptionRow(row));
+    const blockedRows = rows.filter((row) => isBlockedOrExceptionRow(row));
+    const boundaryRows = rows.filter((row) => isUnsupportedOrDeferredRow(row));
+    return { concreteSourceRows, blockedRows, boundaryRows };
+  }, [rows]);
+
+  function toggle(row: AccountingBridgeReconciliationRow) {
+    const key = row.id ?? row.bridge_candidate_id;
+    if (key == null) return;
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  const selectedConcreteRows = concreteSourceRows.filter((row) => selected.has(row.id ?? row.bridge_candidate_id ?? ""));
+  const batchDisabled = selectedConcreteRows.length === 0 || !selectedConcreteRows.every(rowCanPost);
+
+  return (
+    <main className="space-y-6 p-6">
+      <header className="space-y-2"><h1 className="text-2xl font-bold">Accounting Bridge Reconciliation</h1><p className="text-sm text-muted-foreground">Read-only setup and source inventory. Preview/post controls remain row-level and controlled; this page does not auto-post, auto-reconcile, or close periods.</p></header>
+      <section className="rounded-2xl border p-4"><h2 className="font-semibold">Setup health summary</h2></section>
+      <section className="rounded-2xl border p-4"><h2 className="font-semibold">Phase F Control Tower compact inventory</h2></section>
+      <section className="rounded-2xl border p-4"><h2 className="font-semibold">Production Accounting Validation compact matrix</h2></section>
+      <section className="rounded-2xl border p-4"><h2 className="font-semibold">Filters</h2></section>
+      <section className="rounded-2xl border p-4"><h2 className="font-semibold">Selection / batch action panel</h2><button disabled={batchDisabled}>Batch preview/post selected</button></section>
+      <RowList title="Concrete source candidates" rows={concreteSourceRows} selected={selected} toggle={toggle} />
+      <RowList title="Blocked / exception rows" rows={blockedRows} selected={selected} />
+      <RowList title="Unsupported / deferred boundaries" rows={boundaryRows} selected={selected} />
+    </main>
+  );
+}
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs

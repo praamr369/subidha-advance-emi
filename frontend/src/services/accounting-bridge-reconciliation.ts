@@ -1,3 +1,7 @@
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 import { request } from "@/services/api";
 
 export type AccountingBridgeReconciliationSummary = {
@@ -351,4 +355,76 @@ export function verifyBridgeReconciliationItem(itemId: number, payload: { note?:
     method: "POST",
     body: JSON.stringify(payload),
   });
+=======
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+export type AccountingBridgeReconciliationRow = {
+  id?: string | number;
+  row_type?: string;
+  bridge_candidate_id?: string | number | null;
+  status?: string;
+  source_model?: string;
+  event_key?: string;
+  purpose?: string;
+  exception_reasons?: string[];
+  action_href?: string | null;
+  setup_href?: string | null;
+  recommended_action?: string;
+  can_post?: boolean;
+  can_preview?: boolean;
+  action_links?: Array<{ type: string; label: string; href?: string | null; disabled?: boolean }>;
+};
+
+export type AccountingBridgeReadinessContract = {
+  primary_state: string;
+  ready_for_controlled_posting: boolean;
+  read_only: boolean;
+  creates_journal_entries: boolean;
+  creates_bridge_postings: boolean;
+  mutates_source_records: boolean;
+  concrete_candidate_count?: number;
+  readiness_only_count?: number;
+  deferred_count?: number;
+  validation_only_count?: number;
+  rows: AccountingBridgeReconciliationRow[];
+};
+
+export function isConcreteCandidate(row: AccountingBridgeReconciliationRow): boolean {
+  return row.row_type === "bridge_candidate" && Boolean(row.bridge_candidate_id);
+}
+
+export function isUnsupportedOrDeferredRow(row: AccountingBridgeReconciliationRow): boolean {
+  const status = String(row.status || "").toUpperCase();
+  return ["UNSUPPORTED_SOURCE", "UNSUPPORTED", "DEFERRED", "SKIPPED_NOT_APPLICABLE"].includes(status);
+}
+
+export function isBlockedOrExceptionRow(row: AccountingBridgeReconciliationRow): boolean {
+  const status = String(row.status || "").toUpperCase();
+  return (
+    status === "EXCEPTION" ||
+    status.startsWith("BLOCKED") ||
+    (Boolean(row.exception_reasons?.length) &&
+      !["READY_UNPOSTED", "POSTED_UNVERIFIED", "RECONCILED"].includes(status) &&
+      !isUnsupportedOrDeferredRow(row))
+  );
+}
+
+export async function fetchAccountingBridgeReconciliation(): Promise<AccountingBridgeReadinessContract> {
+  const response = await fetch("/api/accounting/bridge-reconciliation/", { credentials: "include" });
+  if (!response.ok) throw new Error("Unable to load bridge reconciliation readiness.");
+  return response.json();
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
 }

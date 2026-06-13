@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from collections import Counter
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 from dataclasses import dataclass
 from typing import Any
 
@@ -929,3 +933,173 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "production_accounting_validation": production_validation,
         "results": rows,
     }
+=======
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+from typing import Any
+
+BLOCKER_LINKS = {
+    "BLOCKED_BY_MAPPING": ("mapping_audit", "/admin/accounting/mapping-audit"),
+    "BLOCKED_BY_FINANCE_ACCOUNT": ("finance_accounts", "/admin/accounting/finance-accounts"),
+    "BLOCKED_BY_NUMBERING": ("journal_numbering", "/admin/accounting/journal-numbering"),
+    "BLOCKED_BY_PERIOD": ("accounting_periods", "/admin/accounting/periods"),
+    "BLOCKED_BY_APPROVAL": ("bridge_posting", "/admin/accounting/bridge-posting"),
+}
+
+UNSUPPORTED_STATUSES = {"UNSUPPORTED", "UNSUPPORTED_SOURCE"}
+DEFERRED_STATUSES = {"DEFERRED", "SKIPPED_NOT_APPLICABLE"}
+VALIDATION_ROW_TYPES = {"validation", "validation_event", "operational_validation"}
+READINESS_ROW_TYPES = {"readiness", "readiness_event", "setup_readiness"}
+
+
+def _status(row: dict[str, Any]) -> str:
+    return str(row.get("status") or "").upper()
+
+
+def _row_type(row: dict[str, Any]) -> str:
+    return str(row.get("row_type") or "").lower()
+
+
+def _is_real_candidate(row: dict[str, Any]) -> bool:
+    return _row_type(row) == "bridge_candidate" and bool(row.get("bridge_candidate_id"))
+
+
+def _is_readiness_only(row: dict[str, Any]) -> bool:
+    return _row_type(row) in READINESS_ROW_TYPES
+
+
+def _is_validation_only(row: dict[str, Any]) -> bool:
+    return _row_type(row) in VALIDATION_ROW_TYPES
+
+
+def _phase_f_action_links(row: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return only setup links relevant to this read-only inventory row."""
+
+    status = _status(row)
+    link_keys: list[str] = []
+    blocker_types = row.get("blocker_types") or row.get("blocking_reasons") or []
+    if isinstance(blocker_types, str):
+        blocker_types = [blocker_types]
+    for blocker in blocker_types:
+        blocker_status = str(blocker or "").upper()
+        if blocker_status in BLOCKER_LINKS and blocker_status not in link_keys:
+            link_keys.append(blocker_status)
+    if status in BLOCKER_LINKS and status not in link_keys:
+        link_keys.append(status)
+
+    links = [
+        {"type": kind, "label": label.replace("_", " ").title(), "href": href, "disabled": False}
+        for label, href in (BLOCKER_LINKS[key] for key in link_keys)
+        for kind in [label]
+    ]
+    if links:
+        return links
+
+    if status in {"EXCEPTION", "POSTED_UNVERIFIED"} or row.get("posted_unverified"):
+        return [{"type": "reconciliation", "label": "Reconciliation", "href": "/admin/accounting/bridge-reconciliation", "disabled": False}]
+    if status == "READY_UNPOSTED" and _is_real_candidate(row):
+        source_model = row.get("source_model") or ""
+        event_key = row.get("event_key") or row.get("purpose") or ""
+        query = "&".join(part for part in [f"source_model={source_model}" if source_model else "", f"event_key={event_key}" if event_key else ""])
+        return [{"type": "bridge_posting", "label": "Bridge Posting", "href": f"/admin/accounting/bridge-posting{('?' + query) if query else ''}", "disabled": False}]
+    if status in UNSUPPORTED_STATUSES or row.get("source_model") == "StaffAdvance":
+        return [{"type": "unsupported_boundary", "label": "Unsupported source", "href": None, "disabled": True}]
+    if status in DEFERRED_STATUSES or _row_type(row) == "source_contract":
+        return [{"type": "deferred_source_contract", "label": "Deferred source contract", "href": None, "disabled": True}]
+    return []
+
+
+def annotate_phase_f_row_actions(row: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(row)
+    links = _phase_f_action_links(payload)
+    payload["action_links"] = links
+    primary = next((link for link in links if not link.get("disabled")), links[0] if links else None)
+    payload["action_href"] = primary.get("href") if primary else None
+    payload["setup_href"] = payload["action_href"]
+    if _is_readiness_only(payload) or _is_validation_only(payload):
+        payload["can_post"] = False
+        payload["can_preview"] = False
+    if _status(payload) in UNSUPPORTED_STATUSES or _status(payload) in DEFERRED_STATUSES or _row_type(payload) == "source_contract":
+        payload["can_post"] = False
+        payload["can_preview"] = False
+    return payload
+
+
+def _phase_f_readiness_contract(rows: list[dict[str, Any]] | None = None, *, setup_blockers: list[str] | None = None) -> dict[str, Any]:
+    """Summarise Phase-F readiness without creating postings or mutating source records."""
+
+    rows = [annotate_phase_f_row_actions(row) for row in (rows or [])]
+    concrete = [row for row in rows if _is_real_candidate(row)]
+    readiness_only = [row for row in rows if _is_readiness_only(row)]
+    validation_only = [row for row in rows if _is_validation_only(row)]
+    unsupported = [row for row in concrete if _status(row) in UNSUPPORTED_STATUSES or row.get("source_model") == "StaffAdvance"]
+    deferred = [row for row in concrete if _status(row) in DEFERRED_STATUSES or _row_type(row) == "source_contract"]
+    blockers = [row for row in rows if _status(row).startswith("BLOCKED") or row.get("blocking_reasons")]
+    exceptions = [row for row in rows if _status(row) == "EXCEPTION" or row.get("exception_reasons")]
+    posted_unverified = [row for row in rows if _status(row) == "POSTED_UNVERIFIED" or row.get("posted_unverified")]
+    ready_unposted = [row for row in concrete if _status(row) == "READY_UNPOSTED"]
+    concrete_postable = [row for row in concrete if row not in unsupported and row not in deferred]
+
+    setup_blockers = setup_blockers or []
+    if exceptions:
+        primary_state = "RECONCILIATION_EXCEPTIONS"
+    elif blockers or setup_blockers:
+        primary_state = "ACTION_REQUIRED"
+    elif posted_unverified:
+        primary_state = "POSTED_UNVERIFIED_EXISTS"
+    elif ready_unposted:
+        primary_state = "READY_FOR_CONTROLLED_POSTING"
+    elif readiness_only and not concrete and not setup_blockers:
+        primary_state = "SETUP_READY_NO_SOURCE_ROWS"
+    elif validation_only and not concrete:
+        primary_state = "VALIDATION_ONLY"
+    elif concrete and len(unsupported) == len(concrete):
+        primary_state = "UNSUPPORTED_ONLY"
+    elif concrete and len(deferred) == len(concrete):
+        primary_state = "DEFERRED_ONLY"
+    else:
+        primary_state = "NO_CANDIDATES"
+
+    return {
+        "primary_state": primary_state,
+        "states": [primary_state],
+        "ready_for_controlled_posting": primary_state == "READY_FOR_CONTROLLED_POSTING",
+        "can_post": False,
+        "can_preview": False,
+        "read_only": True,
+        "creates_journal_entries": False,
+        "creates_bridge_postings": False,
+        "mutates_source_records": False,
+        "auto_posts": False,
+        "auto_reconciles": False,
+        "auto_closes_periods": False,
+        "concrete_candidate_count": len(concrete_postable),
+        "readiness_only_count": len(readiness_only),
+        "validation_only_count": len(validation_only),
+        "deferred_count": len(deferred),
+        "unsupported_count": len(unsupported),
+        "posted_unverified_count": len(posted_unverified),
+        "reconciliation_exception_count": len(exceptions),
+        "blocker_count": len(blockers) + len(setup_blockers),
+        "ready_unposted_count": len(ready_unposted),
+        "status_counts": dict(Counter(_status(row) or "UNKNOWN" for row in rows)),
+        "rows": rows,
+    }
+
+
+def build_phase_f_reconciliation_payload(rows: list[dict[str, Any]] | None = None, *, setup_blockers: list[str] | None = None) -> dict[str, Any]:
+    return _phase_f_readiness_contract(rows, setup_blockers=setup_blockers)
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs

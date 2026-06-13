@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 from typing import Any
 
 from accounting.services.accounting_bridge_reconciliation_read_service import BridgeReconciliationFilters, _phase_f_control_tower, build_accounting_bridge_reconciliation as build_base_reconciliation
@@ -56,3 +60,26 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         payload.get("readiness_blockers") or [],
     )
     return {**payload, "summary": summary, "phase_f_control_tower": phase_f_control_tower, "results": results}
+=======
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+from accounting.services.accounting_bridge_reconciliation_read_service import annotate_phase_f_row_actions
+
+
+def annotate_purchase_bill_reconciliation_row(row: dict) -> dict:
+    """Read-only purchase-bill inventory row action adapter."""
+    return annotate_phase_f_row_actions(row)
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
