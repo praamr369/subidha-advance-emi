@@ -116,6 +116,27 @@ Posting creates:
 
 Posting does not mark the source as posted/settled and does not mark reconciliation as verified.
 
+## Reconciliation-run diagnostics
+
+F23.1 wires `CustomerAdvanceRefund` into reconciliation-run checks with dedicated diagnostic codes:
+
+- `CUSTOMER_ADVANCE_REFUND_MISSING_ACCOUNTING_BRIDGE_POSTING`
+- `CUSTOMER_ADVANCE_REFUND_POSTED_UNVERIFIED`
+- `CUSTOMER_ADVANCE_REFUND_AMOUNT_MISMATCH`
+- `CUSTOMER_ADVANCE_REFUND_PERIOD_MISMATCH`
+- `CUSTOMER_ADVANCE_REFUND_DUPLICATE_ACCOUNTING_BRIDGE_POSTING`
+- `CUSTOMER_ADVANCE_REFUND_SOURCE_LINK_MISSING`
+- `CUSTOMER_ADVANCE_REFUND_JOURNAL_UNBALANCED`
+- `CUSTOMER_ADVANCE_REFUND_MAPPING_MISSING`
+- `CUSTOMER_ADVANCE_REFUND_FINANCE_ACCOUNT_INACTIVE`
+- `CUSTOMER_ADVANCE_REFUND_NUMBERING_MISSING`
+- `CUSTOMER_ADVANCE_REFUND_UNSUPPORTED_SOURCE`
+- `CUSTOMER_ADVANCE_REFUND_DUPLICATE_SOURCE_RISK`
+
+Diagnostics detect ready/unposted refund rows, posted-unverified rows, source/journal amount mismatch, refund-date period mismatch, duplicate postings, wrong source link, unbalanced journal, liability mapping blocker, finance-account blocker, numbering blocker, unsupported source posture, and non-customer-advance refund duplicate-source risk.
+
+Diagnostics create only diagnostic `ReconciliationItem` / `ReconciliationEvidence` records through the existing reconciliation framework. They do not create `JournalEntry` or `AccountingBridgePosting` and do not post, reconcile, close periods, or change source records.
+
 ## No-source-mutation contract
 
 F23 does not mutate:
@@ -130,7 +151,17 @@ F23 does not mutate:
 - subscription/contract
 - `FinanceAccount`
 
-It does not reduce advance balance again. The service snapshots refund, source advance, customer, and finance-account evidence before posting and rolls back if mutation is detected.
+It does not reduce advance balance again. The bridge service snapshots refund, source advance, customer, and finance-account evidence before posting and rolls back if mutation is detected. The reconciliation diagnostics are read-only against operational source records.
+
+## F2/F20/F21/F22/F23 separation
+
+- F2 owns `ReceiptDocument.customer_advance`.
+- F20 owns `CustomerAdvance` receipt posting.
+- F21 owns `CustomerAdvanceAllocation` application posting.
+- F22 owns `CustomerAdvanceRefund` source-contract creation/hardening.
+- F23 owns accounting bridge posting for `CustomerAdvanceRefund` only.
+
+Security deposit refunds remain `RentLeaseDepositTransaction` / F18. Direct-sale refund and customer-credit refund records are not classified as `CustomerAdvanceRefund`. `Payment ADVANCE_ALLOCATION` remains excluded from the normal F1 payment path.
 
 ## Frontend contract
 
@@ -156,8 +187,8 @@ No new bridge button was added outside the existing controlled bridge reconcilia
 ## Required regression
 
 ```bash
-.venv/bin/python manage.py test tests.accounting.test_accounting_bridge_customer_advance_refund_phase_f23 --verbosity=1
-.venv/bin/python manage.py test tests.accounting.test_accounting_bridge_customer_advance_receipt_phase_f20 tests.accounting.test_accounting_bridge_customer_advance_application_phase_f21 tests.accounting.test_customer_advance_refund_source_contract_phase_f22 tests.accounting.test_accounting_bridge_customer_advance_refund_phase_f23 --verbosity=1
+.venv/bin/python manage.py test tests.accounting.test_accounting_bridge_customer_advance_refund_phase_f23 tests.accounting.test_accounting_bridge_customer_advance_refund_diagnostics_phase_f23_1 --verbosity=1
+.venv/bin/python manage.py test tests.accounting.test_accounting_bridge_customer_advance_receipt_phase_f20 tests.accounting.test_accounting_bridge_customer_advance_application_phase_f21 tests.accounting.test_customer_advance_refund_source_contract_phase_f22 tests.accounting.test_accounting_bridge_customer_advance_refund_phase_f23 tests.accounting.test_accounting_bridge_customer_advance_refund_diagnostics_phase_f23_1 --verbosity=1
 .venv/bin/python manage.py test tests.accounting tests.reconciliation tests.subscriptions --verbosity=1
 .venv/bin/python manage.py check
 .venv/bin/python manage.py makemigrations --check --dry-run
@@ -167,6 +198,6 @@ npm run lint
 npm run build:smoke
 ```
 
-## Known closeout note
+## Closeout note
 
-The F23 bridge service, API wrapper, read service, cockpit support, and backend F23 bridge tests were added in this phase. Dedicated reconciliation-run diagnostic-code wiring in `backend/reconciliation/services/accounting_bridge_reconciliation.py` must be completed before Phase F closeout/control-tower hardening is considered ready.
+F23 diagnostics are now wired into reconciliation-run checks. Phase F control-tower hardening can start only after the F20/F21/F22/F23 regression gates pass locally.
