@@ -1,7 +1,3 @@
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 from decimal import Decimal
 
 from django.utils import timezone
@@ -26,7 +22,12 @@ from tests.helpers import (
 )
 
 
-READY_PERIOD = {"financial_year_ready": True, "accounting_period_ready": True, "journal_numbering_ready": True, "posting_controls_ready": True}
+READY_PERIOD = {
+    "financial_year_ready": True,
+    "accounting_period_ready": True,
+    "journal_numbering_ready": True,
+    "posting_controls_ready": True,
+}
 
 
 class PhaseFControlTowerCloseoutF24Tests(APITestCase):
@@ -183,62 +184,3 @@ class PhaseFControlTowerCloseoutF24Tests(APITestCase):
             "reference_no": payment.reference_no,
         }
         self.assertEqual(after, before)
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-from django.test import SimpleTestCase
-
-from accounting.services.accounting_bridge_reconciliation_read_service import _phase_f_readiness_contract
-
-
-class PhaseFControlTowerCloseoutReadinessTests(SimpleTestCase):
-    def test_ready_unposted_concrete_candidate_is_ready_and_never_no_candidates(self):
-        payload = _phase_f_readiness_contract([
-            {"row_type": "bridge_candidate", "bridge_candidate_id": "1", "status": "READY_UNPOSTED", "source_model": "Payment"}
-        ])
-        self.assertEqual(payload["primary_state"], "READY_FOR_CONTROLLED_POSTING")
-        self.assertNotIn("NO_CANDIDATES", payload["states"])
-        self.assertTrue(payload["ready_for_controlled_posting"])
-
-    def test_readiness_event_ready_unposted_does_not_mark_ready_for_controlled_posting(self):
-        payload = _phase_f_readiness_contract([
-            {"row_type": "readiness_event", "status": "READY_UNPOSTED", "source_model": "Payment"}
-        ])
-        self.assertIn(payload["primary_state"], {"SETUP_READY_NO_SOURCE_ROWS", "VALIDATION_ONLY"})
-        self.assertFalse(payload["ready_for_controlled_posting"])
-        self.assertFalse(payload["rows"][0]["can_post"])
-
-    def test_unsupported_staff_advance_remains_boundary_and_non_postable(self):
-        payload = _phase_f_readiness_contract([
-            {"row_type": "bridge_candidate", "bridge_candidate_id": "sa-1", "status": "UNSUPPORTED", "source_model": "StaffAdvance"}
-        ])
-        self.assertEqual(payload["primary_state"], "UNSUPPORTED_ONLY")
-        self.assertFalse(payload["rows"][0]["can_post"])
-
-    def test_deferred_source_contract_rows_are_deferred_only_and_non_postable(self):
-        payload = _phase_f_readiness_contract([
-            {"row_type": "bridge_candidate", "bridge_candidate_id": "sc-1", "status": "DEFERRED", "source_model": "SourceContract"}
-        ])
-        self.assertEqual(payload["primary_state"], "DEFERRED_ONLY")
-        self.assertFalse(payload["rows"][0]["can_post"])
-
-    def test_blocked_action_links_are_specific_not_generic(self):
-        payload = _phase_f_readiness_contract([
-            {"row_type": "bridge_candidate", "bridge_candidate_id": "2", "status": "BLOCKED_BY_MAPPING", "source_model": "Payment"}
-        ])
-        link_types = [link["type"] for link in payload["rows"][0]["action_links"]]
-        self.assertEqual(link_types, ["mapping_audit"])
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
