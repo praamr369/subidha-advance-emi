@@ -29,6 +29,7 @@ const SOURCE_MODEL_OPTIONS = [
   { value: "ReceiptDocument", label: "Receipt Document" },
   { value: "CustomerAdvance", label: "Customer Advance Receipt" },
   { value: "CustomerAdvanceAllocation", label: "Customer Advance Application" },
+  { value: "CustomerAdvanceRefund", label: "Customer Advance Refund" },
   { value: "BillingInvoice", label: "Billing Invoice" },
   { value: "RentLeaseBillingDemand", label: "Rent/Lease Revenue Demand" },
   { value: "RentLeaseCollection", label: "Rent/Lease Collection" },
@@ -47,7 +48,7 @@ const SOURCE_MODEL_OPTIONS = [
 const CONCRETE_POST_MODELS = new Set(SOURCE_MODEL_OPTIONS.map((item) => item.value).filter(Boolean));
 const MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit";
 const RECONCILIATION_RUNS_HREF = "/admin/reconciliation/runs";
-const SAFETY_COPY = "Posting creates accounting entries only after explicit admin confirmation. It does not edit customer advance, allocation, payment, receipt, EMI, deposit, contract, customer, collection, demand, finance-account, inventory, payroll, commission, payout, or StaffAdvance records.";
+const SAFETY_COPY = "Posting creates accounting entries only after explicit admin confirmation. It does not edit customer advance refund, source advance, allocation, payment, receipt, EMI, deposit, contract, customer, collection, demand, finance-account, inventory, payroll, commission, payout, or StaffAdvance records.";
 const SECURITY_DEPOSIT_REFUND_EVENTS = new Set(["security_deposit_refund", "rent_security_deposit_refund", "lease_security_deposit_refund"]);
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -91,6 +92,8 @@ function modelLabel(model?: string | null): string {
 
 function sourceTitle(row: AccountingBridgeReconciliationRow): string {
   if (row.source_display) return row.source_display;
+  if (row.refund_reference) return `Customer advance refund ${row.refund_reference}`;
+  if (row.refund_reference_no) return `Customer advance refund ${row.refund_reference_no}`;
   if (row.allocation_reference) return `Customer advance application ${row.allocation_reference}`;
   if (row.advance_reference) return `Customer advance ${row.advance_reference}`;
   if (row.collection_number) return `Rent/lease collection ${row.collection_number}`;
@@ -112,7 +115,11 @@ function SourceDetails({ row }: { row: AccountingBridgeReconciliationRow }) {
   return (
     <div className="mt-2 space-y-1 text-xs text-muted-foreground">
       <InfoLine label="Model" value={modelLabel(row.source_model)} />
-      <InfoLine label="Reference" value={row.allocation_reference ?? row.advance_reference ?? row.reference_no ?? row.source_reference ?? row.source_reference_number ?? row.collection_reference} />
+      <InfoLine label="Reference" value={row.refund_reference ?? row.refund_reference_no ?? row.allocation_reference ?? row.advance_reference ?? row.reference_no ?? row.source_reference ?? row.source_reference_number ?? row.collection_reference} />
+      <InfoLine label="Refund reference" value={row.refund_reference ?? row.refund_reference_no} />
+      <InfoLine label="Refund date" value={row.refund_date} />
+      <InfoLine label="Refund status" value={row.refund_status} />
+      <InfoLine label="Created by" value={row.created_by_name} />
       <InfoLine label="Advance" value={row.advance_reference} />
       <InfoLine label="Unapplied" value={row.advance_unapplied_amount ?? row.unapplied_amount} />
       <InfoLine label="Allocation date" value={row.allocation_date} />
@@ -128,8 +135,8 @@ function SourceDetails({ row }: { row: AccountingBridgeReconciliationRow }) {
       <InfoLine label="Subscription / contract" value={[row.subscription_id, row.contract_reference].filter(Boolean).join(" · ")} />
       <InfoLine label="Method" value={row.payment_method ?? row.method} />
       <InfoLine label="Finance account" value={[row.finance_account_name, row.finance_account_active === false ? "inactive" : null].filter(Boolean).join(" · ")} />
-      <InfoLine label="Date" value={row.allocation_date ?? row.transaction_date ?? row.payment_date ?? row.source_date} />
-      <InfoLine label="Source status" value={row.advance_status ?? row.transaction_status ?? row.collection_status ?? row.demand_status ?? row.source_status} />
+      <InfoLine label="Date" value={row.refund_date ?? row.allocation_date ?? row.transaction_date ?? row.payment_date ?? row.source_date} />
+      <InfoLine label="Source status" value={row.refund_status ?? row.advance_status ?? row.transaction_status ?? row.collection_status ?? row.demand_status ?? row.source_status} />
       <InfoLine label="Journal state" value={row.journal_entry?.entry_no ?? (row.existing_journal_entry_id ? `Journal #${row.existing_journal_entry_id}` : "Not posted")} />
       <InfoLine label="Reconciliation" value={row.reconciliation_state ?? (row.existing_reconciliation_item_id ? `Item #${row.existing_reconciliation_item_id}` : "Pending posting")} />
     </div>
@@ -304,7 +311,7 @@ export default function AccountingBridgeReconciliationPage() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting operations path</div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Preview source item → post explicitly → verify reconciliation</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Concrete candidates include all approved Phase F source models including Customer Advance Receipt and Customer Advance Application. {SAFETY_COPY}</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Concrete candidates include all approved Phase F source models including Customer Advance Receipt, Application, and Refund. {SAFETY_COPY}</p>
             </div>
             <ActionButton variant="secondary" onClick={() => void load(filters, { silent: true })} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</ActionButton>
           </div>
@@ -313,7 +320,8 @@ export default function AccountingBridgeReconciliationPage() {
             <SummaryCard label="Receipt ready" value={Number(summary?.receipt_ready_unposted_count ?? 0)} href={bridgeHref("ReceiptDocument", "READY_UNPOSTED")} />
             <SummaryCard label="Advance receipt ready" value={Number(summary?.customer_advance_receipt_ready_unposted_count ?? 0)} href={bridgeHref("CustomerAdvance", "READY_UNPOSTED")} />
             <SummaryCard label="Advance application ready" value={Number(summary?.customer_advance_application_ready_unposted_count ?? 0)} href={bridgeHref("CustomerAdvanceAllocation", "READY_UNPOSTED")} />
-            <SummaryCard label="Advance application posted" value={Number(summary?.customer_advance_application_posted_unverified_count ?? 0)} href={bridgeHref("CustomerAdvanceAllocation", "POSTED_UNVERIFIED")} tone="border-emerald-200 bg-white text-emerald-900" />
+            <SummaryCard label="Advance refund ready" value={Number(summary?.customer_advance_refund_ready_unposted_count ?? 0)} href={bridgeHref("CustomerAdvanceRefund", "READY_UNPOSTED")} />
+            <SummaryCard label="Advance refund posted" value={Number(summary?.customer_advance_refund_posted_unverified_count ?? 0)} href={bridgeHref("CustomerAdvanceRefund", "POSTED_UNVERIFIED")} tone="border-emerald-200 bg-white text-emerald-900" />
             <SummaryCard label="Invoice ready" value={Number(summary?.billing_invoice_ready_unposted_count ?? 0)} href={bridgeHref("BillingInvoice", "READY_UNPOSTED")} />
             <SummaryCard label="Rent/lease revenue ready" value={Number(summary?.rent_lease_revenue_ready_unposted_count ?? 0)} href={bridgeHref("RentLeaseBillingDemand", "READY_UNPOSTED")} />
             <SummaryCard label="Rent/lease collection ready" value={Number(summary?.rent_lease_collection_ready_unposted_count ?? summary?.rent_lease_payment_ready_unposted_count ?? 0)} href={bridgeHref("RentLeaseCollection", "READY_UNPOSTED")} />
@@ -327,7 +335,7 @@ export default function AccountingBridgeReconciliationPage() {
           </div>
         </section>
 
-        <WorkspaceSection title="Filters" description="Filter by source model, status, event key, period, or reference. URL filters such as source_model=CustomerAdvanceAllocation are supported.">
+        <WorkspaceSection title="Filters" description="Filter by source model, status, event key, period, or reference. URL filters such as source_model=CustomerAdvanceRefund are supported.">
           <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm md:grid-cols-3 xl:grid-cols-6">
             <input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Financial year" value={draftFilters.financial_year ?? ""} onChange={(event) => setDraft("financial_year", event.target.value)} />
             <input className="rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Accounting period" value={draftFilters.accounting_period ?? ""} onChange={(event) => setDraft("accounting_period", event.target.value)} />
