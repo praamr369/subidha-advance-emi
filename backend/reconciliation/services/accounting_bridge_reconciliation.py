@@ -65,6 +65,27 @@ F17_CODES = {
     "UNSUPPORTED_SOURCE": "SECURITY_DEPOSIT_RECEIPT_UNSUPPORTED_SOURCE",
 }
 
+F18_CODES = {
+    "MISSING_POSTING": "SECURITY_DEPOSIT_REFUND_MISSING_ACCOUNTING_BRIDGE_POSTING",
+    "POSTED_UNVERIFIED": "SECURITY_DEPOSIT_REFUND_POSTED_UNVERIFIED",
+    "AMOUNT_MISMATCH": "SECURITY_DEPOSIT_REFUND_AMOUNT_MISMATCH",
+    "PERIOD_MISMATCH": "SECURITY_DEPOSIT_REFUND_PERIOD_MISMATCH",
+    "DUPLICATE_POSTING": "SECURITY_DEPOSIT_REFUND_DUPLICATE_ACCOUNTING_BRIDGE_POSTING",
+    "SOURCE_LINK_MISSING": "SECURITY_DEPOSIT_REFUND_SOURCE_LINK_MISSING",
+    "JOURNAL_UNBALANCED": "SECURITY_DEPOSIT_REFUND_JOURNAL_UNBALANCED",
+    "MAPPING_MISSING": "SECURITY_DEPOSIT_REFUND_MAPPING_MISSING",
+    "FINANCE_ACCOUNT_INACTIVE": "SECURITY_DEPOSIT_REFUND_FINANCE_ACCOUNT_INACTIVE",
+    "NUMBERING_MISSING": "SECURITY_DEPOSIT_REFUND_NUMBERING_MISSING",
+    "UNSUPPORTED_SOURCE": "SECURITY_DEPOSIT_REFUND_UNSUPPORTED_SOURCE",
+}
+
+SECURITY_DEPOSIT_REFUND_EVENTS = {
+    "security_deposit_refund",
+    "rent_security_deposit_refund",
+    "lease_security_deposit_refund",
+}
+SECURITY_DEPOSIT_REFUND_PURPOSES = {event.upper() for event in SECURITY_DEPOSIT_REFUND_EVENTS}
+
 
 def _money(value) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
@@ -191,9 +212,24 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
     return fallback or f"{source_model}-{source_id}"
 
 
-def _code(source_model: str, generic: str) -> str:
+def _is_security_deposit_refund(*, purpose: str | None = None, event_key: str | None = None) -> bool:
+    return (purpose or "").strip().upper() in SECURITY_DEPOSIT_REFUND_PURPOSES or (event_key or "").strip() in SECURITY_DEPOSIT_REFUND_EVENTS
+
+
+def _deposit_event_key_for_source(source_id: str) -> str | None:
+    row = RentLeaseDepositTransaction.objects.filter(pk=source_id).only("transaction_type", "plan_type").first()
+    if row is None or row.transaction_type not in {"DEPOSIT_REFUND", "REFUNDED"}:
+        return None
+    if row.plan_type == "RENT":
+        return "rent_security_deposit_refund"
+    if row.plan_type == "LEASE":
+        return "lease_security_deposit_refund"
+    return "security_deposit_refund"
+
+
+def _code(source_model: str, generic: str, *, purpose: str | None = None, event_key: str | None = None) -> str:
     if source_model == "RentLeaseDepositTransaction":
-        return F17_CODES.get(generic, generic)
+        return (F18_CODES if _is_security_deposit_refund(purpose=purpose, event_key=event_key) else F17_CODES).get(generic, generic)
     if source_model != "RentLeaseCollection":
         if generic == "SOURCE_LINK_MISSING":
             return "BRIDGE_JOURNAL_MISSING_SOURCE_REFERENCE"
@@ -282,7 +318,12 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
                 continue
             if branch_id and source_model == "SalaryPayment" and not SalaryPayment.objects.filter(pk=row.get("source_pk"), branch_id=branch_id).exists():
                 continue
-            _create_missing_bridge_item(run=run, source_model=source_model, source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"{source_model}-{row['source_pk']}", amount=_money(row.get("amount")), exception_code=code, message=message, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "source_date": row.get("source_date"), "taxable_amount": row.get("taxable_amount"), "tax_amount": row.get("tax_amount")}, totals=totals)
+            row_code = code
+            row_message = message
+            if source_model == "RentLeaseDepositTransaction" and _is_security_deposit_refund(event_key=row.get("event_key")):
+                row_code = F18_CODES["MISSING_POSTING"]
+                row_message = "RentLeaseDepositTransaction exists as a supported concrete security deposit refund bridge candidate but AccountingBridgePosting is missing."
+            _create_missing_bridge_item(run=run, source_model=source_model, source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"{source_model}-{row['source_pk']}", amount=_money(row.get("amount")), exception_code=row_code, message=row_message, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "source_date": row.get("source_date"), "taxable_amount": row.get("taxable_amount"), "tax_amount": row.get("tax_amount")}, totals=totals)
 
 
 def _emit_rent_lease_collection_nonpostable(*, run, totals: dict, date_from, date_to, branch_id):
@@ -320,7 +361,9 @@ def _emit_security_deposit_receipt_nonpostable(*, run, totals: dict, date_from, 
         if branch_id and not RentLeaseDepositTransaction.objects.filter(pk=row.get("source_pk"), finance_account__branch_id=branch_id).exists():
             continue
         amount = _money(row.get("amount"))
-        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="RentLeaseDepositTransaction", source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"RLDT-{row['source_pk']}", severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=code_by_status[status], exception_message=row.get("blocker_reason") or "Security deposit receipt candidate is not postable.", recommended_action=row.get("recommended_action") or "Resolve setup blockers, then use controlled bridge posting.", expected_amount=amount, actual_amount=Decimal("0.00"), amount_delta=amount, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "bridge_status": status, "blocker_code": row.get("blocker_code"), "action_href": row.get("action_href") or "/admin/accounting/bridge-reconciliation"})
+        codes = F18_CODES if _is_security_deposit_refund(event_key=row.get("event_key")) else F17_CODES
+        label = "refund" if codes is F18_CODES else "receipt"
+        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="RentLeaseDepositTransaction", source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"RLDT-{row['source_pk']}", severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=codes["MAPPING_MISSING"] if status == "BLOCKED_BY_MAPPING" else codes["FINANCE_ACCOUNT_INACTIVE"] if status == "BLOCKED_BY_FINANCE_ACCOUNT" else codes["NUMBERING_MISSING"] if status == "BLOCKED_BY_NUMBERING" else codes["PERIOD_MISMATCH"] if status == "BLOCKED_BY_PERIOD" else codes["UNSUPPORTED_SOURCE"], exception_message=row.get("blocker_reason") or f"Security deposit {label} candidate is not postable.", recommended_action=row.get("recommended_action") or "Resolve setup blockers, then use controlled bridge posting.", expected_amount=amount, actual_amount=Decimal("0.00"), amount_delta=amount, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "bridge_status": status, "blocker_code": row.get("blocker_code"), "action_href": row.get("action_href") or "/admin/accounting/bridge-reconciliation"})
         ReconciliationEvidence.objects.create(item=item, evidence_type="RentLeaseDepositTransaction", object_id=str(row["source_pk"]), label=item.source_label, amount=amount, metadata={"status": status})
         totals["exceptions"] += 1
 
@@ -387,7 +430,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         source_label = _source_label(source_model=source_model, source_id=source_id, fallback=bridge.source_reference)
         source_amount = _source_amount(source_model=source_model, source_id=source_id)
         if not journal_id_matches_bridge(bridge, journal):
-            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="AccountingBridgePosting", source_id=str(bridge.id), source_label=str(bridge), severity=ReconciliationSeverity.CRITICAL, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=_code(source_model, "SOURCE_LINK_MISSING"), exception_message="Bridge posting journal entry is missing or mismatching source_model/source_id.", recommended_action="Investigate bridge posting integrity; do not edit posted journals without explicit operational workflow.", metadata={"bridge_posting_id": bridge.id, "bridge_source_model": bridge.source_model, "bridge_source_id": bridge.source_id, "bridge_purpose": bridge.purpose, "journal_entry_id": getattr(journal, "id", None), "journal_source_model": getattr(journal, "source_model", None), "journal_source_id": getattr(journal, "source_id", None)})
+            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="AccountingBridgePosting", source_id=str(bridge.id), source_label=str(bridge), severity=ReconciliationSeverity.CRITICAL, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=_code(source_model, "SOURCE_LINK_MISSING", purpose=bridge.purpose, event_key=(bridge.trace_metadata or {}).get("event_key")), exception_message="Bridge posting journal entry is missing or mismatching source_model/source_id.", recommended_action="Investigate bridge posting integrity; do not edit posted journals without explicit operational workflow.", metadata={"bridge_posting_id": bridge.id, "bridge_source_model": bridge.source_model, "bridge_source_id": bridge.source_id, "bridge_purpose": bridge.purpose, "journal_entry_id": getattr(journal, "id", None), "journal_source_model": getattr(journal, "source_model", None), "journal_source_id": getattr(journal, "source_id", None)})
             ReconciliationEvidence.objects.create(item=item, evidence_type="AccountingBridgePosting", object_id=str(bridge.id), label=str(bridge), metadata={"purpose": bridge.purpose})
             totals["exceptions"] += 1
             totals["high_risk"] += 1
@@ -396,23 +439,23 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         total_debit = _money(line_totals["total_debit"])
         total_credit = _money(line_totals["total_credit"])
         if total_debit != total_credit:
-            ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.CRITICAL, status=ReconciliationItemStatus.AMOUNT_MISMATCH, exception_code=_code(source_model, "JOURNAL_UNBALANCED"), exception_message="Posted bridge journal debit and credit totals do not balance.", recommended_action="Investigate journal lines; resolve only through explicit accounting workflows.", expected_amount=total_debit, actual_amount=total_credit, amount_delta=total_debit - total_credit, metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id})
+            ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.CRITICAL, status=ReconciliationItemStatus.AMOUNT_MISMATCH, exception_code=_code(source_model, "JOURNAL_UNBALANCED", purpose=bridge.purpose, event_key=(bridge.trace_metadata or {}).get("event_key")), exception_message="Posted bridge journal debit and credit totals do not balance.", recommended_action="Investigate journal lines; resolve only through explicit accounting workflows.", expected_amount=total_debit, actual_amount=total_credit, amount_delta=total_debit - total_credit, metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id})
             totals["exceptions"] += 1
             totals["high_risk"] += 1
             continue
         expected_period_id = _expected_period_id(source_model=source_model, source_id=source_id)
         if expected_period_id and journal.accounting_period_id and journal.accounting_period_id != expected_period_id:
-            ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=_code(source_model, "PERIOD_MISMATCH"), exception_message="Posted bridge journal accounting period does not match source event date period.", recommended_action="Investigate period assignment; do not auto-correct posted journals.", expected_amount=source_amount or Decimal("0.00"), actual_amount=total_debit, amount_delta=Decimal("0.00"), metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "expected_period_id": expected_period_id, "actual_period_id": journal.accounting_period_id})
+            ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=_code(source_model, "PERIOD_MISMATCH", purpose=bridge.purpose, event_key=(bridge.trace_metadata or {}).get("event_key")), exception_message="Posted bridge journal accounting period does not match source event date period.", recommended_action="Investigate period assignment; do not auto-correct posted journals.", expected_amount=source_amount or Decimal("0.00"), actual_amount=total_debit, amount_delta=Decimal("0.00"), metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "expected_period_id": expected_period_id, "actual_period_id": journal.accounting_period_id})
             totals["exceptions"] += 1
             continue
         if source_amount is not None and total_debit != source_amount:
-            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.AMOUNT_MISMATCH, exception_code=_code(source_model, "AMOUNT_MISMATCH"), exception_message=f"Posted bridge journal amount does not match the source {source_model} amount.", recommended_action="Investigate source amount and bridge journal; do not auto-correct.", expected_amount=source_amount, actual_amount=total_debit, amount_delta=total_debit - source_amount, metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "bridge_status": "AMOUNT_MISMATCH"})
+            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.AMOUNT_MISMATCH, exception_code=_code(source_model, "AMOUNT_MISMATCH", purpose=bridge.purpose, event_key=(bridge.trace_metadata or {}).get("event_key")), exception_message=f"Posted bridge journal amount does not match the source {source_model} amount.", recommended_action="Investigate source amount and bridge journal; do not auto-correct.", expected_amount=source_amount, actual_amount=total_debit, amount_delta=total_debit - source_amount, metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "bridge_status": "AMOUNT_MISMATCH"})
             ReconciliationEvidence.objects.create(item=item, evidence_type=source_model, object_id=source_id, label=source_label, amount=source_amount)
             ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, amount=total_debit, status=journal.status)
             totals["exceptions"] += 1
             continue
         if source_amount is not None:
-            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.LOW, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=_code(source_model, "POSTED_UNVERIFIED"), exception_message="Bridge journal matches source amount and link checks, but explicit verification is still required.", recommended_action="Verify from bridge reconciliation after operator review.", expected_amount=source_amount, actual_amount=total_debit, amount_delta=Decimal("0.00"), metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "bridge_status": "POSTED_UNVERIFIED", "action_href": "/admin/accounting/bridge-reconciliation"})
+            item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=source_label, severity=ReconciliationSeverity.LOW, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=_code(source_model, "POSTED_UNVERIFIED", purpose=bridge.purpose, event_key=(bridge.trace_metadata or {}).get("event_key")), exception_message="Bridge journal matches source amount and link checks, but explicit verification is still required.", recommended_action="Verify from bridge reconciliation after operator review.", expected_amount=source_amount, actual_amount=total_debit, amount_delta=Decimal("0.00"), metadata={"journal_entry_id": journal.id, "bridge_posting_id": bridge.id, "bridge_status": "POSTED_UNVERIFIED", "action_href": "/admin/accounting/bridge-reconciliation"})
             ReconciliationEvidence.objects.create(item=item, evidence_type=source_model, object_id=source_id, label=source_label, amount=source_amount)
             ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, amount=total_debit, status=journal.status)
 
@@ -430,7 +473,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
     for row in journal_dupes:
         source_model = row["source_model"]
         source_id = str(row["source_id"])
-        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=_source_label(source_model=source_model, source_id=source_id), severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.DUPLICATE_POSTING, exception_code=_code(source_model, "DUPLICATE_POSTING"), exception_message=f"Multiple journal entries reference the same {source_model} source_model/source_id.", recommended_action="Investigate potential duplicate posting; confirm one is reversal/void and audit trail is intact.", metadata={"journal_count": row["journal_count"]})
+        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type=source_model, source_id=source_id, source_label=_source_label(source_model=source_model, source_id=source_id), severity=ReconciliationSeverity.HIGH, status=ReconciliationItemStatus.DUPLICATE_POSTING, exception_code=_code(source_model, "DUPLICATE_POSTING", event_key=_deposit_event_key_for_source(source_id) if source_model == "RentLeaseDepositTransaction" else None), exception_message=f"Multiple journal entries reference the same {source_model} source_model/source_id.", recommended_action="Investigate potential duplicate posting; confirm one is reversal/void and audit trail is intact.", metadata={"journal_count": row["journal_count"]})
         for journal in JournalEntry.objects.filter(source_model=source_model, source_id=source_id, status="POSTED").only("id", "entry_no", "status", "entry_date")[:10]:
             ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, status=journal.status, metadata={"entry_date": str(journal.entry_date)})
         totals["exceptions"] += 1

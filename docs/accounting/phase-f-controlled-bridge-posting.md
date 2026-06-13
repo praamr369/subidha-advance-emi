@@ -712,8 +712,8 @@ F16 must not auto-post, auto-reconcile, auto-close periods, mutate monthly colle
 Deferred bridge shapes:
 
 ```text
-F17 deposit receipt: Dr Cash / Bank / FinanceAccount, Cr Security Deposit Liability
-F18 deposit refund: Dr Security Deposit Liability, Cr Cash / Bank / FinanceAccount
+F17 deposit receipt: Dr RentLeaseDepositTransaction.finance_account.chart_account, Cr Security Deposit Liability
+F18 deposit refund: Dr Security Deposit Liability, Cr RentLeaseDepositTransaction.finance_account.chart_account
 ```
 
 ## Phase F17 — Security deposit receipt bridge
@@ -760,3 +760,48 @@ Safety boundary:
 - Posting does not mark deposits posted/settled, does not auto-reconcile, and does not close periods.
 
 F17 remains separate from F14 rent/lease revenue, F15C monthly collection settlement, customer advances, direct-sale receipts, and F18 deposit refunds.
+
+## Phase F18 — Security deposit refund bridge
+
+F18 extends controlled bridge posting to concrete `subscriptions.RentLeaseDepositTransaction` refund source rows only.
+
+Supported source model:
+
+```text
+RentLeaseDepositTransaction
+```
+
+Supported posting event keys:
+
+```text
+security_deposit_refund
+rent_security_deposit_refund
+lease_security_deposit_refund
+```
+
+Current safe classification:
+
+- `DEPOSIT_REFUND` rows are postable only when they have a positive amount, active concrete finance account with active chart account, payment method, transaction date, customer, subscription, `plan_type` RENT/LEASE, open accounting period, `JOURNAL_ENTRY` numbering, and `SECURITY_DEPOSIT_LIABILITY` mapping.
+- Legacy `REFUNDED` rows may become postable only when they have the same complete F16 evidence.
+- `DEPOSIT_RECEIPT` rows remain handled by F17 and are not refund-postable through F18 event keys.
+- `DEPOSIT_ADJUSTMENT`, voided, reversed, cancelled, incomplete legacy, and ambiguous rows remain non-postable.
+
+Accounting shape:
+
+```text
+Dr Security Deposit Liability
+Cr RentLeaseDepositTransaction.finance_account.chart_account
+```
+
+F18 does not hard-code cash or bank accounts. It always uses the concrete source finance account chart account for the credit. There is no revenue, receivable, customer advance, GST, monthly collection, or general refund line in F18.
+
+Safety boundary:
+
+- Preview is read-only and does not create `JournalEntry`, `AccountingBridgePosting`, or `ReconciliationItem`.
+- Preview does not consume `JOURNAL_ENTRY` numbering.
+- Posting is explicit, admin-only, transactional, row-locked where possible, period-gated, numbering-gated, and idempotent by source/event/idempotency key.
+- Posting creates accounting bridge evidence only: one posted `JournalEntry`, one `AccountingBridgePosting`, and one pending `ReconciliationItem`.
+- Posting does not mutate `RentLeaseDepositTransaction`, subscription/contract, customer, `RentLeaseCollection`, `RentLeaseBillingDemand`, or `FinanceAccount`.
+- Posting does not mark deposits refunded/settled/posted, does not auto-reconcile, and does not close periods.
+
+F18 remains separate from F14 rent/lease revenue, F15C monthly collection settlement, F17 deposit receipts, customer advances, direct-sale receipts, and general customer refunds.

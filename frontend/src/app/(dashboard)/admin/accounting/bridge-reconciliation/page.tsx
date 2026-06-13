@@ -46,6 +46,7 @@ const CONCRETE_POST_MODELS = new Set(SOURCE_MODEL_OPTIONS.map((item) => item.val
 const MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit";
 const RECONCILIATION_RUNS_HREF = "/admin/reconciliation/runs";
 const SAFETY_COPY = "Posting creates accounting entries only after explicit admin confirmation. It does not edit deposit, contract, customer, collection, demand, finance-account, inventory, payroll, commission, payout, or StaffAdvance records.";
+const SECURITY_DEPOSIT_REFUND_EVENTS = new Set(["security_deposit_refund", "rent_security_deposit_refund", "lease_security_deposit_refund"]);
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -89,8 +90,8 @@ function modelLabel(model?: string | null): string {
 function sourceTitle(row: AccountingBridgeReconciliationRow): string {
   if (row.source_display) return row.source_display;
   if (row.collection_number) return `Rent/lease collection ${row.collection_number}`;
-  if (row.deposit_transaction_number) return `Security deposit ${row.deposit_transaction_number}`;
-  if (row.deposit_reference) return `Security deposit ${row.deposit_reference}`;
+  if (row.deposit_transaction_number) return `${SECURITY_DEPOSIT_REFUND_EVENTS.has(row.event_key) ? "Security deposit refund" : "Security deposit receipt"} ${row.deposit_transaction_number}`;
+  if (row.deposit_reference) return `${SECURITY_DEPOSIT_REFUND_EVENTS.has(row.event_key) ? "Security deposit refund" : "Security deposit receipt"} ${row.deposit_reference}`;
   if (row.rent_lease_collection_reference) return `Rent/lease collection ${row.rent_lease_collection_reference}`;
   if (row.rent_lease_reference) return `Rent/lease demand ${row.rent_lease_reference}`;
   if (row.source_reference_number) return `${modelLabel(row.source_model)} ${row.source_reference_number}`;
@@ -304,6 +305,8 @@ export default function AccountingBridgeReconciliationPage() {
             <SummaryCard label="Rent/lease revenue ready" value={Number(summary?.rent_lease_revenue_ready_unposted_count ?? 0)} href={bridgeHref("RentLeaseBillingDemand", "READY_UNPOSTED")} />
             <SummaryCard label="Rent/lease collection ready" value={Number(summary?.rent_lease_collection_ready_unposted_count ?? summary?.rent_lease_payment_ready_unposted_count ?? 0)} href={bridgeHref("RentLeaseCollection", "READY_UNPOSTED")} />
             <SummaryCard label="Rent/lease collection posted" value={Number(summary?.rent_lease_collection_posted_unverified_count ?? summary?.rent_lease_payment_posted_unverified_count ?? 0)} href={bridgeHref("RentLeaseCollection", "POSTED_UNVERIFIED")} tone="border-emerald-200 bg-white text-emerald-900" />
+            <SummaryCard label="Deposit refund ready" value={Number(summary?.security_deposit_refund_ready_unposted_count ?? 0)} href={bridgeHref("RentLeaseDepositTransaction", "READY_UNPOSTED")} />
+            <SummaryCard label="Deposit refund posted" value={Number(summary?.security_deposit_refund_posted_unverified_count ?? 0)} href={bridgeHref("RentLeaseDepositTransaction", "POSTED_UNVERIFIED")} tone="border-emerald-200 bg-white text-emerald-900" />
             <SummaryCard label="Purchase ready" value={Number(summary?.purchase_bill_ready_unposted_count ?? 0)} href={bridgeHref("PurchaseBill", "READY_UNPOSTED")} />
             <SummaryCard label="Vendor payment ready" value={Number(summary?.vendor_payment_ready_unposted_count ?? 0)} href={bridgeHref("VendorPayment", "READY_UNPOSTED")} />
             <SummaryCard label="Stock ready" value={Number(summary?.stock_ledger_ready_unposted_count ?? 0)} href={bridgeHref("StockLedger", "READY_UNPOSTED")} />

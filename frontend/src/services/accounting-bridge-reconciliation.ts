@@ -33,6 +33,12 @@ export type AccountingBridgeReconciliationSummary = {
   security_deposit_receipt_reconciled_count?: number;
   security_deposit_receipt_blocked_count?: number;
   security_deposit_receipt_unsupported_count?: number;
+  security_deposit_refund_ready_unposted_count?: number;
+  security_deposit_refund_posted_count?: number;
+  security_deposit_refund_posted_unverified_count?: number;
+  security_deposit_refund_reconciled_count?: number;
+  security_deposit_refund_blocked_count?: number;
+  security_deposit_refund_unsupported_count?: number;
   [key: string]: number | string | boolean | null | undefined | Record<string, unknown> | Array<unknown>;
 };
 

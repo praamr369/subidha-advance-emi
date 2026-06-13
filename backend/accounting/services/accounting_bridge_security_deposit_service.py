@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import Counter
 from datetime import date
 from decimal import Decimal
 
@@ -25,14 +24,21 @@ SOURCE_MODEL = "RentLeaseDepositTransaction"
 EVENT_KEY = "security_deposit_receipt"
 RENT_EVENT_KEY = "rent_security_deposit_receipt"
 LEASE_EVENT_KEY = "lease_security_deposit_receipt"
-EVENT_KEYS = {EVENT_KEY, RENT_EVENT_KEY, LEASE_EVENT_KEY}
+REFUND_EVENT_KEY = "security_deposit_refund"
+RENT_REFUND_EVENT_KEY = "rent_security_deposit_refund"
+LEASE_REFUND_EVENT_KEY = "lease_security_deposit_refund"
+RECEIPT_EVENT_KEYS = {EVENT_KEY, RENT_EVENT_KEY, LEASE_EVENT_KEY}
+REFUND_EVENT_KEYS = {REFUND_EVENT_KEY, RENT_REFUND_EVENT_KEY, LEASE_REFUND_EVENT_KEY}
+EVENT_KEYS = RECEIPT_EVENT_KEYS | REFUND_EVENT_KEYS
 PURPOSE_BY_EVENT = {key: key.upper() for key in EVENT_KEYS}
 LABEL_BY_EVENT = {
     EVENT_KEY: "Security Deposit",
     RENT_EVENT_KEY: "Security Deposit",
     LEASE_EVENT_KEY: "Security Deposit",
+    REFUND_EVENT_KEY: "Security Deposit Refund",
+    RENT_REFUND_EVENT_KEY: "Security Deposit Refund",
+    LEASE_REFUND_EVENT_KEY: "Security Deposit Refund",
 }
-DEFERRED_REFUND_EVENT_KEY = "deposit_refund_deferred"
 UNSUPPORTED_EVENT_KEY = "unsupported_security_deposit"
 SKIPPED_EVENT_KEY = "security_deposit_skipped_not_applicable"
 SAFETY_TEXT = (
@@ -53,6 +59,14 @@ def _event_for_plan(row: RentLeaseDepositTransaction) -> str:
     return EVENT_KEY
 
 
+def _refund_event_for_plan(row: RentLeaseDepositTransaction) -> str:
+    if row.plan_type == PlanType.RENT:
+        return RENT_REFUND_EVENT_KEY
+    if row.plan_type == PlanType.LEASE:
+        return LEASE_REFUND_EVENT_KEY
+    return REFUND_EVENT_KEY
+
+
 def _has_complete_receipt_evidence(row: RentLeaseDepositTransaction) -> bool:
     return bool(
         base._money(row.amount) > Decimal("0.00")
@@ -66,13 +80,21 @@ def _has_complete_receipt_evidence(row: RentLeaseDepositTransaction) -> bool:
     )
 
 
+def _has_complete_refund_evidence(row: RentLeaseDepositTransaction) -> bool:
+    return _has_complete_receipt_evidence(row)
+
+
 def _classify(row: RentLeaseDepositTransaction):
     status = (row.status or "").strip().upper()
     tx_type = (row.transaction_type or "").strip().upper()
     if status in {RentLeaseDepositTransactionStatus.VOIDED, RentLeaseDepositTransactionStatus.REVERSED, "VOID", "CANCELLED", "CANCELED"}:
         return SKIPPED_EVENT_KEY, "Security deposit skipped", "Voided, cancelled, or reversed deposit transactions are not bridge-postable.", False
-    if tx_type == RentLeaseDepositTransactionType.DEPOSIT_REFUND or tx_type == RentLeaseDepositTransactionType.REFUNDED:
-        return DEFERRED_REFUND_EVENT_KEY, "Security deposit refund deferred", "Deposit refund posting is deferred to F18 and is not postable in F17.", False
+    if tx_type == RentLeaseDepositTransactionType.DEPOSIT_REFUND:
+        return _refund_event_for_plan(row), LABEL_BY_EVENT.get(_refund_event_for_plan(row), "Security Deposit Refund"), None, False
+    if tx_type == RentLeaseDepositTransactionType.REFUNDED and _has_complete_refund_evidence(row):
+        return _refund_event_for_plan(row), LABEL_BY_EVENT.get(_refund_event_for_plan(row), "Security Deposit Refund"), None, False
+    if tx_type == RentLeaseDepositTransactionType.REFUNDED:
+        return UNSUPPORTED_EVENT_KEY, "Unsupported security deposit", "Legacy REFUNDED deposit row lacks complete F16 refund evidence.", False
     if tx_type == RentLeaseDepositTransactionType.DEPOSIT_ADJUSTMENT:
         return UNSUPPORTED_EVENT_KEY, "Unsupported security deposit", "Deposit adjustment rows are not supported by the F17 receipt bridge.", False
     if tx_type == RentLeaseDepositTransactionType.DEPOSIT_RECEIPT:
@@ -89,28 +111,29 @@ def _liability_account():
 
 
 def _finance_account_blocker(row: RentLeaseDepositTransaction, finance_account) -> str | None:
+    label = "security deposit refund" if row.transaction_type in {RentLeaseDepositTransactionType.DEPOSIT_REFUND, RentLeaseDepositTransactionType.REFUNDED} else "security deposit receipt"
     if finance_account is None:
-        return "Finance account is missing for this security deposit receipt."
+        return f"Finance account is missing for this {label}."
     if not finance_account.is_active:
-        return "Finance account is inactive for this security deposit receipt."
+        return f"Finance account is inactive for this {label}."
     if not finance_account.chart_account_id or not finance_account.chart_account.is_active:
-        return "Finance account is not mapped to an active chart account for this security deposit receipt."
+        return f"Finance account is not mapped to an active chart account for this {label}."
     return None
 
 
 def _lines(row: RentLeaseDepositTransaction, event_key: str):
     warnings: list[str] = []
     if event_key not in EVENT_KEYS:
-        return [], ["Unsupported security deposit receipt event."], row.finance_account
+        return [], ["Unsupported security deposit event."], row.finance_account
     amount = base._money(row.amount)
     if amount <= Decimal("0.00"):
-        warnings.append("Security deposit receipt amount must be greater than zero.")
+        warnings.append("Security deposit amount must be greater than zero.")
     if row.plan_type not in {PlanType.RENT, PlanType.LEASE}:
-        warnings.append("Security deposit receipt plan_type must be RENT or LEASE.")
+        warnings.append("Security deposit plan_type must be RENT or LEASE.")
     if not row.transaction_date:
-        warnings.append("Security deposit receipt transaction_date is required.")
+        warnings.append("Security deposit transaction_date is required.")
     if not row.customer_id or not row.subscription_id:
-        warnings.append("Security deposit receipt requires customer and subscription evidence.")
+        warnings.append("Security deposit requires customer and subscription evidence.")
     finance_account = row.finance_account
     finance_blocker = _finance_account_blocker(row, finance_account)
     if finance_blocker:
@@ -121,6 +144,11 @@ def _lines(row: RentLeaseDepositTransaction, event_key: str):
     if warnings:
         return [], warnings, finance_account
     reference = _ref(row)
+    if event_key in REFUND_EVENT_KEYS:
+        return [
+            {"chart_account": liability, "description": f"Security deposit refund liability {reference}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
+            {"chart_account": finance_account.chart_account, "description": f"Security deposit refund paid {reference}", "debit_amount": Decimal("0.00"), "credit_amount": amount},
+        ], warnings, finance_account
     return [
         {"chart_account": finance_account.chart_account, "description": f"Security deposit receipt {reference}", "debit_amount": amount, "credit_amount": Decimal("0.00")},
         {"chart_account": liability, "description": f"Security deposit liability {reference}", "debit_amount": Decimal("0.00"), "credit_amount": amount},
@@ -209,8 +237,8 @@ def candidate_for(row: RentLeaseDepositTransaction) -> dict:
     item = base._latest_posting_reconciliation_item(source_model=SOURCE_MODEL, source_id=str(row.id)) if journal else base._latest_reconciliation_item(source_model=SOURCE_MODEL, source_id=str(row.id))
     period = getattr(journal, "accounting_period", None) or base._source_period(row.transaction_date)
     lines, warnings, finance_account = _lines(row, event_key) if event_key in EVENT_KEYS else ([], [reason] if reason else [], row.finance_account)
-    raw = "SKIPPED_NOT_APPLICABLE" if event_key == SKIPPED_EVENT_KEY or event_key == DEFERRED_REFUND_EVENT_KEY else "UNSUPPORTED_SOURCE" if event_key == UNSUPPORTED_EVENT_KEY else "READY" if lines else "NOT_CONFIGURED"
-    source_workflow_exists = event_key in EVENT_KEYS or event_key in {SKIPPED_EVENT_KEY, DEFERRED_REFUND_EVENT_KEY, UNSUPPORTED_EVENT_KEY}
+    raw = "SKIPPED_NOT_APPLICABLE" if event_key == SKIPPED_EVENT_KEY else "UNSUPPORTED_SOURCE" if event_key == UNSUPPORTED_EVENT_KEY else "READY" if lines else "NOT_CONFIGURED"
+    source_workflow_exists = event_key in EVENT_KEYS or event_key in {SKIPPED_EVENT_KEY, UNSUPPORTED_EVENT_KEY}
     postability = base._candidate_status_payload(event_key=event_key, event_label=event_label, module="subscriptions", source_model=SOURCE_MODEL, raw_status=raw, lines=lines, line_warnings=warnings, period=period, source_date=row.transaction_date, journal=journal, reconciliation_item=item, source_workflow_exists=source_workflow_exists, classification_reason=reason, approval_required=approval_required)
     postability = _normalize_postability(row, postability, finance_account)
     reference = _ref(row)
@@ -222,7 +250,7 @@ def candidate_for(row: RentLeaseDepositTransaction) -> dict:
         module="subscriptions",
         source_model=SOURCE_MODEL,
         source_pk=row.id,
-        source_display=f"Security deposit {reference}",
+        source_display=f"{event_label} {reference}",
         source_reference=reference,
         source_date=row.transaction_date,
         amount=row.amount,
@@ -257,6 +285,7 @@ def candidate_for(row: RentLeaseDepositTransaction) -> dict:
             "rent_lease_reference": demand_reference,
             "demand_reference": demand_reference,
             "finance_account_id": row.finance_account_id,
+            "finance_account_chart_account_id": getattr(row.finance_account, "chart_account_id", None) if row.finance_account_id else None,
         }
     )
     return payload
@@ -422,7 +451,9 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
             "collection_mutation": False,
             "demand_mutation": False,
             "finance_account_mutation": False,
-            "deposit_refund_posting": False,
+            "deposit_refund_posting": candidate["event_key"] in REFUND_EVENT_KEYS,
+            "security_deposit_refund_posting": candidate["event_key"] in REFUND_EVENT_KEYS,
+            "security_deposit_receipt_posting": candidate["event_key"] in RECEIPT_EVENT_KEYS,
         },
         posted_by=actor,
     )
@@ -493,16 +524,20 @@ def batch_post_bridge_candidates(*, candidate_ids: list[str], idempotency_keys: 
 
 def summarize_candidate_statuses(rows: list[dict]) -> dict[str, int]:
     summary = previous.summarize_candidate_statuses(rows)
-    counts = Counter(row.get("status") or "INFO" for row in rows if row.get("source_model") == SOURCE_MODEL)
-    posted_unverified = sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("reconciliation_state") == "POSTED_UNVERIFIED")
     summary.update(
         {
-            "security_deposit_receipt_ready_unposted_count": counts.get("READY_UNPOSTED", 0),
-            "security_deposit_receipt_posted_count": counts.get("POSTED", 0),
-            "security_deposit_receipt_posted_unverified_count": posted_unverified,
-            "security_deposit_receipt_reconciled_count": counts.get("RECONCILED", 0),
-            "security_deposit_receipt_blocked_count": sum(v for k, v in counts.items() if str(k).startswith("BLOCKED")),
-            "security_deposit_receipt_unsupported_count": counts.get("UNSUPPORTED_SOURCE", 0) + counts.get("SKIPPED_NOT_APPLICABLE", 0),
+            "security_deposit_receipt_ready_unposted_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in RECEIPT_EVENT_KEYS and row.get("status") == "READY_UNPOSTED"),
+            "security_deposit_receipt_posted_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in RECEIPT_EVENT_KEYS and row.get("status") == "POSTED"),
+            "security_deposit_receipt_posted_unverified_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in RECEIPT_EVENT_KEYS and row.get("reconciliation_state") == "POSTED_UNVERIFIED"),
+            "security_deposit_receipt_reconciled_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in RECEIPT_EVENT_KEYS and row.get("status") == "RECONCILED"),
+            "security_deposit_receipt_blocked_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in RECEIPT_EVENT_KEYS and str(row.get("status") or "").startswith("BLOCKED")),
+            "security_deposit_receipt_unsupported_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in RECEIPT_EVENT_KEYS and row.get("status") in {"UNSUPPORTED_SOURCE", "SKIPPED_NOT_APPLICABLE"}),
+            "security_deposit_refund_ready_unposted_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in REFUND_EVENT_KEYS and row.get("status") == "READY_UNPOSTED"),
+            "security_deposit_refund_posted_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in REFUND_EVENT_KEYS and row.get("status") == "POSTED"),
+            "security_deposit_refund_posted_unverified_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in REFUND_EVENT_KEYS and row.get("reconciliation_state") == "POSTED_UNVERIFIED"),
+            "security_deposit_refund_reconciled_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in REFUND_EVENT_KEYS and row.get("status") == "RECONCILED"),
+            "security_deposit_refund_blocked_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") in REFUND_EVENT_KEYS and str(row.get("status") or "").startswith("BLOCKED")),
+            "security_deposit_refund_unsupported_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and (row.get("event_key") in REFUND_EVENT_KEYS or row.get("transaction_type") in {RentLeaseDepositTransactionType.DEPOSIT_REFUND, RentLeaseDepositTransactionType.REFUNDED}) and row.get("status") in {"UNSUPPORTED_SOURCE", "SKIPPED_NOT_APPLICABLE"}),
         }
     )
     return summary

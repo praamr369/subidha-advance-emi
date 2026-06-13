@@ -35,6 +35,7 @@ const GROUP_ORDER = [
   "Inventory mappings",
   "Manufacturing mappings",
   "Payments/refunds mappings",
+  "Security Deposit Refund mappings",
   "Security Deposit Receipt mappings",
   "Rent/Lease collection settlement mappings",
   "Rent/Lease revenue mappings",
@@ -105,7 +106,12 @@ function isRentLeaseCollectionRow(row: AccountingMappingAuditRow): boolean {
 
 function isSecurityDepositReceiptRow(row: AccountingMappingAuditRow): boolean {
   const text = rowSearchText(row);
-  return text.includes("rentleasedeposittransaction") || text.includes("rent_lease_deposit_transaction") || text.includes("security_deposit_receipt") || text.includes("rent_security_deposit_receipt") || text.includes("lease_security_deposit_receipt");
+  return !isSecurityDepositRefundRow(row) && (text.includes("rentleasedeposittransaction") || text.includes("rent_lease_deposit_transaction") || text.includes("security_deposit_receipt") || text.includes("rent_security_deposit_receipt") || text.includes("lease_security_deposit_receipt"));
+}
+
+function isSecurityDepositRefundRow(row: AccountingMappingAuditRow): boolean {
+  const text = rowSearchText(row);
+  return text.includes("security_deposit_refund") || text.includes("rent_security_deposit_refund") || text.includes("lease_security_deposit_refund");
 }
 
 function rowHasMappingBlocker(row: AccountingMappingAuditRow): boolean {
@@ -115,6 +121,7 @@ function rowHasMappingBlocker(row: AccountingMappingAuditRow): boolean {
 
 function groupName(row: AccountingMappingAuditRow): string {
   const text = rowSearchText(row);
+  if (isSecurityDepositRefundRow(row)) return "Security Deposit Refund mappings";
   if (isSecurityDepositReceiptRow(row)) return "Security Deposit Receipt mappings";
   if (isRentLeaseCollectionRow(row)) return "Rent/Lease collection settlement mappings";
   if (text.includes("rent_monthly_revenue") || text.includes("lease_monthly_revenue") || text.includes("rentleasebillingdemand")) return "Rent/Lease revenue mappings";
@@ -175,6 +182,11 @@ function rowStats(rows: AccountingMappingAuditRow[]) {
 
 function missingLabel(row: AccountingMappingAuditRow): string {
   const status = normalizedStatus(row);
+  if (isSecurityDepositRefundRow(row) && READY_MAPPING_STATUSES.includes(status)) return "Security deposit refund setup is ready. READY_UNPOSTED means bridge posting is pending, not a mapping failure.";
+  if (isSecurityDepositRefundRow(row) && row.finance_account_status !== "READY") return "Missing or inactive RentLeaseDepositTransaction finance account is a finance-account blocker. Open Finance Accounts before refund posting.";
+  if (isSecurityDepositRefundRow(row) && row.numbering_readiness !== "READY") return "JOURNAL_ENTRY numbering is required before security deposit refund posting.";
+  if (isSecurityDepositRefundRow(row) && row.period_readiness !== "READY") return `Accounting period blocker: ${row.period_blocker_reason || row.period_readiness}.`;
+  if (isSecurityDepositRefundRow(row) && rowHasMappingBlocker(row)) return "Security Deposit Liability mapping is required before security deposit refund posting.";
   if (isSecurityDepositReceiptRow(row) && READY_MAPPING_STATUSES.includes(status)) return "Security deposit receipt setup is ready. READY_UNPOSTED means bridge posting is pending, not a mapping failure.";
   if (isSecurityDepositReceiptRow(row) && row.finance_account_status !== "READY") return "Missing or inactive RentLeaseDepositTransaction finance account is a finance-account blocker. Open Finance Accounts before posting.";
   if (isSecurityDepositReceiptRow(row) && row.numbering_readiness !== "READY") return "JOURNAL_ENTRY numbering is required before security deposit receipt posting.";
@@ -207,6 +219,11 @@ function missingLabel(row: AccountingMappingAuditRow): string {
 
 function routeForRow(row: AccountingMappingAuditRow): string {
   const status = normalizedStatus(row);
+  if (isSecurityDepositRefundRow(row) && READY_MAPPING_STATUSES.includes(status)) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=RentLeaseDepositTransaction`;
+  if (isSecurityDepositRefundRow(row) && row.finance_account_status !== "READY") return ROUTES.admin.accountingFinanceAccounts;
+  if (isSecurityDepositRefundRow(row) && row.period_readiness !== "READY") return ROUTES.admin.accountingPeriods;
+  if (isSecurityDepositRefundRow(row) && row.numbering_readiness !== "READY") return ROUTES.admin.settingsBusinessSetupDocumentNumbering;
+  if (isSecurityDepositRefundRow(row) && rowHasMappingBlocker(row)) return row.debit_account_code || row.credit_account_code ? ROUTES.admin.accountingSetup : ROUTES.admin.accountingChartOfAccounts;
   if (isSecurityDepositReceiptRow(row) && READY_MAPPING_STATUSES.includes(status)) return `${ROUTES.admin.accountingBridgeReconciliation}?source_model=RentLeaseDepositTransaction`;
   if (isSecurityDepositReceiptRow(row) && row.finance_account_status !== "READY") return ROUTES.admin.accountingFinanceAccounts;
   if (isSecurityDepositReceiptRow(row) && row.period_readiness !== "READY") return ROUTES.admin.accountingPeriods;

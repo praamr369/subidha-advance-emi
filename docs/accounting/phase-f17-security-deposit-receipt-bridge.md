@@ -30,9 +30,9 @@ Posting must not mutate:
 - `RentLeaseBillingDemand`
 - `FinanceAccount`
 
-Refund rows are deferred to F18:
+Refund rows are handled by F18 and remain separated from the receipt event keys:
 
 ```text
 Dr Security Deposit Liability
-Cr Cash / Bank / FinanceAccount
+Cr RentLeaseDepositTransaction.finance_account.chart_account
 ```

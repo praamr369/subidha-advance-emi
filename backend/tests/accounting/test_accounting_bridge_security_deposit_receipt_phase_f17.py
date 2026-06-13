@@ -180,8 +180,8 @@ class AccountingBridgeSecurityDepositReceiptPhaseF17Tests(APITestCase):
         rows = {int(row["source_pk"]): row for row in response.data["results"]}
         self.assertEqual(rows[tx.id]["status"], "SKIPPED_NOT_APPLICABLE")
         self.assertFalse(rows[tx.id]["can_post"])
-        self.assertEqual(rows[refund.id]["status"], "SKIPPED_NOT_APPLICABLE")
-        self.assertFalse(rows[refund.id]["can_post"])
+        self.assertEqual(rows[refund.id]["event_key"], "rent_security_deposit_refund")
+        self.assertNotEqual(rows[refund.id]["event_key"], "rent_security_deposit_receipt")
         self.client.force_authenticate(user=self.cashier)
         post = self.client.post(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/{self._candidate_id(tx)}/post/", {"idempotency_key": rows[tx.id]["idempotency_key"], "confirm": True}, format="json")
         self.assertIn(post.status_code, {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN})
