@@ -1,10 +1,18 @@
 from datetime import date
 from decimal import Decimal
 
+from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting.models import AccountingBridgePosting, ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind, JournalEntry
 from accounting.services.accounting_bridge_candidate_service import receipt_candidate
+from accounting.services.accounting_bridge_customer_advance_guard_service import (
+    ADVANCE_ALLOCATION_SKIP_REASON,
+    BridgeCandidateFilters,
+    list_bridge_candidates,
+    post_bridge_candidate,
+    preview_bridge_candidate,
+)
 from billing.models import BillingDocumentStatus, BillingSourceType, ReceiptDocument, ReceiptType
 from reconciliation.models import ReconciliationItem
 from subscriptions.models import CustomerAdvance, CustomerAdvanceAllocation, Payment
@@ -16,6 +24,7 @@ from tests.helpers import create_admin_user, create_batch, create_customer_profi
 class CustomerAdvanceSourceContractPhaseF19Tests(APITestCase):
     def setUp(self):
         self.admin = create_admin_user(username="phase_f19_admin", phone="9305190001")
+        self.client.force_authenticate(user=self.admin)
         self.customer = create_customer_profile(name="F19 Customer", phone="7305190001")
         self.product = create_product(name="F19 Product", product_code="F19-PROD", base_price=Decimal("2400.00"))
         self.batch = create_batch(batch_code="F19BATCH", duration_months=3, total_slots=100)
@@ -39,6 +48,43 @@ class CustomerAdvanceSourceContractPhaseF19Tests(APITestCase):
         self.assertEqual(advance.allocation_metadata["source_idempotency_key"], "f19-advance-001")
         self.assertTrue(advance.allocation_metadata["accounting_bridge_posting_deferred"])
         self.assertEqual(self._counts(), before)
+
+    def test_api_accepts_customer_advance_idempotency_key(self):
+        before = self._counts()
+        payload = {
+            "customer_id": self.customer.id,
+            "amount": "450.00",
+            "method": "UPI",
+            "finance_account_id": self.finance_account.id,
+            "reference_no": "F19-API-ADV-001",
+            "payment_date": "2026-05-21",
+            "idempotency_key": "f19-api-key-001",
+        }
+        first = self.client.post("/api/v1/cashier/collect-advance/", payload, format="json")
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+        second = self.client.post("/api/v1/cashier/collect-advance/", payload, format="json")
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED, second.data)
+        self.assertEqual(first.data["data"]["customer_advance_id"], second.data["data"]["customer_advance_id"])
+        advance = CustomerAdvance.objects.get(pk=first.data["data"]["customer_advance_id"])
+        self.assertEqual(advance.allocation_metadata["source_idempotency_key"], "f19-api-key-001")
+        self.assertTrue(first.data["data"]["source_metadata"]["accounting_bridge_posting_deferred"])
+        self.assertEqual(self._counts(), before)
+
+    def test_api_rejects_customer_advance_idempotency_mismatch(self):
+        payload = {
+            "customer_id": self.customer.id,
+            "amount": "450.00",
+            "method": "CASH",
+            "finance_account_id": self.finance_account.id,
+            "reference_no": "F19-API-MISMATCH",
+            "payment_date": "2026-05-21",
+            "idempotency_key": "f19-api-mismatch-key",
+        }
+        self.assertEqual(self.client.post("/api/v1/cashier/collect-advance/", payload, format="json").status_code, status.HTTP_201_CREATED)
+        mismatch = {**payload, "amount": "451.00"}
+        response = self.client.post("/api/v1/cashier/collect-advance/", mismatch, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("already exists with different source evidence", response.data["detail"])
 
     def test_customer_advance_receipt_idempotency_and_mismatch_protection(self):
         first = CustomerAdvanceService.collect_unapplied_advance(customer_id=self.customer.id, amount=Decimal("500.00"), collected_by=self.admin, finance_account_id=self.finance_account.id, method="CASH", reference_no="F19-ADV-IDEMP", payment_date=date(2026, 5, 21), idempotency_key="f19-idempotent")
@@ -66,6 +112,30 @@ class CustomerAdvanceSourceContractPhaseF19Tests(APITestCase):
         self.assertEqual(replay["payment"].id, payment.id)
         with self.assertRaises(ValueError):
             PaymentAllocationService.allocate_customer_advance(customer_advance_id=advance.id, emi_id=self.emi.id, amount=Decimal("1.00"), allocated_by=self.admin, reference_no="F19-ALLOC-001", allocation_date=date(2026, 5, 22))
+
+    def test_f1_payment_bridge_excludes_advance_allocation_payment(self):
+        advance = CustomerAdvanceService.collect_unapplied_advance(customer_id=self.customer.id, amount=Decimal("500.00"), collected_by=self.admin, finance_account_id=self.finance_account.id, method="CASH", reference_no="F19-ADV-BRIDGE", payment_date=date(2026, 5, 21), idempotency_key="f19-bridge-source")
+        result = PaymentAllocationService.allocate_customer_advance(customer_advance_id=advance.id, emi_id=self.emi.id, amount=Decimal("500.00"), allocated_by=self.admin, reference_no="F19-ALLOC-BRIDGE", allocation_date=date(2026, 5, 22))
+        payment = result["payment"]
+        rows = list_bridge_candidates(BridgeCandidateFilters(source_model="Payment"))
+        row = next(item for item in rows if str(item.get("source_id")) == str(payment.id))
+        self.assertEqual(row["event_key"], "payment_skipped_not_applicable")
+        self.assertEqual(row["status"], "SKIPPED_NOT_APPLICABLE")
+        self.assertFalse(row["can_preview"])
+        self.assertFalse(row["can_post"])
+        f1_candidate_id = f"payment:{payment.id}:subscription_emi_payment"
+        with self.assertRaisesMessage(ValueError, ADVANCE_ALLOCATION_SKIP_REASON):
+            preview_bridge_candidate(f1_candidate_id)
+        with self.assertRaisesMessage(ValueError, ADVANCE_ALLOCATION_SKIP_REASON):
+            post_bridge_candidate(candidate_id=f1_candidate_id, idempotency_key="blocked", confirmed=True, actor=self.admin)
+        self.assertFalse(AccountingBridgePosting.objects.filter(source_model="Payment", source_id=str(payment.id), purpose="PAYMENT_COLLECTION").exists())
+
+    def test_normal_emi_payment_bridge_candidate_remains_f1_payment(self):
+        payment = Payment.objects.create(customer=self.customer, subscription=self.subscription, emi=self.emi, amount=Decimal("100.00"), finance_account=self.finance_account, method="CASH", reference_no="F19-NORMAL-EMI-PAY", payment_date=date(2026, 5, 23), collected_by=self.admin)
+        rows = list_bridge_candidates(BridgeCandidateFilters(source_model="Payment"))
+        row = next(item for item in rows if str(item.get("source_id")) == str(payment.id))
+        self.assertEqual(row["event_key"], "subscription_emi_payment")
+        self.assertNotEqual(row["status"], "SKIPPED_NOT_APPLICABLE")
 
     def test_receiptdocument_f2_customer_advance_classification_is_separate(self):
         manual = ReceiptDocument.objects.create(receipt_no="F19-RCT-ADV", receipt_type=ReceiptType.RETAIL_RECEIPT, status=BillingDocumentStatus.APPROVED, receipt_date=date(2026, 5, 21), finance_account=self.finance_account, customer=self.customer, source_type=BillingSourceType.MANUAL, amount=Decimal("300.00"))
