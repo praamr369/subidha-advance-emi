@@ -1,7 +1,3 @@
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 from decimal import Decimal
 
 from django.utils import timezone
@@ -257,46 +253,3 @@ class PhaseF25ProductionAccountingOperationalValidationTests(APITestCase):
             "reference_no": payment.reference_no,
         }
         self.assertEqual(after, before)
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-from django.test import SimpleTestCase
-
-from accounting.services.phase_f_operational_validation_service import validate_phase_f_operational_rows
-
-
-class PhaseF25ProductionAccountingOperationalValidationTests(SimpleTestCase):
-    def test_validation_is_read_only_and_non_postable(self):
-        payload = validate_phase_f_operational_rows([{"row_type": "validation_event", "status": "READY_UNPOSTED"}])
-        self.assertTrue(payload["read_only"])
-        self.assertFalse(payload["can_post"])
-        self.assertFalse(payload["rows"][0]["can_post"])
-        self.assertFalse(payload["creates_journal_entries"])
-        self.assertFalse(payload["creates_bridge_postings"])
-
-    def test_staff_advance_remains_unsupported_and_non_postable(self):
-        payload = validate_phase_f_operational_rows([{"row_type": "bridge_candidate", "bridge_candidate_id": "1", "status": "UNSUPPORTED", "source_model": "StaffAdvance"}])
-        self.assertEqual(payload["rows"][0]["status"], "UNSUPPORTED")
-        self.assertFalse(payload["rows"][0]["can_post"])
-
-    def test_deferred_source_contract_rows_remain_non_postable(self):
-        payload = validate_phase_f_operational_rows([{"row_type": "bridge_candidate", "bridge_candidate_id": "2", "status": "DEFERRED", "source_model": "SourceContract"}])
-        self.assertFalse(payload["rows"][0]["can_post"])
-
-    def test_concrete_ready_unposted_rows_surface_as_ready_unposted(self):
-        payload = validate_phase_f_operational_rows([{"row_type": "bridge_candidate", "bridge_candidate_id": "3", "status": "READY_UNPOSTED", "source_model": "Payment"}])
-        self.assertEqual(payload["rows"][0]["status"], "READY_UNPOSTED")
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
