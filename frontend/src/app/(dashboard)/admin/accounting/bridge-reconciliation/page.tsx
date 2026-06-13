@@ -74,10 +74,16 @@ function modelLabel(model?: string | null): string {
 
 function statusClass(status: string): string {
   const value = status.toUpperCase();
-  if (["RECONCILED", "POSTED", "READY", "NO_CURRENT_ROWS", "NO_CURRENT_BLOCKERS", "NO_CURRENT_POSTED_UNVERIFIED"].includes(value)) return "border-emerald-200 bg-emerald-50 text-emerald-900";
-  if (["READY_UNPOSTED", "POSTED_UNVERIFIED", "VALIDATION_ONLY", "EXCLUDED"].includes(value)) return "border-blue-200 bg-blue-50 text-blue-900";
+  if (["RECONCILED", "POSTED", "READY", "NO_CANDIDATES", "NO_CURRENT_ROWS", "NO_CURRENT_BLOCKERS", "NO_CURRENT_POSTED_UNVERIFIED"].includes(value)) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  }
+  if (["READY_UNPOSTED", "POSTED_UNVERIFIED", "VALIDATION_ONLY", "EXCLUDED"].includes(value)) {
+    return "border-blue-200 bg-blue-50 text-blue-900";
+  }
   if (value.startsWith("BLOCKED") || value === "ACTION_REQUIRED") return "border-amber-200 bg-amber-50 text-amber-950";
-  if (["EXCEPTION", "UNSUPPORTED", "UNSUPPORTED_SOURCE", "UNSUPPORTED_BOUNDARY", "DEFERRED", "SOURCE_CONTRACT_ONLY", "SKIPPED_NOT_APPLICABLE", "BOUNDARY_VIOLATION"].includes(value)) return "border-red-200 bg-red-50 text-red-900";
+  if (["EXCEPTION", "UNSUPPORTED", "UNSUPPORTED_SOURCE", "UNSUPPORTED_BOUNDARY", "DEFERRED", "SOURCE_CONTRACT_ONLY", "SKIPPED_NOT_APPLICABLE", "BOUNDARY_VIOLATION"].includes(value)) {
+    return "border-red-200 bg-red-50 text-red-900";
+  }
   return "border-slate-200 bg-slate-50 text-slate-900";
 }
 
@@ -158,26 +164,16 @@ function inventoryActivityCount(item: PhaseFSourceInventoryItem): number {
   return Object.values(item.counts ?? {}).reduce((total, value) => total + Number(value ?? 0), 0);
 }
 
-function inventoryDisplayStatus(item: PhaseFSourceInventoryItem): string {
-  const status = String(item.status || "UNKNOWN").toUpperCase();
-  if (status === "UNSUPPORTED") return "UNSUPPORTED_BOUNDARY";
-  if (status === "DEFERRED") return "SOURCE_CONTRACT_ONLY";
-  if (inventoryActivityCount(item) === 0) return "NO_CURRENT_ROWS";
-  return status;
+function activeInventory(items: PhaseFSourceInventoryItem[]): PhaseFSourceInventoryItem[] {
+  return items.filter((item) => inventoryActivityCount(item) > 0);
 }
 
-function inventoryActionLinks(item: PhaseFSourceInventoryItem): BridgeActionLink[] {
-  const displayStatus = inventoryDisplayStatus(item);
-  if (["NO_CURRENT_ROWS", "SOURCE_CONTRACT_ONLY", "UNSUPPORTED_BOUNDARY"].includes(displayStatus)) return [];
-  return item.action_links ?? [];
+function sourceContractCount(items: PhaseFSourceInventoryItem[]): number {
+  return items.filter((item) => String(item.status || "").toUpperCase() === "DEFERRED").length;
 }
 
-function inventoryActionText(item: PhaseFSourceInventoryItem): string {
-  const displayStatus = inventoryDisplayStatus(item);
-  if (displayStatus === "NO_CURRENT_ROWS") return "No current source rows from backend payload.";
-  if (displayStatus === "SOURCE_CONTRACT_ONLY") return "Source-contract boundary. Not postable here.";
-  if (displayStatus === "UNSUPPORTED_BOUNDARY") return "Unsupported boundary. No posting workflow exists.";
-  return "Open only the relevant setup or review action.";
+function unsupportedBoundaryCount(items: PhaseFSourceInventoryItem[]): number {
+  return items.filter((item) => String(item.status || "").toUpperCase() === "UNSUPPORTED").length;
 }
 
 function workflowDisplayStatus(workflow: ProductionAccountingValidationWorkflow): string {
@@ -195,7 +191,7 @@ function workflowDisplayStatus(workflow: ProductionAccountingValidationWorkflow)
 
 function workflowActionLinks(workflow: ProductionAccountingValidationWorkflow): BridgeActionLink[] {
   const displayStatus = workflowDisplayStatus(workflow);
-  if (displayStatus.startsWith("NO_CURRENT") || displayStatus === "UNSUPPORTED_BOUNDARY") return [];
+  if (displayStatus.startsWith("NO_CURRENT") || displayStatus === "UNSUPPORTED_BOUNDARY" || displayStatus === "VALIDATION_ONLY" || displayStatus === "EXCLUDED") return [];
   return workflow.expected_action ? [workflow.expected_action] : [];
 }
 
@@ -286,33 +282,6 @@ function RowsTable({ title, description, rows, selected, onToggle, onPreview, on
   );
 }
 
-function InventoryTable({ items }: { items: PhaseFSourceInventoryItem[] }) {
-  return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-background">
-      <table className="min-w-full divide-y divide-border text-sm">
-        <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-          <tr><th className="px-4 py-3">Phase</th><th className="px-4 py-3">Source</th><th className="px-4 py-3">Events</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">State</th><th className="px-4 py-3">Setup / review</th></tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {items.map((item) => {
-            const displayStatus = inventoryDisplayStatus(item);
-            return (
-              <tr key={`${item.phase}-${item.source_model}-${item.event_keys.join("-")}`} className="align-top">
-                <td className="px-4 py-3 font-semibold">{item.phase}</td>
-                <td className="px-4 py-3"><div className="font-medium">{modelLabel(item.source_model)}</div><div className="text-xs text-muted-foreground">{item.source_owner}</div></td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">{item.event_keys.join(", ")}</td>
-                <td className="px-4 py-3"><StatusBadge value={displayStatus} /></td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">{inventoryActionText(item)}</td>
-                <td className="px-4 py-3"><ActionLinks links={inventoryActionLinks(item)} /></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconciliationPayload }) {
   const tower = payload.phase_f_control_tower;
   const inventory = tower?.source_inventory ?? [];
@@ -320,36 +289,28 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
 
   const readinessState = tower.readiness?.state ?? tower.readiness?.primary_state ?? "UNKNOWN";
   const readinessCounts = tower.readiness?.counts ?? {};
-  const activeInventory = inventory.filter((item) => inventoryActivityCount(item) > 0);
-  const sourceContractCount = inventory.filter((item) => inventoryDisplayStatus(item) === "SOURCE_CONTRACT_ONLY").length;
-  const unsupportedBoundaryCount = inventory.filter((item) => inventoryDisplayStatus(item) === "UNSUPPORTED_BOUNDARY").length;
-  const hiddenEmptyCount = inventory.length - activeInventory.length;
+  const activeCount = activeInventory(inventory).length;
+  const sourceContract = sourceContractCount(inventory);
+  const unsupported = unsupportedBoundaryCount(inventory);
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">Phase F Control Tower</h2>
-        <p className="text-sm text-muted-foreground">Daily view shows only active source rows. Full Phase F source inventory is available as a collapsed reference.</p>
+        <p className="text-sm text-muted-foreground">Daily operator view. Empty source definitions and validation-only references are hidden from the main workflow.</p>
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label="Readiness" value={readinessState} detail="Backend readiness state" tone={statusClass(readinessState)} />
-        <SummaryCard label="Active source rows" value={activeInventory.length} detail="Rows needing review" />
+        <SummaryCard label="Readiness" value={readinessState} detail="Backend state" tone={statusClass(readinessState)} />
+        <SummaryCard label="Active source rows" value={activeCount} detail="Rows needing review" />
         <SummaryCard label="Ready" value={readinessCounts.ready_unposted ?? 0} detail="Unposted candidates" />
         <SummaryCard label="Posted unverified" value={readinessCounts.posted_unverified ?? 0} detail="Needs reconciliation" />
-        <SummaryCard label="Hidden empty inventory" value={hiddenEmptyCount} detail="Reference-only source definitions" tone="border-slate-200 bg-slate-50 text-slate-900" />
+        <SummaryCard label="Boundaries" value={sourceContract + unsupported} detail={`${sourceContract} source-contract · ${unsupported} unsupported`} tone="border-slate-200 bg-slate-50 text-slate-900" />
       </div>
       <div className="mt-4 rounded-xl border border-border bg-background p-4 text-sm text-muted-foreground">
         <div className="font-semibold text-foreground">F24/F25 guardrails</div>
         <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4"><span>No new source model</span><span>No new posting source</span><span>No source mutation</span><span>No auto-post/reconcile/close</span></div>
-        <div className="mt-2 text-xs">Source-contract boundaries: {sourceContractCount}. Unsupported boundaries: {unsupportedBoundaryCount}.</div>
       </div>
-      <div className="mt-4">
-        {activeInventory.length ? <InventoryTable items={activeInventory} /> : <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">No current bridge source rows require operator action.</div>}
-      </div>
-      <details className="mt-4 rounded-xl border border-border bg-background p-4 text-sm">
-        <summary className="cursor-pointer font-semibold text-foreground">Show full Phase F source inventory reference ({inventory.length})</summary>
-        <div className="mt-4"><InventoryTable items={inventory} /></div>
-      </details>
+      {activeCount ? null : <div className="mt-4 rounded-xl border border-dashed p-5 text-sm text-muted-foreground">No current bridge source rows require operator action.</div>}
     </section>
   );
 }
@@ -386,27 +347,23 @@ function ProductionValidation({ payload }: { payload: AccountingBridgeReconcilia
 
   const workflows = validation.workflows ?? Object.values(validation.groups ?? {}).flat();
   const attentionWorkflows = workflows.filter(workflowNeedsOperatorAttention);
-  const boundaryWorkflows = workflows.filter((workflow) => ["VALIDATION_ONLY", "EXCLUDED", "UNSUPPORTED_BOUNDARY"].includes(workflowDisplayStatus(workflow)));
+  const boundaryCount = workflows.filter((workflow) => ["VALIDATION_ONLY", "EXCLUDED", "UNSUPPORTED_BOUNDARY"].includes(workflowDisplayStatus(workflow))).length;
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">{validation.title ?? "Production Accounting Validation"}</h2>
-        <p className="text-sm text-muted-foreground">{validation.safety_copy ?? SAFETY_COPY}</p>
+        <p className="text-sm text-muted-foreground">Only workflows with current source rows, blockers, or exceptions are shown to operators.</p>
       </div>
       <div className="mb-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <SummaryCard label="Workflows" value={validation.workflow_count ?? workflows.length} />
+        <SummaryCard label="Workflows checked" value={validation.workflow_count ?? workflows.length} />
         <SummaryCard label="Needs attention" value={attentionWorkflows.length} detail="Rows/blockers only" />
-        <SummaryCard label="Boundaries" value={boundaryWorkflows.length} detail="Validation-only / excluded" />
+        <SummaryCard label="Boundaries" value={boundaryCount} detail="Validation-only / excluded" />
         <SummaryCard label="Creates journals" value={validation.creates_journal_entry ? "Yes" : "No"} />
         <SummaryCard label="Auto posts" value={validation.auto_posts ? "Yes" : "No"} />
         <SummaryCard label="Mutates sources" value={validation.mutates_sources ? "Yes" : "No"} />
       </div>
       {attentionWorkflows.length ? <WorkflowTable workflows={attentionWorkflows} /> : <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">No current validation workflow requires operator action.</div>}
-      <details className="mt-4 rounded-xl border border-border bg-background p-4 text-sm">
-        <summary className="cursor-pointer font-semibold text-foreground">Show full production validation matrix ({workflows.length})</summary>
-        <div className="mt-4"><WorkflowTable workflows={workflows} /></div>
-      </details>
     </section>
   );
 }
@@ -440,6 +397,7 @@ export default function AccountingBridgeReconciliationPage() {
   const concreteRows = useMemo(() => rows.filter(isConcreteSourceCandidate), [rows]);
   const blockedRows = useMemo(() => rows.filter(isBlockedOrExceptionRow), [rows]);
   const boundaryRows = useMemo(() => rows.filter(isUnsupportedOrDeferredRow), [rows]);
+  const showOperationalTables = concreteRows.length > 0 || blockedRows.length > 0 || boundaryRows.length > 0;
   const selectedRows = useMemo(() => concreteRows.filter((row) => {
     const id = candidateId(row);
     return Boolean(id && selected.has(id));
@@ -554,17 +512,25 @@ export default function AccountingBridgeReconciliationPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-foreground">Selected-row batch panel</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{selectedRows.length} selected concrete source item(s). Only concrete READY_UNPOSTED source rows with posting permission can be batch-posted.</p>
-            <textarea value={postingNote} onChange={(event) => setPostingNote(event.target.value)} placeholder="Optional posting note" className="mt-4 min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm" />
-            <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={!selectedRows.length} onClick={handleBatchPreview} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Preview selected</button><button type="button" disabled={!selectedCanPost} onClick={handleBatchPost} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Post selected</button></div>
-            {operationMessage ? <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">{operationMessage}</div> : null}
-          </section>
-
-          <RowsTable title="Concrete source candidates" description="Real bridge candidate rows from the backend payload. Preview/post remains explicit and row controlled." rows={concreteRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} showSelection />
-          <RowsTable title="Blocked / exception rows" description="Rows that require setup, approval, or reconciliation action before posting can continue." rows={blockedRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} />
-          <RowsTable title="Unsupported / deferred boundaries" description="Unsupported and source-contract-only rows remain visible but non-postable." rows={boundaryRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} />
+          {showOperationalTables ? (
+            <>
+              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <h2 className="text-lg font-semibold text-foreground">Selected-row batch panel</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{selectedRows.length} selected concrete source item(s). Only concrete READY_UNPOSTED source rows with posting permission can be batch-posted.</p>
+                <textarea value={postingNote} onChange={(event) => setPostingNote(event.target.value)} placeholder="Optional posting note" className="mt-4 min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm" />
+                <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={!selectedRows.length} onClick={handleBatchPreview} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Preview selected</button><button type="button" disabled={!selectedCanPost} onClick={handleBatchPost} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Post selected</button></div>
+                {operationMessage ? <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">{operationMessage}</div> : null}
+              </section>
+              <RowsTable title="Concrete source candidates" description="Real bridge candidate rows from the backend payload. Preview/post remains explicit and row controlled." rows={concreteRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} showSelection />
+              <RowsTable title="Blocked / exception rows" description="Rows that require setup, approval, or reconciliation action before posting can continue." rows={blockedRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} />
+              <RowsTable title="Unsupported / deferred boundaries" description="Unsupported and source-contract-only rows remain visible but non-postable." rows={boundaryRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} />
+            </>
+          ) : (
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground">Operational bridge queue</h2>
+              <p className="mt-1 text-sm text-muted-foreground">No concrete candidates, blocked rows, exceptions, unsupported rows, or deferred source rows are present in the backend payload.</p>
+            </section>
+          )}
         </>
       ) : null}
     </main>
