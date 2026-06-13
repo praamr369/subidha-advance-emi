@@ -7,16 +7,22 @@ import { ApiError } from "@/lib/api";
 import ActionButton from "@/components/ui/ActionButton";
 import ModalShell from "@/components/ui/ModalShell";
 
+type ConfirmActionButtonVariant = "primary" | "secondary" | "destructive" | "danger" | "outline" | "ghost";
+
 type ConfirmActionButtonProps = {
   label: string;
   confirmLabel?: string;
   title: string;
   description: string;
   onConfirm: () => Promise<void> | void;
-  variant?: "primary" | "secondary" | "destructive" | "outline" | "ghost";
+  variant?: ConfirmActionButtonVariant;
   disabled?: boolean;
   className?: string;
 };
+
+function normalizeVariant(variant: ConfirmActionButtonVariant): Exclude<ConfirmActionButtonVariant, "danger"> {
+  return variant === "danger" ? "destructive" : variant;
+}
 
 export default function ConfirmActionButton({
   label,
@@ -31,6 +37,7 @@ export default function ConfirmActionButton({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const actionVariant = normalizeVariant(variant);
 
   function formatActionError(err: unknown): string {
     if (err instanceof ApiError) {
@@ -62,7 +69,7 @@ export default function ConfirmActionButton({
   return (
     <>
       <ActionButton
-        variant={variant}
+        variant={actionVariant}
         disabled={disabled}
         onClick={() => {
           setActionError(null);
@@ -134,7 +141,7 @@ export default function ConfirmActionButton({
                 Cancel
               </ActionButton>
               <ActionButton
-                variant={variant === "destructive" ? "destructive" : "primary"}
+                variant={actionVariant === "destructive" ? "destructive" : "primary"}
                 loading={loading}
                 onClick={() => void handleConfirm()}
               >
