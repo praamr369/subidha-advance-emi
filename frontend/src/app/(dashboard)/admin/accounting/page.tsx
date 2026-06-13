@@ -375,7 +375,7 @@ export default function AdminAccountingPage() {
   const fixFirst = controlBlockers(data, setupBlockerCount);
   const readinessCounters = data?.accountingReadiness?.counters as Record<string, unknown> | undefined;
   const bridgeSummary = data?.bridgeReadiness?.summary;
-  const reconciliationExceptionCount = summaryExtra(bridgeSummary, "exception_count") || summaryExtra(bridgeSummary, "reconciliation_exception_count") || metricNumber(readinessCounters?.reconciliation_exceptions) ?? null;
+  const reconciliationExceptionCount = summaryExtra(bridgeSummary, "exception_count") || summaryExtra(bridgeSummary, "reconciliation_exception_count") || metricNumber(readinessCounters?.reconciliation_exceptions) || 0;
   const mappingBlockerCount = bridgeStatusCount(data, "BLOCKED_BY_MAPPING") + (setupBlockerCount ?? 0);
   const bridgeBlockerCount = actionableBridgeBlockerCount(data);
   const readyUnpostedCount = asCount(bridgeSummary?.ready_unposted_count);
