@@ -89,6 +89,19 @@ Dr Customer Advance Liability
 Cr Customer Receivable / Invoice Receivable
 ```
 
+## Phase F19.1 closeout
+
+F19.1 closes the remaining source-contract gaps before F20:
+
+- cashier advance collection API accepts `idempotency_key`
+- cashier advance collection passes the key to `CustomerAdvanceService.collect_unapplied_advance`
+- cashier API response exposes source metadata for operator/audit visibility
+- `ADVANCE_ALLOCATION` linked `Payment` rows are guarded from F1 Payment bridge preview/post
+- bridge candidate lists surface those linked payments as skipped/not-applicable with this reason: `Customer advance application payments are handled by F21, not F1 payment collection.`
+- F2 `ReceiptDocument.customer_advance` remains unchanged and separate
+
+F19.1 still creates no accounting bridge posting. It does not create `JournalEntry`, `AccountingBridgePosting`, or bridge `ReconciliationItem` rows.
+
 ## Refund source gap
 
 No dedicated customer advance refund source contract was finalized in F19.
@@ -124,12 +137,16 @@ Dr Cash / Bank / FinanceAccount
 Cr Customer Advance Liability
 ```
 
+F20 must not duplicate the existing F2 `ReceiptDocument.customer_advance` bridge path.
+
 F21 — customer advance application bridge:
 
 ```text
 Dr Customer Advance Liability
 Cr Customer Receivable / Invoice Receivable
 ```
+
+F21 must use `CustomerAdvanceAllocation`/advance-application evidence and must not post linked `Payment` rows as F1 cash collection.
 
 F22 — customer advance refund bridge:
 
@@ -138,9 +155,11 @@ Dr Customer Advance Liability
 Cr Cash / Bank / FinanceAccount
 ```
 
+F22 requires a concrete customer-advance refund source contract before posting.
+
 ## Safety boundary
 
-F19 does not create:
+F19/F19.1 does not create:
 
 - `JournalEntry`
 - `AccountingBridgePosting`
@@ -149,14 +168,16 @@ F19 does not create:
 - auto-reconcile
 - period close
 
-F19 does not classify security deposits, rent/lease monthly collection, direct-sale receipts, EMI payment collection, salary payment, vendor payment, commission payout, or StaffAdvance as customer advance.
+F19/F19.1 does not classify security deposits, rent/lease monthly collection, direct-sale receipts, EMI payment collection, salary payment, vendor payment, commission payout, or StaffAdvance as customer advance.
 
 ## Required regression
 
 ```bash
 .venv/bin/python manage.py test tests.accounting.test_customer_advance_source_contract_phase_f19 --verbosity=1
-.venv/bin/python manage.py test tests.accounting.test_accounting_bridge_receiptdocument_posting_phase_f2 tests.accounting.test_customer_advance_source_contract_phase_f19 --verbosity=1
+.venv/bin/python manage.py test tests.accounting.test_accounting_bridge_candidate_posting_phase_f tests.accounting.test_accounting_bridge_receiptdocument_posting_phase_f2 tests.accounting.test_customer_advance_source_contract_phase_f19 --verbosity=1
 .venv/bin/python manage.py test tests.accounting tests.reconciliation tests.subscriptions --verbosity=1
+.venv/bin/python manage.py check
+.venv/bin/python manage.py makemigrations --check --dry-run
 cd frontend
 npm run typecheck
 npm run lint
