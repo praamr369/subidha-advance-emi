@@ -282,6 +282,7 @@ class CashierCollectAdvance(APIView):
                 payment_date=validated.get("payment_date") or timezone.localdate(),
                 branch_id=validated.get("branch_id"),
                 cash_counter_id=validated.get("cash_counter_id"),
+                idempotency_key=validated.get("idempotency_key") or None,
             )
         except ValueError as exc:
             return Response(_value_error_payload(exc), status=status.HTTP_400_BAD_REQUEST)
@@ -298,6 +299,7 @@ class CashierCollectAdvance(APIView):
                     "unapplied_amount": str(advance.unapplied_amount),
                     "status": advance.status,
                     "reference_no": advance.reference_no,
+                    "source_metadata": advance.allocation_metadata or {},
                 },
             },
             status=status.HTTP_201_CREATED,
@@ -358,119 +360,16 @@ class CashierSearchDirectSaleView(APIView):
         if not query:
             return Response({"count": 0, "results": []}, status=status.HTTP_200_OK)
 
-        queryset = _outstanding_direct_sale_queryset(user=request.user)
-        search_filter = Q()
-
+        queryset = DirectSale.objects.select_related("customer", "branch", "cash_counter", "finance_account").filter(invoice_active_q()).order_by("-sale_date", "-id")
+        queryset = scope_queryset_to_user_branches(queryset, user=request.user, field_name="branch_id")
         if mode == "phone":
-            search_filter = Q(customer_phone_snapshot__icontains=query) | Q(customer__phone__icontains=query)
+            queryset = queryset.filter(Q(customer_phone_snapshot__icontains=query) | Q(customer__phone__icontains=query))
         elif mode == "sale":
-            search_filter = Q(sale_no__icontains=query)
+            queryset = queryset.filter(sale_no__icontains=query)
         elif mode == "customer":
-            search_filter = Q(customer_name_snapshot__icontains=query) | Q(customer__name__icontains=query)
+            queryset = queryset.filter(Q(customer_name_snapshot__icontains=query) | Q(customer__name__icontains=query))
         else:
-            search_filter = (
-                Q(sale_no__icontains=query)
-                | Q(customer_phone_snapshot__icontains=query)
-                | Q(customer__phone__icontains=query)
-                | Q(customer_name_snapshot__icontains=query)
-                | Q(customer__name__icontains=query)
-                | Q(billing_invoices__document_no__icontains=query)
-                | Q(billing_invoices__source_reference__icontains=query)
-            )
+            queryset = queryset.filter(Q(sale_no__icontains=query) | Q(customer_name_snapshot__icontains=query) | Q(customer_phone_snapshot__icontains=query) | Q(customer__name__icontains=query) | Q(customer__phone__icontains=query))
 
-        rows = list(queryset.filter(search_filter).distinct()[:20])
-        return Response(
-            {
-                "count": len(rows),
-                "results": [_serialize_cashier_direct_sale_result(row) for row in rows],
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-class CashierCollectDirectSale(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsCashierOrAdmin]
-
-    @require_capability("billing.collect")
-    def post(self, request, *args, **kwargs):
-        try:
-            direct_sale_id = _parse_optional_int(
-                request.data.get("direct_sale_id"),
-                field_name="direct_sale_id",
-            )
-            amount = _parse_amount(request.data.get("amount"))
-            finance_account_id = _parse_optional_int(
-                request.data.get("finance_account_id"),
-                field_name="finance_account_id",
-            )
-            branch_id = _parse_optional_int(
-                request.data.get("branch_id"),
-                field_name="branch_id",
-            )
-            cash_counter_id = _parse_optional_int(
-                request.data.get("cash_counter_id"),
-                field_name="cash_counter_id",
-            )
-            if direct_sale_id is None:
-                raise ValueError("direct_sale_id is required.")
-            result = collect_direct_sale_payment(
-                direct_sale_id=direct_sale_id,
-                amount=amount,
-                collected_by=request.user,
-                receipt_date=timezone.localdate(),
-                finance_account_id=finance_account_id,
-                branch_id=branch_id,
-                cash_counter_id=cash_counter_id,
-                reference_no=(request.data.get("reference_no") or "").strip() or None,
-                notes=(request.data.get("note") or "").strip(),
-            )
-        except ValueError as exc:
-            return Response(_value_error_payload(exc), status=status.HTTP_400_BAD_REQUEST)
-
-        receipt = result["receipt"]
-        direct_sale = result["direct_sale"]
-        invoice = result["invoice"]
-
-        return Response(
-            {
-                "message": "Direct-sale payment collected successfully.",
-                "created": result.get("created", True),
-                "receipt": {
-                    "id": receipt.id,
-                    "receipt_no": getattr(receipt, "receipt_no", None),
-                    "receipt_type": getattr(receipt, "receipt_type", None),
-                    "status": getattr(receipt, "status", None),
-                    "receipt_date": getattr(receipt, "receipt_date", None),
-                    "amount": str(receipt.amount),
-                    "finance_account_id": getattr(receipt, "finance_account_id", None),
-                    "branch_id": getattr(receipt, "branch_id", None),
-                    "cash_counter_id": getattr(receipt, "cash_counter_id", None),
-                    "source_reference": getattr(receipt, "source_reference", None),
-                },
-                "direct_sale": {
-                    "id": direct_sale.id,
-                    "sale_no": getattr(direct_sale, "sale_no", None),
-                    "status": getattr(direct_sale, "status", None),
-                    "grand_total": str(direct_sale.grand_total),
-                    "received_total": str(direct_sale.received_total),
-                    "balance_total": str(direct_sale.balance_total),
-                    "branch_id": getattr(direct_sale, "branch_id", None),
-                    "cash_counter_id": getattr(direct_sale, "cash_counter_id", None),
-                    "finance_account_id": getattr(direct_sale, "finance_account_id", None),
-                },
-                "invoice": {
-                    "id": invoice.id,
-                    "document_no": getattr(invoice, "document_no", None),
-                    "status": getattr(invoice, "status", None),
-                    "received_total": str(invoice.received_total),
-                    "balance_total": str(invoice.balance_total),
-                },
-                "outstanding_before": str(result.get("outstanding_before")),
-                "outstanding_after": str(result.get("outstanding_after")),
-            },
-            status=status.HTTP_201_CREATED if result.get("created", True) else status.HTTP_200_OK,
-        )
-
-
-# Backward-compatible alias kept for route imports that still reference the older name.
-CashierCollectDirectSalePayment = CashierCollectDirectSale
+        rows = [_serialize_cashier_direct_sale_result(row) for row in queryset[:50]]
+        return Response({"count": len(rows), "results": rows}, status=status.HTTP_200_OK)
