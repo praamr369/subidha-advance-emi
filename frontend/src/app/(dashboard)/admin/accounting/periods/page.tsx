@@ -135,6 +135,24 @@ function BridgeCloseReadinessSplit({ summary }: { summary: AccountingBridgeRecon
         { label: "Open Mapping Audit", href: MAPPING_AUDIT_HREF },
       ],
     }] : []),
+    ...(summaryHasKey(summary, "security_deposit_receipt_ready_unposted_count") ? [{
+      title: "Security Deposit Receipt",
+      action: "Review deposit receipt items",
+      href: bridgeReviewHref({ source_model: "RentLeaseDepositTransaction" }),
+      rows: [
+        { label: "Ready unposted", value: summaryCount(summary, "security_deposit_receipt_ready_unposted_count"), detail: "Concrete RentLeaseDepositTransaction receipt evidence is ready; bridge posting is still pending.", href: bridgeReviewHref({ source_model: "RentLeaseDepositTransaction", status: "READY_UNPOSTED" }) },
+        { label: "Posted unverified", value: summaryCount(summary, "security_deposit_receipt_posted_unverified_count"), detail: "Security deposit journal exists, but reconciliation verification is pending.", href: bridgeReviewHref({ source_model: "RentLeaseDepositTransaction", status: "POSTED_UNVERIFIED" }) },
+        { label: "Reconciled", value: summaryCount(summary, "security_deposit_receipt_reconciled_count"), detail: "Deposit receipt bridge posting has passed verification.", href: bridgeReviewHref({ source_model: "RentLeaseDepositTransaction", status: "RECONCILED" }) },
+        { label: "Blocked", value: summaryCount(summary, "security_deposit_receipt_blocked_count"), detail: "Finance-account, liability mapping, period, or numbering blocker remains unresolved.", href: bridgeReviewHref({ source_model: "RentLeaseDepositTransaction", status: "BLOCKED" }) },
+        { label: "Unsupported", value: summaryCount(summary, "security_deposit_receipt_unsupported_count"), detail: "Refund, adjustment, voided, reversed, or incomplete legacy deposit rows stay non-postable.", href: bridgeReviewHref({ source_model: "RentLeaseDepositTransaction", status: "UNSUPPORTED" }) },
+      ],
+      extraActions: [
+        { label: "Run reconciliation checks", href: RECONCILIATION_RUNS_HREF },
+        { label: "Open Finance Accounts", href: ROUTES.admin.settingsBusinessSetupFinanceAccounts },
+        { label: "Open Mapping Audit", href: MAPPING_AUDIT_HREF },
+        { label: "Open Journal Numbering", href: DOCUMENT_NUMBERING_HREF },
+      ],
+    }] : []),
     {
       title: "Credit / Return bridge",
       action: "Review credit/return bridge items",

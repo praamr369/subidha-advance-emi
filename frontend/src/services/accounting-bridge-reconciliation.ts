@@ -27,6 +27,12 @@ export type AccountingBridgeReconciliationSummary = {
   rent_lease_collection_reconciled_count?: number;
   rent_lease_collection_blocked_count?: number;
   rent_lease_collection_unsupported_count?: number;
+  security_deposit_receipt_ready_unposted_count?: number;
+  security_deposit_receipt_posted_count?: number;
+  security_deposit_receipt_posted_unverified_count?: number;
+  security_deposit_receipt_reconciled_count?: number;
+  security_deposit_receipt_blocked_count?: number;
+  security_deposit_receipt_unsupported_count?: number;
   [key: string]: number | string | boolean | null | undefined | Record<string, unknown> | Array<unknown>;
 };
 
@@ -46,7 +52,7 @@ export type AccountingBridgeReconciliationJournal = {
 export type AccountingBridgeReconciliationItem = { id: number; status: string; severity: string; exception_code?: string; exception_message?: string };
 export type AccountingBridgePeriodReadiness = { financial_year_ready?: boolean; accounting_period_ready?: boolean; journal_numbering_ready?: boolean; posting_controls_ready?: boolean; active_financial_year?: { id?: number; code?: string; name?: string } | null; current_period?: { id?: number; code?: string; name?: string; status?: string } | null; blockers?: string[] };
 
-export type BridgeSourceModel = "Payment" | "ReceiptDocument" | "BillingInvoice" | "RentLeaseBillingDemand" | "RentLeaseCollection" | "BillingCreditNote" | "DirectSaleReturn" | "BillingDebitNote" | "PurchaseBill" | "VendorPayment" | "StockLedger" | "Commission" | "CommissionPayoutBatch" | "SalarySheet" | "SalaryPayment" | string;
+export type BridgeSourceModel = "Payment" | "ReceiptDocument" | "BillingInvoice" | "RentLeaseBillingDemand" | "RentLeaseCollection" | "RentLeaseDepositTransaction" | "BillingCreditNote" | "DirectSaleReturn" | "BillingDebitNote" | "PurchaseBill" | "VendorPayment" | "StockLedger" | "Commission" | "CommissionPayoutBatch" | "SalarySheet" | "SalaryPayment" | string;
 export type BridgeActionLink = { key: string; label: string; href: string; reason?: string | null; disabled?: boolean };
 export type BridgePostingLine = { chart_account?: { id?: number; code?: string; name?: string } | null; description?: string; debit_amount: string; credit_amount: string };
 export type BridgeFinanceAccount = { id?: number; name?: string; kind?: string; is_active?: boolean; chart_account?: { id?: number; code?: string; name?: string } | null };
@@ -92,6 +98,12 @@ export type AccountingBridgeReconciliationRow = {
   demand_status?: string | null;
   plan_type?: "RENT" | "LEASE" | string | null;
   collection_status?: string | null;
+  deposit_transaction_id?: number | string | null;
+  deposit_transaction_number?: string | null;
+  deposit_reference?: string | null;
+  transaction_type?: string | null;
+  transaction_status?: string | null;
+  transaction_date?: string | null;
   billing_period?: string | null;
   billing_month?: string | null;
   billing_period_start?: string | null;

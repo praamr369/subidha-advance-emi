@@ -30,6 +30,7 @@ const SOURCE_MODEL_OPTIONS = [
   { value: "BillingInvoice", label: "Billing Invoice" },
   { value: "RentLeaseBillingDemand", label: "Rent/Lease Revenue Demand" },
   { value: "RentLeaseCollection", label: "Rent/Lease Collection" },
+  { value: "RentLeaseDepositTransaction", label: "Security Deposit" },
   { value: "BillingCreditNote", label: "Billing Credit Note" },
   { value: "DirectSaleReturn", label: "Direct Sale Return" },
   { value: "BillingDebitNote", label: "Billing Debit Note" },
@@ -44,7 +45,7 @@ const SOURCE_MODEL_OPTIONS = [
 const CONCRETE_POST_MODELS = new Set(SOURCE_MODEL_OPTIONS.map((item) => item.value).filter(Boolean));
 const MAPPING_AUDIT_HREF = "/admin/accounting/setup/mapping-audit";
 const RECONCILIATION_RUNS_HREF = "/admin/reconciliation/runs";
-const SAFETY_COPY = "Posting creates accounting entries only after explicit admin confirmation. It does not edit source business records, collection, demand, contract, customer, deposit, finance account, inventory, payroll, commission, payout, or StaffAdvance records.";
+const SAFETY_COPY = "Posting creates accounting entries only after explicit admin confirmation. It does not edit deposit, contract, customer, collection, demand, finance-account, inventory, payroll, commission, payout, or StaffAdvance records.";
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -88,6 +89,8 @@ function modelLabel(model?: string | null): string {
 function sourceTitle(row: AccountingBridgeReconciliationRow): string {
   if (row.source_display) return row.source_display;
   if (row.collection_number) return `Rent/lease collection ${row.collection_number}`;
+  if (row.deposit_transaction_number) return `Security deposit ${row.deposit_transaction_number}`;
+  if (row.deposit_reference) return `Security deposit ${row.deposit_reference}`;
   if (row.rent_lease_collection_reference) return `Rent/lease collection ${row.rent_lease_collection_reference}`;
   if (row.rent_lease_reference) return `Rent/lease demand ${row.rent_lease_reference}`;
   if (row.source_reference_number) return `${modelLabel(row.source_model)} ${row.source_reference_number}`;
@@ -105,15 +108,17 @@ function SourceDetails({ row }: { row: AccountingBridgeReconciliationRow }) {
     <div className="mt-2 space-y-1 text-xs text-muted-foreground">
       <InfoLine label="Model" value={modelLabel(row.source_model)} />
       <InfoLine label="Reference" value={row.source_reference ?? row.source_reference_number ?? row.collection_reference} />
+      <InfoLine label="Deposit transaction" value={row.deposit_transaction_number ?? row.deposit_reference} />
       <InfoLine label="External ref" value={row.external_reference_no} />
       <InfoLine label="Customer" value={row.customer_name} />
       <InfoLine label="Plan" value={row.plan_type} />
+      <InfoLine label="Transaction type" value={row.transaction_type} />
       <InfoLine label="Demand" value={row.demand_reference ?? row.rent_lease_reference ?? row.rent_lease_demand_id} />
       <InfoLine label="Subscription / contract" value={[row.subscription_id, row.contract_reference].filter(Boolean).join(" · ")} />
       <InfoLine label="Method" value={row.payment_method} />
       <InfoLine label="Finance account" value={[row.finance_account_name, row.finance_account_active === false ? "inactive" : null].filter(Boolean).join(" · ")} />
-      <InfoLine label="Date" value={row.payment_date ?? row.source_date} />
-      <InfoLine label="Source status" value={row.collection_status ?? row.demand_status ?? row.source_status} />
+      <InfoLine label="Date" value={row.transaction_date ?? row.payment_date ?? row.source_date} />
+      <InfoLine label="Source status" value={row.transaction_status ?? row.collection_status ?? row.demand_status ?? row.source_status} />
       <InfoLine label="Journal state" value={row.journal_entry?.entry_no ?? (row.existing_journal_entry_id ? `Journal #${row.existing_journal_entry_id}` : "Not posted")} />
       <InfoLine label="Reconciliation" value={row.reconciliation_state ?? (row.existing_reconciliation_item_id ? `Item #${row.existing_reconciliation_item_id}` : "Pending posting")} />
     </div>

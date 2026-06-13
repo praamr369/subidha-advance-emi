@@ -254,6 +254,45 @@ EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         operator_action="Keep deposit liability mapped. Posting remains audit-deferred in this readiness-only phase.",
     ),
     BridgeEventSpec(
+        event_key="security_deposit_receipt",
+        label="Security deposit receipt",
+        source_module="subscriptions",
+        source_app="subscriptions",
+        source_model="RentLeaseDepositTransaction",
+        event_group="Security Deposit Receipt mappings",
+        debit_requirements=("RentLeaseDepositTransaction.finance_account.chart_account",),
+        credit_requirements=("SECURITY_DEPOSIT_LIABILITY",),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.SECURITY_DEPOSIT_LIABILITY,),
+        required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
+        operator_action="READY means mapping is ready; bridge journal posting remains pending until explicit admin posting.",
+    ),
+    BridgeEventSpec(
+        event_key="rent_security_deposit_receipt",
+        label="Rent security deposit receipt",
+        source_module="subscriptions",
+        source_app="subscriptions",
+        source_model="RentLeaseDepositTransaction",
+        event_group="Security Deposit Receipt mappings",
+        debit_requirements=("RentLeaseDepositTransaction.finance_account.chart_account",),
+        credit_requirements=("SECURITY_DEPOSIT_LIABILITY",),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.SECURITY_DEPOSIT_LIABILITY,),
+        required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
+        operator_action="READY means mapping is ready; bridge journal posting remains pending until explicit admin posting.",
+    ),
+    BridgeEventSpec(
+        event_key="lease_security_deposit_receipt",
+        label="Lease security deposit receipt",
+        source_module="subscriptions",
+        source_app="subscriptions",
+        source_model="RentLeaseDepositTransaction",
+        event_group="Security Deposit Receipt mappings",
+        debit_requirements=("RentLeaseDepositTransaction.finance_account.chart_account",),
+        credit_requirements=("SECURITY_DEPOSIT_LIABILITY",),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.SECURITY_DEPOSIT_LIABILITY,),
+        required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
+        operator_action="READY means mapping is ready; bridge journal posting remains pending until explicit admin posting.",
+    ),
+    BridgeEventSpec(
         event_key="security_deposit_refund",
         label="Security deposit refund",
         source_module="subscriptions",
@@ -925,11 +964,14 @@ def build_accounting_bridge_posting_period_readiness(
         except DocumentNumberingSetupError as exc:
             blockers.append(str(exc))
 
+    financial_year_blocked = any(
+        item["code"] in {"NO_ACTIVE_FINANCIAL_YEAR", "NO_TARGET_FINANCIAL_YEAR", "OUTSIDE_ACTIVE_FINANCIAL_YEAR"}
+        for item in period_blockers
+    )
+
     return {
         "reference_date": reference_date.isoformat(),
-        "financial_year_ready": active_financial_year is not None and target_financial_year is not None and target_financial_year.pk == active_financial_year.pk and not any(
-            "financial year" in reason.lower() for reason in blockers
-        ),
+        "financial_year_ready": active_financial_year is not None and target_financial_year is not None and target_financial_year.pk == active_financial_year.pk and not financial_year_blocked,
         "accounting_period_ready": period_ready,
         "journal_numbering_ready": journal_numbering_ready,
         "posting_controls_ready": bool(period_ready and journal_numbering_ready and not blockers),

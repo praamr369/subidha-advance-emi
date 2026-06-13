@@ -8,11 +8,11 @@ from django.db.models.functions import Cast
 
 from accounting.models import AccountingBridgePosting, JournalEntry, JournalEntryGroup, SalaryPayment, SalarySheet
 from accounting.services.accounting_bridge_purchase_bill_service import stock_ledger_candidate
-from accounting.services.accounting_bridge_rent_lease_collection_service import BridgeCandidateFilters, list_bridge_candidates
+from accounting.services.accounting_bridge_security_deposit_service import BridgeCandidateFilters, list_bridge_candidates
 from accounting.services.period_service import resolve_accounting_period
 from billing.models import BillingCreditNote, BillingDebitNote, BillingInvoice, DirectSaleReturn, ReceiptDocument
 from inventory.models import PurchaseBill, StockLedger, VendorPayment
-from subscriptions.models import Commission, CommissionPayoutBatch, Payment, RentLeaseBillingDemand
+from subscriptions.models import Commission, CommissionPayoutBatch, Payment, RentLeaseBillingDemand, RentLeaseDepositTransaction
 from subscriptions.models_rent_lease_collection import RentLeaseCollection
 
 from reconciliation.models import ReconciliationEvidence, ReconciliationItem, ReconciliationItemStatus, ReconciliationSeverity
@@ -24,6 +24,7 @@ BRIDGE_SOURCE_MODELS = (
     "BillingInvoice",
     "RentLeaseBillingDemand",
     "RentLeaseCollection",
+    "RentLeaseDepositTransaction",
     "BillingCreditNote",
     "DirectSaleReturn",
     "BillingDebitNote",
@@ -48,6 +49,20 @@ F15C_CODES = {
     "FINANCE_ACCOUNT_INACTIVE": "RENT_LEASE_COLLECTION_FINANCE_ACCOUNT_INACTIVE",
     "NUMBERING_MISSING": "RENT_LEASE_COLLECTION_NUMBERING_MISSING",
     "UNSUPPORTED_SOURCE": "RENT_LEASE_COLLECTION_UNSUPPORTED_SOURCE",
+}
+
+F17_CODES = {
+    "MISSING_POSTING": "SECURITY_DEPOSIT_RECEIPT_MISSING_ACCOUNTING_BRIDGE_POSTING",
+    "POSTED_UNVERIFIED": "SECURITY_DEPOSIT_RECEIPT_POSTED_UNVERIFIED",
+    "AMOUNT_MISMATCH": "SECURITY_DEPOSIT_RECEIPT_AMOUNT_MISMATCH",
+    "PERIOD_MISMATCH": "SECURITY_DEPOSIT_RECEIPT_PERIOD_MISMATCH",
+    "DUPLICATE_POSTING": "SECURITY_DEPOSIT_RECEIPT_DUPLICATE_ACCOUNTING_BRIDGE_POSTING",
+    "SOURCE_LINK_MISSING": "SECURITY_DEPOSIT_RECEIPT_SOURCE_LINK_MISSING",
+    "JOURNAL_UNBALANCED": "SECURITY_DEPOSIT_RECEIPT_JOURNAL_UNBALANCED",
+    "MAPPING_MISSING": "SECURITY_DEPOSIT_RECEIPT_MAPPING_MISSING",
+    "FINANCE_ACCOUNT_INACTIVE": "SECURITY_DEPOSIT_RECEIPT_FINANCE_ACCOUNT_INACTIVE",
+    "NUMBERING_MISSING": "SECURITY_DEPOSIT_RECEIPT_NUMBERING_MISSING",
+    "UNSUPPORTED_SOURCE": "SECURITY_DEPOSIT_RECEIPT_UNSUPPORTED_SOURCE",
 }
 
 
@@ -79,6 +94,9 @@ def _source_amount(*, source_model: str, source_id: str) -> Decimal | None:
         return _money(row.amount) if row else None
     if source_model == "RentLeaseCollection":
         row = RentLeaseCollection.objects.filter(pk=source_id).only("amount").first()
+        return _money(row.amount) if row else None
+    if source_model == "RentLeaseDepositTransaction":
+        row = RentLeaseDepositTransaction.objects.filter(pk=source_id).only("amount").first()
         return _money(row.amount) if row else None
     if source_model == "BillingCreditNote":
         row = BillingCreditNote.objects.filter(pk=source_id).only("total_adjustment").first()
@@ -132,6 +150,9 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
     if source_model == "RentLeaseCollection":
         row = RentLeaseCollection.objects.filter(pk=source_id).only("collection_number", "external_reference_no").first()
         return (row.collection_number or row.external_reference_no or f"RLC-{source_id}") if row else f"RLC-{source_id}"
+    if source_model == "RentLeaseDepositTransaction":
+        row = RentLeaseDepositTransaction.objects.filter(pk=source_id).only("transaction_number", "external_reference_no").first()
+        return (row.transaction_number or row.external_reference_no or f"RLDT-{source_id}") if row else f"RLDT-{source_id}"
     if source_model == "BillingCreditNote":
         row = BillingCreditNote.objects.filter(pk=source_id).only("note_no").first()
         return (row.note_no or f"CN-{source_id}") if row else f"CN-{source_id}"
@@ -171,6 +192,8 @@ def _source_label(*, source_model: str, source_id: str, fallback: str = "") -> s
 
 
 def _code(source_model: str, generic: str) -> str:
+    if source_model == "RentLeaseDepositTransaction":
+        return F17_CODES.get(generic, generic)
     if source_model != "RentLeaseCollection":
         if generic == "SOURCE_LINK_MISSING":
             return "BRIDGE_JOURNAL_MISSING_SOURCE_REFERENCE"
@@ -181,6 +204,14 @@ def _code(source_model: str, generic: str) -> str:
 
 
 def _expected_period_id(*, source_model: str, source_id: str):
+    if source_model == "RentLeaseDepositTransaction":
+        row = RentLeaseDepositTransaction.objects.filter(pk=source_id).only("transaction_date").first()
+        if row is None or row.transaction_date is None:
+            return None
+        try:
+            return resolve_accounting_period(row.transaction_date).id
+        except ValueError:
+            return None
     if source_model != "RentLeaseCollection":
         return None
     row = RentLeaseCollection.objects.filter(pk=source_id).only("payment_date").first()
@@ -205,6 +236,7 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
         ("BillingInvoice", "BILLING_INVOICE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingInvoice exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("RentLeaseBillingDemand", "RENT_LEASE_REVENUE_MISSING_ACCOUNTING_BRIDGE_POSTING", "RentLeaseBillingDemand exists as a supported concrete rent/lease revenue bridge candidate but AccountingBridgePosting is missing."),
         ("RentLeaseCollection", F15C_CODES["MISSING_POSTING"], "RentLeaseCollection exists as a supported concrete rent/lease collection settlement bridge candidate but AccountingBridgePosting is missing."),
+        ("RentLeaseDepositTransaction", F17_CODES["MISSING_POSTING"], "RentLeaseDepositTransaction exists as a supported concrete security deposit receipt bridge candidate but AccountingBridgePosting is missing."),
         ("BillingCreditNote", "BILLING_CREDIT_NOTE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingCreditNote exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("DirectSaleReturn", "DIRECT_SALE_RETURN_MISSING_ACCOUNTING_BRIDGE_POSTING", "DirectSaleReturn exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
         ("BillingDebitNote", "BILLING_DEBIT_NOTE_MISSING_ACCOUNTING_BRIDGE_POSTING", "BillingDebitNote exists as a supported concrete bridge candidate but AccountingBridgePosting is missing."),
@@ -227,6 +259,8 @@ def _emit_ready_unposted_candidates(*, run, totals: dict, date_from, date_to, br
             if branch_id and source_model == "RentLeaseBillingDemand" and not RentLeaseBillingDemand.objects.filter(pk=row.get("source_pk"), subscription__branch_id=branch_id).exists():
                 continue
             if branch_id and source_model == "RentLeaseCollection" and not RentLeaseCollection.objects.filter(pk=row.get("source_pk"), finance_account__branch_id=branch_id).exists():
+                continue
+            if branch_id and source_model == "RentLeaseDepositTransaction" and not RentLeaseDepositTransaction.objects.filter(pk=row.get("source_pk"), finance_account__branch_id=branch_id).exists():
                 continue
             if branch_id and source_model == "BillingCreditNote" and not BillingCreditNote.objects.filter(pk=row.get("source_pk"), original_invoice__branch_id=branch_id).exists():
                 continue
@@ -271,6 +305,26 @@ def _emit_rent_lease_collection_nonpostable(*, run, totals: dict, date_from, dat
         totals["exceptions"] += 1
 
 
+def _emit_security_deposit_receipt_nonpostable(*, run, totals: dict, date_from, date_to, branch_id):
+    code_by_status = {
+        "BLOCKED_BY_MAPPING": F17_CODES["MAPPING_MISSING"],
+        "BLOCKED_BY_FINANCE_ACCOUNT": F17_CODES["FINANCE_ACCOUNT_INACTIVE"],
+        "BLOCKED_BY_NUMBERING": F17_CODES["NUMBERING_MISSING"],
+        "BLOCKED_BY_PERIOD": F17_CODES["PERIOD_MISMATCH"],
+        "UNSUPPORTED_SOURCE": F17_CODES["UNSUPPORTED_SOURCE"],
+    }
+    for row in list_bridge_candidates(BridgeCandidateFilters(date_from=date_from, date_to=date_to, source_model="RentLeaseDepositTransaction")):
+        status = str(row.get("status") or "")
+        if status not in code_by_status:
+            continue
+        if branch_id and not RentLeaseDepositTransaction.objects.filter(pk=row.get("source_pk"), finance_account__branch_id=branch_id).exists():
+            continue
+        amount = _money(row.get("amount"))
+        item = ReconciliationItem.objects.create(run=run, module=MODULE, source_type="RentLeaseDepositTransaction", source_id=str(row["source_pk"]), source_label=row.get("source_reference_number") or f"RLDT-{row['source_pk']}", severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code=code_by_status[status], exception_message=row.get("blocker_reason") or "Security deposit receipt candidate is not postable.", recommended_action=row.get("recommended_action") or "Resolve setup blockers, then use controlled bridge posting.", expected_amount=amount, actual_amount=Decimal("0.00"), amount_delta=amount, metadata={"source_pk": row["source_pk"], "event_key": row.get("event_key"), "bridge_status": status, "blocker_code": row.get("blocker_code"), "action_href": row.get("action_href") or "/admin/accounting/bridge-reconciliation"})
+        ReconciliationEvidence.objects.create(item=item, evidence_type="RentLeaseDepositTransaction", object_id=str(row["source_pk"]), label=item.source_label, amount=amount, metadata={"status": status})
+        totals["exceptions"] += 1
+
+
 def _emit_stock_ledger_cogs_nonpostable(*, run, totals: dict, date_from, date_to, branch_id):
     for row in list_bridge_candidates(BridgeCandidateFilters(date_from=date_from, date_to=date_to, source_model="StockLedger")):
         event_key = row.get("event_key")
@@ -300,6 +354,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
 
     _emit_ready_unposted_candidates(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
     _emit_rent_lease_collection_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
+    _emit_security_deposit_receipt_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
     _emit_stock_ledger_cogs_nonpostable(run=run, totals=totals, date_from=date_from, date_to=date_to, branch_id=branch_id)
 
     bridges = AccountingBridgePosting.objects.filter(source_model__in=BRIDGE_SOURCE_MODELS).select_related("journal_entry", "journal_entry__accounting_period")
@@ -311,6 +366,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         invoice_ids = [str(pk) for pk in BillingInvoice.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
         rent_lease_demand_ids = [str(pk) for pk in RentLeaseBillingDemand.objects.filter(subscription__branch_id=branch_id).values_list("id", flat=True)]
         rent_lease_collection_ids = [str(pk) for pk in RentLeaseCollection.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
+        rent_lease_deposit_ids = [str(pk) for pk in RentLeaseDepositTransaction.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
         credit_ids = [str(pk) for pk in BillingCreditNote.objects.filter(original_invoice__branch_id=branch_id).values_list("id", flat=True)]
         debit_ids = [str(pk) for pk in BillingDebitNote.objects.filter(original_invoice__branch_id=branch_id).values_list("id", flat=True)]
         return_ids = [str(pk) for pk in DirectSaleReturn.objects.filter(direct_sale__branch_id=branch_id).values_list("id", flat=True)]
@@ -321,7 +377,7 @@ def run_accounting_bridge_checks(*, run, totals: dict) -> dict:
         commission_payout_ids = [str(pk) for pk in CommissionPayoutBatch.objects.filter(finance_account__branch_id=branch_id).values_list("id", flat=True)]
         salary_sheet_ids = [str(pk) for pk in SalarySheet.objects.filter(employee__branch_id=branch_id).values_list("id", flat=True)]
         salary_payment_ids = [str(pk) for pk in SalaryPayment.objects.filter(branch_id=branch_id).values_list("id", flat=True)]
-        bridges = bridges.filter(Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="RentLeaseBillingDemand", source_id__in=rent_lease_demand_ids) | Q(source_model="RentLeaseCollection", source_id__in=rent_lease_collection_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids) | Q(source_model="PurchaseBill", source_id__in=purchase_ids) | Q(source_model="VendorPayment", source_id__in=vendor_payment_ids) | Q(source_model="StockLedger", source_id__in=stock_ledger_ids) | Q(source_model="Commission", source_id__in=commission_ids) | Q(source_model="CommissionPayoutBatch", source_id__in=commission_payout_ids) | Q(source_model="SalarySheet", source_id__in=salary_sheet_ids) | Q(source_model="SalaryPayment", source_id__in=salary_payment_ids))
+        bridges = bridges.filter(Q(trace_metadata__branch_id=branch_id) | Q(source_model="Payment", source_id__in=payment_ids) | Q(source_model="ReceiptDocument", source_id__in=receipt_ids) | Q(source_model="BillingInvoice", source_id__in=invoice_ids) | Q(source_model="RentLeaseBillingDemand", source_id__in=rent_lease_demand_ids) | Q(source_model="RentLeaseCollection", source_id__in=rent_lease_collection_ids) | Q(source_model="RentLeaseDepositTransaction", source_id__in=rent_lease_deposit_ids) | Q(source_model="BillingCreditNote", source_id__in=credit_ids) | Q(source_model="BillingDebitNote", source_id__in=debit_ids) | Q(source_model="DirectSaleReturn", source_id__in=return_ids) | Q(source_model="PurchaseBill", source_id__in=purchase_ids) | Q(source_model="VendorPayment", source_id__in=vendor_payment_ids) | Q(source_model="StockLedger", source_id__in=stock_ledger_ids) | Q(source_model="Commission", source_id__in=commission_ids) | Q(source_model="CommissionPayoutBatch", source_id__in=commission_payout_ids) | Q(source_model="SalarySheet", source_id__in=salary_sheet_ids) | Q(source_model="SalaryPayment", source_id__in=salary_payment_ids))
     totals["checked"] += bridges.count()
 
     for bridge in bridges:
