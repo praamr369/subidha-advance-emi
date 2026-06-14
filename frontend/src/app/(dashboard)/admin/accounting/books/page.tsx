@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -10,6 +10,7 @@ import { RegistryPageShell } from "@/components/layout/page-shells";
 import PortalPage from "@/components/ui/PortalPage";
 import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import { getAccountingBooksReadiness, type AccountingBooksReadiness, type AccountingBooksReadinessAccount } from "@/services/accounting-books";
 import {
   buildAdminFinanceAccountStatementPrintRoute,
   buildAdminLedgerStatementPrintRoute,
@@ -17,10 +18,8 @@ import {
 import { ROUTES } from "@/lib/routes";
 import {
   createMoneyMovement,
-  listFinanceAccounts,
   listMoneyMovements,
   postMoneyMovement,
-  type FinanceAccount,
   type MoneyMovement,
 } from "@/services/accounting";
 
@@ -48,9 +47,15 @@ function fieldClassName() {
   return "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground";
 }
 
-function linkedChartAccountId(account: FinanceAccount): number | null {
-  const value = (account as FinanceAccount & { chart_account?: number | null }).chart_account;
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+function badgeClass(tone: "green" | "amber" | "red" | "blue" | "slate") {
+  const map = {
+    green: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    amber: "border-amber-200 bg-amber-50 text-amber-900",
+    red: "border-red-200 bg-red-50 text-red-800",
+    blue: "border-blue-200 bg-blue-50 text-blue-800",
+    slate: "border-slate-200 bg-slate-50 text-slate-700",
+  };
+  return `inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${map[tone]}`;
 }
 
 export default function AccountingBooksPage() {
@@ -58,7 +63,7 @@ export default function AccountingBooksPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [readiness, setReadiness] = useState<AccountingBooksReadiness | null>(null);
   const [moneyMovements, setMoneyMovements] = useState<MoneyMovement[]>([]);
   const [movementForm, setMovementForm] = useState({
     movement_date: new Date().toISOString().slice(0, 10),
@@ -74,17 +79,17 @@ export default function AccountingBooksPage() {
     else setRefreshing(true);
 
     try {
-      const [financePayload, movementPayload] = await Promise.all([
-        listFinanceAccounts(),
+      const [readinessPayload, movementPayload] = await Promise.all([
+        getAccountingBooksReadiness(),
         listMoneyMovements(),
       ]);
-      setFinanceAccounts(financePayload.results);
+      setReadiness(readinessPayload);
       setMoneyMovements(movementPayload.results);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err));
       if (mode === "initial") {
-        setFinanceAccounts([]);
+        setReadiness(null);
         setMoneyMovements([]);
       }
     } finally {
@@ -97,16 +102,31 @@ export default function AccountingBooksPage() {
     void loadPage("initial");
   }, []);
 
+  const eligibleAccounts = readiness?.movement_eligible_accounts ?? [];
+  const financeAccounts = readiness?.finance_accounts ?? [];
+  const selectedFrom = eligibleAccounts.find((account) => String(account.id) === movementForm.from_finance_account) ?? null;
+  const selectedTo = eligibleAccounts.find((account) => String(account.id) === movementForm.to_finance_account) ?? null;
+  const amountValue = Number(movementForm.amount || 0);
+  const formBlocker = useMemo(() => {
+    if (eligibleAccounts.length < 2) return "At least two movement-eligible settlement accounts are required.";
+    if (!movementForm.from_finance_account || !movementForm.to_finance_account) return "Select source and destination accounts.";
+    if (movementForm.from_finance_account === movementForm.to_finance_account) return "Source and destination must be different.";
+    if (!Number.isFinite(amountValue) || amountValue <= 0) return "Amount must be greater than zero.";
+    return "";
+  }, [amountValue, eligibleAccounts.length, movementForm.from_finance_account, movementForm.to_finance_account]);
+  const canCreateMovement = !formBlocker;
+
   async function handleCreateMovement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canCreateMovement) return;
     try {
       await createMoneyMovement({
         movement_date: movementForm.movement_date,
         from_finance_account: Number(movementForm.from_finance_account),
         to_finance_account: Number(movementForm.to_finance_account),
         amount: movementForm.amount,
-        reference_no: movementForm.reference_no,
-        notes: movementForm.notes,
+        reference_no: movementForm.reference_no.trim(),
+        notes: movementForm.notes.trim(),
       });
       setMovementForm({
         movement_date: new Date().toISOString().slice(0, 10),
@@ -116,7 +136,7 @@ export default function AccountingBooksPage() {
         reference_no: "",
         notes: "",
       });
-      setNotice("Money movement created.");
+      setNotice("Money movement draft created. Post explicitly after review.");
       await loadPage("refresh");
     } catch (err) {
       setNotice(null);
@@ -127,7 +147,7 @@ export default function AccountingBooksPage() {
   async function handlePostMovement(id: number) {
     try {
       await postMoneyMovement(id);
-      setNotice("Money movement posted.");
+      setNotice("Money movement posted and journal entry created.");
       await loadPage("refresh");
     } catch (err) {
       setNotice(null);
@@ -136,11 +156,13 @@ export default function AccountingBooksPage() {
   }
 
   const postedCount = moneyMovements.filter((item) => item.status === "POSTED").length;
+  const draftCount = moneyMovements.filter((item) => item.status === "DRAFT").length;
+  const hasReadinessBlocker = Boolean(readiness?.blockers?.length);
 
   return (
     <PortalPage
       title="Books"
-      subtitle="Track finance accounts and inter-account money movement inside the accounting module, separate from store-level EMI collection records."
+      subtitle="Track finance accounts and explicit inter-account transfers inside accounting. This is not the EMI collection register and does not auto-post bridge rows."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
@@ -155,19 +177,8 @@ export default function AccountingBooksPage() {
       <RegistryPageShell
         header={
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {notice ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                {notice}
-              </div>
-            ) : (
-              <div />
-            )}
-            <button
-              type="button"
-              onClick={() => void loadPage("refresh")}
-              disabled={refreshing || loading}
-              className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
-            >
+            {notice ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div> : <div />}
+            <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing || loading} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60">
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
           </div>
@@ -177,63 +188,46 @@ export default function AccountingBooksPage() {
             {!loading && !error ? (
               <MetricStrip
                 items={[
-                  { label: "Finance accounts", value: String(financeAccounts.length) },
-                  { label: "Money movements", value: String(moneyMovements.length) },
+                  { label: "Finance accounts", value: String(readiness?.counts.active_finance_accounts ?? financeAccounts.length) },
+                  { label: "Eligible transfers", value: String(readiness?.counts.movement_eligible_accounts ?? eligibleAccounts.length) },
+                  { label: "Draft movements", value: String(draftCount) },
                   { label: "Posted movements", value: String(postedCount) },
                 ]}
               />
             ) : null}
             {loading ? <LoadingBlock label="Loading books..." /> : null}
-            {!loading && error ? (
-              <ErrorState title="Unable to load books" description={error} onRetry={() => void loadPage("initial")} />
-            ) : null}
+            {!loading && error ? <ErrorState title="Unable to load books" description={error} onRetry={() => void loadPage("initial")} /> : null}
           </div>
         }
         register={
           !loading && !error ? (
             <div className="space-y-6">
-              <WorkspaceSection
-                title="Money movement register"
-                description="Draft transfers stay editable until posted. Posted rows expose the journal number generated by the accounting service."
-              >
+              <WorkspaceSection title="Books readiness" description="Money movement is available only when settlement accounts are active, real, and mapped to posting-ready ASSET chart accounts.">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-xl border border-border bg-background p-4"><div className="text-xs font-semibold uppercase text-muted-foreground">Status</div><div className="mt-2 text-lg font-semibold text-foreground">{readiness?.status || "NEEDS_SETUP"}</div></div>
+                  <div className="rounded-xl border border-border bg-background p-4"><div className="text-xs font-semibold uppercase text-muted-foreground">Cash / Bank / UPI</div><div className="mt-2 text-sm font-semibold text-foreground">{readiness?.counts.cash_accounts ?? 0} / {readiness?.counts.bank_accounts ?? 0} / {readiness?.counts.upi_accounts ?? 0}</div></div>
+                  <div className="rounded-xl border border-border bg-background p-4"><div className="text-xs font-semibold uppercase text-muted-foreground">Movement eligible</div><div className="mt-2 text-lg font-semibold text-foreground">{eligibleAccounts.length}</div></div>
+                  <div className="rounded-xl border border-border bg-background p-4"><div className="text-xs font-semibold uppercase text-muted-foreground">Posting contract</div><div className="mt-2 text-sm font-semibold text-foreground">Explicit only</div></div>
+                </div>
+                {readiness?.blockers?.length ? <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900"><div className="font-semibold">Blockers</div><ul className="mt-2 list-disc space-y-1 pl-5">{readiness.blockers.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
+                {readiness?.warnings?.length ? <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><div className="font-semibold">Warnings</div><ul className="mt-2 list-disc space-y-1 pl-5">{readiness.warnings.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
+                {readiness?.safety_note ? <p className="mt-4 text-sm text-muted-foreground">{readiness.safety_note}</p> : null}
+              </WorkspaceSection>
+
+              <WorkspaceSection title="Money movement register" description="Draft transfers stay editable until posted. Posted rows expose the journal number generated by the accounting service.">
                 {moneyMovements.length === 0 ? (
-                  <EmptyState
-                    title="No money movements yet"
-                    description="Create a movement below to transfer value between finance accounts."
-                  />
+                  <EmptyState title="No money movements yet" description="Create a draft transfer only for real cash/bank/UPI movement between finance accounts." />
                 ) : (
                   <div className="grid gap-3">
                     {moneyMovements.map((movement) => (
-                      <div key={movement.id} className="rounded-[1.4rem] border border-white/80 bg-white/75 p-4">
+                      <div key={movement.id} className="rounded-[1.4rem] border border-border bg-card p-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-semibold text-foreground">{movement.movement_no}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {movement.from_finance_account_name} → {movement.to_finance_account_name} •{" "}
-                              {formatDate(movement.movement_date)}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-semibold text-foreground">{money(movement.amount)}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">{movement.status}</div>
-                          </div>
+                          <div><div className="text-sm font-semibold text-foreground">{movement.movement_no}</div><div className="mt-1 text-xs text-muted-foreground">{movement.from_finance_account_name} → {movement.to_finance_account_name} • {formatDate(movement.movement_date)}</div></div>
+                          <div className="text-right"><div className="text-sm font-semibold text-foreground">{money(movement.amount)}</div><div className="mt-1 text-xs text-muted-foreground">{movement.status}</div></div>
                         </div>
-
                         <div className="mt-4 flex flex-wrap gap-2">
-                          {movement.status === "DRAFT" ? (
-                            <button
-                              type="button"
-                              onClick={() => void handlePostMovement(movement.id)}
-                              className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-                            >
-                              Post
-                            </button>
-                          ) : null}
-                          {movement.posted_journal_entry_no ? (
-                            <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                              Journal {movement.posted_journal_entry_no}
-                            </span>
-                          ) : null}
+                          {movement.status === "DRAFT" ? <button type="button" onClick={() => void handlePostMovement(movement.id)} className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800">Post</button> : null}
+                          {movement.posted_journal_entry_no ? <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Journal {movement.posted_journal_entry_no}</span> : null}
                         </div>
                       </div>
                     ))}
@@ -242,173 +236,31 @@ export default function AccountingBooksPage() {
               </WorkspaceSection>
 
               <div className="grid gap-4 xl:grid-cols-2">
-                <WorkspaceSection
-                  title="Create money movement"
-                  description="Transfer value between finance accounts. Posting remains explicit so no duplicate bridge or transfer journal is created."
-                >
+                <WorkspaceSection title="Create money movement" description="Transfer value between real settlement finance accounts. Posting remains explicit; this does not create bridge rows or customer payment records.">
                   <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreateMovement}>
-                    <label className="text-sm text-muted-foreground">
-                      Movement date
-                      <input
-                        className={fieldClassName()}
-                        type="date"
-                        value={movementForm.movement_date}
-                        onChange={(event) =>
-                          setMovementForm((current) => ({
-                            ...current,
-                            movement_date: event.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </label>
-                    <label className="text-sm text-muted-foreground">
-                      Amount
-                      <input
-                        className={fieldClassName()}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={movementForm.amount}
-                        onChange={(event) =>
-                          setMovementForm((current) => ({
-                            ...current,
-                            amount: event.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </label>
-                    <label className="text-sm text-muted-foreground">
-                      From account
-                      <select
-                        className={fieldClassName()}
-                        value={movementForm.from_finance_account}
-                        onChange={(event) =>
-                          setMovementForm((current) => ({
-                            ...current,
-                            from_finance_account: event.target.value,
-                          }))
-                        }
-                        required
-                      >
-                        <option value="">Select source</option>
-                        {financeAccounts.map((account) => (
-                          <option key={account.id} value={account.id}>
-                            {account.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="text-sm text-muted-foreground">
-                      To account
-                      <select
-                        className={fieldClassName()}
-                        value={movementForm.to_finance_account}
-                        onChange={(event) =>
-                          setMovementForm((current) => ({
-                            ...current,
-                            to_finance_account: event.target.value,
-                          }))
-                        }
-                        required
-                      >
-                        <option value="">Select destination</option>
-                        {financeAccounts.map((account) => (
-                          <option key={account.id} value={account.id}>
-                            {account.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="text-sm text-muted-foreground">
-                      Reference no
-                      <input
-                        className={fieldClassName()}
-                        value={movementForm.reference_no}
-                        onChange={(event) =>
-                          setMovementForm((current) => ({
-                            ...current,
-                            reference_no: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="text-sm text-muted-foreground md:col-span-2">
-                      Notes
-                      <textarea
-                        className={fieldClassName()}
-                        value={movementForm.notes}
-                        onChange={(event) =>
-                          setMovementForm((current) => ({
-                            ...current,
-                            notes: event.target.value,
-                          }))
-                        }
-                        rows={3}
-                      />
-                    </label>
-                    <div className="md:col-span-2">
-                      <button
-                        type="submit"
-                        className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-                      >
-                        Create movement
-                      </button>
-                    </div>
+                    <label className="text-sm text-muted-foreground">Movement date<input className={fieldClassName()} type="date" value={movementForm.movement_date} onChange={(event) => setMovementForm((current) => ({ ...current, movement_date: event.target.value }))} required /></label>
+                    <label className="text-sm text-muted-foreground">Amount<input className={fieldClassName()} type="number" min="0.01" step="0.01" value={movementForm.amount} onChange={(event) => setMovementForm((current) => ({ ...current, amount: event.target.value }))} required /></label>
+                    <label className="text-sm text-muted-foreground">From account<select className={fieldClassName()} value={movementForm.from_finance_account} onChange={(event) => setMovementForm((current) => ({ ...current, from_finance_account: event.target.value }))} required><option value="">Select source</option>{eligibleAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
+                    <label className="text-sm text-muted-foreground">To account<select className={fieldClassName()} value={movementForm.to_finance_account} onChange={(event) => setMovementForm((current) => ({ ...current, to_finance_account: event.target.value }))} required><option value="">Select destination</option>{eligibleAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
+                    <label className="text-sm text-muted-foreground">Reference no<input className={fieldClassName()} value={movementForm.reference_no} onChange={(event) => setMovementForm((current) => ({ ...current, reference_no: event.target.value }))} /></label>
+                    <label className="text-sm text-muted-foreground md:col-span-2">Notes<textarea className={fieldClassName()} value={movementForm.notes} onChange={(event) => setMovementForm((current) => ({ ...current, notes: event.target.value }))} rows={3} /></label>
+                    {selectedFrom && selectedTo ? <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 md:col-span-2">Preview: Dr {selectedTo.chart_account_code || selectedTo.name} / Cr {selectedFrom.chart_account_code || selectedFrom.name}. Journal is created only after explicit Post.</div> : null}
+                    {formBlocker ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 md:col-span-2">{formBlocker}</div> : null}
+                    <div className="md:col-span-2"><button type="submit" disabled={!canCreateMovement || hasReadinessBlocker} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50">Create draft movement</button></div>
                   </form>
                 </WorkspaceSection>
 
-                <WorkspaceSection
-                  title="Finance accounts"
-                  description="Operational finance accounts mapped to asset chart accounts. These are the source and destination controls for money movement posting."
-                >
-                  {financeAccounts.length === 0 ? (
-                    <EmptyState
-                      title="No finance accounts yet"
-                      description="Create finance accounts in chart setup before recording money movements."
-                    />
-                  ) : (
+                <WorkspaceSection title="Finance accounts" description="Operational finance accounts mapped to ASSET chart accounts. These are source/destination controls for movement posting.">
+                  {financeAccounts.length === 0 ? <EmptyState title="No finance accounts yet" description="Create finance accounts in chart setup before recording money movements." /> : (
                     <div className="grid gap-3">
-                      {financeAccounts.map((account) => {
-                        const chartAccountId = linkedChartAccountId(account);
-                        return (
-                          <div key={account.id} className="rounded-[1.3rem] border border-white/75 bg-white/75 px-4 py-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-semibold text-foreground">{account.name}</div>
-                                <div className="mt-1 text-xs text-muted-foreground">
-                                  {account.kind} • {account.chart_account_code || "No chart code"} • {account.chart_account_name || "No linked chart account"}
-                                </div>
-                              </div>
-                              <div className="text-sm font-semibold text-foreground">{money(account.opening_balance)}</div>
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <Link
-                                href={buildAdminFinanceAccountStatementPrintRoute(account.id)}
-                                className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
-                              >
-                                Finance Account Statement PDF / Print
-                              </Link>
-                              {chartAccountId ? (
-                                <Link
-                                  href={buildAdminLedgerStatementPrintRoute(chartAccountId)}
-                                  className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
-                                >
-                                  Ledger Statement PDF / Print
-                                </Link>
-                              ) : (
-                                <span
-                                  title="Ledger statement requires a linked chart account."
-                                  className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-900"
-                                >
-                                  Ledger Statement unavailable: no linked chart account
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {financeAccounts.map((account: AccountingBooksReadinessAccount) => (
+                        <div key={account.id} className="rounded-[1.3rem] border border-border bg-card px-4 py-4">
+                          <div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold text-foreground">{account.name}</div><div className="mt-1 text-xs text-muted-foreground">{account.kind} • {account.chart_account_code || "No chart code"} • {account.chart_account_name || "No linked chart account"}</div></div><div className="text-sm font-semibold text-foreground">{money(account.opening_balance)}</div></div>
+                          <div className="mt-3 flex flex-wrap gap-2"><span className={badgeClass(account.movement_eligible ? "green" : "amber")}>{account.movement_eligible ? "Movement eligible" : "Not movement eligible"}</span><span className={badgeClass(account.collection_ready ? "green" : "amber")}>{account.collection_ready ? "Collection ready" : "Collection review"}</span>{account.branch_code ? <span className={badgeClass("blue")}>{account.branch_code}</span> : null}</div>
+                          {account.collection_blocker_reason ? <div className="mt-2 text-xs text-amber-900">{account.collection_blocker_reason}</div> : null}
+                          <div className="mt-3 flex flex-wrap gap-2"><Link href={buildAdminFinanceAccountStatementPrintRoute(account.id)} className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted">Finance Statement PDF / Print</Link>{account.chart_account_id ? <Link href={buildAdminLedgerStatementPrintRoute(account.chart_account_id)} className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted">Ledger Statement PDF / Print</Link> : null}</div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </WorkspaceSection>
