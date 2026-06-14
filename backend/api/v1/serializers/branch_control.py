@@ -1,9 +1,30 @@
+from django.db import transaction
 from rest_framework import serializers
 
-from branch_control.models import Branch, CashCounter
+from branch_control.models import Branch, BranchStatus, CashCounter
 
 
 class BranchSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        status_value = attrs.get("status", getattr(self.instance, "status", BranchStatus.ACTIVE))
+        is_primary = attrs.get("is_primary", getattr(self.instance, "is_primary", False))
+        if is_primary and status_value != BranchStatus.ACTIVE:
+            raise serializers.ValidationError({"is_primary": "Only an active branch can be marked as the primary branch."})
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        if validated_data.get("is_primary"):
+            Branch.objects.filter(is_primary=True).update(is_primary=False)
+        return super().create(validated_data)
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        if validated_data.get("is_primary"):
+            Branch.objects.filter(is_primary=True).exclude(pk=instance.pk).update(is_primary=False)
+        return super().update(instance, validated_data)
+
     class Meta:
         model = Branch
         fields = [
@@ -38,6 +59,8 @@ class CashCounterSerializer(serializers.ModelSerializer):
             finance_account = self.instance.finance_account
         if branch is None or finance_account is None:
             return attrs
+        if branch.status != BranchStatus.ACTIVE:
+            raise serializers.ValidationError({"branch": "Cash counters can only be assigned to active branches."})
         from accounting.services.finance_account_collection_guard import validate_finance_account_for_cash_counter
 
         try:
