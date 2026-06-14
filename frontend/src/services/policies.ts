@@ -250,6 +250,13 @@ export type ComplianceSummary = {
   private_document_disclaimer: string;
 };
 
+export type PolicyReviewDateBulkResponse = {
+  review_due_date: string;
+  updated_count: number;
+  skipped_count: number;
+  detail: string;
+};
+
 const BUSINESS_COMPLIANCE_DOCUMENTS_PATH = "/admin/settings/business-compliance/documents/";
 
 export async function listAdminPolicies(params?: { slug?: string; status?: string; category?: string }): Promise<AdminPolicyPageListResponse> {
@@ -276,6 +283,10 @@ export async function createAdminPolicy(payload: PolicyCreatePayload): Promise<A
 
 export async function updateAdminPolicy(id: number, payload: PolicyUpdatePayload): Promise<AdminPolicyPage> {
   return apiFetch<AdminPolicyPage>(`/admin/public-site/policies/${id}/`, { method: "PATCH", body: payload });
+}
+
+export async function bulkSetPolicyReviewDates(payload?: { review_due_date?: string }): Promise<PolicyReviewDateBulkResponse> {
+  return apiFetch<PolicyReviewDateBulkResponse>("/admin/settings/policies/bulk-review-dates/", { method: "POST", body: payload || {} });
 }
 
 export async function submitAdminPolicyForReview(id: number): Promise<AdminPolicyPage> {
