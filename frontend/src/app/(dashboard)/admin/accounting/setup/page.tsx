@@ -95,48 +95,23 @@ function issueLevel(issue: unknown): string {
   return "WARNING";
 }
 
-function warningCode(warning: unknown): string {
-  if (warning && typeof warning === "object" && "code" in warning) {
-    return String((warning as { code?: unknown }).code ?? "WARNING");
-  }
-  return typeof warning === "string" ? "WARNING" : "INFO";
-}
-
-function warningMessage(warning: unknown): string {
-  if (warning && typeof warning === "object" && "message" in warning) {
-    return String((warning as { message?: unknown }).message ?? "");
-  }
-  return String(warning ?? "");
-}
-
-function warningAction(warning: unknown): string {
-  if (warning && typeof warning === "object" && "operator_action" in warning) {
-    return String((warning as { operator_action?: unknown }).operator_action ?? "");
-  }
-  return "";
-}
-
-function warningAffectedIds(warning: unknown): string {
-  if (warning && typeof warning === "object" && "affected_ids" in warning) {
-    const ids = (warning as { affected_ids?: unknown }).affected_ids;
-    return Array.isArray(ids) && ids.length ? `Affected IDs: ${ids.join(", ")}` : "";
-  }
-  return "";
-}
-
-function scrollToBridgeApproval() {
-  document.getElementById("rent-lease-posting-bridge")?.scrollIntoView({ behavior: "smooth", block: "start" });
+function issueField(issue: unknown, field: "code" | "message" | "operator_action" | "affected_ids") {
+  if (issue && typeof issue === "object" && field in issue) return (issue as Record<string, unknown>)[field];
+  return null;
 }
 
 function IssueList({ issues }: { issues: Array<string | AccountingSetupHealthIssue> }) {
   return (
     <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-      {issues.map((warning, index) => {
-        const action = warningAction(warning);
-        const affected = warningAffectedIds(warning);
+      {issues.map((issue, index) => {
+        const code = String(issueField(issue, "code") ?? (typeof issue === "string" ? "WARNING" : "INFO"));
+        const message = String(issueField(issue, "message") ?? issue ?? "");
+        const action = String(issueField(issue, "operator_action") ?? "");
+        const ids = issueField(issue, "affected_ids");
+        const affected = Array.isArray(ids) && ids.length ? `Affected IDs: ${ids.join(", ")}` : "";
         return (
-          <li key={`${warningCode(warning)}-${warningMessage(warning)}-${affected}-${index}`}>
-            <span className="font-medium">{warningCode(warning)}:</span> {warningMessage(warning)}
+          <li key={`${code}-${message}-${index}`}>
+            <span className="font-medium">{code}:</span> {message}
             {affected ? <span className="ml-1 text-muted-foreground">{affected}</span> : null}
             {action ? <div className="mt-0.5 text-muted-foreground">Action: {action}</div> : null}
           </li>
@@ -144,6 +119,10 @@ function IssueList({ issues }: { issues: Array<string | AccountingSetupHealthIss
       })}
     </ul>
   );
+}
+
+function scrollToBridgeApproval() {
+  document.getElementById("rent-lease-posting-bridge")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function SetupHealthCard({
@@ -164,13 +143,9 @@ function SetupHealthCard({
       {action ? (
         <div className="mt-3">
           {action.href ? (
-            <Link href={action.href} className="inline-flex rounded-lg border border-current/20 bg-white/70 px-2.5 py-1 text-[11px] font-semibold">
-              {action.label}
-            </Link>
+            <Link href={action.href} className="inline-flex rounded-lg border border-current/20 bg-white/70 px-2.5 py-1 text-[11px] font-semibold">{action.label}</Link>
           ) : (
-            <button type="button" onClick={action.onClick} className="inline-flex rounded-lg border border-current/20 bg-white/70 px-2.5 py-1 text-[11px] font-semibold">
-              {action.label}
-            </button>
+            <button type="button" onClick={action.onClick} className="inline-flex rounded-lg border border-current/20 bg-white/70 px-2.5 py-1 text-[11px] font-semibold">{action.label}</button>
           )}
         </div>
       ) : null}
@@ -194,7 +169,6 @@ function RepairDialog({
   onConfirm: () => void;
 }) {
   if (!open) return null;
-
   const targetIds = new Set(targets.map((account) => account.id));
   const previewRows = (preview?.repairable_accounts ?? preview?.blocked_accounts ?? preview?.accounts ?? []).filter((row) =>
     targetIds.size === 0 ? true : targetIds.has(Number(row.finance_account_id)),
@@ -225,9 +199,7 @@ function RepairDialog({
             </div>
           )}
         </div>
-        <div className="mt-4 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
-          Confirmation phrase used by backend: <span className="font-semibold text-foreground">{REPAIR_CONFIRMATION_TEXT}</span>
-        </div>
+        <div className="mt-4 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">Confirmation phrase used by backend: <span className="font-semibold text-foreground">{REPAIR_CONFIRMATION_TEXT}</span></div>
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <ActionButton variant="ghost" onClick={onClose} disabled={repairing}>Cancel</ActionButton>
           <ActionButton variant="primary" onClick={onConfirm} disabled={repairing || targets.length === 0}>{repairing ? "Repairing..." : "Repair mappings"}</ActionButton>
@@ -332,78 +304,6 @@ export default function AdminAccountingSetupPage() {
   const collectionReady = businessFinanceAccounts.some((account) => isSelectable(account));
   const periodCloseReady = Boolean(setupReady && postingReady && bridgeReadiness?.posting_controls_ready !== false);
 
-  const setupHealth = [
-    {
-      label: "Ready for collection",
-      ready: collectionReady,
-      detail: `${businessFinanceAccounts.filter((account) => isSelectable(account)).length} selectable money account(s)`,
-      action: collectionReady ? null : { label: "Repair mappings", onClick: () => void openRepairDialog(repairableAccounts) },
-    },
-    {
-      label: "Ready for posting",
-      ready: postingReady,
-      detail: `${postingProfileReadiness.filter((item) => item.status !== "READY" && item.status !== "DEFERRED").length} posting profile blocker(s)`,
-      action: postingReady ? null : { label: "Apply defaults", onClick: () => void openApplyDefaultsDialog() },
-    },
-    {
-      label: "Ready for reconciliation",
-      ready: bridgeMappingReady,
-      detail: bridgeMappingReady ? "Rent/lease accounting bridge mapping is ready." : bridgeReadiness?.operator_action || bridgeReadiness?.reason || "Complete bridge mapping readiness.",
-      action: bridgeMappingReady ? { label: "Bridge reconciliation", href: ROUTES.admin.accountingBridgeReconciliation } : { label: "Open bridge approval", onClick: scrollToBridgeApproval },
-    },
-    {
-      label: "Ready for period close",
-      ready: periodCloseReady,
-      detail: periodCloseReady ? "Setup health and posting controls are ready." : blockers.length ? "Resolve setup blockers before close." : warnings.length ? "Review warnings before close." : "Complete posting controls before close.",
-      action: { label: "Period controls", href: ROUTES.admin.accountingPeriods },
-    },
-  ];
-
-  const guidedSections = [
-    {
-      title: "Money accounts",
-      explanation: "Cash, bank, and UPI accounts are where staff receive or pay real money.",
-      required: ["Cash Counter", "Bank Account", "UPI Account"],
-      accounts: businessFinanceAccounts.filter((account) => ["CASH", "BANK", "UPI"].includes(String(account.kind).toUpperCase())),
-      profiles: [],
-    },
-    {
-      title: "Liability accounts",
-      explanation: "Customer advance, security deposit, and refund payable balances must remain separate from income.",
-      required: ["Customer Advance", "Security Deposit", "Refund Payable"],
-      accounts: [],
-      profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["advance", "security_deposit", "refund"])),
-    },
-    {
-      title: "Income accounts",
-      explanation: "EMI, rent, lease, and direct sale income mappings affect future postings only.",
-      required: ["EMI Collection", "Rent Income", "Lease Income", "Direct Sale Income"],
-      accounts: [],
-      profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["emi", "rent_lease", "direct_sale"])),
-    },
-    {
-      title: "Inventory/COGS",
-      explanation: "Inventory asset, COGS, stock adjustment, and purchase clearing keep stock value auditable.",
-      required: ["Inventory Asset", "COGS", "Stock Adjustment", "Purchase Clearing"],
-      accounts: [],
-      profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["inventory", "purchase"])),
-    },
-    {
-      title: "Commission/payout",
-      explanation: "Commission expense and partner payable mappings keep payout liability traceable.",
-      required: ["Commission Expense", "Partner Payable"],
-      accounts: [],
-      profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["commission", "payout"])),
-    },
-    {
-      title: "Reconciliation clearing",
-      explanation: "Bank, UPI, and suspense clearing accounts help isolate settlement and exception differences.",
-      required: ["Bank clearing", "UPI clearing", "Suspense/exception clearing"],
-      accounts: businessFinanceAccounts.filter((account) => ["BANK", "UPI"].includes(String(account.kind).toUpperCase())),
-      profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["reconciliation", "clearing"])),
-    },
-  ];
-
   const previewDefaults = useCallback(async () => {
     setPreviewing(true);
     setError(null);
@@ -507,6 +407,42 @@ export default function AdminAccountingSetupPage() {
     }
   }, [bridgeConfirmation, bridgeEnabled, bridgeReason, canSubmitBridge, load]);
 
+  const setupHealth = [
+    {
+      label: "Ready for collection",
+      ready: collectionReady,
+      detail: `${businessFinanceAccounts.filter((account) => isSelectable(account)).length} selectable money account(s)`,
+      action: collectionReady ? null : { label: "Repair mappings", onClick: () => void openRepairDialog(repairableAccounts) },
+    },
+    {
+      label: "Ready for posting",
+      ready: postingReady,
+      detail: `${postingProfileReadiness.filter((item) => item.status !== "READY" && item.status !== "DEFERRED").length} posting profile blocker(s)`,
+      action: postingReady ? null : { label: "Apply defaults", onClick: () => void openApplyDefaultsDialog() },
+    },
+    {
+      label: "Ready for reconciliation",
+      ready: bridgeMappingReady,
+      detail: bridgeMappingReady ? "Rent/lease accounting bridge mapping is ready." : bridgeReadiness?.operator_action || bridgeReadiness?.reason || "Complete bridge mapping readiness.",
+      action: bridgeMappingReady ? { label: "Bridge reconciliation", href: ROUTES.admin.accountingBridgeReconciliation } : { label: "Open bridge approval", onClick: scrollToBridgeApproval },
+    },
+    {
+      label: "Ready for period close",
+      ready: periodCloseReady,
+      detail: periodCloseReady ? "Setup health and posting controls are ready." : blockers.length ? "Resolve setup blockers before close." : warnings.length ? "Review warnings before close." : "Complete posting controls before close.",
+      action: { label: "Period controls", href: ROUTES.admin.accountingPeriods },
+    },
+  ];
+
+  const guidedSections = [
+    { title: "Money accounts", explanation: "Cash, bank, and UPI accounts are where staff receive or pay real money.", required: ["Cash Counter", "Bank Account", "UPI Account"], accounts: businessFinanceAccounts.filter((account) => ["CASH", "BANK", "UPI"].includes(String(account.kind).toUpperCase())), profiles: [] },
+    { title: "Liability accounts", explanation: "Customer advance, security deposit, and refund payable balances must remain separate from income.", required: ["Customer Advance", "Security Deposit", "Refund Payable"], accounts: [], profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["advance", "security_deposit", "refund"])) },
+    { title: "Income accounts", explanation: "EMI, rent, lease, and direct sale income mappings affect future postings only.", required: ["EMI Collection", "Rent Income", "Lease Income", "Direct Sale Income"], accounts: [], profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["emi", "rent_lease", "direct_sale"])) },
+    { title: "Inventory/COGS", explanation: "Inventory asset, COGS, stock adjustment, and purchase clearing keep stock value auditable.", required: ["Inventory Asset", "COGS", "Stock Adjustment", "Purchase Clearing"], accounts: [], profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["inventory", "purchase"])) },
+    { title: "Commission/payout", explanation: "Commission expense and partner payable mappings keep payout liability traceable.", required: ["Commission Expense", "Partner Payable"], accounts: [], profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["commission", "payout"])) },
+    { title: "Reconciliation clearing", explanation: "Bank, UPI, and suspense clearing accounts help isolate settlement and exception differences.", required: ["Bank clearing", "UPI clearing", "Suspense/exception clearing"], accounts: businessFinanceAccounts.filter((account) => ["BANK", "UPI"].includes(String(account.kind).toUpperCase())), profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["reconciliation", "clearing"])) },
+  ];
+
   if (loading) {
     return (
       <PortalPage title="Accounting Setup" subtitle="Operator-proof setup for finance accounts, posting profiles, and Chart of Accounts health.">
@@ -537,10 +473,7 @@ export default function AdminAccountingSetupPage() {
                 <div className="rounded-xl border border-border bg-background p-3"><div className="font-semibold text-foreground">Conflicts</div><div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.conflicts.length}</div></div>
               </div>
             ) : null}
-            <div className="mt-5 flex justify-end gap-2">
-              <ActionButton variant="ghost" onClick={() => setApplyDialogOpen(false)} disabled={saving}>Cancel</ActionButton>
-              <ActionButton variant="primary" onClick={confirmApplyDefaults} disabled={saving}>{saving ? "Applying..." : "Apply suggested defaults"}</ActionButton>
-            </div>
+            <div className="mt-5 flex justify-end gap-2"><ActionButton variant="ghost" onClick={() => setApplyDialogOpen(false)} disabled={saving}>Cancel</ActionButton><ActionButton variant="primary" onClick={confirmApplyDefaults} disabled={saving}>{saving ? "Applying..." : "Apply suggested defaults"}</ActionButton></div>
           </div>
         </div>
       ) : null}
@@ -550,20 +483,8 @@ export default function AdminAccountingSetupPage() {
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Operator-proof accounting setup</div>
-              <h2 className="mt-1 text-xl font-semibold text-foreground">Status {displayStatus}</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Finance Accounts are where money is received or paid. Posting Profiles decide which ledger accounts are debited and credited. Chart of Accounts is the ledger structure. Rent/lease posting approval is separate and explicit.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <ActionButton variant="secondary" onClick={previewDefaults} disabled={previewing}>{previewing ? "Previewing..." : "Preview Suggested Default"}</ActionButton>
-              <ActionButton variant="primary" onClick={openApplyDefaultsDialog} disabled={saving || previewing}>{saving ? "Applying..." : "Apply Suggested Default"}</ActionButton>
-              <ActionButton variant="secondary" onClick={() => void openRepairDialog(repairableAccounts)} disabled={repairableAccounts.length === 0 || repairing}>Repair blocked collection mappings</ActionButton>
-              {!bridgeReadyForExecution && bridgeMappingReady ? <ActionButton variant="secondary" onClick={scrollToBridgeApproval}>Enable rent/lease bridge</ActionButton> : null}
-              <Link href={ROUTES.admin.accountingBridgeReconciliation} className="inline-flex items-center rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Bridge reconciliation</Link>
-              <Link href={ROUTES.admin.accountingPeriods} className="inline-flex items-center rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Period controls</Link>
-              <ActionButton variant="ghost" onClick={() => void load()}>Refresh</ActionButton>
-            </div>
+            <div><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Operator-proof accounting setup</div><h2 className="mt-1 text-xl font-semibold text-foreground">Status {displayStatus}</h2><p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Finance Accounts are where money is received or paid. Posting Profiles decide which ledger accounts are debited and credited. Chart of Accounts is the ledger structure. Rent/lease posting approval is separate and explicit.</p></div>
+            <div className="flex flex-wrap gap-2"><ActionButton variant="secondary" onClick={previewDefaults} disabled={previewing}>{previewing ? "Previewing..." : "Preview Suggested Default"}</ActionButton><ActionButton variant="primary" onClick={openApplyDefaultsDialog} disabled={saving || previewing}>{saving ? "Applying..." : "Apply Suggested Default"}</ActionButton><ActionButton variant="secondary" onClick={() => void openRepairDialog(repairableAccounts)} disabled={repairableAccounts.length === 0 || repairing}>Repair blocked collection mappings</ActionButton>{!bridgeReadyForExecution && bridgeMappingReady ? <ActionButton variant="secondary" onClick={scrollToBridgeApproval}>Enable rent/lease bridge</ActionButton> : null}<Link href={ROUTES.admin.accountingBridgeReconciliation} className="inline-flex items-center rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Bridge reconciliation</Link><Link href={ROUTES.admin.accountingPeriods} className="inline-flex items-center rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground">Period controls</Link><ActionButton variant="ghost" onClick={() => void load()}>Refresh</ActionButton></div>
           </div>
           {applyResultNote ? <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{applyResultNote}</div> : null}
           {blockers.length > 0 ? <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-950"><div className="font-semibold">{blockers.length} blocker{blockers.length === 1 ? "" : "s"}</div><IssueList issues={blockers} /></div> : null}
@@ -571,98 +492,22 @@ export default function AdminAccountingSetupPage() {
           {healthInfos.length > 0 ? <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950"><div className="font-semibold">{healthInfos.length} informational note{healthInfos.length === 1 ? "" : "s"}</div><IssueList issues={healthInfos} /></div> : null}
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Setup health</div>
-              <h2 className="mt-1 text-lg font-semibold text-foreground">Future postings use these mappings</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Changing mappings affects future postings only. Existing payments, receipts, journals, reconciliations, and document numbers are not rewritten from this page.</p>
-            </div>
-            <span className={cx("rounded-full border px-3 py-1 text-xs font-semibold", statusClass(displayStatus))}>{displayStatus}</span>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-4">
-            {setupHealth.map((item) => <SetupHealthCard key={item.label} {...item} />)}
-          </div>
-        </section>
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm"><div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between"><div><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Setup health</div><h2 className="mt-1 text-lg font-semibold text-foreground">Future postings use these mappings</h2><p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Changing mappings affects future postings only. Existing payments, receipts, journals, reconciliations, and document numbers are not rewritten from this page.</p></div><span className={cx("rounded-full border px-3 py-1 text-xs font-semibold", statusClass(displayStatus))}>{displayStatus}</span></div><div className="mt-4 grid gap-3 md:grid-cols-4">{setupHealth.map((item) => <SetupHealthCard key={item.label} {...item} />)}</div></section>
 
-        <section className="space-y-3">
-          <div><h2 className="text-lg font-semibold text-foreground">Guided setup</h2><p className="mt-1 text-sm text-muted-foreground">Review each required business bucket, then use the mapping editor below for explicit changes.</p></div>
-          <div className="grid gap-4 xl:grid-cols-2">
-            {guidedSections.map((section) => {
-              const rows = [
-                ...section.accounts.map((account) => ({ key: `account-${account.id}`, label: account.name, status: isSelectable(account) ? "READY" : "BLOCKED", linked: accountLabel(account.mapped_chart_account), action: account.collection_blocker_reason || account.blocker_reason || account.recommended_action || "Mapped and selectable.", bridgeAction: false })),
-                ...section.profiles.map((profile) => ({ key: `profile-${profile.key}`, label: profile.label, status: profile.status, linked: [...profile.configured_debit_account.map(accountLabel), ...profile.configured_credit_account.map(accountLabel)].join(", ") || "Not configured", action: firstBlocker(profile), bridgeAction: Boolean(profile.operator_action && isRentLeaseBridgeProfile(profile)) })),
-              ];
-              const sectionReady = rows.length > 0 && rows.every((row) => row.status === "READY" || row.status === "DEFERRED");
-              const sectionMissing = rows.length === 0 || rows.some((row) => row.status === "BLOCKED");
-              return (
-                <article key={section.title} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-semibold text-foreground">{section.title}</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">{section.explanation}</p></div><span className={cx("rounded-full border px-2.5 py-1 text-[11px] font-semibold", sectionReady ? statusClass("READY") : sectionMissing ? statusClass("BLOCKED") : statusClass("WARNING"))}>{sectionReady ? "Ready" : sectionMissing ? "Missing" : "Warning"}</span></div>
-                  <div className="mt-3 flex flex-wrap gap-2">{section.required.map((item) => <span key={item} className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">{item}</span>)}</div>
-                  <div className="mt-3 space-y-2">
-                    {rows.length ? rows.map((row) => (
-                      <div key={row.key} className="rounded-xl border border-border bg-background px-3 py-2 text-xs">
-                        <div className="flex items-start justify-between gap-2"><div><div className="font-semibold text-foreground">{row.label}</div><div className="mt-1 text-muted-foreground">Linked: {row.linked}</div></div><span className={cx("rounded-full border px-2 py-0.5 font-semibold", statusClass(row.status))}>{row.status}</span></div>
-                        <div className="mt-2 text-muted-foreground">{row.action}</div>
-                        {row.bridgeAction ? <button type="button" onClick={scrollToBridgeApproval} className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-900">Open bridge approval</button> : null}
-                      </div>
-                    )) : <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">No matching setup row is exposed by the backend yet.</div>}
-                  </div>
-                  <div className="mt-3"><ActionButton variant="secondary" onClick={() => window.location.hash = "business-finance-accounts"}>Edit mapping</ActionButton></div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
+        <section className="space-y-3"><div><h2 className="text-lg font-semibold text-foreground">Guided setup</h2><p className="mt-1 text-sm text-muted-foreground">Review each required business bucket, then use the mapping editor below for explicit changes.</p></div><div className="grid gap-4 xl:grid-cols-2">{guidedSections.map((section) => {
+          const rows = [...section.accounts.map((account) => ({ key: `account-${account.id}`, label: account.name, status: isSelectable(account) ? "READY" : "BLOCKED", linked: accountLabel(account.mapped_chart_account), action: account.collection_blocker_reason || account.blocker_reason || account.recommended_action || "Mapped and selectable.", bridgeAction: false })), ...section.profiles.map((profile) => ({ key: `profile-${profile.key}`, label: profile.label, status: profile.status, linked: [...profile.configured_debit_account.map(accountLabel), ...profile.configured_credit_account.map(accountLabel)].join(", ") || "Not configured", action: firstBlocker(profile), bridgeAction: Boolean(profile.operator_action && isRentLeaseBridgeProfile(profile)) }))];
+          const sectionReady = rows.length > 0 && rows.every((row) => row.status === "READY" || row.status === "DEFERRED");
+          const sectionMissing = rows.length === 0 || rows.some((row) => row.status === "BLOCKED");
+          return <article key={section.title} className="rounded-2xl border border-border bg-card p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-semibold text-foreground">{section.title}</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">{section.explanation}</p></div><span className={cx("rounded-full border px-2.5 py-1 text-[11px] font-semibold", sectionReady ? statusClass("READY") : sectionMissing ? statusClass("BLOCKED") : statusClass("WARNING"))}>{sectionReady ? "Ready" : sectionMissing ? "Missing" : "Warning"}</span></div><div className="mt-3 flex flex-wrap gap-2">{section.required.map((item) => <span key={item} className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">{item}</span>)}</div><div className="mt-3 space-y-2">{rows.length ? rows.map((row) => <div key={row.key} className="rounded-xl border border-border bg-background px-3 py-2 text-xs"><div className="flex items-start justify-between gap-2"><div><div className="font-semibold text-foreground">{row.label}</div><div className="mt-1 text-muted-foreground">Linked: {row.linked}</div></div><span className={cx("rounded-full border px-2 py-0.5 font-semibold", statusClass(row.status))}>{row.status}</span></div><div className="mt-2 text-muted-foreground">{row.action}</div>{row.bridgeAction ? <button type="button" onClick={scrollToBridgeApproval} className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-900">Open bridge approval</button> : null}</div>) : <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">No matching setup row is exposed by the backend yet.</div>}</div><div className="mt-3"><ActionButton variant="secondary" onClick={() => window.location.hash = "business-finance-accounts"}>Edit mapping</ActionButton></div></article>;
+        })}</div></section>
 
-        <section id="rent-lease-posting-bridge" className="rounded-2xl border border-border bg-card p-5 shadow-sm scroll-mt-24">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rent / lease posting bridge</div>
-              <h2 className="mt-1 text-lg font-semibold text-foreground">Current mode {bridgePostingMode}</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Enabling this bridge only allows future explicit backend posting preview/execute workflows to proceed. It does not create backdated journals, payments, receipts, settlement allocations, or reconciliation records.</p>
-            </div>
-            <span className={cx("rounded-full border px-3 py-1 text-xs font-semibold", statusClass(bridgeReadyForExecution ? "READY" : bridgeMappingReady ? "DEFERRED" : "BLOCKED"))}>{bridgeReadyForExecution ? "Posting enabled" : bridgeEnabled ? "Approved but blocked" : "Approval required"}</span>
-          </div>
-          <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
-            <div className="rounded-xl border border-border bg-muted/20 p-3"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping readiness</div><div className="mt-1 font-semibold text-foreground">{bridgeReadiness?.status ?? "Not loaded"}</div><div className="mt-1 text-xs text-muted-foreground">{bridgeMappingReady ? "COA and Finance Account mapping are valid." : bridgeReadiness?.reason ?? "Complete mapping before enabling."}</div></div>
-            <div className="rounded-xl border border-border bg-muted/20 p-3"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posting approval</div><div className="mt-1 font-semibold text-foreground">{bridgeEnabled ? "Enabled" : "Disabled"}</div><div className="mt-1 text-xs text-muted-foreground">{bridgeConfig?.config?.reason || "No approval reason recorded."}</div></div>
-            <div className="rounded-xl border border-border bg-muted/20 p-3"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Future execution</div><div className="mt-1 font-semibold text-foreground">{bridgeReadyForExecution ? "Allowed" : "Blocked"}</div><div className="mt-1 text-xs text-muted-foreground">{bridgeReadyForExecution ? "Future explicit posting execution is enabled." : bridgeReadiness?.operator_action || "Future explicit posting execution is blocked."}</div></div>
-          </div>
-          {bridgeReadiness?.blockers?.length ? <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">{bridgeReadiness.blockers[0]}</div> : null}
-          <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_1fr]">
-            <label className="text-sm"><div className="mb-1 text-xs font-semibold text-muted-foreground">Reason</div><textarea className="min-h-24 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" value={bridgeReason} onChange={(event) => setBridgeReason(event.target.value)} placeholder={bridgeEnabled ? "Reason for disabling posting bridge" : "Reason for enabling posting bridge"} /></label>
-            <div className="space-y-3"><label className="block text-sm"><div className="mb-1 text-xs font-semibold text-muted-foreground">Typed confirmation</div><input className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" value={bridgeConfirmation} onChange={(event) => setBridgeConfirmation(event.target.value)} placeholder={expectedBridgeConfirmation} /></label><div className="rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">Required phrase: <span className="font-semibold text-foreground">{expectedBridgeConfirmation}</span></div>{!bridgeEnabled && !bridgeMappingReady ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">Enable is disabled until rent/lease mapping readiness is valid.</div> : null}<ActionButton variant={bridgeEnabled ? "secondary" : "primary"} onClick={() => void submitBridgeApproval()} disabled={!canSubmitBridge || bridgeSaving}>{bridgeSaving ? "Saving..." : bridgeEnabled ? "Disable posting bridge" : "Enable posting bridge"}</ActionButton></div>
-          </div>
-        </section>
+        <section id="rent-lease-posting-bridge" className="rounded-2xl border border-border bg-card p-5 shadow-sm scroll-mt-24"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rent / lease posting bridge</div><h2 className="mt-1 text-lg font-semibold text-foreground">Current mode {bridgePostingMode}</h2><p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Enabling this bridge only allows future explicit backend posting preview/execute workflows to proceed. It does not create backdated journals, payments, receipts, settlement allocations, or reconciliation records.</p></div><span className={cx("rounded-full border px-3 py-1 text-xs font-semibold", statusClass(bridgeReadyForExecution ? "READY" : bridgeMappingReady ? "DEFERRED" : "BLOCKED"))}>{bridgeReadyForExecution ? "Posting enabled" : bridgeEnabled ? "Approved but blocked" : "Approval required"}</span></div><div className="mt-4 grid gap-3 text-sm md:grid-cols-3"><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping readiness</div><div className="mt-1 font-semibold text-foreground">{bridgeReadiness?.status ?? "Not loaded"}</div><div className="mt-1 text-xs text-muted-foreground">{bridgeMappingReady ? "COA and Finance Account mapping are valid." : bridgeReadiness?.reason ?? "Complete mapping before enabling."}</div></div><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posting approval</div><div className="mt-1 font-semibold text-foreground">{bridgeEnabled ? "Enabled" : "Disabled"}</div><div className="mt-1 text-xs text-muted-foreground">{bridgeConfig?.config?.reason || "No approval reason recorded."}</div></div><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Future execution</div><div className="mt-1 font-semibold text-foreground">{bridgeReadyForExecution ? "Allowed" : "Blocked"}</div><div className="mt-1 text-xs text-muted-foreground">{bridgeReadyForExecution ? "Future explicit posting execution is enabled." : bridgeReadiness?.operator_action || "Future explicit posting execution is blocked."}</div></div></div>{bridgeReadiness?.blockers?.length ? <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">{bridgeReadiness.blockers[0]}</div> : null}<div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_1fr]"><label className="text-sm"><div className="mb-1 text-xs font-semibold text-muted-foreground">Reason</div><textarea className="min-h-24 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" value={bridgeReason} onChange={(event) => setBridgeReason(event.target.value)} placeholder={bridgeEnabled ? "Reason for disabling posting bridge" : "Reason for enabling posting bridge"} /></label><div className="space-y-3"><label className="block text-sm"><div className="mb-1 text-xs font-semibold text-muted-foreground">Typed confirmation</div><input className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" value={bridgeConfirmation} onChange={(event) => setBridgeConfirmation(event.target.value)} placeholder={expectedBridgeConfirmation} /></label><div className="rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">Required phrase: <span className="font-semibold text-foreground">{expectedBridgeConfirmation}</span></div>{!bridgeEnabled && !bridgeMappingReady ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">Enable is disabled until rent/lease mapping readiness is valid.</div> : null}<ActionButton variant={bridgeEnabled ? "secondary" : "primary"} onClick={() => void submitBridgeApproval()} disabled={!canSubmitBridge || bridgeSaving}>{bridgeSaving ? "Saving..." : bridgeEnabled ? "Disable posting bridge" : "Enable posting bridge"}</ActionButton></div></div></section>
 
-        <section id="business-finance-accounts" className="space-y-3">
-          <div><h2 className="text-lg font-semibold text-foreground">1. Business Finance Accounts</h2><p className="mt-1 text-sm text-muted-foreground">Cash desks, bank accounts, UPI accounts, and payment gateway accounts are operational money destinations. Ledger posting profiles are excluded from this section.</p></div>
-          <FinanceAccountMappingPanel financeAccounts={businessFinanceAccounts} chartAccounts={chartAccounts} saving={saving || repairing} editingId={editingFinanceAccount?.id ?? null} repairId={repairing && repairTargets.length === 1 ? repairTargets[0].id : null} selectedChartAccountId={selectedChartAccountId} onEdit={openFinanceMappingEdit} onCancelEdit={() => { setEditingFinanceAccount(null); setSelectedChartAccountId(""); }} onChartAccountChange={setSelectedChartAccountId} onSave={() => void submitFinanceMappingEdit()} onRepair={(account) => void openRepairDialog([account])} onRepairAll={(accounts) => void openRepairDialog(accounts)} />
-        </section>
+        <section id="business-finance-accounts" className="space-y-3"><div><h2 className="text-lg font-semibold text-foreground">1. Business Finance Accounts</h2><p className="mt-1 text-sm text-muted-foreground">Cash desks, bank accounts, UPI accounts, and payment gateway accounts are operational money destinations. Ledger posting profiles are excluded from this section.</p></div><FinanceAccountMappingPanel financeAccounts={businessFinanceAccounts} chartAccounts={chartAccounts} saving={saving || repairing} editingId={editingFinanceAccount?.id ?? null} repairId={repairing && repairTargets.length === 1 ? repairTargets[0].id : null} selectedChartAccountId={selectedChartAccountId} onEdit={openFinanceMappingEdit} onCancelEdit={() => { setEditingFinanceAccount(null); setSelectedChartAccountId(""); }} onChartAccountChange={setSelectedChartAccountId} onSave={() => void submitFinanceMappingEdit()} onRepair={(account) => void openRepairDialog([account])} onRepairAll={(accounts) => void openRepairDialog(accounts)} /></section>
 
-        <section className="space-y-3">
-          <div><h2 className="text-lg font-semibold text-foreground">2. System Posting Profiles</h2><p className="mt-1 text-sm text-muted-foreground">System posting profiles are diagnostic only and cannot receive customer collections. They decide which ledger accounts are debited and credited.</p></div>
-          {diagnosticAccounts.length > 0 ? <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950"><div className="font-semibold">Ledger posting profiles (system)</div><div className="mt-1">Diagnostic only. Not selectable for customer collections.</div><div className="mt-2 flex flex-wrap gap-2 text-xs">{diagnosticAccounts.map((account) => <span key={account.id} className="rounded-full border border-blue-200 bg-white px-2 py-1">{account.name}</span>)}</div></div> : null}
-          <div className="grid gap-4 lg:grid-cols-2">
-            {postingProfileReadiness.map((item) => (
-              <article key={item.key} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-semibold text-foreground">{item.label}</h3><p className="mt-1 text-xs text-muted-foreground">{item.key}</p></div><span className={cx("rounded-full border px-2 py-1 text-xs font-semibold", statusClass(item.status))}>{item.status}</span></div>
-                <div className="mt-3 grid gap-3 text-xs md:grid-cols-2"><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="font-semibold text-foreground">Debit account</div><div className="mt-1 text-muted-foreground">Required: {item.required_debit_account.join(", ") || "Not configured"}</div><div className="mt-1 text-foreground">{item.configured_debit_account.map(accountLabel).join(", ") || "Not configured"}</div></div><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="font-semibold text-foreground">Credit account</div><div className="mt-1 text-muted-foreground">Required: {item.required_credit_account.join(", ") || "Not configured"}</div><div className="mt-1 text-foreground">{item.configured_credit_account.map(accountLabel).join(", ") || "Not configured"}</div></div></div>
-                <div className="mt-3 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">{firstBlocker(item)}</div>
-                {item.collection_ready !== undefined || item.mapping_ready !== undefined || item.posting_mode ? <div className="mt-3 grid gap-2 text-xs md:grid-cols-3"><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="font-semibold text-foreground">Source collection</div><div className="mt-1 text-muted-foreground">{setupFlagLabel(item.collection_ready)}</div></div><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="font-semibold text-foreground">COA / FA mapping</div><div className="mt-1 text-muted-foreground">{setupFlagLabel(item.mapping_ready)}</div></div><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="font-semibold text-foreground">Posting mode</div><div className="mt-1 text-muted-foreground">{item.posting_mode || "Not exposed"}</div></div></div> : null}
-                {item.operator_action ? <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-950"><div>Action: {item.operator_action}</div>{isRentLeaseBridgeProfile(item) ? <button type="button" onClick={scrollToBridgeApproval} className="mt-2 rounded-lg border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-blue-900">Open bridge approval</button> : null}</div> : null}
-                {!item.implemented ? <div className="mt-2 text-xs font-medium text-blue-800">Deferred workflow. Do not create fake collection action.</div> : null}
-              </article>
-            ))}
-          </div>
-        </section>
+        <section className="space-y-3"><div><h2 className="text-lg font-semibold text-foreground">2. System Posting Profiles</h2><p className="mt-1 text-sm text-muted-foreground">System posting profiles are diagnostic only and cannot receive customer collections. They decide which ledger accounts are debited and credited.</p></div>{diagnosticAccounts.length > 0 ? <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950"><div className="font-semibold">Ledger posting profiles (system)</div><div className="mt-1">Diagnostic only. Not selectable for customer collections.</div><div className="mt-2 flex flex-wrap gap-2 text-xs">{diagnosticAccounts.map((account) => <span key={account.id} className="rounded-full border border-blue-200 bg-white px-2 py-1">{account.name}</span>)}</div></div> : null}<div className="grid gap-4 lg:grid-cols-2">{postingProfileReadiness.map((item) => <article key={item.key} className="rounded-2xl border border-border bg-card p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-semibold text-foreground">{item.label}</h3><p className="mt-1 text-xs text-muted-foreground">{item.key}</p></div><span className={cx("rounded-full border px-2 py-1 text-xs font-semibold", statusClass(item.status))}>{item.status}</span></div><div className="mt-3 grid gap-3 text-xs md:grid-cols-2"><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="font-semibold text-foreground">Debit account</div><div className="mt-1 text-muted-foreground">Required: {item.required_debit_account.join(", ") || "Not configured"}</div><div className="mt-1 text-foreground">{item.configured_debit_account.map(accountLabel).join(", ") || "Not configured"}</div></div><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="font-semibold text-foreground">Credit account</div><div className="mt-1 text-muted-foreground">Required: {item.required_credit_account.join(", ") || "Not configured"}</div><div className="mt-1 text-foreground">{item.configured_credit_account.map(accountLabel).join(", ") || "Not configured"}</div></div></div><div className="mt-3 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">{firstBlocker(item)}</div>{item.collection_ready !== undefined || item.mapping_ready !== undefined || item.posting_mode ? <div className="mt-3 grid gap-2 text-xs md:grid-cols-3"><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="font-semibold text-foreground">Source collection</div><div className="mt-1 text-muted-foreground">{setupFlagLabel(item.collection_ready)}</div></div><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="font-semibold text-foreground">COA / FA mapping</div><div className="mt-1 text-muted-foreground">{setupFlagLabel(item.mapping_ready)}</div></div><div className="rounded-xl border border-border bg-muted/20 p-3"><div className="font-semibold text-foreground">Posting mode</div><div className="mt-1 text-muted-foreground">{item.posting_mode || "Not exposed"}</div></div></div> : null}{item.operator_action ? <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-950"><div>Action: {item.operator_action}</div>{isRentLeaseBridgeProfile(item) ? <button type="button" onClick={scrollToBridgeApproval} className="mt-2 rounded-lg border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-blue-900">Open bridge approval</button> : null}</div> : null}{!item.implemented ? <div className="mt-2 text-xs font-medium text-blue-800">Deferred workflow. Do not create fake collection action.</div> : null}</article>)}</div></section>
 
-        <section className="space-y-3">
-          <div><h2 className="text-lg font-semibold text-foreground">3. Chart of Accounts Health</h2><p className="mt-1 text-sm text-muted-foreground">Chart of Accounts is the ledger structure. Collection accounts must point to active posting-enabled leaf ASSET accounts, not group/control accounts.</p></div>
-          <div className="grid gap-3 md:grid-cols-4"><div className="rounded-2xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Group/control accounts</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.group_control_count ?? 0}</div></div><div className="rounded-2xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posting leaf accounts</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.posting_leaf_count ?? 0}</div></div><div className="rounded-2xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Missing leaf assets</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.missing_posting_leaf_count ?? 0}</div></div><div className="rounded-2xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inactive/non-posting</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.inactive_or_non_posting_count ?? 0}</div></div></div>
-          <div className="rounded-2xl border border-border bg-card p-4"><div className="text-sm font-semibold text-foreground">COA blockers</div>{(coaHealth?.inactive_or_non_posting_blockers ?? []).length === 0 ? <div className="mt-2 text-sm text-emerald-700">No inactive/non-posting blockers exposed.</div> : <div className="mt-3 overflow-x-auto"><table className="min-w-full text-left text-xs"><thead className="text-muted-foreground"><tr><th className="px-2 py-2">Code</th><th className="px-2 py-2">Name</th><th className="px-2 py-2">Type</th><th className="px-2 py-2">Issue</th></tr></thead><tbody>{(coaHealth?.inactive_or_non_posting_blockers ?? []).slice(0, 12).map((account) => <tr key={`${account.id}-${account.code}`} className="border-t border-border"><td className="px-2 py-2 font-medium text-foreground">{account.code}</td><td className="px-2 py-2">{account.name}</td><td className="px-2 py-2">{account.account_type || account.type}</td><td className="px-2 py-2 text-amber-700">{!account.is_active ? "Inactive" : account.is_group_control ? "Group/control or non-posting" : "Not collection-ready"}</td></tr>)}</tbody></table></div>}</div>
-        </section>
+        <section className="space-y-3"><div><h2 className="text-lg font-semibold text-foreground">3. Chart of Accounts Health</h2><p className="mt-1 text-sm text-muted-foreground">Chart of Accounts is the ledger structure. Collection accounts must point to active posting-enabled leaf ASSET accounts, not group/control accounts.</p></div><div className="grid gap-3 md:grid-cols-4"><div className="rounded-2xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Group/control accounts</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.group_control_count ?? 0}</div></div><div className="rounded-2xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posting leaf accounts</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.posting_leaf_count ?? 0}</div></div><div className="rounded-2xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Missing leaf assets</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.missing_posting_leaf_count ?? 0}</div></div><div className="rounded-2xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inactive/non-posting</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.inactive_or_non_posting_count ?? 0}</div></div></div><div className="rounded-2xl border border-border bg-card p-4"><div className="text-sm font-semibold text-foreground">COA blockers</div>{(coaHealth?.inactive_or_non_posting_blockers ?? []).length === 0 ? <div className="mt-2 text-sm text-emerald-700">No inactive/non-posting blockers exposed.</div> : <div className="mt-3 overflow-x-auto"><table className="min-w-full text-left text-xs"><thead className="text-muted-foreground"><tr><th className="px-2 py-2">Code</th><th className="px-2 py-2">Name</th><th className="px-2 py-2">Type</th><th className="px-2 py-2">Issue</th></tr></thead><tbody>{(coaHealth?.inactive_or_non_posting_blockers ?? []).slice(0, 12).map((account) => <tr key={`${account.id}-${account.code}`} className="border-t border-border"><td className="px-2 py-2 font-medium text-foreground">{account.code}</td><td className="px-2 py-2">{account.name}</td><td className="px-2 py-2">{account.account_type || account.type}</td><td className="px-2 py-2 text-amber-700">{!account.is_active ? "Inactive" : account.is_group_control ? "Group/control or non-posting" : "Not collection-ready"}</td></tr>)}</tbody></table></div>}</div></section>
       </div>
     </PortalPage>
   );
