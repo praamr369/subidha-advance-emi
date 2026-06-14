@@ -52,6 +52,26 @@ export type CashCounterRecord = {
   updated_at?: string;
 };
 
+export type BranchReadiness = {
+  status: "READY" | "NEEDS_SETUP";
+  blockers: string[];
+  warnings: string[];
+  counts: {
+    branches_total: number;
+    branches_active: number;
+    branches_inactive: number;
+    primary_configured: boolean;
+    active_counters: number;
+    assigned_counters: number;
+    branches_with_counters: number;
+    branches_without_counters: number;
+  };
+  primary_branch: BranchRecord | null;
+  uncovered_branches: BranchRecord[];
+  actions: Array<{ label: string; href: string }>;
+  safety_note: string;
+};
+
 export type BranchReportingOverview = {
   branch?: {
     id: number;
@@ -145,6 +165,10 @@ export function updateBranch(id: number | string, payload: Partial<BranchPayload
     method: "PATCH",
     body: JSON.stringify(payload),
   });
+}
+
+export function getBranchReadiness() {
+  return apiFetch<BranchReadiness>("/branch-control/readiness/");
 }
 
 export function listCashCounters(params: Record<string, QueryValue> = {}) {
