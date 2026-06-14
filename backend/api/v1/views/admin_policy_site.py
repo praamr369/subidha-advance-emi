@@ -234,6 +234,16 @@ class AdminBusinessComplianceReadinessView(_AdminPolicyBase):
         return Response(build_business_compliance_readiness())
 
 
+def _validated_compliance_template_key(value: str) -> str:
+    key = (value or "").strip().lower()
+    if not key:
+        return ""
+    allowed_keys = {template["key"] for template in list_business_compliance_templates()}
+    if key not in allowed_keys:
+        raise ValidationError({"source_template_key": "Unknown compliance template key."})
+    return key
+
+
 class AdminBusinessComplianceDocumentListCreateView(_AdminPolicyBase):
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
@@ -245,10 +255,17 @@ class AdminBusinessComplianceDocumentListCreateView(_AdminPolicyBase):
     def post(self, request):
         serializer = BusinessComplianceDocumentAdminSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        source_template_key = _validated_compliance_template_key(request.data.get("source_template_key", ""))
         document = serializer.save(uploaded_by=request.user)
-        get_review_state(document)
+        payload = {}
+        if source_template_key:
+            payload["source_template_key"] = source_template_key
         if document.file:
-            update_document_metadata(document=document, payload={"file": document.file}, performed_by=request.user)
+            payload["file"] = document.file
+        if payload:
+            document = update_document_metadata(document=document, payload=payload, performed_by=request.user)
+        else:
+            get_review_state(document)
         return Response(BusinessComplianceDocumentAdminSerializer(document).data, status=status.HTTP_201_CREATED)
 
 
@@ -266,6 +283,8 @@ class AdminBusinessComplianceDocumentDetailView(_AdminPolicyBase):
         payload = dict(serializer.validated_data)
         if "expires_at" in request.data:
             payload["expires_at"] = request.data.get("expires_at") or None
+        if "source_template_key" in request.data:
+            payload["source_template_key"] = _validated_compliance_template_key(request.data.get("source_template_key", ""))
         try:
             updated = update_document_metadata(document=document, payload=payload, performed_by=request.user)
         except ValueError as error:
