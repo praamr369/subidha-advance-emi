@@ -116,14 +116,10 @@ function buildRouteWithQuery(destination: string, params: Record<string, QueryPa
 }
 
 export function buildAdminReconciliationRoute(params: AdminReconciliationRouteParams = {}): string {
-  return buildRouteWithQuery(ROUTES.admin.financeCanonicalReconciliation, {
-    view: params.view === "payments" ? "payments" : null,
-    subscription: params.subscription,
-    payment: params.payment,
-    status: params.status,
-    flagged: params.flagged,
-    locked: params.locked,
-    q: params.q,
+  const requestedStatus = params.status || (params.flagged ? "POSTED_UNVERIFIED" : null);
+  return buildRouteWithQuery(ROUTES.admin.accountingBridgeReconciliation, {
+    status: requestedStatus,
+    customer: params.subscription ? null : params.q,
   });
 }
 
