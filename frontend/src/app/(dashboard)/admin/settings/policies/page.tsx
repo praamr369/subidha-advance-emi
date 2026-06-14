@@ -11,6 +11,7 @@ import {
   getAdminPolicyCoverage,
   listAdminPolicies,
   seedDefaultPolicies,
+  updateAdminPolicy,
   type AdminPolicyPage,
   type PolicyCoverageMatrix,
   type PolicyCoverageRow,
@@ -65,6 +66,12 @@ const initialForm: PolicyCreatePayload = {
 function readableError(error: unknown): string {
   if (error instanceof ApiError) return error.readableMessage || error.message;
   return error instanceof Error ? error.message : "Request failed.";
+}
+
+function defaultAnnualReviewDate(): string {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() + 1);
+  return date.toISOString().slice(0, 10);
 }
 
 function badgeClass(tone: "green" | "amber" | "red" | "blue" | "slate" | "purple") {
@@ -246,6 +253,7 @@ export default function AdminPoliciesSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [settingReviewDates, setSettingReviewDates] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [form, setForm] = useState<PolicyCreatePayload>(initialForm);
@@ -278,6 +286,28 @@ export default function AdminPoliciesSettingsPage() {
       setError(readableError(err));
     } finally {
       setSeeding(false);
+    }
+  }
+
+  async function handleSetAnnualReviewDates() {
+    const targets = rows.filter(policyReviewDueMissing);
+    if (!targets.length) {
+      setMessage("All active policy rows already have review due dates.");
+      return;
+    }
+    const reviewDueDate = defaultAnnualReviewDate();
+    try {
+      setSettingReviewDates(true);
+      setError(null);
+      for (const row of targets) {
+        await updateAdminPolicy(row.id, { review_due_date: reviewDueDate });
+      }
+      setMessage(`Set annual review due date ${reviewDueDate} on ${targets.length} active policy row(s).`);
+      await loadPolicies();
+    } catch (err) {
+      setError(readableError(err));
+    } finally {
+      setSettingReviewDates(false);
     }
   }
 
@@ -346,9 +376,16 @@ export default function AdminPoliciesSettingsPage() {
             <h2 className="text-base font-semibold text-foreground">Governance cockpit</h2>
             <p className="mt-1 text-sm text-muted-foreground">Lifecycle counts, public/internal readiness, metadata mismatch health, and review-schedule warnings.</p>
           </div>
-          <button type="button" onClick={handleSeed} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-accent disabled:opacity-60" disabled={seeding}>
-            {seeding ? "Seeding..." : "Seed default templates"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {reviewDueMissingCount ? (
+              <button type="button" onClick={() => void handleSetAnnualReviewDates()} className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100 disabled:opacity-60" disabled={settingReviewDates || loading}>
+                {settingReviewDates ? "Setting dates..." : "Set annual review dates"}
+              </button>
+            ) : null}
+            <button type="button" onClick={handleSeed} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-accent disabled:opacity-60" disabled={seeding}>
+              {seeding ? "Seeding..." : "Seed default templates"}
+            </button>
+          </div>
         </div>
 
         {coverage ? (
@@ -358,7 +395,7 @@ export default function AdminPoliciesSettingsPage() {
             <SummaryCard label="Internal ready" value={`${coverage.summary.internal_ready_count}/${coverage.summary.internal_required_count}`} tone={coverage.summary.internal_ready_count === coverage.summary.internal_required_count ? "green" : "amber"} />
             <SummaryCard label="Metadata mismatch" value={coverage.summary.metadata_mismatch_count || 0} tone={(coverage.summary.metadata_mismatch_count || 0) ? "red" : "green"} />
             <SummaryCard label="Missing" value={coverage.summary.missing_count} tone={coverage.summary.missing_count ? "red" : "green"} />
-            <SummaryCard label="Review dates" value={reviewDueMissingCount} tone={reviewDueMissingCount ? "amber" : "green"} detail="Warning only" />
+            <SummaryCard label="Review dates" value={reviewDueMissingCount} tone={reviewDueMissingCount ? "amber" : "green"} detail={reviewDueMissingCount ? "Click set annual review dates" : "Ready"} />
           </div>
         ) : null}
 
@@ -380,7 +417,7 @@ export default function AdminPoliciesSettingsPage() {
                 ? "Resolve missing, unpublished public, unaccepted internal, or metadata-mismatch rows before relying on public/legal readiness."
                 : "All required public policies are published, all internal policies are ready, and no metadata mismatch is exposed."}
             </div>
-            {reviewDueMissingCount ? <div className="mt-2 text-amber-900">Warning: {reviewDueMissingCount} policy row(s) do not have a review due date. This is governance hygiene, not a launch blocker.</div> : null}
+            {reviewDueMissingCount ? <div className="mt-2 text-amber-900">Warning: {reviewDueMissingCount} policy row(s) do not have a review due date. Use Set annual review dates to clear this governance hygiene gap.</div> : null}
           </div>
         ) : null}
       </section>
