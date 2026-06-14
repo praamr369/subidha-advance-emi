@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -13,9 +14,11 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
   createBranch,
+  getBranchReadiness,
   listBranches,
   updateBranch,
   type BranchPayload,
+  type BranchReadiness,
   type BranchRecord,
 } from "@/services/branch-control";
 
@@ -48,8 +51,20 @@ function emptyForm(): BranchForm {
   };
 }
 
+function statusBadge(tone: "green" | "amber" | "red" | "blue" | "slate") {
+  const map = {
+    green: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    amber: "border-amber-200 bg-amber-50 text-amber-900",
+    red: "border-red-200 bg-red-50 text-red-800",
+    blue: "border-blue-200 bg-blue-50 text-blue-800",
+    slate: "border-slate-200 bg-slate-50 text-slate-700",
+  };
+  return `inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${map[tone]}`;
+}
+
 export default function AdminBranchesPage() {
   const [rows, setRows] = useState<BranchRecord[]>([]);
+  const [readiness, setReadiness] = useState<BranchReadiness | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   const [form, setForm] = useState<BranchForm>(emptyForm());
   const [loading, setLoading] = useState(true);
@@ -63,11 +78,13 @@ export default function AdminBranchesPage() {
     else setRefreshing(true);
 
     try {
-      const payload = await listBranches();
-      setRows(payload.results);
+      const [branchPayload, readinessPayload] = await Promise.all([listBranches(), getBranchReadiness()]);
+      setRows(branchPayload.results);
+      setReadiness(readinessPayload);
       setError(null);
     } catch (err) {
       setRows([]);
+      setReadiness(null);
       setError(toErrorMessage(err));
     } finally {
       if (mode === "initial") setLoading(false);
@@ -81,7 +98,7 @@ export default function AdminBranchesPage() {
 
   const selectedBranch = useMemo(
     () => rows.find((row) => row.id === selectedBranchId) ?? null,
-    [rows, selectedBranchId]
+    [rows, selectedBranchId],
   );
 
   const columns: EnterpriseColumnDef<BranchRecord>[] = [
@@ -134,7 +151,7 @@ export default function AdminBranchesPage() {
     setNotice(null);
 
     const payload: BranchPayload = {
-      code: form.code.trim(),
+      code: form.code.trim().toUpperCase(),
       name: form.name.trim(),
       status: form.status,
       is_primary: form.is_primary,
@@ -171,7 +188,10 @@ export default function AdminBranchesPage() {
 
   const activeCount = rows.filter((row) => row.status === "ACTIVE").length;
   const inactiveCount = rows.filter((row) => row.status === "INACTIVE").length;
-  const primaryBranch = rows.find((row) => row.is_primary) ?? null;
+  const primaryBranch = readiness?.primary_branch ?? rows.find((row) => row.is_primary) ?? null;
+  const activeCounters = readiness?.counts.active_counters ?? 0;
+  const branchesWithCounters = readiness?.counts.branches_with_counters ?? 0;
+  const hasBranchBlocker = Boolean(readiness?.blockers?.length);
 
   return (
     <ERPPageShell
@@ -205,6 +225,55 @@ export default function AdminBranchesPage() {
 
         {!loading && !error ? (
           <>
+            <WorkspaceSection
+              title="Branch readiness"
+              description="This is the launch gate for branch-safe operations: one active primary branch, active counter coverage, and branch traceability."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <StatCard
+                  label="Readiness"
+                  value={readiness?.status || "NEEDS_SETUP"}
+                  subtext={hasBranchBlocker ? "Resolve blockers before cashier rollout." : "Branch setup is safe for current shop operation."}
+                  tone={hasBranchBlocker ? "warning" : "success"}
+                />
+                <StatCard
+                  label="Active Counters"
+                  value={String(activeCounters)}
+                  subtext="Counters link cashier collection to branch and finance account."
+                  tone={activeCounters > 0 ? "success" : "warning"}
+                />
+                <StatCard
+                  label="Counter Coverage"
+                  value={String(branchesWithCounters)}
+                  subtext="Active branches with at least one active counter."
+                  tone={branchesWithCounters > 0 ? "info" : "warning"}
+                />
+                <StatCard
+                  label="Operational Posture"
+                  value={activeCount > 1 ? "Multi-branch" : "Single-branch"}
+                  subtext="Current business can stay single-branch; expansion remains additive."
+                  tone="info"
+                />
+              </div>
+              {readiness?.blockers?.length ? (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                  <div className="font-semibold">Blockers</div>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">{readiness.blockers.map((item) => <li key={item}>{item}</li>)}</ul>
+                </div>
+              ) : null}
+              {readiness?.warnings?.length ? (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  <div className="font-semibold">Warnings</div>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">{readiness.warnings.map((item) => <li key={item}>{item}</li>)}</ul>
+                </div>
+              ) : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link href={ROUTES.admin.counters} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">Open counters</Link>
+                <Link href={ROUTES.admin.branchReporting} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">Open reporting</Link>
+                <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh"}</button>
+              </div>
+            </WorkspaceSection>
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Primary Branch"
@@ -213,9 +282,9 @@ export default function AdminBranchesPage() {
                 tone={primaryBranch ? "success" : "warning"}
               />
               <StatCard
-                label="Operational Posture"
-                value={activeCount > 1 ? "Multi-branch" : "Single-branch"}
-                subtext="New branch-aware posting stays additive on top of the current operational modules."
+                label="Financial Integrity"
+                value="No rewrite"
+                subtext="Branch setup does not rewrite EMI, payment, receipt, journal, or stock history."
                 tone="info"
               />
             </div>
@@ -243,7 +312,7 @@ export default function AdminBranchesPage() {
 
               <WorkspaceSection
                 title={selectedBranch ? `Edit ${selectedBranch.code}` : "Create Branch"}
-                description="Use one primary branch only. That default is used to backfill older single-branch records safely."
+                description="Use one primary branch only. Marking a branch primary safely clears the previous primary flag in the backend."
               >
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
@@ -251,7 +320,7 @@ export default function AdminBranchesPage() {
                       <span className="mb-2 block font-medium">Code</span>
                       <input
                         value={form.code}
-                        onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
+                        onChange={(event) => setForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
                         className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-ring"
                         placeholder="BR-MAIN"
                         required
@@ -275,6 +344,7 @@ export default function AdminBranchesPage() {
                           setForm((current) => ({
                             ...current,
                             status: event.target.value as BranchForm["status"],
+                            is_primary: event.target.value === "INACTIVE" ? false : current.is_primary,
                           }))
                         }
                         className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-ring"
@@ -328,45 +398,23 @@ export default function AdminBranchesPage() {
                     <input
                       type="checkbox"
                       checked={form.is_primary}
+                      disabled={form.status !== "ACTIVE"}
                       onChange={(event) => setForm((current) => ({ ...current, is_primary: event.target.checked }))}
                       className="h-4 w-4 rounded border-border"
                     />
                     Mark this as the primary branch default for legacy and fallback branch assignment.
                   </label>
+                  {form.status !== "ACTIVE" && form.is_primary ? <div className={statusBadge("red")}>Inactive branches cannot be primary.</div> : null}
 
-                  {notice ? (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                      {notice}
-                    </div>
-                  ) : null}
-
-                  {error ? (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                      {error}
-                    </div>
-                  ) : null}
+                  {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div> : null}
+                  {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
 
                   <div className="flex flex-wrap gap-3">
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition disabled:opacity-60"
-                    >
+                    <button type="submit" disabled={saving} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition disabled:opacity-60">
                       {saving ? "Saving..." : selectedBranch ? "Update Branch" : "Create Branch"}
                     </button>
-                    <button
-                      type="button"
-                      onClick={resetForm}
-                      className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted"
-                    >
-                      Reset
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void loadPage("refresh")}
-                      disabled={refreshing}
-                      className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60"
-                    >
+                    <button type="button" onClick={resetForm} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted">Reset</button>
+                    <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60">
                       {refreshing ? "Refreshing..." : "Refresh"}
                     </button>
                   </div>
