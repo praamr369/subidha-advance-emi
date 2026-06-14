@@ -44,6 +44,12 @@ function statusTone(status?: string): string {
   return "border-border bg-muted text-muted-foreground";
 }
 
+function portalStatusTone(status?: string): "success" | "warning" | "danger" {
+  if (status === "POSTED") return "success";
+  if (status === "VOID") return "danger";
+  return "warning";
+}
+
 export default function AccountingJournalDetailPage() {
   const params = useParams<{ id: string }>();
   const id = useMemo(() => Number(params.id), [params.id]);
@@ -107,6 +113,13 @@ export default function AccountingJournalDetailPage() {
     }
   }
 
+  const pageActions = journal
+    ? [
+        { href: ROUTES.admin.accountingJournals, label: "Journal register", variant: "secondary" as const },
+        { href: buildAdminJournalEntryPrintRoute(journal.id), label: "Print / PDF", variant: "primary" as const },
+      ]
+    : [{ href: ROUTES.admin.accountingJournals, label: "Journal register", variant: "secondary" as const }];
+
   return (
     <PortalPage
       eyebrow="Accounting Journal Control"
@@ -118,11 +131,8 @@ export default function AccountingJournalDetailPage() {
         { label: "Journals", href: ROUTES.admin.accountingJournals },
         { label: journal?.entry_no || String(id) },
       ]}
-      actions={[
-        { href: ROUTES.admin.accountingJournals, label: "Journal register", variant: "secondary" },
-        journal ? { href: buildAdminJournalEntryPrintRoute(journal.id), label: "Print / PDF", variant: "primary" } : undefined,
-      ].filter(Boolean)}
-      statusBadge={{ label: journal?.status || "Loading", tone: journal?.status === "POSTED" ? "success" : journal?.status === "VOID" ? "danger" : "warning" }}
+      actions={pageActions}
+      statusBadge={{ label: journal?.status || "Loading", tone: portalStatusTone(journal?.status) }}
     >
       <div className="space-y-5">
         {notice ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div> : null}
