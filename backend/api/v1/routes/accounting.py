@@ -24,6 +24,7 @@ from api.v1.views.accounting import (
     VendorViewSet,
 )
 from api.v1.views.accounting_books_readiness import AccountingBooksReadinessView
+from api.v1.views.admin_accounting_setup import AccountingSetupMatrixView
 from api.v1.views.accounting_commission_payout_bridge import (
     CommissionSettlementBridgeRunView,
     PayoutBatchBridgeRunView,
@@ -112,6 +113,7 @@ urlpatterns = [
     path("reports/balance-sheet/", BalanceSheetReportView.as_view()),
     path("reports/general-ledger/", GeneralLedgerReportView.as_view()),
     path("reports/cashbook/", CashbookReportView.as_view()),
+    path("setup/matrix/", AccountingSetupMatrixView.as_view()),
     path("books/readiness/", AccountingBooksReadinessView.as_view()),
     path("books/cash/", CashBookView.as_view()),
     path("books/bank/", BankBookView.as_view()),
