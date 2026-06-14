@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import { ApiError } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
+import { fetchComplianceDocumentEvidence } from "@/services/business-compliance-evidence";
 import {
   approveComplianceDocument,
   approveCompliancePublicSummary,
@@ -296,6 +297,35 @@ export default function AdminBusinessCompliancePage() {
     }
   }
 
+  async function handleOpenEvidence(row: ComplianceDocument) {
+    if (!row.has_file) {
+      setError("No evidence file is uploaded for this compliance document.");
+      return;
+    }
+    try {
+      setActionId(row.id);
+      setError(null);
+      const blob = await fetchComplianceDocumentEvidence(row.id);
+      const url = URL.createObjectURL(blob);
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        anchor.download = `${row.title || "business-compliance-evidence"}`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      setError(readableError(err));
+    } finally {
+      setActionId(null);
+    }
+  }
+
   async function performAction(row: ComplianceDocument, action: "submit" | "approve" | "reject" | "expire" | "approve-summary" | "revoke-summary") {
     try {
       setActionId(row.id);
@@ -440,9 +470,16 @@ export default function AdminBusinessCompliancePage() {
                     <strong className="text-foreground">Matched row:</strong> {row.title || "Untitled"} · {row.source_template_key || "document-type fallback"} · {templateNextAction(row)}
                   </div>
                 ) : null}
-                <button type="button" onClick={() => applyTemplate(template)} className="mt-3 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-accent">
-                  {row ? "Add/replace evidence from this template" : "Add row from template"}
-                </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => applyTemplate(template)} className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-accent">
+                    {row ? "Add/replace evidence from this template" : "Add row from template"}
+                  </button>
+                  {row?.has_file ? (
+                    <button type="button" onClick={() => void handleOpenEvidence(row)} disabled={actionId === row.id} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 disabled:opacity-50">
+                      {actionId === row.id ? "Opening..." : "View file"}
+                    </button>
+                  ) : null}
+                </div>
               </article>
             );
           })}
@@ -452,7 +489,7 @@ export default function AdminBusinessCompliancePage() {
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-semibold text-foreground">How to clear this setup blocker</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-4">
-          {["Select template", "Upload real file", "Submit review", "Approve evidence"].map((step, index) => (
+          {["Select template", "Upload real file", "View/check file", "Submit review", "Approve evidence"].map((step, index) => (
             <div key={step} className="rounded-xl border border-border bg-background p-3 text-sm">
               <div className="text-xs font-semibold uppercase text-muted-foreground">Step {index + 1}</div>
               <div className="mt-1 font-semibold text-foreground">{step}</div>
@@ -529,20 +566,27 @@ export default function AdminBusinessCompliancePage() {
                       <div className="mt-1 text-xs text-muted-foreground">{row.source_template_key || "manual-row"}</div>
                     </td>
                     <td className="px-3 py-3 text-muted-foreground">
-                      <span className={badgeClass(row.has_file ? "green" : "red")}>{row.has_file ? "File uploaded" : "No file"}</span>
-                      <input
-                        type="file"
-                        aria-label={`Upload evidence for ${row.title || row.id}`}
-                        onChange={(event) => {
-                          const input = event.currentTarget;
-                          const file = input.files?.[0] || null;
-                          void handleUploadEvidence(row, file).finally(() => {
-                            input.value = "";
-                          });
-                        }}
-                        className="mt-2 block w-48 text-xs"
-                        disabled={actionId === row.id}
-                      />
+                      <div className="flex flex-col items-start gap-2">
+                        <span className={badgeClass(row.has_file ? "green" : "red")}>{row.has_file ? "File uploaded" : "No file"}</span>
+                        {row.has_file ? (
+                          <button type="button" onClick={() => void handleOpenEvidence(row)} disabled={actionId === row.id} className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800 disabled:opacity-50">
+                            {actionId === row.id ? "Opening..." : "View file"}
+                          </button>
+                        ) : null}
+                        <input
+                          type="file"
+                          aria-label={`Upload evidence for ${row.title || row.id}`}
+                          onChange={(event) => {
+                            const input = event.currentTarget;
+                            const file = input.files?.[0] || null;
+                            void handleUploadEvidence(row, file).finally(() => {
+                              input.value = "";
+                            });
+                          }}
+                          className="block w-48 text-xs"
+                          disabled={actionId === row.id}
+                        />
+                      </div>
                     </td>
                     <td className="px-3 py-3"><span className={badgeClass(statusTone(row.review_status || row.status))}>{reviewLabel(row)}</span></td>
                     <td className="px-3 py-3 text-muted-foreground">
@@ -575,7 +619,14 @@ export default function AdminBusinessCompliancePage() {
               <h2 className="text-base font-semibold text-foreground">Document review detail</h2>
               <p className="mt-1 text-sm text-muted-foreground">{selectedRow.title || "Untitled"} · {docTypeLabels[selectedRow.document_type]}</p>
             </div>
-            <button type="button" onClick={() => setSelectedRow(null)} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">Close detail</button>
+            <div className="flex flex-wrap gap-2">
+              {selectedRow.has_file ? (
+                <button type="button" onClick={() => void handleOpenEvidence(selectedRow)} disabled={actionId === selectedRow.id} className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 disabled:opacity-50">
+                  {actionId === selectedRow.id ? "Opening..." : "View evidence file"}
+                </button>
+              ) : null}
+              <button type="button" onClick={() => setSelectedRow(null)} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold hover:bg-accent">Close detail</button>
+            </div>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-xl border border-border bg-background p-3"><div className="text-xs uppercase text-muted-foreground">Review status</div><div className="mt-1 text-sm font-semibold">{reviewLabel(selectedRow)}</div></div>
