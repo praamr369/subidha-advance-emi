@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from api.v1.views.branch_control import (
     BranchImportPostView,
     BranchImportPreviewView,
+    BranchReadinessView,
     BranchReportingOverviewView,
     BranchViewSet,
     CounterImportPostView,
@@ -16,6 +17,7 @@ router.register(r"branches", BranchViewSet, basename="branch-control-branches")
 router.register(r"counters", CashCounterViewSet, basename="branch-control-counters")
 
 urlpatterns = [
+    path("readiness/", BranchReadinessView.as_view()),
     path("imports/branches/preview/", BranchImportPreviewView.as_view()),
     path("imports/branches/post/", BranchImportPostView.as_view()),
     path("imports/counters/preview/", CounterImportPreviewView.as_view()),
