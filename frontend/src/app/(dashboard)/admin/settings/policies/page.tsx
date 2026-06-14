@@ -7,11 +7,11 @@ import PageHeader from "@/components/ui/PageHeader";
 import { ApiError } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import {
+  bulkSetPolicyReviewDates,
   createAdminPolicy,
   getAdminPolicyCoverage,
   listAdminPolicies,
   seedDefaultPolicies,
-  updateAdminPolicy,
   type AdminPolicyPage,
   type PolicyCoverageMatrix,
   type PolicyCoverageRow,
@@ -290,19 +290,12 @@ export default function AdminPoliciesSettingsPage() {
   }
 
   async function handleSetAnnualReviewDates() {
-    const targets = rows.filter(policyReviewDueMissing);
-    if (!targets.length) {
-      setMessage("All active policy rows already have review due dates.");
-      return;
-    }
     const reviewDueDate = defaultAnnualReviewDate();
     try {
       setSettingReviewDates(true);
       setError(null);
-      for (const row of targets) {
-        await updateAdminPolicy(row.id, { review_due_date: reviewDueDate });
-      }
-      setMessage(`Set annual review due date ${reviewDueDate} on ${targets.length} active policy row(s).`);
+      const result = await bulkSetPolicyReviewDates({ review_due_date: reviewDueDate });
+      setMessage(`Set annual review due date ${result.review_due_date} on ${result.updated_count} active policy row(s). ${result.skipped_count} row(s) already had review dates.`);
       await loadPolicies();
     } catch (err) {
       setError(readableError(err));
