@@ -11,7 +11,7 @@ from api.v1.serializers.branch_control import (
     BranchSerializer,
     CashCounterSerializer,
 )
-from branch_control.models import Branch, CashCounter
+from branch_control.models import Branch, BranchStatus, CashCounter
 from branch_control.services.import_service import (
     post_branch_import,
     post_counter_import,
@@ -31,13 +31,16 @@ class BranchViewSet(AdminBranchControlViewSet):
     serializer_class = BranchSerializer
     search_fields = ["code", "name", "phone", "email"]
     ordering_fields = ["name", "code", "created_at"]
-    ordering = ["name", "id"]
+    ordering = ["-is_primary", "name", "id"]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().order_by("-is_primary", "name", "id")
         status_value = (self.request.query_params.get("status") or "").strip().upper()
+        is_primary = (self.request.query_params.get("is_primary") or "").strip().lower()
         if status_value:
             queryset = queryset.filter(status=status_value)
+        if is_primary in {"true", "false"}:
+            queryset = queryset.filter(is_primary=is_primary == "true")
         return queryset
 
 
@@ -60,6 +63,59 @@ class CashCounterViewSet(AdminBranchControlViewSet):
         if assigned_user_id:
             queryset = queryset.filter(assigned_user_id=assigned_user_id)
         return queryset
+
+
+class BranchReadinessView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        active_branches = Branch.objects.filter(status=BranchStatus.ACTIVE).order_by("-is_primary", "name", "id")
+        primary_branch = active_branches.filter(is_primary=True).first()
+        active_counters = CashCounter.objects.filter(is_active=True).select_related("branch", "finance_account", "assigned_user")
+        covered_branch_ids = set(active_counters.values_list("branch_id", flat=True))
+        active_branch_ids = set(active_branches.values_list("id", flat=True))
+        uncovered_active_branches = active_branches.exclude(id__in=covered_branch_ids)
+
+        blockers = []
+        warnings = []
+        if not active_branches.exists():
+            blockers.append("Create at least one active branch before shop operations.")
+        if primary_branch is None:
+            blockers.append("Mark exactly one active branch as the primary branch default.")
+        if not active_counters.exists():
+            blockers.append("Create at least one active cash counter for collections.")
+        if active_branches.exists() and uncovered_active_branches.exists():
+            warnings.append(f"{uncovered_active_branches.count()} active branch(es) do not yet have an active counter.")
+        inactive_primary_count = Branch.objects.filter(is_primary=True).exclude(status=BranchStatus.ACTIVE).count()
+        if inactive_primary_count:
+            blockers.append("Inactive branch cannot remain marked as primary.")
+
+        return Response(
+            {
+                "status": "READY" if not blockers else "NEEDS_SETUP",
+                "blockers": blockers,
+                "warnings": warnings,
+                "counts": {
+                    "branches_total": Branch.objects.count(),
+                    "branches_active": active_branches.count(),
+                    "branches_inactive": Branch.objects.filter(status=BranchStatus.INACTIVE).count(),
+                    "primary_configured": primary_branch is not None,
+                    "active_counters": active_counters.count(),
+                    "assigned_counters": active_counters.exclude(assigned_user__isnull=True).count(),
+                    "branches_with_counters": len(covered_branch_ids.intersection(active_branch_ids)),
+                    "branches_without_counters": uncovered_active_branches.count(),
+                },
+                "primary_branch": BranchSerializer(primary_branch).data if primary_branch else None,
+                "uncovered_branches": BranchSerializer(uncovered_active_branches, many=True).data,
+                "actions": [
+                    {"label": "Open branches", "href": "/admin/branches"},
+                    {"label": "Open counters", "href": "/admin/counters"},
+                    {"label": "Open branch reporting", "href": "/admin/branch-reporting"},
+                    {"label": "Open finance accounts", "href": "/admin/settings/business-setup/finance-accounts"},
+                ],
+                "safety_note": "Branch control is additive. Existing subscription, payment, receipt, inventory, and accounting records remain authoritative; branch context is used as controlled operational trace data.",
+            }
+        )
 
 
 class BranchReportingOverviewView(APIView):
