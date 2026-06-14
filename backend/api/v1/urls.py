@@ -52,6 +52,7 @@ urlpatterns = [
     path("admin/accounting/year-end/readiness/", AccountingYearEndReadinessView.as_view()),
     path("admin/accounting/year-end/close/", AccountingYearEndCloseView.as_view()),
     path("admin/", include("api.v1.routes.admin_business_compliance")),
+    path("admin/", include("api.v1.routes.admin_policy_governance")),
     path("admin/", include("api.v1.routes.admin_accounting_bridge_readiness")),
     path("admin/", include("api.v1.routes.admin_rent_lease_accounting_bridge")),
     path("admin/", include("api.v1.routes.contract_amendments_admin")),
