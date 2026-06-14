@@ -57,6 +57,7 @@ type ComplianceFormState = {
   public_summary: string;
   notes: string;
   file: File | null;
+  source_template_key: string;
 };
 
 const initialForm: ComplianceFormState = {
@@ -66,6 +67,7 @@ const initialForm: ComplianceFormState = {
   public_summary: "",
   notes: "",
   file: null,
+  source_template_key: "",
 };
 
 function readableError(error: unknown): string {
@@ -102,6 +104,33 @@ function reviewLabel(row: ComplianceDocument): string {
   return reviewStatusLabels[status] || status;
 }
 
+function normalizeText(value?: string | null): string {
+  return (value || "").trim().toLowerCase();
+}
+
+function rowMatchesTemplate(row: ComplianceDocument, template: ComplianceTemplate): boolean {
+  const rowTemplate = normalizeText(row.source_template_key);
+  if (rowTemplate) return rowTemplate === template.key;
+  if (row.document_type !== template.document_type) return false;
+  const rowTitle = normalizeText(row.title);
+  const templateTitle = normalizeText(template.label);
+  return rowTitle === templateTitle || !rowTitle || Boolean(row.has_file);
+}
+
+function templateRowScore(row: ComplianceDocument, template: ComplianceTemplate): number {
+  let score = 0;
+  if (normalizeText(row.source_template_key) === template.key) score += 1000;
+  if (normalizeText(row.title) === normalizeText(template.label)) score += 300;
+  if (row.has_file) score += 200;
+  if (row.review_status === "APPROVED") score += 120;
+  if (row.review_status === "UNDER_REVIEW") score += 80;
+  if (row.review_status === "PENDING") score += 50;
+  if (row.review_status === "REJECTED") score -= 60;
+  if (row.review_status === "EXPIRED" || row.is_active === false) score -= 100;
+  score += Date.parse(row.updated_at || row.created_at || "") / 1_000_000_000 || 0;
+  return score;
+}
+
 function buildComplianceFormData(form: ComplianceFormState): FormData {
   const formData = new FormData();
   formData.set("document_type", form.document_type);
@@ -111,12 +140,23 @@ function buildComplianceFormData(form: ComplianceFormState): FormData {
   formData.set("public_summary", form.public_summary.trim());
   formData.set("notes", form.notes.trim());
   formData.set("is_active", "true");
+  if (form.source_template_key) formData.set("source_template_key", form.source_template_key);
   if (form.file) formData.set("file", form.file);
   return formData;
 }
 
 function canApprovePublicSummary(row: ComplianceDocument): boolean {
   return Boolean(row.review_status === "APPROVED" && row.public_visibility === "PUBLIC_SUMMARY_ONLY" && row.public_summary?.trim() && !row.public_summary_ready);
+}
+
+function templateNextAction(row: ComplianceDocument | undefined): string {
+  if (!row) return "Add evidence row";
+  if (!row.has_file) return "Upload file";
+  if (row.review_status === "APPROVED") return row.public_summary_ready ? "Approved" : "Evidence approved";
+  if (row.review_status === "UNDER_REVIEW") return "Review pending";
+  if (row.review_status === "REJECTED") return "Upload corrected file";
+  if (row.review_status === "EXPIRED") return "Replace expired file";
+  return "Submit for review";
 }
 
 export default function AdminBusinessCompliancePage() {
@@ -133,6 +173,7 @@ export default function AdminBusinessCompliancePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [form, setForm] = useState<ComplianceFormState>(initialForm);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>("");
+  const [formResetKey, setFormResetKey] = useState(0);
 
   async function loadData() {
     try {
@@ -163,8 +204,10 @@ export default function AdminBusinessCompliancePage() {
   const rowsByTemplate = useMemo(() => {
     const map = new Map<string, ComplianceDocument>();
     for (const template of templates) {
-      const row = rows.find((item) => item.source_template_key === template.key || (item.document_type === template.document_type && item.title === template.label));
-      if (row) map.set(template.key, row);
+      const matches = rows
+        .filter((row) => rowMatchesTemplate(row, template))
+        .sort((left, right) => templateRowScore(right, template) - templateRowScore(left, template));
+      if (matches[0]) map.set(template.key, matches[0]);
     }
     return map;
   }, [rows, templates]);
@@ -193,7 +236,9 @@ export default function AdminBusinessCompliancePage() {
       public_summary: "",
       notes: `Template: ${template.key}. ${template.recommended_action}`,
       file: null,
+      source_template_key: template.key,
     });
+    setFormResetKey((key) => key + 1);
   }
 
   async function handleSeedRows() {
@@ -219,12 +264,13 @@ export default function AdminBusinessCompliancePage() {
     try {
       setSaving(true);
       setError(null);
-      await createComplianceDocument(buildComplianceFormData(form));
+      const created = await createComplianceDocument(buildComplianceFormData(form));
       setMessage(form.file ? "Compliance document created with evidence file. Submit for review before approval." : "Compliance row created. Upload real evidence before approval.");
       setForm(initialForm);
       setSelectedTemplateKey("");
-      event.currentTarget.reset();
+      setFormResetKey((key) => key + 1);
       await loadData();
+      setSelectedRow(created);
     } catch (err) {
       setError(readableError(err));
     } finally {
@@ -239,6 +285,7 @@ export default function AdminBusinessCompliancePage() {
       setError(null);
       const formData = new FormData();
       formData.set("file", file);
+      if (row.source_template_key) formData.set("source_template_key", row.source_template_key);
       await updateComplianceDocument(row.id, formData);
       setMessage("Evidence file uploaded. Review status reset to pending and public summary approval revoked.");
       await loadData();
@@ -312,7 +359,7 @@ export default function AdminBusinessCompliancePage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">Compliance review status</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Setup readiness uses approved evidence with real files only. Seeded rows and public summaries do not approve themselves.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Setup readiness uses approved evidence with real files only. Uploading a file is step one; it must then be submitted and approved.</p>
           </div>
           {readiness ? <span className={badgeClass(statusTone(readiness.status))}>{readiness.status}</span> : null}
         </div>
@@ -331,6 +378,16 @@ export default function AdminBusinessCompliancePage() {
             ))}
           </div>
         )}
+        {readiness?.required_checks?.length ? (
+          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {readiness.required_checks.map((check) => (
+              <div key={check.key} className="rounded-xl border border-border bg-background p-3 text-sm">
+                <div className="font-semibold text-foreground">{check.label}</div>
+                <span className={badgeClass(check.ready ? "green" : "red")}>{check.ready ? "Approved" : "Needs approved evidence"}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {readiness?.blockers?.length ? (
           <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">
             <div className="font-semibold">Blockers</div>
@@ -353,7 +410,7 @@ export default function AdminBusinessCompliancePage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">Premade compliance checklist</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Templates create checklist rows only. They do not verify registration, create legal publication, or expose files.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Templates create checklist rows only. Matched uploaded files appear here, but readiness turns green only after approval.</p>
           </div>
           <button type="button" onClick={handleSeedRows} disabled={seeding} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-accent disabled:opacity-60">
             {seeding ? "Seeding..." : "Seed required/recommended rows"}
@@ -373,17 +430,36 @@ export default function AdminBusinessCompliancePage() {
                     <span className={badgeClass(levelTone(template.required_level))}>{template.required_level}</span>
                     <span className={badgeClass(template.visibility_default === "PRIVATE" ? "slate" : "blue")}>{template.visibility_default}</span>
                     <span className={badgeClass(row ? statusTone(row.review_status || row.status) : "red")}>{row ? reviewLabel(row) : "Missing row"}</span>
+                    {row?.has_file ? <span className={badgeClass("green")}>File linked</span> : <span className={badgeClass("red")}>No file</span>}
                   </div>
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">{template.description}</p>
                 <p className="mt-2 text-xs text-muted-foreground">Exposure rule: {template.allowed_public_exposure}. {template.readiness_impact}</p>
+                {row ? (
+                  <div className="mt-3 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+                    <strong className="text-foreground">Matched row:</strong> {row.title || "Untitled"} · {row.source_template_key || "document-type fallback"} · {templateNextAction(row)}
+                  </div>
+                ) : null}
                 <button type="button" onClick={() => applyTemplate(template)} className="mt-3 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-accent">
-                  {row ? "Add another row from template" : "Add row from template"}
+                  {row ? "Add/replace evidence from this template" : "Add row from template"}
                 </button>
               </article>
             );
           })}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-foreground">How to clear this setup blocker</h2>
+        <div className="mt-3 grid gap-3 md:grid-cols-4">
+          {["Select template", "Upload real file", "Submit review", "Approve evidence"].map((step, index) => (
+            <div key={step} className="rounded-xl border border-border bg-background p-3 text-sm">
+              <div className="text-xs font-semibold uppercase text-muted-foreground">Step {index + 1}</div>
+              <div className="mt-1 font-semibold text-foreground">{step}</div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-sm text-muted-foreground">Do not approve GST/Udyam/MSME unless the actual certificate exists. Do not expose PAN, bank proof, rental agreement, or raw file scans publicly.</p>
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -404,7 +480,7 @@ export default function AdminBusinessCompliancePage() {
         <h2 className="text-base font-semibold text-foreground">Add compliance document row</h2>
         {selectedTemplateKey ? <p className="mt-1 text-sm text-muted-foreground">Selected template: {selectedTemplateKey}. Status defaults to pending. Upload real evidence before approval.</p> : null}
         <form className="mt-4 grid gap-3" onSubmit={handleCreate}>
-          <select value={form.document_type} onChange={(event) => setForm((current) => ({ ...current, document_type: event.target.value as ComplianceDocumentType }))} className="rounded-xl border border-input bg-background px-3 py-2 text-sm">
+          <select value={form.document_type} onChange={(event) => setForm((current) => ({ ...current, document_type: event.target.value as ComplianceDocumentType, source_template_key: "" }))} className="rounded-xl border border-input bg-background px-3 py-2 text-sm">
             {docTypeOptions.map((option) => <option key={option} value={option}>{docTypeLabels[option]}</option>)}
           </select>
           <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Title" className="rounded-xl border border-input bg-background px-3 py-2 text-sm" />
@@ -413,8 +489,9 @@ export default function AdminBusinessCompliancePage() {
               <option value="PRIVATE">Private file / internal only</option>
               <option value="PUBLIC_SUMMARY_ONLY">Public summary only after separate approval</option>
             </select>
-            <input type="file" onChange={(event) => setForm((current) => ({ ...current, file: event.target.files?.[0] || null }))} className="rounded-xl border border-input bg-background px-3 py-2 text-sm" />
+            <input key={formResetKey} type="file" onChange={(event) => setForm((current) => ({ ...current, file: event.target.files?.[0] || null }))} className="rounded-xl border border-input bg-background px-3 py-2 text-sm" />
           </div>
+          {form.source_template_key ? <input type="hidden" value={form.source_template_key} readOnly /> : null}
           <textarea value={form.public_summary} onChange={(event) => setForm((current) => ({ ...current, public_summary: event.target.value }))} placeholder="Public-safe summary. This is not visible publicly until evidence and summary are separately approved." className="min-h-[90px] rounded-xl border border-input bg-background px-3 py-2 text-sm" />
           <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Internal notes for admin review only" className="min-h-[80px] rounded-xl border border-input bg-background px-3 py-2 text-sm" />
           <div>
@@ -453,7 +530,19 @@ export default function AdminBusinessCompliancePage() {
                     </td>
                     <td className="px-3 py-3 text-muted-foreground">
                       <span className={badgeClass(row.has_file ? "green" : "red")}>{row.has_file ? "File uploaded" : "No file"}</span>
-                      <input type="file" aria-label={`Upload evidence for ${row.title || row.id}`} onChange={(event) => void handleUploadEvidence(row, event.target.files?.[0] || null)} className="mt-2 block w-48 text-xs" disabled={actionId === row.id} />
+                      <input
+                        type="file"
+                        aria-label={`Upload evidence for ${row.title || row.id}`}
+                        onChange={(event) => {
+                          const input = event.currentTarget;
+                          const file = input.files?.[0] || null;
+                          void handleUploadEvidence(row, file).finally(() => {
+                            input.value = "";
+                          });
+                        }}
+                        className="mt-2 block w-48 text-xs"
+                        disabled={actionId === row.id}
+                      />
                     </td>
                     <td className="px-3 py-3"><span className={badgeClass(statusTone(row.review_status || row.status))}>{reviewLabel(row)}</span></td>
                     <td className="px-3 py-3 text-muted-foreground">
@@ -463,7 +552,7 @@ export default function AdminBusinessCompliancePage() {
                     <td className="px-3 py-3 text-muted-foreground">{row.reviewed_by_username || row.reviewed_at || row.verified_at || "Pending"}</td>
                     <td className="px-3 py-3">
                       <div className="flex max-w-[360px] flex-wrap gap-2">
-                        <button type="button" onClick={() => void performAction(row, "submit")} disabled={actionId === row.id || row.review_status === "APPROVED" || row.review_status === "EXPIRED"} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-accent disabled:opacity-50">Submit</button>
+                        <button type="button" onClick={() => void performAction(row, "submit")} disabled={actionId === row.id || row.review_status === "APPROVED" || row.review_status === "EXPIRED" || !row.has_file} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-accent disabled:opacity-50">Submit</button>
                         <button type="button" onClick={() => void performAction(row, "approve")} disabled={actionId === row.id || !row.has_file || row.review_status === "APPROVED" || row.review_status === "EXPIRED"} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 disabled:opacity-50">Approve</button>
                         <button type="button" onClick={() => void performAction(row, "reject")} disabled={actionId === row.id || row.review_status === "EXPIRED"} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-800 disabled:opacity-50">Reject</button>
                         <button type="button" onClick={() => void performAction(row, "expire")} disabled={actionId === row.id || row.review_status === "EXPIRED"} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-accent disabled:opacity-50">Expire</button>
@@ -492,7 +581,7 @@ export default function AdminBusinessCompliancePage() {
             <div className="rounded-xl border border-border bg-background p-3"><div className="text-xs uppercase text-muted-foreground">Review status</div><div className="mt-1 text-sm font-semibold">{reviewLabel(selectedRow)}</div></div>
             <div className="rounded-xl border border-border bg-background p-3"><div className="text-xs uppercase text-muted-foreground">Evidence uploaded</div><div className="mt-1 text-sm font-semibold">{selectedRow.evidence_uploaded_at || "No file timestamp"}</div></div>
             <div className="rounded-xl border border-border bg-background p-3"><div className="text-xs uppercase text-muted-foreground">Public summary</div><div className="mt-1 text-sm font-semibold">{selectedRow.public_summary_ready ? "Approved" : "Not approved"}</div></div>
-            <div className="rounded-xl border border-border bg-background p-3"><div className="text-xs uppercase text-muted-foreground">Expiry</div><div className="mt-1 text-sm font-semibold">{selectedRow.expires_at || "Not set"}</div></div>
+            <div className="rounded-xl border border-border bg-background p-3"><div className="text-xs uppercase text-muted-foreground">Template</div><div className="mt-1 text-sm font-semibold">{selectedRow.source_template_key || "Manual row"}</div></div>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div className="rounded-xl border border-border bg-background p-3 text-sm text-muted-foreground"><strong className="text-foreground">Public summary:</strong><p className="mt-1 whitespace-pre-wrap">{selectedRow.public_summary || "No public summary text."}</p></div>
