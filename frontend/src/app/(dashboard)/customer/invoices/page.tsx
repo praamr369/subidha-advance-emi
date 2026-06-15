@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -9,9 +10,6 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { listCustomerInvoices, type FinanceInvoiceRow } from "@/services/phase4-finance";
 
-function money(value: unknown): string {
-  return `₹${Number(value ?? 0).toFixed(2)}`;
-}
 
 export default function CustomerInvoicesPage() {
   const [loading, setLoading] = useState(true);
@@ -68,9 +66,9 @@ export default function CustomerInvoicesPage() {
                     <td className="px-3 py-2 font-medium">{row.invoice_no || `INV-${row.id}`}</td>
                     <td className="px-3 py-2">{row.invoice_date}</td>
                     <td className="px-3 py-2">{row.status}</td>
-                    <td className="px-3 py-2">{money(row.grand_total)}</td>
-                    <td className="px-3 py-2">{money(row.received_total)}</td>
-                    <td className="px-3 py-2">{money(row.balance_total)}</td>
+                    <td className="px-3 py-2">{formatRupee(row.grand_total)}</td>
+                    <td className="px-3 py-2">{formatRupee(row.received_total)}</td>
+                    <td className="px-3 py-2">{formatRupee(row.balance_total)}</td>
                   </tr>
                 ))}
               </tbody>

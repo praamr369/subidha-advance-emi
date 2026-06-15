@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -39,9 +40,6 @@ function text(value: unknown, fallback = "—"): string {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-function money(value: unknown): string {
-  return `₹${toNumber(value).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -340,25 +338,25 @@ export default function CustomerSubscriptionDetailPage() {
         key: "amount",
         title: "Amount",
         align: "right" as const,
-        render: (row: EmiRow) => money(row.amount),
+        render: (row: EmiRow) => formatRupee(row.amount),
       },
       {
         key: "paid_amount",
         title: "Paid",
         align: "right" as const,
-        render: (row: EmiRow) => money(row.paid_amount),
+        render: (row: EmiRow) => formatRupee(row.paid_amount),
       },
       {
         key: "waived_amount",
         title: "Waived",
         align: "right" as const,
-        render: (row: EmiRow) => money(row.waived_amount),
+        render: (row: EmiRow) => formatRupee(row.waived_amount),
       },
       {
         key: "outstanding_amount",
         title: "Outstanding",
         align: "right" as const,
-        render: (row: EmiRow) => money(row.outstanding_amount),
+        render: (row: EmiRow) => formatRupee(row.outstanding_amount),
       },
       {
         key: "status",
@@ -413,7 +411,7 @@ export default function CustomerSubscriptionDetailPage() {
         },
         {
           label: "Outstanding",
-          value: money(financialSummary.outstanding_amount),
+          value: formatRupee(financialSummary.outstanding_amount),
           tone: detailSemantics.isSettled ? "success" : "warning",
         },
         {
@@ -500,7 +498,7 @@ export default function CustomerSubscriptionDetailPage() {
                     />
                     <DetailMetricTile
                       label="Remaining amount"
-                      value={money(financialSummary.outstanding_amount)}
+                      value={formatRupee(financialSummary.outstanding_amount)}
                       tone={detailSemantics.isSettled ? "success" : "warning"}
                     />
                   </>
@@ -573,7 +571,7 @@ export default function CustomerSubscriptionDetailPage() {
                     />
                     <DetailMetricTile
                       label="Waived amount"
-                      value={money(detailSemantics.waivedAmount)}
+                      value={formatRupee(detailSemantics.waivedAmount)}
                       tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
                     />
                     <DetailMetricTile
@@ -657,21 +655,21 @@ export default function CustomerSubscriptionDetailPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <DetailMetricTile
                   label="Advance EMI total"
-                  value={money(financialSummary.emi_total)}
+                  value={formatRupee(financialSummary.emi_total)}
                 />
                 <DetailMetricTile
                   label="Paid amount"
-                  value={money(financialSummary.paid_amount)}
+                  value={formatRupee(financialSummary.paid_amount)}
                   tone="success"
                 />
                 <DetailMetricTile
                   label="Waived amount"
-                  value={money(financialSummary.waived_amount)}
+                  value={formatRupee(financialSummary.waived_amount)}
                   tone={detailSemantics.hasWaiver ? detailSemantics.waiverTone : "default"}
                 />
                 <DetailMetricTile
                   label="Outstanding"
-                  value={money(financialSummary.outstanding_amount)}
+                  value={formatRupee(financialSummary.outstanding_amount)}
                   tone={detailSemantics.isSettled ? "success" : "warning"}
                 />
                 <DetailMetricTile

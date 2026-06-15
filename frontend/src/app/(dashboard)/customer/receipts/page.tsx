@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -9,9 +10,6 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { listCustomerReceipts, type FinanceReceiptRow } from "@/services/phase4-finance";
 
-function money(value: unknown): string {
-  return `₹${Number(value ?? 0).toFixed(2)}`;
-}
 
 export default function CustomerReceiptsPage() {
   const [loading, setLoading] = useState(true);
@@ -81,7 +79,7 @@ export default function CustomerReceiptsPage() {
                     <td className="px-4 py-3 text-sm text-foreground">{row.status || "—"}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{row.payment_method || "—"}</td>
                     <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                      {money(row.amount)}
+                      {formatRupee(row.amount)}
                     </td>
                   </tr>
                 ))}

@@ -15,15 +15,13 @@ import StatCard from "@/components/ui/StatCard";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   listAdminSupportRequests,
   type AdminSupportRequest,
   type AdminSupportRequestStatus,
 } from "@/services/admin-support-requests";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
@@ -207,7 +205,7 @@ export default function AdminSupportRequestsPage() {
         title: "Payment",
         align: "right" as const,
         render: (row: AdminSupportRequest) =>
-          row.payment_amount ? money(row.payment_amount) : "—",
+          row.payment_amount ? formatRupee(row.payment_amount) : "—",
       },
     ],
     []

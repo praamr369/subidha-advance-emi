@@ -5,7 +5,14 @@ import type {
 } from "@/services/dashboard-types";
 
 export function money(value: string | number | undefined | null): string {
-  return `₹${Number(value ?? 0).toFixed(2)}`;
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) return "₹0.00";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numeric);
 }
 
 export function formatDate(value?: string | null): string {

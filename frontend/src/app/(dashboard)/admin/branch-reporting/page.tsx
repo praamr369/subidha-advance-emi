@@ -14,14 +14,12 @@ import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   getBranchReportingOverview,
   type BranchReportingOverview,
 } from "@/services/branch-control";
 
-function money(value?: string | number | null): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function qty(value?: string | number | null): string {
   return Number(value || 0).toFixed(2);
@@ -88,9 +86,9 @@ export default function AdminBranchReportingPage() {
       ]}
       stats={[
         { label: "Branch Scope", value: selectedBranchLabel, tone: "info" },
-        { label: "Collections", value: money(payload?.collections.gross_amount), tone: "success" },
-        { label: "Direct Sales", value: money(payload?.direct_sales.gross_total), tone: "info" },
-        { label: "Overdue EMI", value: money(payload?.subscriptions.overdue_emi_amount), tone: (Number(payload?.subscriptions.overdue_emi_amount || 0) > 0 ? "warning" : "success") },
+        { label: "Collections", value: formatRupee(payload?.collections.gross_amount), tone: "success" },
+        { label: "Direct Sales", value: formatRupee(payload?.direct_sales.gross_total), tone: "info" },
+        { label: "Overdue EMI", value: formatRupee(payload?.subscriptions.overdue_emi_amount), tone: (Number(payload?.subscriptions.overdue_emi_amount || 0) > 0 ? "warning" : "success") },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
@@ -332,7 +330,7 @@ export default function AdminBranchReportingPage() {
               <StatCard
                 label="Collection Count"
                 value={String(payload.collections.count)}
-                subtext={`Cash ${money(payload.collections.cash_total)} · Bank ${money(payload.collections.bank_total)} · UPI ${money(payload.collections.upi_total)}`}
+                subtext={`Cash ${formatRupee(payload.collections.cash_total)} · Bank ${formatRupee(payload.collections.bank_total)} · UPI ${formatRupee(payload.collections.upi_total)}`}
                 tone="success"
               />
               <StatCard
@@ -349,12 +347,12 @@ export default function AdminBranchReportingPage() {
               />
               <StatCard
                 label="People Costs"
-                value={money(
+                value={formatRupee(
                   Number(payload.people_costs.salary_paid_total || 0) +
                     Number(payload.people_costs.expense_total || 0) +
                     Number(payload.people_costs.reimbursement_total || 0)
                 )}
-                subtext={`Salary ${money(payload.people_costs.salary_paid_total)} · Expense ${money(payload.people_costs.expense_total)} · Reimbursement ${money(payload.people_costs.reimbursement_total)}`}
+                subtext={`Salary ${formatRupee(payload.people_costs.salary_paid_total)} · Expense ${formatRupee(payload.people_costs.expense_total)} · Reimbursement ${formatRupee(payload.people_costs.reimbursement_total)}`}
                 tone="warning"
               />
             </div>
@@ -367,13 +365,13 @@ export default function AdminBranchReportingPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <StatCard
                     label="Collections Gross"
-                    value={money(payload.collections.gross_amount)}
+                    value={formatRupee(payload.collections.gross_amount)}
                     subtext={`${payload.collections.count} payment rows in the current branch/date scope`}
                     tone="success"
                   />
                   <StatCard
                     label="Direct Sales Gross"
-                    value={money(payload.direct_sales.gross_total)}
+                    value={formatRupee(payload.direct_sales.gross_total)}
                     subtext={`${payload.direct_sales.count} direct-sale source records in scope`}
                     tone="info"
                   />
@@ -388,7 +386,7 @@ export default function AdminBranchReportingPage() {
                   <StatCard
                     label="Overdue EMI Count"
                     value={String(payload.subscriptions.overdue_emi_count)}
-                    subtext={money(payload.subscriptions.overdue_emi_amount)}
+                    subtext={formatRupee(payload.subscriptions.overdue_emi_amount)}
                     tone={payload.subscriptions.overdue_emi_count > 0 ? "warning" : "success"}
                   />
                   <StatCard

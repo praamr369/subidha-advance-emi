@@ -11,6 +11,7 @@ import StatusBadge from "@/components/ui/status-badge";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import { ApiError } from "@/lib/api";
 import { getAccountingSetupReadiness } from "@/services/accounting-setup";
 import {
@@ -35,10 +36,6 @@ const REQUIRED_MAPPING_TYPES: Record<string, string> = {
   damage_recovery_income_account_id: "INCOME",
 };
 
-function money(value: unknown): string {
-  const parsed = Number(value ?? 0);
-  return `₹${Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00"}`;
-}
 
 function isPositive(value: string): boolean {
   const parsed = Number(value);
@@ -300,10 +297,10 @@ export default function AdminFinanceDepositsPage() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {[
           ["Total deposit demands", kpis.count],
-          ["Total collected", money(kpis.collected)],
-          ["Total held", money(kpis.held)],
-          ["Refundable amount", money(kpis.refundable)],
-          ["Deducted amount", money(kpis.deducted)],
+          ["Total collected", formatRupee(kpis.collected)],
+          ["Total held", formatRupee(kpis.held)],
+          ["Refundable amount", formatRupee(kpis.refundable)],
+          ["Deducted amount", formatRupee(kpis.deducted)],
           ["Pending refund count", kpis.pendingRefunds],
         ].map(([label, value]) => (
           <div key={String(label)} className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -363,10 +360,10 @@ export default function AdminFinanceDepositsPage() {
                         {row.customer_phone ? <div className="text-xs text-muted-foreground">{row.customer_phone}</div> : null}
                       </td>
                       <td className="px-3 py-2">{row.plan_type}</td>
-                      <td className="px-3 py-2 text-right font-medium">{money(row.collected_amount)}</td>
-                      <td className="px-3 py-2 text-right">{money(row.held_amount)}</td>
-                      <td className="px-3 py-2 text-right">{money(row.refundable_amount)}</td>
-                      <td className="px-3 py-2 text-right">{money(row.deducted_amount)}</td>
+                      <td className="px-3 py-2 text-right font-medium">{formatRupee(row.collected_amount)}</td>
+                      <td className="px-3 py-2 text-right">{formatRupee(row.held_amount)}</td>
+                      <td className="px-3 py-2 text-right">{formatRupee(row.refundable_amount)}</td>
+                      <td className="px-3 py-2 text-right">{formatRupee(row.deducted_amount)}</td>
                       <td className="px-3 py-2">
                         <StatusBadge status={posture(row)} />
                         {row.disabled_reason ? <div className="mt-1 max-w-[12rem] text-xs text-muted-foreground">{row.disabled_reason}</div> : null}
@@ -388,10 +385,10 @@ export default function AdminFinanceDepositsPage() {
               <div className="mt-2 text-lg font-semibold">{selected.subscription_number || `SUB-${selected.subscription_id}`}</div>
               <div className="mt-1 text-sm text-muted-foreground">{selected.customer_name} · {selected.plan_type}</div>
               <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <div><dt className="text-muted-foreground">Collected</dt><dd className="font-semibold">{money(selected.collected_amount)}</dd></div>
-                <div><dt className="text-muted-foreground">Held</dt><dd className="font-semibold">{money(selected.held_amount)}</dd></div>
-                <div><dt className="text-muted-foreground">Refundable</dt><dd className="font-semibold">{money(selected.refundable_amount)}</dd></div>
-                <div><dt className="text-muted-foreground">Deducted</dt><dd className="font-semibold">{money(selected.deducted_amount)}</dd></div>
+                <div><dt className="text-muted-foreground">Collected</dt><dd className="font-semibold">{formatRupee(selected.collected_amount)}</dd></div>
+                <div><dt className="text-muted-foreground">Held</dt><dd className="font-semibold">{formatRupee(selected.held_amount)}</dd></div>
+                <div><dt className="text-muted-foreground">Refundable</dt><dd className="font-semibold">{formatRupee(selected.refundable_amount)}</dd></div>
+                <div><dt className="text-muted-foreground">Deducted</dt><dd className="font-semibold">{formatRupee(selected.deducted_amount)}</dd></div>
                 <div><dt className="text-muted-foreground">Source ref</dt><dd className="font-semibold">{selected.latest_transaction?.source_reference || selected.latest_transaction?.transaction_number || "-"}</dd></div>
                 <div><dt className="text-muted-foreground">Source type</dt><dd className="font-semibold">{selected.latest_transaction?.transaction_type || "-"}</dd></div>
                 <div><dt className="text-muted-foreground">Method</dt><dd className="font-semibold">{selected.latest_transaction?.payment_method || "-"}</dd></div>

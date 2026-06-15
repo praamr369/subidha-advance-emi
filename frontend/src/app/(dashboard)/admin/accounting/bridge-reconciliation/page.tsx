@@ -161,7 +161,7 @@ function actionCopy(row: AccountingBridgeReconciliationRow): string {
 }
 
 function inventoryActivityCount(item: PhaseFSourceInventoryItem): number {
-  return Object.values(item.counts ?? {}).reduce((total, value) => total + Number(value ?? 0), 0);
+  return Object.values(item.counts ?? {}).reduce((total: number, value) => total + Number(value ?? 0), 0);
 }
 
 function activeInventory(items: PhaseFSourceInventoryItem[]): PhaseFSourceInventoryItem[] {
@@ -393,7 +393,7 @@ export default function AccountingBridgeReconciliationPage() {
 
   useEffect(() => { void load({}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rows = payload?.results ?? [];
+  const rows = useMemo(() => payload?.results ?? [], [payload]);
   const concreteRows = useMemo(() => rows.filter(isConcreteSourceCandidate), [rows]);
   const blockedRows = useMemo(() => rows.filter(isBlockedOrExceptionRow), [rows]);
   const boundaryRows = useMemo(() => rows.filter(isUnsupportedOrDeferredRow), [rows]);

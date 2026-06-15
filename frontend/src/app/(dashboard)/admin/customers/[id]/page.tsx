@@ -29,6 +29,7 @@ import {
 } from "@/lib/auth/password-reset";
 import { apiFetch, toArray } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import type { CollectionPrimaryAction } from "@/services/receivables";
 
 // =====================================================
@@ -315,9 +316,6 @@ type AdminKycDocumentRow = {
 // =====================================================
 // UTILITIES
 // =====================================================
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toMoneyString(value: unknown): string {
   const parsed = Number(value ?? 0);
@@ -854,7 +852,7 @@ function ContractReferenceList({
                     Due
                   </div>
                   <div className="mt-1 text-sm font-semibold text-foreground">
-                    {money(row.due_amount)}
+                    {formatRupee(row.due_amount)}
                   </div>
                 </div>
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
@@ -862,7 +860,7 @@ function ContractReferenceList({
                     Overdue
                   </div>
                   <div className="mt-1 text-sm font-semibold text-amber-900">
-                    {money(row.overdue_amount)}
+                    {formatRupee(row.overdue_amount)}
                   </div>
                 </div>
                 <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
@@ -1072,10 +1070,10 @@ function SubscriptionsTable({ rows }: { rows: SubscriptionPreviewRow[] }) {
                   </td>
                   <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
                     <div className="font-semibold">
-                      {money(row.total_amount)}
+                      {formatRupee(row.total_amount)}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      EMI {money(row.monthly_amount)}
+                      EMI {formatRupee(row.monthly_amount)}
                     </div>
                   </td>
                   <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -1249,7 +1247,7 @@ function PaymentsTable({ rows }: { rows: PaymentPreviewRow[] }) {
                   </span>
                 </td>
                 <td className="border-b border-border px-4 py-3 text-right text-sm font-semibold text-foreground">
-                  {money(row.amount)}
+                  {formatRupee(row.amount)}
                 </td>
                 <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                   <span
@@ -1781,12 +1779,12 @@ export default function AdminCustomerDetailPage() {
         },
         {
           label: "Active Contract Value",
-          value: money(totalContractValue),
+          value: formatRupee(totalContractValue),
           tone: "success",
         },
         {
           label: "Historical Contract Value",
-          value: money(historicalContractValue),
+          value: formatRupee(historicalContractValue),
         },
         {
           label: "Active Payments",
@@ -1872,12 +1870,12 @@ export default function AdminCustomerDetailPage() {
               />
               <KpiCard
                 label="Active contract value"
-                value={money(totalContractValue)}
+                value={formatRupee(totalContractValue)}
                 helper="Excludes cancelled/history-only subscriptions"
               />
               <KpiCard
                 label="Historical contract value"
-                value={money(historicalContractValue)}
+                value={formatRupee(historicalContractValue)}
                 helper="Cancelled/archived contracts preserved for audit"
               />
               <KpiCard
@@ -1898,7 +1896,7 @@ export default function AdminCustomerDetailPage() {
               />
               <KpiCard
                 label="Active direct-sale outstanding"
-                value={money(
+                value={formatRupee(
                   operationalProfile?.direct_sales.summary.outstanding_total || "0.00"
                 )}
                 helper={`Open receivables ${operationalProfile?.direct_sales.summary.outstanding_count ?? 0} (active only)`}
@@ -2244,10 +2242,10 @@ export default function AdminCustomerDetailPage() {
                       </div>
                       <div className="mt-2 space-y-1 text-sm text-amber-900">
                         <div>
-                          Outstanding {money(operationalProfile.direct_sales.summary.outstanding_total)}
+                          Outstanding {formatRupee(operationalProfile.direct_sales.summary.outstanding_total)}
                         </div>
                         <div>
-                          Collected {money(operationalProfile.direct_sales.summary.received_total)}
+                          Collected {formatRupee(operationalProfile.direct_sales.summary.received_total)}
                         </div>
                         <div>
                           Draft sales {draftDirectSales.length}
@@ -2303,10 +2301,10 @@ export default function AdminCustomerDetailPage() {
                           Historical contracts {operationalProfile.overview.historical_subscriptions ?? 0}
                         </div>
                         <div>
-                          Net collections {money(operationalProfile.ledger_summary.net_subscription_collections)}
+                          Net collections {formatRupee(operationalProfile.ledger_summary.net_subscription_collections)}
                         </div>
                         <div>
-                          Latest payment {latestPayment ? money(latestPayment.amount) : "—"}
+                          Latest payment {latestPayment ? formatRupee(latestPayment.amount) : "—"}
                         </div>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
@@ -2362,7 +2360,7 @@ export default function AdminCustomerDetailPage() {
                     />
                     <DetailValue
                       label="Active direct-sale outstanding"
-                      value={money(
+                      value={formatRupee(
                         operationalProfile.overview.direct_sale_outstanding_total
                       )}
                     />
@@ -2376,7 +2374,7 @@ export default function AdminCustomerDetailPage() {
                     />
                     <DetailValue
                       label="Active invoice outstanding"
-                      value={money(
+                      value={formatRupee(
                         operationalProfile.receipts_documents.summary.invoice_outstanding_total
                       )}
                     />
@@ -2390,11 +2388,11 @@ export default function AdminCustomerDetailPage() {
                     />
                     <DetailValue
                       label="Active ledger credits"
-                      value={money(operationalProfile.ledger_summary.active_ledger_credits)}
+                      value={formatRupee(operationalProfile.ledger_summary.active_ledger_credits)}
                     />
                     <DetailValue
                       label="Active net collections"
-                      value={money(
+                      value={formatRupee(
                         operationalProfile.ledger_summary.net_subscription_collections
                       )}
                     />
@@ -2569,16 +2567,16 @@ export default function AdminCustomerDetailPage() {
                             <div className="grid gap-2 sm:grid-cols-3">
                               <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
                                 <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Grand Total</div>
-                                <div className="mt-1 text-sm font-semibold text-foreground">{money(row.grand_total)}</div>
+                                <div className="mt-1 text-sm font-semibold text-foreground">{formatRupee(row.grand_total)}</div>
                               </div>
                               <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
                                 <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Collected</div>
-                                <div className="mt-1 text-sm font-semibold text-foreground">{money(row.received_total)}</div>
+                                <div className="mt-1 text-sm font-semibold text-foreground">{formatRupee(row.received_total)}</div>
                               </div>
                               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
                                 <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Outstanding</div>
                                 <div className="mt-1 text-sm font-semibold text-amber-900">
-                                  {row.is_history_only ? "₹0.00" : money(row.active_outstanding_total || row.balance_total)}
+                                  {row.is_history_only ? "₹0.00" : formatRupee(row.active_outstanding_total || row.balance_total)}
                                 </div>
                               </div>
                             </div>
@@ -2759,7 +2757,7 @@ export default function AdminCustomerDetailPage() {
                                 {receipt.receipt_type || "Receipt"} · {formatDate(receipt.receipt_date)}
                               </div>
                               <div className="mt-1 text-xs text-muted-foreground">
-                                {receipt.finance_account_name || "Finance account not labeled"} · {money(receipt.amount)}
+                                {receipt.finance_account_name || "Finance account not labeled"} · {formatRupee(receipt.amount)}
                               </div>
                             </div>
                           ))
@@ -2785,8 +2783,8 @@ export default function AdminCustomerDetailPage() {
                                 {invoice.billing_channel || "DIRECT_SALE"}
                               </div>
                               <div className="mt-1 text-xs text-muted-foreground">
-                                Total {money(invoice.grand_total)} · Received {money(invoice.received_total)} ·
-                                Balance {money(invoice.balance_total)}
+                                Total {formatRupee(invoice.grand_total)} · Received {formatRupee(invoice.received_total)} ·
+                                Balance {formatRupee(invoice.balance_total)}
                               </div>
                               <div className="mt-2 flex flex-wrap gap-2">
                                 <Link

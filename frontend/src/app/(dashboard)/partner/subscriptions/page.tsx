@@ -29,7 +29,7 @@ function formatMoney(value?: string | number | null): string {
   if (value === null || value === undefined || value === "") return "—";
   const numeric = Number(value);
   if (Number.isNaN(numeric)) return String(value);
-  return `₹${numeric.toFixed(2)}`;
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value ?? 0));
 }
 
 function formatDate(value?: string | null): string {

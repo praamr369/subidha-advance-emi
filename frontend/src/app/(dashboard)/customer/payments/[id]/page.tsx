@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,10 +20,6 @@ import ActionButton from "@/components/ui/ActionButton";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { getCustomerPaymentDetail, type CustomerPayment } from "@/services/customer";
 
-function money(value: string | number | null | undefined): string {
-  const parsed = Number(value);
-  return `₹${(Number.isFinite(parsed) ? parsed : 0).toFixed(2)}`;
-}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
@@ -175,7 +172,7 @@ export default function CustomerPaymentReceiptPage() {
       ]}
       stats={[
         { label: "Payment ID", value: payment ? `#${payment.id}` : hasValidPaymentId ? `#${paymentId}` : "—" },
-        { label: "Amount", value: money(payment?.amount), tone: "success" },
+        { label: "Amount", value: formatRupee(payment?.amount), tone: "success" },
         { label: "Method", value: payment?.method || "—" },
         { label: "Status", value: statusLabel, tone: payment?.is_reversed ? "danger" : "success" },
       ]}
@@ -257,7 +254,7 @@ export default function CustomerPaymentReceiptPage() {
               ]}
               summaryFields={[
                 { label: "Recorded At", value: formatDateTime(payment.created_at || payment.payment_date), emphasize: true },
-                { label: "Amount", value: money(payment.amount), emphasize: true },
+                { label: "Amount", value: formatRupee(payment.amount), emphasize: true },
                 { label: "Collected By", value: payment.collected_by_username || "—" },
               ]}
               detailFields={[
@@ -266,7 +263,7 @@ export default function CustomerPaymentReceiptPage() {
                 { label: "Subscription", value: subscriptionLabel },
                 { label: "Advance EMI Context", value: emiContext },
                 { label: "Advance EMI Due Date", value: formatDate(payment.emi_due_date) },
-                { label: "Advance EMI Amount", value: money(payment.emi_amount) },
+                { label: "Advance EMI Amount", value: formatRupee(payment.emi_amount) },
                 { label: "Batch", value: payment.batch_code || "—" },
                 {
                   label: "Lucky Number",
@@ -294,7 +291,7 @@ export default function CustomerPaymentReceiptPage() {
                   { label: "Collected by", value: payment.collected_by_username || "—" },
                   { label: "Subscription", value: subscriptionLabel },
                   { label: "Advance EMI context", value: emiContext },
-                  { label: "Advance EMI amount", value: money(payment.emi_amount) },
+                  { label: "Advance EMI amount", value: formatRupee(payment.emi_amount) },
                   {
                     label: "Batch / lucky",
                     value: `${payment.batch_code || "—"} / ${typeof payment.lucky_number === "number" ? `#${payment.lucky_number}` : "—"}`,

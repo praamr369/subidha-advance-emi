@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -13,9 +14,6 @@ import {
   listPartnerReceipts,
 } from "@/services/phase4-finance";
 
-function money(value: unknown): string {
-  return `₹${Number(value ?? 0).toFixed(2)}`;
-}
 
 function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
@@ -86,15 +84,15 @@ export default function PartnerFinancePage() {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-xl border p-4">
               <div className="text-xs text-muted-foreground">Collections Total</div>
-              <div className="text-xl font-semibold">{money(summary.collections_total)}</div>
+              <div className="text-xl font-semibold">{formatRupee(summary.collections_total)}</div>
             </div>
             <div className="rounded-xl border p-4">
               <div className="text-xs text-muted-foreground">Pending Dues</div>
-              <div className="text-xl font-semibold">{money(summary.pending_dues)}</div>
+              <div className="text-xl font-semibold">{formatRupee(summary.pending_dues)}</div>
             </div>
             <div className="rounded-xl border p-4">
               <div className="text-xs text-muted-foreground">Commission Total</div>
-              <div className="text-xl font-semibold">{money(summary.commission_total)}</div>
+              <div className="text-xl font-semibold">{formatRupee(summary.commission_total)}</div>
             </div>
             <div className="rounded-xl border p-4">
               <div className="text-xs text-muted-foreground">Live Rent/Lease Contracts</div>
@@ -140,7 +138,7 @@ export default function PartnerFinancePage() {
                     <td className="px-3 py-2">{String(row.subscription_number ?? "—")}</td>
                     <td className="px-3 py-2">{String(row.payment_date ?? "—")}</td>
                     <td className="px-3 py-2">{String(row.method ?? "—")}</td>
-                    <td className="px-3 py-2">{money(row.amount)}</td>
+                    <td className="px-3 py-2">{formatRupee(row.amount)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -163,7 +161,7 @@ export default function PartnerFinancePage() {
               >
                 <div className="text-sm font-medium">{row.receipt_no || `RCT-${row.id}`}</div>
                 <div className="text-sm text-muted-foreground">
-                  {String(row.receipt_date)} • {money(row.amount)}
+                  {String(row.receipt_date)} • {formatRupee(row.amount)}
                 </div>
               </div>
             ))}

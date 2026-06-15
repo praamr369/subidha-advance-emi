@@ -1,5 +1,6 @@
 // frontend/src/app/(dashboard)/admin/products/create/page.tsx
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import {
@@ -60,9 +61,6 @@ type FieldErrors = Partial<
   >
 >;
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) return "Failed to create product.";
@@ -512,7 +510,7 @@ export default function AdminProductCreatePage() {
   const stats: Array<{ label: string; value: string | number; tone?: "danger" | "success" | "warning" | "default" | "info" }> = [
     {
       label: "Base Price",
-      value: money(basePrice || 0),
+      value: formatRupee(basePrice || 0),
       tone: "success",
     },
     {
@@ -569,7 +567,7 @@ export default function AdminProductCreatePage() {
           metrics={[
             {
               label: "Base Price",
-              value: money(basePrice || 0),
+              value: formatRupee(basePrice || 0),
               detail: "Total contract price for this product.",
             },
             {
@@ -960,7 +958,7 @@ export default function AdminProductCreatePage() {
                 { label: "Product ID", value: `#${created.id}` },
                 { label: "Product Code", value: created.product_code || trimmedProductCode },
                 { label: "Name", value: created.name || trimmedName },
-                { label: "Base Price", value: money(created.base_price || trimmedBasePrice) },
+                { label: "Base Price", value: formatRupee(created.base_price || trimmedBasePrice) },
                 { label: "SKU", value: created.sku || trimmedSku || "—" },
                 { label: "Unit", value: created.unit_of_measure || trimmedUnitOfMeasure },
               ]}

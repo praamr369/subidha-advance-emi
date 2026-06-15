@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PortalPage from "@/components/ui/PortalPage";
@@ -33,10 +34,6 @@ type PartnerCollectionRequestListResponse = {
   results: PartnerCollectionRequestRow[];
 };
 
-function money(value?: string | number | null): string {
-  if (value === undefined || value === null || value === "") return "—";
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -307,7 +304,7 @@ export default function AdminPartnerCollectionRequestsPage() {
               key: "amount",
               title: "Amount",
               align: "right",
-              render: (row) => money(row.amount),
+              render: (row) => formatRupee(row.amount),
             },
             {
               key: "payment_method",

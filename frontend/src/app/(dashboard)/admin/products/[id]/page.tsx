@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -30,9 +31,6 @@ type SubscriptionUsageRow = {
   start_date?: string | null;
 };
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function dateText(value: string | null | undefined): string {
   if (!value) return "—";
@@ -120,7 +118,7 @@ export default function AdminProductDetailPage() {
       subtitle="Product operational cockpit for catalog, inventory profile, capabilities, and downstream usage. Product edits affect future onboarding only."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Products", href: "/admin/products" }, { label: product?.name || `Product #${productId ?? "—"}` }]}
       actions={[{ href: "/admin/products", label: "Back to Register", variant: "secondary" }, { href: productId ? `/admin/products/${productId}/edit` : "/admin/products", label: "Edit full page", variant: "primary" }, { href: "/admin/products/masters", label: "Manage Masters", variant: "secondary" }]}
-      stats={[{ label: "Base Price", value: money(product?.base_price), tone: "success" }, { label: "Linked Subscriptions", value: String(subscriptions.length) }, { label: "Active Usage", value: String(activeSubscriptions), tone: activeSubscriptions ? "success" : undefined }, { label: "Contract Value", value: money(contractValue) }, { label: "Inventory", value: product?.inventory_ready ? "Ready" : "Pending", tone: product?.inventory_ready ? "success" : "warning" }]}
+      stats={[{ label: "Base Price", value: formatRupee(product?.base_price), tone: "success" }, { label: "Linked Subscriptions", value: String(subscriptions.length) }, { label: "Active Usage", value: String(activeSubscriptions), tone: activeSubscriptions ? "success" : undefined }, { label: "Contract Value", value: formatRupee(contractValue) }, { label: "Inventory", value: product?.inventory_ready ? "Ready" : "Pending", tone: product?.inventory_ready ? "success" : "warning" }]}
       statusBadge={{ label: product?.is_active === false ? "Inactive Product" : "Active Product", tone: product?.is_active === false ? "warning" : "success" }}
     >
       <div className="space-y-6">
@@ -141,7 +139,7 @@ export default function AdminProductDetailPage() {
             <section className="grid gap-6 xl:grid-cols-2">
               <ERPSectionShell title="Product readiness" description="Identity, pricing, and capability posture for sales and subscription staff.">
                 <div className="space-y-4">
-                  <ERPDetailGrid columns={2} items={[{ label: "Product ID", value: `#${product.id}` }, { label: "Product Code", value: product.product_code || "—" }, { label: "SKU", value: product.sku || "SKU pending" }, { label: "Unit", value: product.unit_of_measure || "PCS" }, { label: "Base Price", value: money(product.base_price) }, { label: "Category", value: product.category || "—" }, { label: "Subcategory", value: product.subcategory || "—" }, { label: "Inventory Profile", value: product.inventory_profile_id ? `#${product.inventory_profile_id}` : "Not prepared" }]} />
+                  <ERPDetailGrid columns={2} items={[{ label: "Product ID", value: `#${product.id}` }, { label: "Product Code", value: product.product_code || "—" }, { label: "SKU", value: product.sku || "SKU pending" }, { label: "Unit", value: product.unit_of_measure || "PCS" }, { label: "Base Price", value: formatRupee(product.base_price) }, { label: "Category", value: product.category || "—" }, { label: "Subcategory", value: product.subcategory || "—" }, { label: "Inventory Profile", value: product.inventory_profile_id ? `#${product.inventory_profile_id}` : "Not prepared" }]} />
                   <div className="flex flex-wrap gap-2">{boolBadge("Cataloged", state.cataloged)}{boolBadge("Image", state.image)}{boolBadge("SKU", state.sku)}{boolBadge("Inventory Ready", state.inventory)}{boolBadge("Subscription Ready", state.subscription)}{boolBadge("Direct Sale Ready", state.directSale)}{boolBadge("Rent/Lease Ready", state.rentLease)}</div>
                 </div>
               </ERPSectionShell>
@@ -168,7 +166,7 @@ export default function AdminProductDetailPage() {
 
             <ERPSectionShell title="Linked subscription usage" description="Historical and active usage is read-only. Product master edits do not recalculate these saved contract amounts.">
               {subscriptions.length === 0 ? <ERPEmptyState title="No linked subscriptions" description="This product is not yet used in subscriptions." /> : (
-                <DataTableShell><table className="min-w-full divide-y divide-border text-sm"><thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Subscription</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Plan</th><th className="px-4 py-3">Total</th><th className="px-4 py-3">Monthly</th><th className="px-4 py-3">Status</th></tr></thead><tbody className="divide-y divide-border">{subscriptions.map((row) => <tr key={row.id}><td className="px-4 py-3"><Link href={`/admin/subscriptions/${row.id}`} className="font-semibold text-primary underline underline-offset-4">{row.subscription_number}</Link><div className="text-xs text-muted-foreground">{dateText(row.start_date)}</div></td><td className="px-4 py-3">{row.customer_name || "—"}</td><td className="px-4 py-3">{row.plan_type || "—"}</td><td className="px-4 py-3">{money(row.total_amount)}</td><td className="px-4 py-3">{money(row.monthly_amount)}</td><td className="px-4 py-3">{row.status}</td></tr>)}</tbody></table></DataTableShell>
+                <DataTableShell><table className="min-w-full divide-y divide-border text-sm"><thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Subscription</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Plan</th><th className="px-4 py-3">Total</th><th className="px-4 py-3">Monthly</th><th className="px-4 py-3">Status</th></tr></thead><tbody className="divide-y divide-border">{subscriptions.map((row) => <tr key={row.id}><td className="px-4 py-3"><Link href={`/admin/subscriptions/${row.id}`} className="font-semibold text-primary underline underline-offset-4">{row.subscription_number}</Link><div className="text-xs text-muted-foreground">{dateText(row.start_date)}</div></td><td className="px-4 py-3">{row.customer_name || "—"}</td><td className="px-4 py-3">{row.plan_type || "—"}</td><td className="px-4 py-3">{formatRupee(row.total_amount)}</td><td className="px-4 py-3">{formatRupee(row.monthly_amount)}</td><td className="px-4 py-3">{row.status}</td></tr>)}</tbody></table></DataTableShell>
               )}
             </ERPSectionShell>
           </>

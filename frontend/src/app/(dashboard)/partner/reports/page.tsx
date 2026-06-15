@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
@@ -30,15 +31,12 @@ type TrendRow = {
   commission_amount: string;
 };
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function moneyValue(value: string | number | null | undefined): string {
   if (value === null || value === undefined) {
     return "—";
   }
-  return money(value);
+  return formatRupee(value);
 }
 
 function metricValue(value: number | string | null | undefined): string {

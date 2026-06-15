@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -15,9 +16,6 @@ import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getProduct, getProductCatalogOptions, updateProduct, type ProductCatalogOptions, type ProductRecord } from "@/services/products";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function fieldClass() {
   return "mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring";
@@ -220,7 +218,7 @@ export default function AdminProductEditPage() {
 
               <FormCard title="Pricing" description="Product base price is the future contract total. Historical snapshots are preserved.">
                 <label className="text-sm text-muted-foreground">Base price<input className={fieldClass()} type="number" min="0" step="0.01" value={basePrice} onChange={(event) => setBasePrice(event.target.value)} required /></label>
-                <div className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">Current display: {money(basePrice)}</div>
+                <div className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">Current display: {formatRupee(basePrice)}</div>
               </FormCard>
 
               <FormCard title="Category / Master data" description="Catalog fields improve shop search, public display, and future purchase planning.">

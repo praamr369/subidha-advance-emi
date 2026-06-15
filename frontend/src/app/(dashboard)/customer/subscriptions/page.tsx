@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { RefreshCw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -26,9 +27,6 @@ import type { CustomerSubscription } from "@/services/customer";
 
 const PAGE_SIZE = 25;
 
-function money(value?: string | number | null): string {
-  return `₹${Number(value ?? 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -64,7 +62,7 @@ function winnerWaiverLabel(subscription: CustomerSubscription): string {
     Number(waivedAmount ?? 0) > 0 || Number(waivedCount) > 0;
 
   if (winnerRecorded && hasWaiver) {
-    return `Winner month ${subscription.winner_month ?? "—"} · Waived ${money(
+    return `Winner month ${subscription.winner_month ?? "—"} · Waived ${formatRupee(
       waivedAmount
     )}`;
   }
@@ -74,7 +72,7 @@ function winnerWaiverLabel(subscription: CustomerSubscription): string {
   }
 
   if (hasWaiver) {
-    return `Waived ${money(waivedAmount)}${waivedCount > 0 ? ` · ${waivedCount} EMI` : ""}`;
+    return `Waived ${formatRupee(waivedAmount)}${waivedCount > 0 ? ` · ${waivedCount} EMI` : ""}`;
   }
 
   return "No winner or waiver recorded";
@@ -88,12 +86,12 @@ function paymentProgressLabel(subscription: CustomerSubscription): string {
     subscription.financial_summary?.outstanding_amount;
 
   if (emiCount > 0) {
-    return `${paidCount} of ${emiCount} EMI paid · ${money(outstanding)} outstanding`;
+    return `${paidCount} of ${emiCount} EMI paid · ${formatRupee(outstanding)} outstanding`;
   }
 
-  return `${money(
+  return `${formatRupee(
     subscription.total_paid_amount ?? subscription.financial_summary?.paid_amount
-  )} paid · ${money(outstanding)} outstanding`;
+  )} paid · ${formatRupee(outstanding)} outstanding`;
 }
 
 export default function CustomerSubscriptionsPage() {
@@ -262,7 +260,7 @@ export default function CustomerSubscriptionsPage() {
               {paymentProgressLabel(row)}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              Paid {money(row.total_paid_amount ?? row.financial_summary?.paid_amount)} · Next due{" "}
+              Paid {formatRupee(row.total_paid_amount ?? row.financial_summary?.paid_amount)} · Next due{" "}
               {formatDate(row.next_due_date)}
             </div>
           </div>
@@ -272,13 +270,13 @@ export default function CustomerSubscriptionsPage() {
         key: "monthly_amount",
         title: "Monthly",
         align: "right",
-        render: (row) => money(row.monthly_amount),
+        render: (row) => formatRupee(row.monthly_amount),
       },
       {
         key: "total_amount",
         title: "Total",
         align: "right",
-        render: (row) => money(row.total_amount),
+        render: (row) => formatRupee(row.total_amount),
       },
       {
         key: "start_date",
@@ -353,7 +351,7 @@ export default function CustomerSubscriptionsPage() {
               { label: "Matching subscriptions", value: String(count) },
               { label: "Active on page", value: String(pageActiveCount) },
               { label: "Winner benefit on page", value: String(pageWinnerCount) },
-              { label: "Outstanding on page", value: money(pageOutstanding) },
+              { label: "Outstanding on page", value: formatRupee(pageOutstanding) },
               { label: "Next due on page", value: pageNextDueLabel },
             ]}
           />

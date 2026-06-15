@@ -30,6 +30,7 @@ import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   getAdminPaymentRegister,
   type PaymentRegisterRow,
@@ -66,9 +67,6 @@ type EmiRow = {
 // =====================================================
 // HELPER FUNCTIONS
 // =====================================================
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -319,12 +317,12 @@ function DueTodayTable({ rows }: { rows: EmiRow[] }) {
                   </td>
 
                   <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
-                    <div className="font-medium">{money(row.amount)}</div>
+                    <div className="font-medium">{formatRupee(row.amount)}</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Paid {money(row.total_paid)}
+                      Paid {formatRupee(row.total_paid)}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Balance {money(balance)}
+                      Balance {formatRupee(balance)}
                     </div>
                   </td>
 
@@ -527,7 +525,7 @@ function RecentPaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
                 </td>
 
                 <td className="border-b border-border px-4 py-3 text-right text-sm font-semibold text-foreground">
-                  {money(row.amount)}
+                  {formatRupee(row.amount)}
                 </td>
 
                 <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -617,7 +615,7 @@ function OverduePreview({ rows }: { rows: EmiRow[] }) {
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <div className="text-sm font-semibold text-foreground">
-                    {money(balance)}
+                    {formatRupee(balance)}
                   </div>
                   <div className="text-xs text-muted-foreground">Balance</div>
                 </div>
@@ -939,7 +937,7 @@ export default function AdminCollectionsPage() {
             <div className="rounded-lg border border-border px-3 py-2">
               <span className="text-muted-foreground">Net Collection</span>
               <span className="ml-2 font-semibold text-foreground">
-                {money(todayCollectedAmount)}
+                {formatRupee(todayCollectedAmount)}
               </span>
             </div>
           </div>
@@ -966,7 +964,7 @@ export default function AdminCollectionsPage() {
               />
               <KpiCard
                 label="Net Collected Today"
-                value={money(todayCollectedAmount)}
+                value={formatRupee(todayCollectedAmount)}
                 helper={`Collection rate ${collectionRate}%`}
               />
               <KpiCard
@@ -981,7 +979,7 @@ export default function AdminCollectionsPage() {
               />
               <KpiCard
                 label="Direct-Sale Outstanding"
-                value={money(directSaleOutstandingTotal)}
+                value={formatRupee(directSaleOutstandingTotal)}
                 helper="Uncollected direct-sale balance"
               />
             </QuickActionGrid>
@@ -1081,13 +1079,13 @@ export default function AdminCollectionsPage() {
                             Invoice {sale.billing_invoice_no || "—"} · {sale.branch_name || sale.branch_code || "Primary branch"}
                           </div>
                           <div className="mt-1 text-xs text-muted-foreground">
-                            Sale date {formatDate(sale.sale_date)} · Collected {money(sale.received_total)}
+                            Sale date {formatDate(sale.sale_date)} · Collected {formatRupee(sale.received_total)}
                           </div>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3">
                           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-                            Outstanding {money(sale.balance_total)}
+                            Outstanding {formatRupee(sale.balance_total)}
                           </div>
                           <Link
                             href={`/admin/finance/collect?workflow=direct-sale&sale_id=${sale.id}`}
@@ -1126,7 +1124,7 @@ export default function AdminCollectionsPage() {
                     Gross Amount
                   </div>
                   <div className="mt-1 text-lg font-semibold text-foreground">
-                    {money(visibleRecentPaymentsSummary.gross_amount)}
+                    {formatRupee(visibleRecentPaymentsSummary.gross_amount)}
                   </div>
                 </div>
 
@@ -1135,7 +1133,7 @@ export default function AdminCollectionsPage() {
                     Reversed Amount
                   </div>
                   <div className="mt-1 text-lg font-semibold text-amber-800">
-                    {money(visibleRecentPaymentsSummary.reversed_amount)}
+                    {formatRupee(visibleRecentPaymentsSummary.reversed_amount)}
                   </div>
                 </div>
 
@@ -1144,7 +1142,7 @@ export default function AdminCollectionsPage() {
                     Net Collected
                   </div>
                   <div className="mt-1 text-lg font-semibold text-emerald-800">
-                    {money(visibleRecentPaymentsSummary.net_collected_amount)}
+                    {formatRupee(visibleRecentPaymentsSummary.net_collected_amount)}
                   </div>
                 </div>
               </div>

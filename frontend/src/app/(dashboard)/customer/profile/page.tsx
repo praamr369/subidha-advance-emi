@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import {
   ClipboardList,
@@ -51,9 +52,6 @@ import {
 import { initialsFromDisplayName } from "@/lib/display-name";
 import { useLogout } from "@/hooks/useLogout";
 
-function money(value: string | number): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
@@ -293,7 +291,7 @@ export default function CustomerProfilePage() {
       },
       {
         label: "Total paid",
-        value: money(data.summary.total_paid_amount ?? 0),
+        value: formatRupee(data.summary.total_paid_amount ?? 0),
         tone: "success" as const,
       },
     ];
@@ -636,7 +634,7 @@ export default function CustomerProfilePage() {
                 <div className="rounded-xl border border-border p-3 text-sm">
                   <div className="text-xs text-muted-foreground">Outstanding dues</div>
                   <div className="mt-1 font-semibold">
-                    {money(directSaleSummary?.total_outstanding_direct_sale_dues || 0)}
+                    {formatRupee(directSaleSummary?.total_outstanding_direct_sale_dues || 0)}
                   </div>
                 </div>
               </div>
@@ -682,7 +680,7 @@ export default function CustomerProfilePage() {
                         {pay.subscription_plan_type || "EMI"}
                       </div>
                     </div>
-                    <div className="font-semibold tabular-nums">{money(String(pay.amount))}</div>
+                    <div className="font-semibold tabular-nums">{formatRupee(String(pay.amount))}</div>
                   </div>
                 ))}
               </div>
@@ -1055,7 +1053,7 @@ export default function CustomerProfilePage() {
                           <td className="border-b border-border px-4 py-3 text-sm text-foreground">
                             {draw.waived_emi_count ?? 0} EMI
                             <div className="text-xs text-muted-foreground">
-                              {money(draw.waived_amount || 0)}
+                              {formatRupee(draw.waived_amount || 0)}
                             </div>
                           </td>
                         </tr>

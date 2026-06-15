@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { RefreshCw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -21,10 +22,6 @@ import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { listCustomerPayments, type CustomerPayment } from "@/services/customer";
 import { listCustomerReceipts, type FinanceReceiptRow } from "@/services/phase4-finance";
 
-function money(value: string | number | null | undefined): string {
-  const parsed = Number(value);
-  return `₹${(Number.isFinite(parsed) ? parsed : 0).toFixed(2)}`;
-}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
@@ -238,7 +235,7 @@ export default function CustomerPaymentsPage() {
         key: "amount",
         title: "Amount",
         align: "right",
-        render: (row) => money(row.amount),
+        render: (row) => formatRupee(row.amount),
       },
       {
         key: "status",
@@ -295,7 +292,7 @@ export default function CustomerPaymentsPage() {
       ]}
       stats={[
         { label: "Payment records", value: String(count) },
-        { label: "Total paid", value: money(totalPaidAmount), tone: "success" },
+        { label: "Total paid", value: formatRupee(totalPaidAmount), tone: "success" },
         { label: "Subscriptions", value: String(uniqueSubscriptionCount) },
         { label: "Reversed", value: String(reversedCount), tone: reversedCount > 0 ? "warning" : "default" },
         {
@@ -454,7 +451,7 @@ export default function CustomerPaymentsPage() {
                         <td className="px-3 py-2">{receipt.subscription_number || "—"}</td>
                         <td className="px-3 py-2">{formatDate(receipt.receipt_date)}</td>
                         <td className="px-3 py-2">{receipt.payment_method || "—"}</td>
-                        <td className="px-3 py-2 text-right">{money(receipt.amount)}</td>
+                        <td className="px-3 py-2 text-right">{formatRupee(receipt.amount)}</td>
                         <td className="px-3 py-2">
                           <a
                             href={downloadReceiptHref(receipt.id)}
@@ -500,7 +497,7 @@ export default function CustomerPaymentsPage() {
                         <td className="px-3 py-2">{receipt.receipt_no || `RCT-${receipt.id}`}</td>
                         <td className="px-3 py-2">{formatDate(receipt.receipt_date)}</td>
                         <td className="px-3 py-2">{receipt.payment_method || "—"}</td>
-                        <td className="px-3 py-2 text-right">{money(receipt.amount)}</td>
+                        <td className="px-3 py-2 text-right">{formatRupee(receipt.amount)}</td>
                         <td className="px-3 py-2">
                           <a
                             href={downloadReceiptHref(receipt.id)}
@@ -546,7 +543,7 @@ export default function CustomerPaymentsPage() {
                         <td className="px-3 py-2">{receipt.subscription_number || "—"}</td>
                         <td className="px-3 py-2">{formatDate(receipt.receipt_date)}</td>
                         <td className="px-3 py-2">{receipt.payment_method || "—"}</td>
-                        <td className="px-3 py-2 text-right">{money(receipt.amount)}</td>
+                        <td className="px-3 py-2 text-right">{formatRupee(receipt.amount)}</td>
                         <td className="px-3 py-2">
                           <a
                             href={downloadReceiptHref(receipt.id)}

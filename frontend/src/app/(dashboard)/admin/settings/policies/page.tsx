@@ -327,7 +327,7 @@ export default function AdminPoliciesSettingsPage() {
     return counts;
   }, [rows]);
 
-  const coverageRows = coverage?.results ?? [];
+  const coverageRows = useMemo(() => coverage?.results ?? [], [coverage]);
   const actionRequiredCoverage = useMemo(() => coverageRows.filter(coverageNeedsAction), [coverageRows]);
   const reviewDueCoverage = useMemo(() => coverageRows.filter(coverageReviewDueMissing), [coverageRows]);
   const actionRequiredPolicies = useMemo(() => rows.filter(policyNeedsAction), [rows]);

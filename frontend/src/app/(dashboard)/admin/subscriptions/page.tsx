@@ -18,6 +18,7 @@ import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 25;
@@ -64,9 +65,6 @@ type SubscriptionListPayload = {
   has_previous: boolean;
 };
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toMoneyString(value: unknown): string {
   const parsed = Number(value ?? 0);
@@ -545,7 +543,7 @@ export default function AdminSubscriptionsPage() {
               <span className="font-semibold text-foreground">Filtered register</span>
               {": "}
               {count} matching · This page: {pageActiveCount} active, {pageWonCount} won · Page contract total{" "}
-              <span className="tabular-nums text-foreground">{money(pageContractValue)}</span>
+              <span className="tabular-nums text-foreground">{formatRupee(pageContractValue)}</span>
             </div>
           ) : null
         }
@@ -845,10 +843,10 @@ export default function AdminSubscriptionsPage() {
 
                           <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
                             <div className="font-semibold">
-                              {money(row.total_amount)}
+                              {formatRupee(row.total_amount)}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                              EMI {money(row.monthly_amount)}
+                              EMI {formatRupee(row.monthly_amount)}
                             </div>
                           </td>
 

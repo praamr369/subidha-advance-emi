@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -21,9 +22,6 @@ import {
   type PartnerSubscription,
 } from "@/services/partner";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -148,10 +146,10 @@ export default function PartnerCustomerDetailPage() {
         render: (row) => (
           <div className="space-y-1 text-right">
             <div className="font-semibold text-foreground">
-              {money(row.monthly_amount)}
+              {formatRupee(row.monthly_amount)}
             </div>
             <div className="text-xs text-muted-foreground">
-              Total {money(row.total_amount)}
+              Total {formatRupee(row.total_amount)}
             </div>
           </div>
         ),
@@ -166,7 +164,7 @@ export default function PartnerCustomerDetailPage() {
             {row.outstanding_amount ? (
               <StatusBadge
                 status="PENDING"
-                label={`Outstanding ${money(row.outstanding_amount)}`}
+                label={`Outstanding ${formatRupee(row.outstanding_amount)}`}
               />
             ) : null}
           </div>
@@ -235,7 +233,7 @@ export default function PartnerCustomerDetailPage() {
         align: "right",
         sortable: true,
         sortAccessor: (row) => Number(row.amount || 0),
-        render: (row) => money(row.amount),
+        render: (row) => formatRupee(row.amount),
       },
     ],
     []
@@ -286,7 +284,7 @@ export default function PartnerCustomerDetailPage() {
         { label: "Subscriptions", value: summary?.total_subscriptions ?? "—" },
         { label: "Active", value: summary?.active_subscriptions ?? "—", tone: "success" },
         { label: "Pending EMIs", value: summary?.pending_emis ?? "—", tone: "warning" },
-        { label: "Collected", value: money(summary?.total_collected), tone: "success" },
+        { label: "Collected", value: formatRupee(summary?.total_collected), tone: "success" },
       ]}
       statusBadge={{ label: "Partner Scope", tone: "info" }}
     >

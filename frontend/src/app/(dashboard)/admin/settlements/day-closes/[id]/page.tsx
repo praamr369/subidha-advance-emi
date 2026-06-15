@@ -14,6 +14,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { buildAdminCashierDayClosePrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   approveAdminCashierDayClose,
   getAdminCashierDayClose,
@@ -21,9 +22,6 @@ import {
 } from "@/services/settlements";
 import type { CashierDayClose } from "@/types/settlements";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatError(err: unknown, fallback: string): string {
   if (err instanceof ApiError) return err.readableMessage || fallback;
@@ -196,15 +194,15 @@ export default function AdminDayCloseDetailPage() {
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">System cash total</div>
-            <div className="mt-2 text-sm font-semibold text-foreground">{money(record.system_cash_total)}</div>
+            <div className="mt-2 text-sm font-semibold text-foreground">{formatRupee(record.system_cash_total)}</div>
           </div>
           <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Counted cash</div>
-            <div className="mt-2 text-sm font-semibold text-foreground">{money(record.counted_cash)}</div>
+            <div className="mt-2 text-sm font-semibold text-foreground">{formatRupee(record.counted_cash)}</div>
           </div>
           <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Variance</div>
-            <div className="mt-2 text-sm font-semibold text-foreground">{money(record.variance)}</div>
+            <div className="mt-2 text-sm font-semibold text-foreground">{formatRupee(record.variance)}</div>
           </div>
         </div>
 

@@ -11,6 +11,7 @@ import PortalPage from "@/components/ui/PortalPage";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   listOutstandings,
   outstandingsExportUrl,
@@ -21,9 +22,6 @@ import {
   type OutstandingState,
 } from "@/services/outstandings";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -121,12 +119,12 @@ export default function AdminOutstandingsPage() {
       {
         key: "outstanding_amount",
         title: "Outstanding",
-        render: (row) => money(row.outstanding_amount),
+        render: (row) => formatRupee(row.outstanding_amount),
       },
       {
         key: "paid_amount",
         title: "Paid",
-        render: (row) => money(row.paid_amount),
+        render: (row) => formatRupee(row.paid_amount),
       },
       {
         key: "age",
@@ -180,12 +178,12 @@ export default function AdminOutstandingsPage() {
     >
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Total Outstanding" value={money(summary?.total_outstanding_amount)} />
-          <StatCard label="Overdue" value={money(summary?.overdue_amount)} tone="warning" />
-          <StatCard label="Due Today" value={money(summary?.due_today_amount)} />
-          <StatCard label="Advance EMI" value={money(summary?.advance_emi_outstanding)} />
-          <StatCard label="Rent / Lease" value={money((Number(summary?.rent_outstanding || 0) + Number(summary?.lease_outstanding || 0)).toFixed(2))} />
-          <StatCard label="Direct Sale" value={money(summary?.direct_sale_outstanding)} />
+          <StatCard label="Total Outstanding" value={formatRupee(summary?.total_outstanding_amount)} />
+          <StatCard label="Overdue" value={formatRupee(summary?.overdue_amount)} tone="warning" />
+          <StatCard label="Due Today" value={formatRupee(summary?.due_today_amount)} />
+          <StatCard label="Advance EMI" value={formatRupee(summary?.advance_emi_outstanding)} />
+          <StatCard label="Rent / Lease" value={formatRupee((Number(summary?.rent_outstanding || 0) + Number(summary?.lease_outstanding || 0)).toFixed(2))} />
+          <StatCard label="Direct Sale" value={formatRupee(summary?.direct_sale_outstanding)} />
           <StatCard label="30+ Days Risk" value={String(summary?.serious_30_plus_count || 0)} tone="danger" />
         </div>
 

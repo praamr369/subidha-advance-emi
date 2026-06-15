@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { apiFetch, toArray } from "@/lib/api";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   getVendorOperationalSummary,
   listChartOfAccounts,
@@ -56,10 +57,6 @@ type PayoutBatchRow = {
   created_at?: string;
   finalized_at?: string | null;
 };
-
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toMoneyString(value: unknown): string {
   const parsed = Number(value ?? 0);
@@ -459,22 +456,22 @@ export default function AdminFinancePage() {
       stats={[
         {
           label: "Window Net",
-          value: money(windowNet),
+          value: formatRupee(windowNet),
           tone: "success",
         },
         {
           label: "Customer Receivables",
-          value: money(outstandingReceivables),
+          value: formatRupee(outstandingReceivables),
           tone: outstandingReceivables > 0 ? "warning" : "success",
         },
         {
           label: "Direct-Sale Unpaid",
-          value: money(directSalesOutstandingTotal),
+          value: formatRupee(directSalesOutstandingTotal),
           tone: directSalesOutstandingTotal > 0 ? "warning" : "success",
         },
         {
           label: "Supplier Payables",
-          value: money(supplierPayableTotal),
+          value: formatRupee(supplierPayableTotal),
           tone: supplierPayableTotal > 0 ? "warning" : "success",
         },
         {
@@ -636,29 +633,29 @@ export default function AdminFinancePage() {
             <QuickActionGrid className="xl:grid-cols-5">
               <MetricCard
                 label="Customer Receivables"
-                value={money(outstandingReceivables)}
-                note={`${money(overdueAmount)} overdue EMI`}
+                value={formatRupee(outstandingReceivables)}
+                note={`${formatRupee(overdueAmount)} overdue EMI`}
                 href={ROUTES.admin.collections}
                 tone={overdueAmount > 0 ? "warning" : "default"}
               />
               <MetricCard
                 label="Direct Sale Unpaid"
-                value={money(directSalesOutstandingTotal)}
+                value={formatRupee(directSalesOutstandingTotal)}
                 note={`${directSales.length} receivable bills`}
                 href={`${ROUTES.admin.financeCollect}?workflow=direct-sale`}
                 tone={directSalesOutstandingTotal > 0 ? "warning" : "default"}
               />
               <MetricCard
                 label="Supplier Payables"
-                value={money(supplierPayableTotal)}
+                value={formatRupee(supplierPayableTotal)}
                 note={`${vendorSummaries.length} supplier summaries`}
                 href={ROUTES.admin.accountingVendors}
                 tone={supplierPayableTotal > 0 ? "warning" : "default"}
               />
               <MetricCard
                 label="Payment Account Mix"
-                value={money(windowNet)}
-                note={`${money(cashNet)} cash · ${money(bankNet)} bank · ${money(upiNet)} UPI`}
+                value={formatRupee(windowNet)}
+                note={`${formatRupee(cashNet)} cash · ${formatRupee(bankNet)} bank · ${formatRupee(upiNet)} UPI`}
                 href={ROUTES.admin.payments}
                 tone="success"
               />
@@ -679,14 +676,14 @@ export default function AdminFinancePage() {
                 <QuickActionGrid className="md:grid-cols-3">
                   <MetricCard
                     label="Pending Settlement"
-                    value={money(pendingSettlementAmount)}
+                    value={formatRupee(pendingSettlementAmount)}
                     note={`${pendingSettlementAccounts} finance accounts still carrying unsettled value`}
                     href={buildAdminReconciliationRoute({ flagged: true })}
                     tone={pendingSettlementAmount > 0 ? "warning" : "success"}
                   />
                   <MetricCard
                     label="Unapplied Advances"
-                    value={money(unappliedAdvanceTotal)}
+                    value={formatRupee(unappliedAdvanceTotal)}
                     note="Customer money collected but not yet allocated to a receivable rail"
                     tone={unappliedAdvanceTotal > 0 ? "warning" : "success"}
                   />
@@ -717,7 +714,7 @@ export default function AdminFinancePage() {
                               {row.finance_account_name} · {row.kind}
                             </div>
                             <div className="mt-1 text-xs text-slate-600">
-                              Chart {row.chart_account_code} · Branch {row.branch_name || "Shared"} · Payments {money(row.payment_total)} · Advances {money(row.advance_total)}
+                              Chart {row.chart_account_code} · Branch {row.branch_name || "Shared"} · Payments {formatRupee(row.payment_total)} · Advances {formatRupee(row.advance_total)}
                             </div>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -726,10 +723,10 @@ export default function AdminFinancePage() {
                               label={row.reconciliation_status || "—"}
                             />
                             <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                              Pending {money(row.pending_settlement_amount)}
+                              Pending {formatRupee(row.pending_settlement_amount)}
                             </span>
                             <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                              Unapplied {money(row.unapplied_advance_total)}
+                              Unapplied {formatRupee(row.unapplied_advance_total)}
                             </span>
                           </div>
                         </div>
@@ -894,7 +891,7 @@ export default function AdminFinancePage() {
                         </div>
                         <div className="text-right">
                           <div className="text-sm font-semibold text-slate-900">
-                            {money(transfer.amount)}
+                            {formatRupee(transfer.amount)}
                           </div>
                           <div className="mt-1 text-xs text-slate-600">{transfer.status}</div>
                         </div>
@@ -913,15 +910,15 @@ export default function AdminFinancePage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                     <span className="font-medium text-slate-700">Subscription overdue</span>
-                    <span className="font-semibold text-slate-900">{money(overdueAmount)}</span>
+                    <span className="font-semibold text-slate-900">{formatRupee(overdueAmount)}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                     <span className="font-medium text-slate-700">Direct-sale unpaid</span>
-                    <span className="font-semibold text-slate-900">{money(directSalesOutstandingTotal)}</span>
+                    <span className="font-semibold text-slate-900">{formatRupee(directSalesOutstandingTotal)}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                     <span className="font-medium text-slate-700">Recent net collection</span>
-                    <span className="font-semibold text-emerald-700">{money(windowNet)}</span>
+                    <span className="font-semibold text-emerald-700">{formatRupee(windowNet)}</span>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Link
@@ -983,19 +980,19 @@ export default function AdminFinancePage() {
                     label="Cash"
                     value={cashNet}
                     total={Math.max(windowNet, 1)}
-                    amount={money(cashNet)}
+                    amount={formatRupee(cashNet)}
                   />
                   <MiniBar
                     label="Bank"
                     value={bankNet}
                     total={Math.max(windowNet, 1)}
-                    amount={money(bankNet)}
+                    amount={formatRupee(bankNet)}
                   />
                   <MiniBar
                     label="UPI"
                     value={upiNet}
                     total={Math.max(windowNet, 1)}
-                    amount={money(upiNet)}
+                    amount={formatRupee(upiNet)}
                   />
                 </div>
               </SectionCard>
@@ -1024,7 +1021,7 @@ export default function AdminFinancePage() {
                               {sale.sale_no || `SALE-${sale.id}`} · {sale.customer_name || sale.customer_name_snapshot || "Walk-in customer"}
                             </div>
                             <div className="mt-1 text-sm text-slate-600">
-                              Invoice {sale.billing_invoice_no || "—"} · {formatDate(sale.sale_date)} · Collected {money(sale.received_total)}
+                              Invoice {sale.billing_invoice_no || "—"} · {formatDate(sale.sale_date)} · Collected {formatRupee(sale.received_total)}
                             </div>
                             <div className="mt-1 text-xs text-slate-600">
                               Finance account {sale.finance_account_name || "Not tagged"} · Branch {sale.branch_name || sale.branch_code || "Primary branch"}
@@ -1032,7 +1029,7 @@ export default function AdminFinancePage() {
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-                              Outstanding {money(sale.balance_total)}
+                              Outstanding {formatRupee(sale.balance_total)}
                             </div>
                             <Link
                               href={`${ROUTES.admin.financeCollect}?workflow=direct-sale&sale_id=${sale.id}`}
@@ -1073,7 +1070,7 @@ export default function AdminFinancePage() {
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                           <div>
                             <div className="text-sm font-semibold text-slate-900">
-                              {row.customer_name || "Unassigned customer"} · {money(row.amount)}
+                              {row.customer_name || "Unassigned customer"} · {formatRupee(row.amount)}
                             </div>
                             <div className="mt-1 text-sm text-slate-600">
                               {row.method || "Unknown method"} · {formatDate(row.payment_date)} · Collected by {row.collected_by_username || "System"}
@@ -1125,7 +1122,7 @@ export default function AdminFinancePage() {
                         label={row.label}
                         value={toNumber(row.amount)}
                         total={Math.max(receivableAgingMax, 1)}
-                        amount={`${money(row.amount)} · ${row.count}`}
+                        amount={`${formatRupee(row.amount)} · ${row.count}`}
                       />
                     ))}
                   </div>
@@ -1157,7 +1154,7 @@ export default function AdminFinancePage() {
                           </div>
                           <div className="text-right">
                             <div className="text-sm font-semibold text-amber-900">
-                              {money(vendor.summary.outstanding_payable_total)}
+                              {formatRupee(vendor.summary.outstanding_payable_total)}
                             </div>
                             <Link
                               href={`${ROUTES.admin.accountingVendors}?vendor=${vendor.vendor.id}`}
@@ -1185,7 +1182,7 @@ export default function AdminFinancePage() {
                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Pending commission exposure</div>
                     <div className="mt-1 text-lg font-semibold text-slate-900">
-                      {money(summary?.summary?.pending_commission)}
+                      {formatRupee(summary?.summary?.pending_commission)}
                     </div>
                   </div>
                   {recentBatches.length === 0 ? (
@@ -1208,7 +1205,7 @@ export default function AdminFinancePage() {
                               </div>
                             </div>
                             <div className="text-right text-xs text-slate-600">
-                              <div className="font-semibold text-slate-900">{money(row.total_amount)}</div>
+                              <div className="font-semibold text-slate-900">{formatRupee(row.total_amount)}</div>
                               <div>{formatDateTime(row.created_at)}</div>
                             </div>
                           </div>
@@ -1242,7 +1239,7 @@ export default function AdminFinancePage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Direct Sale</div>
-                    <div className="mt-2 text-xl font-semibold text-slate-900">{money(directSalesGross)}</div>
+                    <div className="mt-2 text-xl font-semibold text-slate-900">{formatRupee(directSalesGross)}</div>
                     <div className="mt-1 text-sm text-slate-600">{directSalesCount} direct-sale documents in selected window</div>
                     <Link
                       href={ROUTES.admin.billingDirectSales}
@@ -1253,8 +1250,8 @@ export default function AdminFinancePage() {
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Subscription Sale</div>
-                    <div className="mt-2 text-xl font-semibold text-slate-900">{money(outstandingReceivables)}</div>
-                    <div className="mt-1 text-sm text-slate-600">{money(overdueAmount)} overdue from EMI side</div>
+                    <div className="mt-2 text-xl font-semibold text-slate-900">{formatRupee(outstandingReceivables)}</div>
+                    <div className="mt-1 text-sm text-slate-600">{formatRupee(overdueAmount)} overdue from EMI side</div>
                     <Link
                       href={ROUTES.admin.subscriptions}
                       className="mt-3 inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"

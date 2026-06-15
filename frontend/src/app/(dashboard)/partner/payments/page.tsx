@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -20,9 +21,6 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import { getPartnerDashboard, listPartnerPayments, type PartnerPayment } from "@/services/partner";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
@@ -203,7 +201,7 @@ export default function PartnerPaymentsPage() {
         align: "right",
         sortable: true,
         sortAccessor: (row) => Number(row.amount || 0),
-        render: (row) => money(row.amount),
+        render: (row) => formatRupee(row.amount),
       },
     ],
     []
@@ -267,7 +265,7 @@ export default function PartnerPaymentsPage() {
       ]}
       stats={[
         { label: "Visible rows", value: String(count) },
-        { label: "Total collected", value: money(totalCollected), tone: "success" },
+        { label: "Total collected", value: formatRupee(totalCollected), tone: "success" },
         { label: "Customers", value: String(uniqueCustomers) },
         { label: "Latest payment", value: latestPayment ? formatDateTime(latestPayment.created_at || latestPayment.payment_date) : "—" },
       ]}

@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useParams } from "next/navigation";
 import {
@@ -107,9 +108,6 @@ function toMoneyString(value: unknown): string {
   return Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00";
 }
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -643,11 +641,11 @@ export default function AdminLuckyIdDetailPage() {
                     />
                     <DetailValue
                       label="Total Amount"
-                      value={money(subscriptionPreview.total_amount)}
+                      value={formatRupee(subscriptionPreview.total_amount)}
                     />
                     <DetailValue
                       label="Monthly Amount"
-                      value={money(subscriptionPreview.monthly_amount)}
+                      value={formatRupee(subscriptionPreview.monthly_amount)}
                     />
                     <DetailValue
                       label="Start Date"

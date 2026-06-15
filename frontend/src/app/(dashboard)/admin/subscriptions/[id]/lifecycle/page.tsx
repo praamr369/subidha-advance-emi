@@ -33,7 +33,7 @@ import {
 } from "@/services/contracts";
 
 function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value ?? 0));
 }
 
 function formatDate(value?: string | null): string {

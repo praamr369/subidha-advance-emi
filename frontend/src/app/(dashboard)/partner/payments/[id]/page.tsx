@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -20,9 +21,6 @@ import ActionButton from "@/components/ui/ActionButton";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { getPartnerPaymentDetail, type PartnerPayment } from "@/services/partner";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
@@ -162,7 +160,7 @@ export default function PartnerPaymentDetailPage() {
       ]}
       stats={[
         { label: "Payment ID", value: payment ? `#${payment.id}` : Number.isFinite(paymentId) && paymentId > 0 ? `#${paymentId}` : "—" },
-        { label: "Amount", value: money(payment?.amount), tone: "success" },
+        { label: "Amount", value: formatRupee(payment?.amount), tone: "success" },
         { label: "Method", value: payment?.method || "—" },
         { label: "Status", value: statusLabel, tone: statusLabel === "REVERSED" ? "danger" : "success" },
       ]}
@@ -256,7 +254,7 @@ export default function PartnerPaymentDetailPage() {
               ]}
               summaryFields={[
                 { label: "Recorded At", value: formatDateTime(payment.created_at || payment.payment_date), emphasize: true },
-                { label: "Amount", value: money(payment.amount), emphasize: true },
+                { label: "Amount", value: formatRupee(payment.amount), emphasize: true },
                 { label: "Collected By", value: payment.collected_by_username || "—" },
               ]}
               detailFields={[
@@ -267,7 +265,7 @@ export default function PartnerPaymentDetailPage() {
                 { label: "Advance EMI Due Date", value: formatDate(payment.emi_due_date) },
                 {
                   label: "Advance EMI Amount",
-                  value: payment.emi_amount === null || payment.emi_amount === undefined ? "—" : money(payment.emi_amount),
+                  value: payment.emi_amount === null || payment.emi_amount === undefined ? "—" : formatRupee(payment.emi_amount),
                 },
                 { label: "Batch", value: payment.batch_code || "—" },
                 { label: "Lucky Number", value: typeof payment.lucky_number === "number" ? `#${payment.lucky_number}` : "—" },
@@ -290,7 +288,7 @@ export default function PartnerPaymentDetailPage() {
                   { label: "Payment date", value: formatDate(payment.payment_date) },
                   { label: "Method", value: payment.method || "—" },
                   { label: "Status", value: <ERPStatusBadge status={statusLabel} label={statusLabel} /> },
-                  { label: "Amount", value: money(payment.amount) },
+                  { label: "Amount", value: formatRupee(payment.amount) },
                   { label: "Verified by", value: payment.verified_by_username || "—" },
                 ]}
               />
@@ -346,7 +344,7 @@ export default function PartnerPaymentDetailPage() {
                   { label: "Due date", value: formatDate(payment.emi_due_date ?? null) },
                   {
                     label: "Advance EMI amount",
-                    value: payment.emi_amount === null || payment.emi_amount === undefined ? "—" : money(payment.emi_amount),
+                    value: payment.emi_amount === null || payment.emi_amount === undefined ? "—" : formatRupee(payment.emi_amount),
                   },
                   { label: "Advance EMI status", value: payment.emi_status ? <ERPStatusBadge status={payment.emi_status} /> : "—" },
                 ]}

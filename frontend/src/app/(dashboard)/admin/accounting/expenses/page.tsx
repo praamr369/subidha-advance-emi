@@ -8,6 +8,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   approveExpenseVoucher,
   createExpenseVoucher,
@@ -22,10 +23,6 @@ import {
   type FinanceAccount,
   type Vendor,
 } from "@/services/accounting";
-
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -541,7 +538,7 @@ export default function AccountingExpensesPage() {
                         </div>
                         <div className="text-right">
                           <div className="text-sm font-semibold text-foreground">
-                            {money(expense.net_amount)}
+                            {formatRupee(expense.net_amount)}
                           </div>
                           <div className="mt-1 text-xs text-muted-foreground">
                             {expense.status} • {formatDate(expense.expense_date)}

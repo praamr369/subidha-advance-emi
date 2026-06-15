@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -122,9 +123,6 @@ function normalizeBoolean(value: unknown): boolean {
   return false;
 }
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -822,7 +820,7 @@ export default function AdminLuckyDrawDetailPage() {
                     />
                     <DetailValue
                       label="Waived Amount"
-                      value={draw.waived_amount ? money(draw.waived_amount) : "—"}
+                      value={draw.waived_amount ? formatRupee(draw.waived_amount) : "—"}
                     />
                   </div>
                 ) : (
@@ -862,8 +860,8 @@ export default function AdminLuckyDrawDetailPage() {
                       </span>
                     }
                   />
-                  <DetailValue label="Total Amount" value={money(subscriptionPreview.total_amount)} />
-                  <DetailValue label="Monthly Amount" value={money(subscriptionPreview.monthly_amount)} />
+                  <DetailValue label="Total Amount" value={formatRupee(subscriptionPreview.total_amount)} />
+                  <DetailValue label="Monthly Amount" value={formatRupee(subscriptionPreview.monthly_amount)} />
                   <DetailValue label="Start Date" value={formatDate(subscriptionPreview.start_date)} />
                 </div>
               ) : (

@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { RefreshCw, Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -26,9 +27,6 @@ import {
   type CashierTransaction,
 } from "@/services/cashier";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
@@ -187,7 +185,7 @@ export default function CashierPaymentsPage() {
         key: "amount",
         title: "Amount",
         align: "right",
-        render: (row) => money(row.amount),
+        render: (row) => formatRupee(row.amount),
       },
       {
         key: "status",
@@ -233,7 +231,7 @@ export default function CashierPaymentsPage() {
         },
         {
           label: "Visible amount",
-          value: money(visibleAmount),
+          value: formatRupee(visibleAmount),
           tone: "success",
         },
         {

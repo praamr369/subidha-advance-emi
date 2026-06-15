@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -33,9 +34,6 @@ import {
   type UnifiedReceivableResult,
 } from "@/services/receivables";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -968,7 +966,7 @@ export default function CashierCollectPage() {
                             Advance EMI Amount
                           </div>
                           <div className="mt-1 text-sm font-semibold text-foreground">
-                            {money(result.amount)}
+                            {formatRupee(result.amount)}
                           </div>
                         </div>
                         <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
@@ -976,7 +974,7 @@ export default function CashierCollectPage() {
                             Balance
                           </div>
                           <div className="mt-1 text-sm font-semibold text-foreground">
-                            {money(result.balance_amount)}
+                            {formatRupee(result.balance_amount)}
                           </div>
                         </div>
                       </div>
@@ -1030,7 +1028,7 @@ export default function CashierCollectPage() {
                     Pending amount
                   </div>
                   <div className="mt-1 text-base font-semibold text-foreground">
-                    {money(lookup?.total_pending_amount)}
+                    {formatRupee(lookup?.total_pending_amount)}
                   </div>
                 </div>
                 <div>
@@ -1038,7 +1036,7 @@ export default function CashierCollectPage() {
                     Overdue load
                   </div>
                   <div className="mt-1 text-base font-semibold text-foreground">
-                    {lookup?.overdue_emi_count ?? 0} EMI · {money(lookup?.overdue_amount)}
+                    {lookup?.overdue_emi_count ?? 0} EMI · {formatRupee(lookup?.overdue_amount)}
                   </div>
                 </div>
               </div>
@@ -1056,7 +1054,7 @@ export default function CashierCollectPage() {
                   <span className="text-sm text-slate-600">
                     Next due EMI:{" "}
                     {lookup?.next_due_date
-                      ? `${formatDate(lookup.next_due_date)} · ${money(lookup?.next_due_amount)}`
+                      ? `${formatDate(lookup.next_due_date)} · ${formatRupee(lookup?.next_due_amount)}`
                       : "No pending EMI available"}
                   </span>
                 </div>
@@ -1139,7 +1137,7 @@ export default function CashierCollectPage() {
                                 Advance EMI Amount
                               </div>
                               <div className="mt-1 text-sm font-semibold text-foreground">
-                                {money(emi.amount)}
+                                {formatRupee(emi.amount)}
                               </div>
                             </div>
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
@@ -1147,7 +1145,7 @@ export default function CashierCollectPage() {
                                 Paid
                               </div>
                               <div className="mt-1 text-sm font-semibold text-foreground">
-                                {money(emi.total_paid)}
+                                {formatRupee(emi.total_paid)}
                               </div>
                             </div>
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
@@ -1155,7 +1153,7 @@ export default function CashierCollectPage() {
                                 Balance
                               </div>
                               <div className="mt-1 text-sm font-semibold text-foreground">
-                                {money(emi.balance_amount || emi.amount)}
+                                {formatRupee(emi.balance_amount || emi.amount)}
                               </div>
                             </div>
                           </div>
@@ -1192,7 +1190,7 @@ export default function CashierCollectPage() {
                         "Duplicate reference detected. Existing payment returned instead of posting a second collection."}
                   </div>
                   <div className="mt-1">
-                    Payment #{success.payment.id} · Amount {money(success.payment.amount)} ·
+                    Payment #{success.payment.id} · Amount {formatRupee(success.payment.amount)} ·
                     EMI #{success.emi.id} · Posted{" "}
                     {formatDateTime(success.payment.created_at || success.payment.payment_date)}
                   </div>
@@ -1272,7 +1270,7 @@ export default function CashierCollectPage() {
                           Balance
                         </div>
                         <div className="mt-1 text-sm font-semibold text-foreground">
-                          {money(selectedEmi.balance_amount || selectedEmi.amount)}
+                          {formatRupee(selectedEmi.balance_amount || selectedEmi.amount)}
                         </div>
                       </div>
                     </div>
@@ -1460,7 +1458,7 @@ export default function CashierCollectPage() {
                     {advanceSuccess.message || "Customer advance collected successfully."}
                   </div>
                   <div className="mt-1">
-                    Advance #{advanceSuccess.data.customer_advance_id} · Unapplied balance {money(advanceSuccess.data.unapplied_amount)}.
+                    Advance #{advanceSuccess.data.customer_advance_id} · Unapplied balance {formatRupee(advanceSuccess.data.unapplied_amount)}.
                   </div>
                 </div>
               ) : null}

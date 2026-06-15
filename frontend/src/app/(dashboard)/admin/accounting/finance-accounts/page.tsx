@@ -5,10 +5,12 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { RefreshCw, Wand2 } from "lucide-react";
 
 import FinanceAccountEditDrawer from "@/components/accounting/FinanceAccountEditDrawer";
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import { formatRupee } from "@/lib/utils/currency";
 import { ROUTES } from "@/lib/routes";
 import {
   applyAccountingSetupDefaults,
@@ -24,11 +26,6 @@ import {
 
 type KindFilter = "ALL" | "CASH" | "BANK" | "UPI";
 type StatusFilter = "ALL" | "READY" | "BLOCKED" | "ACTIVE" | "INACTIVE";
-
-function money(value: unknown): string {
-  const parsed = Number(value ?? 0);
-  return `₹${Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00"}`;
-}
 
 function text(value: unknown): string {
   return value === null || value === undefined || value === "" ? "—" : String(value);
@@ -196,8 +193,8 @@ export default function AdminAccountingFinanceAccountsPage() {
           {assetChartAccounts.length === 0 ? <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">No active ASSET chart account is available. Create or activate one in Chart of Accounts first.</div> : null}
           <form className="mt-3 grid gap-3 md:grid-cols-3" onSubmit={handleCreate}>
             <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Display name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required />
-            <select className="rounded-xl border px-3 py-2 text-sm" value={form.kind} onChange={(event) => setForm((current) => ({ ...current, kind: event.target.value }))}><option value="CASH">Cash</option><option value="BANK">Bank</option><option value="UPI">UPI</option></select>
-            <select className="rounded-xl border px-3 py-2 text-sm" value={form.chart_account} onChange={(event) => setForm((current) => ({ ...current, chart_account: event.target.value }))} required disabled={assetChartAccounts.length === 0}><option value="">Select active ASSET COA</option>{assetChartAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select>
+            <select title="Account kind" className="rounded-xl border px-3 py-2 text-sm" value={form.kind} onChange={(event) => setForm((current) => ({ ...current, kind: event.target.value }))}><option value="CASH">Cash</option><option value="BANK">Bank</option><option value="UPI">UPI</option></select>
+            <select title="Chart of account" className="rounded-xl border px-3 py-2 text-sm" value={form.chart_account} onChange={(event) => setForm((current) => ({ ...current, chart_account: event.target.value }))} required disabled={assetChartAccounts.length === 0}><option value="">Select active ASSET COA</option>{assetChartAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select>
             <input className="rounded-xl border px-3 py-2 text-sm" type="number" min="0" step="0.01" placeholder="Opening balance" value={form.opening_balance} onChange={(event) => setForm((current) => ({ ...current, opening_balance: event.target.value }))} />
             <input className="rounded-xl border px-3 py-2 text-sm" maxLength={4} placeholder="Bank last 4" value={form.bank_last4} onChange={(event) => setForm((current) => ({ ...current, bank_last4: event.target.value }))} />
             <input className="rounded-xl border px-3 py-2 text-sm" placeholder="UPI handle" value={form.upi_handle} onChange={(event) => setForm((current) => ({ ...current, upi_handle: event.target.value }))} />
@@ -208,10 +205,20 @@ export default function AdminAccountingFinanceAccountsPage() {
 
         <ERPSectionShell title="Finance account register" description="Operator-friendly view of settlement accounts and collection readiness. Use Edit to repair labels, handles, notes, or allowed account mapping changes.">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap gap-2"><select className="rounded-xl border px-3 py-2 text-sm" value={kindFilter} onChange={(event) => setKindFilter(event.target.value as KindFilter)}><option value="ALL">All kinds</option><option value="CASH">Cash</option><option value="BANK">Bank</option><option value="UPI">UPI</option></select><select className="rounded-xl border px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}><option value="ALL">All statuses</option><option value="READY">Collection ready</option><option value="BLOCKED">Blocked</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></div>
+            <div className="flex flex-wrap gap-2">
+              <select title="Filter by kind" className="rounded-xl border px-3 py-2 text-sm" value={kindFilter} onChange={(event) => setKindFilter(event.target.value as KindFilter)}><option value="ALL">All kinds</option><option value="CASH">Cash</option><option value="BANK">Bank</option><option value="UPI">UPI</option></select>
+              <select title="Filter by status" className="rounded-xl border px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}><option value="ALL">All statuses</option><option value="READY">Collection ready</option><option value="BLOCKED">Blocked</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select>
+            </div>
             <button type="button" onClick={() => void load("refresh")} disabled={refreshing} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Refresh</button>
           </div>
-          <div className="overflow-x-auto rounded-2xl border"><table className="min-w-full text-sm"><thead className="bg-muted/40 text-left"><tr><th className="px-3 py-2">Finance account</th><th className="px-3 py-2">Kind</th><th className="px-3 py-2">Linked COA</th><th className="px-3 py-2">Readiness</th><th className="px-3 py-2 text-right">Opening</th><th className="px-3 py-2">Action</th></tr></thead><tbody>{filteredRows.map((row) => { const ready = row.collection_ready !== false; return <tr key={row.id} className="border-t"><td className="px-3 py-2"><div className="font-semibold">{row.name}</div><div className="text-xs text-muted-foreground">{row.branch_code || row.branch_name || "Primary"}</div></td><td className="px-3 py-2"><span className={pill("info")}>{row.kind}</span></td><td className="px-3 py-2"><div className="font-medium">{row.chart_account_code || row.mapped_chart_account_code || text(row.chart_account)}</div><div className="text-xs text-muted-foreground">{row.chart_account_name || row.mapped_chart_account_name || "Mapped chart account"}</div></td><td className="px-3 py-2"><span className={ready ? pill("success") : pill("warning")}>{ready ? "Ready" : "Blocked"}</span>{!ready ? <div className="mt-1 max-w-xs text-xs text-amber-800">{row.collection_blocker_reason || row.recommended_action || "Map to an active ASSET posting account."}</div> : null}</td><td className="px-3 py-2 text-right">{money(row.opening_balance)}</td><td className="px-3 py-2"><button type="button" className="rounded-xl border px-3 py-2 text-xs font-semibold" onClick={() => setSelectedFinanceAccountId(row.id)}>Edit</button></td></tr>; })}</tbody></table></div>
+          {filteredRows.length === 0 && !loading ? (
+            <ERPEmptyState
+              title="No finance accounts match the current filter"
+              description={financeAccounts.length === 0 ? "No finance accounts have been created yet. Use the form above to create the first settlement account." : "Adjust the kind or status filter to see accounts."}
+            />
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border"><table className="min-w-full text-sm"><thead className="bg-muted/40 text-left"><tr><th className="px-3 py-2">Finance account</th><th className="px-3 py-2">Kind</th><th className="px-3 py-2">Linked COA</th><th className="px-3 py-2">Readiness</th><th className="px-3 py-2 text-right">Opening</th><th className="px-3 py-2">Action</th></tr></thead><tbody>{filteredRows.map((row) => { const ready = row.collection_ready !== false; return <tr key={row.id} className="border-t"><td className="px-3 py-2"><div className="font-semibold">{row.name}</div><div className="text-xs text-muted-foreground">{row.branch_code || row.branch_name || "Primary"}</div></td><td className="px-3 py-2"><span className={pill("info")}>{row.kind}</span></td><td className="px-3 py-2"><div className="font-medium">{row.chart_account_code || row.mapped_chart_account_code || text(row.chart_account)}</div><div className="text-xs text-muted-foreground">{row.chart_account_name || row.mapped_chart_account_name || "Mapped chart account"}</div></td><td className="px-3 py-2"><span className={ready ? pill("success") : pill("warning")}>{ready ? "Ready" : "Blocked"}</span>{!ready ? <div className="mt-1 max-w-xs text-xs text-amber-800">{row.collection_blocker_reason || row.recommended_action || "Map to an active ASSET posting account."}</div> : null}</td><td className="px-3 py-2 text-right">{formatRupee(row.opening_balance)}</td><td className="px-3 py-2"><button type="button" className="rounded-xl border px-3 py-2 text-xs font-semibold" onClick={() => setSelectedFinanceAccountId(row.id)}>Edit</button></td></tr>; })}</tbody></table></div>
+          )}
         </ERPSectionShell>
 
         <ERPSectionShell title="COA / FA operating rule" description="Keep these pages separate for daily operators.">

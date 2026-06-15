@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
@@ -29,9 +30,6 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load partner request form.";
 }
 
-function money(value?: string | number | null): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toNumber(value: unknown): number {
   const parsed = Number(value ?? 0);
@@ -643,7 +641,7 @@ export default function PartnerSubscriptionRequestCreatePage() {
                       />
                       <DetailItem
                         label="Base price"
-                        value={money(selectedProduct?.base_price)}
+                        value={formatRupee(selectedProduct?.base_price)}
                       />
                       <DetailItem
                         label="Batch"
@@ -657,7 +655,7 @@ export default function PartnerSubscriptionRequestCreatePage() {
                         label="Monthly estimate"
                         value={
                           derivedMonthly
-                            ? `${money(derivedMonthly)} / month`
+                            ? `${formatRupee(derivedMonthly)} / month`
                             : "Pending batch selection"
                         }
                       />

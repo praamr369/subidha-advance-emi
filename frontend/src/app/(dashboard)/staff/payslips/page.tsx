@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 
@@ -6,9 +7,6 @@ import StaffDataPage from "@/components/staff/StaffDataPage";
 import { ROUTES } from "@/lib/routes";
 import { getStaffPayslips, type StaffPayslip } from "@/services/staff";
 
-function money(value?: string | null): string {
-  return `₹${Number(value ?? 0).toLocaleString("en-IN")}`;
-}
 
 export default function StaffPayslipsPage() {
   return (
@@ -36,10 +34,10 @@ export default function StaffPayslipsPage() {
               {data.results.map((row) => (
                 <tr key={row.id}>
                   <td className="px-4 py-3 font-semibold">{row.year}-{String(row.month).padStart(2, "0")}</td>
-                  <td className="px-4 py-3">{money(row.gross_amount)}</td>
-                  <td className="px-4 py-3">{money(row.deductions_amount)}</td>
-                  <td className="px-4 py-3 font-semibold">{money(row.net_amount)}</td>
-                  <td className="px-4 py-3">{money(row.payment_total)}</td>
+                  <td className="px-4 py-3">{formatRupee(row.gross_amount)}</td>
+                  <td className="px-4 py-3">{formatRupee(row.deductions_amount)}</td>
+                  <td className="px-4 py-3 font-semibold">{formatRupee(row.net_amount)}</td>
+                  <td className="px-4 py-3">{formatRupee(row.payment_total)}</td>
                   <td className="px-4 py-3">{row.status}</td>
                   <td className="px-4 py-3"><Link className="font-semibold underline underline-offset-4" href={`${ROUTES.staff.payslips}/${row.id}`}>Open</Link></td>
                 </tr>

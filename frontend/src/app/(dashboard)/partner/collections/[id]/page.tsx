@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { RefreshCw } from "lucide-react";
 import { useParams, usePathname } from "next/navigation";
@@ -23,10 +24,6 @@ import {
   type PartnerCollectionRequestDetail,
 } from "@/services/partner";
 
-function money(value?: string | number | null): string {
-  if (value === undefined || value === null || value === "") return "—";
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -202,7 +199,7 @@ export default function PartnerCollectionDetailPage() {
         },
         {
           label: "Amount",
-          value: money(request?.amount),
+          value: formatRupee(request?.amount),
         },
         {
           label: "Method",
@@ -296,7 +293,7 @@ export default function PartnerCollectionDetailPage() {
                 columns={4}
                 items={[
                   { label: "Subscription", value: request.subscription_number || "—" },
-                  { label: "Amount", value: money(request.amount) },
+                  { label: "Amount", value: formatRupee(request.amount) },
                   { label: "Method", value: request.method || "—" },
                   { label: "Reference", value: request.reference_no || "—" },
                   { label: "Submitted", value: formatDateTime(request.submitted_at || request.created_at) },

@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -100,9 +101,6 @@ function normalizeBatchStatus(value: unknown): BatchStatus {
   return "UNKNOWN";
 }
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -684,7 +682,7 @@ export default function AdminLuckyDrawCreatePage() {
                   <DetailValue label="Won Lucky IDs" value={String(selectedBatchSummary.won_lucky_ids)} />
                   <DetailValue label="Subscriptions" value={String(selectedBatchSummary.subscription_count)} />
                   <DetailValue label="Existing Draws" value={String(selectedBatchSummary.draw_count)} />
-                  <DetailValue label="Monthly Booked Value" value={money(selectedBatchSummary.monthly_booked_value)} />
+                  <DetailValue label="Monthly Booked Value" value={formatRupee(selectedBatchSummary.monthly_booked_value)} />
                   <DetailValue label="Start Date" value={formatDate(selectedBatchSummary.start_date)} />
                 </div>
 

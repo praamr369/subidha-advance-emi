@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -9,9 +10,6 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { getCustomerAccountStatement } from "@/services/phase4-finance";
 
-function money(value: unknown): string {
-  return `₹${Number(value ?? 0).toFixed(2)}`;
-}
 
 export default function CustomerAccountStatementPage() {
   const [loading, setLoading] = useState(true);
@@ -63,19 +61,19 @@ export default function CustomerAccountStatementPage() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-xl border p-4">
               <div className="text-xs text-muted-foreground">Invoice Total</div>
-              <div className="text-xl font-semibold">{money(data.summary.invoice_total)}</div>
+              <div className="text-xl font-semibold">{formatRupee(data.summary.invoice_total)}</div>
             </div>
             <div className="rounded-xl border p-4">
               <div className="text-xs text-muted-foreground">Invoice Balance</div>
-              <div className="text-xl font-semibold">{money(data.summary.invoice_balance_total)}</div>
+              <div className="text-xl font-semibold">{formatRupee(data.summary.invoice_balance_total)}</div>
             </div>
             <div className="rounded-xl border p-4">
               <div className="text-xs text-muted-foreground">Payments Total</div>
-              <div className="text-xl font-semibold">{money(data.summary.payments_total)}</div>
+              <div className="text-xl font-semibold">{formatRupee(data.summary.payments_total)}</div>
             </div>
             <div className="rounded-xl border p-4">
               <div className="text-xs text-muted-foreground">Receipts Total</div>
-              <div className="text-xl font-semibold">{money(data.summary.receipts_total)}</div>
+              <div className="text-xl font-semibold">{formatRupee(data.summary.receipts_total)}</div>
             </div>
           </div>
         ) : null}

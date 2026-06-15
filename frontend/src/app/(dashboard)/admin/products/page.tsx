@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,9 +22,6 @@ import { listProductRegister, type ProductRecord, type ProductRegisterPage } fro
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
@@ -185,7 +183,7 @@ export default function AdminProductsPage() {
       align: "right",
       sortable: true,
       sortAccessor: (row) => Number(row.base_price || 0),
-      render: (row) => <div className="space-y-1 text-right"><div className="font-semibold text-foreground">{money(row.base_price)}</div><div className="text-xs text-muted-foreground">Future contracts only</div></div>,
+      render: (row) => <div className="space-y-1 text-right"><div className="font-semibold text-foreground">{formatRupee(row.base_price)}</div><div className="text-xs text-muted-foreground">Future contracts only</div></div>,
     },
     {
       key: "capabilities",
@@ -211,7 +209,7 @@ export default function AdminProductsPage() {
       statusBadge={{ label: "Admin Workspace", tone: "info" }}
     >
       <div className="space-y-6">
-        <ERPMetricStrip metrics={[{ label: "Total products", value: payload.catalog_total_count || payload.count, detail: `${rangeText} visible on this page` }, { label: "Total base value", value: money(summary.total_base_value), detail: "Filtered product master value" }, { label: "Inventory ready", value: summary.inventory_ready, detail: `${summary.stock_profile_pending} pending stock profile` }, { label: "Subscription ready", value: summary.subscription_ready, detail: "Future onboarding readiness" }, { label: "Image missing", value: summary.image_missing, detail: "Catalog cleanup required" }, { label: "Catalog cleanup", value: summary.catalog_cleanup_required, detail: "Missing category/subcategory" }]} />
+        <ERPMetricStrip metrics={[{ label: "Total products", value: payload.catalog_total_count || payload.count, detail: `${rangeText} visible on this page` }, { label: "Total base value", value: formatRupee(summary.total_base_value), detail: "Filtered product master value" }, { label: "Inventory ready", value: summary.inventory_ready, detail: `${summary.stock_profile_pending} pending stock profile` }, { label: "Subscription ready", value: summary.subscription_ready, detail: "Future onboarding readiness" }, { label: "Image missing", value: summary.image_missing, detail: "Catalog cleanup required" }, { label: "Catalog cleanup", value: summary.catalog_cleanup_required, detail: "Missing category/subcategory" }]} />
 
         <ERPSectionShell title="Register toolbar" description="Search and filters run on the full product dataset, not only the visible page.">
           <ERPDataToolbar

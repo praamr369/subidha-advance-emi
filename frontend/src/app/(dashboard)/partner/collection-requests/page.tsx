@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
@@ -18,9 +19,6 @@ import {
   type PartnerCollectionRequest,
 } from "@/services/partner";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -135,7 +133,7 @@ export default function PartnerCollectionRequestsPage() {
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{row.subscription_number || "—"}</td>
                       <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                        {money(row.amount)}
+                        {formatRupee(row.amount)}
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{row.method || "—"}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(row.payment_date)}</td>

@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -13,9 +14,6 @@ import type { CustomerSubscription } from "@/services/customer";
 
 const PAGE_SIZE = 50;
 
-function money(value?: string | number | null): string {
-  return `₹${Number(value ?? 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -103,8 +101,8 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>Tenure: {sub.tenure_months ? `${sub.tenure_months} months` : "—"}</span>
             <span>Start: {formatDate(sub.start_date)}</span>
-            <span>Monthly: {money(sub.monthly_amount)}</span>
-            <span>Total: {money(sub.total_amount)}</span>
+            <span>Monthly: {formatRupee(sub.monthly_amount)}</span>
+            <span>Total: {formatRupee(sub.total_amount)}</span>
           </div>
 
           {isEmi && (
@@ -120,7 +118,7 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
               )}
               {Number(sub.waived_amount ?? 0) > 0 && (
                 <span className="text-emerald-700">
-                  Waived: {money(sub.waived_amount)}
+                  Waived: {formatRupee(sub.waived_amount)}
                 </span>
               )}
             </div>
@@ -135,10 +133,10 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
           )}
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>Paid: {money(sub.total_paid_amount)}</span>
+            <span>Paid: {formatRupee(sub.total_paid_amount)}</span>
             {Number(sub.outstanding_amount ?? 0) > 0 && (
               <span className="text-amber-700">
-                Outstanding: {money(sub.outstanding_amount)}
+                Outstanding: {formatRupee(sub.outstanding_amount)}
               </span>
             )}
             {sub.delivery_status && (

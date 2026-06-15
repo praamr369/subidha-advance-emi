@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -66,9 +67,6 @@ function formatDateTime(value?: string | null): string {
   return new Date(parsed).toLocaleString("en-IN");
 }
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function statusTone(status?: string | null): string {
   switch ((status || "").toUpperCase()) {
@@ -442,7 +440,7 @@ export default function AdminSupportRequestDetailPage() {
                     label="Payment Amount"
                     value={
                       supportRequest.payment_amount
-                        ? money(supportRequest.payment_amount)
+                        ? formatRupee(supportRequest.payment_amount)
                         : "—"
                     }
                   />

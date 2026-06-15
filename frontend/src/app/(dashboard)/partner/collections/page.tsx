@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -42,10 +43,6 @@ type VerifiedPaymentRow = {
   reference_no: string;
 };
 
-function money(value?: string | number | null): string {
-  if (value === undefined || value === null || value === "") return "—";
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toNumber(value: unknown): number | undefined {
   const parsed = Number(value);
@@ -230,7 +227,7 @@ export default function PartnerCollectionsPage() {
         key: "amount",
         title: "Amount",
         align: "right",
-        render: (row) => money(row.amount),
+        render: (row) => formatRupee(row.amount),
       },
       {
         key: "method",
@@ -276,7 +273,7 @@ export default function PartnerCollectionsPage() {
         key: "amount",
         title: "Amount",
         align: "right",
-        render: (row) => money(row.amount),
+        render: (row) => formatRupee(row.amount),
       },
       {
         key: "method",

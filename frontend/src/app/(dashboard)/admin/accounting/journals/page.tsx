@@ -14,6 +14,7 @@ import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminJournalEntryPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   createManualJournalEntry,
   listChartOfAccounts,
@@ -23,10 +24,6 @@ import {
   type ChartOfAccount,
   type JournalEntry,
 } from "@/services/accounting";
-
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -257,8 +254,8 @@ export default function AccountingJournalsPage() {
                         <div className="text-right">
                           <div className="text-sm font-semibold text-foreground">
                             {journal.lines.length > 0
-                              ? money(journal.lines[0].debit_amount || journal.lines[0].credit_amount)
-                              : money(0)}
+                              ? formatRupee(journal.lines[0].debit_amount || journal.lines[0].credit_amount)
+                              : formatRupee(0)}
                           </div>
                           <div className="mt-1 text-xs text-muted-foreground">{journal.memo || "No memo"}</div>
                         </div>
@@ -274,7 +271,7 @@ export default function AccountingJournalsPage() {
                               {line.chart_account_code} · {line.chart_account_name}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                              Dr {money(line.debit_amount)} • Cr {money(line.credit_amount)}
+                              Dr {formatRupee(line.debit_amount)} • Cr {formatRupee(line.credit_amount)}
                             </div>
                           </div>
                         ))}

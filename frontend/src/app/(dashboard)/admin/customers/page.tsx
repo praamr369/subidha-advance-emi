@@ -37,6 +37,7 @@ import { buildForgotPasswordHref } from "@/lib/auth/password-reset";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 
 type CustomerStatus = "ACTIVE" | "INACTIVE" | "UNKNOWN";
 type KycStatus =
@@ -69,9 +70,6 @@ type CustomerRow = {
   active_invoice_outstanding?: string;
 };
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toMoneyString(value: unknown): string {
   const parsed = Number(value ?? 0);
@@ -512,13 +510,13 @@ export default function AdminCustomersPage() {
               {row.active_subscription_count ?? 0} active
             </div>
             <div className="text-xs text-muted-foreground">
-              Active contract {money(row.active_contract_value)}
+              Active contract {formatRupee(row.active_contract_value)}
             </div>
             <div className="text-xs text-muted-foreground">
-              Active due {money(row.active_subscription_due)}
+              Active due {formatRupee(row.active_subscription_due)}
             </div>
             <div className="text-xs text-muted-foreground">
-              Direct due {money(row.active_direct_sale_outstanding)} · Invoice due {money(row.active_invoice_outstanding)}
+              Direct due {formatRupee(row.active_direct_sale_outstanding)} · Invoice due {formatRupee(row.active_invoice_outstanding)}
             </div>
             {(row.cancelled_subscription_count || 0) > 0 ? (
               <div className="text-xs text-amber-700">
@@ -531,7 +529,7 @@ export default function AdminCustomersPage() {
               </div>
             ) : null}
             <div className="text-xs text-muted-foreground">
-              Historical contract (deduped) {money(row.historical_contract_value ?? "0.00")}
+              Historical contract (deduped) {formatRupee(row.historical_contract_value ?? "0.00")}
             </div>
           </div>
         ),

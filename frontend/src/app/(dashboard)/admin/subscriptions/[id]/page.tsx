@@ -239,13 +239,9 @@ function toObject(value: unknown): Record<string, unknown> | null {
   return null;
 }
 
-function parseMoney(value: unknown): number {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
 
 function money(value: string | number | null | undefined): string {
-  return `₹${parseMoney(value).toFixed(2)}`;
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value ?? 0));
 }
 
 function formatDate(value: string | null | undefined): string {

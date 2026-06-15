@@ -10,16 +10,13 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PortalPage from "@/components/ui/PortalPage";
 import { buildAdminJournalEntryPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import { apiFetch } from "@/lib/api";
 import {
   postJournalEntry,
   voidJournalEntry,
   type JournalEntry,
 } from "@/services/accounting";
-
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -208,8 +205,8 @@ export default function AccountingJournalDetailPage() {
                       <tr key={line.id ?? index}>
                         <td className="px-4 py-3 font-medium">{line.chart_account_code} · {line.chart_account_name}</td>
                         <td className="px-4 py-3 text-muted-foreground">{line.description || "—"}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{money(line.debit_amount)}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{money(line.credit_amount)}</td>
+                        <td className="px-4 py-3 text-right font-semibold">{formatRupee(line.debit_amount)}</td>
+                        <td className="px-4 py-3 text-right font-semibold">{formatRupee(line.credit_amount)}</td>
                       </tr>
                     ))}
                   </tbody>

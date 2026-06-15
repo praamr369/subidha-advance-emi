@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -21,9 +22,6 @@ import {
 } from "@/services/settlements";
 import type { CashierDayClose } from "@/types/settlements";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function localBusinessDate(): string {
   const now = new Date();
@@ -271,7 +269,7 @@ export default function CashierDayClosePage() {
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               System cash total
             </div>
-            <div className="mt-2 text-sm font-semibold text-foreground">{money(record?.system_cash_total ?? systemCashTotal)}</div>
+            <div className="mt-2 text-sm font-semibold text-foreground">{formatRupee(record?.system_cash_total ?? systemCashTotal)}</div>
             <div className="mt-1 text-xs text-muted-foreground">
               System total is based on valid CASH payments collected by this cashier for the selected date and filters.
             </div>
@@ -280,7 +278,7 @@ export default function CashierDayClosePage() {
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Variance (preview)
             </div>
-            <div className="mt-2 text-sm font-semibold text-foreground">{money(record?.variance ?? variancePreview)}</div>
+            <div className="mt-2 text-sm font-semibold text-foreground">{formatRupee(record?.variance ?? variancePreview)}</div>
           </div>
         </div>
       </ERPSectionShell>
@@ -315,7 +313,7 @@ export default function CashierDayClosePage() {
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border border-border/70 bg-[var(--surface-muted)] p-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Counted cash</div>
-                <div className="mt-2 text-sm font-semibold text-foreground">{money(record.counted_cash)}</div>
+                <div className="mt-2 text-sm font-semibold text-foreground">{formatRupee(record.counted_cash)}</div>
               </div>
               <div className="rounded-xl border border-border/70 bg-[var(--surface-muted)] p-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Notes</div>

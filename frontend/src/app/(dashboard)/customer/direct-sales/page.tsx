@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -12,9 +13,6 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { listCustomerDirectSales, type CustomerDirectSaleListItem } from "@/services/customer";
 
-function money(value: string | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string): string {
   if (!value) return "—";
@@ -95,9 +93,9 @@ export default function CustomerDirectSalesPage() {
                       <td className="px-3 py-2">
                         <ERPStatusBadge status={row.status || "DRAFT"} />
                       </td>
-                      <td className="px-3 py-2 text-right">{money(row.grand_total)}</td>
-                      <td className="px-3 py-2 text-right">{money(row.paid_amount)}</td>
-                      <td className="px-3 py-2 text-right">{money(row.outstanding_amount)}</td>
+                      <td className="px-3 py-2 text-right">{formatRupee(row.grand_total)}</td>
+                      <td className="px-3 py-2 text-right">{formatRupee(row.paid_amount)}</td>
+                      <td className="px-3 py-2 text-right">{formatRupee(row.outstanding_amount)}</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-2">
                           <Link

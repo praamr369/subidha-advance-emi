@@ -32,6 +32,7 @@ import {
   buildAdminSubscriptionRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   getAdminPaymentRegister,
   type PaymentRegisterRow,
@@ -48,9 +49,6 @@ const EMPTY_SUMMARY: PaymentRegisterSummary = {
   net_collected_amount: "0.00",
 };
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -259,7 +257,7 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
                 </td>
 
                 <td className="border-b border-border px-4 py-3 text-right text-sm font-semibold text-foreground">
-                  {money(row.amount)}
+                  {formatRupee(row.amount)}
                 </td>
 
                 <td className="border-b border-border px-4 py-3 text-sm text-foreground">
@@ -560,7 +558,7 @@ export default function AdminPaymentsPage() {
                   <span className="font-semibold text-foreground">Current filter view</span>
                   {": "}
                   {summary.visible_payments} payments · Net collected{" "}
-                  <span className="tabular-nums text-foreground">{money(summary.net_collected_amount)}</span>
+                  <span className="tabular-nums text-foreground">{formatRupee(summary.net_collected_amount)}</span>
                   {" · "}
                   {summary.active_payments} active · {summary.reversed_payments} reversed
                 </div>

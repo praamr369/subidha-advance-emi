@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -9,9 +10,6 @@ import PortalPage from "@/components/ui/PortalPage";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { getCustomerFinanceSummary } from "@/services/phase4-finance";
 
-function money(value: unknown): string {
-  return `₹${Number(value ?? 0).toFixed(2)}`;
-}
 
 export default function CustomerFinanceSummaryPage() {
   const [loading, setLoading] = useState(true);
@@ -61,15 +59,15 @@ export default function CustomerFinanceSummaryPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl border p-4">
               <div className="text-xs text-muted-foreground">Total Paid</div>
-              <div className="mt-1 text-xl font-semibold">{money(summary.total_paid)}</div>
+              <div className="mt-1 text-xl font-semibold">{formatRupee(summary.total_paid)}</div>
             </div>
             <div className="rounded-2xl border p-4">
               <div className="text-xs text-muted-foreground">Total Pending</div>
-              <div className="mt-1 text-xl font-semibold">{money(summary.total_pending)}</div>
+              <div className="mt-1 text-xl font-semibold">{formatRupee(summary.total_pending)}</div>
             </div>
             <div className="rounded-2xl border p-4">
               <div className="text-xs text-muted-foreground">Total Overdue</div>
-              <div className="mt-1 text-xl font-semibold">{money(summary.total_overdue)}</div>
+              <div className="mt-1 text-xl font-semibold">{formatRupee(summary.total_overdue)}</div>
             </div>
             <div className="rounded-2xl border p-4">
               <div className="text-xs text-muted-foreground">Active Contracts</div>
@@ -81,7 +79,7 @@ export default function CustomerFinanceSummaryPage() {
             </div>
             <div className="rounded-2xl border p-4">
               <div className="text-xs text-muted-foreground">Next Due Amount</div>
-              <div className="mt-1 text-xl font-semibold">{money(summary.next_due_amount)}</div>
+              <div className="mt-1 text-xl font-semibold">{formatRupee(summary.next_due_amount)}</div>
             </div>
           </div>
         )}
@@ -98,7 +96,7 @@ export default function CustomerFinanceSummaryPage() {
               <div key={row.payment_method} className="flex items-center justify-between rounded-xl border px-4 py-2">
                 <div className="text-sm font-medium">{row.payment_method}</div>
                 <div className="text-sm text-muted-foreground">
-                  {row.count} payments • {money(row.amount)}
+                  {row.count} payments • {formatRupee(row.amount)}
                 </div>
               </div>
             ))}
@@ -125,9 +123,9 @@ export default function CustomerFinanceSummaryPage() {
                   {String(row.subscription_number ?? "Contract")} • {String(row.plan_type ?? "RENT/LEASE")}
                 </div>
                 <div className="mt-1 text-sm text-muted-foreground">
-                  Paid {money(row.collected_amount)} • Held {money(row.held_amount)} • Refundable{" "}
-                  {money(row.refundable_amount)} • Deducted {money(row.deducted_amount)} • Refunded{" "}
-                  {money(row.refunded_amount)} • Status {String(row.refund_status ?? "PENDING")}
+                  Paid {formatRupee(row.collected_amount)} • Held {formatRupee(row.held_amount)} • Refundable{" "}
+                  {formatRupee(row.refundable_amount)} • Deducted {formatRupee(row.deducted_amount)} • Refunded{" "}
+                  {formatRupee(row.refunded_amount)} • Status {String(row.refund_status ?? "PENDING")}
                 </div>
               </div>
             ))}

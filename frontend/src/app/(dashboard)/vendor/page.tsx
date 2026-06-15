@@ -10,6 +10,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { PartnerVendorWorkspaceShell } from "@/components/layout/page-shells";
 import { MetricStrip } from "@/components/ui/operations";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   getVendorNotificationSummary,
   type NotificationSummaryResponse,
@@ -31,10 +32,6 @@ function toErrorMessage(error: unknown): string {
   return "Unable to load vendor dashboard.";
 }
 
-function formatMoney(value: unknown): string {
-  const amount = Number(value ?? 0);
-  return `₹${Number.isFinite(amount) ? amount.toFixed(2) : "0.00"}`;
-}
 
 export default function VendorDashboardPage() {
   const [data, setData] = useState<VendorDashboardPayload | null>(null);
@@ -141,7 +138,7 @@ export default function VendorDashboardPage() {
                 },
                 {
                   label: "Outstanding payable",
-                  value: formatMoney(data.outstanding_payable),
+                  value: formatRupee(data.outstanding_payable),
                   href: ROUTES.vendor.outstanding,
                 },
                 {
@@ -157,7 +154,7 @@ export default function VendorDashboardPage() {
               <p className="text-sm text-muted-foreground">
                 Accepted quotes: {String(data.accepted_quotes ?? 0)} · Returns:{" "}
                 {String(data.purchase_returns ?? 0)} · Pending bills:{" "}
-                {formatMoney(data.pending_purchase_bills)} · Catalog products:{" "}
+                {formatRupee(data.pending_purchase_bills)} · Catalog products:{" "}
                 {String(data.products_count ?? 0)}
               </p>
 

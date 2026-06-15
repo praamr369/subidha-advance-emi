@@ -7,12 +7,8 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import { getVendorOutstanding } from "@/services/vendor-ops";
-
-function formatMoney(value: unknown): string {
-  const amount = Number(value ?? 0);
-  return `₹${Number.isFinite(amount) ? amount.toFixed(2) : "0.00"}`;
-}
 
 export default function VendorOutstandingPage() {
   const [value, setValue] = useState("0.00");
@@ -55,7 +51,7 @@ export default function VendorOutstandingPage() {
               Outstanding payable
             </div>
             <div className="mt-2 text-3xl font-semibold tracking-tight text-foreground tabular-nums">
-              {formatMoney(value)}
+              {formatRupee(value)}
             </div>
           </div>
         ) : null}

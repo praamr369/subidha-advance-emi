@@ -11,6 +11,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   cancelProductionJob,
   completeProductionJob,
@@ -26,9 +27,6 @@ function toErrorMessage(error: unknown): string {
   return "Unable to load the production job.";
 }
 
-function money(value?: string | null): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
@@ -262,7 +260,7 @@ export default function AdminManufacturingJobDetailPage() {
       stats={[
         { label: "Status", value: job?.status || "—", tone: "info" },
         { label: "Output", value: `${job?.completed_output_qty || "0.000"} / ${job?.planned_output_qty || "0.000"}` },
-        { label: "WIP", value: money(job?.wip_cost) },
+        { label: "WIP", value: formatRupee(job?.wip_cost) },
         { label: "Accounting", value: job?.accounting_status || "—" },
       ]}
       statusBadge={{ label: job?.costing_status || "Job", tone: "info" }}
@@ -323,10 +321,10 @@ export default function AdminManufacturingJobDetailPage() {
                 <ERPDetailGrid
                   columns={2}
                   items={[
-                    { label: "Issued cost", value: money(job.total_issued_cost) },
-                    { label: "Received cost", value: money(job.total_received_cost) },
-                    { label: "Scrap cost", value: money(job.total_scrap_cost) },
-                    { label: "Current WIP", value: money(job.wip_cost) },
+                    { label: "Issued cost", value: formatRupee(job.total_issued_cost) },
+                    { label: "Received cost", value: formatRupee(job.total_received_cost) },
+                    { label: "Scrap cost", value: formatRupee(job.total_scrap_cost) },
+                    { label: "Current WIP", value: formatRupee(job.wip_cost) },
                     { label: "Costing status", value: job.costing_status },
                     { label: "Accounting status", value: job.accounting_status },
                   ]}
@@ -587,7 +585,7 @@ export default function AdminManufacturingJobDetailPage() {
                           {line.entry_kind} · {line.inventory_item_product_name || line.inventory_item_sku || `Item ${line.inventory_item}`}
                         </div>
                         <div className="text-muted-foreground">
-                          Qty {line.quantity} · Cost {money(line.line_total_cost)} · {line.is_posted ? "Posted" : "Draft"}
+                          Qty {line.quantity} · Cost {formatRupee(line.line_total_cost)} · {line.is_posted ? "Posted" : "Draft"}
                         </div>
                       </div>
                     ))
@@ -609,7 +607,7 @@ export default function AdminManufacturingJobDetailPage() {
                           {line.inventory_item_product_name || line.inventory_item_sku || `Item ${line.inventory_item}`}
                         </div>
                         <div className="text-muted-foreground">
-                          Qty {line.quantity} · Cost {money(line.line_total_cost)} · {line.is_posted ? "Posted" : "Draft"}
+                          Qty {line.quantity} · Cost {formatRupee(line.line_total_cost)} · {line.is_posted ? "Posted" : "Draft"}
                         </div>
                       </div>
                     ))
@@ -629,7 +627,7 @@ export default function AdminManufacturingJobDetailPage() {
                       <div key={line.id} className="rounded-2xl border border-border bg-background/70 p-3 text-sm">
                         <div className="font-medium text-foreground">{line.reason}</div>
                         <div className="text-muted-foreground">
-                          Qty {line.quantity} · Cost {money(line.line_total_cost)} · {line.is_posted ? "Posted" : "Draft"}
+                          Qty {line.quantity} · Cost {formatRupee(line.line_total_cost)} · {line.is_posted ? "Posted" : "Draft"}
                         </div>
                       </div>
                     ))

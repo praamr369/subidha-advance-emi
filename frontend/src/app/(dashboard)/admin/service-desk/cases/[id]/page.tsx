@@ -18,6 +18,7 @@ import {
   buildAdminSupportRequestsRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   completeServiceDeskDeliveryReturn,
   getServiceDeskCase,
@@ -37,9 +38,6 @@ function formatDateTime(value?: string | null): string {
   return new Date(parsed).toLocaleString("en-IN");
 }
 
-function money(value?: string | null): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -259,7 +257,7 @@ export default function AdminServiceDeskCaseDetailPage() {
         { label: "Branch", value: serviceCase?.branch_code || serviceCase?.branch_name || "—", tone: "info" },
         { label: "Finance", value: serviceCase?.finance_status || "—" },
         { label: "Stock", value: serviceCase?.stock_status || "—" },
-        { label: "Total", value: money(serviceCase?.total_amount) },
+        { label: "Total", value: formatRupee(serviceCase?.total_amount) },
       ]}
       statusBadge={{ label: serviceCase?.case_type || "Case", tone: "info" }}
       headerMode="erp"
@@ -445,7 +443,7 @@ export default function AdminServiceDeskCaseDetailPage() {
                         </div>
                         <div className="text-right text-sm text-foreground">
                           <div>Qty {line.quantity}</div>
-                          <div>{money(line.line_total)}</div>
+                          <div>{formatRupee(line.line_total)}</div>
                         </div>
                       </div>
                     </div>

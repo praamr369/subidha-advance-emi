@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -76,9 +77,6 @@ function toNullableString(value: unknown): string | null {
   return typeof value === "string" ? value : value === null ? null : null;
 }
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -537,7 +535,7 @@ export default function AdminBatchEditPage() {
                   />
                   <DetailValue
                     label="Monthly Booked Value"
-                    value={money(summary.monthly_booked_value)}
+                    value={formatRupee(summary.monthly_booked_value)}
                   />
                   <DetailValue
                     label="Draw Records"

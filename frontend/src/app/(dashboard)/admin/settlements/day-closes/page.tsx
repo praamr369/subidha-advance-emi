@@ -16,12 +16,10 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import { ApiError } from "@/lib/api";
 import { buildAdminCashierDayClosePrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import { listAdminCashierDayCloses } from "@/services/settlements";
 import type { CashierDayClose } from "@/types/settlements";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatError(err: unknown, fallback: string): string {
   if (err instanceof ApiError) return err.readableMessage || fallback;
@@ -93,19 +91,19 @@ export default function AdminDayClosesPage() {
         key: "system_cash_total",
         title: "System",
         align: "right",
-        render: (row) => money(row.system_cash_total),
+        render: (row) => formatRupee(row.system_cash_total),
       },
       {
         key: "counted_cash",
         title: "Counted",
         align: "right",
-        render: (row) => money(row.counted_cash),
+        render: (row) => formatRupee(row.counted_cash),
       },
       {
         key: "variance",
         title: "Variance",
         align: "right",
-        render: (row) => money(row.variance),
+        render: (row) => formatRupee(row.variance),
       },
       {
         key: "status",

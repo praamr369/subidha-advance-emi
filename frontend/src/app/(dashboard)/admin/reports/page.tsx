@@ -22,6 +22,7 @@ import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminReconciliationRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   getAdminAnalyticsSummary,
   type AdminAnalyticsSummaryResponse,
@@ -32,9 +33,6 @@ import {
 } from "@/services/reports-center";
 import type { DashboardWindowPreset } from "@/services/dashboard-types";
 
-function money(value: string | number | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function toNumber(value: unknown): number {
   const parsed = Number(value ?? 0);
@@ -249,20 +247,20 @@ export default function AdminReportsPage() {
     return [
       {
         label: "Window Net Collections",
-        value: money(overview?.window_net_collections),
+        value: formatRupee(overview?.window_net_collections),
         subtext: `${overview?.window_active_collection_count ?? 0} active rows`,
         tone: "success" as const,
       },
       {
         label: "Outstanding Receivables",
-        value: money(overview?.outstanding_amount),
+        value: formatRupee(overview?.outstanding_amount),
         subtext: "Canonical outstanding posture",
         tone: "warning" as const,
       },
       {
         label: "Overdue EMIs",
         value: String(overview?.overdue_emi_count ?? 0),
-        subtext: money(overview?.overdue_emi_amount),
+        subtext: formatRupee(overview?.overdue_emi_amount),
         tone: (overview?.overdue_emi_count ?? 0) > 0 ? ("danger" as const) : undefined,
       },
       {
@@ -281,7 +279,7 @@ export default function AdminReportsPage() {
       },
       {
         label: "Pending Commission",
-        value: money(overview?.pending_commission_amount),
+        value: formatRupee(overview?.pending_commission_amount),
         subtext: `${overview?.pending_commission_count ?? 0} rows`,
         tone:
           (overview?.pending_commission_count ?? 0) > 0
@@ -429,7 +427,7 @@ export default function AdminReportsPage() {
       stats={[
         {
           label: "Collections",
-          value: money(analytics?.overview.window_net_collections),
+          value: formatRupee(analytics?.overview.window_net_collections),
           tone: "success",
         },
         {
@@ -533,7 +531,7 @@ export default function AdminReportsPage() {
                   />
                   <StatCard
                     label="Today collection"
-                    value={money(liveTodayCollection)}
+                    value={formatRupee(liveTodayCollection)}
                     subtext="Financial.today_collection"
                     tone="success"
                     href={ROUTES.admin.collections}
@@ -691,7 +689,7 @@ export default function AdminReportsPage() {
                           label={point.date || "Unknown date"}
                           value={toNumber(point.net_amount)}
                           total={Math.max(trendMax, 1)}
-                          amount={`${money(point.net_amount)} · ${point.active_count} active`}
+                          amount={`${formatRupee(point.net_amount)} · ${point.active_count} active`}
                         />
                       ))}
                     </div>
@@ -715,7 +713,7 @@ export default function AdminReportsPage() {
                           label={row.label}
                           value={toNumber(row.amount)}
                           total={Math.max(receivableAgingMax, 1)}
-                          amount={`${money(row.amount)} · ${row.count}`}
+                          amount={`${formatRupee(row.amount)} · ${row.count}`}
                         />
                       ))}
                     </div>
@@ -739,7 +737,7 @@ export default function AdminReportsPage() {
                           label={row.method}
                           value={toNumber(row.net_amount)}
                           total={Math.max(methodTotal, 1)}
-                          amount={`${money(row.net_amount)} · ${row.active_count} active`}
+                          amount={`${formatRupee(row.net_amount)} · ${row.active_count} active`}
                         />
                       ))}
                     </div>
@@ -786,7 +784,7 @@ export default function AdminReportsPage() {
                               label={row.batch_code}
                               value={toNumber(row.monthly_booked_value)}
                               total={Math.max(batchMixMax, 1)}
-                              amount={`${money(row.monthly_booked_value)} · ${row.subscription_count} subs`}
+                              amount={`${formatRupee(row.monthly_booked_value)} · ${row.subscription_count} subs`}
                             />
                           ))}
                         </div>
@@ -831,7 +829,7 @@ export default function AdminReportsPage() {
                             >
                               <div className="font-medium text-foreground">{row.subscription_number}</div>
                               <div className="text-xs text-muted-foreground">
-                                {row.customer_name || "Unknown customer"} · Delta {money(row.delta)}
+                                {row.customer_name || "Unknown customer"} · Delta {formatRupee(row.delta)}
                               </div>
                             </Link>
                           ))}
@@ -865,7 +863,7 @@ export default function AdminReportsPage() {
                             label={row.date || "Unknown date"}
                             value={toNumber(row.gross_total)}
                             total={Math.max(directSalesTrendMax, 1)}
-                            amount={`${money(row.gross_total)} · ${row.count} docs`}
+                            amount={`${formatRupee(row.gross_total)} · ${row.count} docs`}
                           />
                         ))}
                       </div>
@@ -900,7 +898,7 @@ export default function AdminReportsPage() {
                 />
                 <StatCard
                   label="Pending Commission"
-                  value={money(financePosture?.commission_summary.pending_amount)}
+                  value={formatRupee(financePosture?.commission_summary.pending_amount)}
                   subtext={`${financePosture?.commission_summary.pending_count ?? 0} rows`}
                   tone={
                     (financePosture?.commission_summary.pending_count ?? 0) > 0

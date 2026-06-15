@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -9,9 +10,6 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { getCustomerPaymentSchedule } from "@/services/phase4-finance";
 
-function money(value: unknown): string {
-  return `₹${Number(value ?? 0).toFixed(2)}`;
-}
 
 type ScheduleRow = {
   emi_id: number;
@@ -91,8 +89,8 @@ export default function CustomerPaymentSchedulePage() {
                       {row.status}
                       {row.is_overdue ? " (Overdue)" : ""}
                     </td>
-                    <td className="px-3 py-2">{money(row.amount)}</td>
-                    <td className="px-3 py-2">{money(row.outstanding_amount)}</td>
+                    <td className="px-3 py-2">{formatRupee(row.amount)}</td>
+                    <td className="px-3 py-2">{formatRupee(row.outstanding_amount)}</td>
                   </tr>
                 ))}
               </tbody>

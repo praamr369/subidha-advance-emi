@@ -150,7 +150,7 @@ function toNumber(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function money(value: number): string {
+function toDecimal(value: number): string {
   return value.toFixed(2);
 }
 
@@ -222,14 +222,14 @@ function buildLinePayload(line: DraftLine, taxMode: "GST" | "NON_GST"): DirectSa
     inventory_item: line.inventory_item_id ? Number(line.inventory_item_id) : null,
     description: line.description.trim(),
     quantity: quantity(Math.max(toNumber(line.quantity), 0)),
-    unit_price: money(Math.max(toNumber(line.unit_price), 0)),
-    discount_amount: money(Math.max(toNumber(line.discount_amount), 0)),
-    taxable_value: money(totals.taxable),
-    gst_rate: taxMode === "GST" ? money(gstRate) : null,
-    cgst_amount: money(cgst),
-    sgst_amount: money(sgst),
+    unit_price: toDecimal(Math.max(toNumber(line.unit_price), 0)),
+    discount_amount: toDecimal(Math.max(toNumber(line.discount_amount), 0)),
+    taxable_value: toDecimal(totals.taxable),
+    gst_rate: taxMode === "GST" ? toDecimal(gstRate) : null,
+    cgst_amount: toDecimal(cgst),
+    sgst_amount: toDecimal(sgst),
     igst_amount: "0.00",
-    line_total: money(totals.lineTotal),
+    line_total: toDecimal(totals.lineTotal),
     hsn_sac_code: "",
     create_purchase_requirement: line.create_requirement,
     requirement_quantity: line.create_requirement
@@ -1042,13 +1042,13 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       delivery_snapshot_district: form.delivery_snapshot_district.trim(),
       delivery_snapshot_state: form.delivery_snapshot_state.trim(),
       delivery_snapshot_pincode: form.delivery_snapshot_pincode.trim(),
-      subtotal: money(totals.subtotal),
-      discount_total: money(totals.discount),
-      taxable_total: money(totals.taxable),
-      tax_total: money(totals.tax),
-      grand_total: money(totals.grand),
-      received_total: money(totals.received),
-      balance_total: money(totals.balance),
+      subtotal: toDecimal(totals.subtotal),
+      discount_total: toDecimal(totals.discount),
+      taxable_total: toDecimal(totals.taxable),
+      tax_total: toDecimal(totals.tax),
+      grand_total: toDecimal(totals.grand),
+      received_total: toDecimal(totals.received),
+      balance_total: toDecimal(totals.balance),
       notes: form.notes.trim(),
       terms: form.terms.trim(),
       lines: lines.map((line) => buildLinePayload(line, form.tax_mode)),
@@ -1938,7 +1938,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
               </label>
               <button
                 type="button"
-                onClick={() => setForm((current) => ({ ...current, received_total: money(totals.grand) }))}
+                onClick={() => setForm((current) => ({ ...current, received_total: toDecimal(totals.grand) }))}
                 disabled={submitting}
                 className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
               >

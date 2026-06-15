@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -11,9 +12,6 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { getCustomerDirectSale, type CustomerDirectSaleDetail } from "@/services/customer";
 
-function money(value: string | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function stringify(value: unknown): string {
   if (typeof value === "string" && value.trim()) return value;
@@ -86,11 +84,11 @@ export default function CustomerDirectSaleDetailPage() {
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Grand total</div>
-                <div className="mt-1 text-sm font-semibold">{money(row.grand_total)}</div>
+                <div className="mt-1 text-sm font-semibold">{formatRupee(row.grand_total)}</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Outstanding</div>
-                <div className="mt-1 text-sm font-semibold">{money(row.outstanding_amount)}</div>
+                <div className="mt-1 text-sm font-semibold">{formatRupee(row.outstanding_amount)}</div>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -139,31 +137,31 @@ export default function CustomerDirectSaleDetailPage() {
                 <tbody>
                   <tr className="border-b border-border">
                     <td className="px-3 py-2 text-muted-foreground">Subtotal</td>
-                    <td className="px-3 py-2 text-right font-medium">{money(row.subtotal)}</td>
+                    <td className="px-3 py-2 text-right font-medium">{formatRupee(row.subtotal)}</td>
                   </tr>
                   <tr className="border-b border-border">
                     <td className="px-3 py-2 text-muted-foreground">Discount</td>
-                    <td className="px-3 py-2 text-right font-medium">{money(row.discount_total)}</td>
+                    <td className="px-3 py-2 text-right font-medium">{formatRupee(row.discount_total)}</td>
                   </tr>
                   <tr className="border-b border-border">
                     <td className="px-3 py-2 text-muted-foreground">Taxable amount</td>
-                    <td className="px-3 py-2 text-right font-medium">{money(row.taxable_total)}</td>
+                    <td className="px-3 py-2 text-right font-medium">{formatRupee(row.taxable_total)}</td>
                   </tr>
                   <tr className="border-b border-border">
                     <td className="px-3 py-2 text-muted-foreground">Tax total</td>
-                    <td className="px-3 py-2 text-right font-medium">{money(row.tax_total)}</td>
+                    <td className="px-3 py-2 text-right font-medium">{formatRupee(row.tax_total)}</td>
                   </tr>
                   <tr>
                     <td className="px-3 py-2 font-semibold">Grand total</td>
-                    <td className="px-3 py-2 text-right font-semibold">{money(row.grand_total)}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{formatRupee(row.grand_total)}</td>
                   </tr>
                   <tr className="border-t border-border bg-muted/30">
                     <td className="px-3 py-2 text-muted-foreground">Paid</td>
-                    <td className="px-3 py-2 text-right font-medium">{money(row.paid_amount)}</td>
+                    <td className="px-3 py-2 text-right font-medium">{formatRupee(row.paid_amount)}</td>
                   </tr>
                   <tr className="bg-muted/30">
                     <td className="px-3 py-2 text-muted-foreground">Due</td>
-                    <td className="px-3 py-2 text-right font-medium">{money(row.outstanding_amount)}</td>
+                    <td className="px-3 py-2 text-right font-medium">{formatRupee(row.outstanding_amount)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -188,9 +186,9 @@ export default function CustomerDirectSaleDetailPage() {
                       <tr key={index} className="border-t border-border">
                         <td className="px-3 py-2">{stringify(line.description)}</td>
                         <td className="px-3 py-2 text-right">{stringify(line.quantity)}</td>
-                        <td className="px-3 py-2 text-right">{money(String(line.unit_price ?? "0.00"))}</td>
-                        <td className="px-3 py-2 text-right">{money(String(line.discount_amount ?? "0.00"))}</td>
-                        <td className="px-3 py-2 text-right">{money(String(line.line_total ?? "0.00"))}</td>
+                        <td className="px-3 py-2 text-right">{formatRupee(String(line.unit_price ?? "0.00"))}</td>
+                        <td className="px-3 py-2 text-right">{formatRupee(String(line.discount_amount ?? "0.00"))}</td>
+                        <td className="px-3 py-2 text-right">{formatRupee(String(line.line_total ?? "0.00"))}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -208,7 +206,7 @@ export default function CustomerDirectSaleDetailPage() {
                   <div key={receipt.id} className="rounded-xl border border-border p-3 text-sm">
                     <div className="font-medium">{receipt.receipt_number || `Receipt #${receipt.id}`}</div>
                     <div className="text-muted-foreground">
-                      {receipt.receipt_date || "—"} · {receipt.payment_method || "—"} · {money(receipt.amount)}
+                      {receipt.receipt_date || "—"} · {receipt.payment_method || "—"} · {formatRupee(receipt.amount)}
                     </div>
                     {receipt.receipt_pdf_url ? (
                       <a

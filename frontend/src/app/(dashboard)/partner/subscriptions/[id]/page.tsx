@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -46,9 +47,6 @@ function text(value: unknown, fallback = "—"): string {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-function money(value: unknown): string {
-  return `₹${toNumber(value).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -407,25 +405,25 @@ export default function PartnerSubscriptionDetailPage() {
         align: "right",
         sortable: true,
         sortAccessor: (row) => row.amount,
-        render: (row) => money(row.amount),
+        render: (row) => formatRupee(row.amount),
       },
       {
         key: "paid_amount",
         title: "Paid",
         align: "right",
-        render: (row) => money(row.paid_amount),
+        render: (row) => formatRupee(row.paid_amount),
       },
       {
         key: "waived_amount",
         title: "Waived",
         align: "right",
-        render: (row) => money(row.waived_amount),
+        render: (row) => formatRupee(row.waived_amount),
       },
       {
         key: "outstanding_amount",
         title: "Outstanding",
         align: "right",
-        render: (row) => money(row.outstanding_amount),
+        render: (row) => formatRupee(row.outstanding_amount),
       },
       {
         key: "status",
@@ -492,10 +490,10 @@ export default function PartnerSubscriptionDetailPage() {
       ]}
       stats={[
         { label: "Status", value: subscription?.status || "—" },
-        { label: "Total Paid", value: money(summary.paid_amount), tone: "success" },
+        { label: "Total Paid", value: formatRupee(summary.paid_amount), tone: "success" },
         {
           label: "Outstanding",
-          value: money(summary.outstanding_amount),
+          value: formatRupee(summary.outstanding_amount),
           tone: summary.outstanding_amount > 0 ? "warning" : "success",
         },
         {
@@ -575,7 +573,7 @@ export default function PartnerSubscriptionDetailPage() {
                   />
                   <div className="text-xs text-muted-foreground">
                     {detailSemantics.waivedEmiCount} waived Advance EMI rows ·{" "}
-                    {money(detailSemantics.waivedAmount)}
+                    {formatRupee(detailSemantics.waivedAmount)}
                   </div>
                 </div>
               }
@@ -631,7 +629,7 @@ export default function PartnerSubscriptionDetailPage() {
                 title={summary.outstanding_amount > 0 ? "Outstanding follow-up remains" : "Contract exposure is settled"}
               >
                 {summary.outstanding_amount > 0
-                  ? `Outstanding exposure is ${money(summary.outstanding_amount)} across ${pendingEmiCount} visible Advance EMI row${
+                  ? `Outstanding exposure is ${formatRupee(summary.outstanding_amount)} across ${pendingEmiCount} visible Advance EMI row${
                       pendingEmiCount === 1 ? "" : "s"
                     }. Winner history and waiver posture remain separate from collection workflow.`
                   : "The visible contract exposure is settled in the current partner scope. Keep winner history and prior payment evidence separate from future collection activity."}
@@ -641,20 +639,20 @@ export default function PartnerSubscriptionDetailPage() {
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Advance EMI Total"
-                value={money(summary.emi_total)}
+                value={formatRupee(summary.emi_total)}
                 subtext={`${subscription.emi_count ?? emiRows.length} scheduled rows`}
                 icon={<CreditCard className="h-4 w-4" />}
               />
               <StatCard
                 label="Collected"
-                value={money(summary.paid_amount)}
+                value={formatRupee(summary.paid_amount)}
                 subtext={`${subscription.paid_emi_count ?? 0} paid Advance EMIs`}
                 tone="success"
                 icon={<ShieldCheck className="h-4 w-4" />}
               />
               <StatCard
                 label="Waived"
-                value={money(summary.waived_amount)}
+                value={formatRupee(summary.waived_amount)}
                 subtext={`${subscription.waived_emi_count ?? 0} waived Advance EMIs`}
                 tone={summary.waived_amount > 0 ? "info" : "default"}
                 icon={<Trophy className="h-4 w-4" />}
@@ -662,7 +660,7 @@ export default function PartnerSubscriptionDetailPage() {
               <StatCard
                 label="Pending"
                 value={String(pendingEmiCount)}
-                subtext={money(summary.outstanding_amount)}
+                subtext={formatRupee(summary.outstanding_amount)}
                 tone={pendingEmiCount > 0 ? "warning" : "success"}
                 icon={<CalendarClock className="h-4 w-4" />}
               />
@@ -748,12 +746,12 @@ export default function PartnerSubscriptionDetailPage() {
                 <DetailItem label="Start Date" value={formatDate(subscription.start_date)} />
                 <DetailItem
                   label="Total Contract Price"
-                  value={money(subscription.total_amount)}
+                  value={formatRupee(subscription.total_amount)}
                   tone="success"
                 />
                 <DetailItem
                   label="Monthly Advance EMI"
-                  value={money(subscription.monthly_amount)}
+                  value={formatRupee(subscription.monthly_amount)}
                   tone="success"
                 />
                 <DetailItem
@@ -800,7 +798,7 @@ export default function PartnerSubscriptionDetailPage() {
                 />
                 <DetailItem
                   label="Outstanding"
-                  value={money(summary.outstanding_amount)}
+                  value={formatRupee(summary.outstanding_amount)}
                   tone={summary.outstanding_amount > 0 ? "warning" : "success"}
                 />
               </div>

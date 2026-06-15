@@ -161,9 +161,6 @@ function toErrorMessage(error: unknown): string {
   return "Failed to load accounting cockpit.";
 }
 
-function cx(...values: Array<string | false | null | undefined>) {
-  return values.filter(Boolean).join(" ");
-}
 
 function metricNumber(value: unknown): number | null {
   const parsed = Number(value);

@@ -417,10 +417,8 @@ export default function AccountingBridgeReadinessPage() {
   const setupReadyCount = allEvents.filter(isPostableSetup).length;
   const reconciledCount = allEvents.filter(isReconciled).length;
   const finalReadyCount = allEvents.filter(isBusinessReady).length;
-  const approvalCount = allEvents.filter(isApprovalGated).length;
   const unsupportedCount = boundaryEvents.length;
   const activeBlockerCount = actionRequiredEvents.length;
-  const warningCount = allEvents.filter(isWarning).length;
   const bridgeStatus = activeBlockerCount > 0 ? "Action required" : unsupportedCount > 0 ? "Boundary review" : setupReadyCount > 0 ? "Setup ready" : "Needs review";
 
   return (

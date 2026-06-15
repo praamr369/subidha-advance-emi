@@ -16,16 +16,13 @@ import {
   buildAdminLedgerStatementPrintRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   createMoneyMovement,
   listMoneyMovements,
   postMoneyMovement,
   type MoneyMovement,
 } from "@/services/accounting";
-
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -223,7 +220,7 @@ export default function AccountingBooksPage() {
                       <div key={movement.id} className="rounded-[1.4rem] border border-border bg-card p-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div><div className="text-sm font-semibold text-foreground">{movement.movement_no}</div><div className="mt-1 text-xs text-muted-foreground">{movement.from_finance_account_name} → {movement.to_finance_account_name} • {formatDate(movement.movement_date)}</div></div>
-                          <div className="text-right"><div className="text-sm font-semibold text-foreground">{money(movement.amount)}</div><div className="mt-1 text-xs text-muted-foreground">{movement.status}</div></div>
+                          <div className="text-right"><div className="text-sm font-semibold text-foreground">{formatRupee(movement.amount)}</div><div className="mt-1 text-xs text-muted-foreground">{movement.status}</div></div>
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2">
                           {movement.status === "DRAFT" ? <button type="button" onClick={() => void handlePostMovement(movement.id)} className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800">Post</button> : null}
@@ -255,7 +252,7 @@ export default function AccountingBooksPage() {
                     <div className="grid gap-3">
                       {financeAccounts.map((account: AccountingBooksReadinessAccount) => (
                         <div key={account.id} className="rounded-[1.3rem] border border-border bg-card px-4 py-4">
-                          <div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold text-foreground">{account.name}</div><div className="mt-1 text-xs text-muted-foreground">{account.kind} • {account.chart_account_code || "No chart code"} • {account.chart_account_name || "No linked chart account"}</div></div><div className="text-sm font-semibold text-foreground">{money(account.opening_balance)}</div></div>
+                          <div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold text-foreground">{account.name}</div><div className="mt-1 text-xs text-muted-foreground">{account.kind} • {account.chart_account_code || "No chart code"} • {account.chart_account_name || "No linked chart account"}</div></div><div className="text-sm font-semibold text-foreground">{formatRupee(account.opening_balance)}</div></div>
                           <div className="mt-3 flex flex-wrap gap-2"><span className={badgeClass(account.movement_eligible ? "green" : "amber")}>{account.movement_eligible ? "Movement eligible" : "Not movement eligible"}</span><span className={badgeClass(account.collection_ready ? "green" : "amber")}>{account.collection_ready ? "Collection ready" : "Collection review"}</span>{account.branch_code ? <span className={badgeClass("blue")}>{account.branch_code}</span> : null}</div>
                           {account.collection_blocker_reason ? <div className="mt-2 text-xs text-amber-900">{account.collection_blocker_reason}</div> : null}
                           <div className="mt-3 flex flex-wrap gap-2"><Link href={buildAdminFinanceAccountStatementPrintRoute(account.id)} className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted">Finance Statement PDF / Print</Link>{account.chart_account_id ? <Link href={buildAdminLedgerStatementPrintRoute(account.chart_account_id)} className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted">Ledger Statement PDF / Print</Link> : null}</div>

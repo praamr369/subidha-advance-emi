@@ -1,4 +1,5 @@
 "use client";
+import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -23,10 +24,6 @@ import {
   type CashierTransaction,
 } from "@/services/cashier";
 
-function money(value: string | number | null | undefined): string {
-  const parsed = Number(value);
-  return `₹${(Number.isFinite(parsed) ? parsed : 0).toFixed(2)}`;
-}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
@@ -154,7 +151,7 @@ export default function CashierPaymentReceiptPage() {
         { label: "Payment ID", value: payment ? `#${payment.id}` : "—" },
         {
           label: "Amount",
-          value: money(payment?.amount),
+          value: formatRupee(payment?.amount),
           tone: "success",
         },
         { label: "Method", value: payment?.method || "—" },
@@ -252,7 +249,7 @@ export default function CashierPaymentReceiptPage() {
                 },
                 {
                   label: "Amount",
-                  value: money(payment.amount),
+                  value: formatRupee(payment.amount),
                   emphasize: true,
                 },
                 {
@@ -265,7 +262,7 @@ export default function CashierPaymentReceiptPage() {
                 { label: "Subscription", value: subscriptionLabel },
                 { label: "Advance EMI Context", value: emiContext },
                 { label: "Advance EMI Due Date", value: formatDate(payment.emi_due_date) },
-                { label: "Advance EMI Amount", value: money(payment.emi_amount) },
+                { label: "Advance EMI Amount", value: formatRupee(payment.emi_amount) },
                 { label: "Batch", value: payment.batch_code || "—" },
                 {
                   label: "Lucky Number",
@@ -305,7 +302,7 @@ export default function CashierPaymentReceiptPage() {
                   },
                   {
                     label: "Amount",
-                    value: <span className="text-[var(--semantic-success-fg)]">{money(payment.amount)}</span>,
+                    value: <span className="text-[var(--semantic-success-fg)]">{formatRupee(payment.amount)}</span>,
                   },
                 ]}
               />

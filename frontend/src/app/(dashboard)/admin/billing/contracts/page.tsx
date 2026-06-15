@@ -14,6 +14,7 @@ import PrintActionBanner from "@/components/print/PrintActionBanner";
 import SubscriptionContractDocument from "@/components/print/SubscriptionContractDocument";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
+import { formatRupee } from "@/lib/utils/currency";
 import {
   listBillingProfiles,
   listBillingSyncEvents,
@@ -22,9 +23,6 @@ import {
   type BillingSyncEvent,
 } from "@/services/billing";
 
-function money(value: string | number | null | undefined): string {
-  return `₹${Number(value || 0).toFixed(2)}`;
-}
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
@@ -195,10 +193,10 @@ export default function BillingContractsPage() {
                             State: {profile.activation_state.replaceAll("_", " ")} • Delivery gate: {profile.delivery_gate_status || "—"}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            Contract {money(profile.contract_total)} • Paid {money(profile.paid_amount_snapshot)} • Remaining {money(profile.remaining_amount_snapshot)}
+                            Contract {formatRupee(profile.contract_total)} • Paid {formatRupee(profile.paid_amount_snapshot)} • Remaining {formatRupee(profile.remaining_amount_snapshot)}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            Next due {formatDate(profile.next_due_date)} • {money(profile.next_due_amount)}
+                            Next due {formatDate(profile.next_due_date)} • {formatRupee(profile.next_due_amount)}
                           </div>
                           {profile.latest_sync_event ? (
                             <div className="text-xs text-muted-foreground">
@@ -340,30 +338,30 @@ export default function BillingContractsPage() {
                   financialFields={[
                     {
                       label: "Contract Value",
-                      value: money(highlightedProfile.contract_total),
+                      value: formatRupee(highlightedProfile.contract_total),
                       emphasize: true,
                     },
                     {
                       label: "Monthly EMI",
-                      value: money(highlightedProfile.monthly_amount),
+                      value: formatRupee(highlightedProfile.monthly_amount),
                       emphasize: true,
                     },
                     {
                       label: "Paid",
-                      value: money(highlightedProfile.paid_amount_snapshot),
+                      value: formatRupee(highlightedProfile.paid_amount_snapshot),
                     },
                     {
                       label: "Waived",
-                      value: money(highlightedProfile.waived_amount_snapshot),
+                      value: formatRupee(highlightedProfile.waived_amount_snapshot),
                     },
                     {
                       label: "Remaining",
-                      value: money(highlightedProfile.remaining_amount_snapshot),
+                      value: formatRupee(highlightedProfile.remaining_amount_snapshot),
                       emphasize: true,
                     },
                     {
                       label: "Next Due",
-                      value: `${money(highlightedProfile.next_due_amount)} on ${formatDate(highlightedProfile.next_due_date)}`,
+                      value: `${formatRupee(highlightedProfile.next_due_amount)} on ${formatDate(highlightedProfile.next_due_date)}`,
                     },
                   ]}
                   terms={[
