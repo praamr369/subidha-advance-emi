@@ -15,8 +15,11 @@ type PeriodFiltersProps = {
 };
 
 export function accountingMoney(value: string | number | null | undefined): string {
-  const numeric = Number(value ?? 0);
-  if (!Number.isFinite(numeric)) return "₹0.00";
+  // null/undefined means the backend hasn't returned a value — show placeholder,
+  // not ₹0.00, which would falsely imply a zero balance.
+  if (value === null || value === undefined) return "—";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "—";
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",

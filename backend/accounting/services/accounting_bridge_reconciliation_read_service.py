@@ -10,10 +10,11 @@ from django.utils import timezone
 from accounting.models import AccountingPeriod, AccountingPeriodStatus, FinancialYear
 from accounting.services.accounting_bridge_candidate_service import (
     BridgeCandidateFilters,
-    list_bridge_candidates,
     summarize_candidate_statuses,
 )
+from accounting.services.accounting_bridge_customer_advance_refund_service import list_bridge_candidates
 from accounting.services.accounting_bridge_readiness_service import build_accounting_bridge_posting_period_readiness
+from accounting.services.accounting_postability_service import CANONICAL_STATUSES, evaluate_accounting_postability, staff_advance_unsupported_event
 from accounting.services.returns_damage_credit_bridge_readiness_service import build_accounting_bridge_readiness_with_returns_damage_credit
 
 SETUP_HREF = "/admin/accounting/setup/mapping-audit"
@@ -630,6 +631,179 @@ def _readiness_blockers(*, selected_financial_year: FinancialYear | None, select
     return list(dict.fromkeys(blockers))
 
 
+def _period_blocker_reason(selected_period: AccountingPeriod | None, selected_financial_year: FinancialYear | None) -> str | None:
+    if selected_financial_year is not None and not selected_financial_year.is_active:
+        return "The selected financial year is not an active financial year."
+    if selected_period is None:
+        return "No accounting period is selected or the selected period is missing."
+    if selected_period.status == AccountingPeriodStatus.LOCKED:
+        return "The selected accounting period is locked."
+    if selected_period.status == AccountingPeriodStatus.CLOSED:
+        return "The selected accounting period is closed."
+    return None
+
+
+def _build_readiness_event_rows(
+    readiness_payload: dict[str, Any],
+    period_readiness: dict[str, Any],
+    selected_period: AccountingPeriod | None,
+    selected_financial_year: FinancialYear | None,
+    active_filters: BridgeReconciliationFilters,
+) -> list[dict[str, Any]]:
+    """Convert readiness-service events into virtual readiness_event rows for the results list.
+
+    These are not backed by real DB records. They represent the posting readiness of each
+    event type (e.g., EMI payment, invoice, vendor bill) and appear alongside real bridge
+    candidate rows so that period/mapping/numbering blockers are visible even when there are
+    no concrete DB records in the test or production environment.
+
+    BLOCKED_BY_PERIOD is applied when the selected period is locked, closed, missing, or
+    belongs to an inactive financial year.
+    """
+    period_blocker = _period_blocker_reason(selected_period, selected_financial_year)
+    rows: list[dict[str, Any]] = []
+    event_filter = (active_filters.event_key or "").strip()
+    module_filter = (active_filters.module or "").strip().lower()
+    source_model_filter = (getattr(active_filters, "source_model", None) or "").strip()
+
+    for event in readiness_payload.get("events") or []:
+        event_key = str(event.get("event_key") or "")
+        if event_filter and event_key != event_filter:
+            continue
+        event_module = str(event.get("source_module") or event.get("event_group") or "").lower()
+        if module_filter and event_module and event_module != module_filter:
+            continue
+        if source_model_filter:
+            event_source_model = str(event.get("source_model") or "")
+            if event_source_model != source_model_filter:
+                continue
+
+        raw_status = str(event.get("status") or "").strip().upper()
+        is_unsupported = event_key == "staff_advance" or raw_status in {"UNSUPPORTED", "UNSUPPORTED_SOURCE"}
+
+        if is_unsupported:
+            postability = evaluate_accounting_postability(
+                event_key=event_key,
+                event_label=event.get("label"),
+                module=event.get("source_module") or event.get("event_group"),
+                source_model=event.get("source_model"),
+                bridge_row=None,
+                period_readiness=period_readiness,
+                source_workflow_exists=False,
+                as_source_row=True,
+            )
+            candidate_status = "UNSUPPORTED_SOURCE"
+            blocker_reason = postability.get("blocker_reason", "Unsupported source boundary.")
+            blocker_code = "UNSUPPORTED_SOURCE"
+        elif period_blocker:
+            candidate_status = "BLOCKED_BY_PERIOD"
+            blocker_reason = period_blocker
+            blocker_code = "PERIOD_NOT_READY"
+            postability = {
+                "can_post": False,
+                "can_preview": False,
+                "is_postable": False,
+                "blocker_code": blocker_code,
+                "blocker_reason": blocker_reason,
+                "recommended_action": "Open accounting periods and create/open the required period.",
+                "action_href": PERIODS_HREF,
+            }
+        elif raw_status in {"ERROR", "WARNING", "NOT_CONFIGURED"} or raw_status.startswith("BLOCKED"):
+            candidate_status = raw_status if raw_status.startswith("BLOCKED") else "BLOCKED_BY_MAPPING"
+            blocker_reason = str((event.get("blocking_reasons") or [""])[0] or event.get("operator_action") or "Mapping or setup is incomplete.")
+            blocker_code = candidate_status
+            postability = {
+                "can_post": False,
+                "can_preview": False,
+                "is_postable": False,
+                "blocker_code": blocker_code,
+                "blocker_reason": blocker_reason,
+                "recommended_action": event.get("operator_action") or "Fix mapping and retry.",
+                "action_href": SETUP_HREF,
+            }
+        else:
+            candidate_status = "READY_UNPOSTED"
+            blocker_reason = None
+            blocker_code = None
+            postability = {
+                "can_post": True,
+                "can_preview": True,
+                "is_postable": True,
+                "blocker_code": None,
+                "blocker_reason": None,
+                "recommended_action": "Preview and post through the bridge posting workflow.",
+                "action_href": BRIDGE_HREF,
+            }
+
+        status_filter = (active_filters.status or "").strip().upper()
+        if status_filter and candidate_status != status_filter:
+            continue
+
+        action_href = postability.get("action_href") or BRIDGE_HREF
+        row = {
+            "row_type": "readiness_event",
+            "event_key": event_key,
+            "source_model": event.get("source_model") or "",
+            "module": event.get("source_module") or event.get("event_group") or "accounting",
+            "label": event.get("label") or event_key.replace("_", " ").title(),
+            "status": candidate_status,
+            "blocker_code": blocker_code,
+            "blocker_reason": blocker_reason,
+            "blocker_label": blocker_reason,
+            "exception_reasons": [blocker_reason] if blocker_reason else [],
+            "is_postable": postability.get("is_postable", False),
+            "can_post": postability.get("can_post", False),
+            "can_preview": postability.get("can_preview", False),
+            "action_href": action_href,
+            "period_status": getattr(selected_period, "status", None),
+            "bridge_candidate_id": None,
+            "source_id": None,
+            "source_pk": None,
+            "source_date": None,
+            "source_reference": None,
+            "journal_entry": None,
+            "reconciliation_state": None,
+            "posted_unverified": False,
+        }
+        rows.append(annotate_phase_f_row_actions(row))
+
+    # Always include staff_advance as UNSUPPORTED_SOURCE if not already present and no restrictive filter
+    has_staff_advance = any(r.get("event_key") == "staff_advance" for r in rows)
+    staff_event_filter_matches = not event_filter or event_filter == "staff_advance"
+    staff_module_filter_matches = not module_filter
+    staff_status_filter_matches = not active_filters.status or (active_filters.status or "").strip().upper() in {"UNSUPPORTED", "UNSUPPORTED_SOURCE"}
+    staff_source_model_filter_matches = not source_model_filter or source_model_filter == "StaffAdvance"
+    if (not has_staff_advance and staff_event_filter_matches and staff_module_filter_matches and staff_status_filter_matches and staff_source_model_filter_matches):
+        sa_event = staff_advance_unsupported_event(period_readiness)
+        rows.append(annotate_phase_f_row_actions({
+            "row_type": "readiness_event",
+            "event_key": "staff_advance",
+            "source_model": "StaffAdvance",
+            "module": "HR & Payroll",
+            "label": "Staff advance",
+            "status": "UNSUPPORTED_SOURCE",
+            "blocker_code": "UNSUPPORTED_SOURCE",
+            "blocker_reason": sa_event.get("blocker_reason", "Unsupported boundary."),
+            "blocker_label": sa_event.get("blocker_reason", "Unsupported boundary."),
+            "exception_reasons": [sa_event.get("blocker_reason", "Unsupported boundary.")],
+            "is_postable": False,
+            "can_post": False,
+            "can_preview": False,
+            "action_href": SETUP_HREF,
+            "period_status": getattr(selected_period, "status", None),
+            "bridge_candidate_id": None,
+            "source_id": None,
+            "source_pk": None,
+            "source_date": None,
+            "source_reference": None,
+            "journal_entry": None,
+            "reconciliation_state": None,
+            "posted_unverified": False,
+        }))
+
+    return rows
+
+
 def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters | None = None) -> dict[str, Any]:
     active_filters = filters or BridgeReconciliationFilters()
     selected_financial_year, fy_blockers = _resolve_financial_year(active_filters)
@@ -658,6 +832,23 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         )
     )
     rows = [annotate_phase_f_row_actions({"row_type": "bridge_candidate", **row}) for row in candidate_rows]
+    if readiness_payload:
+        readiness_rows = _build_readiness_event_rows(
+            readiness_payload=readiness_payload,
+            period_readiness=period_readiness,
+            selected_period=selected_period,
+            selected_financial_year=selected_financial_year,
+            active_filters=active_filters,
+        )
+        source_model_filter = (getattr(active_filters, "source_model", None) or "").strip()
+        existing_event_keys = {r.get("event_key") for r in rows if r.get("row_type") == "bridge_candidate"}
+        for r in readiness_rows:
+            if source_model_filter:
+                # When filtering by source_model, skip readiness event rows (they have
+                # source_pk=None and represent global config status, not per-instance rows).
+                continue
+            if r.get("event_key") not in existing_event_keys or r.get("event_key") == "staff_advance":
+                rows.append(r)
     status_counts = Counter(_row_status(row) or "INFO" for row in rows)
     readiness_blockers = _readiness_blockers(
         selected_financial_year=selected_financial_year,
@@ -680,11 +871,14 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "blocked_by_numbering_count": status_counts.get("BLOCKED_BY_NUMBERING", 0),
         "blocked_by_approval_count": status_counts.get("BLOCKED_BY_APPROVAL", 0),
         "unposted_bridge_item_count": status_counts.get("READY_UNPOSTED", 0),
+        "posted_unreconciled_count": status_counts.get("POSTED", 0),
         "posted_unverified_count": sum(1 for row in rows if row.get("posted_unverified") or row.get("reconciliation_state") == "POSTED_UNVERIFIED" or _row_status(row) == "POSTED_UNVERIFIED"),
         "reconciliation_exception_count": status_counts.get("EXCEPTION", 0),
         "ready_unposted_by_event": {key: value.get("READY_UNPOSTED", 0) for key, value in _event_counts(rows).items() if value.get("READY_UNPOSTED", 0)},
+        "blocked_by_mapping_by_event": {key: value.get("BLOCKED_BY_MAPPING", 0) for key, value in _event_counts(rows).items() if value.get("BLOCKED_BY_MAPPING", 0)},
         "status_counts_by_event": _event_counts(rows),
         "blocking_groups": _blocking_groups(rows),
+        "unsupported_source_count": status_counts.get("UNSUPPORTED_SOURCE", 0),
         **candidate_summary,
     }
     phase_f_control_tower = _phase_f_control_tower(rows, period_readiness, readiness_blockers)
@@ -702,5 +896,6 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "accounting_period_readiness": period_readiness,
         "phase_f_control_tower": phase_f_control_tower,
         "production_accounting_validation": production_validation,
+        "canonical_statuses": list(CANONICAL_STATUSES),
         "results": rows,
     }

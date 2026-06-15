@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from accounting.models import AccountingPeriod, AccountingPeriodStatus, ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind, FinancialYear
+from accounting.models import AccountingPeriod, AccountingPeriodStatus, ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountCoaMapping, FinanceAccountKind, FinanceAccountMappingPurpose, FinancialYear
 from billing.models import BillingDocumentStatus, BillingInvoice, BillingInvoiceLine, ReceiptDocument, ReceiptType
 from billing.services.billing_service import approve_billing_invoice, post_billing_invoice
 from inventory.models import InventoryItem, StockLedger, StockMovementType
@@ -44,6 +44,12 @@ class BillingInvoicePostingTests(TestCase):
             chart_account=self.cash_chart,
             opening_balance=Decimal("0.00"),
         )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=self.cash_account,
+            chart_account=self.cash_chart,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
+        )
         self.financial_year = FinancialYear.objects.create(
             code="FY2026-27",
             name="FY 2026-27",
@@ -54,16 +60,28 @@ class BillingInvoicePostingTests(TestCase):
         )
         self.sequence = DocumentSequence.objects.create(
             series_code="BILL_INV",
+            document_type="TAX_INVOICE",
             financial_year="2026-27",
+            financial_year_ref=self.financial_year,
             prefix="INV-2026-27",
             next_number=1,
         )
         self.receipt_sequence = DocumentSequence.objects.create(
             series_code="BILL_RCT",
+            document_type="DIRECT_SALE_RECEIPT",
             financial_year="2026-27",
             financial_year_ref=self.financial_year,
             prefix="RCP",
             pattern="RCP/FY{FY}/{number}",
+            next_number=1,
+        )
+        DocumentSequence.objects.create(
+            series_code="JE-2026-27",
+            document_type="JOURNAL_ENTRY",
+            financial_year="2026-27",
+            financial_year_ref=self.financial_year,
+            prefix="JE",
+            pattern="JE/{FY}/{number}",
             next_number=1,
         )
 

@@ -73,8 +73,8 @@ export default function AccountingBalanceSheetPage() {
         { label: "Equity", value: accountingMoney(report?.total_equity), tone: "success" },
         {
           label: "Balanced",
-          value: report?.balanced ? "Yes" : "No",
-          tone: report?.balanced ? "success" : "warning",
+          value: report == null ? "—" : report.balanced ? "Yes" : "No",
+          tone: report == null ? "default" : report.balanced ? "success" : "warning",
         },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}

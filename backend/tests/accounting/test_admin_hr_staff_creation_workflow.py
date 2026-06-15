@@ -21,7 +21,10 @@ class AdminHrStaffCreationWorkflowTests(APITestCase):
             role=UserRole.ADMIN,
             is_staff=True,
         )
-        self.branch = Branch.objects.create(code="BR-MAIN", name="Main Branch", is_primary=True)
+        self.branch, _ = Branch.objects.get_or_create(
+            is_primary=True,
+            defaults={"code": "BR-MAIN", "name": "Main Branch"},
+        )
         self.client.force_authenticate(self.admin)
         self.url = "/api/v1/admin/hr/staff/"
 

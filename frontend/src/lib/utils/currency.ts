@@ -1,6 +1,7 @@
 export function formatRupee(value: unknown): string {
-  const numeric = Number(value ?? 0);
-  if (!Number.isFinite(numeric)) return "₹0.00";
+  if (value === null || value === undefined) return "—";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "—";
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",

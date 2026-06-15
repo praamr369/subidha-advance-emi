@@ -77,7 +77,7 @@ export default function AccountingProfitLossPage() {
         {
           label: "Net Profit",
           value: accountingMoney(report?.net_profit),
-          tone: Number(report?.net_profit || 0) >= 0 ? "success" : "danger",
+          tone: report == null ? "default" : Number(report.net_profit ?? 0) >= 0 ? "success" : "danger",
         },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}

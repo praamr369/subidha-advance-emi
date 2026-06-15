@@ -20,6 +20,8 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -31,6 +33,8 @@ class BillingProfileSyncServiceTests(TestCase):
             username="billing_sync_admin",
             phone="9387000001",
         )
+        ensure_test_accounting_posting_prerequisites(self.today, performed_by=self.admin)
+        ensure_document_numbering_profile_for_date("JOURNAL_ENTRY", self.today, performed_by=self.admin)
         self.customer = create_customer_profile(
             name="Billing Sync Customer",
             phone="7387000001",

@@ -2528,6 +2528,16 @@ class Emi(TimeStampedModel):
                 )
 
     def save(self, *args, **kwargs):
+        # PAID and WAIVED EMIs are immutable — status can only be changed through
+        # an explicit reversal/correction via the service layer to preserve the
+        # payment audit trail. Direct reversion to PENDING would orphan receipts.
+        if self.pk:
+            existing = Emi.objects.filter(pk=self.pk).only("status").first()
+            if existing is not None and existing.status in {EmiStatus.PAID, EmiStatus.WAIVED}:
+                if getattr(self, "status", None) != existing.status:
+                    raise ValidationError(
+                        {"status": f"EMI is immutable once it reaches {existing.status}. Use a service-layer correction."}
+                    )
         self.full_clean()
         super().save(*args, **kwargs)
 

@@ -1420,6 +1420,18 @@ class JournalEntryLine(AccountingTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        # Lines of a POSTED or VOID journal entry are immutable — all amendments
+        # must go through a reversal journal issued via the service layer.
+        if self.pk and self.journal_entry_id:
+            parent_status = (
+                JournalEntry.objects.filter(pk=self.journal_entry_id)
+                .values_list("status", flat=True)
+                .first()
+            )
+            if parent_status in {JournalEntryStatus.POSTED, JournalEntryStatus.VOID}:
+                raise ValidationError(
+                    "Journal entry lines are immutable once the parent entry is posted or void."
+                )
         self.description = (self.description or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)

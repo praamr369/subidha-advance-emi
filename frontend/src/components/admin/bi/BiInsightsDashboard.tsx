@@ -35,7 +35,9 @@ const MODULE_LINKS = [
 ];
 
 function display(value: string | number | null | undefined) {
-  if (value === null || value === undefined || value === "") return "0";
+  // null/undefined means the backend did not return a value — show "—" rather
+  // than "0", which would falsely imply zero revenue/cost/exposure.
+  if (value === null || value === undefined || value === "") return "—";
   return String(value);
 }
 

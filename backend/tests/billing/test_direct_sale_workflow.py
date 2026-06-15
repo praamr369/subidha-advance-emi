@@ -2,8 +2,9 @@ from datetime import date
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountCoaMapping, FinanceAccountKind, FinanceAccountMappingPurpose
 from billing.models import BillingDocumentStatus, BillingInvoice, BillingSourceType, DirectSaleStatus, ReceiptDocument
 from billing.services.billing_service import (
     approve_billing_invoice,
@@ -13,7 +14,9 @@ from billing.services.billing_service import (
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from billing.services.direct_sale_operational_state import get_direct_sale_operational_state
 from inventory.models import InventoryItem, StockLedger, StockMovementType
-from tests.helpers import create_admin_user, create_customer_profile, create_product
+from tests.helpers import create_admin_user, create_customer_profile, create_product, ensure_document_numbering_profile_for_date, ensure_test_accounting_posting_prerequisites
+
+_SALE_DATE = date(2026, 4, 15)
 
 
 class DirectSaleWorkflowTests(TestCase):
@@ -23,6 +26,14 @@ class DirectSaleWorkflowTests(TestCase):
             username="direct_sale_admin",
             phone="9388000001",
         )
+        _today = timezone.localdate()
+        ensure_test_accounting_posting_prerequisites(_SALE_DATE, performed_by=self.admin)
+        if _today != _SALE_DATE:
+            ensure_test_accounting_posting_prerequisites(_today, performed_by=self.admin)
+        for doc_type in ("DIRECT_SALE", "TAX_INVOICE", "DIRECT_SALE_RECEIPT", "JOURNAL_ENTRY"):
+            ensure_document_numbering_profile_for_date(doc_type, _SALE_DATE, performed_by=self.admin)
+            if _today != _SALE_DATE:
+                ensure_document_numbering_profile_for_date(doc_type, _today, performed_by=self.admin)
         self.customer = create_customer_profile(
             name="Direct Sale Customer",
             phone="7388000001",
@@ -49,6 +60,12 @@ class DirectSaleWorkflowTests(TestCase):
             kind=FinanceAccountKind.CASH,
             chart_account=cash_chart,
             opening_balance=Decimal("0.00"),
+        )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=self.cash_account,
+            chart_account=cash_chart,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
         )
 
     def _direct_sale_payload(self, *, delivery_required: bool) -> dict:

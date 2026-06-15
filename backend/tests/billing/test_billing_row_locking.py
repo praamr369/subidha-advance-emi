@@ -9,19 +9,31 @@ from datetime import date
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind
+from accounting.models import ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountCoaMapping, FinanceAccountKind, FinanceAccountMappingPurpose
 from billing.models import BillingChannel, BillingDocumentStatus, BillingInvoice, BillingInvoiceLine, BillingSourceType
 from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
 from inventory.models import InventoryItem
-from tests.helpers import create_admin_user, create_customer_profile, create_product
+from tests.helpers import create_admin_user, create_customer_profile, create_product, ensure_document_numbering_profile_for_date, ensure_test_accounting_posting_prerequisites
+
+_INVOICE_DATE = date(2026, 4, 20)
+_SALE_DATE = date(2026, 4, 21)
 
 
 class BillingInvoiceLockingRegressionTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="lock_inv_admin", phone="9389000001")
+        ensure_test_accounting_posting_prerequisites(_INVOICE_DATE, performed_by=self.admin)
+        _today = timezone.localdate()
+        if _today != _INVOICE_DATE:
+            ensure_test_accounting_posting_prerequisites(_today, performed_by=self.admin)
+        for doc_type in ("TAX_INVOICE", "DIRECT_SALE_RECEIPT", "JOURNAL_ENTRY"):
+            ensure_document_numbering_profile_for_date(doc_type, _INVOICE_DATE, performed_by=self.admin)
+            if _today != _INVOICE_DATE:
+                ensure_document_numbering_profile_for_date(doc_type, _today, performed_by=self.admin)
         self.customer = create_customer_profile(name="Lock Inv Customer", phone="7389000001")
         self.product = create_product(name="Lock Inv Product", product_code="LOCK-INV-01", base_price=Decimal("5000.00"))
         self.inventory_item = InventoryItem.objects.create(
@@ -42,12 +54,20 @@ class BillingInvoiceLockingRegressionTests(TestCase):
             chart_account=self.cash_chart,
             opening_balance=Decimal("0.00"),
         )
-        self.sequence = DocumentSequence.objects.create(
-            series_code="BILL_INV",
-            financial_year="2026-27",
-            prefix="INV-2026-27",
-            next_number=1,
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=self.cash_account,
+            chart_account=self.cash_chart,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
         )
+        self.sequence = DocumentSequence.objects.filter(document_type="TAX_INVOICE", financial_year="2026-27", is_active=True).order_by("-id").first()
+        if self.sequence is None:
+            self.sequence = DocumentSequence.objects.create(
+                series_code="BILL_INV",
+                financial_year="2026-27",
+                prefix="INV-2026-27",
+                next_number=1,
+            )
 
     def _create_draft_invoice(self, *, subscription=None, direct_sale=None):
         inv = BillingInvoice.objects.create(
@@ -117,6 +137,14 @@ class DirectSaleCollectionLockingRegressionTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="lock_ds_admin", phone="9389000002")
+        ensure_test_accounting_posting_prerequisites(_SALE_DATE, performed_by=self.admin)
+        _today = timezone.localdate()
+        if _today != _SALE_DATE:
+            ensure_test_accounting_posting_prerequisites(_today, performed_by=self.admin)
+        for doc_type in ("DIRECT_SALE", "TAX_INVOICE", "DIRECT_SALE_RECEIPT", "JOURNAL_ENTRY"):
+            ensure_document_numbering_profile_for_date(doc_type, _SALE_DATE, performed_by=self.admin)
+            if _today != _SALE_DATE:
+                ensure_document_numbering_profile_for_date(doc_type, _today, performed_by=self.admin)
         self.customer = create_customer_profile(name="Lock DS Customer", phone="7389000002")
         self.product = create_product(name="Lock DS Product", product_code="LOCK-DS-01", base_price=Decimal("12000.00"))
         self.inventory_item = InventoryItem.objects.create(
@@ -136,6 +164,12 @@ class DirectSaleCollectionLockingRegressionTests(TestCase):
             kind=FinanceAccountKind.CASH,
             chart_account=cash_chart,
             opening_balance=Decimal("0.00"),
+        )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=self.cash_account,
+            chart_account=cash_chart,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
         )
 
     def _partial_paid_sale_payload(self):

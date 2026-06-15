@@ -248,8 +248,9 @@ class AccountingBridgeCandidatePostingPhaseFTests(APITestCase):
         self.assertTrue(ReconciliationItem.objects.filter(run=run2, source_type="Payment", source_id=str(self.payment.id), exception_code="POSTED_UNVERIFIED").exists())
 
         first_debit = journal.lines.filter(debit_amount__gt=0).first()
-        first_debit.debit_amount = Decimal("999.00")
-        first_debit.save(update_fields=["debit_amount", "updated_at"])
+        # JournalEntryLine is immutable once posted — bypass guard to simulate amount mismatch.
+        journal.lines.filter(pk=first_debit.pk).update(debit_amount=Decimal("999.00"))
+        first_debit.refresh_from_db()
         run3 = ReconciliationRun.objects.create(
             run_no=next_reconciliation_run_no(),
             scope="PHASE_F_TEST",

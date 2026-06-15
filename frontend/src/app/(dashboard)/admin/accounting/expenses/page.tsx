@@ -125,6 +125,11 @@ export default function AccountingExpensesPage() {
 
   async function handleCreateExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const netAmount = parseFloat(expenseForm.net_amount);
+    if (!Number.isFinite(netAmount) || netAmount <= 0) {
+      setError("Net amount must be greater than zero.");
+      return;
+    }
     try {
       await createExpenseVoucher({
         expense_date: expenseForm.expense_date,

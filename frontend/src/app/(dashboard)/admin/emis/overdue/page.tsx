@@ -283,22 +283,22 @@ export default function OverdueEmiPage() {
       stats={[
         {
           label: "Overdue EMI Count",
-          value: String(summary?.overdueCount ?? summary?.overdue_count ?? 0),
+          value: summary == null ? "—" : String(summary.overdueCount ?? summary.overdue_count ?? 0),
           tone: "warning",
         },
         {
           label: "Overdue Exposure",
-          value: money(totalExposure),
+          value: summary == null ? "—" : money(totalExposure),
           tone: "danger",
         },
         {
           label: "Oldest Overdue",
-          value: `${oldestOverdueDays} days`,
+          value: summary == null ? "—" : `${oldestOverdueDays} days`,
           tone: oldestOverdueDays > 30 ? "danger" : "warning",
         },
         {
           label: "Pending EMI Count",
-          value: String(summary?.pendingCount ?? summary?.pending_count ?? 0),
+          value: summary == null ? "—" : String(summary.pendingCount ?? summary.pending_count ?? 0),
         },
       ]}
       statusBadge={{

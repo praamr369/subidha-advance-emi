@@ -20,13 +20,16 @@ from inventory.models import (
     VendorBillStatus,
 )
 from inventory.services.procurement_service import cancel_purchase_order, post_goods_receipt, post_vendor_bill
-from tests.helpers import create_admin_user, create_product
+from tests.helpers import create_admin_user, create_product, ensure_test_accounting_posting_prerequisites
+
+_REF_DATE = date(2026, 4, 30)
 
 
 class VendorPurchaseManagementTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="procure_admin", phone="9381301001")
+        ensure_test_accounting_posting_prerequisites(_REF_DATE, performed_by=self.admin)
         self.vendor = Vendor.objects.create(name="Procure Vendor", phone="9898989898")
         product = create_product(name="Vendor PO Product", product_code="VPO-001", base_price=Decimal("1000.00"))
         self.item = InventoryItem.objects.create(

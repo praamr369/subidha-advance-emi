@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
 
-from accounting.models import AccountingBridgePosting, ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.models import AccountingBridgePosting, ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountCoaMapping, FinanceAccountKind, FinanceAccountMappingPurpose
 from billing.models import ReceiptType
 from billing.services.billing_service import generate_emi_payment_receipt
 from subscriptions.services.payment_service import record_emi_payment
@@ -16,6 +16,8 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -24,6 +26,9 @@ class EmiReceiptGenerationBridgeTests(TestCase):
         super().setUp()
         today = timezone.localdate()
         self.admin = create_admin_user(username="emi_bridge_admin", phone="9386200001")
+        ensure_test_accounting_posting_prerequisites(today, performed_by=self.admin)
+        for doc_type in ("DIRECT_SALE_RECEIPT", "EMI_RECEIPT", "JOURNAL_ENTRY"):
+            ensure_document_numbering_profile_for_date(doc_type, today, performed_by=self.admin)
         self.customer = create_customer_profile(name="EMI Bridge Customer", phone="7386200001")
         product = create_product(name="EMI Bridge Product", product_code="EMI-BRIDGE-001", base_price=Decimal("2400.00"))
         batch = create_batch(
@@ -68,6 +73,12 @@ class EmiReceiptGenerationBridgeTests(TestCase):
             kind=FinanceAccountKind.CASH,
             chart_account=cash_chart,
             opening_balance=Decimal("0.00"),
+        )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=self.cash_account,
+            chart_account=cash_chart,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
         )
 
     def test_generate_emi_payment_receipt_posts_once_per_payment(self):

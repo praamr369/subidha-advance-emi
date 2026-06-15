@@ -122,6 +122,13 @@ export default function AccountingSalaryPage() {
     event.preventDefault();
     setError(null);
     setNotice(null);
+    if (!salaryForm.auto_generate) {
+      const netAmount = parseFloat(salaryForm.net_amount);
+      if (!Number.isFinite(netAmount) || netAmount <= 0) {
+        setError("Net amount must be greater than zero when not using auto-generate.");
+        return;
+      }
+    }
     try {
       await createSalarySheet({
         employee: Number(salaryForm.employee),

@@ -321,6 +321,29 @@ class FinancialSourceLifecycleEvent(models.Model):
             models.Index(fields=["related_cancellation"]),
         ]
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        # Guard against duplicate ACTIVE lifecycle events of the same type for the
+        # same source. Superseded/voided events are excluded so history is preserved.
+        if self.event_status == self.EventStatus.ACTIVE and self.source_type and self.source_id and self.event_type:
+            qs = FinancialSourceLifecycleEvent.objects.filter(
+                source_type=self.source_type,
+                source_id=self.source_id,
+                event_type=self.event_type,
+                event_status=self.EventStatus.ACTIVE,
+            )
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            if qs.exists():
+                raise ValidationError(
+                    f"An ACTIVE '{self.event_type}' lifecycle event already exists for "
+                    f"{self.source_type}#{self.source_id}. Supersede the existing event first."
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         return f"{self.event_no} {self.source_type}#{self.source_id} {self.event_type}"
 

@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountCoaMapping, FinanceAccountKind, FinanceAccountMappingPurpose
 from billing.models import BillingDocumentStatus, ReceiptType
 from billing.services.billing_service import generate_emi_payment_receipt
 from subscriptions.services.payment_service import record_emi_payment
@@ -16,6 +16,8 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -27,6 +29,9 @@ class BillingEmiReceiptGenerationTests(TestCase):
             username="emi_receipt_admin",
             phone="9383000001",
         )
+        ensure_test_accounting_posting_prerequisites(self.today, performed_by=self.admin)
+        for doc_type in ("DIRECT_SALE_RECEIPT", "EMI_RECEIPT", "JOURNAL_ENTRY"):
+            ensure_document_numbering_profile_for_date(doc_type, self.today, performed_by=self.admin)
         self.customer = create_customer_profile(
             name="EMI Receipt Customer",
             phone="7383000001",
@@ -79,6 +84,12 @@ class BillingEmiReceiptGenerationTests(TestCase):
             kind=FinanceAccountKind.CASH,
             chart_account=cash_chart,
             opening_balance=Decimal("0.00"),
+        )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=self.cash_account,
+            chart_account=cash_chart,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
         )
 
     def test_emi_payment_receipt_generation_is_idempotent(self):

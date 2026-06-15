@@ -16,7 +16,9 @@ from inventory.services.stock_service import (
     approve_stock_adjustment,
     post_stock_adjustment,
 )
-from tests.helpers import create_admin_user, create_product
+from tests.helpers import create_admin_user, create_product, ensure_test_accounting_posting_prerequisites
+
+_REF_DATE = date(2026, 4, 8)
 
 
 class StockAdjustmentPostingTests(TestCase):
@@ -26,6 +28,7 @@ class StockAdjustmentPostingTests(TestCase):
             username="stock_adjustment_admin",
             phone="9384000001",
         )
+        ensure_test_accounting_posting_prerequisites(_REF_DATE, performed_by=self.admin)
         product = create_product(
             name="Adjustment Product",
             product_code="STK-ADJ-001",

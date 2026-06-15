@@ -30,13 +30,21 @@ from inventory.models import (
     VendorPayment,
 )
 from inventory.services.procurement_service import post_goods_receipt, post_vendor_bill, post_vendor_payment
-from tests.helpers import create_admin_user, create_product
+from django.utils import timezone
+
+from tests.helpers import create_admin_user, create_product, ensure_test_accounting_posting_prerequisites
+
+_REF_DATE = date(2026, 5, 2)
 
 
 class Phase4ProcurementHardeningTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="phase4_proc_admin", phone="9381401001")
+        ensure_test_accounting_posting_prerequisites(_REF_DATE, performed_by=self.admin)
+        _today = timezone.localdate()
+        if _today != _REF_DATE:
+            ensure_test_accounting_posting_prerequisites(_today, performed_by=self.admin)
         self.vendor = Vendor.objects.create(name="Phase4 Vendor", phone="9876543210")
         product = create_product(name="Phase4 RM", product_code="PH4-RM-001", base_price=Decimal("900.00"))
         self.item = InventoryItem.objects.create(

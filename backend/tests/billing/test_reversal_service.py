@@ -3,8 +3,9 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.test import TestCase
+from django.utils import timezone
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind, Vendor as AccountingVendor
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountCoaMapping, FinanceAccountKind, FinanceAccountMappingPurpose, Vendor as AccountingVendor
 from billing.models import BillingDocumentStatus, CustomerCreditLedger, DirectSale, DirectSaleReturnKind, DirectSaleReturnStatus, PurchaseReturn
 from billing.services.billing_service import approve_billing_invoice, create_direct_sale, post_billing_invoice
 from billing.services.reversal_service import (
@@ -20,13 +21,23 @@ from billing.services.reversal_service import (
 )
 from inventory.models import InventoryItem, PurchaseBill, PurchaseBillLine, StockLedger, StockLocation, StockMovementType, Vendor
 from subscriptions.models import Emi, LuckyDraw, Payment
-from tests.helpers import create_admin_user, create_customer_profile, create_product
+from tests.helpers import create_admin_user, create_customer_profile, create_product, ensure_document_numbering_profile_for_date, ensure_test_accounting_posting_prerequisites
+
+_SALE_DATE = date(2026, 4, 15)
 
 
 class ReversalServiceTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="rv_admin", phone="9386111111")
+        ensure_test_accounting_posting_prerequisites(_SALE_DATE, performed_by=self.admin)
+        _today = timezone.localdate()
+        if _today != _SALE_DATE:
+            ensure_test_accounting_posting_prerequisites(_today, performed_by=self.admin)
+        for doc_type in ("DIRECT_SALE", "TAX_INVOICE", "DIRECT_SALE_RECEIPT", "CREDIT_NOTE", "JOURNAL_ENTRY"):
+            ensure_document_numbering_profile_for_date(doc_type, _SALE_DATE, performed_by=self.admin)
+            if _today != _SALE_DATE:
+                ensure_document_numbering_profile_for_date(doc_type, _today, performed_by=self.admin)
         self.customer = create_customer_profile(name="RV Customer", phone="7386111111")
         self.product = create_product(name="RV Product", product_code="RV-P-001", base_price=Decimal("1000.00"))
         self.sellable_location = StockLocation.objects.create(code="RV-SELL", name="RV Sellable")
@@ -35,6 +46,12 @@ class ReversalServiceTests(TestCase):
         self.inventory_item = InventoryItem.objects.create(product=self.product, sku="RV-SKU-001", default_stock_location=self.sellable_location, opening_stock_qty=Decimal("20.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("700.00"))
         cash_chart = ChartOfAccount.objects.create(code="RV-CASH-001", name="RV Cash", account_type=ChartOfAccountType.ASSET)
         self.cash_account = FinanceAccount.objects.create(name="RV Counter", kind=FinanceAccountKind.CASH, chart_account=cash_chart, opening_balance=Decimal("0.00"))
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=self.cash_account,
+            chart_account=cash_chart,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
+        )
 
     def _sale_payload(self):
         return {

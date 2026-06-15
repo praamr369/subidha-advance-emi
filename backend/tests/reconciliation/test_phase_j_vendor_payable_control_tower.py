@@ -121,26 +121,32 @@ class AdminReconciliationControlTowerPhaseJVendorPayableTests(APITestCase):
         self.assertIn("PURCHASE_BILL_DUPLICATE_JOURNAL_SOURCE_REFERENCE", exception_codes)
 
     def test_vendor_bill_missing_and_invalid_journal_are_detected(self):
+        # Create in DRAFT then promote via update() — POSTED without journal is now
+        # rejected by clean(), so we bypass the guard to set up reconciliation test data.
         missing = VendorBill.objects.create(
             bill_no="PHJ-VB-001",
             bill_date=date(2026, 4, 13),
             vendor=self.vendor,
             finance_account=self.finance_account,
-            status=VendorBillStatus.POSTED,
+            status=VendorBillStatus.DRAFT,
             subtotal=Decimal("100.00"),
             tax_total=Decimal("0.00"),
             grand_total=Decimal("100.00"),
         )
+        VendorBill.objects.filter(pk=missing.pk).update(status=VendorBillStatus.POSTED)
+        missing.refresh_from_db()
         invalid = VendorBill.objects.create(
             bill_no="PHJ-VB-002",
             bill_date=date(2026, 4, 14),
             vendor=self.vendor,
             finance_account=self.finance_account,
-            status=VendorBillStatus.POSTED,
+            status=VendorBillStatus.DRAFT,
             subtotal=Decimal("150.00"),
             tax_total=Decimal("0.00"),
             grand_total=Decimal("150.00"),
         )
+        VendorBill.objects.filter(pk=invalid.pk).update(status=VendorBillStatus.POSTED)
+        invalid.refresh_from_db()
         journal = JournalEntry.objects.create(
             entry_date=invalid.bill_date,
             entry_type=JournalEntryType.SYSTEM_BRIDGE,
@@ -162,22 +168,28 @@ class AdminReconciliationControlTowerPhaseJVendorPayableTests(APITestCase):
         self.assertIsNone(missing.posted_journal_entry_id)
 
     def test_vendor_payment_missing_and_invalid_journal_are_detected(self):
+        # Create in DRAFT then promote via update() — POSTED without journal is now
+        # rejected by clean(), so we bypass the guard to set up reconciliation test data.
         missing = VendorPayment.objects.create(
             payment_no="PHJ-VPAY-001",
             payment_date=date(2026, 4, 15),
             vendor=self.vendor,
             amount=Decimal("50.00"),
             finance_account=self.finance_account,
-            status=VendorPaymentStatus.POSTED,
+            status=VendorPaymentStatus.DRAFT,
         )
+        VendorPayment.objects.filter(pk=missing.pk).update(status=VendorPaymentStatus.POSTED)
+        missing.refresh_from_db()
         invalid = VendorPayment.objects.create(
             payment_no="PHJ-VPAY-002",
             payment_date=date(2026, 4, 16),
             vendor=self.vendor,
             amount=Decimal("75.00"),
             finance_account=self.finance_account,
-            status=VendorPaymentStatus.POSTED,
+            status=VendorPaymentStatus.DRAFT,
         )
+        VendorPayment.objects.filter(pk=invalid.pk).update(status=VendorPaymentStatus.POSTED)
+        invalid.refresh_from_db()
         journal = JournalEntry.objects.create(
             entry_date=invalid.payment_date,
             entry_type=JournalEntryType.SYSTEM_BRIDGE,

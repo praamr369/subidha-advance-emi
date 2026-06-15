@@ -229,42 +229,53 @@ def _get_emi_net_paid(emi: Emi) -> Decimal:
 
 
 def _refresh_emi_status(emi: Emi):
-    net_paid = _get_emi_net_paid(emi)
-
     waived_status = _safe_enum_value(getattr(EmiStatus, "WAIVED", "WAIVED"))
     pending_status = _safe_enum_value(getattr(EmiStatus, "PENDING", "PENDING"))
     partial_status = _safe_enum_value(getattr(EmiStatus, "PARTIAL", "PARTIAL"))
     paid_status = _safe_enum_value(getattr(EmiStatus, "PAID", "PAID"))
 
+    # Load authoritative DB state first. In-memory emi.status may be stale (e.g. the caller
+    # refreshed the object before a concurrent waiver was committed).
+    db_row = Emi.objects.filter(pk=emi.pk).values("status").first()
+    if db_row is None:
+        return
+    db_status = _safe_enum_value(db_row["status"])
+
+    # WAIVED is a permanent terminal state set by the lucky draw waiver workflow.
+    # Payment recalculation must never reverse it — no approved waiver-reversal path exists.
+    if db_status == waived_status:
+        return
+
+    net_paid = _get_emi_net_paid(emi)
+
     if net_paid >= emi.amount:
-        emi.status = paid_status
+        new_status = paid_status
+        new_paid_date = timezone.now().date() if hasattr(emi, "paid_date") else None
+    elif net_paid > MONEY_ZERO:
+        new_status = partial_status if hasattr(EmiStatus, "PARTIAL") else pending_status
+        new_paid_date = None
+    else:
+        new_status = pending_status
+        new_paid_date = None
+
+    if db_status == new_status:
+        if new_paid_date is not None and hasattr(emi, "paid_date") and emi.paid_date == new_paid_date:
+            return
+
+    emi.status = new_status
+    if hasattr(emi, "paid_date"):
+        emi.paid_date = new_paid_date
+
+    if db_status == paid_status and new_status != paid_status:
+        # Approved service-layer bypass: PAID → PENDING/PARTIAL after payment reversal/correction.
+        # The model guard blocks this at the ORM level; only this controlled path may override it.
+        update_fields: dict = {"status": new_status}
         if hasattr(emi, "paid_date"):
-            emi.paid_date = timezone.now().date()
-            emi.save(update_fields=["status", "paid_date"])
-        else:
-            emi.save(update_fields=["status"])
+            update_fields["paid_date"] = new_paid_date
+        Emi.objects.filter(pk=emi.pk).update(**update_fields)
         return
-
-    if net_paid > MONEY_ZERO:
-        # Only use PARTIAL if your EmiStatus enum supports it.
-        # If not, keep PENDING as fallback.
-        if hasattr(EmiStatus, "PARTIAL"):
-            emi.status = partial_status
-        else:
-            emi.status = pending_status
-
-        if hasattr(emi, "paid_date"):
-            emi.paid_date = None
-            emi.save(update_fields=["status", "paid_date"])
-        else:
-            emi.save(update_fields=["status"])
-        return
-
-    if _safe_enum_value(getattr(emi, "status", None)) != waived_status:
-        emi.status = pending_status
 
     if hasattr(emi, "paid_date"):
-        emi.paid_date = None
         emi.save(update_fields=["status", "paid_date"])
     else:
         emi.save(update_fields=["status"])

@@ -209,8 +209,9 @@ class AccountingBridgeDebitNotePostingPhaseF5Tests(APITestCase):
         self.assertTrue(ReconciliationItem.objects.filter(run=run2, source_type="BillingDebitNote", source_id=str(note.id), exception_code="POSTED_UNVERIFIED").exists())
 
         first_debit = journal.lines.filter(debit_amount__gt=0).first()
-        first_debit.debit_amount = Decimal("999.00")
-        first_debit.save(update_fields=["debit_amount", "updated_at"])
+        # JournalEntryLine is immutable once posted — bypass guard to simulate amount mismatch.
+        journal.lines.filter(pk=first_debit.pk).update(debit_amount=Decimal("999.00"))
+        first_debit.refresh_from_db()
         run3 = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="PHASE_F5_TEST", module="ACCOUNTING_BRIDGE", date_from=note.note_date, date_to=note.note_date, status=ReconciliationRunStatus.RUNNING, started_by=self.admin)
         run_accounting_bridge_checks(run=run3, totals={"checked": 0, "matched": 0, "exceptions": 0, "high_risk": 0})
         self.assertTrue(ReconciliationItem.objects.filter(run=run3, source_type="BillingDebitNote", source_id=str(note.id), exception_code="JOURNAL_UNBALANCED").exists())

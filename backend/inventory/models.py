@@ -461,6 +461,22 @@ class StockLedger(InventoryTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        # Stock ledger entries are append-only. Once created, the quantity and
+        # movement type fields must not change — corrections are done via a new
+        # opposing StockLedger entry created through StockAdjustment.
+        if self.pk:
+            existing = (
+                StockLedger.objects.filter(pk=self.pk)
+                .values("quantity_in", "quantity_out", "movement_type", "reference_model", "reference_id")
+                .first()
+            )
+            if existing is not None:
+                for field in ("quantity_in", "quantity_out", "movement_type", "reference_model", "reference_id"):
+                    if str(getattr(self, field, None)) != str(existing[field]):
+                        from django.core.exceptions import ValidationError as DjangoValidationError
+                        raise DjangoValidationError(
+                            f"StockLedger entries are immutable once created. Field '{field}' cannot be changed."
+                        )
         self.reference_model = (self.reference_model or "").strip()
         self.reference_id = (self.reference_id or "").strip()
         self.warehouse_name = (self.warehouse_name or "").strip()
@@ -1022,6 +1038,27 @@ class VendorBill(InventoryTimeStampedModel):
         db_table = "inventory_vendor_bills"
         ordering = ["-bill_date", "-created_at", "-id"]
 
+    def clean(self):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        errors = {}
+        expected_grand_total = (self.subtotal or MONEY_ZERO) + (self.tax_total or MONEY_ZERO)
+        if self.grand_total != expected_grand_total:
+            errors["grand_total"] = "Grand total must equal subtotal plus tax total."
+        if self.status == VendorBillStatus.POSTED and not self.posted_journal_entry_id:
+            errors["posted_journal_entry"] = "Posted vendor bills must reference a journal entry."
+        if errors:
+            raise DjangoValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        _guard_final_status(
+            self,
+            immutable_statuses={VendorBillStatus.POSTED, VendorBillStatus.CANCELLED},
+        )
+        self.bill_no = (self.bill_no or "").strip().upper()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 
 class VendorBillLine(InventoryTimeStampedModel):
     vendor_bill = models.ForeignKey(VendorBill, on_delete=models.CASCADE, related_name="lines")
@@ -1053,6 +1090,27 @@ class VendorPayment(InventoryTimeStampedModel):
     class Meta:
         db_table = "inventory_vendor_payments"
         ordering = ["-payment_date", "-created_at", "-id"]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        errors = {}
+        if (self.amount or MONEY_ZERO) <= MONEY_ZERO:
+            errors["amount"] = "Vendor payment amount must be greater than zero."
+        if self.status == VendorPaymentStatus.POSTED and not self.posted_journal_entry_id:
+            errors["posted_journal_entry"] = "Posted vendor payments must reference a journal entry."
+        if errors:
+            raise DjangoValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        _guard_final_status(
+            self,
+            immutable_statuses={VendorPaymentStatus.POSTED, VendorPaymentStatus.CANCELLED},
+        )
+        self.payment_no = (self.payment_no or "").strip().upper()
+        self.reference_no = (self.reference_no or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class VendorAgreementStatus(models.TextChoices):
