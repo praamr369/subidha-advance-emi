@@ -14,6 +14,26 @@ export type HrSummary = {
   counter_assignment_summary: Array<{ branch_id: number | null; assigned_count: number }>;
 };
 
+export type HrOption = { value: string; label: string };
+
+export type HrStaffOptions = {
+  employment_statuses: HrOption[];
+  employment_types: HrOption[];
+  payment_modes: HrOption[];
+  user_roles: HrOption[];
+  departments: HrOption[];
+  roles_titles: HrOption[];
+  attendance_policies: HrOption[];
+  shifts: HrOption[];
+  weekly_offs: HrOption[];
+  cost_centers: HrOption[];
+  kyc_statuses: HrOption[];
+  kyc_types: HrOption[];
+  emergency_relations: HrOption[];
+  payroll_accounting: { enabled: boolean; message: string };
+  unsupported_profile_fields?: Array<{ field: string; reason: string }>;
+};
+
 export type HrStaff = {
   id: number;
   employee_code: string;
@@ -161,6 +181,10 @@ export async function getHrSummary() {
   return apiFetch<HrSummary>("/admin/hr/summary/");
 }
 
+export async function getHrStaffOptions() {
+  return apiFetch<HrStaffOptions>("/admin/hr/staff/options/");
+}
+
 type StaffListParams = {
   q?: string;
   is_active?: string;
@@ -192,18 +216,22 @@ export async function getHrStaff(staffId: number | string) {
   return apiFetch<HrStaff>(`/admin/hr/staff/${staffId}/`);
 }
 
-export async function createHrStaff(payload: {
+export type HrStaffCreatePayload = {
+  full_name?: string;
   name: string;
   phone: string;
   email?: string;
-  role?: "ADMIN" | "CASHIER";
+  user_role?: "STAFF";
+  username?: string;
+  temporary_password?: string;
   branch?: number | null;
   cash_counter?: number | null;
   joining_date?: string | null;
   is_active?: boolean;
-  employment_status?: "DRAFT" | "ACTIVE" | "INACTIVE";
+  employment_status?: "DRAFT" | "ONBOARDING" | "ACTIVE" | "INACTIVE";
   base_salary?: string | null;
   designation?: string;
+  title?: string;
   department?: string;
   employment_type?:
     | "PERMANENT_MONTHLY"
@@ -213,34 +241,48 @@ export async function createHrStaff(payload: {
     | "PIECE_RATE"
     | "MANUFACTURING"
     | "SERVICE";
+  staff_type?: string;
   reporting_manager?: string;
   work_location?: string;
   probation_end_date?: string | null;
   attendance_policy?: string;
   shift_name?: string;
+  shift?: string;
+  weekly_off?: string;
   salary_effective_from?: string | null;
+  salary_effective_date?: string | null;
   temporary_contract_end_date?: string | null;
   daily_wage_rate?: string | null;
   hourly_wage_rate?: string | null;
   piece_rate_amount?: string | null;
   piece_rate_unit_label?: string;
   payroll_eligible?: boolean;
+  salary_type?: string;
   payment_mode?: "CASH" | "BANK" | "UPI";
   bank_account_name?: string;
   bank_account_number?: string;
   bank_ifsc?: string;
   upi_id?: string;
+  kyc_status?: "PENDING" | "VERIFIED" | "REJECTED";
+  kyc_type?: string;
+  kyc_reference?: string;
   kyc_id_type?: string;
   kyc_id_number?: string;
   kyc_verified?: boolean;
   address?: string;
   emergency_contact_name?: string;
+  emergency_contact_relation?: string;
   emergency_contact_phone?: string;
+  emergency_phone?: string;
+  cost_center?: string;
   cost_center_code?: string;
   payroll_expense_account?: number | null;
+  create_login_account?: boolean;
   notes?: string;
-}) {
-  return apiFetch("/admin/hr/staff/", { method: "POST", body: JSON.stringify(payload) });
+};
+
+export async function createHrStaff(payload: HrStaffCreatePayload) {
+  return apiFetch<{ employee: HrStaff; workflow_status?: string; user_id?: number | null; staff_identity_id?: number | null; temporary_password?: string | null }>("/admin/hr/staff/", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export async function patchHrStaff(staffId: number, payload: Record<string, unknown>) {
@@ -251,14 +293,7 @@ export async function listHrAttendance(params = "") {
   return apiFetch<{ count: number; results: HrAttendance[] }>(`/admin/hr/attendance/${params ? `?${params}` : ""}`);
 }
 
-export async function markHrAttendance(payload: {
-  employee: number;
-  attendance_date?: string;
-  status: string;
-  notes?: string;
-  worked_hours?: string | null;
-  overtime_hours?: string | null;
-}) {
+export async function markHrAttendance(payload: { employee: number; attendance_date?: string; status: string; notes?: string; worked_hours?: string | null; overtime_hours?: string | null }) {
   return apiFetch("/admin/hr/attendance/", { method: "POST", body: JSON.stringify(payload) });
 }
 
@@ -279,9 +314,7 @@ export async function patchHrExpenseClaim(expenseClaimId: number, payload: { act
 }
 
 export async function getHrPayroll(params: Record<string, string | number | undefined | null> = {}) {
-  return apiFetch<{ current_period: { id: number; code: string; status: string } | null; salary_sheets: HrPayrollSheet[] }>(
-    `/admin/hr/payroll/${queryString(params)}`
-  );
+  return apiFetch<{ current_period: { id: number; code: string; status: string } | null; salary_sheets: HrPayrollSheet[] }>(`/admin/hr/payroll/${queryString(params)}`);
 }
 
 export async function listHrSalaryPayments(params: Record<string, string | number | undefined | null> = {}) {
@@ -289,31 +322,20 @@ export async function listHrSalaryPayments(params: Record<string, string | numbe
 }
 
 export async function setHrStaffStatus(staffId: number, action: "DEACTIVATE" | "REACTIVATE", reason?: string) {
-  return apiFetch<HrStaff>(`/admin/hr/staff/${staffId}/status/`, {
-    method: "POST",
-    body: JSON.stringify({ action, reason }),
-  });
+  return apiFetch<HrStaff>(`/admin/hr/staff/${staffId}/status/`, { method: "POST", body: JSON.stringify({ action, reason }) });
 }
 
-export async function listHrStaffDocuments(
-  params: number | Record<string, string | number | undefined | null> = {}
-) {
+export async function listHrStaffDocuments(params: number | Record<string, string | number | undefined | null> = {}) {
   const query = typeof params === "number" ? queryString({ employee: params }) : queryString(params);
   return apiFetch<{ count: number; results: HrStaffDocument[] }>(`/admin/hr/staff-documents/${query}`);
 }
 
 export async function createHrStaffDocument(payload: FormData) {
-  return apiFetch<HrStaffDocument>("/admin/hr/staff-documents/", {
-    method: "POST",
-    body: payload,
-  });
+  return apiFetch<HrStaffDocument>("/admin/hr/staff-documents/", { method: "POST", body: payload });
 }
 
 export async function patchHrStaffDocument(documentId: number, payload: Record<string, unknown>) {
-  return apiFetch<HrStaffDocument>(`/admin/hr/staff-documents/${documentId}/`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
+  return apiFetch<HrStaffDocument>(`/admin/hr/staff-documents/${documentId}/`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
 export function downloadHrStaffProfilePdf(staffId: number, fallbackFilename = "staff-profile.pdf") {
