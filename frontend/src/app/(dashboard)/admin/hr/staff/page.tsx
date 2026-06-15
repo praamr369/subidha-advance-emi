@@ -46,8 +46,8 @@ const EMPLOYMENT_TYPES: Array<{ value: EmploymentTypeValue; label: string; helpe
 ];
 
 const STATUS_OPTIONS = [
-  { value: "DRAFT", label: "Draft" },
-  { value: "ACTIVE", label: "Active" },
+  { value: "DRAFT", label: "Draft — save and continue onboarding later" },
+  { value: "ACTIVE", label: "Active — requires name, phone, role, branch, department, joining date" },
 ];
 
 type StaffFormState = {
@@ -258,11 +258,18 @@ function payBasis(staff: HrStaff) {
   return staff.pay_basis || (staff.base_salary ? "Monthly/base" : staff.daily_wage_rate ? "Daily wage" : staff.hourly_wage_rate ? "Hourly" : staff.piece_rate_amount ? "Piece rate" : "Not configured");
 }
 
+function FieldError({ errors, name }: { errors: Record<string, string | string[]>; name: string }) {
+  const msg = errors[name];
+  if (!msg) return null;
+  return <span className="mt-0.5 text-xs font-medium text-destructive">{Array.isArray(msg) ? msg.join(" ") : msg}</span>;
+}
+
 function Wizard({
   form,
   branches,
   editing,
   saving,
+  fieldErrors,
   onChange,
   onClose,
   onSave,
@@ -271,6 +278,7 @@ function Wizard({
   branches: BranchRecord[];
   editing: boolean;
   saving: boolean;
+  fieldErrors: Record<string, string | string[]>;
   onChange: (next: StaffFormState) => void;
   onClose: () => void;
   onSave: () => void;
@@ -303,23 +311,43 @@ function Wizard({
       <div className="mt-5 grid gap-4">
         {step === 0 ? (
           <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Full name"><TextInput value={form.name} onChange={(value) => update("name", value)} /></Field>
-            <Field label="Phone" hint="Required and duplicate-checked by API"><TextInput value={form.phone} onChange={(value) => update("phone", value)} /></Field>
-            <Field label="Role / title"><TextInput value={form.designation} onChange={(value) => update("designation", value)} /></Field>
+            <Field label="Full name">
+              <TextInput value={form.name} onChange={(value) => update("name", value)} />
+              <FieldError errors={fieldErrors} name="name" />
+            </Field>
+            <Field label="Phone" hint="Required and duplicate-checked by API">
+              <TextInput value={form.phone} onChange={(value) => update("phone", value)} />
+              <FieldError errors={fieldErrors} name="phone" />
+            </Field>
+            <Field label="Role / title">
+              <TextInput value={form.designation} onChange={(value) => update("designation", value)} />
+              <FieldError errors={fieldErrors} name="designation" />
+            </Field>
             <Field label="Branch">
               <SelectInput value={form.branch} onChange={(value) => update("branch", value)}>
                 <option value="">Select branch</option>
                 {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>)}
               </SelectInput>
+              <FieldError errors={fieldErrors} name="branch" />
             </Field>
-            <Field label="Department"><TextInput value={form.department} onChange={(value) => update("department", value)} /></Field>
-            <Field label="Joining date"><TextInput type="date" value={form.joining_date} onChange={(value) => update("joining_date", value)} /></Field>
+            <Field label="Department">
+              <TextInput value={form.department} onChange={(value) => update("department", value)} />
+              <FieldError errors={fieldErrors} name="department" />
+            </Field>
+            <Field label="Joining date">
+              <TextInput type="date" value={form.joining_date} onChange={(value) => update("joining_date", value)} />
+              <FieldError errors={fieldErrors} name="joining_date" />
+            </Field>
             <Field label="Staff type">
               <SelectInput value={form.employment_type} onChange={(value) => update("employment_type", value as EmploymentTypeValue)}>
                 {EMPLOYMENT_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
               </SelectInput>
+              <FieldError errors={fieldErrors} name="employment_type" />
             </Field>
-            <Field label="Email"><TextInput type="email" value={form.email} onChange={(value) => update("email", value)} /></Field>
+            <Field label="Email">
+              <TextInput type="email" value={form.email} onChange={(value) => update("email", value)} />
+              <FieldError errors={fieldErrors} name="email" />
+            </Field>
             <Field label="Emergency contact"><TextInput value={form.emergency_contact_name} onChange={(value) => update("emergency_contact_name", value)} /></Field>
             <Field label="Emergency phone"><TextInput value={form.emergency_contact_phone} onChange={(value) => update("emergency_contact_phone", value)} /></Field>
             <Field label="Address"><textarea value={form.address} onChange={(event) => update("address", event.target.value)} className="min-h-24 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground outline-none focus:border-primary" /></Field>
@@ -409,10 +437,20 @@ function Wizard({
         ) : null}
       </div>
 
-      {(activeRequiredMissing || payrollMissing) ? (
+      {(activeRequiredMissing || payrollMissing || Object.keys(fieldErrors).length > 0) ? (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          {activeRequiredMissing ? "Active staff requires name, phone, role/title, branch, department, joining date, and staff type. " : null}
-          {payrollMissing ? "Payroll eligible staff requires the matching pay setup, salary effective date, and selected payment details." : null}
+          {activeRequiredMissing ? <p>{"Active staff requires name, phone, role/title, branch, department, joining date, and staff type."}</p> : null}
+          {payrollMissing ? <p>{"Payroll eligible staff requires the matching pay setup, salary effective date, and selected payment details."}</p> : null}
+          {Object.keys(fieldErrors).length > 0 ? (
+            <div className="mt-1">
+              <p className="font-semibold">Errors from server:</p>
+              <ul className="mt-1 list-inside list-disc space-y-0.5">
+                {Object.entries(fieldErrors).map(([field, msg]) => (
+                  <li key={field}><span className="font-medium">{field}:</span> {Array.isArray(msg) ? msg.join(" ") : msg}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -422,11 +460,37 @@ function Wizard({
           <ActionButton variant="ghost" onClick={onClose}>Close</ActionButton>
           {step > 0 ? <ActionButton variant="secondary" onClick={() => setStep(step - 1)}>Back</ActionButton> : null}
           {step < steps.length - 1 ? <ActionButton variant="secondary" onClick={() => setStep(step + 1)}>Next</ActionButton> : null}
-          <ActionButton variant="primary" loading={saving} disabled={!canSave} onClick={onSave}>{editing ? "Save changes" : form.employment_status === "DRAFT" ? "Save draft" : "Create active staff"}</ActionButton>
+          <ActionButton variant="primary" loading={saving} disabled={!canSave || saving} onClick={onSave}>{editing ? "Save changes" : form.employment_status === "DRAFT" ? "Save draft" : "Activate staff"}</ActionButton>
         </div>
       </div>
     </FormSection>
   );
+}
+
+type FieldErrors = Record<string, string | string[]>;
+
+function parseApiErrors(err: unknown): { detail: string; fields: FieldErrors } {
+  if (err instanceof Error) {
+    try {
+      const parsed = JSON.parse(err.message) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const fields: FieldErrors = {};
+        let detail = "";
+        for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+          if (key === "detail") {
+            detail = Array.isArray(value) ? (value as string[]).join(" ") : String(value);
+          } else {
+            fields[key] = Array.isArray(value) ? (value as string[]).join(" ") : String(value);
+          }
+        }
+        return { detail: detail || Object.values(fields).join("; "), fields };
+      }
+    } catch {
+      // not JSON
+    }
+    return { detail: err.message, fields: {} };
+  }
+  return { detail: "Unknown error", fields: {} };
 }
 
 export default function AdminHrStaffRegisterPage() {
@@ -436,6 +500,7 @@ export default function AdminHrStaffRegisterPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editStaff, setEditStaff] = useState<HrStaff | null>(null);
@@ -490,6 +555,8 @@ export default function AdminHrStaffRegisterPage() {
     setEditStaff(null);
     setEditorOpen(true);
     setNotice(null);
+    setFieldErrors({});
+    setError(null);
   }
 
   function openEdit(staff: HrStaff) {
@@ -497,40 +564,68 @@ export default function AdminHrStaffRegisterPage() {
     setEditStaff(staff);
     setEditorOpen(true);
     setNotice(null);
+    setFieldErrors({});
+    setError(null);
   }
 
   async function saveStaff() {
+    if (saving) return; // Prevent duplicate submit
     try {
       setSaving(true);
+      setFieldErrors({});
+      setError(null);
       if (editStaff) {
         await patchHrStaff(editStaff.id, compactPayload(form));
         setNotice("Staff setup updated.");
+        setEditorOpen(false);
+        setEditStaff(null);
       } else {
-        const created = await createHrStaff(compactPayload(form));
+        const payload = {
+          ...compactPayload(form),
+          create_login_account: form.create_login,
+        };
+        const created = await createHrStaff(payload);
         const employee = (created as { employee?: HrStaff }).employee;
-        if (form.create_login && employee) {
-          await createAdminStaffIdentity({
-            employee: employee.id,
-            name: form.name.trim(),
-            phone: form.phone.trim(),
-            email: form.email.trim(),
-            username: form.username.trim() || form.phone.trim(),
-            temporary_password: form.temporary_password.trim() || undefined,
-            designation: form.designation.trim(),
-            department: form.department.trim(),
-            branch: form.branch ? Number(form.branch) : null,
-            joining_date: form.joining_date || new Date().toISOString().slice(0, 10),
-            base_salary: form.base_salary.trim() || null,
-            login_enabled: true,
-          });
+        // Login identity creation is now handled server-side via create_login_account.
+        // Fallback: if create_login is set but server didn't create it (older backend),
+        // create via identity endpoint — only if employee id is available.
+        if (form.create_login && employee && !employee.login_created) {
+          try {
+            await createAdminStaffIdentity({
+              employee: employee.id,
+              name: form.name.trim(),
+              phone: form.phone.trim(),
+              email: form.email.trim(),
+              username: form.username.trim() || form.phone.trim(),
+              temporary_password: form.temporary_password.trim() || undefined,
+              designation: form.designation.trim(),
+              department: form.department.trim(),
+              branch: form.branch ? Number(form.branch) : null,
+              joining_date: form.joining_date || new Date().toISOString().slice(0, 10),
+              base_salary: form.base_salary.trim() || null,
+              login_enabled: true,
+            });
+          } catch {
+            // non-fatal — staff was created, login will need to be set up separately
+          }
         }
-        setNotice(form.employment_status === "DRAFT" ? "Draft staff saved." : "Active staff created.");
+        const statusLabel =
+          form.employment_status === "DRAFT"
+            ? "Draft staff saved."
+            : "Staff activated and saved.";
+        setNotice(statusLabel);
+        setEditorOpen(false);
+        setEditStaff(null);
       }
-      setEditorOpen(false);
-      setEditStaff(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save staff setup.");
+      const { detail, fields } = parseApiErrors(err);
+      if (Object.keys(fields).length > 0) {
+        setFieldErrors(fields);
+        setError(null);
+      } else {
+        setError(detail || "Unable to save staff setup.");
+      }
     } finally {
       setSaving(false);
     }
@@ -636,8 +731,9 @@ export default function AdminHrStaffRegisterPage() {
           branches={branches}
           editing={Boolean(editStaff)}
           saving={saving}
+          fieldErrors={fieldErrors}
           onChange={setForm}
-          onClose={() => { setEditorOpen(false); setEditStaff(null); }}
+          onClose={() => { setEditorOpen(false); setEditStaff(null); setFieldErrors({}); }}
           onSave={() => void saveStaff()}
         />
       ) : null}

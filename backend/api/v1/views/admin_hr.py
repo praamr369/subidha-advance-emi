@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
-from rest_framework import permissions, serializers
+from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -34,6 +36,7 @@ from accounting.services.hr_workspace_service import (
     record_salary_payment,
     reject_expense_claim_action,
     reject_leave_request_action,
+    _write_audit,
 )
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting import (
@@ -50,6 +53,8 @@ from accounting.services.staff_pdf_service import (
     render_staff_profile_pdf,
 )
 
+User = get_user_model()
+
 
 class _AdminBase(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
@@ -61,15 +66,25 @@ class AdminHrSummaryView(_AdminBase):
 
 
 class HrStaffCreateSerializer(serializers.Serializer):
+    # Core identity
     name = serializers.CharField()
     phone = serializers.CharField()
     email = serializers.EmailField(required=False, allow_blank=True)
+    # Login account creation (optional, only when login fields are valid)
+    create_login_account = serializers.BooleanField(required=False, default=False)
+    user_role = serializers.ChoiceField(choices=[("ADMIN", "ADMIN"), ("CASHIER", "CASHIER")], required=False, allow_null=True)
+    # Legacy role field kept for compatibility
     role = serializers.ChoiceField(choices=[("ADMIN", "ADMIN"), ("CASHIER", "CASHIER")], required=False)
     branch = serializers.IntegerField(required=False, allow_null=True)
     cash_counter = serializers.IntegerField(required=False, allow_null=True)
     joining_date = serializers.DateField(required=False, allow_null=True)
-    is_active = serializers.BooleanField(required=False, default=True)
-    employment_status = serializers.ChoiceField(choices=EmployeeStatus.choices, required=False)
+    is_active = serializers.BooleanField(required=False, default=False)
+    # employment_status drives DRAFT/ACTIVE/INACTIVE workflow
+    employment_status = serializers.ChoiceField(
+        choices=EmployeeStatus.choices,
+        required=False,
+        default=EmployeeStatus.DRAFT,
+    )
     base_salary = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True)
     designation = serializers.CharField(required=False, allow_blank=True)
@@ -80,26 +95,87 @@ class HrStaffCreateSerializer(serializers.Serializer):
     probation_end_date = serializers.DateField(required=False, allow_null=True)
     attendance_policy = serializers.CharField(required=False, allow_blank=True)
     shift_name = serializers.CharField(required=False, allow_blank=True)
+    weekly_off = serializers.CharField(required=False, allow_blank=True)
     salary_effective_from = serializers.DateField(required=False, allow_null=True)
+    salary_effective_date = serializers.DateField(required=False, allow_null=True)
     temporary_contract_end_date = serializers.DateField(required=False, allow_null=True)
     daily_wage_rate = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     hourly_wage_rate = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     piece_rate_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     piece_rate_unit_label = serializers.CharField(required=False, allow_blank=True)
-    payroll_eligible = serializers.BooleanField(required=False)
+    payroll_eligible = serializers.BooleanField(required=False, default=False)
+    salary_type = serializers.CharField(required=False, allow_blank=True)
     payment_mode = serializers.ChoiceField(choices=[("CASH", "CASH"), ("BANK", "BANK"), ("UPI", "UPI")], required=False)
     bank_account_name = serializers.CharField(required=False, allow_blank=True)
     bank_account_number = serializers.CharField(required=False, allow_blank=True)
     bank_ifsc = serializers.CharField(required=False, allow_blank=True)
     upi_id = serializers.CharField(required=False, allow_blank=True)
+    # KYC fields (kyc_type/kyc_reference are aliases for kyc_id_type/kyc_id_number)
+    kyc_status = serializers.CharField(required=False, allow_blank=True)
+    kyc_type = serializers.CharField(required=False, allow_blank=True)
+    kyc_reference = serializers.CharField(required=False, allow_blank=True)
     kyc_id_type = serializers.CharField(required=False, allow_blank=True)
     kyc_id_number = serializers.CharField(required=False, allow_blank=True)
-    kyc_verified = serializers.BooleanField(required=False)
+    kyc_verified = serializers.BooleanField(required=False, default=False)
     address = serializers.CharField(required=False, allow_blank=True)
     emergency_contact_name = serializers.CharField(required=False, allow_blank=True)
+    emergency_contact_relation = serializers.CharField(required=False, allow_blank=True)
     emergency_contact_phone = serializers.CharField(required=False, allow_blank=True)
+    emergency_phone = serializers.CharField(required=False, allow_blank=True)
+    cost_center = serializers.CharField(required=False, allow_blank=True)
     cost_center_code = serializers.CharField(required=False, allow_blank=True)
     payroll_expense_account = serializers.IntegerField(required=False, allow_null=True)
+    # staff_type is an alias for employment_type from older form versions
+    staff_type = serializers.CharField(required=False, allow_blank=True)
+    # title is an alias for designation
+    title = serializers.CharField(required=False, allow_blank=True)
+    full_name = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # Resolve field aliases so downstream code only reads canonical names
+        if not attrs.get("name") and attrs.get("full_name"):
+            attrs["name"] = attrs["full_name"]
+        if not attrs.get("designation") and attrs.get("title"):
+            attrs["designation"] = attrs["title"]
+        if not attrs.get("emergency_contact_phone") and attrs.get("emergency_phone"):
+            attrs["emergency_contact_phone"] = attrs["emergency_phone"]
+        if not attrs.get("cost_center_code") and attrs.get("cost_center"):
+            attrs["cost_center_code"] = attrs["cost_center"]
+        if not attrs.get("salary_effective_from") and attrs.get("salary_effective_date"):
+            attrs["salary_effective_from"] = attrs["salary_effective_date"]
+        if not attrs.get("kyc_id_type") and attrs.get("kyc_type"):
+            attrs["kyc_id_type"] = attrs["kyc_type"]
+        if not attrs.get("kyc_id_number") and attrs.get("kyc_reference"):
+            attrs["kyc_id_number"] = attrs["kyc_reference"]
+
+        employment_status = attrs.get("employment_status") or EmployeeStatus.DRAFT
+        errors = {}
+
+        # Active staff requires onboarding fields
+        if employment_status == EmployeeStatus.ACTIVE:
+            if not (attrs.get("name") or "").strip():
+                errors["name"] = "Required for active staff."
+            if not (attrs.get("phone") or "").strip():
+                errors["phone"] = "Required for active staff."
+            if not (attrs.get("designation") or "").strip():
+                errors["designation"] = "Role/title is required to activate staff."
+            if not attrs.get("branch"):
+                errors["branch"] = "Branch is required to activate staff."
+            if not attrs.get("joining_date"):
+                errors["joining_date"] = "Joining date is required to activate staff."
+            if not (attrs.get("department") or "").strip():
+                errors["department"] = "Department is required to activate staff."
+
+        # Login account requires role
+        if attrs.get("create_login_account"):
+            effective_role = attrs.get("user_role") or attrs.get("role")
+            if not effective_role:
+                errors["user_role"] = "User role (ADMIN or CASHIER) is required to create a login account."
+
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
 
 class AdminHrStaffListCreateView(_AdminBase):
@@ -147,68 +223,123 @@ class AdminHrStaffListCreateView(_AdminBase):
     def post(self, request):
         serializer = HrStaffCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        employment_status = serializer.validated_data.get("employment_status") or EmployeeStatus.ACTIVE
+        vd = serializer.validated_data
+
+        employment_status = vd.get("employment_status") or EmployeeStatus.DRAFT
+        is_active = employment_status == EmployeeStatus.ACTIVE
+        cleaned_phone = (vd.get("phone") or "").strip()
+        cleaned_name = (vd.get("name") or "").strip()
+
+        # Duplicate phone guard — return 400 before touching the DB
+        if EmployeeProfile.objects.filter(phone=cleaned_phone, is_active=True).exists():
+            raise serializers.ValidationError({"phone": "An active staff profile already exists with this phone number."})
+
         try:
-            payload = create_staff_profile(
-                performed_by=request.user,
-                name=serializer.validated_data["name"],
-                phone=serializer.validated_data["phone"],
-                email=serializer.validated_data.get("email") or None,
-                role=serializer.validated_data.get("role"),
-                branch_id=serializer.validated_data.get("branch"),
-                cash_counter_id=serializer.validated_data.get("cash_counter"),
-                joining_date=serializer.validated_data.get("joining_date"),
-                is_active=employment_status == EmployeeStatus.ACTIVE and serializer.validated_data.get("is_active", True),
-                base_salary=serializer.validated_data.get("base_salary"),
-                notes=serializer.validated_data.get("notes") or "",
-            )
+            with transaction.atomic():
+                # --- Optional login account creation ---
+                login_user = None
+                effective_role = vd.get("user_role") or vd.get("role")
+                if vd.get("create_login_account") and effective_role in {"ADMIN", "CASHIER"}:
+                    cleaned_email = (vd.get("email") or "").strip()
+                    existing_user = User.objects.filter(phone=cleaned_phone).first()
+                    if existing_user is not None:
+                        login_user = existing_user
+                    else:
+                        username = cleaned_phone
+                        if User.objects.filter(username=username).exists():
+                            username = f"{username}-{timezone.now().strftime('%H%M%S')}"
+                        login_user = User.objects.create_user(
+                            username=username,
+                            password=User.objects.make_random_password(),
+                            phone=cleaned_phone,
+                            email=cleaned_email,
+                            first_name=cleaned_name,
+                            role=effective_role,
+                            is_active=True,
+                            is_staff=True,
+                            is_superuser=False,
+                        )
+                        _write_audit(
+                            actor=request.user,
+                            action_type="HR_USER_CREATED",
+                            model_name="User",
+                            object_id=login_user.id,
+                            metadata={"phone": cleaned_phone, "role": effective_role},
+                        )
+
+                # --- Build the full profile data in a single serializer pass ---
+                profile_data = {
+                    "name": cleaned_name,
+                    "phone": cleaned_phone,
+                    "branch": vd.get("branch"),
+                    "joining_date": vd.get("joining_date") or timezone.localdate().isoformat(),
+                    "is_active": is_active,
+                    "employment_status": employment_status,
+                    "employment_type": vd.get("employment_type") or EmploymentType.PERMANENT_MONTHLY,
+                    "designation": vd.get("designation") or "",
+                    "department": vd.get("department") or "",
+                    "reporting_manager": vd.get("reporting_manager") or "",
+                    "work_location": vd.get("work_location") or "",
+                    "probation_end_date": vd.get("probation_end_date"),
+                    "attendance_policy": vd.get("attendance_policy") or "",
+                    "shift_name": vd.get("shift_name") or "",
+                    "salary_effective_from": vd.get("salary_effective_from"),
+                    "temporary_contract_end_date": vd.get("temporary_contract_end_date"),
+                    "base_salary": vd.get("base_salary"),
+                    "daily_wage_rate": vd.get("daily_wage_rate"),
+                    "hourly_wage_rate": vd.get("hourly_wage_rate"),
+                    "piece_rate_amount": vd.get("piece_rate_amount"),
+                    "piece_rate_unit_label": vd.get("piece_rate_unit_label") or "",
+                    "payroll_eligible": vd.get("payroll_eligible", False),
+                    "payment_mode": vd.get("payment_mode") or "CASH",
+                    "bank_account_name": vd.get("bank_account_name") or "",
+                    "bank_account_number": vd.get("bank_account_number") or "",
+                    "bank_ifsc": vd.get("bank_ifsc") or "",
+                    "upi_id": vd.get("upi_id") or "",
+                    "kyc_id_type": vd.get("kyc_id_type") or "",
+                    "kyc_id_number": vd.get("kyc_id_number") or "",
+                    "kyc_verified": vd.get("kyc_verified", False),
+                    "address": vd.get("address") or "",
+                    "emergency_contact_name": vd.get("emergency_contact_name") or "",
+                    "emergency_contact_phone": vd.get("emergency_contact_phone") or "",
+                    "cost_center_code": vd.get("cost_center_code") or "",
+                    "payroll_expense_account": vd.get("payroll_expense_account"),
+                    "notes": vd.get("notes") or "",
+                }
+
+                profile_serializer = EmployeeProfileSerializer(
+                    data=profile_data,
+                    context={"request": request},
+                )
+                profile_serializer.is_valid(raise_exception=True)
+                employee = profile_serializer.save()
+
+                _write_audit(
+                    actor=request.user,
+                    action_type="HR_STAFF_PROFILE_CREATED",
+                    model_name="EmployeeProfile",
+                    object_id=employee.id,
+                    metadata={
+                        "employee_code": employee.employee_code,
+                        "phone": cleaned_phone,
+                        "employment_status": employment_status,
+                        "user_id": getattr(login_user, "id", None),
+                    },
+                )
+
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "A staff record with this phone or employee code already exists."}) from exc
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
-        employee = payload["employee"]
-        profile_serializer = EmployeeProfileSerializer(
-            employee,
-            data={
-                "designation": serializer.validated_data.get("designation") or "",
-                "department": serializer.validated_data.get("department") or "",
-                "employment_status": employment_status,
-                "employment_type": serializer.validated_data.get("employment_type") or EmploymentType.PERMANENT_MONTHLY,
-                "reporting_manager": serializer.validated_data.get("reporting_manager") or "",
-                "work_location": serializer.validated_data.get("work_location") or "",
-                "probation_end_date": serializer.validated_data.get("probation_end_date"),
-                "attendance_policy": serializer.validated_data.get("attendance_policy") or "",
-                "shift_name": serializer.validated_data.get("shift_name") or "",
-                "salary_effective_from": serializer.validated_data.get("salary_effective_from"),
-                "temporary_contract_end_date": serializer.validated_data.get("temporary_contract_end_date"),
-                "daily_wage_rate": serializer.validated_data.get("daily_wage_rate"),
-                "hourly_wage_rate": serializer.validated_data.get("hourly_wage_rate"),
-                "piece_rate_amount": serializer.validated_data.get("piece_rate_amount"),
-                "piece_rate_unit_label": serializer.validated_data.get("piece_rate_unit_label") or "",
-                "payroll_eligible": serializer.validated_data.get("payroll_eligible", False),
-                "payment_mode": serializer.validated_data.get("payment_mode") or "CASH",
-                "bank_account_name": serializer.validated_data.get("bank_account_name") or "",
-                "bank_account_number": serializer.validated_data.get("bank_account_number") or "",
-                "bank_ifsc": serializer.validated_data.get("bank_ifsc") or "",
-                "upi_id": serializer.validated_data.get("upi_id") or "",
-                "kyc_id_type": serializer.validated_data.get("kyc_id_type") or "",
-                "kyc_id_number": serializer.validated_data.get("kyc_id_number") or "",
-                "kyc_verified": serializer.validated_data.get("kyc_verified", False),
-                "address": serializer.validated_data.get("address") or "",
-                "emergency_contact_name": serializer.validated_data.get("emergency_contact_name") or "",
-                "emergency_contact_phone": serializer.validated_data.get("emergency_contact_phone") or "",
-                "cost_center_code": serializer.validated_data.get("cost_center_code") or "",
-                "payroll_expense_account": serializer.validated_data.get("payroll_expense_account"),
-            },
-            partial=True,
-            context={"request": request},
-        )
-        profile_serializer.is_valid(raise_exception=True)
-        employee = profile_serializer.save()
         return Response(
             {
                 "employee": EmployeeProfileSerializer(employee, context={"request": request}).data,
-                "user_id": getattr(payload.get("user"), "id", None),
-            }
+                "user_id": getattr(login_user, "id", None),
+            },
+            status=status.HTTP_201_CREATED,
         )
 
 
