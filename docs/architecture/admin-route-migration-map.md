@@ -237,3 +237,18 @@ Every route in the table above, every backend endpoint, every model, migration,
 and database field is preserved. Phase 9A is classification + safe hygiene only.
 
 Full Phase 9A audit detail: `docs/architecture/admin-route-cleanup-phase-9a-report.md`.
+
+## Phase 9B.1 — Canonical alias flip plan (planning + lock only, no flip)
+
+Phase 9B.1 prepares the `migrate_then_alias` flip for the four canonical alias
+families (Profiles & Parties, CRM & Requests, Lucky Plan Control, Finance
+Operations) **without** moving any page content, flipping any redirect, or
+deleting any route. It documents the per-family migration plan, the safe
+one-module-at-a-time order (Profiles & Parties → CRM & Requests → Lucky Plan
+Control → Finance Operations, Finance last), and locks the current pre-flip
+topology with a guard test. `/admin/profiles/vendors` and `/admin/profiles/staff`
+are explicitly **excluded** from the flip (cross-module ownership; their current
+alias direction is the intended permanent state).
+
+Full plan: `docs/architecture/admin-canonical-alias-flip-plan.md`.
+Lock test: `frontend/tests/unit/route-cleanup-phase-9b1.test.ts`.
