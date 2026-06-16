@@ -26,7 +26,11 @@ from inventory.models import (
     VendorContact,
     VendorPayment,
 )
-from inventory.services.stock_service import generate_stock_adjustment_number
+from inventory.services.stock_service import (
+    compute_adjustment_line_readiness,
+    compute_adjustment_posting_readiness,
+    generate_stock_adjustment_number,
+)
 from inventory.services.stock_service import upsert_purchase_bill_draft
 
 
@@ -135,6 +139,13 @@ class StockAdjustmentLineSerializer(serializers.ModelSerializer):
         read_only=True,
         allow_null=True,
     )
+    # Additive, read-only valuation readiness (never coerces unknown cost to 0).
+    effective_unit_cost = serializers.SerializerMethodField()
+    line_valuation = serializers.SerializerMethodField()
+    valuation_status = serializers.SerializerMethodField()
+    has_standard_cost = serializers.SerializerMethodField()
+    requires_unit_cost = serializers.SerializerMethodField()
+    line_blocker = serializers.SerializerMethodField()
 
     class Meta:
         model = StockAdjustmentLine
@@ -147,6 +158,12 @@ class StockAdjustmentLineSerializer(serializers.ModelSerializer):
             "quantity_delta",
             "unit_cost_snapshot",
             "valuation_amount_snapshot",
+            "effective_unit_cost",
+            "line_valuation",
+            "valuation_status",
+            "has_standard_cost",
+            "requires_unit_cost",
+            "line_blocker",
             "notes",
             "created_at",
             "updated_at",
@@ -157,7 +174,52 @@ class StockAdjustmentLineSerializer(serializers.ModelSerializer):
             "updated_at",
             "inventory_item_standard_unit_cost",
             "valuation_amount_snapshot",
+            "effective_unit_cost",
+            "line_valuation",
+            "valuation_status",
+            "has_standard_cost",
+            "requires_unit_cost",
+            "line_blocker",
         ]
+
+    def _readiness(self, obj):
+        # ``obj`` is a saved StockAdjustmentLine in read paths; unsaved nested
+        # write payloads (dicts) never reach SerializerMethodField rendering.
+        if not isinstance(obj, StockAdjustmentLine) or obj.pk is None:
+            return None
+        cache = getattr(obj, "_readiness_cache", None)
+        if cache is None:
+            cache = compute_adjustment_line_readiness(obj)
+            obj._readiness_cache = cache
+        return cache
+
+    def get_effective_unit_cost(self, obj):
+        readiness = self._readiness(obj)
+        if not readiness or readiness["effective_unit_cost"] is None:
+            return None
+        return f"{readiness['effective_unit_cost']:.2f}"
+
+    def get_line_valuation(self, obj):
+        readiness = self._readiness(obj)
+        if not readiness or readiness["line_valuation"] is None:
+            return None
+        return f"{readiness['line_valuation']:.2f}"
+
+    def get_valuation_status(self, obj):
+        readiness = self._readiness(obj)
+        return readiness["valuation_status"] if readiness else None
+
+    def get_has_standard_cost(self, obj):
+        readiness = self._readiness(obj)
+        return bool(readiness["has_standard_cost"]) if readiness else False
+
+    def get_requires_unit_cost(self, obj):
+        readiness = self._readiness(obj)
+        return bool(readiness["requires_unit_cost"]) if readiness else False
+
+    def get_line_blocker(self, obj):
+        readiness = self._readiness(obj)
+        return readiness["line_blocker"] if readiness else None
 
     def validate_unit_cost_snapshot(self, value):
         if value is None:
@@ -209,6 +271,12 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
     posted_by_username = serializers.CharField(source="posted_by.username", read_only=True)
     stock_location_code = serializers.CharField(source="stock_location.code", read_only=True)
     stock_location_name = serializers.CharField(source="stock_location.name", read_only=True)
+    # Additive, read-only posting readiness so the register can show per-row
+    # blockers instead of failing the whole list when one row is not postable.
+    can_post = serializers.SerializerMethodField()
+    posting_blockers = serializers.SerializerMethodField()
+    valuation_status = serializers.SerializerMethodField()
+    requires_unit_cost = serializers.SerializerMethodField()
 
     class Meta:
         model = StockAdjustment
@@ -230,6 +298,10 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
             "posted_at",
             "posted_journal_entry",
             "lines",
+            "can_post",
+            "posting_blockers",
+            "valuation_status",
+            "requires_unit_cost",
             "created_at",
             "updated_at",
         ]
@@ -244,9 +316,38 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
             "posted_by_username",
             "posted_at",
             "posted_journal_entry",
+            "can_post",
+            "posting_blockers",
+            "valuation_status",
+            "requires_unit_cost",
             "created_at",
             "updated_at",
         ]
+
+    def _posting_readiness(self, obj):
+        if not isinstance(obj, StockAdjustment) or obj.pk is None:
+            return None
+        cache = getattr(obj, "_posting_readiness_cache", None)
+        if cache is None:
+            cache = compute_adjustment_posting_readiness(obj)
+            obj._posting_readiness_cache = cache
+        return cache
+
+    def get_can_post(self, obj):
+        readiness = self._posting_readiness(obj)
+        return bool(readiness["can_post"]) if readiness else False
+
+    def get_posting_blockers(self, obj):
+        readiness = self._posting_readiness(obj)
+        return readiness["posting_blockers"] if readiness else []
+
+    def get_valuation_status(self, obj):
+        readiness = self._posting_readiness(obj)
+        return readiness["valuation_status"] if readiness else None
+
+    def get_requires_unit_cost(self, obj):
+        readiness = self._posting_readiness(obj)
+        return bool(readiness["requires_unit_cost"]) if readiness else False
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

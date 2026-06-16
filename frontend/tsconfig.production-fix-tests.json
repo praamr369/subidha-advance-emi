@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".tmp-production-fix-tests",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "ES2022",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "declaration": false,
+    "sourceMap": false,
+    "incremental": false
+  },
+  "include": [
+    "tests/unit/emi-installment.test.ts",
+    "tests/unit/inventory-adjustment.test.ts",
+    "tests/unit/production-fix-page-wiring.test.ts",
+    "src/lib/emi-installment.ts",
+    "src/lib/inventory-adjustment.ts"
+  ],
+  "exclude": ["node_modules"]
+}

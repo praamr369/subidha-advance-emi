@@ -251,6 +251,11 @@ export type InventoryValuationReport = {
   rows: InventoryValuationRow[];
 };
 
+export type AdjustmentValuationStatus =
+  | "READY"
+  | "MISSING_UNIT_COST"
+  | "NOT_APPLICABLE";
+
 export type StockAdjustmentLine = {
   id?: number;
   inventory_item: number;
@@ -260,6 +265,13 @@ export type StockAdjustmentLine = {
   quantity_delta: string;
   unit_cost_snapshot?: string | null;
   valuation_amount_snapshot?: string | null;
+  // Additive, read-only valuation readiness (null = unknown, never ₹0).
+  effective_unit_cost?: string | null;
+  line_valuation?: string | null;
+  valuation_status?: AdjustmentValuationStatus;
+  has_standard_cost?: boolean;
+  requires_unit_cost?: boolean;
+  line_blocker?: string | null;
   notes?: string;
 };
 
@@ -276,6 +288,11 @@ export type StockAdjustment = {
   approved_by_username?: string | null;
   posted_by_username?: string | null;
   posted_journal_entry?: number | null;
+  // Additive, read-only posting readiness.
+  can_post?: boolean;
+  posting_blockers?: string[];
+  valuation_status?: AdjustmentValuationStatus;
+  requires_unit_cost?: boolean;
 };
 
 export type VendorLite = {
@@ -607,6 +624,19 @@ export function postStockAdjustment(id: number) {
     {
       method: "POST",
       body: JSON.stringify({}),
+    }
+  );
+}
+
+export function setStockAdjustmentLineCosts(
+  id: number,
+  unitCosts: Record<string, string | null>
+) {
+  return apiFetch<{ updated: number; stock_adjustment: StockAdjustment }>(
+    `/inventory/stock-adjustments/${id}/set-line-costs/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ unit_costs: unitCosts }),
     }
   );
 }

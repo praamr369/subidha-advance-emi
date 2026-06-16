@@ -43,6 +43,11 @@ import {
   type UnifiedReceivableResult,
   type UnifiedReceivablePreviewResponse,
 } from "@/services/receivables";
+import {
+  emiInstallmentLabel,
+  isEmiCollectible,
+  resolveOutstandingAmount,
+} from "@/lib/emi-installment";
 
 type AdminPaymentCollectVariant = "page" | "drawer";
 type CollectionWorkflow = "advance-emi" | "direct-sale" | "unified";
@@ -207,20 +212,19 @@ function WorkflowTabs({ active }: { active: CollectionWorkflow }) {
   );
 }
 
+// Numeric string for the amount input (or "" when unknown — never a fake 0).
 function normalizeOutstandingAmount(
   emi: AdminEmiCollectionCandidate | null
 ): string {
-  if (!emi) return "";
-  if (emi.outstanding_amount && emi.outstanding_amount !== "0") {
-    return String(emi.outstanding_amount);
-  }
+  return resolveOutstandingAmount(emi) ?? "";
+}
 
-  const amount = Number(emi.amount || 0);
-  const paid = Number(emi.paid_amount || 0);
-  const waived = Number(emi.waived_amount || 0);
-  const outstanding = amount - paid - waived;
-
-  return outstanding > 0 ? outstanding.toFixed(2) : "0.00";
+// Display string for outstanding: "Not available" when unknown, never ₹0.
+function outstandingDisplayLabel(
+  emi: AdminEmiCollectionCandidate | null
+): string {
+  const resolved = resolveOutstandingAmount(emi);
+  return resolved === null ? "Not available" : formatCurrency(resolved);
 }
 
 function getSubscriptionLabel(
@@ -237,17 +241,19 @@ function getSubscriptionLabel(
   return `${code} • ${customer}${phone}${product}`;
 }
 
-function getEmiLabel(emi: AdminEmiCollectionCandidate): string {
-  const inst =
-    emi.installment_no !== undefined && emi.installment_no !== null
-      ? `EMI ${emi.installment_no}`
-      : `EMI #${emi.id}`;
+function getEmiLabel(
+  emi: AdminEmiCollectionCandidate,
+  subscription?: AdminSubscriptionCollectionCandidate | null
+): string {
+  // Operator-friendly installment label (e.g. "1st EMI of 15"), never raw db id.
+  const inst = emiInstallmentLabel(emi, subscription);
+  const collectible = isEmiCollectible(emi)
+    ? emi.status
+    : `${emi.status} — Not collectible`;
 
   return `${inst} • Due ${formatDateLabel(
     emi.due_date
-  )} • Outstanding ${formatCurrency(normalizeOutstandingAmount(emi))} • ${
-    emi.status
-  }`;
+  )} • Outstanding ${outstandingDisplayLabel(emi)} • ${collectible}`;
 }
 
 export default function AdminPaymentCollectPage({
@@ -329,6 +335,9 @@ export default function AdminPaymentCollectPage({
     PAYMENT_METHOD_OPTIONS.find(
       (option) => option.value === form.payment_method
     )?.label ?? form.payment_method;
+  const selectedEmiLabel = selectedEmi
+    ? emiInstallmentLabel(selectedEmi, selectedSubscription)
+    : "—";
   const showAside = variant === "page";
   const availableCounters = form.branch_id
     ? counters.filter((counter) => String(counter.branch) === form.branch_id)
@@ -722,6 +731,10 @@ export default function AdminPaymentCollectPage({
       return "Select a valid EMI.";
     }
 
+    if (selectedEmi && !isEmiCollectible(selectedEmi)) {
+      return `This EMI is ${selectedEmi.status} and is not collectible.`;
+    }
+
     if (!form.amount.trim()) {
       return "Amount is required.";
     }
@@ -948,7 +961,7 @@ export default function AdminPaymentCollectPage({
               },
               {
                 label: "Selected EMI",
-                value: selectedEmi ? `#${selectedEmi.id}` : "—",
+                value: selectedEmiLabel,
               },
               {
                 label: "Auto amount",
@@ -973,7 +986,7 @@ export default function AdminPaymentCollectPage({
           />
           <KpiCard
             label="Selected EMI"
-            value={selectedEmi ? `#${selectedEmi.id}` : "—"}
+            value={selectedEmiLabel}
             helper={selectedEmi?.status || "No EMI selected"}
           />
           <KpiCard
@@ -1094,8 +1107,12 @@ export default function AdminPaymentCollectPage({
                         : "Select EMI"}
                   </option>
                   {emiOptions.map((emi) => (
-                    <option key={emi.id} value={emi.id}>
-                      {getEmiLabel(emi)}
+                    <option
+                      key={emi.id}
+                      value={emi.id}
+                      disabled={!isEmiCollectible(emi)}
+                    >
+                      {getEmiLabel(emi, selectedSubscription)}
                     </option>
                   ))}
                 </select>
@@ -1338,7 +1355,12 @@ export default function AdminPaymentCollectPage({
                 description="This action posts a financial collection record and updates the selected EMI allocation state. Confirm the subscription, EMI, amount, branch/counter, method, and reference number before posting."
                 onConfirm={submitPayment}
                 variant="primary"
-                disabled={isSubmitting || loadingSubscription || loadingEmis}
+                disabled={
+                  isSubmitting ||
+                  loadingSubscription ||
+                  loadingEmis ||
+                  (selectedEmi ? !isEmiCollectible(selectedEmi) : false)
+                }
                 className="h-11"
               />
 
@@ -1411,8 +1433,8 @@ export default function AdminPaymentCollectPage({
             <DetailPanel title="Selected EMI">
               <div className="grid gap-3">
                 <KpiCard
-                  label="EMI ID"
-                  value={selectedEmi ? `#${selectedEmi.id}` : "—"}
+                  label="Installment"
+                  value={selectedEmiLabel}
                   helper={selectedEmi?.status || "No EMI selected"}
                 />
                 <KpiCard
@@ -1427,9 +1449,23 @@ export default function AdminPaymentCollectPage({
                 />
                 <KpiCard
                   label="Outstanding"
-                  value={form.amount ? formatCurrency(form.amount) : "—"}
-                  helper="Auto-filled collection amount"
+                  value={outstandingDisplayLabel(selectedEmi)}
+                  helper="Collectible outstanding amount"
                 />
+                {selectedEmi?.paid_amount !== undefined ? (
+                  <KpiCard
+                    label="Paid"
+                    value={formatCurrency(selectedEmi.paid_amount)}
+                    helper="Already collected against this EMI"
+                  />
+                ) : null}
+                {selectedEmi?.waived_amount !== undefined ? (
+                  <KpiCard
+                    label="Waived"
+                    value={formatCurrency(selectedEmi.waived_amount)}
+                    helper="Waived portion of this EMI"
+                  />
+                ) : null}
               </div>
             </DetailPanel>
 

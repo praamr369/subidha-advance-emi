@@ -88,6 +88,9 @@ export type AdminEmiCollectionCandidate = {
   subscription: number;
   installment_no?: number;
   month_no?: number;
+  total_installments?: number;
+  installment_label?: string;
+  display_label?: string;
   due_date?: string;
   amount: string;
   paid_amount?: string;

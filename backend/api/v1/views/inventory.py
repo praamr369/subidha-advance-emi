@@ -37,7 +37,11 @@ from inventory.services.stock_service import (
     approve_stock_adjustment,
     build_stock_ledger,
     build_stock_summary,
+    compute_adjustment_posting_readiness,
     post_stock_adjustment,
+    set_stock_adjustment_line_unit_costs,
+    UNIT_COST_REQUIRED_BEFORE_POSTING_MSG,
+    UNIT_COST_REQUIRED_CODE,
 )
 from billing.services.reversal_service import _location_quantity
 from subscriptions.models import AuditLog
@@ -216,6 +220,48 @@ class StockAdjustmentViewSet(AdminInventoryModelViewSet):
                 stock_adjustment_id=int(pk),
                 posted_by=request.user,
             )
+        except ValueError as exc:
+            # Missing-cost posting blocks are a controlled, structured 400 with a
+            # stable code + per-line errors — never a 500, never a list failure.
+            if str(exc) == UNIT_COST_REQUIRED_BEFORE_POSTING_MSG:
+                blocked = StockAdjustment.objects.filter(pk=int(pk)).first()
+                line_errors = (
+                    compute_adjustment_posting_readiness(blocked)["line_errors"]
+                    if blocked is not None
+                    else []
+                )
+                return Response(
+                    {
+                        "detail": UNIT_COST_REQUIRED_BEFORE_POSTING_MSG,
+                        "code": UNIT_COST_REQUIRED_CODE,
+                        "line_errors": line_errors,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = StockAdjustmentSerializer(adjustment, context=self.get_serializer_context())
+        return Response({"updated": updated, "stock_adjustment": payload.data})
+
+    @action(detail=True, methods=["post"], url_path="set-line-costs")
+    @require_capability("inventory.adjust")
+    def set_line_costs(self, request, pk=None):
+        """Set/clear line unit costs before posting (DRAFT/APPROVED only).
+
+        Body: {"unit_costs": {"<line_id>": "<unit_cost>" | null, ...}}.
+        Only ``unit_cost_snapshot`` is touched; quantities, journals, and posted
+        ledger rows are never altered.
+        """
+        unit_costs = request.data.get("unit_costs") or {}
+        if not isinstance(unit_costs, dict):
+            raise ValidationError({"detail": "unit_costs must be an object mapping line id to unit cost."})
+        try:
+            adjustment, updated = set_stock_adjustment_line_unit_costs(
+                stock_adjustment_id=int(pk),
+                unit_costs=unit_costs,
+                performed_by=request.user,
+            )
+        except StockAdjustment.DoesNotExist:
+            return Response({"detail": "Stock adjustment not found."}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         payload = StockAdjustmentSerializer(adjustment, context=self.get_serializer_context())

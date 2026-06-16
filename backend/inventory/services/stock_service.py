@@ -375,6 +375,168 @@ def approve_stock_adjustment(*, stock_adjustment_id: int, approved_by):
 UNIT_COST_REQUIRED_BEFORE_POSTING_MSG = (
     "Unit cost is required before posting this stock adjustment."
 )
+UNIT_COST_REQUIRED_CODE = "UNIT_COST_REQUIRED"
+
+# Adjustment line valuation readiness states (display/contract only — these
+# never change posting math, journal rules, or ledger immutability).
+VALUATION_STATUS_READY = "READY"
+VALUATION_STATUS_MISSING_UNIT_COST = "MISSING_UNIT_COST"
+VALUATION_STATUS_NOT_APPLICABLE = "NOT_APPLICABLE"
+
+# Statuses where line unit cost may still be set safely before any ledger /
+# journal mutation has happened. Posting/cancellation are excluded.
+_EDITABLE_PRE_POSTING_STATUSES = {
+    StockAdjustmentStatus.DRAFT,
+    StockAdjustmentStatus.APPROVED,
+}
+
+
+def resolve_effective_unit_cost(line) -> Decimal | None:
+    """Resolve the effective unit cost used for valuation/posting.
+
+    Preference order mirrors :func:`post_stock_adjustment` exactly so readiness
+    previews never diverge from real posting behaviour:
+      1. explicit line ``unit_cost_snapshot`` (frozen override)
+      2. item ``standard_unit_cost`` fallback
+      3. ``None`` when neither exists — never silently 0.
+    """
+    if line.unit_cost_snapshot is not None:
+        return _money(line.unit_cost_snapshot)
+    std = getattr(line.inventory_item, "standard_unit_cost", None)
+    if std is not None:
+        return _money(std)
+    return None
+
+
+def compute_adjustment_line_readiness(line) -> dict:
+    """Return display-only valuation readiness for a single adjustment line.
+
+    Missing cost is reported as ``None`` (unknown), never coerced to 0.
+    """
+    effective = resolve_effective_unit_cost(line)
+    qty_abs = abs(_quantity(line.quantity_delta))
+    has_standard_cost = getattr(line.inventory_item, "standard_unit_cost", None) is not None
+    if effective is None:
+        return {
+            "effective_unit_cost": None,
+            "line_valuation": None,
+            "valuation_status": VALUATION_STATUS_MISSING_UNIT_COST,
+            "has_standard_cost": has_standard_cost,
+            "requires_unit_cost": True,
+            "line_blocker": UNIT_COST_REQUIRED_BEFORE_POSTING_MSG,
+        }
+    line_valuation = _money(qty_abs * effective)
+    return {
+        "effective_unit_cost": effective,
+        "line_valuation": line_valuation,
+        "valuation_status": VALUATION_STATUS_READY,
+        "has_standard_cost": has_standard_cost,
+        "requires_unit_cost": False,
+        "line_blocker": None,
+    }
+
+
+def compute_adjustment_posting_readiness(adjustment) -> dict:
+    """Return whether an adjustment can be posted plus human-readable blockers.
+
+    This is a read-only inspection used by the API list/detail payload and by
+    the controlled posting error response. It does not mutate anything and does
+    not relax the posting guard in :func:`post_stock_adjustment`.
+    """
+    blockers: list[str] = []
+    line_errors: list[dict] = []
+    lines = list(adjustment.lines.select_related("inventory_item").order_by("id"))
+
+    if adjustment.status != StockAdjustmentStatus.APPROVED:
+        blockers.append("Only approved stock adjustments can be posted.")
+    if not (adjustment.reason or "").strip():
+        blockers.append("Reason is required before posting a stock adjustment.")
+    if not lines:
+        blockers.append("Stock adjustment lines are required before posting.")
+
+    missing_cost = False
+    for line in lines:
+        readiness = compute_adjustment_line_readiness(line)
+        if readiness["requires_unit_cost"]:
+            missing_cost = True
+            line_errors.append(
+                {
+                    "line_id": line.id,
+                    "inventory_item": line.inventory_item_id,
+                    "code": UNIT_COST_REQUIRED_CODE,
+                    "detail": UNIT_COST_REQUIRED_BEFORE_POSTING_MSG,
+                }
+            )
+    if missing_cost:
+        blockers.append(UNIT_COST_REQUIRED_BEFORE_POSTING_MSG)
+
+    return {
+        "can_post": not blockers,
+        "posting_blockers": blockers,
+        "line_errors": line_errors,
+        "requires_unit_cost": missing_cost,
+        "valuation_status": (
+            VALUATION_STATUS_NOT_APPLICABLE
+            if not lines
+            else VALUATION_STATUS_MISSING_UNIT_COST
+            if missing_cost
+            else VALUATION_STATUS_READY
+        ),
+    }
+
+
+@transaction.atomic
+def set_stock_adjustment_line_unit_costs(*, stock_adjustment_id: int, unit_costs: dict, performed_by=None):
+    """Set line ``unit_cost_snapshot`` values before posting (DRAFT/APPROVED).
+
+    ``unit_costs`` maps line id -> unit cost (Decimal/str/number, or None to
+    clear). Only the unit cost is touched — quantities, reasons, and ledger rows
+    are never altered here. Refuses POSTED/CANCELLED so posted ledger valuation
+    can never be retro-edited.
+    """
+    adjustment = (
+        StockAdjustment.objects.select_for_update()
+        .prefetch_related("lines")
+        .get(pk=stock_adjustment_id)
+    )
+    if adjustment.status not in _EDITABLE_PRE_POSTING_STATUSES:
+        raise ValueError(
+            "Unit cost can only be edited while the adjustment is draft or approved (pre-posting)."
+        )
+
+    lines_by_id = {line.id: line for line in adjustment.lines.all()}
+    updated = 0
+    for raw_line_id, raw_cost in (unit_costs or {}).items():
+        try:
+            line_id = int(raw_line_id)
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid line id: {raw_line_id!r}.")
+        line = lines_by_id.get(line_id)
+        if line is None:
+            raise ValueError(f"Line {line_id} does not belong to this adjustment.")
+        if raw_cost in (None, ""):
+            new_cost = None
+        else:
+            new_cost = _money(raw_cost)
+            if new_cost < Decimal("0.00"):
+                raise ValueError("Unit cost cannot be negative.")
+        if line.unit_cost_snapshot != new_cost:
+            line.unit_cost_snapshot = new_cost
+            line.save(update_fields=["unit_cost_snapshot", "updated_at"])
+            updated += 1
+
+    log_inventory_event(
+        action_type=AuditLog.ActionType.STOCK_ADJUSTMENT_UPDATED,
+        instance=adjustment,
+        performed_by=performed_by,
+        event="STOCK_ADJUSTMENT_LINE_UNIT_COST_SET",
+        metadata={
+            "adjustment_id": adjustment.id,
+            "adjustment_no": adjustment.adjustment_no,
+            "updated_line_count": updated,
+        },
+    )
+    return adjustment, updated
 
 
 @transaction.atomic

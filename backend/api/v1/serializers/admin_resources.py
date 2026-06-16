@@ -534,6 +534,15 @@ class EmiAdminSerializer(serializers.ModelSerializer):
     balance_amount = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
     overdue_days = serializers.SerializerMethodField()
+    # Additive, read-only operator labelling. ``installment_no`` is the
+    # subscription-local sequence (month_no), never the global db id.
+    installment_no = serializers.IntegerField(source="month_no", read_only=True)
+    total_installments = serializers.SerializerMethodField()
+    installment_label = serializers.SerializerMethodField()
+    display_label = serializers.SerializerMethodField()
+    paid_amount = serializers.SerializerMethodField()
+    waived_amount = serializers.SerializerMethodField()
+    outstanding_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Emi
@@ -549,14 +558,48 @@ class EmiAdminSerializer(serializers.ModelSerializer):
             "lucky_id",
             "lucky_number",
             "month_no",
+            "installment_no",
+            "total_installments",
+            "installment_label",
+            "display_label",
             "due_date",
             "amount",
             "status",
             "total_paid",
+            "paid_amount",
+            "waived_amount",
+            "outstanding_amount",
             "balance_amount",
             "is_overdue",
             "overdue_days",
         )
+
+    def get_total_installments(self, obj):
+        return getattr(obj.subscription, "tenure_months", None)
+
+    def get_installment_label(self, obj):
+        from subscriptions.services.emi_label_service import installment_label
+
+        return installment_label(
+            obj.month_no, getattr(obj.subscription, "tenure_months", None)
+        )
+
+    def get_display_label(self, obj):
+        return self.get_installment_label(obj)
+
+    def get_paid_amount(self, obj):
+        if obj.status == EmiStatus.WAIVED:
+            return "0.00"
+        return str(obj.total_paid())
+
+    def get_waived_amount(self, obj):
+        return str(obj.amount if obj.status == EmiStatus.WAIVED else Decimal("0.00"))
+
+    def get_outstanding_amount(self, obj):
+        if obj.status == EmiStatus.WAIVED:
+            return "0.00"
+        outstanding = obj.amount - obj.total_paid()
+        return str(max(outstanding, Decimal("0.00")))
 
     def get_total_paid(self, obj):
         return str(obj.total_paid())

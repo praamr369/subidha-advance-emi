@@ -15,6 +15,25 @@ class PdfBrandingContext:
     watermark: str
 
 
+def _first_branding_value(profile, candidate_fields: tuple[str, ...]) -> str:
+    """Return the first non-empty value among candidate attribute names.
+
+    BusinessProfile field names have varied over time (e.g. ``pan`` vs
+    ``pan_number``). Branding rendering must never assume one specific spelling,
+    so we probe a list of compatible names defensively and fall back to "" when
+    none of them exist or carry a value. This keeps contract/receipt PDF
+    generation crash-free even when optional branding data is absent.
+    """
+    for field_name in candidate_fields:
+        value = getattr(profile, field_name, None)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
 def get_branding_context() -> PdfBrandingContext:
     profile = BusinessProfile.objects.filter(is_active=True).order_by("-created_at", "-id").first()
     if not profile:
@@ -28,28 +47,37 @@ def get_branding_context() -> PdfBrandingContext:
         )
 
     address_bits = [
-        profile.address_line_1,
-        profile.address_line_2,
-        profile.landmark,
-        profile.city,
-        profile.district,
-        profile.state,
-        profile.postal_code,
-        profile.country,
+        _first_branding_value(profile, ("address_line_1",)),
+        _first_branding_value(profile, ("address_line_2",)),
+        _first_branding_value(profile, ("landmark",)),
+        _first_branding_value(profile, ("city",)),
+        _first_branding_value(profile, ("district",)),
+        _first_branding_value(profile, ("state",)),
+        _first_branding_value(profile, ("postal_code",)),
+        _first_branding_value(profile, ("country",)),
     ]
-    address = ", ".join([bit for bit in address_bits if (bit or "").strip()])
+    address = ", ".join([bit for bit in address_bits if bit])
+
+    gst_value = _first_branding_value(profile, ("gstin", "gst", "gst_number", "tax_id"))
+    pan_value = _first_branding_value(
+        profile, ("pan", "pan_number", "owner_pan", "business_pan")
+    )
     tax_bits = []
-    if profile.gstin:
-        tax_bits.append(f"GST: {profile.gstin}")
-    if profile.pan:
-        tax_bits.append(f"PAN: {profile.pan}")
+    if gst_value:
+        tax_bits.append(f"GST: {gst_value}")
+    if pan_value:
+        tax_bits.append(f"PAN: {pan_value}")
+
+    legal_name = _first_branding_value(profile, ("legal_name",))
+    trade_name = _first_branding_value(profile, ("trade_name",))
+    business_name = trade_name or legal_name or "Subidha Furniture"
     return PdfBrandingContext(
-        business_name=profile.trade_name or profile.legal_name or "Subidha Furniture",
+        business_name=business_name,
         address=address,
-        phone=profile.primary_phone or "",
-        email=profile.primary_email or "",
+        phone=_first_branding_value(profile, ("primary_phone", "phone")),
+        email=_first_branding_value(profile, ("primary_email", "email")),
         tax_line=" | ".join(tax_bits),
-        watermark=(profile.trade_name or profile.legal_name or "SUBIDHA").upper(),
+        watermark=(trade_name or legal_name or "SUBIDHA").upper(),
     )
 
 
