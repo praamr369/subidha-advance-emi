@@ -10,6 +10,11 @@ from api.v1.views.staff_portal import (
     StaffSalarySummaryView,
     StaffTasksView,
 )
+from api.v1.views.staff_kyc import (
+    StaffSelfKycAuditTrailView,
+    StaffSelfKycDocumentDownloadView,
+    StaffSelfKycDocumentListUploadView,
+)
 
 urlpatterns = [
     path("dashboard/", StaffDashboardView.as_view(), name="staff-dashboard"),
@@ -20,4 +25,9 @@ urlpatterns = [
     path("salary-summary/", StaffSalarySummaryView.as_view(), name="staff-salary-summary"),
     path("reports/", StaffReportsView.as_view(), name="staff-reports"),
     path("tasks/", StaffTasksView.as_view(), name="staff-tasks"),
+    # KYC self-service (Phase KYC)
+    path("kyc/documents/", StaffSelfKycDocumentListUploadView.as_view(), name="staff-kyc-documents"),
+    path("kyc/documents/upload/", StaffSelfKycDocumentListUploadView.as_view(), name="staff-kyc-upload"),
+    path("kyc/documents/<int:doc_id>/download/", StaffSelfKycDocumentDownloadView.as_view(), name="staff-kyc-download"),
+    path("kyc/audit-trail/", StaffSelfKycAuditTrailView.as_view(), name="staff-kyc-audit-trail"),
 ]

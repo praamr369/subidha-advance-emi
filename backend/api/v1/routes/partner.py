@@ -1,5 +1,10 @@
 from django.urls import path
 
+from api.v1.views.partner_kyc import (
+    PartnerSelfKycAuditTrailView,
+    PartnerSelfKycDocumentDownloadView,
+    PartnerSelfKycDocumentListUploadView,
+)
 from api.v1.views.partner_collection_requests import (
     LegacyPartnerCollectionListCreateView,
     LegacyPartnerPaymentCollectView,
@@ -66,4 +71,9 @@ urlpatterns = [
     path("collections/", LegacyPartnerCollectionListCreateView.as_view()),
     path("collection-requests/", PartnerCollectionRequestListCreateView.as_view()),
     path("collection-requests/<int:pk>/", PartnerCollectionRequestDetailView.as_view()),
+    # KYC self-service (Phase KYC)
+    path("kyc/documents/", PartnerSelfKycDocumentListUploadView.as_view()),
+    path("kyc/documents/upload/", PartnerSelfKycDocumentListUploadView.as_view()),
+    path("kyc/documents/<int:doc_id>/download/", PartnerSelfKycDocumentDownloadView.as_view()),
+    path("kyc/audit-trail/", PartnerSelfKycAuditTrailView.as_view()),
 ]

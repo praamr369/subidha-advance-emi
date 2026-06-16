@@ -14,6 +14,7 @@ class SubscriptionsConfig(AppConfig):
         import subscriptions.models_policy_governance  # noqa
         import subscriptions.models_rent_lease_collection  # noqa
         import subscriptions.models_customer_advance_refund  # noqa
+        import subscriptions.models_kyc_workflow  # noqa
 
     def ready(self):
         import subscriptions.signals  # noqa

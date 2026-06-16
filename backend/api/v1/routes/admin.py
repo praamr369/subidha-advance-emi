@@ -368,6 +368,29 @@ from api.v1.views.admin_crm_module import (
     AdminCrmLeadStageUpdateView,
     AdminCustomerCrmProfileView,
 )
+from api.v1.views.admin_kyc import (
+    AdminCustomerKycAuditTrailView,
+    AdminCustomerKycRequestResubmissionView,
+    AdminCustomerKycUploadView,
+    AdminPartnerKycAuditTrailView,
+    AdminPartnerKycDocumentApproveView,
+    AdminPartnerKycDocumentDownloadView,
+    AdminPartnerKycDocumentListUploadView,
+    AdminPartnerKycDocumentRejectView,
+    AdminPartnerKycDocumentResubmitView,
+    AdminStaffKycAuditTrailView,
+    AdminStaffKycDocumentApproveView,
+    AdminStaffKycDocumentDownloadView,
+    AdminStaffKycDocumentListUploadView,
+    AdminStaffKycDocumentRejectView,
+    AdminStaffKycDocumentResubmitView,
+    AdminVendorKycAuditTrailView,
+    AdminVendorKycDocumentApproveView,
+    AdminVendorKycDocumentDownloadView,
+    AdminVendorKycDocumentListUploadView,
+    AdminVendorKycDocumentRejectView,
+    AdminVendorKycDocumentResubmitView,
+)
 from api.v1.views.admin_hr import (
     AdminHrAttendanceListCreateView,
     AdminHrExpenseClaimPatchView,
@@ -990,4 +1013,33 @@ urlpatterns = [
     path("settlements/cashier-day-closes/<int:pk>/approve/", CashierDayCloseApproveView.as_view(), name="admin-cashier-day-closes-approve"),
     path("settlements/cashier-day-closes/<int:pk>/reject/", CashierDayCloseRejectView.as_view(), name="admin-cashier-day-closes-reject"),
     path("", include(router.urls)),
+    # KYC intake & review – new additive endpoints (Phase KYC)
+    # Customer
+    path("customers/<int:pk>/kyc-documents/upload/", AdminCustomerKycUploadView.as_view()),
+    path("customers/<int:pk>/kyc-documents/audit-trail/", AdminCustomerKycAuditTrailView.as_view()),
+    path("customers/<int:pk>/kyc-documents/<int:doc_id>/request-resubmission/", AdminCustomerKycRequestResubmissionView.as_view()),
+    # Partner
+    path("partners/<int:pk>/kyc-documents/", AdminPartnerKycDocumentListUploadView.as_view()),
+    path("partners/<int:pk>/kyc-documents/upload/", AdminPartnerKycDocumentListUploadView.as_view()),
+    path("partners/<int:pk>/kyc-documents/audit-trail/", AdminPartnerKycAuditTrailView.as_view()),
+    path("partners/<int:pk>/kyc-documents/<int:doc_id>/approve/", AdminPartnerKycDocumentApproveView.as_view()),
+    path("partners/<int:pk>/kyc-documents/<int:doc_id>/reject/", AdminPartnerKycDocumentRejectView.as_view()),
+    path("partners/<int:pk>/kyc-documents/<int:doc_id>/request-resubmission/", AdminPartnerKycDocumentResubmitView.as_view()),
+    path("partners/<int:pk>/kyc-documents/<int:doc_id>/download/", AdminPartnerKycDocumentDownloadView.as_view()),
+    # Vendor
+    path("vendors/<int:pk>/kyc-documents/", AdminVendorKycDocumentListUploadView.as_view()),
+    path("vendors/<int:pk>/kyc-documents/upload/", AdminVendorKycDocumentListUploadView.as_view()),
+    path("vendors/<int:pk>/kyc-documents/audit-trail/", AdminVendorKycAuditTrailView.as_view()),
+    path("vendors/<int:pk>/kyc-documents/<int:doc_id>/approve/", AdminVendorKycDocumentApproveView.as_view()),
+    path("vendors/<int:pk>/kyc-documents/<int:doc_id>/reject/", AdminVendorKycDocumentRejectView.as_view()),
+    path("vendors/<int:pk>/kyc-documents/<int:doc_id>/request-resubmission/", AdminVendorKycDocumentResubmitView.as_view()),
+    path("vendors/<int:pk>/kyc-documents/<int:doc_id>/download/", AdminVendorKycDocumentDownloadView.as_view()),
+    # Staff
+    path("hr/staff/<int:staff_id>/kyc-documents/", AdminStaffKycDocumentListUploadView.as_view()),
+    path("hr/staff/<int:staff_id>/kyc-documents/upload/", AdminStaffKycDocumentListUploadView.as_view()),
+    path("hr/staff/<int:staff_id>/kyc-documents/audit-trail/", AdminStaffKycAuditTrailView.as_view()),
+    path("hr/staff/<int:staff_id>/kyc-documents/<int:doc_id>/approve/", AdminStaffKycDocumentApproveView.as_view()),
+    path("hr/staff/<int:staff_id>/kyc-documents/<int:doc_id>/reject/", AdminStaffKycDocumentRejectView.as_view()),
+    path("hr/staff/<int:staff_id>/kyc-documents/<int:doc_id>/request-resubmission/", AdminStaffKycDocumentResubmitView.as_view()),
+    path("hr/staff/<int:staff_id>/kyc-documents/<int:doc_id>/download/", AdminStaffKycDocumentDownloadView.as_view()),
 ]

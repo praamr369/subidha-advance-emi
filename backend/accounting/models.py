@@ -3892,3 +3892,237 @@ class ExportPackJob(AccountingTimeStampedModel):
         self.error_message = (self.error_message or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+# =============================================================================
+# KYC Document storage for Vendor and Staff (additive, non-breaking)
+# =============================================================================
+
+class KycDocumentGenericStatus(models.TextChoices):
+    SUBMITTED = "SUBMITTED", "Submitted"
+    PENDING = "PENDING", "Pending Review"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    RESUBMISSION_REQUIRED = "RESUBMISSION_REQUIRED", "Resubmission Required"
+
+
+class VendorKycDocumentType(models.TextChoices):
+    AADHAAR = "AADHAAR", "Aadhaar Card"
+    PAN = "PAN", "PAN Card"
+    PASSPORT = "PASSPORT", "Passport"
+    DRIVING_LICENSE = "DRIVING_LICENSE", "Driving License"
+    VOTER_ID = "VOTER_ID", "Voter ID"
+    GST_CERTIFICATE = "GST_CERTIFICATE", "GST Certificate"
+    BANK_PROOF = "BANK_PROOF", "Bank Proof"
+    INCORPORATION_CERTIFICATE = "INCORPORATION_CERTIFICATE", "Incorporation Certificate"
+    OTHER = "OTHER", "Other"
+
+
+def _vendor_kyc_upload_to(instance, filename: str) -> str:
+    from pathlib import Path
+    from uuid import uuid4
+    ext = Path(filename or "").suffix.lower() or ".bin"
+    vendor_id = getattr(instance, "vendor_id", None)
+    doc_type = (getattr(instance, "document_type", "") or "kyc").strip().lower()
+    token = uuid4().hex[:12]
+    identity = f"vendor-{vendor_id}" if vendor_id else "vendor"
+    return f"vendors/kyc/{identity}/{doc_type}-{token}{ext}"
+
+
+class VendorKycDocument(AccountingTimeStampedModel):
+    """KYC document uploaded for a Vendor."""
+
+    vendor = models.ForeignKey(
+        "accounting.Vendor",
+        on_delete=models.CASCADE,
+        related_name="kyc_documents",
+    )
+    document_type = models.CharField(
+        max_length=30,
+        choices=VendorKycDocumentType.choices,
+        default=VendorKycDocumentType.OTHER,
+        db_index=True,
+    )
+    category = models.CharField(max_length=30, blank=True, default="", db_index=True)
+    document_reference = models.CharField(max_length=80, blank=True, default="")
+    file = models.FileField(upload_to=_vendor_kyc_upload_to)
+    original_filename = models.CharField(max_length=255, blank=True, default="")
+    content_type = models.CharField(max_length=100, blank=True, default="")
+    file_size = models.PositiveBigIntegerField(default=0)
+    notes = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=30,
+        choices=KycDocumentGenericStatus.choices,
+        default=KycDocumentGenericStatus.SUBMITTED,
+        db_index=True,
+    )
+    upload_source = models.CharField(max_length=30, blank=True, default="", db_index=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_vendor_kyc_documents",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_vendor_kyc_documents",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, default="")
+    resubmission_of = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resubmissions",
+    )
+
+    class Meta:
+        db_table = "accounting_vendor_kyc_documents"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["vendor", "status"]),
+            models.Index(fields=["vendor", "document_type"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not self.vendor_id:
+            errors["vendor"] = "Vendor is required."
+        if not self.file:
+            errors["file"] = "Document file is required."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        from pathlib import Path
+        if self.file:
+            self.original_filename = (
+                self.original_filename or Path(getattr(self.file, "name", "")).name
+            )[:255]
+            self.file_size = int(getattr(self.file, "size", None) or self.file_size or 0)
+            ct = getattr(self.file, "content_type", "") or ""
+            if ct:
+                self.content_type = ct[:100]
+        self.notes = (self.notes or "").strip()
+        self.rejection_reason = (self.rejection_reason or "").strip()
+        self.document_reference = (self.document_reference or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"VendorKYC {self.document_type} for vendor {self.vendor_id} [{self.status}]"
+
+
+class StaffKycDocumentType(models.TextChoices):
+    AADHAAR = "AADHAAR", "Aadhaar Card"
+    PAN = "PAN", "PAN Card"
+    PASSPORT = "PASSPORT", "Passport"
+    DRIVING_LICENSE = "DRIVING_LICENSE", "Driving License"
+    VOTER_ID = "VOTER_ID", "Voter ID"
+    BANK_PROOF = "BANK_PROOF", "Bank Proof"
+    OTHER = "OTHER", "Other"
+
+
+def _staff_kyc_upload_to(instance, filename: str) -> str:
+    from pathlib import Path
+    from uuid import uuid4
+    ext = Path(filename or "").suffix.lower() or ".bin"
+    employee_id = getattr(instance, "employee_id", None)
+    doc_type = (getattr(instance, "document_type", "") or "kyc").strip().lower()
+    token = uuid4().hex[:12]
+    identity = f"staff-{employee_id}" if employee_id else "staff"
+    return f"staff/kyc/{identity}/{doc_type}-{token}{ext}"
+
+
+class StaffKycDocument(AccountingTimeStampedModel):
+    """KYC document uploaded for a staff member (EmployeeProfile)."""
+
+    employee = models.ForeignKey(
+        "accounting.EmployeeProfile",
+        on_delete=models.CASCADE,
+        related_name="kyc_documents",
+    )
+    document_type = models.CharField(
+        max_length=30,
+        choices=StaffKycDocumentType.choices,
+        default=StaffKycDocumentType.OTHER,
+        db_index=True,
+    )
+    category = models.CharField(max_length=30, blank=True, default="", db_index=True)
+    document_reference = models.CharField(max_length=80, blank=True, default="")
+    file = models.FileField(upload_to=_staff_kyc_upload_to)
+    original_filename = models.CharField(max_length=255, blank=True, default="")
+    content_type = models.CharField(max_length=100, blank=True, default="")
+    file_size = models.PositiveBigIntegerField(default=0)
+    notes = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=30,
+        choices=KycDocumentGenericStatus.choices,
+        default=KycDocumentGenericStatus.SUBMITTED,
+        db_index=True,
+    )
+    upload_source = models.CharField(max_length=30, blank=True, default="", db_index=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_staff_kyc_documents",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_staff_kyc_documents",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, default="")
+    resubmission_of = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resubmissions",
+    )
+
+    class Meta:
+        db_table = "accounting_staff_kyc_documents"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["employee", "status"]),
+            models.Index(fields=["employee", "document_type"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not self.employee_id:
+            errors["employee"] = "Employee is required."
+        if not self.file:
+            errors["file"] = "Document file is required."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        from pathlib import Path
+        if self.file:
+            self.original_filename = (
+                self.original_filename or Path(getattr(self.file, "name", "")).name
+            )[:255]
+            self.file_size = int(getattr(self.file, "size", None) or self.file_size or 0)
+            ct = getattr(self.file, "content_type", "") or ""
+            if ct:
+                self.content_type = ct[:100]
+        self.notes = (self.notes or "").strip()
+        self.rejection_reason = (self.rejection_reason or "").strip()
+        self.document_reference = (self.document_reference or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"StaffKYC {self.document_type} for employee {self.employee_id} [{self.status}]"

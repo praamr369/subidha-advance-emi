@@ -4364,6 +4364,7 @@ class CustomerKycDocumentStatus(models.TextChoices):
     SUBMITTED = "SUBMITTED", "Submitted"
     APPROVED = "APPROVED", "Approved"
     REJECTED = "REJECTED", "Rejected"
+    RESUBMISSION_REQUIRED = "RESUBMISSION_REQUIRED", "Resubmission Required"
 
 
 class KycDocumentCategory(models.TextChoices):
@@ -4420,7 +4421,7 @@ class CustomerKycDocument(TimeStampedModel):
     file_size = models.PositiveBigIntegerField(default=0)
     notes = models.TextField(blank=True, default="")
     status = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=CustomerKycDocumentStatus.choices,
         default=CustomerKycDocumentStatus.SUBMITTED,
         db_index=True,
@@ -4441,6 +4442,21 @@ class CustomerKycDocument(TimeStampedModel):
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
     rejection_reason = models.TextField(blank=True, default="")
+    # Additive: tracks where the upload originated (admin / self-service / CRM / registration)
+    upload_source = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    # Additive: links to the document that this is replacing (resubmission chain)
+    resubmission_of = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resubmissions",
+    )
 
     class Meta:
         db_table = "customer_kyc_documents"

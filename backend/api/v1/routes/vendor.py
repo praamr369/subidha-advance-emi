@@ -16,6 +16,11 @@ from api.v1.views.notifications import (
     VendorNotificationListView,
     VendorNotificationSummaryView,
 )
+from api.v1.views.vendor_kyc import (
+    VendorSelfKycAuditTrailView,
+    VendorSelfKycDocumentDownloadView,
+    VendorSelfKycDocumentListUploadView,
+)
 
 urlpatterns = [
     path("dashboard/", VendorSelfDashboardView.as_view()),
@@ -31,4 +36,9 @@ urlpatterns = [
     path("products/", VendorSelfProductsView.as_view()),
     path("purchase-orders/", VendorSelfPurchaseOrdersView.as_view()),
     path("purchase-returns/", VendorSelfPurchaseReturnsView.as_view()),
+    # KYC self-service (Phase KYC)
+    path("kyc/documents/", VendorSelfKycDocumentListUploadView.as_view()),
+    path("kyc/documents/upload/", VendorSelfKycDocumentListUploadView.as_view()),
+    path("kyc/documents/<int:doc_id>/download/", VendorSelfKycDocumentDownloadView.as_view()),
+    path("kyc/audit-trail/", VendorSelfKycAuditTrailView.as_view()),
 ]
