@@ -14,6 +14,8 @@ import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { ROUTES } from "@/lib/routes";
 import CustomerSelector from "@/components/admin/customers/CustomerSelector";
 import type { CustomerRecord } from "@/services/customers";
+import KycReadinessPanel from "@/domains/subscriptions/components/KycReadinessPanel";
+import type { ContractKycReadiness } from "@/services/kyc-readiness";
 
 type PlanType = "EMI" | "RENT" | "LEASE";
 type SubscriptionCreateVariant = "page" | "drawer";
@@ -425,6 +427,8 @@ export default function SubscriptionCreatePage({
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [manualTenureMonths, setManualTenureMonths] = useState("12");
 
+  const [kycReadiness, setKycReadiness] = useState<ContractKycReadiness | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [globalLoadingLabel, setGlobalLoadingLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -569,6 +573,35 @@ export default function SubscriptionCreatePage({
     tenureMonths,
     isEmiPlan,
     batch,
+    depositPercentNumber,
+    isRentPlan,
+    isLeasePlan,
+  ]);
+
+  // For RENT/LEASE, the activate path is gated on KYC readiness from the backend.
+  // If gating is disabled server-side, readiness.can_activate will be true anyway.
+  const canActivate = useMemo(() => {
+    if (!canSubmit) return false;
+    if (isEmiPlan) return canSubmit;
+    if (kycReadiness && !kycReadiness.can_activate) return false;
+    return true;
+  }, [canSubmit, isEmiPlan, kycReadiness]);
+
+  // Save as Draft is always allowed when the form structure is complete (no KYC gate).
+  const canSaveAsDraft = useMemo(() => {
+    if (isEmiPlan) return false;
+    if (!customer || !product || !startDate) return false;
+    if (!tenureMonths || tenureMonths <= 0) return false;
+    if (depositPercentNumber < 20 || depositPercentNumber > 30) return false;
+    if (isRentPlan && !product.is_rent_enabled) return false;
+    if (isLeasePlan && !product.is_lease_enabled) return false;
+    return true;
+  }, [
+    isEmiPlan,
+    customer,
+    product,
+    startDate,
+    tenureMonths,
     depositPercentNumber,
     isRentPlan,
     isLeasePlan,
@@ -987,6 +1020,7 @@ export default function SubscriptionCreatePage({
     nextLuckyRequestToken();
     setPlanType("EMI");
     setCustomer(null);
+    setKycReadiness(null);
     setProduct(null);
     setBatch(null);
     setLuckyId(null);
@@ -1043,7 +1077,8 @@ export default function SubscriptionCreatePage({
     }
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(options?: { saveAsDraft?: boolean }) {
+    const asDraft = options?.saveAsDraft ?? false;
     setError(null);
     setSuccess(null);
     setDocUploadError(null);
@@ -1082,7 +1117,9 @@ export default function SubscriptionCreatePage({
     setGlobalLoadingLabel(
       isEmiPlan
         ? "Creating subscription and applying contract rules..."
-        : `Creating ${planType} contract and generating contract PDF...`
+        : asDraft
+          ? `Saving ${planType} contract as draft...`
+          : `Creating ${planType} contract and generating contract PDF...`
     );
 
     try {
@@ -1113,6 +1150,7 @@ export default function SubscriptionCreatePage({
           security_deposit_percent: depositPercentNumber,
           handover_notes: handoverNotes || "",
           contract_terms_snapshot: contractTermsSnapshot || "",
+          save_as_draft: asDraft,
         };
 
         created = await apiFetch<CreatedSubscriptionResponse>("/admin/contracts/rent/", {
@@ -1130,6 +1168,7 @@ export default function SubscriptionCreatePage({
           ownership_transfer_allowed: ownershipTransferAllowed,
           handover_notes: handoverNotes || "",
           contract_terms_snapshot: contractTermsSnapshot || "",
+          save_as_draft: asDraft,
         };
 
         created = await apiFetch<CreatedSubscriptionResponse>("/admin/contracts/lease/", {
@@ -1321,6 +1360,7 @@ export default function SubscriptionCreatePage({
                 }}
                 onClear={() => {
                   setCustomer(null);
+                  setKycReadiness(null);
                 }}
                 placeholder="Search customer by phone, name, or code…"
               />
@@ -1925,6 +1965,23 @@ export default function SubscriptionCreatePage({
           </div>
         </SectionCard>
 
+        {customer && (isRentPlan || isLeasePlan || isEmiPlan) ? (
+          <SectionCard
+            title="KYC Readiness"
+            description={
+              isEmiPlan
+                ? "KYC status is shown for reference. The gate is enforced at contract activation, not subscription creation."
+                : "Required documents must be present before the contract can be activated. Save as Draft to register now and upload documents later."
+            }
+          >
+            <KycReadinessPanel
+              customerId={customer.id}
+              planType={planType}
+              onReadinessChange={setKycReadiness}
+            />
+          </SectionCard>
+        ) : null}
+
         {globalLoadingLabel ? <ERPLoadingState label={globalLoadingLabel} /> : null}
 
         {leadContext ? (
@@ -1971,7 +2028,7 @@ export default function SubscriptionCreatePage({
           <ERPErrorState
             title={isEmiPlan ? "Unable to create subscription" : "Unable to create contract"}
             description={error}
-            onRetry={canSubmit ? handleSubmit : undefined}
+            onRetry={canActivate ? handleSubmit : undefined}
           />
         ) : null}
 
@@ -2005,8 +2062,9 @@ export default function SubscriptionCreatePage({
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">Customer KYC ID files</label>
+                    <label htmlFor="kyc-id-files" className="text-xs font-medium text-muted-foreground">Customer KYC ID files</label>
                     <input
+                      id="kyc-id-files"
                       type="file"
                       multiple
                       onChange={(event) => {
@@ -2022,8 +2080,9 @@ export default function SubscriptionCreatePage({
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">Customer signature file</label>
+                    <label htmlFor="signature-file" className="text-xs font-medium text-muted-foreground">Customer signature file</label>
                     <input
+                      id="signature-file"
                       type="file"
                       onChange={(event) => {
                         const file = (event.target.files ?? [])[0] ?? null;
@@ -2157,8 +2216,9 @@ export default function SubscriptionCreatePage({
           <div className={variant === "drawer" ? "popup-action-bar items-center" : "flex flex-wrap gap-3"}>
             <button
               type="button"
-              onClick={handleSubmit}
-              disabled={!canSubmit || submitting}
+              onClick={() => { void handleSubmit(); }}
+              disabled={!canActivate || submitting}
+              data-testid="activate-contract-button"
               className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting
@@ -2167,8 +2227,20 @@ export default function SubscriptionCreatePage({
                   : "Creating Contract..."
                 : isEmiPlan
                   ? "Create Subscription"
-                  : "Create Contract"}
+                  : "Activate Contract"}
             </button>
+
+            {!isEmiPlan ? (
+              <button
+                type="button"
+                onClick={() => { void handleSubmit({ saveAsDraft: true }); }}
+                disabled={!canSaveAsDraft || submitting}
+                data-testid="save-draft-button"
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? "Saving..." : "Save as Draft"}
+              </button>
+            ) : null}
 
             <button
               type="button"

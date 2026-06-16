@@ -569,6 +569,20 @@ PASSWORD_RESET_MAX_RESENDS = _parse_int(
     name="PASSWORD_RESET_MAX_RESENDS",
 )
 
+# --- KYC / document readiness gating ---------------------------------------
+# Additive, non-breaking enforcement switch for the Rent / Lease / EMI
+# subscription contract KYC gate. When False (default) the readiness service
+# still computes and exposes can_activate / can_deliver / missing_documents so
+# the UI can show the checklist, but backend activation / delivery is NOT hard
+# blocked — this preserves existing daily-shop flows and existing tests.
+# When True, EMI / Rent / Lease activation and delivery/handover are blocked
+# with a controlled HTTP 400 (code "KYC_REQUIRED") until the gate passes.
+# Direct sale is never gated by this switch.
+KYC_CONTRACT_GATING_ENABLED = _parse_bool(
+    os.getenv("KYC_CONTRACT_GATING_ENABLED"),
+    default=False,
+)
+
 EMAIL_BACKEND = (
     os.getenv("EMAIL_BACKEND")
     or (

@@ -23,6 +23,8 @@ class AdminRentContractCreateSerializer(serializers.Serializer):
     security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2)
     handover_notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     contract_terms_snapshot = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    # Additive: when true the contract is created as DRAFT (KYC gate not applied).
+    save_as_draft = serializers.BooleanField(required=False, default=False)
 
     def validate_start_date(self, value):
         return value or timezone.localdate()
@@ -43,6 +45,8 @@ class AdminLeaseContractCreateSerializer(serializers.Serializer):
     ownership_transfer_allowed = serializers.BooleanField(required=False, default=False)
     handover_notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     contract_terms_snapshot = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    # Additive: when true the contract is created as DRAFT (KYC gate not applied).
+    save_as_draft = serializers.BooleanField(required=False, default=False)
 
     def validate_start_date(self, value):
         return value or timezone.localdate()

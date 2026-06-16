@@ -958,6 +958,76 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         filename = (document.original_filename or os.path.basename(document.file.name) or f"kyc-{document.id}").strip()
         return FileResponse(document.file.open("rb"), as_attachment=True, filename=filename)
 
+    @action(detail=True, methods=["get"], url_path="contract-readiness")
+    def contract_readiness(self, request, pk=None):
+        """KYC / document readiness for a Rent / Lease / EMI (or direct sale) contract.
+
+        Query params: ``plan_type`` (EMI/RENT/LEASE/DIRECT_SALE), optional
+        ``subscription`` id, optional ``delivery_address_differs`` (truthy),
+        optional ``deposit_required`` (truthy/falsey), optional ``high_value``.
+        """
+        from subscriptions.models import Subscription
+        from subscriptions.services.kyc_readiness_service import (
+            get_contract_kyc_readiness,
+        )
+
+        customer = self.get_object()
+        plan_type = (request.query_params.get("plan_type") or "").strip().upper()
+
+        subscription = None
+        subscription_id = request.query_params.get("subscription")
+        if subscription_id:
+            subscription = (
+                Subscription.objects.filter(pk=subscription_id, customer=customer)
+                .select_related("rent_profile", "lease_profile")
+                .first()
+            )
+            if subscription is not None and not plan_type:
+                plan_type = subscription.plan_type
+
+        def _truthy(value):
+            return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+        deposit_param = request.query_params.get("deposit_required")
+        readiness = get_contract_kyc_readiness(
+            customer,
+            plan_type,
+            subscription,
+            delivery_address_differs=_truthy(
+                request.query_params.get("delivery_address_differs")
+            ),
+            deposit_required=(_truthy(deposit_param) if deposit_param is not None else None),
+            high_value=_truthy(request.query_params.get("high_value")),
+        )
+        return Response(readiness, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="kyc-exception-approve")
+    @transaction.atomic
+    def kyc_exception_approve(self, request, pk=None):
+        """Admin-only audited KYC exception override (requires a reason)."""
+        from subscriptions.services.customer_service import exception_approve_kyc
+
+        reason = (request.data.get("reason") or "").strip()
+        if not reason:
+            return Response(
+                {"reason": ["A reason is required for a KYC exception approval."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        customer = self.get_object()
+        customer = exception_approve_kyc(
+            customer, reason=reason, performed_by=request.user
+        )
+        return Response(
+            {
+                "id": customer.id,
+                "kyc_status": customer.kyc_status,
+                "kyc_reviewed_by_username": getattr(request.user, "username", None),
+                "kyc_reviewed_at": customer.kyc_reviewed_at,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=["get"], url_path="referrals")
     def referrals(self, request, pk=None):
         from api.v1.serializers.customers import CustomerReferralReadSerializer

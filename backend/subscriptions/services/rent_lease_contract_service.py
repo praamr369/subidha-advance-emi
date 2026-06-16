@@ -66,6 +66,7 @@ def create_rent_contract(
     performed_by=None,
     handover_notes: str = "",
     contract_terms_snapshot: str = "",
+    save_as_draft: bool = False,
 ) -> Subscription:
     if start_date is None:
         start_date = timezone.now().date()
@@ -75,6 +76,16 @@ def create_rent_contract(
 
     if not getattr(product, "is_rent_enabled", False):
         raise ValidationError({"product": "Selected product is not enabled for RENT contracts."})
+
+    # Drafts are always allowed. Activating (the default) goes through the
+    # additive KYC/document gate (no-op unless KYC gating is enabled).
+    contract_status = SubscriptionStatus.DRAFT if save_as_draft else SubscriptionStatus.ACTIVE
+    if not save_as_draft:
+        from subscriptions.services.kyc_readiness_service import enforce_contract_kyc_gate
+
+        enforce_contract_kyc_gate(
+            customer=customer, plan_type=PlanType.RENT, stage="activate"
+        )
 
     total_amount = Decimal(product.base_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     monthly_amount = (total_amount / Decimal(tenure_months)).quantize(
@@ -92,7 +103,7 @@ def create_rent_contract(
         start_date=start_date,
         total_amount=total_amount,
         monthly_amount=monthly_amount,
-        status=SubscriptionStatus.ACTIVE,
+        status=contract_status,
         tax_profile_snapshot=build_non_gst_snapshot(
             document_type="ADVANCE_EMI_CONTRACT",
             document_date=start_date,
@@ -160,6 +171,7 @@ def create_lease_contract(
     performed_by=None,
     handover_notes: str = "",
     contract_terms_snapshot: str = "",
+    save_as_draft: bool = False,
 ) -> Subscription:
     if start_date is None:
         start_date = timezone.now().date()
@@ -169,6 +181,16 @@ def create_lease_contract(
 
     if not getattr(product, "is_lease_enabled", False):
         raise ValidationError({"product": "Selected product is not enabled for LEASE contracts."})
+
+    # Drafts are always allowed. Activating (the default) goes through the
+    # additive KYC/document gate (no-op unless KYC gating is enabled).
+    contract_status = SubscriptionStatus.DRAFT if save_as_draft else SubscriptionStatus.ACTIVE
+    if not save_as_draft:
+        from subscriptions.services.kyc_readiness_service import enforce_contract_kyc_gate
+
+        enforce_contract_kyc_gate(
+            customer=customer, plan_type=PlanType.LEASE, stage="activate"
+        )
 
     total_amount = Decimal(product.base_price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     monthly_amount = (total_amount / Decimal(tenure_months)).quantize(
@@ -192,7 +214,7 @@ def create_lease_contract(
         start_date=start_date,
         total_amount=total_amount,
         monthly_amount=monthly_amount,
-        status=SubscriptionStatus.ACTIVE,
+        status=contract_status,
         tax_profile_snapshot=build_non_gst_snapshot(
             document_type="ADVANCE_EMI_CONTRACT",
             document_date=start_date,

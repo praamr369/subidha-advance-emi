@@ -208,6 +208,9 @@ class KycStatus(models.TextChoices):
     VERIFIED = "VERIFIED", "Verified"
     APPROVED = "APPROVED", "Approved"
     REJECTED = "REJECTED", "Rejected"
+    # Additive: admin override that records an explicit, audited exception so a
+    # contract can proceed without full KYC verification. Never set silently.
+    EXCEPTION_APPROVED = "EXCEPTION_APPROVED", "Exception Approved (Admin Override)"
 
 
 class CustomerSource(models.TextChoices):
@@ -275,6 +278,11 @@ class SubscriptionDocumentType(models.TextChoices):
     AMENDMENT_RECORD = "AMENDMENT_RECORD", "Contract Amendment Record"
     DIRECT_SALE_INVOICE_PDF = "DIRECT_SALE_INVOICE_PDF", "Direct Sale Invoice PDF"
     SECURITY_DEPOSIT_RECEIPT_PDF = "SECURITY_DEPOSIT_RECEIPT_PDF", "Security Deposit Receipt PDF"
+    # Additive: signed acknowledgement that the rent/lease asset was handed over.
+    ASSET_HANDOVER_ACKNOWLEDGEMENT = (
+        "ASSET_HANDOVER_ACKNOWLEDGEMENT",
+        "Asset Handover Acknowledgement",
+    )
 
 
 class DocumentVerificationStatus(models.TextChoices):
@@ -3677,6 +3685,10 @@ class AuditLog(models.Model):
         )
         CUSTOMER_KYC_APPROVED = "CUSTOMER_KYC_APPROVED", "Customer KYC Approved"
         CUSTOMER_KYC_REJECTED = "CUSTOMER_KYC_REJECTED", "Customer KYC Rejected"
+        CUSTOMER_KYC_EXCEPTION_APPROVED = (
+            "CUSTOMER_KYC_EXCEPTION_APPROVED",
+            "Customer KYC Exception Approved (Admin Override)",
+        )
         CUSTOMER_REFERRAL_CREATED = "CUSTOMER_REFERRAL_CREATED", "Customer Referral Created"
         CUSTOMER_REFERRAL_COMMISSION_APPROVED = (
             "CUSTOMER_REFERRAL_COMMISSION_APPROVED",
@@ -4354,6 +4366,27 @@ class CustomerKycDocumentStatus(models.TextChoices):
     REJECTED = "REJECTED", "Rejected"
 
 
+class KycDocumentCategory(models.TextChoices):
+    """
+    Additive readiness category for customer KYC documents.
+
+    Lets an uploaded document be classified into the readiness buckets used by
+    the contract KYC gate (ID proof, address proof, etc.) without rewriting the
+    existing document_type storage. When left UNSPECIFIED the readiness service
+    infers a category from ``document_type`` (e.g. AADHAAR -> ID/address proof).
+    """
+
+    UNSPECIFIED = "UNSPECIFIED", "Unspecified"
+    ID_PROOF = "ID_PROOF", "Identity Proof"
+    ADDRESS_PROOF = "ADDRESS_PROOF", "Address Proof"
+    CUSTOMER_PHOTO = "CUSTOMER_PHOTO", "Customer Photo"
+    PHONE_VERIFICATION = "PHONE_VERIFICATION", "Phone Verification"
+    DELIVERY_ADDRESS_PROOF = "DELIVERY_ADDRESS_PROOF", "Delivery Address Proof"
+    GUARANTOR_ID_PROOF = "GUARANTOR_ID_PROOF", "Guarantor Identity Proof"
+    GUARANTOR_ADDRESS_PROOF = "GUARANTOR_ADDRESS_PROOF", "Guarantor Address Proof"
+    OTHER = "OTHER", "Other"
+
+
 class CustomerKycDocument(TimeStampedModel):
     """
     Customer-level KYC documents.
@@ -4370,6 +4403,15 @@ class CustomerKycDocument(TimeStampedModel):
         max_length=30,
         choices=CustomerKycDocumentType.choices,
         default=CustomerKycDocumentType.OTHER,
+        db_index=True,
+    )
+    # Additive readiness classification (blank-safe for existing rows). When
+    # UNSPECIFIED the readiness service infers the category from document_type.
+    category = models.CharField(
+        max_length=30,
+        choices=KycDocumentCategory.choices,
+        default=KycDocumentCategory.UNSPECIFIED,
+        blank=True,
         db_index=True,
     )
     file = models.FileField(upload_to=customer_kyc_doc_upload_to)

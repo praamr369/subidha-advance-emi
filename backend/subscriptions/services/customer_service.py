@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Optional
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from django.utils.crypto import get_random_string
@@ -30,6 +31,7 @@ from subscriptions.models import (
     CustomerKycDocumentStatus,
     CustomerReferral,
     CustomerSource,
+    KycDocumentCategory,
     KycStatus,
 )
 from subscriptions.services.customer_account_service import (
@@ -380,6 +382,7 @@ def create_kyc_update_request(
     file,
     notes: str = "",
     uploaded_by=None,
+    category: str = "",
 ) -> CustomerKycDocument:
     """
     Customer-initiated KYC document submission.
@@ -389,6 +392,7 @@ def create_kyc_update_request(
     doc = CustomerKycDocument.objects.create(
         customer=customer,
         document_type=document_type,
+        category=(category or "").strip() or KycDocumentCategory.UNSPECIFIED,
         file=file,
         original_filename=(getattr(file, "name", "") or "")[:255],
         content_type=(getattr(file, "content_type", "") or "")[:100],
@@ -398,7 +402,11 @@ def create_kyc_update_request(
         uploaded_by=uploaded_by,
     )
 
-    if customer.kyc_status not in (KycStatus.APPROVED, KycStatus.VERIFIED):
+    if customer.kyc_status not in (
+        KycStatus.APPROVED,
+        KycStatus.VERIFIED,
+        KycStatus.EXCEPTION_APPROVED,
+    ):
         customer.kyc_status = KycStatus.SUBMITTED
         customer.save(update_fields=["kyc_status"])
 
@@ -489,6 +497,55 @@ def reject_kyc(
             "old_status": old_status,
             "new_status": KycStatus.REJECTED,
             "reason": customer.kyc_rejection_reason,
+        },
+    )
+    return customer
+
+
+@transaction.atomic
+def exception_approve_kyc(
+    customer: Customer,
+    *,
+    reason: str,
+    performed_by=None,
+) -> Customer:
+    """
+    Admin-only: record an explicit, audited KYC exception override.
+
+    This is the safe alternative to silently bypassing the KYC gate: it sets
+    ``kyc_status = EXCEPTION_APPROVED`` (which the contract readiness gate
+    accepts) but only with a mandatory reason and a recorded actor + timestamp.
+    It never auto-verifies documents and never fabricates verification state.
+    """
+    normalized_reason = (reason or "").strip()
+    if not normalized_reason:
+        raise ValidationError({"reason": "An exception-approval reason is required."})
+    if performed_by is None:
+        raise ValidationError({"performed_by": "An acting admin is required."})
+
+    old_status = customer.kyc_status
+    customer.kyc_status = KycStatus.EXCEPTION_APPROVED
+    customer.kyc_reviewed_by = performed_by
+    customer.kyc_reviewed_at = timezone.now()
+    customer.kyc_rejection_reason = ""
+    customer.save(
+        update_fields=[
+            "kyc_status",
+            "kyc_reviewed_by",
+            "kyc_reviewed_at",
+            "kyc_rejection_reason",
+        ]
+    )
+
+    AuditLog.objects.create(
+        action_type=AuditLog.ActionType.CUSTOMER_KYC_EXCEPTION_APPROVED,
+        model_name="Customer",
+        object_id=customer.pk,
+        performed_by=performed_by,
+        metadata={
+            "old_status": old_status,
+            "new_status": KycStatus.EXCEPTION_APPROVED,
+            "reason": normalized_reason,
         },
     )
     return customer

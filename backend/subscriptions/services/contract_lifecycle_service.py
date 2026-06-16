@@ -65,6 +65,11 @@ def activate_contract(*, subscription: Subscription, performed_by) -> Subscripti
         )
 
     _run_activation_gates(subscription)
+    # Additive KYC/document readiness gate. No-op unless KYC gating is enabled
+    # (and never applies to direct sale). Raises a controlled HTTP 400.
+    from subscriptions.services.kyc_readiness_service import enforce_contract_kyc_gate
+
+    enforce_contract_kyc_gate(subscription=subscription, stage="activate")
     change_subscription_status(subscription, SubscriptionStatus.ACTIVE)
     _lock_financial_terms(subscription, performed_by)
 

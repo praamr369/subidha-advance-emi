@@ -56,6 +56,7 @@ class AdminRentContractCreateView(APIView):
             performed_by=request.user,
             handover_notes=(data.get("handover_notes") or ""),
             contract_terms_snapshot=(data.get("contract_terms_snapshot") or ""),
+            save_as_draft=bool(data.get("save_as_draft", False)),
         )
 
         from subscriptions.services.contract_pdf_service import generate_contract_pdf_for_subscription
@@ -87,6 +88,7 @@ class AdminLeaseContractCreateView(APIView):
             performed_by=request.user,
             handover_notes=(data.get("handover_notes") or ""),
             contract_terms_snapshot=(data.get("contract_terms_snapshot") or ""),
+            save_as_draft=bool(data.get("save_as_draft", False)),
         )
 
         from subscriptions.services.contract_pdf_service import generate_contract_pdf_for_subscription

@@ -621,6 +621,7 @@ class CustomerKycUpdateRequestView(APIView):
                 file=serializer.validated_data["file"],
                 notes=serializer.validated_data.get("notes", ""),
                 uploaded_by=request.user,
+                category=serializer.validated_data.get("category", ""),
             )
         except Exception as exc:
             return Response(

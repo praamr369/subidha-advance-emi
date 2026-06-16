@@ -17,6 +17,7 @@ from subscriptions.models import (
     CustomerKycDocumentType,
     CustomerReferral,
     CustomerSource,
+    KycDocumentCategory,
     KycStatus,
 )
 
@@ -114,6 +115,12 @@ class CustomerQuickCreateSerializer(serializers.Serializer):
 
 class CustomerKycDocumentUploadSerializer(serializers.Serializer):
     document_type = serializers.ChoiceField(choices=CustomerKycDocumentType.choices)
+    category = serializers.ChoiceField(
+        choices=KycDocumentCategory.choices,
+        required=False,
+        allow_blank=True,
+        default=KycDocumentCategory.UNSPECIFIED,
+    )
     file = serializers.FileField()
     notes = serializers.CharField(required=False, allow_blank=True, default="")
 
@@ -141,6 +148,7 @@ class CustomerKycDocumentReadSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "document_type",
+            "category",
             "status",
             "original_filename",
             "file_size",

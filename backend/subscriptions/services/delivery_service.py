@@ -26,6 +26,27 @@ from subscriptions.services.audit_service import log_audit
 ACTIVE_DELIVERY_STATUSES = tuple(SubscriptionDelivery.ACTIVE_STATUSES)
 TERMINAL_DELIVERY_STATUSES = tuple(SubscriptionDelivery.TERMINAL_STATUSES)
 
+
+def _enforce_delivery_kyc_gate(
+    subscription: Subscription, *, delivery_address_snapshot: str | None = None
+) -> None:
+    """Block delivery/handover when the KYC gate fails (no-op unless enabled).
+
+    Raises a controlled HTTP 400 (``KycGateError``) — never a 500. Direct sale
+    and non-gated plans pass straight through.
+    """
+    from subscriptions.services.kyc_readiness_service import enforce_contract_kyc_gate
+
+    customer_address = (getattr(subscription.customer, "address", "") or "").strip().lower()
+    snapshot = (delivery_address_snapshot or "").strip().lower()
+    differs = bool(snapshot) and bool(customer_address) and snapshot != customer_address
+
+    enforce_contract_kyc_gate(
+        subscription=subscription,
+        stage="deliver",
+        delivery_address_differs=differs,
+    )
+
 ALLOWED_DELIVERY_TRANSITIONS: dict[str, set[str]] = {
     DeliveryStatus.PENDING: {
         DeliveryStatus.SCHEDULED,
@@ -322,6 +343,10 @@ def create_subscription_delivery(
     if _active_delivery_for_subscription(subscription) is not None:
         raise ValueError("An active delivery already exists for this subscription.")
 
+    _enforce_delivery_kyc_gate(
+        subscription, delivery_address_snapshot=delivery_address_snapshot
+    )
+
     normalized_status = (status or DeliveryStatus.PENDING).strip().upper()
     if normalized_status not in {DeliveryStatus.PENDING, DeliveryStatus.SCHEDULED}:
         raise ValueError("New deliveries can start only in PENDING or SCHEDULED status.")
@@ -468,6 +493,14 @@ def transition_subscription_delivery_status(
     if next_status not in allowed:
         raise ValueError(
             f"Invalid delivery status transition from {delivery.status} to {next_status}."
+        )
+
+    # Re-check the KYC gate at the actual handover/delivery completion point so a
+    # delivery created before documents were ready still cannot be completed.
+    if next_status == DeliveryStatus.DELIVERED:
+        _enforce_delivery_kyc_gate(
+            delivery.subscription,
+            delivery_address_snapshot=delivery.delivery_address_snapshot,
         )
 
     if next_status in {DeliveryStatus.FAILED, DeliveryStatus.CANCELLED}:
