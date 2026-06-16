@@ -19,6 +19,7 @@ import {
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import { DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
@@ -2225,6 +2226,8 @@ export default function AdminCustomerDetailPage() {
                 </div>
               </SectionCard>
             </div>
+
+            <KycDocumentPanel mode="admin" owner="customer" ownerId={customer.id} />
 
             {operationalProfile ? (
               <div className="grid gap-6 xl:grid-cols-2">

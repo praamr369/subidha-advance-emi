@@ -7,6 +7,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
+import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import { ROUTES } from "@/lib/routes";
 import { getVendorProfile } from "@/services/vendor-ops";
@@ -62,6 +63,10 @@ export default function VendorProfilePage() {
           />
         ) : null}
       </ERPSectionShell>
+
+      <div className="mt-4">
+        <KycDocumentPanel mode="self" portal="vendor" />
+      </div>
     </ERPPageShell>
   );
 }

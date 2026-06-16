@@ -12,6 +12,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
+import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import { ROUTES } from "@/lib/routes";
 import {
   createAdminVendorProduct,
@@ -271,6 +272,8 @@ export default function AdminVendorDetailPage() {
               </button>
             </div>
           </ERPSectionShell>
+
+          <KycDocumentPanel mode="admin" owner="vendor" ownerId={id} />
         </div>
       ) : (
         <div className="space-y-4 text-sm">

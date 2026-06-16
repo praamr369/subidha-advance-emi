@@ -1,5 +1,6 @@
 "use client";
 
+import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import StaffDataPage from "@/components/staff/StaffDataPage";
 import { getStaffProfile, type StaffProfilePayload } from "@/services/staff";
 
@@ -31,6 +32,9 @@ export default function StaffProfilePage() {
               <div><dt className="text-muted-foreground">CRM party</dt><dd>{data.crm_party?.party_no || "Not linked"}</dd></div>
             </dl>
           </section>
+          <div className="lg:col-span-2">
+            <KycDocumentPanel mode="self" portal="staff" />
+          </div>
         </div>
       )}
     />

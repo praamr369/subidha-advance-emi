@@ -20,6 +20,7 @@ import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
 import { PartnerVendorWorkspaceShell } from "@/components/layout/page-shells";
@@ -403,6 +404,8 @@ export default function PartnerDashboardPage() {
             ]}
           />
         </WorkspaceSection>
+
+        <KycDocumentPanel mode="self" portal="partner" />
 
         {loading ? <ERPLoadingState label="Loading partner dashboard..." /> : null}
 

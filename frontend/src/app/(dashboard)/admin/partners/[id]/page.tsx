@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
@@ -138,6 +139,8 @@ export default function AdminPartnerDetailPage() {
               </button>
             </div>
           </WorkspaceSection>
+
+          <KycDocumentPanel mode="admin" owner="partner" ownerId={partner.id} />
         </div>
       ) : null}
     </PortalPage>

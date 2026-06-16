@@ -9,6 +9,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
+import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import ActionButton from "@/components/ui/ActionButton";
 import {
   DataTableShell,
@@ -46,7 +47,7 @@ import {
 } from "@/services/admin-hr";
 
 const EMPLOYMENT_TYPES = ["PERMANENT_MONTHLY", "TEMPORARY", "DAILY_WAGE", "HOURLY", "PIECE_RATE", "MANUFACTURING", "SERVICE"];
-const DETAIL_TABS = ["Overview", "Employment", "Attendance", "Payroll", "Documents", "Access", "Timeline"] as const;
+const DETAIL_TABS = ["Overview", "Employment", "Attendance", "Payroll", "Documents", "KYC", "Access", "Timeline"] as const;
 type DetailTab = (typeof DETAIL_TABS)[number];
 
 type EditForm = {
@@ -558,6 +559,8 @@ export default function AdminHrStaffProfilePage() {
           ])}
         />
       </DetailPanel> : null}
+
+      {activeTab === "KYC" ? <KycDocumentPanel mode="admin" owner="staff" ownerId={staff.id} /> : null}
 
       {activeTab === "Attendance" ? <DetailPanel title="Attendance Summary">
         <div className="mb-4 grid gap-3 sm:grid-cols-4">

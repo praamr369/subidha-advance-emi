@@ -24,7 +24,8 @@
     "test:e2e:install": "playwright install chromium",
     "playwright:install": "playwright install chromium",
     "playwright:check": "node scripts/check-playwright-env.mjs",
-    "test:dashboard-presets": "node scripts/run-dashboard-widget-board-tests.mjs"
+    "test:dashboard-presets": "node scripts/run-dashboard-widget-board-tests.mjs",
+    "test:kyc-frontend": "node scripts/run-kyc-frontend-tests.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
