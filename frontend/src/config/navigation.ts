@@ -194,19 +194,24 @@ function flattenGroups(groups: NavGroup[]): NavItem[] {
   return groups.flatMap((group) => flattenItems(group.items));
 }
 
+// Navigation v2 — icon assignments for the 14 canonical business modules.
+// Order here controls sidebar group order for ADMIN role.
 const ADMIN_MODULE_ICONS: Record<string, NavIconKey> = {
   "Command Center": "dashboard",
+  "Profiles & Parties": "customers",
+  "CRM & Requests": "crm",
   "Sales & Contracts": "billing",
-  "Rent / Lease": "subscriptions",
-  "Accounting & Finance": "accounting",
-  Inventory: "inventory",
-  "Purchase & Vendors": "procurement",
+  "Lucky Plan Control": "luckyDraws",
+  "Collections & Cashier": "collectPayment",
+  "Finance Operations": "finance",
+  "Accounting & Reconciliation": "accounting",
+  "Inventory & Stock": "inventory",
+  "Purchases & Vendors": "procurement",
   Manufacturing: "manufacturing",
-  "CRM / Parties": "crm",
-  "Service Desk": "serviceDesk",
+  "Delivery & Service": "deliveries",
   "HR & Staff": "payroll",
-  "Reports & Analysis": "reports",
-  Settings: "settings",
+  "BI & Reports": "reports",
+  "Settings & Governance": "settings",
 };
 
 function registryItemToNavItem(row: AdminRouteRegistryItem): NavItem {

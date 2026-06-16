@@ -383,23 +383,25 @@ function countsForGroup(groupTitle: string, badges: Record<string, number>): Arr
       { label: "Outstanding", key: "admin.badges.outstanding_count" },
       { label: "Overdue", key: "admin.badges.overdue_count" },
     ],
-    "Accounting & Finance": [
+    "Accounting & Reconciliation": [
       { label: "Overdue", key: "admin.badges.overdue_count" },
       { label: "Unreconciled", key: "admin.badges.unreconciled_count" },
     ],
-    "Service Desk": [
+    "Delivery & Service": [
       { label: "Returns", key: "admin.badges.pending_return_count" },
       { label: "Refunds", key: "admin.badges.pending_refund_count" },
     ],
     "Sales & Contracts": [
       { label: "Delivery", key: "admin.badges.pending_delivery_count" },
+    ],
+    "Lucky Plan Control": [
       { label: "Pending Draw", key: "admin.badges.pending_draw_count" },
     ],
-    Inventory: [
+    "Inventory & Stock": [
       { label: "Low Stock", key: "admin.badges.low_stock_count" },
       { label: "Inspection", key: "admin.badges.inspection_stock_count" },
     ],
-    "CRM / Parties": [{ label: "Support", key: "admin.badges.open_support_ticket_count" }],
+    "CRM & Requests": [{ label: "Support", key: "admin.badges.open_support_ticket_count" }],
   };
   return (byGroup[groupTitle] ?? [])
     .map((row) => ({ label: row.label, value: Number(badges[row.key] ?? 0) }))
@@ -611,36 +613,20 @@ function SidebarContent({
 
   const modeFilteredGroups = useMemo(() => {
     if (role !== "ADMIN" || operatorMode !== "SIMPLE") return navGroups;
-    const allowedGroupTitles = new Set([
-      "Command Center",
-      "Sales & Contracts",
-      "Rent / Lease",
-      "Accounting & Finance",
-      "Inventory",
-      "Purchase & Vendors",
-      "Manufacturing",
-      "CRM / Parties",
-      "Service Desk",
-      "HR & Staff",
-      "Reports & Analysis",
-      "Settings",
-    ]);
-    const simpleFinanceAllowed = new Set([
-      "Finance Workspace",
-      "Collection",
-      "Payments",
-      "Outstandings",
+    // Simple mode shows all 15 groups but restricts Accounting & Reconciliation
+    // to the most essential daily items so daily operators aren't overwhelmed.
+    const simpleAccountingAllowed = new Set([
       "Reconciliation",
-      "Deposits",
-      "Reversal Control",
+      "Accounting Control Center",
+      "Accounting Setup",
+      "Journals",
     ]);
     return navGroups
-      .filter((group) => allowedGroupTitles.has(group.title))
       .map((group) => {
-        if (group.title !== "Accounting & Finance") return group;
+        if (group.title !== "Accounting & Reconciliation") return group;
         return {
           ...group,
-          items: group.items.filter((item) => simpleFinanceAllowed.has(item.label)),
+          items: group.items.filter((item) => simpleAccountingAllowed.has(item.label)),
         };
       })
       .filter((group) => group.items.length > 0);
