@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import DataTable from "@/components/ui/DataTable";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import PortalPage from "@/components/ui/PortalPage";
+import { ROUTES } from "@/lib/routes";
 import { listSubscriptions, type SubscriptionRecord } from "@/services/subscriptions";
 
 export default function ChurnAnalysisPage() {
@@ -42,16 +44,31 @@ export default function ChurnAnalysisPage() {
   return (
     <PortalPage
       title="Churn Analysis"
-      subtitle="Operational watchlist based on defaulted or high-outstanding subscriptions."
+      subtitle="Read-only churn-risk watchlist based on defaulted or high-outstanding subscriptions. Source-linked report — drill down to Profiles / Customers for action."
       headerMode="erp"
+      helperNote="Read-only BI. Decision support only — no posting from this page. To act on a defaulted contract, use Sales & Contracts or Finance Operations."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
-        { label: "Reports", href: "/admin/reports" },
-        { label: "Analytics", href: "/admin/reports?live=1" },
+        { label: "Reports", href: ROUTES.admin.reports },
+        { label: "Analytics", href: `${ROUTES.admin.reports}?live=1` },
         { label: "Churn analysis" },
       ]}
-      statusBadge={{ label: "Analytics", tone: "info" }}
+      actions={[
+        { href: ROUTES.admin.profilesCustomers, label: "Profiles — Customers", variant: "secondary" },
+        { href: ROUTES.admin.financeOutstandings, label: "Open Outstandings", variant: "secondary" },
+      ]}
+      statusBadge={{ label: "Read-only BI", tone: "info" }}
     >
+      <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50/80 px-4 py-3 text-sm text-sky-800">
+        <strong>Drill down to source workflow:</strong> No mutation can be made from this page. Use the links below to act on churn-risk contracts.
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Link href={ROUTES.admin.profilesCustomers} className="inline-flex items-center rounded-md border border-sky-300 bg-white px-3 py-1 text-xs font-medium text-sky-900 transition hover:bg-sky-100">Profiles — Customers</Link>
+          <Link href={ROUTES.admin.subscriptions} className="inline-flex items-center rounded-md border border-sky-300 bg-white px-3 py-1 text-xs font-medium text-sky-900 transition hover:bg-sky-100">Sales & Contracts</Link>
+          <Link href={ROUTES.admin.financeOutstandings} className="inline-flex items-center rounded-md border border-sky-300 bg-white px-3 py-1 text-xs font-medium text-sky-900 transition hover:bg-sky-100">Finance Operations — Outstandings</Link>
+        </div>
+      </div>
+
       {loading ? (
         <ERPLoadingState label="Loading watchlist..." />
       ) : error ? (

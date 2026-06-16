@@ -216,11 +216,42 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
     key: "bi_reports",
     label: "BI & Reports",
     canonicalRoot: ROUTES.admin.bi,
-    description: "Read-only operational and financial analytics with drill-down links to source records.",
+    description: "Read-only operational and financial analytics with drill-down links to source records. Answers: which products sell, which customers are risky, which batches perform well, which stock is stuck, which money is unreconciled, what trend needs operator action.",
     effect: "read_only",
-    safetyRule: "BI must never mutate records, post accounting, repair mappings, or change workflow states.",
+    // Phase 8: BI & Reports is a decision-support-only layer.
+    // It must never create payments, receipts, journals, money movements, stock movements,
+    // salary payments, commissions, or payout records.
+    // It must never repair mappings, post accounting bridge entries, mark reconciliation complete,
+    // or change contract/request/delivery/payroll state.
+    // Trial Balance, P&L, Balance Sheet remain in Accounting & Reconciliation (not here).
+    safetyRule: "BI must never mutate records, post accounting, repair mappings, collect payments, adjust stock, pay staff/vendor/partner, or change workflow states. Read-only BI only. No posting from these pages.",
     uiPattern: "read_only_bi",
-    primaryRoutes: [ROUTES.admin.bi, ROUTES.admin.biProfitability, ROUTES.admin.biCustomers, ROUTES.admin.biBatches, ROUTES.admin.biCashflow, ROUTES.admin.biInventory, ROUTES.admin.biHr, ROUTES.admin.reportsCenter, ROUTES.admin.reports],
+    primaryRoutes: [
+      // BI dashboards
+      ROUTES.admin.bi,
+      ROUTES.admin.biProfitability,
+      ROUTES.admin.biCustomers,
+      ROUTES.admin.biBatches,
+      ROUTES.admin.biCashflow,
+      ROUTES.admin.biInventory,
+      ROUTES.admin.biHr,
+      // Report hub and center
+      ROUTES.admin.reportsCenter,
+      ROUTES.admin.reports,
+      // Phase 8: all /admin/reports/* sub-routes explicitly classified here
+      ROUTES.admin.reportsRevenue,
+      ROUTES.admin.reportsCollections,
+      ROUTES.admin.reportsOverdue,
+      ROUTES.admin.reportsCustomerAnalytics,
+      ROUTES.admin.reportsBatchPerformance,
+      ROUTES.admin.reportsPartners,
+      ROUTES.admin.reportsWaiverLoss,
+      // Phase 8: /admin/analytics/* routes classified here
+      // /admin/analytics redirects to Reports & analysis; sub-pages are BI decision surfaces
+      ROUTES.admin.analytics,
+      ROUTES.admin.analyticsRiskMonitor,
+      ROUTES.admin.analyticsChurnAnalysis,
+    ],
   },
   {
     key: "settings_governance",

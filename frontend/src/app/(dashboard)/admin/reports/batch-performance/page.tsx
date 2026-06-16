@@ -153,7 +153,9 @@ export default function BatchPerformanceReportPage() {
           tone: totals.totalWinners > 0 ? "info" : "default",
         },
       ]}
-      statusBadge={{ label: "Operations Report", tone: "info" }}
+      statusBadge={{ label: "Source-linked report", tone: "info" }}
+      helperNote="Read-only BI. Decision support only — no posting from this page. Drill down to Lucky Plan Control to take action on a batch."
+      helperTone="info"
     >
       <div className="space-y-6">
         <TableToolbar
@@ -342,13 +344,7 @@ export default function BatchPerformanceReportPage() {
                         href={`/admin/batches/${row.batchId}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
-                        Batch
-                      </Link>
-                      <Link
-                        href={`/admin/batches/${row.batchId}/edit`}
-                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-                      >
-                        Edit
+                        View in Lucky Plan
                       </Link>
                     </div>
                   )}

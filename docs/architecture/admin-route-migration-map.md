@@ -126,8 +126,25 @@ This map is the Phase 0 control document for cleaning admin routes without break
 | `/admin/hr/expenses` | HR & Staff | `/admin/hr/expenses` | keep | Phase 7: Expense claim workflow. Approve/reject via existing backend workflow. No journal posting from this page. |
 | `/admin/hr/staff-documents` | HR & Staff | `/admin/hr/staff-documents` | keep | Phase 7: Staff documents and KYC. Upload and toggle active/inactive. Verify/reject requires backend support — documented as a gap. |
 | `/admin/profiles/staff` | Profiles & Parties | `/admin/profiles/staff` | keep | Phase 7: Staff profile source alias. Thin server redirect to /admin/hr/staff. Remains under Profiles & Parties as identity alias. Does not duplicate HR workflow logic. |
-| `/admin/bi/*` | BI & Reports | `/admin/bi/*` | keep | Read-only analytics. |
-| `/admin/reports*` | BI & Reports | `/admin/reports*` | keep_temporarily | Later converge into BI/report center. |
+| `/admin/bi/*` | BI & Reports | `/admin/bi/*` | keep | Phase 8: Read-only analytics. All /admin/bi/* sub-routes explicitly classified under BI & Reports in taxonomy and registry. |
+| `/admin/bi/profitability` | BI & Reports | `/admin/bi/profitability` | keep | Phase 8: Read-only profitability BI. statusBadge "Read Only". No mutation. |
+| `/admin/bi/customers` | BI & Reports | `/admin/bi/customers` | keep | Phase 8: Read-only customer insights BI. statusBadge "Read Only". Drill down to Profiles / Customers. |
+| `/admin/bi/batches` | BI & Reports | `/admin/bi/batches` | keep | Phase 8: Read-only batch performance BI. statusBadge "Read Only". Drill down to Lucky Plan Control. |
+| `/admin/bi/cashflow` | BI & Reports | `/admin/bi/cashflow` | keep | Phase 8: Read-only cashflow BI. statusBadge "Read Only". Drill down to Finance Operations / Outstandings. |
+| `/admin/bi/inventory` | BI & Reports | `/admin/bi/inventory` | keep | Phase 8: Read-only inventory intelligence BI. statusBadge "Read Only". Drill down to Inventory & Stock. |
+| `/admin/bi/hr` | BI & Reports | `/admin/bi/hr` | keep | Phase 8: Read-only HR cost BI. statusBadge "Read Only". Drill down to HR & Staff. |
+| `/admin/reports` | BI & Reports | `/admin/reports` | keep | Phase 8: Unified Reports & analysis hub. Decision support only. No posting from this page. |
+| `/admin/reports-center` | BI & Reports | `/admin/reports-center` | keep | Phase 8: Redirects to /admin/reports?catalog=1. |
+| `/admin/reports/revenue` | BI & Reports | `/admin/reports/revenue` | keep | Phase 8: Source-linked revenue report. Added to taxonomy primaryRoutes and registry. Decision support only. |
+| `/admin/reports/collections` | BI & Reports | `/admin/reports/collections` | keep | Phase 8: Fixed — was incorrectly re-exporting revenue page. Now a proper collection analytics page using existing admin analytics summary endpoint. Source-linked report. Decision support only. Drill down to Finance Operations / Outstandings. |
+| `/admin/reports/overdue` | BI & Reports | `/admin/reports/overdue` | keep | Phase 8: Source-linked overdue EMI report. Added to taxonomy primaryRoutes and registry. Decision support only. Drill down to Finance Operations / Outstandings. |
+| `/admin/reports/customer-analytics` | BI & Reports | `/admin/reports/customer-analytics` | keep | Phase 8: Customer analytics — documented gap, no backend aggregate endpoint yet. Shows empty state. Added to taxonomy and registry. |
+| `/admin/reports/batch-performance` | BI & Reports | `/admin/reports/batch-performance` | keep | Phase 8: Source-linked batch performance report. Added to taxonomy and registry. Unsafe "Edit" row action removed — now "View in Lucky Plan" only. |
+| `/admin/reports/partners` | BI & Reports | `/admin/reports/partners` | keep | Phase 8: Source-linked partner performance report. Added to taxonomy and registry. |
+| `/admin/reports/waiver-loss` | BI & Reports | `/admin/reports/waiver-loss` | keep | Phase 8: Source-linked waiver and loss report. Added to taxonomy and registry. |
+| `/admin/analytics` | BI & Reports | `/admin/analytics` | keep | Phase 8: Redirects to /admin/reports?live=1. Classified under BI & Reports in taxonomy and registry. |
+| `/admin/analytics/risk-monitor` | BI & Reports | `/admin/analytics/risk-monitor` | keep | Phase 8: Read-only overdue EMI risk watchlist. Classified under BI & Reports. statusBadge changed from "Analytics" to "Read-only BI". Source drill-down links added to Finance Operations / Outstandings and Profiles / Customers. |
+| `/admin/analytics/churn-analysis` | BI & Reports | `/admin/analytics/churn-analysis` | keep | Phase 8: Read-only churn-risk watchlist. Classified under BI & Reports. statusBadge changed from "Analytics" to "Read-only BI". Source drill-down links added to Profiles / Customers and Finance Operations. |
 | `/admin/settings/*` | Settings & Governance | `/admin/settings/*` | keep | System settings and setup. |
 | `/admin/audit-logs` | Settings & Governance | `/admin/audit-logs` | keep | Audit trail. |
 | `/admin/brand-data` | Settings & Governance | `/admin/brand-data` | keep | Public business data setup. |

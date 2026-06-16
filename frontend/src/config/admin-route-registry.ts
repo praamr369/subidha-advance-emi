@@ -296,16 +296,46 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("HR & Staff", "Staff Documents", ROUTES.admin.hrStaffDocuments, "Staff documents and KYC: upload, maintain, and toggle active/inactive status. Document verify/reject requires backend support — documented as a gap."),
 
   // ── 14. BI & Reports ──────────────────────────────────────────────────────
-  item("BI & Reports", "BI Dashboards", ROUTES.admin.bi, "Read-only chart and trend control center."),
-  item("BI & Reports", "Reports Center", ROUTES.admin.reportsCenter, "SME report catalog and report launch center."),
-  item("BI & Reports", "Reports", ROUTES.admin.reports, "Classic operational report shortcuts."),
-  item("BI & Reports", "Revenue", ROUTES.admin.reportsRevenue, "Revenue report."),
-  item("BI & Reports", "Collections", ROUTES.admin.reportsCollections, "Collections report."),
-  item("BI & Reports", "Overdue", ROUTES.admin.reportsOverdue, "Overdue report."),
-  item("BI & Reports", "Customer Analytics", ROUTES.admin.reportsCustomerAnalytics, "Customer analytics."),
-  item("BI & Reports", "Batch Performance", ROUTES.admin.reportsBatchPerformance, "Batch performance report."),
-  item("BI & Reports", "Partner Reports", ROUTES.admin.reportsPartners, "Partner performance report."),
-  item("BI & Reports", "Waiver Loss", ROUTES.admin.reportsWaiverLoss, "Waiver and loss visibility."),
+  // Phase 8: BI & Reports is read-only decision-support only.
+  // These pages answer: which products sell, which customers are risky, which batches
+  // perform well, which stock is stuck, which money is unreconciled, what trend needs action.
+  //
+  // What this group must NOT do:
+  //   - Create payments, receipts, journals, money movements, stock movements.
+  //   - Create salary payments, commissions, or payout records.
+  //   - Repair mappings, post accounting bridge entries, mark reconciliation complete.
+  //   - Change contract, request, delivery, or payroll state.
+  //
+  // Drill-down targets (links go TO source modules, no mutation from here):
+  //   customer risk  → Profiles / Customers or CRM KYC
+  //   overdue        → Finance Operations / Outstandings
+  //   collections    → Collections & Cashier
+  //   bridge blocker → Accounting & Reconciliation
+  //   stock risk     → Inventory & Stock
+  //   purchase risk  → Purchases & Vendors
+  //   HR risk        → HR & Staff
+  //   batch risk     → Lucky Plan Control
+  //
+  // Trial Balance, P&L, Balance Sheet remain under Accounting & Reconciliation (not here).
+  item("BI & Reports", "BI Dashboards", ROUTES.admin.bi, "Read-only BI control center. Decision support only — no posting from this page."),
+  item("BI & Reports", "Profitability View", ROUTES.admin.biProfitability, "Read-only income, waiver, deposit liability, and monthly operating summary. Source-linked report. No posting from this page."),
+  item("BI & Reports", "Customer Insights", ROUTES.admin.biCustomers, "Read-only customer activity, overdue, repeat, and churn-risk posture. Drill down to Profiles / Customers or CRM KYC for action."),
+  item("BI & Reports", "Batch Performance BI", ROUTES.admin.biBatches, "Read-only fill rate, payment discipline, default rate, and draw completion. Drill down to Lucky Plan Control for action."),
+  item("BI & Reports", "Cashflow Dashboard", ROUTES.admin.biCashflow, "Read-only daily inflow, expected inflow, and overdue exposure. Drill down to Finance Operations / Outstandings for action."),
+  item("BI & Reports", "Inventory Intelligence", ROUTES.admin.biInventory, "Read-only fast-moving, slow-moving, and stock-risk intelligence. Drill down to Inventory & Stock for action."),
+  item("BI & Reports", "HR Cost Insights", ROUTES.admin.biHr, "Read-only salary/revenue ratio, department costs, and employment-type cost split. Drill down to HR & Staff for action."),
+  item("BI & Reports", "Reports Center", ROUTES.admin.reportsCenter, "SME report catalog and report launch center. Redirects to Reports & analysis with catalog view."),
+  item("BI & Reports", "Reports & Analysis", ROUTES.admin.reports, "Unified analytics hub: windowed analytics, live posture, SME report catalog, and decision-support shortcuts. Read-only BI. No posting from this page."),
+  item("BI & Reports", "Revenue Report", ROUTES.admin.reportsRevenue, "Source-linked revenue report from payment register. Decision support only. Drill down to Collections & Cashier / Payments for action."),
+  item("BI & Reports", "Collections Report", ROUTES.admin.reportsCollections, "Source-linked collection analytics posture. Decision support only. Drill down to Finance Operations / Outstandings for action."),
+  item("BI & Reports", "Overdue EMI Report", ROUTES.admin.reportsOverdue, "Source-linked overdue EMI exposure with row-level drill-down. Decision support only. Drill down to Finance Operations / Outstandings for action."),
+  item("BI & Reports", "Customer Analytics", ROUTES.admin.reportsCustomerAnalytics, "Read-only customer cohort and lifecycle analytics. Decision support only. Drill down to Profiles / Customers for action."),
+  item("BI & Reports", "Batch Performance Report", ROUTES.admin.reportsBatchPerformance, "Source-linked Lucky Plan batch performance — draw, enrollment, Lucky ID progression. Decision support only. Drill down to Lucky Plan Control for action."),
+  item("BI & Reports", "Partner Reports", ROUTES.admin.reportsPartners, "Source-linked partner performance — customers, contracts, collections, commission posture. Decision support only. Drill down to Profiles / Partners for action."),
+  item("BI & Reports", "Waiver Loss Report", ROUTES.admin.reportsWaiverLoss, "Source-linked waiver and loss analytics with auditable source references. Decision support only. Drill down to Lucky Plan Control for action."),
+  item("BI & Reports", "Analytics Workspace", ROUTES.admin.analytics, "Read-only analytics workspace — redirects to Reports & analysis live posture view. Decision support only. No posting from this page."),
+  item("BI & Reports", "Risk Monitor", ROUTES.admin.analyticsRiskMonitor, "Read-only overdue EMI risk watchlist for collection escalation. Source-linked report. Drill down to Finance Operations / Outstandings for action."),
+  item("BI & Reports", "Churn Analysis", ROUTES.admin.analyticsChurnAnalysis, "Read-only churn-risk and defaulted subscription watchlist. Source-linked report. Drill down to Profiles / Customers for action."),
 
   // ── 15. Settings & Governance ─────────────────────────────────────────────
   item("Settings & Governance", "Settings", ROUTES.admin.settings, "Settings cockpit."),
