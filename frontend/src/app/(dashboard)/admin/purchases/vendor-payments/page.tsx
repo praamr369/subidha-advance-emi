@@ -61,14 +61,14 @@ export default function AdminVendorPaymentsPage() {
   return (
     <PortalPage
       title="Vendor Payments"
-      subtitle="Payable settlement payments with posted journal trace."
+      subtitle="Vendor payment register: amounts applied against vendor payable source records."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Purchases", href: ROUTES.admin.purchases },
         { label: "Vendor Payments" },
       ]}
     >
-      <WorkspaceSection title="Payments" description="Posted payments reduce vendor payable through controlled accounting bridges.">
+      <WorkspaceSection title="Vendor payments" description="Payments reduce vendor payable source records. Accounting bridge status is confirmed separately in Accounting & Reconciliation.">
         <EnterpriseDataTable
           data={rows}
           columns={columns}

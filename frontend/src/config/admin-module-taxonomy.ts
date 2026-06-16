@@ -146,7 +146,7 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
     effect: "stock",
     safetyRule: "Stock changes must explain why stock changed and must not be hidden behind sales/accounting screens.",
     uiPattern: "object_pages",
-    primaryRoutes: [ROUTES.admin.inventory, ROUTES.admin.inventoryItems, ROUTES.admin.inventoryStockOnHand, ROUTES.admin.inventoryLocations, ROUTES.admin.inventoryLedger, ROUTES.admin.inventoryMovements, ROUTES.admin.inventoryAdjustments, ROUTES.admin.inventoryValuation, ROUTES.admin.inventoryReadiness],
+    primaryRoutes: [ROUTES.admin.inventory, ROUTES.admin.inventoryItems, ROUTES.admin.inventoryProfiles, ROUTES.admin.inventoryStockOnHand, ROUTES.admin.inventoryLocations, ROUTES.admin.inventoryLedger, ROUTES.admin.inventoryMovements, ROUTES.admin.inventoryAdjustments, ROUTES.admin.inventoryOpeningStock, ROUTES.admin.inventoryValuation, ROUTES.admin.inventoryDemandPlanning, ROUTES.admin.inventoryPurchaseNeeds, ROUTES.admin.inventoryReadiness],
   },
   {
     key: "purchases_vendors",
@@ -156,7 +156,7 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
     effect: "money",
     safetyRule: "Vendor profile, purchase receipt, purchase bill, vendor payable, and vendor payment must remain traceable as separate steps.",
     uiPattern: "object_pages",
-    primaryRoutes: [ROUTES.admin.vendors, ROUTES.admin.vendorsProducts, ROUTES.admin.vendorsQuotes, ROUTES.admin.vendorsSourcing, ROUTES.admin.purchases, ROUTES.admin.purchaseRequests, ROUTES.admin.purchaseOrders, ROUTES.admin.purchaseReceipts, ROUTES.admin.purchaseBills, ROUTES.admin.purchaseVendorPayables, ROUTES.admin.purchaseVendorPayments, ROUTES.admin.purchaseVendorReturns],
+    primaryRoutes: [ROUTES.admin.purchases, ROUTES.admin.purchaseRequests, ROUTES.admin.purchaseOrders, ROUTES.admin.purchaseReceipts, ROUTES.admin.purchaseBills, ROUTES.admin.purchaseVendorPayables, ROUTES.admin.purchaseVendorPayments, ROUTES.admin.purchaseVendorReturns, ROUTES.admin.vendors, ROUTES.admin.vendorsProducts, ROUTES.admin.vendorsQuotes, ROUTES.admin.vendorsSourcing, ROUTES.admin.vendorsLedger, ROUTES.admin.vendorsOutstanding],
   },
   {
     key: "delivery_service",

@@ -73,13 +73,35 @@ This map is the Phase 0 control document for cleaning admin routes without break
 | `/admin/accounting/reports/trial-balance` | Accounting & Reconciliation | `/admin/accounting/reports/trial-balance` | keep | Trial balance report. |
 | `/admin/accounting/reports/profit-loss` | Accounting & Reconciliation | `/admin/accounting/reports/profit-loss` | keep | Profit & Loss report. |
 | `/admin/accounting/reports/balance-sheet` | Accounting & Reconciliation | `/admin/accounting/reports/balance-sheet` | keep | Balance sheet report. |
-| `/admin/inventory` | Inventory & Stock | `/admin/inventory` | keep | Inventory workspace. |
-| `/admin/inventory/items` | Inventory & Stock | `/admin/inventory/items` | keep | Item master. |
-| `/admin/inventory/stock-on-hand` | Inventory & Stock | `/admin/inventory/stock-on-hand` | keep | Stock posture. |
-| `/admin/inventory/ledger` | Inventory & Stock | `/admin/inventory/ledger` | keep | Stock ledger. |
-| `/admin/inventory/movements` | Inventory & Stock | `/admin/inventory/movements` | keep | Movement register. |
-| `/admin/purchases/*` | Purchases & Vendors | `/admin/purchases/*` | keep | Purchase lifecycle. |
-| `/admin/vendors/*` | Purchases & Vendors | `/admin/vendors/*` | keep_temporarily | Split profile vs procurement in Phase 5. |
+| `/admin/inventory` | Inventory & Stock | `/admin/inventory` | keep | Phase 5: Inventory workspace. Cross-module billing links removed from actions. Stock source workflow label added. |
+| `/admin/inventory/items` | Inventory & Stock | `/admin/inventory/items` | keep | Phase 5: Item master. |
+| `/admin/inventory/profiles` | Inventory & Stock | `/admin/inventory/profiles` | keep | Phase 5: Inventory profiles — added to taxonomy primaryRoutes. |
+| `/admin/inventory/stock-on-hand` | Inventory & Stock | `/admin/inventory/stock-on-hand` | keep | Phase 5: Stock posture. |
+| `/admin/inventory/locations` | Inventory & Stock | `/admin/inventory/locations` | keep | Phase 5: Stock locations — confirmed in taxonomy. |
+| `/admin/inventory/ledger` | Inventory & Stock | `/admin/inventory/ledger` | keep | Phase 5: Stock ledger. |
+| `/admin/inventory/movements` | Inventory & Stock | `/admin/inventory/movements` | keep | Phase 5: Movement register. |
+| `/admin/inventory/adjustments` | Inventory & Stock | `/admin/inventory/adjustments` | keep | Phase 5: Adjustment workflow. |
+| `/admin/inventory/opening-stock` | Inventory & Stock | `/admin/inventory/opening-stock` | keep | Phase 5: Opening stock — added to taxonomy primaryRoutes. |
+| `/admin/inventory/valuation` | Inventory & Stock | `/admin/inventory/valuation` | keep | Phase 5: Inventory valuation visibility. |
+| `/admin/inventory/demand-planning` | Inventory & Stock | `/admin/inventory/demand-planning` | keep | Phase 5: Demand planning — added to taxonomy primaryRoutes. |
+| `/admin/inventory/purchase-needs` | Inventory & Stock | `/admin/inventory/purchase-needs` | keep | Phase 5: Purchase needs planning — added to taxonomy primaryRoutes. |
+| `/admin/inventory/readiness` | Inventory & Stock | `/admin/inventory/readiness` | keep | Phase 5: Inventory readiness check. Confirmed in taxonomy. |
+| `/admin/purchases` | Purchases & Vendors | `/admin/purchases` | keep | Phase 5: Purchases hub added to registry as first Purchases & Vendors item. Full chain workflow documented on page. |
+| `/admin/purchases/requests` | Purchases & Vendors | `/admin/purchases/requests` | keep | Phase 5: Purchase request register. |
+| `/admin/purchases/orders` | Purchases & Vendors | `/admin/purchases/orders` | keep | Phase 5: Purchase order register. |
+| `/admin/purchases/receipts` | Purchases & Vendors | `/admin/purchases/receipts` | keep | Phase 5: Goods receipt — stock ledger IN entry. |
+| `/admin/purchases/bills` | Purchases & Vendors | `/admin/purchases/bills` | keep | Phase 5: Purchase bill — creates vendor payable. |
+| `/admin/purchases/vendor-payables` | Purchases & Vendors | `/admin/purchases/vendor-payables` | keep | Phase 5: Vendor payable source — added to registry. Unsafe "Posted Paid" column fixed to "Paid to date". |
+| `/admin/purchases/vendor-payments` | Purchases & Vendors | `/admin/purchases/vendor-payments` | keep | Phase 5: Vendor payment register — added to registry. Unsafe "posted journal trace" copy fixed. |
+| `/admin/purchases/vendor-returns` | Purchases & Vendors | `/admin/purchases/vendor-returns` | keep | Phase 5: Vendor return register. Gap documented: no aggregate endpoint. |
+| `/admin/vendors` | Purchases & Vendors | `/admin/vendors` | keep_temporarily | Phase 5: Vendor procurement register remains here. Identity/profile canonical route is /admin/profiles/vendors. |
+| `/admin/vendors/products` | Purchases & Vendors | `/admin/vendors/products` | keep | Phase 5: Vendor product catalog. |
+| `/admin/vendors/quotes` | Purchases & Vendors | `/admin/vendors/quotes` | keep | Phase 5: Vendor quotes and sourcing. |
+| `/admin/vendors/sourcing` | Purchases & Vendors | `/admin/vendors/sourcing` | keep | Phase 5: Vendor sourcing — added to taxonomy primaryRoutes. |
+| `/admin/vendors/ledger` | Purchases & Vendors | `/admin/vendors/ledger` | keep | Phase 5: Vendor ledger — added to taxonomy primaryRoutes. |
+| `/admin/vendors/outstanding` | Purchases & Vendors | `/admin/vendors/outstanding` | keep | Phase 5: Vendor outstanding — added to taxonomy primaryRoutes. |
+| `/admin/profiles/vendors` | Profiles & Parties | `/admin/profiles/vendors` | keep | Phase 5: Vendor identity/profile stays under Profiles & Parties. Separate from procurement operations. |
+| `/admin/manufacturing` | Manufacturing (deferred) | `/admin/manufacturing` | keep_temporarily | Phase 5: Manufacturing is classified as separate from Purchases & Vendors. No workflow migration in this phase. Navigation group remains as group 11 (outside canonical 14). Deferred to future phase. |
 | `/admin/deliveries` | Delivery & Service | `/admin/deliveries` | keep | Delivery register. |
 | `/admin/delivery/workspace` | Delivery & Service | `/admin/delivery/workspace` | keep | Delivery document workflow. |
 | `/admin/delivery/returns` | Delivery & Service | `/admin/delivery/returns` | keep | Delivery return workflow. |

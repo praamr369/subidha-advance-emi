@@ -211,16 +211,23 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Inventory & Stock", "Profiles", ROUTES.admin.inventoryProfiles, "Inventory profiles."),
 
   // ── 10. Purchases & Vendors ───────────────────────────────────────────────
-  item("Purchases & Vendors", "Vendors", ROUTES.admin.vendors, "Vendor register and operations."),
+  // Purchase source workflow: vendor profile → request → order → receipt → stock increase
+  //   → purchase bill → vendor payable → vendor payment → accounting bridge → reconciliation.
+  // Vendor identity/profile remains under Profiles & Parties (/admin/profiles/vendors).
+  // /admin/vendors is the procurement operations register (keep_temporarily per migration map).
+  item("Purchases & Vendors", "Purchases Hub", ROUTES.admin.purchases, "Purchase source workflow: request → order → receipt → bill → payable → payment. Vendor procurement chain."),
+  item("Purchases & Vendors", "Purchase Requests", ROUTES.admin.purchaseRequests, "Purchase request register. First step in the purchase source workflow."),
+  item("Purchases & Vendors", "Purchase Orders", ROUTES.admin.purchaseOrders, "Purchase order register. Authorised procurement commitments."),
+  item("Purchases & Vendors", "Purchase Receipts", ROUTES.admin.purchaseReceipts, "Purchase receipt register. Goods receipt creates stock ledger IN entries."),
+  item("Purchases & Vendors", "Purchase Bills", ROUTES.admin.purchaseBills, "Purchase bill register. Bills create vendor payable obligations."),
+  item("Purchases & Vendors", "Vendor Payables", ROUTES.admin.purchaseVendorPayables, "Vendor payable source: payable obligations from entered purchase bills."),
+  item("Purchases & Vendors", "Vendor Payments", ROUTES.admin.purchaseVendorPayments, "Vendor payment register: payments against vendor payable source records."),
+  item("Purchases & Vendors", "Vendor Returns", ROUTES.admin.purchaseVendorReturns, "Vendor return register."),
+  item("Purchases & Vendors", "Vendors", ROUTES.admin.vendors, "Vendor procurement register. Vendor identity/profile is under Profiles & Parties."),
   item("Purchases & Vendors", "Vendor Products", ROUTES.admin.vendorsProducts, "Vendor product catalog."),
-  item("Purchases & Vendors", "Purchase Requests", ROUTES.admin.purchaseRequests, "Purchase request register."),
-  item("Purchases & Vendors", "Purchase Orders", ROUTES.admin.purchaseOrders, "Purchase order register."),
-  item("Purchases & Vendors", "Purchase Receipts", ROUTES.admin.purchaseReceipts, "Purchase receipt register."),
-  item("Purchases & Vendors", "Purchase Bills", ROUTES.admin.purchaseBills, "Purchase bill register."),
   item("Purchases & Vendors", "Vendor Ledger", ROUTES.admin.vendorsLedger, "Vendor payable ledger entries."),
   item("Purchases & Vendors", "Vendor Outstanding", ROUTES.admin.vendorsOutstanding, "Vendor payable outstanding summary."),
   item("Purchases & Vendors", "Vendor Settlements", ROUTES.admin.accountingVendorSettlements, "Vendor settlement workflow."),
-  item("Purchases & Vendors", "Vendor Returns", ROUTES.admin.purchaseVendorReturns, "Vendor return register."),
   item("Purchases & Vendors", "Quotes / Sourcing", ROUTES.admin.vendorsQuotes, "Vendor quote requests and sourcing.", {
     children: [
       item("Purchases & Vendors", "Vendor Sourcing", ROUTES.admin.vendorsSourcing, "Read-only sourcing suggestions based on location and score."),

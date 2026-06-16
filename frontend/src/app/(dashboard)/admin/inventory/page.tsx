@@ -156,18 +156,16 @@ export default function AdminInventoryPage() {
       statusBadge={{ label: "Admin Controlled", tone: "info" }}
       actions={[
         { href: ROUTES.admin.inventoryStockOnHand, label: "Stock on Hand", variant: "primary" },
-        { href: ROUTES.admin.inventoryLocations, label: "Locations", variant: "secondary" },
         { href: ROUTES.admin.inventoryItems, label: "Items", variant: "secondary" },
+        { href: ROUTES.admin.inventoryLocations, label: "Locations", variant: "secondary" },
         { href: ROUTES.admin.inventoryMovements, label: "Movements", variant: "secondary" },
         { href: ROUTES.admin.inventoryLedger, label: "Ledger", variant: "secondary" },
-        { href: ROUTES.admin.inventoryDemandPlanning, label: "Demand Planning", variant: "secondary" },
-        { href: ROUTES.admin.inventoryPurchaseNeeds, label: "Purchase Needs", variant: "secondary" },
-        { href: ROUTES.admin.vendors, label: "Vendors", variant: "secondary" },
-        { href: ROUTES.admin.purchases, label: "Purchases", variant: "secondary" },
-        { href: ROUTES.admin.billingRegister, label: "Billing Register", variant: "secondary" },
-        { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
         { href: ROUTES.admin.inventoryAdjustments, label: "Adjustments", variant: "secondary" },
         { href: ROUTES.admin.inventoryOpeningStock, label: "Opening Stock", variant: "secondary" },
+        { href: ROUTES.admin.inventoryDemandPlanning, label: "Demand Planning", variant: "secondary" },
+        { href: ROUTES.admin.inventoryPurchaseNeeds, label: "Purchase Needs", variant: "secondary" },
+        { href: ROUTES.admin.inventoryReadiness, label: "Readiness", variant: "secondary" },
+        { href: ROUTES.admin.purchases, label: "Purchases (supply chain)", variant: "secondary" },
       ]}
       stats={[
         { label: "Tracked Items", value: String(itemsCount), tone: "info" },
@@ -282,8 +280,8 @@ export default function AdminInventoryPage() {
           </div>
 
           <ERPSectionShell
-            title="Delivery-Linked Stock Bridge"
-            description="These rows show the safe inventory bridge from delivered and returned subscription deliveries into the stock ledger."
+            title="Stock source workflow — Delivery-Linked Movements"
+            description="Stock movement rows created by delivered and returned subscription deliveries. Stock truth lives here; purchase source workflow (vendor → PO → receipt → bill → payable) is tracked separately under Purchases & Vendors."
           >
             <EnterpriseDataTable
               data={bridgeRows}
