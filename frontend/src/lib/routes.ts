@@ -39,6 +39,28 @@ export const ROUTES = {
     root: "/admin",
     dashboard: "/admin",
 
+    // ── Compatibility-alias topology (Phase 9A audit) ─────────────────────────
+    // Several canonical "new" routes are thin page-level redirect aliases that
+    // point BACK to the legacy route that still hosts the real page. The legacy
+    // path is the content owner (classification: keep_temporarily); the canonical
+    // path is the alias (classification: alias). These are intentionally preserved
+    // and must NOT be deleted in Phase 9A. Direction (canonical → legacy):
+    //   /admin/profiles/customers        → /admin/customers
+    //   /admin/profiles/partners         → /admin/partners
+    //   /admin/profiles/vendors          → /admin/vendors
+    //   /admin/profiles/branches         → /admin/branches
+    //   /admin/profiles/staff            → /admin/hr/staff
+    //   /admin/profiles/parties          → /admin/crm/parties
+    //   /admin/lucky-plan/batches        → /admin/batches
+    //   /admin/lucky-plan/lucky-ids      → /admin/lucky-ids
+    //   /admin/lucky-plan/draws          → /admin/lucky-draws
+    //   /admin/finance/outstandings      → /admin/outstandings
+    //   /admin/finance/customer-advances → /admin/customer-advances
+    //   /admin/requests/online-enquiries → /admin/online-enquiries
+    //   /admin/requests/support          → /admin/support-requests
+    //   /admin/requests/subscriptions    → /admin/subscription-requests
+    // Phase 9B (deferred): move page content into the canonical path, then flip
+    // each redirect so the legacy path becomes the alias (migrate_then_alias).
     profiles: "/admin/profiles",
     profilesCustomers: "/admin/profiles/customers",
     profilesPartners: "/admin/profiles/partners",

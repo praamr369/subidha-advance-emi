@@ -184,3 +184,56 @@ This map is the Phase 0 control document for cleaning admin routes without break
 /admin/bi
 /admin/settings/business-setup
 ```
+
+## Phase 9A — Final classification (cleanup audit, no deletions)
+
+Phase 9A audited the live route topology and reconciles one labelling nuance in
+the table above: the canonical `/admin/profiles/*`, `/admin/lucky-plan/{batches,
+lucky-ids,draws}`, `/admin/finance/{outstandings,customer-advances}`, and
+`/admin/requests/*` routes are **thin page-level redirect aliases that point BACK
+to the legacy routes, which still host the real pages**. Therefore the *legacy*
+path is the content owner (`keep_temporarily`) and the *canonical* path is the
+`alias`. No route or endpoint is deleted in Phase 9A.
+
+| Route | Phase 9A class | Content owner now | Phase 9B intent |
+|---|---|---|---|
+| `/admin/customers` | keep_temporarily | yes (real page) | migrate_then_alias → `/admin/profiles/customers` |
+| `/admin/partners` | keep_temporarily | yes (real page) | migrate_then_alias → `/admin/profiles/partners` |
+| `/admin/vendors` | keep_temporarily | yes (procurement register) | keep; identity stays `/admin/profiles/vendors` |
+| `/admin/hr/staff` | keep | yes (HR source workflow) | keep; `/admin/profiles/staff` stays alias |
+| `/admin/branches` | keep_temporarily | yes (real page) | migrate_then_alias → `/admin/profiles/branches` |
+| `/admin/crm/parties` | keep_temporarily | yes (party directory) | migrate_then_alias → `/admin/profiles/parties` |
+| `/admin/batches` | keep_temporarily | yes (real page) | migrate_then_alias → `/admin/lucky-plan/batches` |
+| `/admin/lucky-ids` | keep_temporarily | yes (real page) | migrate_then_alias → `/admin/lucky-plan/lucky-ids` |
+| `/admin/lucky-draws` | keep_temporarily | yes (real page) | migrate_then_alias → `/admin/lucky-plan/draws` |
+| `/admin/outstandings` | keep_temporarily | yes (real page) | migrate_then_alias → `/admin/finance/outstandings` |
+| `/admin/customer-advances` | keep_temporarily | yes (real page) | add ROUTES constant; migrate_then_alias → `/admin/finance/customer-advances` |
+| `/admin/online-enquiries` | keep_temporarily | yes (real page) | migrate_then_alias → `/admin/requests/online-enquiries` |
+| `/admin/support-requests` | keep_temporarily | yes (real page) | migrate_then_alias → `/admin/requests/support` |
+| `/admin/subscription-requests` | keep_temporarily | yes (real page) | migrate_then_alias → `/admin/requests/subscriptions` |
+| `/admin/profiles/*` aliases | alias | no (redirect) | becomes content owner after Phase 9B move |
+| `/admin/lucky-plan/{batches,lucky-ids,draws}` | alias | no (redirect) | becomes content owner after Phase 9B move |
+| `/admin/finance/{outstandings,customer-advances}` | alias | no (redirect) | becomes content owner after Phase 9B move |
+| `/admin/requests/*` aliases | alias | no (redirect) | becomes content owner after Phase 9B move |
+| `/admin/service-desk/cases` | keep_temporarily | no page (nav uses hub) | build dedicated cases page + endpoint |
+| `/admin/vendors/ledger` | keep | stub (per-vendor detail) | aggregate ledger endpoint, then real page |
+| `/admin/vendors/outstanding` | keep | stub (per-vendor detail) | aggregate outstanding endpoint, then real page |
+| `/admin/purchases/vendor-returns` | keep | page (no aggregate endpoint) | vendor-returns aggregate endpoint |
+| `/admin/reports/customer-analytics` | keep | page (honest empty state) | cohort/retention/churn aggregate endpoint |
+| `/admin/lucky-plan/winners` | keep | page (documented gap) | winners aggregate endpoint |
+| `/admin/finance/customer-credits` | keep_temporarily | no page, no endpoint | build endpoint + page |
+| `/admin/finance/refunds` | keep_temporarily | no page (reversal-control owns it) | decide: dedicated page or permanent alias to reversal-control |
+| `/admin/manufacturing` (+ boms, jobs) | keep_temporarily | yes (real pages) | separate module decision; do NOT merge into Inventory/Purchases |
+
+### delete_later candidates (none acted on in Phase 9A)
+
+No route is `delete_later` yet. A legacy path only becomes `delete_later` after
+its page content has moved to the canonical path (Phase 9B `migrate_then_alias`)
+and the alias has redirected safely through at least one release cycle.
+
+### Do-not-delete in Phase 9A
+
+Every route in the table above, every backend endpoint, every model, migration,
+and database field is preserved. Phase 9A is classification + safe hygiene only.
+
+Full Phase 9A audit detail: `docs/architecture/admin-route-cleanup-phase-9a-report.md`.
