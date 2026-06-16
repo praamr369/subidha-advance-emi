@@ -388,19 +388,23 @@ export default function AdminBatchesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan Control"
       title="Batch Register"
-      subtitle="Review Lucky Plan grouping, slot pressure, draw timing, and subscription attachment from one operational register without changing batch lifecycle logic."
+      subtitle="Lucky Plan Control — Batch source. Review batch grouping, slot pressure, Lucky ID assignment, draw timing, and linked subscriptions without changing batch lifecycle logic."
+      helperNote="This is the Lucky Plan batch source page. Winner waiver means future EMI waiver only — past collected EMIs are not reversed. Draw readiness, winner state, and Lucky ID assignment are all shown from real backend data only. No fake draw readiness or slot grids are displayed."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
+        { label: "Lucky Plan", href: "/admin/lucky-plan" },
         { label: "Batches" },
       ]}
       actions={[
         { href: "/admin/batches/create", label: "Create Batch", variant: "primary" },
-        {
-          href: "/admin/subscriptions/advance-emi/create",
-          label: "Create Subscription",
-          variant: "secondary",
-        },
+        { href: "/admin/lucky-ids", label: "Lucky IDs", variant: "secondary" },
+        { href: "/admin/lucky-draws", label: "Lucky Draws", variant: "secondary" },
+        { href: "/admin/lucky-plan/winners", label: "Winners", variant: "secondary" },
+        { href: "/admin/subscriptions?plan_type=EMI", label: "EMI Subscriptions", variant: "secondary" },
+        { href: "/admin/subscriptions/advance-emi/create", label: "Create EMI Subscription", variant: "secondary" },
       ]}
       stats={[
         { label: "Visible Batches", value: rows.length },
@@ -408,7 +412,7 @@ export default function AdminBatchesPage() {
         { label: "Subscription Volume", value: totalSubscriptions },
         { label: "Winner Count", value: totalWinners, tone: totalWinners > 0 ? "info" : undefined },
       ]}
-      statusBadge={{ label: "Batch Operations", tone: "info" }}
+      statusBadge={{ label: "Lucky Plan Control — Batch Source", tone: "info" }}
     >
       <div className="space-y-6">
         <QuickActionGrid>
@@ -510,6 +514,7 @@ export default function AdminBatchesPage() {
                   </label>
 
                   <select
+                    title="Batch status filter"
                     value={statusInput}
                     onChange={(event) =>
                       setStatusInput(event.target.value as "" | CanonicalBatchStatus)
@@ -557,6 +562,33 @@ export default function AdminBatchesPage() {
         ) : null}
 
         {!loading && !error ? (
+          <>
+          <DetailPanel
+            title="Lucky Plan context — batch, Lucky IDs, draws, winners"
+            description="Navigate to each Lucky Plan module from here. All state shown is from real backend data."
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+                <div className="font-semibold text-foreground">Lucky IDs</div>
+                <div className="text-xs text-muted-foreground">Unique slot identifiers per batch. Assigned to subscribers during Advance EMI creation.</div>
+                <Link href="/admin/lucky-ids" className="text-xs font-medium text-primary hover:underline">Open Lucky IDs →</Link>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+                <div className="font-semibold text-foreground">Lucky Draws</div>
+                <div className="text-xs text-muted-foreground">Draw events per batch. Draw readiness is determined by backend batch state, not by this page.</div>
+                <Link href="/admin/lucky-draws" className="text-xs font-medium text-primary hover:underline">Open Lucky Draws →</Link>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+                <div className="font-semibold text-foreground">EMI Subscriptions</div>
+                <div className="text-xs text-muted-foreground">Advance EMI contracts linked to this batch. Use the register filter to scope by batch.</div>
+                <Link href="/admin/subscriptions?plan_type=EMI" className="text-xs font-medium text-primary hover:underline">View EMI subscriptions →</Link>
+              </div>
+              <div className="rounded-xl border border-border bg-amber-50 border-amber-200 px-4 py-3 space-y-1">
+                <div className="font-semibold text-amber-900">Winner waiver rule</div>
+                <div className="text-xs text-amber-800">Winner waiver applies to <strong>future EMI instalments only</strong>. Past collected EMIs are not reversed. Waivers are posted through the existing draw and waiver workflow — not from this page.</div>
+              </div>
+            </div>
+          </DetailPanel>
           <DetailPanel
             title="Batch rows"
             description="Open a batch to review Lucky IDs, draw readiness, and linked subscriptions without leaving the operational register."
@@ -601,10 +633,16 @@ export default function AdminBatchesPage() {
                         Control Center
                       </Link>
                       <Link
-                        href="/admin/subscriptions/advance-emi/create"
+                        href={`/admin/subscriptions?batch=${row.id}&plan_type=EMI`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
-                        Create Subscription
+                        Subscriptions
+                      </Link>
+                      <Link
+                        href={`/admin/lucky-ids?batch=${row.id}`}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                      >
+                        Lucky IDs
                       </Link>
                     </div>
                   )}
@@ -612,6 +650,7 @@ export default function AdminBatchesPage() {
               </DataTableShell>
             )}
           </DetailPanel>
+          </>
         ) : null}
       </div>
     </ERPPageShell>

@@ -547,10 +547,10 @@ export default function AdminCustomersPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Customer Operations"
+      eyebrow="Profiles & Parties"
       title="Customer Register"
-      subtitle="Search, review, and route customer records into KYC, subscription, and payment workflows with clear operational context."
-      helperNote="Customer rows here are source-linked for onboarding, subscription sale, direct sale, and collection operations. Use filters to narrow high-volume registers before action."
+      subtitle="Customer profile source — identity, KYC, and linked contract context. Money posture, collections, and accounting bridge each belong to their respective modules."
+      helperNote="This is the customer identity source. Linked contracts and subscriptions are in Sales & Contracts. Money posture (outstanding amounts) belongs to Finance Operations. Cash collection and receipts belong to Collections & Cashier. Accounting bridge posting and reconciliation belong to Accounting & Reconciliation."
       helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
@@ -558,12 +558,12 @@ export default function AdminCustomersPage() {
       ]}
       actions={[
         { href: "/admin/customers/create", label: "Create Customer", variant: "primary" },
-        { href: ROUTES.admin.subscriptionsAdvanceEmiCreate, label: "Create Subscription", variant: "secondary" },
-        { href: ROUTES.admin.financeCollect, label: "Collect Payment", variant: "secondary" },
+        { href: "/admin/subscriptions", label: "View Subscriptions", variant: "secondary" },
+        { href: ROUTES.admin.outstandings, label: "Outstandings (Finance)", variant: "secondary" },
+        { href: ROUTES.admin.financeCollect, label: "Collection Workspace", variant: "secondary" },
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
-        { href: "/admin/subscriptions", label: "Subscriptions", variant: "secondary" },
       ]}
-      statusBadge={{ label: "Customer Operations", tone: "info" }}
+      statusBadge={{ label: "Customer Profile Source", tone: "info" }}
     >
       <RegistryPageShell
         summary={
@@ -578,8 +578,8 @@ export default function AdminCustomersPage() {
         }
         filters={
           <DetailPanel
-          title="Customer workflow"
-          description="Use server-backed search and KYC/status filters to reduce noise, then route directly into customer detail, subscriptions, or payment history."
+          title="Customer profile source workflow"
+          description="Use server-backed search and KYC/status filters to reduce noise. Navigate into customer detail for identity and KYC management. Route to Subscriptions (Sales & Contracts), Outstandings (Finance Operations), or Collection Workspace (Collections & Cashier) as needed — those concerns belong to their own modules."
         >
           <div className="mb-4 flex flex-wrap gap-2">
             <ActionButton
@@ -769,12 +769,7 @@ export default function AdminCustomersPage() {
                         href={`/admin/payments?customer=${row.id}`}
                         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                       >
-                        {(Number(row.active_subscription_count || 0) > 0 ||
-                          Number(row.active_subscription_due || 0) > 0 ||
-                          Number(row.active_direct_sale_outstanding || 0) > 0 ||
-                          Number(row.active_invoice_outstanding || 0) > 0)
-                          ? "Payments"
-                          : "Payment History"}
+                        Payment History
                       </Link>
                     </div>
                   )}
@@ -785,50 +780,50 @@ export default function AdminCustomersPage() {
 
 
         <ControlLaneGrid
-          title="Shortcuts"
-          description="After you locate the right row, jump to common follow-up routes."
+          title="Module navigation — follow the chain of truth"
+          description="Customer identity lives here. Each downstream concern belongs to its own module. Navigate; do not duplicate module logic from the profile page."
           lanes={[
             {
               title: "Create customer",
-              description: "Start a new customer record in the canonical admin register.",
+              description: "Start a new customer identity record. KYC and contact details only — no payment or accounting records are created here.",
               href: `${ROUTES.admin.customers}/create`,
               icon: <UserPlus className="h-4 w-4" />,
-              badge: "Setup",
+              badge: "Profiles & Parties",
             },
             {
-              title: "Create subscription",
-              description: "Route a verified customer into the canonical subscription-sale workflow.",
-              href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
+              title: "Subscriptions & contracts",
+              description: "Sales & Contracts module — EMI, rent, and lease contracts. Subscriptions are created and managed there, not from the customer profile.",
+              href: "/admin/subscriptions",
               icon: <RefreshCw className="h-4 w-4" />,
-              badge: "Sale",
+              badge: "Sales & Contracts",
             },
             {
-              title: "Collect payment",
-              description: "Open the admin payment workflow without blending collection into profile edits.",
+              title: "Outstandings",
+              description: "Finance Operations module — view money due, overdue amounts, and outstanding posture for this customer.",
+              href: ROUTES.admin.outstandings,
+              icon: <RefreshCw className="h-4 w-4" />,
+              badge: "Finance Operations",
+            },
+            {
+              title: "Collection workspace",
+              description: "Collections & Cashier module — post cash, UPI, or bank collections. Receipts and cashier close are managed there.",
               href: ROUTES.admin.financeCollect,
-              icon: <RefreshCw className="h-4 w-4" />,
-              badge: "Payment",
+              icon: <Users className="h-4 w-4" />,
+              badge: "Collections & Cashier",
             },
             {
-              title: "Direct sales lane",
-              description: "Retail sale and billing work remain explicit and separate from EMI subscriptions.",
+              title: "Direct sales",
+              description: "Sales & Contracts — direct retail sale and billing. Separate from EMI subscription workflows.",
               href: ROUTES.admin.billingDirectSales,
               icon: <Users className="h-4 w-4" />,
-              badge: "Retail",
-            },
-            {
-              title: "CRM directory",
-              description: "Review party continuity and follow-up posture before conversion or escalation.",
-              href: ROUTES.admin.crmParties,
-              icon: <Users className="h-4 w-4" />,
-              badge: "CRM",
+              badge: "Sales & Contracts",
             },
             {
               title: "Support queue",
-              description: "Customer disputes and service issues remain in their own route-safe queue.",
+              description: "CRM & Requests — customer disputes and service issues tracked separately from profile and financial data.",
               href: ROUTES.admin.supportRequests,
               icon: <ShieldCheck className="h-4 w-4" />,
-              badge: "Support",
+              badge: "CRM & Requests",
             },
           ]}
         />

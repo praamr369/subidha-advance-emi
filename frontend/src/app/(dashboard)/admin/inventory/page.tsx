@@ -145,15 +145,16 @@ export default function AdminInventoryPage() {
 
   return (
     <ERPPageShell
-      title="Inventory Operations"
-      subtitle="Operate stock as a separate ledger-backed module while keeping product master canonical and leaving EMI, payment, draw, waiver, and reconciliation truth unchanged."
-      helperNote="Stock movement, delivery bridge, and adjustment queues stay explicit so inventory remains auditable and finance-safe."
+      eyebrow="Inventory & Stock"
+      title="Stock Posture"
+      subtitle="Inventory & Stock — Stock source workflow. On-hand, available, reserved, delivery-out, and adjustment posture from the live stock ledger."
+      helperNote="Stock counts here are derived from the explicit stock ledger and opening balances. Purchase payable and vendor payment belong to Purchases & Vendors — not to Inventory. No billing, payment, or accounting bridge posting happens from this page. Accounting bridge status for stock is tracked in Accounting & Reconciliation."
       helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory" },
       ]}
-      statusBadge={{ label: "Admin Controlled", tone: "info" }}
+      statusBadge={{ label: "Inventory & Stock — Source Workflow", tone: "info" }}
       actions={[
         { href: ROUTES.admin.inventoryStockOnHand, label: "Stock on Hand", variant: "primary" },
         { href: ROUTES.admin.inventoryItems, label: "Items", variant: "secondary" },
@@ -165,7 +166,7 @@ export default function AdminInventoryPage() {
         { href: ROUTES.admin.inventoryDemandPlanning, label: "Demand Planning", variant: "secondary" },
         { href: ROUTES.admin.inventoryPurchaseNeeds, label: "Purchase Needs", variant: "secondary" },
         { href: ROUTES.admin.inventoryReadiness, label: "Readiness", variant: "secondary" },
-        { href: ROUTES.admin.purchases, label: "Purchases (supply chain)", variant: "secondary" },
+        { href: ROUTES.admin.purchases, label: "Purchases & Vendors", variant: "secondary" },
       ]}
       stats={[
         { label: "Tracked Items", value: String(itemsCount), tone: "info" },
@@ -179,6 +180,53 @@ export default function AdminInventoryPage() {
 
       {!loading && !error ? (
         <>
+          <ERPSectionShell
+            title="Stock posture — category separation"
+            description="Each stock category has a distinct meaning. No stock count is fabricated — all values come from the live ledger."
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+                <div className="font-semibold text-foreground">On hand</div>
+                <div className="text-xs text-muted-foreground">Physical stock present at a location, derived from opening stock + receipts − deliveries out + returns in + adjustments.</div>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+                <div className="font-semibold text-foreground">Available</div>
+                <div className="text-xs text-muted-foreground">On hand minus reserved quantity. Available for new delivery commitments.</div>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+                <div className="font-semibold text-foreground">Reserved</div>
+                <div className="text-xs text-muted-foreground">Stock committed to winners and confirmed orders pending delivery handover.</div>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+                <div className="font-semibold text-foreground">Delivery out</div>
+                <div className="text-xs text-muted-foreground">Stock issued via completed delivery. Reduces on-hand in the ledger via EMI_DELIVERY_OUT movement.</div>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+                <div className="font-semibold text-foreground">Adjustment</div>
+                <div className="text-xs text-muted-foreground">Counted stock correction approved through the adjustment workflow. Posted explicitly — not on page load.</div>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+                <div className="font-semibold text-foreground">Purchase receipt</div>
+                <div className="text-xs text-muted-foreground">
+                  Stock-in from goods receipt. Source workflow is{" "}
+                  <a href={ROUTES.admin.purchases} className="text-primary hover:underline">Purchases & Vendors</a>
+                  {" "}— not this page.
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
+                <div className="font-semibold text-foreground">Return / hold / maintenance</div>
+                <div className="text-xs text-muted-foreground">Returned and held stock from Delivery & Service returns. EMI_RETURN_IN movement restores on-hand.</div>
+              </div>
+              <div className="rounded-xl border border-border bg-amber-50 border-amber-200 px-4 py-3 space-y-1">
+                <div className="font-semibold text-amber-900">Accounting bridge</div>
+                <div className="text-xs text-amber-800">
+                  COGS and stock valuation bridge posting belong to{" "}
+                  <a href={ROUTES.admin.reconciliation} className="text-primary hover:underline">Accounting & Reconciliation</a>
+                  . Not shown or posted here.
+                </div>
+              </div>
+            </div>
+          </ERPSectionShell>
           <Phase7Guidance
             items={[
               {

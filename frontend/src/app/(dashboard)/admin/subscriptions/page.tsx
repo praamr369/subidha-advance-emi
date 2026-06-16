@@ -210,83 +210,112 @@ function normalizeSubscriptionListPayload(payload: unknown): SubscriptionListPay
 function SubscriptionWorkflowLanding() {
   return (
     <ERPPageShell
+      eyebrow="Sales & Contracts"
       title="Subscriptions"
-      subtitle="Canonical contract workflow entry point for Advance EMI, rent, lease, and partner Advance EMI operations."
+      subtitle="Contract source workflow — Advance EMI, Rent, and Lease contracts. Each plan type has distinct context, Lucky Plan assignment rules, and downstream module ownership."
+      helperNote="Contract creation lives here. Payment and receipt collection belongs to Collections & Cashier. Accounting bridge and reconciliation belong to Accounting & Reconciliation. Delivery and handover belong to Delivery & Service. Winner waiver (Advance EMI only) applies to future EMI instalments only — past collected EMIs are not reversed."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Subscriptions" },
       ]}
       actions={[
-        { href: ROUTES.admin.subscriptionsAdvanceEmiCreate, label: "Create EMI", variant: "primary" },
+        { href: ROUTES.admin.subscriptionsAdvanceEmiCreate, label: "Create Advance EMI", variant: "primary" },
         { href: ROUTES.admin.subscriptionsRentCreate, label: "Create Rent", variant: "secondary" },
         { href: ROUTES.admin.subscriptionsLeaseCreate, label: "Create Lease", variant: "secondary" },
         { href: ROUTES.admin.subscriptionRequests, label: "Subscription Requests", variant: "secondary" },
       ]}
-      statusBadge={{ label: "Workflow Landing", tone: "info" }}
+      statusBadge={{ label: "Contract Source Workflow", tone: "info" }}
     >
       <div className="space-y-5">
         <Phase7Guidance
           items={[
             {
-              label: "Create EMI",
+              label: "Create Advance EMI contract",
               href: ROUTES.admin.subscriptionsAdvanceEmiCreate,
-              note: "Start Lucky Plan contract creation with batch and Lucky ID checks.",
-              warning: "Assign Lucky ID only inside the Advance EMI workflow.",
+              note: "Start Lucky Plan contract. Assigns a Lucky ID from a batch — Lucky ID and batch context are Advance EMI only.",
+              warning: "Assign Lucky ID only inside the Advance EMI workflow. Rent and Lease contracts do not use Lucky IDs or Lucky Draws.",
             },
             {
-              label: "Collect first EMI",
+              label: "Collect first instalment",
               href: ROUTES.admin.financeCollect,
-              note: "Post the first collection through the canonical finance collection route.",
-              warning: "Payments remain backend-allocated and reconciliation-safe.",
+              note: "Post the first collection through Collections & Cashier. Payment and receipt belong to that module.",
+              warning: "Payment posting and receipt generation remain backend-allocated and reconciliation-safe. Do not post from the contract register.",
             },
             {
               label: "Schedule delivery",
               href: ROUTES.admin.deliveryCreate,
-              note: "Create delivery only after stock/source readiness is confirmed.",
-              warning: "Stock unavailable deliveries stay blocked by delivery controls.",
+              note: "Create delivery through Delivery & Service only after stock readiness is confirmed by Inventory & Stock.",
+              warning: "Delivery handover and stock-out belong to Delivery & Service — not to the contract register.",
             },
           ]}
         />
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1 text-sm">
+            <div className="font-semibold text-foreground">Plan-type boundary</div>
+            <div className="text-xs text-muted-foreground">Advance EMI → Lucky ID + batch (Lucky Plan context). Rent / Lease → No Lucky ID, no draw.</div>
+          </div>
+          <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1 text-sm">
+            <div className="font-semibold text-foreground">Winner waiver rule</div>
+            <div className="text-xs text-muted-foreground">Advance EMI only. Future EMI instalments are waived for the draw winner. Past collected EMIs are not reversed.</div>
+          </div>
+          <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1 text-sm">
+            <div className="font-semibold text-foreground">Payment & receipt</div>
+            <div className="text-xs text-muted-foreground">
+              <Link href={ROUTES.admin.financeCollect} className="text-primary hover:underline">Collections & Cashier</Link>
+              {" "}— not from this contract page
+            </div>
+          </div>
+          <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1 text-sm">
+            <div className="font-semibold text-foreground">Accounting & reconciliation</div>
+            <div className="text-xs text-muted-foreground">
+              <Link href={ROUTES.admin.reconciliation} className="text-primary hover:underline">Accounting & Reconciliation</Link>
+              {" "}— separate module
+            </div>
+          </div>
+        </div>
+
         <div className="grid gap-4 lg:grid-cols-2">
           <WorkflowCard
-            title="Advance EMI"
-            description="Lucky Plan EMI contracts, batches, lucky IDs, EMI register, payments, draws, winners, waivers, and delivery requests. Primary action: Create Advance EMI contract. Queue: Pending requests and overdue EMI appear in the sidebar badges. Recent activity: Use the register for current subscription rows and detail drill-down."
+            title="Advance EMI — Lucky Plan"
+            description="Lucky Plan EMI contracts with batch and Lucky ID assignment. Each subscriber gets a unique Lucky ID from their assigned batch. Draw winner receives a future EMI waiver only. Payment and receipt collection belong to Collections & Cashier."
             action={
               <Link
                 href={`${ROUTES.admin.subscriptions}?plan_type=EMI`}
                 className="inline-flex text-sm font-semibold text-primary hover:underline"
               >
-                Open subscription register →
+                Open Advance EMI register →
               </Link>
             }
           />
           <WorkflowCard
-            title="Rent"
-            description="Rent contracts, monthly demands, rent payments, security deposits, possession, handover, and return inspections. Primary action: Create rent contract. Queue: Rent queues are contract, demand, payment, deposit, and return oriented. Recent activity: Rent does not expose Lucky ID or Lucky Draw workflows."
+            title="Rent — monthly demand"
+            description="Rent contracts with monthly demand cycle, security deposit, possession, handover, and return inspection. No Lucky ID or Lucky Draw context. Rent payment and receipt belong to Collections & Cashier. Deposit refund belongs to Finance Operations."
             action={
               <Link
                 href={`${ROUTES.admin.subscriptions}?plan_type=RENT`}
                 className="inline-flex text-sm font-semibold text-primary hover:underline"
               >
-                Open subscription register →
+                Open Rent register →
               </Link>
             }
           />
           <WorkflowCard
-            title="Lease"
-            description="Lease contracts, monthly demands, lease payments, security deposits, possession, handover, and return inspections. Primary action: Create lease contract. Queue: Lease queues are contract, demand, payment, deposit, and return oriented. Recent activity: Lease does not expose Lucky ID or Lucky Draw workflows."
+            title="Lease — monthly demand"
+            description="Lease contracts with monthly demand cycle, security deposit, possession, handover, and return inspection. No Lucky ID or Lucky Draw context. Lease payment and receipt belong to Collections & Cashier. Deposit refund belongs to Finance Operations."
             action={
               <Link
                 href={`${ROUTES.admin.subscriptions}?plan_type=LEASE`}
                 className="inline-flex text-sm font-semibold text-primary hover:underline"
               >
-                Open subscription register →
+                Open Lease register →
               </Link>
             }
           />
           <WorkflowCard
             title="Partner Operations"
-            description="Partner register, partner customers, subscription requests, payment requests, collections, commissions, payouts, and performance. Primary action: Review partner payment requests. Queue: Partner payment and collection badges stay under this workflow. Recent activity: Partner operations remain tied to Advance EMI workflows."
+            description="Partner register, partner customers, subscription requests, commissions, and payouts. Partner Advance EMI follows the same Lucky Plan rules. Commission and payout belong to Finance Operations — not from this page."
             action={
               <Link
                 href={ROUTES.admin.partnersWorkspace}
@@ -513,8 +542,11 @@ export default function AdminSubscriptionsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Sales & Contracts"
       title="Subscription Register"
-      subtitle="Operational contract register for customer subscriptions, EMI plan visibility, and downstream handoff into detail, payments, and customer workflows."
+      subtitle="Contract source workflow — filtered view of Advance EMI, Rent, and Lease contracts. Advance EMI rows include Lucky ID and batch context. Rent and Lease rows do not."
+      helperNote="Contract values shown here are source records. Payment and receipt belong to Collections & Cashier. Accounting bridge and reconciliation belong to Accounting & Reconciliation. Delivery belongs to Delivery & Service."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Subscriptions" },
@@ -522,17 +554,27 @@ export default function AdminSubscriptionsPage() {
       actions={[
         {
           href: createSubscriptionHref,
-          label: "Create Subscription",
+          label: "Create Advance EMI",
           variant: "primary",
         },
         {
+          href: ROUTES.admin.subscriptionsRentCreate,
+          label: "Create Rent",
+          variant: "secondary",
+        },
+        {
+          href: ROUTES.admin.subscriptionsLeaseCreate,
+          label: "Create Lease",
+          variant: "secondary",
+        },
+        {
           href: "/admin/customers",
-          label: "Open Customers",
+          label: "Customer Profiles",
           variant: "secondary",
         },
       ]}
       statusBadge={{
-        label: "Contract Operations",
+        label: "Contract Source Workflow",
         tone: "info",
       }}
     >
@@ -776,22 +818,22 @@ export default function AdminSubscriptionsPage() {
                     <thead>
                       <tr className="text-left">
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Subscription
+                          Contract
                         </th>
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Customer
+                          Customer (Profiles & Parties)
                         </th>
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Product / Plan
+                          Product / Plan type
                         </th>
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right">
-                          Financials
+                          Contract value
                         </th>
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Status
                         </th>
                         <th className="border-b border-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Actions
+                          Navigate
                         </th>
                       </tr>
                     </thead>
@@ -833,12 +875,19 @@ export default function AdminSubscriptionsPage() {
                               {row.product_code || "No product code"}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                              {row.batch_code || "No batch"}
-                              {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
+                              Plan: {row.plan_type || "—"}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {row.plan_type || "No plan type"}
-                            </div>
+                            {row.batch_code ? (
+                              <div className="mt-1 text-xs text-blue-700">
+                                Batch: {row.batch_code}
+                                {typeof row.lucky_number === "number" ? ` · Lucky #${row.lucky_number}` : ""}
+                                {" "}(Lucky Plan)
+                              </div>
+                            ) : (
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                No batch / Lucky ID — Rent or Lease contract
+                              </div>
+                            )}
                           </td>
 
                           <td className="border-b border-border px-4 py-3 text-right text-sm text-foreground">
@@ -846,7 +895,10 @@ export default function AdminSubscriptionsPage() {
                               {formatRupee(row.total_amount)}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                              EMI {formatRupee(row.monthly_amount)}
+                              Monthly {formatRupee(row.monthly_amount)}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Payments → Collections & Cashier
                             </div>
                           </td>
 
@@ -901,7 +953,7 @@ export default function AdminSubscriptionsPage() {
                                 }`}
                                 className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                               >
-                                Create Delivery
+                                Delivery & Service
                               </Link>
                             </div>
                           </td>
