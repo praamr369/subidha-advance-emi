@@ -39,6 +39,14 @@ export const ROUTES = {
     root: "/admin",
     dashboard: "/admin",
 
+    profiles: "/admin/profiles",
+    profilesCustomers: "/admin/profiles/customers",
+    profilesPartners: "/admin/profiles/partners",
+    profilesVendors: "/admin/profiles/vendors",
+    profilesStaff: "/admin/profiles/staff",
+    profilesBranches: "/admin/profiles/branches",
+    profilesParties: "/admin/profiles/parties",
+
     analytics: "/admin/analytics",
     analyticsRiskMonitor: "/admin/analytics/risk-monitor",
     analyticsChurnAnalysis: "/admin/analytics/churn-analysis",

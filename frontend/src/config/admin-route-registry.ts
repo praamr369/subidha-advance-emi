@@ -56,14 +56,19 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Command Center", "ERP Home", ROUTES.admin.erp, "Unified ERP command center."),
 
   // ── 2. Profiles & Parties ─────────────────────────────────────────────────
-  // Legacy paths: /admin/customers → /admin/profiles/customers (migrate_then_alias)
-  //               /admin/partners → /admin/profiles/partners (migrate_then_alias)
-  //               /admin/branches → /admin/profiles/branches (migrate_then_alias)
-  //               /admin/crm/parties → /admin/profiles/parties (migrate_then_alias)
-  item("Profiles & Parties", "Customers", ROUTES.admin.customers, "Customer register and object cockpit."),
-  item("Profiles & Parties", "Partners", ROUTES.admin.partnersWorkspace, "Partner workspace for Advance EMI operations.", {
+  // Phase 2: canonical /admin/profiles/* routes are now live as redirect aliases.
+  // Old paths remain active; new canonical paths are linked here.
+  // Legacy → canonical:
+  //   /admin/customers       → /admin/profiles/customers (migrate_then_alias)
+  //   /admin/partners        → /admin/profiles/partners  (migrate_then_alias)
+  //   /admin/vendors         → /admin/profiles/vendors   (migrate_then_alias)
+  //   /admin/hr/staff        → /admin/profiles/staff     (keep_temporarily)
+  //   /admin/branches        → /admin/profiles/branches  (migrate_then_alias)
+  //   /admin/crm/parties     → /admin/profiles/parties   (migrate_then_alias)
+  item("Profiles & Parties", "Profiles Hub", ROUTES.admin.profiles, "Master identity landing page for all profile sub-modules."),
+  item("Profiles & Parties", "Customers", ROUTES.admin.profilesCustomers, "Customer register and identity cockpit."),
+  item("Profiles & Parties", "Partners", ROUTES.admin.profilesPartners, "Partner register and identity cockpit.", {
     children: [
-      item("Profiles & Parties", "Partner Register", ROUTES.admin.partners, "Partner directory."),
       item("Profiles & Parties", "Partner Payment Requests", ROUTES.admin.partnerPaymentRequests, "Partner payment request queue.", {
         badgeSource: "queue.partner_payment_requests_pending",
       }),
@@ -72,9 +77,10 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
       }),
     ],
   }),
-  // Branches route: /admin/branches kept as-is until canonical alias /admin/profiles/branches is wired
-  item("Profiles & Parties", "Branches", ROUTES.admin.branches, "Branch identity and operational status."),
-  item("Profiles & Parties", "Party Master", ROUTES.admin.crmParties, "Party-centric 360 records across customers, partners, vendors, and staff."),
+  item("Profiles & Parties", "Vendors", ROUTES.admin.profilesVendors, "Vendor identity register. Procurement operations remain under Purchases & Vendors."),
+  item("Profiles & Parties", "Staff Profiles", ROUTES.admin.profilesStaff, "Staff identity and HR context. Payroll operations remain under HR & Staff."),
+  item("Profiles & Parties", "Branches", ROUTES.admin.profilesBranches, "Branch identity and operational status."),
+  item("Profiles & Parties", "Party Master", ROUTES.admin.profilesParties, "Party-centric 360 records across customers, partners, vendors, and staff."),
 
   // ── 3. CRM & Requests ─────────────────────────────────────────────────────
   item("CRM & Requests", "CRM Workspace", ROUTES.admin.crmWorkspace, "Lead, customer, and support operating board."),

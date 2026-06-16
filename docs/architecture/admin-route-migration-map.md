@@ -20,12 +20,13 @@ This map is the Phase 0 control document for cleaning admin routes without break
 | `/admin/operations` | Command Center | `/admin/operations` | keep | Cross-module operations. |
 | `/admin/operations/today-work` | Command Center | `/admin/operations/today-work` | keep | Daily work queue. |
 | `/admin/operations/command-center` | Command Center | `/admin/operations/command-center` | keep | Enterprise control surface. |
-| `/admin/customers` | Profiles & Parties | `/admin/profiles/customers` | migrate_then_alias | Customer object cockpit should live under Profiles. |
-| `/admin/partners` | Profiles & Parties | `/admin/profiles/partners` | migrate_then_alias | Partner profile, not finance payout workspace. |
-| `/admin/vendors` | Profiles & Parties / Purchases | `/admin/profiles/vendors` | migrate_then_alias | Vendor identity under Profiles; procurement under Purchases. |
-| `/admin/hr/staff` | Profiles & Parties / HR | `/admin/profiles/staff` and `/admin/hr/staff` | keep_temporarily | Staff profile belongs to Profiles; HR workflow remains under HR. |
-| `/admin/branches` | Profiles & Parties / Settings | `/admin/profiles/branches` | migrate_then_alias | Branch profile and operational branch status. Configuration remains Settings. |
-| `/admin/crm/parties` | Profiles & Parties | `/admin/profiles/parties` | migrate_then_alias | Party master should become canonical party route. |
+| `/admin/customers` | Profiles & Parties | `/admin/profiles/customers` | alias | Phase 2: `/admin/profiles/customers` redirects to `/admin/customers`. Navigation updated. Old route preserved. |
+| `/admin/partners` | Profiles & Parties | `/admin/profiles/partners` | alias | Phase 2: `/admin/profiles/partners` redirects to `/admin/partners`. Navigation updated. Old route preserved. |
+| `/admin/vendors` | Profiles & Parties / Purchases | `/admin/profiles/vendors` | alias | Phase 2: `/admin/profiles/vendors` redirects to `/admin/vendors`. Navigation updated. Old route preserved. |
+| `/admin/hr/staff` | Profiles & Parties / HR | `/admin/profiles/staff` and `/admin/hr/staff` | keep_temporarily | Phase 2: `/admin/profiles/staff` redirects to `/admin/hr/staff`. Both routes active. Full profile/HR split deferred to Phase 7. |
+| `/admin/branches` | Profiles & Parties / Settings | `/admin/profiles/branches` | alias | Phase 2: `/admin/profiles/branches` redirects to `/admin/branches`. Navigation updated. Old route preserved. |
+| `/admin/crm/parties` | Profiles & Parties | `/admin/profiles/parties` | alias | Phase 2: `/admin/profiles/parties` redirects to `/admin/crm/parties`. Navigation updated. Old route preserved. |
+| `/admin/profiles` | Profiles & Parties | `/admin/profiles` | keep | Phase 2: New landing hub page for all profile sub-modules. |
 | `/admin/crm` | CRM & Requests | `/admin/crm` | keep | CRM workspace. |
 | `/admin/crm/leads` | CRM & Requests | `/admin/crm/leads` | keep | Lead register. |
 | `/admin/crm/pipeline` | CRM & Requests | `/admin/crm/pipeline` | keep | Pipeline. |
