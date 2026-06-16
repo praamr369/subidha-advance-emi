@@ -215,7 +215,9 @@ export default function AdminPartnerCollectionRequestsPage() {
   return (
     <PortalPage
       title="Partner Collection Requests"
-      subtitle="Review partner-submitted field collections and convert approved requests into final payment truth."
+      subtitle="Controlled approval queue for partner-submitted field collection reports. Approve or reject request status only."
+      helperNote="This is a controlled approval queue. Approving or rejecting a request updates the request status through the existing backend workflow. No direct payment, commission, or payout record is created from this page."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Partners", href: "/admin/partners" },
@@ -232,6 +234,7 @@ export default function AdminPartnerCollectionRequestsPage() {
         <select
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value)}
+          aria-label="Filter by status"
           className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
         >
           <option value="">All statuses</option>

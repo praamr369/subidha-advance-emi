@@ -44,11 +44,13 @@ export default function AdminPartnerPaymentRequestsPage() {
   return (
     <PortalPage
       title="Partner Payment Requests"
-      subtitle="Admin review queue for partner-submitted payment requests."
+      subtitle="Request intake queue for partner-submitted payment reports. Review context only — no financial posting from this page."
+      helperNote="This is a request intake queue. Reviewing a request here does not post a payment, create a receipt, or update any accounting record. To process a payment, use the Collection Workspace. No financial posting from this page."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "Partner Operations" },
-        { label: "Payment Requests" },
+        { label: "CRM & Requests", href: ROUTES.admin.requestsHub },
+        { label: "Partner Payment Requests" },
       ]}
     >
       {loading ? <LoadingBlock label="Loading partner payment requests..." /> : null}
@@ -86,12 +88,12 @@ export default function AdminPartnerPaymentRequestsPage() {
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-2">
                         <ActionButton href={ROUTES.admin.financeCollect} size="sm" variant="secondary">
-                          Process
-                        </ActionButton>
-                        <ActionButton href={ROUTES.admin.reconciliation} size="sm" variant="outline">
-                          Approve / Reject
+                          Open Collection Workspace
                         </ActionButton>
                       </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        No financial posting from this page
+                      </p>
                     </td>
                   </tr>
                 ))

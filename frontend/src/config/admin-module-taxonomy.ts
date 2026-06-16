@@ -65,11 +65,29 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
     key: "crm_requests",
     label: "CRM & Requests",
     canonicalRoot: ROUTES.admin.crm,
-    description: "Leads, enquiry intake, support requests, KYC queues, follow-ups, and approval requests.",
+    description: "Leads, enquiry intake, support requests, KYC queues, follow-ups, subscription request approval, partner payment intake, and public request queues.",
     effect: "request",
-    safetyRule: "CRM may create requests but must not silently create contracts, payments, or accounting entries.",
+    safetyRule: "CRM may create requests but must not silently create contracts, payments, or accounting entries. Subscription request approval follows existing backend workflow only. Partner payment intake links to collection workspace for context but must not post payments directly.",
     uiPattern: "work_queue",
-    primaryRoutes: [ROUTES.admin.crm, ROUTES.admin.crmLeads, ROUTES.admin.crmPipeline, ROUTES.admin.crmFollowUps, ROUTES.admin.crmKyc, ROUTES.admin.onlineEnquiries, ROUTES.admin.supportRequests, ROUTES.admin.subscriptionRequests],
+    primaryRoutes: [
+      // Core CRM routes
+      ROUTES.admin.crm,
+      ROUTES.admin.crmLeads,
+      ROUTES.admin.crmPipeline,
+      ROUTES.admin.crmFollowUps,
+      ROUTES.admin.crmKyc,
+      // Phase 6: legacy request routes remain under CRM & Requests
+      ROUTES.admin.onlineEnquiries,
+      ROUTES.admin.supportRequests,
+      ROUTES.admin.subscriptionRequests,
+      // Phase 6: partner payment intake moved from Profiles & Parties — intake only
+      ROUTES.admin.partnerPaymentRequests,
+      // Phase 6: canonical /admin/requests/* hub and thin alias routes
+      ROUTES.admin.requestsHub,
+      ROUTES.admin.requestsOnlineEnquiries,
+      ROUTES.admin.requestsSupport,
+      ROUTES.admin.requestsSubscriptions,
+    ],
   },
   {
     key: "sales_contracts",
@@ -162,11 +180,22 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
     key: "delivery_service",
     label: "Delivery & Service",
     canonicalRoot: ROUTES.admin.deliveries,
-    description: "Delivery, handover documents, returns, complaints, service cases, and service tickets.",
+    description: "Delivery, handover documents, returns, complaints, service cases, and service tickets. Answers: which delivered item has a complaint, return, or service ticket? Which case needs staff action? Which return/service state is linked to a sale, subscription, or delivery?",
     effect: "stock",
-    safetyRule: "Delivery may trigger stock movement only through approved fulfillment workflows; service requests do not create financial records directly.",
+    safetyRule: "Delivery may trigger stock movement only through approved fulfillment workflows; service requests do not create financial records directly. Support request intake must remain separated from service case execution.",
     uiPattern: "work_queue",
-    primaryRoutes: [ROUTES.admin.deliveries, ROUTES.admin.deliveryWorkspace, ROUTES.admin.deliveryReturns, ROUTES.admin.serviceDesk, ROUTES.admin.serviceDeskCases, ROUTES.admin.serviceDeskComplaints, ROUTES.admin.serviceDeskReturns, ROUTES.admin.serviceDeskTickets],
+    primaryRoutes: [
+      // Delivery routes
+      ROUTES.admin.deliveries,
+      ROUTES.admin.deliveryWorkspace,
+      ROUTES.admin.deliveryReturns,
+      // Service desk routes — Phase 6: all /admin/service-desk/* routes explicitly classified here
+      ROUTES.admin.serviceDesk,
+      ROUTES.admin.serviceDeskCases,
+      ROUTES.admin.serviceDeskComplaints,
+      ROUTES.admin.serviceDeskReturns,
+      ROUTES.admin.serviceDeskTickets,
+    ],
   },
   {
     key: "hr_staff",

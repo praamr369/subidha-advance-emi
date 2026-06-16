@@ -32,9 +32,15 @@ This map is the Phase 0 control document for cleaning admin routes without break
 | `/admin/crm/pipeline` | CRM & Requests | `/admin/crm/pipeline` | keep | Pipeline. |
 | `/admin/crm/follow-ups` | CRM & Requests | `/admin/crm/follow-ups` | keep | Follow-up tasks. |
 | `/admin/crm/kyc` | CRM & Requests | `/admin/crm/kyc` | keep | KYC queue. |
-| `/admin/online-enquiries` | CRM & Requests | `/admin/requests/online-enquiries` | migrate_then_alias | Public enquiry queue. |
-| `/admin/support-requests` | CRM & Requests / Service | `/admin/requests/support` | migrate_then_alias | Intake route; service cases remain Service Desk. |
-| `/admin/subscription-requests` | CRM & Requests / Sales | `/admin/requests/subscriptions` | migrate_then_alias | Request queue feeding Sales. |
+| `/admin/online-enquiries` | CRM & Requests | `/admin/requests/online-enquiries` | migrate_then_alias | Phase 6: Public enquiry queue. Legacy route kept; canonical alias /admin/requests/online-enquiries added as thin redirect. |
+| `/admin/support-requests` | CRM & Requests | `/admin/requests/support` | migrate_then_alias | Phase 6: Support intake route. Legacy route kept; canonical alias /admin/requests/support added as thin redirect. Service execution remains Service Desk. |
+| `/admin/subscription-requests` | CRM & Requests | `/admin/requests/subscriptions` | migrate_then_alias | Phase 6: Controlled approval queue feeding Sales. Legacy route kept; canonical alias /admin/requests/subscriptions added as thin redirect. |
+| `/admin/requests` | CRM & Requests | `/admin/requests` | keep | Phase 6: New requests hub page. Hub only — no fake counters, no financial posting. Links to all request queues. |
+| `/admin/requests/online-enquiries` | CRM & Requests | `/admin/requests/online-enquiries` | keep | Phase 6: Thin server redirect alias → /admin/online-enquiries. |
+| `/admin/requests/support` | CRM & Requests | `/admin/requests/support` | keep | Phase 6: Thin server redirect alias → /admin/support-requests. |
+| `/admin/requests/subscriptions` | CRM & Requests | `/admin/requests/subscriptions` | keep | Phase 6: Thin server redirect alias → /admin/subscription-requests. |
+| `/admin/partner-payment-requests` | CRM & Requests | `/admin/partner-payment-requests` | keep | Phase 6: Moved from Profiles & Parties children to CRM & Requests. Request intake queue only. Unsafe "Process" / "Approve / Reject" buttons replaced with "Open Collection Workspace" and audit note. No financial posting from this page. |
+| `/admin/partners/collection-requests` | Profiles & Parties | `/admin/partners/collection-requests` | keep | Phase 6: Remains in Profiles & Parties as child of Partners. Controlled approval queue — approve/reject updates request status through existing backend workflow only. Unsafe subtitle "convert approved requests into final payment truth" replaced with audit-safe wording. No payment/commission/payout auto-creation from this page. |
 | `/admin/sales` | Sales & Contracts | `/admin/sales` | keep | Sales workspace. |
 | `/admin/billing/direct-sale` | Sales & Contracts | `/admin/sales/direct-sale` | migrate_then_alias | Direct sale belongs under Sales; billing documents remain linked. |
 | `/admin/billing/direct-sale/create` | Sales & Contracts | `/admin/sales/direct-sale/create` | migrate_then_alias | Existing route can remain alias. |
@@ -105,7 +111,11 @@ This map is the Phase 0 control document for cleaning admin routes without break
 | `/admin/deliveries` | Delivery & Service | `/admin/deliveries` | keep | Delivery register. |
 | `/admin/delivery/workspace` | Delivery & Service | `/admin/delivery/workspace` | keep | Delivery document workflow. |
 | `/admin/delivery/returns` | Delivery & Service | `/admin/delivery/returns` | keep | Delivery return workflow. |
-| `/admin/service-desk/*` | Delivery & Service | `/admin/service-desk/*` | keep | Complaints, cases, returns, tickets. |
+| `/admin/service-desk` | Delivery & Service | `/admin/service-desk` | keep | Phase 6: Service desk hub — service execution, not request intake. |
+| `/admin/service-desk/cases` | Delivery & Service | `/admin/service-desk/cases` | keep | Phase 6: Service cases — explicitly classified as Delivery & Service in taxonomy. |
+| `/admin/service-desk/complaints` | Delivery & Service | `/admin/service-desk/complaints` | keep | Phase 6: Complaint register — service execution lane. |
+| `/admin/service-desk/returns` | Delivery & Service | `/admin/service-desk/returns` | keep | Phase 6: Return queue — linked to sale, subscription, or delivery source record. |
+| `/admin/service-desk/tickets` | Delivery & Service | `/admin/service-desk/tickets` | keep | Phase 6: Service ticket register — after-sales execution. |
 | `/admin/hr/*` | HR & Staff | `/admin/hr/*` | keep | HR workflows. |
 | `/admin/bi/*` | BI & Reports | `/admin/bi/*` | keep | Read-only analytics. |
 | `/admin/reports*` | BI & Reports | `/admin/reports*` | keep_temporarily | Later converge into BI/report center. |

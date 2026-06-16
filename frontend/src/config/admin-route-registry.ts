@@ -69,10 +69,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Profiles & Parties", "Customers", ROUTES.admin.profilesCustomers, "Customer register and identity cockpit."),
   item("Profiles & Parties", "Partners", ROUTES.admin.profilesPartners, "Partner register and identity cockpit.", {
     children: [
-      item("Profiles & Parties", "Partner Payment Requests", ROUTES.admin.partnerPaymentRequests, "Partner payment request queue.", {
-        badgeSource: "queue.partner_payment_requests_pending",
-      }),
-      item("Profiles & Parties", "Partner Collections", ROUTES.admin.partnersCollectionRequests, "Partner collection queue.", {
+      // Phase 6: partner collection requests remain here as a controlled approval queue under Partners.
+      // Approval or rejection updates request status only; no commission/payout/payment records are created
+      // from this page. Documented: kept in Profiles & Parties (not CRM & Requests) because the
+      // approve/reject action is partner-relationship-owned, not a generic inbound request queue.
+      // Partner payment requests (intake queue only) are classified under CRM & Requests (Phase 6).
+      item("Profiles & Parties", "Partner Collections", ROUTES.admin.partnersCollectionRequests, "Controlled approval queue for partner-submitted collection reports. Approve or reject request status only.", {
         badgeSource: "queue.partner_collection_requests_pending",
       }),
     ],
@@ -83,6 +85,21 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Profiles & Parties", "Party Master", ROUTES.admin.profilesParties, "Party-centric 360 records across customers, partners, vendors, and staff."),
 
   // ── 3. CRM & Requests ─────────────────────────────────────────────────────
+  // Phase 6: CRM & Requests owns demand, follow-up, KYC queues, public enquiries,
+  // support intake, subscription request approval, and partner payment intake.
+  //
+  // What this group answers:
+  //   - Who is interested? Who needs follow-up? Which KYC/request is pending?
+  //   - Which public enquiry or subscription request needs action?
+  //   - What is the next allowed non-financial step?
+  //
+  // What this group must NOT do:
+  //   - Create contracts, payments, journals, stock movements, or commission records.
+  //   - Auto-convert subscription requests to contracts.
+  //   - Auto-post payment or reconciliation records from request review.
+  //
+  // /admin/requests/* canonical hub (Phase 6 thin aliases → existing legacy pages):
+  item("CRM & Requests", "Requests Hub", ROUTES.admin.requestsHub, "Unified request intake hub. Request intake only — no financial posting from this page."),
   item("CRM & Requests", "CRM Workspace", ROUTES.admin.crmWorkspace, "Lead, customer, and support operating board."),
   item("CRM & Requests", "Leads", ROUTES.admin.crmLeads, "Lead register."),
   item("CRM & Requests", "Pipeline", ROUTES.admin.crmPipeline, "Lead pipeline."),
@@ -90,11 +107,21 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("CRM & Requests", "KYC", ROUTES.admin.crmKyc, "KYC review queue.", {
     badgeSource: "queue.customer_kyc_pending",
   }),
-  item("CRM & Requests", "Online Enquiries", ROUTES.admin.onlineEnquiries, "Public enquiry queue."),
-  item("CRM & Requests", "Support Requests", ROUTES.admin.supportRequests, "Customer support intake."),
-  item("CRM & Requests", "Subscription Requests", ROUTES.admin.subscriptionRequests, "Admin subscription request queue.", {
+  // Legacy routes (direct paths remain canonical for daily use):
+  item("CRM & Requests", "Online Enquiries", ROUTES.admin.onlineEnquiries, "Public enquiry queue. Request intake — no procurement or payment posting from this page."),
+  item("CRM & Requests", "Support Requests", ROUTES.admin.supportRequests, "Customer support intake. Request intake — service execution remains in Service Desk."),
+  item("CRM & Requests", "Subscription Requests", ROUTES.admin.subscriptionRequests, "Controlled approval queue for subscription requests. Approval follows existing backend workflow — no silent contract/payment creation.", {
     badgeSource: "queue.subscription_requests_pending",
   }),
+  // Phase 6: partner payment requests moved here from Profiles & Parties — intake queue only.
+  // The page links to collection workspace for review context; no payment is posted from this page.
+  item("CRM & Requests", "Partner Payment Requests", ROUTES.admin.partnerPaymentRequests, "Request intake queue for partner-submitted payment reports. No financial posting from this page.", {
+    badgeSource: "queue.partner_payment_requests_pending",
+  }),
+  // Phase 6: canonical /admin/requests/* alias routes — thin server redirects to existing legacy pages.
+  item("CRM & Requests", "Online Enquiries (via /requests)", ROUTES.admin.requestsOnlineEnquiries, "Canonical alias → /admin/online-enquiries. Keeps legacy route intact."),
+  item("CRM & Requests", "Support (via /requests)", ROUTES.admin.requestsSupport, "Canonical alias → /admin/support-requests. Keeps legacy route intact."),
+  item("CRM & Requests", "Subscriptions (via /requests)", ROUTES.admin.requestsSubscriptions, "Canonical alias → /admin/subscription-requests. Keeps legacy route intact."),
 
   // ── 4. Sales & Contracts ──────────────────────────────────────────────────
   // Rent/lease contract items are included here (canonical route family:
@@ -311,6 +338,11 @@ export const ADMIN_ROUTE_ALIASES: Record<string, string> = {
   // Phase 4: Finance Operations canonical alias — old /admin/outstandings still works directly.
   // /admin/finance/outstandings is the new canonical navigation entry point.
   "/admin/finance/reconciliation": ROUTES.admin.financeCanonicalReconciliation,
+  // Phase 6: canonical /admin/requests/* aliases → existing legacy request pages.
+  // Legacy paths remain live and unchanged; these are additive thin redirects only.
+  [ROUTES.admin.requestsOnlineEnquiries]: ROUTES.admin.onlineEnquiries,
+  [ROUTES.admin.requestsSupport]: ROUTES.admin.supportRequests,
+  [ROUTES.admin.requestsSubscriptions]: ROUTES.admin.subscriptionRequests,
 };
 
 function flattenTree(items: AdminRouteRegistryItem[]): AdminRouteRegistryItem[] {

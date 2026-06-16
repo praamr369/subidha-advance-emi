@@ -188,6 +188,13 @@ export const ROUTES = {
     crmCustomerDetail: "/admin/crm/customers",
     crmParties: "/admin/crm/parties",
 
+    // Phase 6: canonical /admin/requests/* request hub routes
+    // These are thin redirect aliases that keep legacy routes intact.
+    requestsHub: "/admin/requests",
+    requestsOnlineEnquiries: "/admin/requests/online-enquiries",
+    requestsSupport: "/admin/requests/support",
+    requestsSubscriptions: "/admin/requests/subscriptions",
+
     billing: "/admin/billing",
     billingDirectSales: "/admin/billing/direct-sales",
     billingDirectSaleWorkspace: "/admin/billing/direct-sale",
