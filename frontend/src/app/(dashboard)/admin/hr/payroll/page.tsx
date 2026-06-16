@@ -45,17 +45,17 @@ export default function AdminHrPayrollPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Staff HR"
-      title="Salary / Payroll"
-      subtitle="Payroll periods and salary sheets from existing accounting workforce models."
+      eyebrow="Staff HR — Payroll setup"
+      title="Payroll Setup"
+      subtitle="Payroll setup: configure staff pay basis, salary effective dates, and view payroll periods and salary sheets. No payroll journal posting, no accounting bridge posting, and no reconciliation record is created from this page."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "HR", href: ROUTES.admin.hr },
-        { label: "Payroll" },
+        { label: "Payroll Setup" },
       ]}
       actions={[
-        { href: ROUTES.admin.hrSalaryPayments, label: "Salary Payments", variant: "secondary" },
-        { href: ROUTES.admin.accountingSalary, label: "Accounting Salary", variant: "ghost" },
+        { href: ROUTES.admin.hrSalaryPayments, label: "Salary Payment Source", variant: "secondary" },
+        { href: ROUTES.admin.accountingSalary, label: "View accounting bridge", variant: "ghost" },
         { href: ROUTES.admin.hrStaffDocuments, label: "Staff Documents", variant: "ghost" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
@@ -64,7 +64,7 @@ export default function AdminHrPayrollPage() {
       {!loading && error ? <ERPErrorState title="Payroll unavailable" description={error} onRetry={() => void load()} /> : null}
       {!loading && !error && payload ? (
         <>
-          <ERPSectionShell title="Payroll setup (Staff master)" description="Updates staff payroll fields only through the existing staff patch API.">
+          <ERPSectionShell title="Payroll setup — staff master" description="Payroll setup: updates staff pay basis through the existing staff PATCH API only. Salary sheets and salary payments are separate steps. No payroll journal or accounting bridge posting from this section.">
             <div className="grid gap-3 md:grid-cols-3">
               <select
                 value={staffId}
@@ -125,7 +125,7 @@ export default function AdminHrPayrollPage() {
           </ERPSectionShell>
 
           {payload.salary_sheets.length === 0 ? (
-            <ERPEmptyState title="No salary sheets yet" description="Salary sheets will appear here when generated in the salary module." />
+            <ERPEmptyState title="No salary sheets yet" description="Salary sheets will appear here when generated through the payroll period workflow. Salary sheets are a separate step from payroll setup." />
           ) : (
             <ERPSectionShell title="Recent salary sheets" description="Read-only peek at the first 20 rows for operator troubleshooting.">
               <div className="overflow-auto">

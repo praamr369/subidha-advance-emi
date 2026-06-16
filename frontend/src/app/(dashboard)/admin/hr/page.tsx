@@ -9,6 +9,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import StatCard from "@/components/ui/StatCard";
+import { WorkflowCard } from "@/components/ui/operations";
 import { ROUTES } from "@/lib/routes";
 import { getHrSummary, type HrSummary } from "@/services/admin-hr";
 
@@ -48,16 +49,16 @@ export default function AdminHrWorkspacePage() {
 
   return (
     <ERPPageShell
-      eyebrow="Staff HR"
-      title="Staff Workspace"
-      subtitle="Daily HR command center over existing employee, attendance, leave, expense, and payroll records."
+      eyebrow="Staff HR — Staff profile source"
+      title="HR & Staff Workspace"
+      subtitle="Staff HR command center: staff profile source, onboarding workflow, attendance source workflow, payroll setup, and salary payment source. No payroll accounting posting from this page."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "HR" },
       ]}
       actions={[
         { href: ROUTES.admin.hrStaff, label: "Staff Register", variant: "primary" },
-        { href: ROUTES.admin.hrAttendance, label: "Mark Attendance", variant: "secondary" },
+        { href: ROUTES.admin.hrAttendance, label: "Attendance", variant: "secondary" },
         { href: ROUTES.admin.hrLeave, label: "Leave Requests", variant: "secondary" },
         { href: ROUTES.admin.hrExpenses, label: "Expense Claims", variant: "secondary" },
         { href: ROUTES.admin.hrStaffDocuments, label: "Staff Documents", variant: "secondary" },
@@ -80,6 +81,10 @@ export default function AdminHrWorkspacePage() {
 
       {payload ? (
         <>
+          <WorkflowCard
+            title="HR & Staff — separation rules"
+            description="Staff profile source, onboarding workflow, attendance source workflow, payroll setup, and salary payment source live here. Payroll accounting bridge status and reconciliation evidence are in Accounting & Reconciliation. No payroll journal, money movement, receipt, accounting bridge posting, or reconciliation item is created from any page in this group."
+          />
           <ERPSectionShell title="Work queue" description="Snapshot summary from existing HR registers and payroll-safe models.">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard label="Expense claims pending" value={payload.pending_expense_claims} tone={payload.pending_expense_claims > 0 ? "warning" : "success"} />
@@ -89,7 +94,7 @@ export default function AdminHrWorkspacePage() {
             </div>
           </ERPSectionShell>
 
-          <ERPSectionShell title="Quick routes" description="Open existing HR workspaces without changing staff, attendance, payroll, or salary behavior.">
+          <ERPSectionShell title="Quick routes" description="Open HR source workflow workspaces. Staff creation, attendance, payroll setup, and salary payments do not create journals, accounting bridge postings, or reconciliation records.">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {[
                 ["Staff Register", ROUTES.admin.hrStaff],

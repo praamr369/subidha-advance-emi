@@ -280,14 +280,20 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Delivery & Service", "Tickets", ROUTES.admin.serviceDeskTickets, "Service ticket register."),
 
   // ── 13. HR & Staff ────────────────────────────────────────────────────────
-  item("HR & Staff", "HR Dashboard", ROUTES.admin.hr, "Daily HR command center."),
-  item("HR & Staff", "Staff", ROUTES.admin.hrStaff, "Create and manage staff profiles."),
-  item("HR & Staff", "Attendance", ROUTES.admin.hrAttendance, "Mark and review attendance."),
-  item("HR & Staff", "Payroll", ROUTES.admin.hrPayroll, "Payroll periods and salary sheets."),
-  item("HR & Staff", "Salary Payments", ROUTES.admin.hrSalaryPayments, "Salary payment register."),
-  item("HR & Staff", "Leave", ROUTES.admin.hrLeave, "Approve or reject leave requests."),
-  item("HR & Staff", "Expenses", ROUTES.admin.hrExpenses, "Employee expense claims."),
-  item("HR & Staff", "Staff Documents", ROUTES.admin.hrStaffDocuments, "Manage staff KYC and agreement documents."),
+  // Phase 7: HR & Staff owns people operations only.
+  // Answers: who works for the business? Is the staff profile complete?
+  //          Is onboarding complete? Is attendance configured? Is payroll setup complete?
+  //          Which salary sheet/payment workflow applies? Which documents/KYC are attached?
+  // Does NOT own: payroll journal auto-posting, accounting bridge reconciliation,
+  //               reconciliation evidence — those belong to Accounting & Reconciliation.
+  item("HR & Staff", "HR Dashboard", ROUTES.admin.hr, "Staff HR workspace: daily command center for staff profiles, onboarding workflow, attendance, payroll setup, and salary payment source. No payroll accounting posting from this group."),
+  item("HR & Staff", "Staff", ROUTES.admin.hrStaff, "Staff profile source: recruit, onboard, and manage staff records. Payroll setup and salary payment remain separate controlled workflows. No payroll/accounting posting from staff creation."),
+  item("HR & Staff", "Attendance", ROUTES.admin.hrAttendance, "Attendance source workflow: mark and review attendance records. Attendance does not auto-generate payroll sheets or salary payments."),
+  item("HR & Staff", "Payroll", ROUTES.admin.hrPayroll, "Payroll setup: configure staff pay basis, salary effective dates, and payroll periods. Salary sheets and salary payments are separate steps. No payroll journal posting from this page."),
+  item("HR & Staff", "Salary Payments", ROUTES.admin.hrSalaryPayments, "Salary payment source: record and view salary payments against existing salary sheets. Payroll accounting bridge status and reconciliation evidence are in Accounting & Reconciliation."),
+  item("HR & Staff", "Leave", ROUTES.admin.hrLeave, "Onboarding workflow — leave: approve or reject staff leave requests through the existing leave workflow."),
+  item("HR & Staff", "Expenses", ROUTES.admin.hrExpenses, "Employee expense claims: approve or reject claims through the existing expense workflow. No journal posting from this page."),
+  item("HR & Staff", "Staff Documents", ROUTES.admin.hrStaffDocuments, "Staff documents and KYC: upload, maintain, and toggle active/inactive status. Document verify/reject requires backend support — documented as a gap."),
 
   // ── 14. BI & Reports ──────────────────────────────────────────────────────
   item("BI & Reports", "BI Dashboards", ROUTES.admin.bi, "Read-only chart and trend control center."),

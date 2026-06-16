@@ -116,7 +116,16 @@ This map is the Phase 0 control document for cleaning admin routes without break
 | `/admin/service-desk/complaints` | Delivery & Service | `/admin/service-desk/complaints` | keep | Phase 6: Complaint register — service execution lane. |
 | `/admin/service-desk/returns` | Delivery & Service | `/admin/service-desk/returns` | keep | Phase 6: Return queue — linked to sale, subscription, or delivery source record. |
 | `/admin/service-desk/tickets` | Delivery & Service | `/admin/service-desk/tickets` | keep | Phase 6: Service ticket register — after-sales execution. |
-| `/admin/hr/*` | HR & Staff | `/admin/hr/*` | keep | HR workflows. |
+| `/admin/hr` | HR & Staff | `/admin/hr` | keep | Phase 7: HR workspace hub. Staff profile source, onboarding workflow, attendance source, payroll setup, salary payment source, and staff documents. No payroll journal auto-posting from this group. |
+| `/admin/hr/staff` | HR & Staff | `/admin/hr/staff` | keep | Phase 7: Staff profile source and onboarding workflow. Staff creation never creates payroll journals, money movements, receipts, or reconciliation records. Deactivation preserves payroll, attendance, documents, salary records, and audit history. |
+| `/admin/hr/staff/[id]` | HR & Staff | `/admin/hr/staff/[id]` | keep | Phase 7: Staff 360 object page. Profile, employment, attendance, payroll history, documents, access, and audit timeline. Read-only payroll/salary history only. |
+| `/admin/hr/attendance` | HR & Staff | `/admin/hr/attendance` | keep | Phase 7: Attendance source workflow. Mark and review attendance. Does not auto-generate payroll sheets or salary payments. |
+| `/admin/hr/payroll` | HR & Staff | `/admin/hr/payroll` | keep | Phase 7: Payroll setup. Configure staff pay basis and view payroll periods/salary sheets. No payroll journal or accounting bridge posting. |
+| `/admin/hr/salary-payments` | HR & Staff | `/admin/hr/salary-payments` | keep | Phase 7: Salary payment source. Record and view salary payments. Payroll accounting bridge status and reconciliation evidence are in Accounting & Reconciliation. |
+| `/admin/hr/leave` | HR & Staff | `/admin/hr/leave` | keep | Phase 7: Leave request workflow. Approve/reject via existing backend workflow only. |
+| `/admin/hr/expenses` | HR & Staff | `/admin/hr/expenses` | keep | Phase 7: Expense claim workflow. Approve/reject via existing backend workflow. No journal posting from this page. |
+| `/admin/hr/staff-documents` | HR & Staff | `/admin/hr/staff-documents` | keep | Phase 7: Staff documents and KYC. Upload and toggle active/inactive. Verify/reject requires backend support — documented as a gap. |
+| `/admin/profiles/staff` | Profiles & Parties | `/admin/profiles/staff` | keep | Phase 7: Staff profile source alias. Thin server redirect to /admin/hr/staff. Remains under Profiles & Parties as identity alias. Does not duplicate HR workflow logic. |
 | `/admin/bi/*` | BI & Reports | `/admin/bi/*` | keep | Read-only analytics. |
 | `/admin/reports*` | BI & Reports | `/admin/reports*` | keep_temporarily | Later converge into BI/report center. |
 | `/admin/settings/*` | Settings & Governance | `/admin/settings/*` | keep | System settings and setup. |

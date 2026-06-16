@@ -57,9 +57,9 @@ export default function AdminHrAttendancePage() {
 
   return (
     <ERPPageShell
-      eyebrow="Staff HR"
+      eyebrow="Staff HR — Attendance source workflow"
       title="Attendance"
-      subtitle="Mark and review attendance using existing payroll-safe attendance records."
+      subtitle="Attendance source workflow: mark and review attendance records using existing payroll-safe attendance models. Attendance does not auto-generate payroll sheets or salary payments."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "HR", href: ROUTES.admin.hr },

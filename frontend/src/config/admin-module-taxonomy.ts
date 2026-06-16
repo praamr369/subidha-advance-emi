@@ -201,9 +201,14 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
     key: "hr_staff",
     label: "HR & Staff",
     canonicalRoot: ROUTES.admin.hr,
-    description: "Staff, attendance, payroll setup, salary sheets, salary payments, leave, expenses, and staff documents.",
+    // Phase 7: HR & Staff answers: who works for the business? Is the staff profile complete?
+    // Is onboarding complete? Is attendance configured? Is payroll setup complete?
+    // Which salary sheet/payment workflow applies? Which documents/KYC are attached?
+    // Does NOT answer: which journal/period/reconciliation evidence? Is the bridge posted?
+    // Those questions belong to Accounting & Reconciliation.
+    description: "Staff profile source, onboarding workflow, attendance source workflow, payroll setup, salary payment source, leave, expenses, and staff documents. Answers: who works for the business, is the staff profile complete, is onboarding complete, is attendance configured, is payroll setup complete, which salary sheet applies. Does not own payroll journal auto-posting, accounting bridge reconciliation, or reconciliation evidence — those are Accounting & Reconciliation.",
     effect: "payroll",
-    safetyRule: "Staff creation and attendance must not create salary payments or payroll accounting postings automatically.",
+    safetyRule: "Staff creation, onboarding, and attendance must not create salary payments, payroll journals, money movements, receipts, accounting bridge postings, or reconciliation items automatically. Payroll accounting bridge status and reconciliation evidence belong to Accounting & Reconciliation. Staff deactivation must preserve payroll, attendance, documents, salary records, and audit history.",
     uiPattern: "object_pages",
     primaryRoutes: [ROUTES.admin.hr, ROUTES.admin.hrStaff, ROUTES.admin.hrAttendance, ROUTES.admin.hrPayroll, ROUTES.admin.hrSalaryPayments, ROUTES.admin.hrLeave, ROUTES.admin.hrExpenses, ROUTES.admin.hrStaffDocuments],
   },

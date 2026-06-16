@@ -35,24 +35,25 @@ export default function AdminHrSalaryPaymentsPage() {
 
   return (
     <ERPPageShell
-      eyebrow="Staff HR"
+      eyebrow="Staff HR — Salary payment source"
       title="Salary Payments"
-      subtitle="Salary payment register. This uses existing salary payment models and does not mutate unrelated finance records."
+      subtitle="Salary payment source: record and view salary payments against existing salary sheets. Payroll accounting bridge status and reconciliation evidence are separate — use Accounting & Reconciliation for those."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "HR", href: ROUTES.admin.hr },
         { label: "Salary Payments" },
       ]}
       actions={[
-        { href: ROUTES.admin.hrPayroll, label: "Payroll", variant: "secondary" },
-        { href: ROUTES.admin.accountingSalary, label: "Accounting Salary", variant: "ghost" },
+        { href: ROUTES.admin.hrPayroll, label: "Payroll setup", variant: "secondary" },
+        { href: ROUTES.admin.accountingSalary, label: "View accounting bridge", variant: "ghost" },
+        { href: ROUTES.admin.accountingBridgeReconciliation, label: "Reconciliation evidence", variant: "ghost" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       {loading ? <ERPLoadingState label="Loading salary payments..." /> : null}
       {!loading && error ? <ERPErrorState title="Unable to load salary payments" description={error} onRetry={() => void load()} /> : null}
       {!loading && !error && rows.length === 0 ? (
-        <ERPEmptyState title="No salary payments yet" description="Salary payments will appear here when recorded." />
+        <ERPEmptyState title="No salary payments yet" description="Salary payments will appear here when recorded against existing salary sheets. Salary payments are a separate step from payroll setup and payroll accounting bridge posting." />
       ) : null}
       {!loading && !error && rows.length > 0 ? (
         <ERPSectionShell title="Recent salary payments" description="Read-only preview of the first 20 items returned by the API.">
