@@ -21,6 +21,10 @@ const adminLayoutSource = readFileSync(
   join(rootDir, "src/app/(dashboard)/admin/layout.tsx"),
   "utf8"
 );
+const adminShellRouterSource = readFileSync(
+  join(rootDir, "src/components/layout/AdminShellRouter.tsx"),
+  "utf8"
+);
 
 test("admin compliance tax profile page defaults to GST_UNREGISTERED mode", () => {
   assert.ok(complianceTaxProfileSource.includes('"GST_UNREGISTERED"'));
@@ -39,5 +43,13 @@ test("purchase bills workspace shows itc blocked posture in non-gst mode", () =>
 });
 
 test("admin routes remain role-guarded", () => {
-  assert.ok(adminLayoutSource.includes("RoleGuard allowedRoles={[\"ADMIN\"]}"));
+  // The admin layout no longer inlines the guard; it delegates the whole admin
+  // route group to AdminShellRouter, which is where ADMIN-only protection now lives.
+  assert.ok(adminLayoutSource.includes("AdminShellRouter"));
+
+  // AdminShellRouter must wrap every admin route (both the print and shell
+  // branches) in RoleGuard restricted to the ADMIN role. Assert the real
+  // current mechanism rather than a string the layout no longer contains.
+  assert.ok(adminShellRouterSource.includes('import RoleGuard from "@/components/guards/RoleGuard"'));
+  assert.ok(adminShellRouterSource.includes("allowedRoles={[\"ADMIN\"]}"));
 });
