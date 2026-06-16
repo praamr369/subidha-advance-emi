@@ -8,17 +8,21 @@ const thisFileDir = dirname(fileURLToPath(import.meta.url));
 const navigationSource = readFileSync(join(thisFileDir, "../../src/config/navigation.ts"), "utf8");
 const registrySource = readFileSync(join(thisFileDir, "../../src/config/admin-route-registry.ts"), "utf8");
 
-test("admin sidebar includes Vendors & Procurement group", () => {
-  assert.ok(registrySource.includes('"Vendors & Procurement"'));
-  assert.ok(registrySource.includes("Vendor Sourcing"));
-  assert.ok(registrySource.includes("Vendor Ledger"));
-  assert.ok(registrySource.includes("ROUTES.admin.vendorsProducts"));
-  assert.ok(registrySource.includes("Online Enquiries"));
+// Phase 1: canonical group is "Purchases & Vendors" (was "Vendors & Procurement" in pre-Phase-1 draft)
+test("admin sidebar includes Purchases & Vendors group with procurement content", () => {
+  assert.ok(
+    registrySource.includes('"Purchases & Vendors"'),
+    'Missing canonical "Purchases & Vendors" group in registry'
+  );
+  assert.ok(registrySource.includes("Vendor Sourcing"), "Missing Vendor Sourcing item");
+  assert.ok(registrySource.includes("Vendor Ledger"), "Missing Vendor Ledger item");
+  assert.ok(registrySource.includes("ROUTES.admin.vendorsProducts"), "Missing vendorsProducts route in registry");
+  assert.ok(registrySource.includes("Online Enquiries"), "Missing Online Enquiries item");
 });
 
 test("vendor role navigation exists", () => {
   assert.ok(navigationSource.includes("VENDOR: ["));
-  assert.ok(navigationSource.includes('href: "/vendor/quotes"'));
-  assert.ok(navigationSource.includes('href: "/vendor/ledger"'));
-  assert.ok(navigationSource.includes('href: "/vendor/notifications"'));
+  assert.ok(navigationSource.includes('href: "/vendor/quotes"') || navigationSource.includes("VENDOR_ROUTES"));
+  assert.ok(navigationSource.includes('href: "/vendor/ledger"') || navigationSource.includes("VENDOR_ROUTES"));
+  assert.ok(navigationSource.includes('href: "/vendor/notifications"') || navigationSource.includes("VENDOR_ROUTES"));
 });

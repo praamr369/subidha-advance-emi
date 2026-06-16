@@ -172,6 +172,12 @@ export const ROUTES = {
     luckyIds: "/admin/lucky-ids",
     luckyDraws: "/admin/lucky-draws",
 
+    luckyPlanControl: "/admin/lucky-plan",
+    luckyPlanBatches: "/admin/lucky-plan/batches",
+    luckyPlanLuckyIds: "/admin/lucky-plan/lucky-ids",
+    luckyPlanDraws: "/admin/lucky-plan/draws",
+    luckyPlanWinners: "/admin/lucky-plan/winners",
+
     crm: "/admin/crm",
     crmLeads: "/admin/crm/leads",
     crmPipeline: "/admin/crm/pipeline",

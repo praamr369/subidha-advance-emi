@@ -131,12 +131,17 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Sales & Contracts", "Monthly Demands", `${ROUTES.admin.emis}?plan_type=RENT_LEASE`, "Rent and lease monthly demand visibility."),
 
   // ── 5. Lucky Plan Control ─────────────────────────────────────────────────
-  // Legacy paths: /admin/batches, /admin/lucky-ids, /admin/lucky-draws
-  //   → /admin/lucky-plan/batches, /admin/lucky-plan/lucky-ids, /admin/lucky-plan/draws
-  //   (migrate_then_alias — aliases to be wired in Phase 3)
-  item("Lucky Plan Control", "Batches", ROUTES.admin.batches, "Batch lifecycle and draw scope."),
-  item("Lucky Plan Control", "Lucky IDs", ROUTES.admin.luckyIds, "Lucky ID register."),
-  item("Lucky Plan Control", "Lucky Draws", ROUTES.admin.luckyDraws, "Lucky draw schedule and execution."),
+  // Phase 3: canonical /admin/lucky-plan/* routes are now live as redirect aliases.
+  // Legacy paths remain active:
+  //   /admin/batches      → /admin/lucky-plan/batches  (migrate_then_alias)
+  //   /admin/lucky-ids    → /admin/lucky-plan/lucky-ids (migrate_then_alias)
+  //   /admin/lucky-draws  → /admin/lucky-plan/draws    (migrate_then_alias)
+  // Winners route is a documented gap (no dedicated backend endpoint exists).
+  item("Lucky Plan Control", "Lucky Plan Control", ROUTES.admin.luckyPlanControl, "Lucky Plan hub: batches, Lucky IDs, draws, and winner audit evidence."),
+  item("Lucky Plan Control", "Batches", ROUTES.admin.luckyPlanBatches, "Batch lifecycle and draw scope."),
+  item("Lucky Plan Control", "Lucky IDs", ROUTES.admin.luckyPlanLuckyIds, "Lucky ID register and 00–99 allocation grid."),
+  item("Lucky Plan Control", "Lucky Draws", ROUTES.admin.luckyPlanDraws, "Draw schedule and execution: commit, reveal, winner evidence."),
+  item("Lucky Plan Control", "Winners", ROUTES.admin.luckyPlanWinners, "Winner visibility and EMI waiver audit trail. (Gap: no dedicated winners endpoint yet; see page for detail.)"),
 
   // ── 6. Collections & Cashier ──────────────────────────────────────────────
   item("Collections & Cashier", "Collection", ROUTES.admin.financeCollect, "Unified collection workspace."),

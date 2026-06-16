@@ -41,9 +41,11 @@ This map is the Phase 0 control document for cleaning admin routes without break
 | `/admin/subscriptions` | Sales & Contracts | `/admin/subscriptions` | keep | Contract register with plan filters. |
 | `/admin/rent-lease` | Sales & Contracts / Rent-Lease | `/admin/rent-lease` | keep | Rent/lease cockpit. |
 | `/admin/contract-amendments` | Sales & Contracts | `/admin/contract-amendments` | keep | Controlled contract change workflow. |
-| `/admin/batches` | Lucky Plan Control | `/admin/lucky-plan/batches` | migrate_then_alias | Batch lifecycle and draw scope. |
-| `/admin/lucky-ids` | Lucky Plan Control | `/admin/lucky-plan/lucky-ids` | migrate_then_alias | Lucky ID register. |
-| `/admin/lucky-draws` | Lucky Plan Control | `/admin/lucky-plan/draws` | migrate_then_alias | Draw execution and evidence. |
+| `/admin/batches` | Lucky Plan Control | `/admin/lucky-plan/batches` | alias | Phase 3: `/admin/lucky-plan/batches` redirects to `/admin/batches`. Navigation updated. Old route preserved. |
+| `/admin/lucky-ids` | Lucky Plan Control | `/admin/lucky-plan/lucky-ids` | alias | Phase 3: `/admin/lucky-plan/lucky-ids` redirects to `/admin/lucky-ids`. Navigation updated. Old route preserved. |
+| `/admin/lucky-draws` | Lucky Plan Control | `/admin/lucky-plan/draws` | alias | Phase 3: `/admin/lucky-plan/draws` redirects to `/admin/lucky-draws`. Navigation updated. Old route preserved. |
+| `/admin/lucky-plan` | Lucky Plan Control | `/admin/lucky-plan` | keep | Phase 3: New Lucky Plan hub landing page. Links to batches, lucky-ids, draws, and winners (gap noted). |
+| `/admin/lucky-plan/winners` | Lucky Plan Control | `/admin/lucky-plan/winners` | keep | Phase 3: Safe hub. No dedicated backend endpoint exists — page documents the gap without fake data. |
 | `/admin/finance/collect` | Collections & Cashier | `/admin/collections/collect` | migrate_then_alias | Unified collection workspace. |
 | `/admin/payments` | Collections & Cashier / Finance | `/admin/collections/payments` | migrate_then_alias | Payment register; finance reads source state. |
 | `/admin/settlements` | Collections & Cashier | `/admin/collections/settlements` | migrate_then_alias | Settlement imports and evidence. |
