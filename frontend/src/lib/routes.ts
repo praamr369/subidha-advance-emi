@@ -110,6 +110,8 @@ export const ROUTES = {
     outstandings: "/admin/outstandings",
     finance: "/admin/finance",
     financeCollect: "/admin/finance/collect",
+    financeOutstandings: "/admin/finance/outstandings",
+    financeCustomerAdvances: "/admin/finance/customer-advances",
     financeCanonicalReconciliation: "/admin/accounting/bridge-reconciliation",
     financeReconciliation: "/admin/finance/reconciliation",
     financeCommissions: "/admin/finance/commissions",

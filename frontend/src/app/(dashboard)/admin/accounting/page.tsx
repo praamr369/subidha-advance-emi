@@ -102,16 +102,20 @@ const MODULE_GROUPS: AccountingModuleGroup[] = [
     ],
   },
   {
-    title: "Collections & Receivables",
-    description: "Customer money intake and receivable review through route-safe collection workflows.",
+    // Phase 4: These are Finance Operations source feeds that accounting observes.
+    // The collection, advance, deposit, and receivable OPERATIONS happen in Finance Operations
+    // (/admin/finance/*). Accounting sees them through bridge candidates after they are recorded.
+    // Accounting pages must not present source collection/deposit/refund as if it happens inside accounting.
+    title: "Finance Operations feeds into accounting",
+    description: "Finance source workflow records that flow into the accounting bridge. The operational recording of collections, advances, deposits, and receivables happens in Finance Operations — not in this accounting cockpit.",
     modules: [
-      { key: "collections", title: "Collections", description: "Use this when receiving customer money through approved collection workflows.", route: ROUTES.admin.collections, icon: HandCoins, implemented: true, setupGate: true },
-      { key: "collection_control_center", title: "Collection Control Center", description: "Review collection blockers, finance-account readiness, and cashier/admin collection posture.", route: ROUTES.admin.collectionControlCenter, icon: ClipboardCheck, implemented: true, readOnly: true, setupGate: true },
-      { key: "receivables", title: "Receivables", description: "Review unified unpaid dues and outstanding customer balances before collection follow-up.", route: ROUTES.admin.outstandings, icon: Receipt, implemented: true, readOnly: true },
-      { key: "direct_sale_receivables", title: "Direct-sale Receivables", description: "Review unpaid direct-sale invoices before collection follow-up.", route: ROUTES.admin.billingInvoices, icon: ReceiptText, implemented: true, readOnly: true },
-      { key: "customer_advances", title: "Customer Advances", description: "Create and post customer advance liability source records through the controlled accounting bridge.", route: "/admin/customer-advances", icon: WalletCards, implemented: true, setupGate: true },
-      { key: "rent_lease_dues", title: "Rent / Lease Dues", description: "Review collected rent/lease source demands and explicitly post the accounting bridge when mapping is ready.", route: "/admin/rent-lease", icon: Building2, implemented: true, setupGate: true },
-      { key: "security_deposits", title: "Security Deposits", description: "Review rent/lease deposit liabilities, refund posture, damage recovery, and explicit posting state.", route: ROUTES.admin.financeDeposits, icon: Banknote, implemented: true, readOnly: true, setupGate: true },
+      { key: "collections", title: "Collections (Finance Operations)", description: "Collection source records are recorded in Finance Operations. Review collection posture here; posting to accounting happens through the bridge.", route: ROUTES.admin.collections, icon: HandCoins, implemented: true, setupGate: true },
+      { key: "collection_control_center", title: "Collection Control Center (Finance Operations)", description: "Read-only view of collection blockers and finance-account readiness. Operational recording belongs to Finance Operations.", route: ROUTES.admin.collectionControlCenter, icon: ClipboardCheck, implemented: true, readOnly: true, setupGate: true },
+      { key: "receivables", title: "Outstandings (Finance Operations)", description: "Read-only view of unified unpaid dues. Outstanding source records belong to Finance Operations; see /admin/finance/outstandings.", route: ROUTES.admin.financeOutstandings, icon: Receipt, implemented: true, readOnly: true },
+      { key: "direct_sale_receivables", title: "Direct-sale Receivables (Finance Operations)", description: "Read-only view of unpaid direct-sale invoices. Invoice source records are Sales & Contracts operations.", route: ROUTES.admin.billingInvoices, icon: ReceiptText, implemented: true, readOnly: true },
+      { key: "customer_advances", title: "Customer Advances (Finance Operations)", description: "Customer advance source records are Finance Operations. Accounting bridge posting is triggered after the advance is recorded — not from this cockpit.", route: ROUTES.admin.financeCustomerAdvances, icon: WalletCards, implemented: true, setupGate: true },
+      { key: "rent_lease_dues", title: "Rent / Lease Dues (Sales & Contracts)", description: "Rent/lease demand source records are Sales & Contracts. Accounting bridge is posted when mapping is confirmed — no bridge posting from this cockpit.", route: "/admin/rent-lease", icon: Building2, implemented: true, setupGate: true },
+      { key: "security_deposits", title: "Security Deposits (Finance Operations)", description: "Deposit source records are Finance Operations. Review refund posture and damage recovery here; accounting bridge posting state follows the deposit workflow.", route: ROUTES.admin.financeDeposits, icon: Banknote, implemented: true, readOnly: true, setupGate: true },
     ],
   },
   {

@@ -446,12 +446,12 @@ export default function AdminFinancePage() {
 
   return (
     <PortalPage
-      eyebrow="Finance Control"
-      title="Finance Control Center"
-      subtitle="Admin finance operations view for customer receivables, supplier payables, direct-sale recovery, subscription collections, account mix, and reconciliation-sensitive review."
+      eyebrow="Finance Operations · Finance source workflow"
+      title="Finance Operations"
+      subtitle="Finance source workflow: customer receivables, supplier payables, direct-sale recovery, subscription collections, deposits, commissions, and payouts. This is not an accounting or ledger surface. Accounting bridge posting and reconciliation evidence live in Accounting & Reconciliation (/admin/accounting)."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
-        { label: "Finance" },
+        { label: "Finance Operations" },
       ]}
       stats={[
         {
@@ -532,21 +532,21 @@ export default function AdminFinancePage() {
         />
 
         <FormSection
-          title="Finance quick lanes"
-          description="Fast access to reconciliation, receivables/payables, and controlled posting surfaces without mixing EMI collection into finance lanes."
+          title="Finance source workflow quick lanes"
+          description="Fast access to finance source workflow records: receivables, payables, collections, and deposits. Accounting bridge status and ledger entries live in Accounting &amp; Reconciliation."
         >
           <div className="grid gap-3 md:grid-cols-3">
             <Link
-              href={buildAdminReconciliationRoute({ flagged: true })}
+              href={ROUTES.admin.financeOutstandings}
               className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted"
             >
-              Reconciliation queue
+              Outstandings (Finance source)
             </Link>
             <Link
               href={ROUTES.admin.accountingVendors}
               className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted"
             >
-              Vendor payables
+              Vendor payables (Finance source)
             </Link>
             <Link
               href={ROUTES.admin.payments}
@@ -555,10 +555,16 @@ export default function AdminFinancePage() {
               Payment register
             </Link>
             <Link
-              href="/admin/finance/deposits"
+              href={ROUTES.admin.financeDeposits}
               className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted md:col-span-1"
             >
-              Rent/Lease deposits
+              Rent/Lease deposits (Finance source)
+            </Link>
+            <Link
+              href={buildAdminReconciliationRoute({ flagged: true })}
+              className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted"
+            >
+              Accounting bridge status →
             </Link>
           </div>
         </FormSection>
@@ -576,57 +582,57 @@ export default function AdminFinancePage() {
         {!loading && !error ? (
           <>
             <ControlLaneGrid
-              title="Finance control lanes"
-              description="Accounting and finance remain distinct from EMI collection. These lanes route operators into the dedicated registers for account structure, account control, posting, reconciliation, payables or receivables, exports, and period governance."
+              title="Finance source workflow lanes"
+              description="Finance Operations lanes route operators into source-of-money registers. Accounting bridge status and ledger posting belong to Accounting &amp; Reconciliation (/admin/accounting) — not this page."
               lanes={[
                 {
-                  title: "Account structure",
-                  description: "Chart of accounts and finance-account setup for operational finance control.",
-                  href: ROUTES.admin.accountingChartOfAccounts,
-                  badge: "Setup",
+                  title: "Outstandings",
+                  description: "Unified collectible dues: who owes money across EMI, rent, lease, and direct sale. Finance source workflow.",
+                  href: ROUTES.admin.financeOutstandings,
+                  badge: "Finance source",
                 },
                 {
-                  title: "Cash / Bank / UPI control",
+                  title: "Customer Advances",
+                  description: "Customer advance liability source records. Finance source workflow.",
+                  href: ROUTES.admin.financeCustomerAdvances,
+                  badge: "Finance source",
+                },
+                {
+                  title: "Cash / Bank / UPI posture",
                   description: "Finance-account mix, transfers, and operational account posture without merging cashier collection screens.",
                   href: ROUTES.admin.finance,
-                  badge: "Accounts",
+                  badge: "Finance source",
                   detail: "Use this lane for account mix and transfer visibility only.",
                 },
                 {
-                  title: "Posting & journals",
-                  description: "Manual journals and controlled posting stay in accounting, not inside the collection workflow.",
-                  href: ROUTES.admin.accountingJournals,
-                  badge: "Posting",
-                },
-                {
-                  title: "Reconciliation",
-                  description: "Investigate subscription and payment deltas before closing or settlement.",
-                  href: buildAdminReconciliationRoute({ flagged: true }),
-                  badge: "Risk",
-                },
-                {
-                  title: "Receivables / payables",
-                  description: "Customer receivables and vendor payables remain explicit and separately auditable.",
+                  title: "Receivables / vendor payables",
+                  description: "Customer receivables and vendor payables remain explicit and separately auditable. Finance source posture view.",
                   href: ROUTES.admin.accountingVendors,
-                  badge: "Ledger",
-                },
-                {
-                  title: "Tax / billing / exports",
-                  description: "Open billing, GST, and export surfaces without collapsing them into finance review.",
-                  href: ROUTES.admin.billing,
-                  badge: "Compliance",
-                },
-                {
-                  title: "Period / controls",
-                  description: "Close governance, periods, and admin accounting controls.",
-                  href: ROUTES.admin.accountingPeriods,
-                  badge: "Close",
+                  badge: "Finance source",
                 },
                 {
                   title: "EMI collection lane",
                   description: "Customer EMI and cashier collection remain a separate operational lane by design.",
                   href: ROUTES.admin.collections,
-                  badge: "Separate",
+                  badge: "Collections",
+                },
+                {
+                  title: "Accounting bridge status",
+                  description: "Accounting bridge posting state and reconciliation evidence. Belongs to Accounting & Reconciliation — navigate there for COA, journals, periods, and ledger reports.",
+                  href: buildAdminReconciliationRoute({ flagged: true }),
+                  badge: "→ Accounting",
+                },
+                {
+                  title: "Ledger posting (Accounting)",
+                  description: "Manual journals and controlled ledger posting stay in Accounting & Reconciliation, not inside the finance source workflow.",
+                  href: ROUTES.admin.accountingJournals,
+                  badge: "→ Accounting",
+                },
+                {
+                  title: "Period & books (Accounting)",
+                  description: "Close governance, accounting periods, and book registers belong to Accounting & Reconciliation.",
+                  href: ROUTES.admin.accountingPeriods,
+                  badge: "→ Accounting",
                 },
               ]}
             />

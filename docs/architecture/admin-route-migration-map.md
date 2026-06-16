@@ -50,19 +50,29 @@ This map is the Phase 0 control document for cleaning admin routes without break
 | `/admin/payments` | Collections & Cashier / Finance | `/admin/collections/payments` | migrate_then_alias | Payment register; finance reads source state. |
 | `/admin/settlements` | Collections & Cashier | `/admin/collections/settlements` | migrate_then_alias | Settlement imports and evidence. |
 | `/admin/settlements/day-closes` | Collections & Cashier | `/admin/collections/day-closes` | migrate_then_alias | Cashier day close. |
-| `/admin/outstandings` | Finance Operations | `/admin/finance/outstandings` | migrate_then_alias | Money due cockpit. |
-| `/admin/finance/deposits` | Finance Operations | `/admin/finance/deposits` | keep | Security deposit operations. |
+| `/admin/outstandings` | Finance Operations | `/admin/finance/outstandings` | migrate_then_alias | Phase 4: `/admin/finance/outstandings` canonical alias created; redirects to `/admin/outstandings`. Navigation updated. Old route preserved. |
+| `/admin/finance/outstandings` | Finance Operations | `/admin/finance/outstandings` | keep | Phase 4: New canonical Finance Operations route for outstandings (money due cockpit). Redirects to `/admin/outstandings` until content is migrated. |
+| `/admin/customer-advances` | Finance Operations | `/admin/finance/customer-advances` | migrate_then_alias | Phase 4: `/admin/finance/customer-advances` canonical alias created; redirects to `/admin/customer-advances`. Navigation updated. Old route preserved. |
+| `/admin/finance/customer-advances` | Finance Operations | `/admin/finance/customer-advances` | keep | Phase 4: New canonical Finance Operations route for customer advance source records. |
+| `/admin/finance/customer-credits` | Finance Operations | `/admin/finance/customer-credits` | keep_temporarily | Phase 4 gap: no dedicated backend endpoint or page exists. Documented as missing. |
+| `/admin/finance/refunds` | Finance Operations | `/admin/finance/refunds` | keep_temporarily | Phase 4 gap: no dedicated backend refunds page exists. Reversal workflow is /admin/finance/reversal-control. |
+| `/admin/finance/deposits` | Finance Operations | `/admin/finance/deposits` | keep | Security deposit source records: receipt, refund posture, damage recovery. |
 | `/admin/finance/commissions` | Finance Operations | `/admin/finance/commissions` | keep | Commission source register. |
 | `/admin/finance/payout-batches` | Finance Operations | `/admin/finance/payout-batches` | keep | Partner payout source workflow. |
 | `/admin/finance/reversal-control` | Finance Operations | `/admin/finance/reversal-control` | keep | Controlled reversal workflow. |
-| `/admin/accounting` | Accounting & Reconciliation | `/admin/accounting` | keep | Accounting cockpit. |
+| `/admin/accounting` | Accounting & Reconciliation | `/admin/accounting` | keep | Accounting cockpit. Phase 4: Finance Operations feeds section relabeled to clarify source operations belong to Finance Operations. |
 | `/admin/accounting/setup` | Accounting & Reconciliation | `/admin/accounting/setup` | keep | COA/finance mapping setup. |
-| `/admin/accounting/chart-of-accounts` | Accounting & Reconciliation | `/admin/accounting/chart-of-accounts` | keep | COA. |
+| `/admin/accounting/chart-of-accounts` | Accounting & Reconciliation | `/admin/accounting/chart-of-accounts` | keep | COA. Finance pages must not present COA as a Finance Operations surface. |
 | `/admin/accounting/finance-accounts` | Accounting & Reconciliation | `/admin/accounting/finance-accounts` | keep | Operational finance accounts mapped to ledger. |
-| `/admin/accounting/journals` | Accounting & Reconciliation | `/admin/accounting/journals` | keep | Journal register. |
-| `/admin/accounting/bridge-reconciliation` | Accounting & Reconciliation | `/admin/accounting/bridge-reconciliation` | keep | Canonical reconciliation route. |
-| `/admin/accounting/periods` | Accounting & Reconciliation | `/admin/accounting/periods` | keep | Period locks and close readiness. |
+| `/admin/accounting/journals` | Accounting & Reconciliation | `/admin/accounting/journals` | keep | Journal register. Finance pages must not present journal posting as Finance Operations. |
+| `/admin/accounting/bridge-reconciliation` | Accounting & Reconciliation | `/admin/accounting/bridge-reconciliation` | keep | Canonical reconciliation route. All reconciliation aliases point here. |
+| `/admin/accounting/reconciliation` | Accounting & Reconciliation | `/admin/accounting/bridge-reconciliation` | alias | Phase 4: redirect alias for /admin/accounting/bridge-reconciliation. |
+| `/admin/finance/reconciliation` | Accounting & Reconciliation | `/admin/accounting/bridge-reconciliation` | alias | Phase 4: redirect alias preserved. Reconciliation is an Accounting & Reconciliation concern. |
+| `/admin/accounting/periods` | Accounting & Reconciliation | `/admin/accounting/periods` | keep | Period locks and close readiness. Finance pages must not present period close as Finance Operations. |
 | `/admin/accounting/books` | Accounting & Reconciliation | `/admin/accounting/books` | keep | Cash/bank/UPI/sales/purchase books. |
+| `/admin/accounting/reports/trial-balance` | Accounting & Reconciliation | `/admin/accounting/reports/trial-balance` | keep | Trial balance report. |
+| `/admin/accounting/reports/profit-loss` | Accounting & Reconciliation | `/admin/accounting/reports/profit-loss` | keep | Profit & Loss report. |
+| `/admin/accounting/reports/balance-sheet` | Accounting & Reconciliation | `/admin/accounting/reports/balance-sheet` | keep | Balance sheet report. |
 | `/admin/inventory` | Inventory & Stock | `/admin/inventory` | keep | Inventory workspace. |
 | `/admin/inventory/items` | Inventory & Stock | `/admin/inventory/items` | keep | Item master. |
 | `/admin/inventory/stock-on-hand` | Inventory & Stock | `/admin/inventory/stock-on-hand` | keep | Stock posture. |

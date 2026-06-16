@@ -110,11 +110,23 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
     key: "finance_operations",
     label: "Finance Operations",
     canonicalRoot: ROUTES.admin.finance,
-    description: "Operational money posture: outstandings, advances, deposits, refunds, commissions, payouts, payables, reversals.",
+    description: "Operational money posture: outstandings, customer advances, deposits, refunds, commissions, payouts, payables, reversals. Finance source workflow answers: who owes money, who gets money, what came in/out, what is pending.",
     effect: "money",
-    safetyRule: "Finance source operations must remain distinct from accounting ledger posting and period close.",
+    safetyRule: "Finance source operations must remain distinct from accounting ledger posting, COA, journals, and period close. Finance pages must not present accounting bridge posting as automatically enabled unless backend readiness confirms it.",
     uiPattern: "control_center",
-    primaryRoutes: [ROUTES.admin.finance, ROUTES.admin.outstandings, ROUTES.admin.financeDeposits, ROUTES.admin.financeCommissions, ROUTES.admin.financePayoutBatches, ROUTES.admin.financeReversalControl, ROUTES.admin.financeReversalReconciliation],
+    primaryRoutes: [
+      ROUTES.admin.finance,
+      // Phase 4 canonical Finance Operations routes
+      ROUTES.admin.financeOutstandings,
+      ROUTES.admin.financeCustomerAdvances,
+      ROUTES.admin.financeDeposits,
+      ROUTES.admin.financeCommissions,
+      ROUTES.admin.financePayoutBatches,
+      ROUTES.admin.financeReversalControl,
+      ROUTES.admin.financeReversalReconciliation,
+      // Legacy route kept for backward-compat path matching
+      ROUTES.admin.outstandings,
+    ],
   },
   {
     key: "accounting_reconciliation",

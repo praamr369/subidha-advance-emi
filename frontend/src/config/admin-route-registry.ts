@@ -150,13 +150,18 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Collections & Cashier", "Day Closes", ROUTES.admin.settlementsDayCloses, "Cashier day close."),
 
   // ── 7. Finance Operations ─────────────────────────────────────────────────
-  item("Finance Operations", "Finance Workspace", ROUTES.admin.finance, "Finance operations workspace."),
-  item("Finance Operations", "Outstandings", ROUTES.admin.outstandings, "Unified collectible dues across EMI, rent, lease, direct sale, and invoices."),
-  item("Finance Operations", "Deposits", ROUTES.admin.financeDeposits, "Security deposits and refunds.", {
+  // Finance Operations = source-of-money workflow records.
+  // Answers: who owes money, who gets money, what came in/out, what is pending.
+  // Does NOT include COA, journals, accounting periods, trial balance, P&L,
+  // or balance sheet — those are Accounting & Reconciliation.
+  item("Finance Operations", "Finance Workspace", ROUTES.admin.finance, "Finance source workflow workspace: receivables, payables, deposits, commissions, payouts, and reversals."),
+  item("Finance Operations", "Outstandings", ROUTES.admin.financeOutstandings, "Unified collectible dues across EMI, rent, lease, direct sale, and invoices. Finance source workflow."),
+  item("Finance Operations", "Customer Advances", ROUTES.admin.financeCustomerAdvances, "Customer advance liability source records. Finance source workflow."),
+  item("Finance Operations", "Deposits", ROUTES.admin.financeDeposits, "Security deposit source records: receipt, refund posture, damage recovery. Finance source workflow.", {
     badgeSource: "queue.deposit_refunds_pending",
   }),
-  item("Finance Operations", "Commissions", ROUTES.admin.financeCommissions, "Commission register."),
-  item("Finance Operations", "Payout Batches", ROUTES.admin.financePayoutBatches, "Partner payout batches."),
+  item("Finance Operations", "Commissions", ROUTES.admin.financeCommissions, "Commission source register: partner earnings from subscription and sale workflows."),
+  item("Finance Operations", "Payout Batches", ROUTES.admin.financePayoutBatches, "Partner payout batches: source payout obligations before accounting bridge."),
   item("Finance Operations", "Reversal Control", ROUTES.admin.financeReversalControl, "Audited admin pipeline for cancellation, reversal, returns, refunds, and customer-credit decisions."),
   item("Finance Operations", "Reversal Reconciliation", ROUTES.admin.financeReversalReconciliation, "Queue for unresolved reversal, refund, stock return, and delivery return links."),
 
@@ -185,6 +190,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
       item("Accounting & Reconciliation", "Debit Notes", ROUTES.admin.accountingDebitNotes, "Accounting debit note register."),
     ],
   }),
+  item("Accounting & Reconciliation", "Accounting Periods", ROUTES.admin.accountingPeriods, "Period locks, close readiness, and year-end close governance."),
   item("Accounting & Reconciliation", "Trial Balance", ROUTES.admin.accountingTrialBalance, "Trial balance report."),
   item("Accounting & Reconciliation", "Profit & Loss", ROUTES.admin.accountingProfitLoss, "Profit and loss report."),
   item("Accounting & Reconciliation", "Balance Sheet", ROUTES.admin.accountingBalanceSheet, "Balance sheet report."),
@@ -295,6 +301,9 @@ export const ADMIN_ROUTE_ALIASES: Record<string, string> = {
   "/admin/partners/commissions": ROUTES.admin.financeCommissions,
   "/admin/partner/commisions": ROUTES.admin.financeCommissions,
   "/admin/partner/commissions": ROUTES.admin.financeCommissions,
+  // Phase 4: Finance Operations canonical alias — old /admin/outstandings still works directly.
+  // /admin/finance/outstandings is the new canonical navigation entry point.
+  "/admin/finance/reconciliation": ROUTES.admin.financeCanonicalReconciliation,
 };
 
 function flattenTree(items: AdminRouteRegistryItem[]): AdminRouteRegistryItem[] {
