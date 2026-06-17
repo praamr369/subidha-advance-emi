@@ -41,16 +41,16 @@ const requiredRoutes = [
 const requiredAdminSidebarParents = [
   ["Command Center", "/admin"],
   ["Sales & Contracts", "/admin/sales"],
-  ["Rent / Lease", "/admin/rent-lease"],
-  ["Accounting & Finance", "/admin/finance"],
-  ["Inventory", "/admin/inventory"],
-  ["Purchase & Vendors", "/admin/vendors"],
+  // "Rent / Lease" dissolved into "Sales & Contracts" — no standalone group.
+  ["Accounting & Reconciliation", "/admin/accounting/bridge-reconciliation"],
+  ["Inventory & Stock", "/admin/inventory"],
+  ["Purchases & Vendors", "/admin/purchases"],
   ["Manufacturing", "/admin/manufacturing"],
-  ["CRM / Parties", "/admin/crm"],
-  ["Service Desk", "/admin/service-desk"],
+  ["CRM & Requests", "/admin/requests"],
+  ["Delivery & Service", "/admin/deliveries"],
   ["HR & Staff", "/admin/hr"],
-  ["Reports & Analysis", "/admin/reports-center"],
-  ["Settings", "/admin/settings"],
+  ["BI & Reports", "/admin/bi"],
+  ["Settings & Governance", "/admin/settings"],
 ];
 
 const forbiddenAdminSidebarLabels = new Set([]);
