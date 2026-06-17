@@ -36,6 +36,9 @@ def _enforce_delivery_kyc_gate(
     and non-gated plans pass straight through.
     """
     from subscriptions.services.kyc_readiness_service import enforce_contract_kyc_gate
+    from subscriptions.services.contract_activation_readiness_service import (
+        assert_contract_activation_ready,
+    )
 
     customer_address = (getattr(subscription.customer, "address", "") or "").strip().lower()
     snapshot = (delivery_address_snapshot or "").strip().lower()
@@ -46,6 +49,10 @@ def _enforce_delivery_kyc_gate(
         stage="deliver",
         delivery_address_differs=differs,
     )
+    # Additive P0 milestone gate: before the asset leaves the shop, rent/lease
+    # also require a collected deposit receipt (and lease an asset-condition
+    # proof), EMI an identity proof + signed consent. No-op unless gating is on.
+    assert_contract_activation_ready(subscription, stage="handover")
 
 ALLOWED_DELIVERY_TRANSITIONS: dict[str, set[str]] = {
     DeliveryStatus.PENDING: {

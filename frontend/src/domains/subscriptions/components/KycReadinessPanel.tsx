@@ -203,6 +203,36 @@ export default function KycReadinessPanel({
           All required documents are present. The contract can be activated.
         </div>
       )}
+
+      {readiness.activation_milestone &&
+        readiness.activation_milestone.required_documents.length > 0 && (
+          <div
+            className="mt-4 border-t border-border/60 pt-3"
+            data-testid="handover-milestone"
+            data-can-handover={String(
+              readiness.activation_milestone.can_reach_active_or_handover
+            )}
+          >
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Handover readiness
+              {readiness.activation_milestone.enforced ? "" : " (advisory)"}
+            </div>
+            <div className="space-y-1.5">
+              {readiness.activation_milestone.required_documents.map((doc) => (
+                <DocRow key={`ms-${doc.code}`} doc={doc} />
+              ))}
+            </div>
+            {readiness.activation_milestone.blocker_messages.length > 0 && (
+              <ul className="mt-2 space-y-1" data-testid="handover-blocker-messages">
+                {readiness.activation_milestone.blocker_messages.map((msg, i) => (
+                  <li key={i} className="text-xs text-red-700">
+                    {msg}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
     </div>
   );
 }

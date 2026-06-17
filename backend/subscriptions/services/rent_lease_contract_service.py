@@ -105,7 +105,7 @@ def create_rent_contract(
         monthly_amount=monthly_amount,
         status=contract_status,
         tax_profile_snapshot=build_non_gst_snapshot(
-            document_type="ADVANCE_EMI_CONTRACT",
+            document_type="RENT_CONTRACT",
             document_date=start_date,
             party_type="CUSTOMER",
             party_id=getattr(customer, "id", None),
@@ -216,7 +216,7 @@ def create_lease_contract(
         monthly_amount=monthly_amount,
         status=contract_status,
         tax_profile_snapshot=build_non_gst_snapshot(
-            document_type="ADVANCE_EMI_CONTRACT",
+            document_type="LEASE_CONTRACT",
             document_date=start_date,
             party_type="CUSTOMER",
             party_id=getattr(customer, "id", None),

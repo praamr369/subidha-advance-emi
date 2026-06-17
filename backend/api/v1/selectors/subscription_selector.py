@@ -42,12 +42,19 @@ def is_lucky_id_available(lucky: LuckyId) -> bool:
     return lucky.status == LuckyIdStatus.AVAILABLE
 
 
-def customer_has_emi_in_batch(*, customer: Customer, batch: Batch) -> bool:
+def customer_emi_count_in_batch(*, customer: Customer, batch: Batch) -> int:
+    """Number of EMI Lucky IDs a customer holds in a batch.
+
+    A customer may hold multiple Lucky IDs in the same batch; this selector is
+    informational (operator UI / analytics) and is intentionally NOT used to
+    block subscription creation. Lucky ID uniqueness is enforced by DB
+    constraints (one EMI subscription per Lucky ID, Lucky ID unique per batch).
+    """
     return Subscription.objects.filter(
         batch=batch,
         customer=customer,
         plan_type=PlanType.EMI,
-    ).exists()
+    ).count()
 
 
 def get_latest_subscription_for_customer(customer: Customer) -> Optional[Subscription]:

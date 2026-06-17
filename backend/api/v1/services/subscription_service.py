@@ -12,7 +12,6 @@ from subscriptions.models import LuckyIdStatus, PlanType, Subscription
 from subscriptions.services.emi_engine import generate_emi_schedule
 
 from api.v1.selectors.subscription_selector import (
-    customer_has_emi_in_batch,
     get_batch_by_id,
     get_customer_by_id,
     get_lucky_id_with_batch,
@@ -54,10 +53,9 @@ def create_partner_emi_subscription(
     if not is_lucky_id_available(lucky):
         raise serializers.ValidationError("Lucky ID is not available")
 
-    if customer_has_emi_in_batch(customer=customer, batch=batch):
-        raise serializers.ValidationError(
-            "Customer already has EMI subscription in this batch"
-        )
+    # NOTE: A customer may hold multiple Lucky IDs within the same batch.
+    # Uniqueness is enforced at the Lucky ID level (one EMI subscription per
+    # Lucky ID, Lucky ID unique per batch) by DB constraints, not per customer.
 
     total_amount = product.base_price
     tenure = tenure_months

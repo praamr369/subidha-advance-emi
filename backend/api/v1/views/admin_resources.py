@@ -999,6 +999,17 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
             deposit_required=(_truthy(deposit_param) if deposit_param is not None else None),
             high_value=_truthy(request.query_params.get("high_value")),
         )
+        # Additive (P0): when a concrete contract exists, also surface the
+        # activation/handover milestone readiness (deposit receipt + lease
+        # condition proof). Computation only — never enforced here.
+        if subscription is not None:
+            from subscriptions.services.contract_activation_readiness_service import (
+                evaluate_contract_activation_readiness,
+            )
+
+            readiness["activation_milestone"] = evaluate_contract_activation_readiness(
+                subscription
+            )
         return Response(readiness, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="kyc-exception-approve")

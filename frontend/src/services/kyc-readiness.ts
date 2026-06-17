@@ -16,7 +16,30 @@ export type KycRequiredDocument = {
   present: boolean;
   status: KycDocumentStatus;
   source: string;
-  stage: string;
+  /** Present on contract-KYC rows; absent on activation-milestone rows. */
+  stage?: string;
+};
+
+/**
+ * Activation / handover milestone readiness (additive, P0).
+ *
+ * Surfaced only when the readiness endpoint is queried with a concrete
+ * `subscription`. Reports the extra evidence required before the asset leaves
+ * the shop: a collected security-deposit receipt (rent/lease) and an asset
+ * condition proof (lease). Computation only — never enforced by this endpoint.
+ */
+export type ContractActivationMilestone = {
+  plan_type: string;
+  is_direct_sale: boolean;
+  kyc_gating_enabled: boolean;
+  enforced: boolean;
+  kyc_verified: boolean;
+  can_reach_active_or_handover: boolean;
+  required_documents: KycRequiredDocument[];
+  missing_documents: string[];
+  present_documents: string[];
+  blocker_codes: string[];
+  blocker_messages: string[];
 };
 
 export type ContractKycReadiness = {
@@ -37,6 +60,8 @@ export type ContractKycReadiness = {
   blocker_codes: string[];
   blocker_messages: string[];
   optional_warnings?: string[];
+  /** Present only when the readiness query includes a concrete subscription. */
+  activation_milestone?: ContractActivationMilestone;
 };
 
 export type FetchReadinessOptions = {
