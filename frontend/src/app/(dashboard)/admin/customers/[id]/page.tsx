@@ -303,17 +303,6 @@ type KycDecisionResponse = {
   kyc_rejection_reason?: string | null;
 };
 
-type AdminKycDocumentRow = {
-  id: number;
-  document_type: string;
-  status: string;
-  original_filename: string;
-  file_size: number;
-  created_at: string | null;
-  reviewed_at: string | null;
-  rejection_reason: string;
-};
-
 // =====================================================
 // UTILITIES
 // =====================================================
@@ -1293,31 +1282,6 @@ async function submitCustomerKycDecision(
   );
 }
 
-async function listAdminCustomerKycDocuments(customerId: string): Promise<AdminKycDocumentRow[]> {
-  const response = await apiFetch<Record<string, unknown>>(`/admin/customers/${customerId}/kyc-documents/`);
-  return toArray<Record<string, unknown>>(response.results).map((row) => ({
-    id: toNumber(row.id),
-    document_type: toStringValue(row.document_type),
-    status: toStringValue(row.status),
-    original_filename: toStringValue(row.original_filename),
-    file_size: toNumber(row.file_size),
-    created_at: toNullableString(row.created_at) ?? null,
-    reviewed_at: toNullableString(row.reviewed_at) ?? null,
-    rejection_reason: toStringValue(row.rejection_reason),
-  }));
-}
-
-async function approveAdminCustomerKycDocument(customerId: string, documentId: number): Promise<void> {
-  await apiFetch(`/admin/customers/${customerId}/kyc-documents/${documentId}/approve/`, { method: "POST", body: {} });
-}
-
-async function rejectAdminCustomerKycDocument(customerId: string, documentId: number, reason: string): Promise<void> {
-  await apiFetch(`/admin/customers/${customerId}/kyc-documents/${documentId}/reject/`, {
-    method: "POST",
-    body: { reason },
-  });
-}
-
 async function adminChangeUserUsername(
   userId: number,
   payload: { new_username: string; reason: string }
@@ -1356,7 +1320,6 @@ export default function AdminCustomerDetailPage() {
   const [usernameSaving, setUsernameSaving] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
-  const [kycDocuments, setKycDocuments] = useState<AdminKycDocumentRow[]>([]);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -1366,7 +1329,7 @@ export default function AdminCustomerDetailPage() {
       else setRefreshing(true);
 
       try {
-        const [customerResult, subscriptionResult, paymentResult, operationalResult, kycDocumentsResult] =
+        const [customerResult, subscriptionResult, paymentResult, operationalResult] =
           await Promise.allSettled([
             apiFetch<Record<string, unknown>>(`/admin/customers/${customerId}/`),
             apiFetch<unknown>(`/admin/subscriptions/?customer=${customerId}`),
@@ -1374,7 +1337,6 @@ export default function AdminCustomerDetailPage() {
             apiFetch<Record<string, unknown>>(
               `/admin/customers/${customerId}/operational-profile/`
             ),
-            listAdminCustomerKycDocuments(customerId),
           ]);
 
         if (customerResult.status !== "fulfilled") {
@@ -1451,12 +1413,6 @@ export default function AdminCustomerDetailPage() {
             "Operational profile sections could not be loaded from the dedicated customer operations endpoint."
           );
         }
-        if (kycDocumentsResult.status === "fulfilled") {
-          setKycDocuments(kycDocumentsResult.value);
-        } else {
-          setKycDocuments([]);
-          nextWarnings.push("KYC document review records could not be loaded.");
-        }
 
         setCustomer(normalizedCustomer);
         setSubscriptions(nextSubscriptions);
@@ -1471,7 +1427,6 @@ export default function AdminCustomerDetailPage() {
           setSubscriptions([]);
           setPayments([]);
           setOperationalProfile(null);
-          setKycDocuments([]);
           setWarnings([]);
         }
       } finally {
@@ -1717,30 +1672,6 @@ export default function AdminCustomerDetailPage() {
       setUsernameError(toErrorMessage(err));
     } finally {
       setUsernameSaving(false);
-    }
-  }
-
-  async function handleKycDocumentReview(documentId: number, decision: "APPROVE" | "REJECT") {
-    if (!customerId) return;
-    if (decision === "REJECT" && !kycReason.trim()) {
-      setKycError("Reason is required when rejecting KYC.");
-      return;
-    }
-    setSavingKyc(true);
-    setKycError(null);
-    setKycSuccess(null);
-    try {
-      if (decision === "APPROVE") {
-        await approveAdminCustomerKycDocument(customerId, documentId);
-      } else {
-        await rejectAdminCustomerKycDocument(customerId, documentId, kycReason.trim());
-      }
-      await loadPage("refresh");
-      setKycSuccess(decision === "APPROVE" ? "KYC document approved." : "KYC document rejected.");
-    } catch (err) {
-      setKycError(toErrorMessage(err));
-    } finally {
-      setSavingKyc(false);
     }
   }
 
@@ -2013,63 +1944,6 @@ export default function AdminCustomerDetailPage() {
                   >
                     {usernameSaving ? "Changing username..." : "Change Username"}
                   </button>
-                </div>
-
-                <div className="mt-5 space-y-2">
-                  <h4 className="text-sm font-semibold text-foreground">Submitted KYC documents</h4>
-                  {kycDocuments.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No KYC documents uploaded yet.</p>
-                  ) : (
-                    kycDocuments.map((doc) => (
-                      <div key={doc.id} className="rounded-xl border border-border bg-background px-4 py-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <div className="text-sm font-medium text-foreground">{doc.document_type}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {doc.original_filename || "Unnamed file"} · {Math.max(1, Math.round((doc.file_size || 0) / 1024))} KB · Uploaded {formatDateTime(doc.created_at)}
-                            </div>
-                            {doc.rejection_reason ? (
-                              <div className="text-xs text-destructive">Reason: {doc.rejection_reason}</div>
-                            ) : null}
-                          </div>
-                          <StatusBadge
-                            status={doc.status}
-                            tone={
-                              doc.status === "APPROVED"
-                                ? "success"
-                                : doc.status === "REJECTED"
-                                ? "danger"
-                                : "warning"
-                            }
-                          />
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <a
-                            href={`/api/v1/admin/customers/${customer.id}/kyc-documents/${doc.id}/download/`}
-                            className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted"
-                          >
-                            Download
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => void handleKycDocumentReview(doc.id, "APPROVE")}
-                            disabled={savingKyc}
-                            className="inline-flex h-9 items-center rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleKycDocumentReview(doc.id, "REJECT")}
-                            disabled={savingKyc}
-                            className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">

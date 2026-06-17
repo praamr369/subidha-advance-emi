@@ -440,13 +440,19 @@ A production-grade, unified KYC intake and admin review workflow has been implem
 
 **None for backend.** Implementation is complete, tested, and verified.
 
-**Frontend (not blocking release; can be done post-merge):**
-- Shared UI components (KycStatusBadge, KycDocumentList, KycUploadPanel, etc.) – skeletal only
-- Admin KYC tabs (customer, partner, vendor, staff pages) – routes exist, UI TBD
-- Partner self-service KYC page (/partner/kyc/) – service exists, UI TBD
-- Frontend typecheck/lint/build:smoke – deferred (Bash classifier temporarily down)
+**Frontend status (updated 2026-06-17):** Admin customer/partner/vendor/staff KYC
+panels and partner/vendor/staff self-service KYC panels are wired and verified
+(single reusable `KycDocumentPanel` consuming `@/services/kyc`; 17 `kyc-frontend`
+UI tests pass). Customer self-service KYC remains handled by the existing customer
+profile KYC flow. The admin customer detail page exposes a **single** KYC document
+surface — the legacy inline per-document review section was removed so the
+`/admin/customers/{id}/kyc-documents` endpoints are no longer driven by duplicate
+UI. The customer-level KYC decision card (`/admin/customers/{id}/kyc-decision/`,
+which sets `Customer.kyc_status` read by contract gating) is intentionally retained.
 
-**These are UI/UX enhancements.** The backend workflow is production-ready and usable via API.
+**Genuinely outstanding (not yet built):** a consolidated CRM KYC review queue
+(needs a cross-owner list endpoint; only per-owner endpoints exist today). Do **not**
+claim "all KYC UI is complete" until that queue ships.
 
 ---
 
@@ -520,6 +526,6 @@ f237fb9a docs(frontend): audit admin route cleanup boundaries
 
 ## Summary
 
-A production-grade, fully tested, and auditable KYC intake and review workflow has been delivered for all four party types (Customers, Partners, Vendors, Staff) in SUBIDHA CORE. The implementation is **100% additive and non-breaking**: it does not modify any existing financial, payment, or reconciliation logic, and all contract gating remains unchanged. The new layer introduces unified admin review capabilities, partner self-service uploads, and a complete immutable audit trail. All 35 backend tests pass; the frontend service is ready for UI integration.
+A production-grade, fully tested, and auditable KYC intake and review workflow has been delivered for all four party types (Customers, Partners, Vendors, Staff) in SUBIDHA CORE. The implementation is **100% additive and non-breaking**: it does not modify any existing financial, payment, or reconciliation logic, and all contract gating remains unchanged. The new layer introduces unified admin review capabilities, partner self-service uploads, and a complete immutable audit trail. All 35 backend tests pass. On the frontend, the admin customer/partner/vendor/staff KYC panels and partner/vendor/staff self-service KYC panels are wired and verified (17 `kyc-frontend` UI tests pass); customer self-service KYC remains handled by the existing customer profile KYC flow. A consolidated CRM KYC review queue is the one KYC UI piece still outstanding.
 
 **Status: Ready for Production Merge ✅**

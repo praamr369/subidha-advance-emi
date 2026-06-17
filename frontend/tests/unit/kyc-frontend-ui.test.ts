@@ -65,6 +65,23 @@ test("admin customer detail renders the admin KYC panel", () => {
   assert.ok(adminCustomerSource.includes('<KycDocumentPanel mode="admin" owner="customer"'));
 });
 
+test("admin customer page renders a single KYC document panel (no duplicate inline review)", () => {
+  // The unified panel is the sole KYC document surface — exactly one instance.
+  const panelInstances = adminCustomerSource.match(/<KycDocumentPanel\b/g) ?? [];
+  assert.equal(
+    panelInstances.length,
+    1,
+    "expected exactly one <KycDocumentPanel> on the admin customer page"
+  );
+  // The legacy inline per-document review UI and its helpers must be gone, so the
+  // /admin/customers/{id}/kyc-documents endpoints are driven only by the panel.
+  assert.ok(!adminCustomerSource.includes("Submitted KYC documents"));
+  assert.ok(!adminCustomerSource.includes("handleKycDocumentReview"));
+  assert.ok(!adminCustomerSource.includes("listAdminCustomerKycDocuments"));
+  assert.ok(!adminCustomerSource.includes("approveAdminCustomerKycDocument"));
+  assert.ok(!adminCustomerSource.includes("rejectAdminCustomerKycDocument"));
+});
+
 test("admin partner detail renders the admin KYC panel", () => {
   assert.ok(adminPartnerSource.includes('import KycDocumentPanel from "@/components/kyc/KycDocumentPanel"'));
   assert.ok(adminPartnerSource.includes('<KycDocumentPanel mode="admin" owner="partner"'));
