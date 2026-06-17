@@ -125,6 +125,7 @@ from api.v1.views.admin_resources import (
     ProductAdminViewSet,
     ProductSubcategoryMasterViewSet,
     ProductUnitOfMeasureMasterViewSet,
+    RentalAssetAdminViewSet,
 )
 from api.v1.views.admin_public_site import AdminPublicBusinessProfileView
 from api.v1.views.admin_policy_site import (
@@ -550,6 +551,7 @@ router.register(r"products", ProductAdminViewSet, basename="admin-products")
 router.register(r"product-categories", ProductCategoryMasterViewSet, basename="admin-product-categories")
 router.register(r"product-subcategories", ProductSubcategoryMasterViewSet, basename="admin-product-subcategories")
 router.register(r"product-units", ProductUnitOfMeasureMasterViewSet, basename="admin-product-units")
+router.register(r"rental-assets", RentalAssetAdminViewSet, basename="admin-rental-assets")
 router.register(r"vendors", AdminVendorViewSet, basename="admin-vendors")
 router.register(r"vendors/categories", AdminVendorCategoryViewSet, basename="admin-vendor-categories")
 router.register(r"subscriptions", PaginatedSubscriptionAdminViewSet, basename="admin-subscriptions")

@@ -3137,3 +3137,115 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         ).data
         payload["return_assessment"] = result
         return Response(payload)
+
+
+# =====================================================
+# P3B — RENTAL ASSET (read-only admin)
+# =====================================================
+
+class RentalAssetAdminViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only admin view for RentalAsset lifecycle tracking.
+
+    Write operations (reserve, hand-over, return, retire) are performed via the
+    rental_asset_lifecycle_service and are not exposed as REST mutations in P3B.
+    The UI deferred to a future phase.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        from subscriptions.models import RentalAsset
+        qs = (
+            RentalAsset.objects.all()
+            .select_related(
+                "product",
+                "inventory_item",
+                "current_customer",
+                "current_subscription",
+                "current_location",
+                "created_by",
+            )
+            .order_by("asset_code")
+        )
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter.upper())
+        product_id = self.request.query_params.get("product")
+        if product_id:
+            qs = qs.filter(product_id=product_id)
+        customer_id = self.request.query_params.get("customer")
+        if customer_id:
+            qs = qs.filter(current_customer_id=customer_id)
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        data = []
+        for asset in qs:
+            data.append(self._serialize_asset(asset))
+        return Response({"count": len(data), "results": data})
+
+    def retrieve(self, request, pk=None):
+        from subscriptions.models import RentalAsset
+        asset = get_object_or_404(self.get_queryset(), pk=pk)
+        return Response(self._serialize_asset(asset, include_snapshots=True))
+
+    @action(detail=False, methods=["get"], url_path="subscription-readiness/(?P<subscription_pk>[0-9]+)")
+    def subscription_readiness(self, request, subscription_pk=None):
+        """Asset condition readiness for a specific subscription (P3B integration)."""
+        from subscriptions.models import AssetConditionSnapshotStage, RentalAsset
+        from subscriptions.services.contract_activation_readiness_service import (
+            evaluate_contract_activation_readiness,
+        )
+        subscription = get_object_or_404(Subscription, pk=subscription_pk)
+        has_handover_snapshot = subscription.asset_condition_snapshots.filter(
+            stage=AssetConditionSnapshotStage.BEFORE_HANDOVER
+        ).exists()
+        rental_assets = RentalAsset.objects.filter(
+            current_subscription=subscription
+        ).values("id", "asset_code", "status", "condition_grade")
+        readiness = evaluate_contract_activation_readiness(subscription)
+        return Response({
+            "subscription_id": subscription.pk,
+            "plan_type": subscription.plan_type,
+            "has_before_handover_snapshot": has_handover_snapshot,
+            "linked_assets": list(rental_assets),
+            "activation_readiness": {
+                "can_reach_active_or_handover": readiness["can_reach_active_or_handover"],
+                "blocker_codes": readiness["blocker_codes"],
+                "missing_documents": readiness["missing_documents"],
+            },
+        })
+
+    @staticmethod
+    def _serialize_asset(asset, *, include_snapshots: bool = False) -> dict:
+        from subscriptions.models import AssetConditionSnapshot
+        row = {
+            "id": asset.pk,
+            "asset_code": asset.asset_code,
+            "serial_no": asset.serial_no,
+            "status": asset.status,
+            "condition_grade": asset.condition_grade,
+            "purchase_cost": str(asset.purchase_cost),
+            "last_inspection_date": asset.last_inspection_date,
+            "product_id": asset.product_id,
+            "product_name": asset.product.name if asset.product_id else None,
+            "inventory_item_id": asset.inventory_item_id,
+            "current_customer_id": asset.current_customer_id,
+            "current_subscription_id": asset.current_subscription_id,
+            "current_location_id": asset.current_location_id,
+            "current_location_code": (
+                asset.current_location.code if asset.current_location_id else None
+            ),
+            "metadata": asset.metadata,
+            "created_at": asset.created_at,
+        }
+        if include_snapshots:
+            snapshots = AssetConditionSnapshot.objects.filter(
+                asset=asset
+            ).order_by("-assessed_at").values(
+                "id", "stage", "condition_grade", "condition_score",
+                "notes", "assessed_at", "assessed_by_id",
+            )
+            row["condition_snapshots"] = list(snapshots)
+        return row

@@ -3790,6 +3790,14 @@ class AuditLog(models.Model):
         CONTRACT_RETURN_INSPECTION_CREATED = "CONTRACT_RETURN_INSPECTION_CREATED", "Return Inspection Created"
         CONTRACT_RETURN_INSPECTION_APPROVED = "CONTRACT_RETURN_INSPECTION_APPROVED", "Return Inspection Approved"
         CONTRACT_DOCUMENT_REGENERATED = "CONTRACT_DOCUMENT_REGENERATED", "Contract Document Regenerated"
+        # P3B – Rental Asset Lifecycle
+        RENTAL_ASSET_CREATED = "RENTAL_ASSET_CREATED", "Rental Asset Created"
+        RENTAL_ASSET_RESERVED = "RENTAL_ASSET_RESERVED", "Rental Asset Reserved"
+        RENTAL_ASSET_HANDED_OVER = "RENTAL_ASSET_HANDED_OVER", "Rental Asset Handed Over"
+        RENTAL_ASSET_RETURNED = "RENTAL_ASSET_RETURNED", "Rental Asset Returned"
+        RENTAL_ASSET_UNDER_REPAIR = "RENTAL_ASSET_UNDER_REPAIR", "Rental Asset Sent for Repair"
+        RENTAL_ASSET_RETIRED = "RENTAL_ASSET_RETIRED", "Rental Asset Retired"
+        RENTAL_ASSET_CONDITION_SNAPSHOT = "RENTAL_ASSET_CONDITION_SNAPSHOT", "Asset Condition Snapshot Recorded"
 
     action_type = models.CharField(
         max_length=50,
@@ -5150,3 +5158,239 @@ class DryRunValidationJob(models.Model):
 
     def __str__(self):
         return f"DryRunJob {self.run_id} [{self.status}]"
+
+
+# =====================================================
+# P3B – RENTAL ASSET LIFECYCLE
+# =====================================================
+
+class RentalAssetStatus(models.TextChoices):
+    AVAILABLE = "AVAILABLE", "Available"
+    RESERVED = "RESERVED", "Reserved"
+    HANDED_OVER = "HANDED_OVER", "Handed Over"
+    RETURNED = "RETURNED", "Returned"
+    UNDER_REPAIR = "UNDER_REPAIR", "Under Repair"
+    RETIRED = "RETIRED", "Retired"
+
+
+class AssetConditionGrade(models.TextChoices):
+    NEW = "NEW", "New"
+    GOOD = "GOOD", "Good"
+    FAIR = "FAIR", "Fair"
+    DAMAGED = "DAMAGED", "Damaged"
+    SCRAP = "SCRAP", "Scrap"
+    UNKNOWN = "UNKNOWN", "Unknown"
+
+
+class AssetConditionSnapshotStage(models.TextChoices):
+    BEFORE_HANDOVER = "BEFORE_HANDOVER", "Before Handover"
+    AFTER_RETURN = "AFTER_RETURN", "After Return"
+    DAMAGE_REVIEW = "DAMAGE_REVIEW", "Damage Review"
+    MAINTENANCE_REVIEW = "MAINTENANCE_REVIEW", "Maintenance Review"
+
+
+class RentalAsset(TimeStampedModel):
+    """
+    A specific physical furniture unit registered for reuse across RENT/LEASE contracts.
+
+    This is distinct from InventoryItem (which tracks quantity / stock-ledger).
+    RentalAsset tracks the lifecycle of one identifiable unit (by serial number /
+    asset code) through handover → return → repair → re-handover cycles.
+
+    Physical stock quantities in InventoryItem are NOT mutated by the asset
+    lifecycle service — stock movements remain the sole domain of the inventory app.
+    """
+
+    inventory_item = models.ForeignKey(
+        "inventory.InventoryItem",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="rental_assets",
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="rental_assets",
+    )
+    asset_code = models.CharField(max_length=40, unique=True, db_index=True)
+    serial_no = models.CharField(max_length=80, blank=True, default="")
+    purchase_cost = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    current_location = models.ForeignKey(
+        "inventory.StockLocation",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="rental_assets",
+    )
+    current_customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="rented_assets",
+    )
+    current_subscription = models.ForeignKey(
+        "subscriptions.Subscription",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="rental_assets",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=RentalAssetStatus.choices,
+        default=RentalAssetStatus.AVAILABLE,
+        db_index=True,
+    )
+    condition_grade = models.CharField(
+        max_length=10,
+        choices=AssetConditionGrade.choices,
+        default=AssetConditionGrade.UNKNOWN,
+        db_index=True,
+    )
+    last_inspection_date = models.DateField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_rental_assets",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="updated_rental_assets",
+    )
+
+    class Meta:
+        db_table = "subscriptions_rental_assets"
+        ordering = ["asset_code", "id"]
+        indexes = [
+            models.Index(fields=["status", "condition_grade"]),
+            models.Index(fields=["product", "status"]),
+            models.Index(fields=["current_customer", "status"]),
+            models.Index(fields=["current_subscription", "status"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(status="HANDED_OVER", current_subscription__isnull=False)
+                    | ~Q(status="HANDED_OVER")
+                ),
+                name="rental_asset_handedover_requires_subscription",
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        asset_code = (self.asset_code or "").strip().upper()
+        if not asset_code:
+            errors["asset_code"] = "Asset code is required."
+        if self.status == RentalAssetStatus.HANDED_OVER and not self.current_subscription_id:
+            errors["current_subscription"] = "HANDED_OVER assets must have a current subscription."
+        if self.status == RentalAssetStatus.RETIRED and self.current_subscription_id:
+            errors["status"] = "RETIRED assets cannot have an active subscription."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.asset_code = (self.asset_code or "").strip().upper()
+        self.serial_no = (self.serial_no or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.asset_code} ({self.get_status_display()})"
+
+
+class AssetConditionSnapshot(TimeStampedModel):
+    """
+    Append-only record of an asset's assessed condition at a specific lifecycle stage.
+
+    BEFORE_HANDOVER — satisfies the P0/P3A condition-proof requirement for lease/rent.
+    AFTER_RETURN    — feeds into the damage-deduction / refund workflow.
+    DAMAGE_REVIEW   — may be linked to a damage deduction later.
+    MAINTENANCE_REVIEW — recorded during servicing.
+
+    Snapshots are never mutated after creation; corrections are new snapshot rows.
+    """
+
+    asset = models.ForeignKey(
+        RentalAsset,
+        on_delete=models.PROTECT,
+        related_name="condition_snapshots",
+    )
+    subscription = models.ForeignKey(
+        "subscriptions.Subscription",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="asset_condition_snapshots",
+    )
+    stage = models.CharField(
+        max_length=24,
+        choices=AssetConditionSnapshotStage.choices,
+        db_index=True,
+    )
+    condition_score = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+    )
+    condition_grade = models.CharField(
+        max_length=10,
+        choices=AssetConditionGrade.choices,
+        default=AssetConditionGrade.UNKNOWN,
+    )
+    notes = models.TextField(blank=True, default="")
+    assessed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="asset_condition_snapshots",
+    )
+    assessed_at = models.DateTimeField(default=timezone.now, db_index=True)
+    document = models.ForeignKey(
+        SubscriptionDocument,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="condition_snapshots",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "subscriptions_asset_condition_snapshots"
+        ordering = ["-assessed_at", "-id"]
+        indexes = [
+            models.Index(fields=["asset", "stage", "assessed_at"]),
+            models.Index(fields=["subscription", "stage"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if not self.stage:
+            errors["stage"] = "Stage is required."
+        score = self.condition_score
+        if score is not None and not (1 <= score <= 10):
+            errors["condition_score"] = "Condition score must be between 1 and 10."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.asset_id}:{self.stage}@{self.assessed_at:%Y-%m-%d}"

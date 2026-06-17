@@ -39,6 +39,7 @@ from datetime import date
 from typing import Optional
 
 from subscriptions.models import (
+    AssetConditionSnapshotStage,
     DocumentVerificationStatus,
     PlanType,
     RentLeaseBillingDemand,
@@ -184,11 +185,13 @@ def _has_condition_proof(subscription) -> bool:
     if not subscription or not getattr(subscription, "pk", None):
         return False
 
-    # Forward compatible with the P3 AssetConditionSnapshot model.
+    # P3B: check for a BEFORE_HANDOVER AssetConditionSnapshot on this subscription.
     snapshots = getattr(subscription, "asset_condition_snapshots", None)
     if snapshots is not None:
         try:
-            if snapshots.exists():
+            if snapshots.filter(
+                stage=AssetConditionSnapshotStage.BEFORE_HANDOVER
+            ).exists():
                 return True
         except Exception:
             pass
