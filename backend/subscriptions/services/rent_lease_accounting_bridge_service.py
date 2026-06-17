@@ -23,6 +23,7 @@ from accounting.models import (
     JournalEntryStatus,
     JournalEntryType,
 )
+from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
 from subscriptions.models import (
     AuditLog,
@@ -35,7 +36,13 @@ from subscriptions.models import (
     q2,
 )
 from subscriptions.services.audit_service import log_audit
-from subscriptions.services.rent_lease_finance_sync_service import get_active_account_mapping
+from subscriptions.services.rent_lease_finance_sync_service import (
+    ensure_premade_rent_lease_accounting_setup,
+    get_active_account_mapping,
+)
+from subscriptions.services.rent_lease_posting_bridge_config_service import (
+    get_rent_lease_posting_bridge_state,
+)
 
 SOURCE_MODEL_ADVANCE = "CustomerAdvance"
 SOURCE_MODEL_DEMAND = "RentLeaseBillingDemand"
@@ -508,3 +515,183 @@ def build_accounting_bridge_summary() -> dict[str, Any]:
             "reason": None if required_mapping_ok else "Active rent/lease mapping and settlement finance account are required before posting deposit liabilities.",
         },
     }
+
+
+# ===========================================================================
+# P1 — Canonical AccountingBridgePosting path for security-deposit damage
+# deduction.
+#
+# Damage deduction is the one rent/lease deposit event that historically posted
+# through the legacy direct-journal sync (rent_lease_finance_sync_service, with
+# ``source_model="Subscription"``). It now posts through the canonical
+# ``post_bridge_entry`` path with ``source_model="RentLeaseDepositTransaction"``
+# and purpose ``SECURITY_DEPOSIT_DAMAGE_DEDUCTION``, so it is idempotent on
+# (source_model, source_id, purpose) — exactly like deposit receipts (F17),
+# deposit refunds (F18), monthly revenue (F14), and collection settlement (F15c).
+#
+# The accounting is unchanged from the legacy sync:
+#     Dr Security Deposit Liability / Cr Damage Recovery Income.
+# Posting stays gated behind the existing rent/lease posting-bridge approval
+# (``get_rent_lease_posting_bridge_state``), so the default behaviour — no
+# journal until a shop explicitly enables the bridge — is preserved.
+# ===========================================================================
+
+PURPOSE_SECURITY_DEPOSIT_DAMAGE_DEDUCTION = "SECURITY_DEPOSIT_DAMAGE_DEDUCTION"
+RENT_LEASE_VOUCHER_TYPE = "RENT_LEASE"
+DAMAGE_DEDUCTION_SOURCE_MODEL = "RentLeaseDepositTransaction"
+
+
+def _first_error_message(exc: Exception) -> str:
+    messages = getattr(exc, "messages", None)
+    if messages:
+        return str(messages[0])
+    return str(exc)
+
+
+def _damage_deduction_result(
+    *, status: str, deposit_tx: RentLeaseDepositTransaction, reason: str, journal=None
+) -> dict[str, Any]:
+    return {
+        "purpose": PURPOSE_SECURITY_DEPOSIT_DAMAGE_DEDUCTION,
+        "status": status,
+        "source_model": DAMAGE_DEDUCTION_SOURCE_MODEL,
+        "source_id": deposit_tx.id,
+        "source_reference": deposit_tx.transaction_number,
+        "journal_entry_id": journal.id if journal else None,
+        "entry_no": getattr(journal, "entry_no", None),
+        "reason": reason,
+    }
+
+
+def post_security_deposit_damage_deduction(
+    deposit_tx: RentLeaseDepositTransaction, *, performed_by=None
+) -> dict[str, Any]:
+    """Post a security-deposit damage deduction to the canonical accounting bridge.
+
+    ``Dr Security Deposit Liability / Cr Damage Recovery Income`` for a
+    ``RentLeaseDepositTransaction`` of type ``DEDUCTION``. Idempotent on
+    ``(RentLeaseDepositTransaction, id, SECURITY_DEPOSIT_DAMAGE_DEDUCTION)``.
+
+    Returns a controlled result dict; it never raises for the no-op / not-ready /
+    period-locked cases:
+
+    * ``SKIPPED`` — not a positive DEDUCTION row.
+    * ``DEFERRED`` — the rent/lease posting bridge is not approved.
+    * ``BLOCKED`` — bridge approved but accounting controls (period lock,
+      numbering, accounts) are not ready (never a 500).
+    * ``POSTED`` / ``ALREADY_POSTED`` — journal created / idempotent no-op.
+    """
+    if deposit_tx is None or not getattr(deposit_tx, "pk", None):
+        raise ValidationError("A persisted deposit transaction is required for bridge posting.")
+
+    if deposit_tx.transaction_type != RentLeaseDepositTransactionType.DEDUCTION:
+        return _damage_deduction_result(
+            status="SKIPPED",
+            deposit_tx=deposit_tx,
+            reason="Only DEDUCTION deposit transactions post a damage deduction.",
+        )
+
+    amount = _money(deposit_tx.amount)
+    if amount <= MONEY_ZERO:
+        return _damage_deduction_result(
+            status="SKIPPED",
+            deposit_tx=deposit_tx,
+            reason="Damage deduction amount must be greater than zero.",
+        )
+
+    bridge_state = get_rent_lease_posting_bridge_state(
+        readiness={"status": "READY", "mapping_ready": True}
+    )
+    if not bridge_state.get("posting_bridge_ready"):
+        return _damage_deduction_result(
+            status="DEFERRED",
+            deposit_tx=deposit_tx,
+            reason=bridge_state.get("blocked_reason")
+            or "Rent/lease posting bridge is not approved.",
+        )
+
+    subscription = deposit_tx.subscription
+    mapping = ensure_premade_rent_lease_accounting_setup(performed_by=performed_by)
+    debit_account = mapping.deposit_liability_account  # Security deposit liability
+    credit_account = mapping.damage_recovery_income_account  # Damage recovery income
+
+    event_date = deposit_tx.transaction_date or (
+        deposit_tx.created_at.date() if deposit_tx.created_at else timezone.localdate()
+    )
+    trace_metadata = {
+        "subscription_id": subscription.id,
+        "customer_id": subscription.customer_id,
+        "product_id": subscription.product_id,
+        "plan_type": subscription.plan_type,
+        "demand_id": deposit_tx.demand_id,
+        "deposit_transaction_id": deposit_tx.id,
+        "reference_key": getattr(deposit_tx.demand, "reference_key", None),
+        "transaction_number": deposit_tx.transaction_number,
+        "amount": f"{amount:.2f}",
+    }
+
+    try:
+        journal, created = post_bridge_entry(
+            source_instance=deposit_tx,
+            purpose=PURPOSE_SECURITY_DEPOSIT_DAMAGE_DEDUCTION,
+            entry_date=event_date,
+            memo=(
+                "Security deposit damage deduction for "
+                f"{subscription.subscription_number or subscription.id}"
+            ),
+            lines=[
+                {
+                    "chart_account": debit_account,
+                    "debit_amount": amount,
+                    "credit_amount": MONEY_ZERO,
+                    "description": "Security deposit liability (damage deduction)",
+                },
+                {
+                    "chart_account": credit_account,
+                    "debit_amount": MONEY_ZERO,
+                    "credit_amount": amount,
+                    "description": "Damage recovery income",
+                },
+            ],
+            voucher_type=RENT_LEASE_VOUCHER_TYPE,
+            source_type=PURPOSE_SECURITY_DEPOSIT_DAMAGE_DEDUCTION,
+            source_reference=deposit_tx.transaction_number,
+            source_document_no=deposit_tx.transaction_number,
+            source_event_date=event_date,
+            trace_metadata=trace_metadata,
+            posted_by=performed_by,
+        )
+    except (ValidationError, ValueError) as exc:
+        return _damage_deduction_result(
+            status="BLOCKED",
+            deposit_tx=deposit_tx,
+            reason=_first_error_message(exc),
+        )
+
+    status = "POSTED" if created else "ALREADY_POSTED"
+    log_audit(
+        action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+        instance=subscription,
+        performed_by=performed_by,
+        metadata={
+            "event": (
+                "RENT_LEASE_DAMAGE_DEDUCTION_BRIDGE_POSTED"
+                if created
+                else "RENT_LEASE_DAMAGE_DEDUCTION_BRIDGE_ALREADY_POSTED"
+            ),
+            "purpose": PURPOSE_SECURITY_DEPOSIT_DAMAGE_DEDUCTION,
+            "deposit_transaction_id": deposit_tx.id,
+            "journal_entry_id": journal.id,
+            "amount": f"{amount:.2f}",
+        },
+    )
+    return _damage_deduction_result(
+        status=status,
+        deposit_tx=deposit_tx,
+        reason=(
+            "Damage deduction posted to the canonical accounting bridge."
+            if created
+            else "Damage deduction already posted; idempotent no-op."
+        ),
+        journal=journal,
+    )

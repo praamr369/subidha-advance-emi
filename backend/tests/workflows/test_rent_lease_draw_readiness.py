@@ -139,7 +139,7 @@ class RentLeaseProductionWorkflowTests(TestCase):
         )
         self.assertTrue(
             subscription.deposit_transactions.filter(
-                transaction_type=RentLeaseDepositTransactionType.COLLECTION,
+                transaction_type=RentLeaseDepositTransactionType.COLLECTED,
                 amount=Decimal("6000.00"),
             ).exists()
         )

@@ -567,22 +567,38 @@ def sync_deposit_refund_liability_reduction(*, subscription: Subscription, amoun
 
 
 def sync_damage_deduction_income(*, subscription: Subscription, amount, performed_by=None) -> dict:
-    mapping = ensure_premade_rent_lease_accounting_setup(performed_by=performed_by)
+    """Compatibility wrapper for the legacy direct-journal damage sync.
+
+    Security-deposit damage deduction now posts through the canonical
+    ``AccountingBridgePosting`` path (purpose ``SECURITY_DEPOSIT_DAMAGE_DEDUCTION``,
+    ``source_model="RentLeaseDepositTransaction"``). This wrapper is retained for
+    any existing import sites: it resolves the concrete DEDUCTION source row for
+    the ``(subscription, amount)`` pair and delegates, so there is a single
+    posting path and no double-posting.
+    """
+    from subscriptions.services.rent_lease_accounting_bridge_service import (
+        post_security_deposit_damage_deduction,
+    )
+
     amount_q = _money(amount)
-    source_reference = _deposit_source_reference(
-        subscription=subscription,
-        tx_type=RentLeaseDepositTransactionType.DEDUCTION,
-        amount=amount_q,
-        fallback_event="SECURITY_DEPOSIT_DAMAGE_DEDUCTION",
+    deduction_tx = (
+        RentLeaseDepositTransaction.objects.filter(
+            subscription=subscription,
+            transaction_type=RentLeaseDepositTransactionType.DEDUCTION,
+            amount=amount_q,
+        )
+        .order_by("-created_at", "-id")
+        .first()
     )
-    result = _post_bridge_journal(
-        subscription=subscription,
-        event="SECURITY_DEPOSIT_DAMAGE_DEDUCTION",
-        amount=amount_q,
-        debit_account=mapping.deposit_liability_account,
-        credit_account=mapping.damage_recovery_income_account,
-        performed_by=performed_by,
-        source_reference=source_reference,
-        memo=f"Security deposit damage deduction for {subscription.subscription_number or subscription.id}",
-    )
-    return _log_sync_result(subscription=subscription, amount=amount_q, performed_by=performed_by, result=result, mapping=mapping)
+    if deduction_tx is None:
+        result = _result(
+            event="SECURITY_DEPOSIT_DAMAGE_DEDUCTION",
+            status="SKIPPED",
+            source_model="RentLeaseDepositTransaction",
+            source_id=0,
+            reason="No DEDUCTION deposit transaction found to post.",
+        )
+        return _log_sync_result(
+            subscription=subscription, amount=amount_q, performed_by=performed_by, result=result
+        )
+    return post_security_deposit_damage_deduction(deduction_tx, performed_by=performed_by)

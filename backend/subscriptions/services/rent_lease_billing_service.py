@@ -28,9 +28,6 @@ from subscriptions.models import (
     q2,
 )
 from subscriptions.services.audit_service import log_audit
-from subscriptions.services.rent_lease_finance_sync_service import (
-    sync_damage_deduction_income,
-)
 
 
 @dataclass(frozen=True)
@@ -399,7 +396,7 @@ def record_damage_deduction(
     profile.return_inspection_notes = reason.strip()
     profile.save(update_fields=["deduction_amount", "refundable_security_deposit", "refund_status", "return_inspection_notes", "updated_at"])
 
-    RentLeaseDepositTransaction.objects.create(
+    deduction_tx = RentLeaseDepositTransaction.objects.create(
         subscription=subscription,
         demand=demand,
         inspection=inspection,
@@ -418,11 +415,16 @@ def record_damage_deduction(
             "reason": reason.strip(),
         },
     )
-    sync_damage_deduction_income(
-        subscription=subscription,
-        amount=amount_q,
-        performed_by=performed_by,
+    # Post the damage deduction to the canonical accounting bridge
+    # (Dr Security Deposit Liability / Cr Damage Recovery Income). This replaces
+    # the legacy direct-journal sync (source_model="Subscription") with the
+    # idempotent AccountingBridgePosting path (source = the DEDUCTION transaction).
+    # No-op (DEFERRED) unless the rent/lease posting bridge is explicitly enabled.
+    from subscriptions.services.rent_lease_accounting_bridge_service import (
+        post_security_deposit_damage_deduction,
     )
+
+    post_security_deposit_damage_deduction(deduction_tx, performed_by=performed_by)
     return demand
 
 
