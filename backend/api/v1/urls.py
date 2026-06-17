@@ -51,6 +51,7 @@ urlpatterns = [
     path("admin/accounting/bridge-reconciliation/items/<int:pk>/verify/", AccountingBridgeReconciliationItemVerifyView.as_view()),
     path("admin/accounting/year-end/readiness/", AccountingYearEndReadinessView.as_view()),
     path("admin/accounting/year-end/close/", AccountingYearEndCloseView.as_view()),
+    path("admin/", include("api.v1.routes.admin_control_foundation")),
     path("admin/", include("api.v1.routes.admin_business_compliance")),
     path("admin/", include("api.v1.routes.admin_policy_governance")),
     path("admin/", include("api.v1.routes.admin_accounting_bridge_readiness")),
