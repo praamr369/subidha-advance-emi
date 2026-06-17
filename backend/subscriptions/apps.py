@@ -16,6 +16,8 @@ class SubscriptionsConfig(AppConfig):
         import subscriptions.models_customer_advance_refund  # noqa
         import subscriptions.models_kyc_workflow  # noqa
         import subscriptions.models_control_foundation  # noqa
+        import subscriptions.models_cash_counter_session  # noqa
+        import subscriptions.models_month_end_close  # noqa
 
     def ready(self):
         import subscriptions.signals  # noqa
