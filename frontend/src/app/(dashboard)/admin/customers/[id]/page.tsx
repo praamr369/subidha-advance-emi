@@ -1775,6 +1775,33 @@ export default function AdminCustomerDetailPage() {
 
         {!loading && !error && customer ? (
           <>
+            {/* Phase 9B-NF7A — Object detail cockpit: module-ownership posture.
+                Additive copy only. This page is the identity source; money,
+                collection, contract, and accounting truth stay in their owning
+                modules and are reached by navigation, never posted from here. */}
+            <section className="rounded-2xl border border-border bg-muted/30 p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Profiles & Parties · Customer profile source
+              </p>
+              <h2 className="mt-2 text-base font-semibold text-foreground">
+                This page is the Customer profile source. It owns customer identity and KYC only — financial truth lives in the modules below and is never posted from this profile.
+              </h2>
+              <ul className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Money posture belongs to Finance Operations. This page links to outstandings and advances; it does not create payments or journals.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Collections belong to Collections & Cashier. Receipts and cashier close are recorded there, not from this profile.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Contracts belong to Sales & Contracts. Subscriptions and direct sales are created and amended in that module.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Accounting bridge and reconciliation evidence belong to Accounting & Reconciliation.
+                </li>
+              </ul>
+            </section>
+
             {warnings.length > 0 && (
               <SectionCard
                 title="Data source note"

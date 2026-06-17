@@ -364,3 +364,251 @@ test("Phase 9B-NF6: inventory page does not link stock source to billing or paym
     "inventory page must not link stock to billing or payment creation"
   );
 });
+
+// ── 8. Phase 9B-NF7: Object detail cockpit polish ──────────────────────────────
+// These guard the touched object/detail pages. They are file-content / existence
+// based (no module imports). Inventory has no per-item /inventory/items/[id]
+// detail route yet (documented gap) — its item source surface is the items list
+// page, which is asserted instead.
+
+const customerDetail = "customers/[id]";
+const subscriptionDetail = "subscriptions/[id]";
+const batchDetail = "batches/[id]";
+const inventoryItemsSource = "inventory/items";
+
+// 8.0 — Touched detail pages exist; inventory per-item [id] detail is a documented gap.
+test("Phase 9B-NF7: touched detail pages exist (customer, subscription, batch) and inventory items source exists", () => {
+  for (const rel of [customerDetail, subscriptionDetail, batchDetail, inventoryItemsSource]) {
+    assert.ok(existsSync(pagePath(rel)), `${rel}/page.tsx must exist`);
+  }
+});
+
+test("Phase 9B-NF7C: inventory per-item /inventory/items/[id] detail route is a documented gap (not invented)", () => {
+  assert.ok(
+    !existsSync(pagePath("inventory/items/[id]")),
+    "no fake /inventory/items/[id] detail page should be invented; the items source page is improved instead"
+  );
+});
+
+// 8.1 — Customer detail cockpit (NF7A)
+test("Phase 9B-NF7A: customer detail carries Profiles & Parties + 'Customer profile source'", () => {
+  const src = readPage(customerDetail);
+  assert.ok(src.includes("Profiles & Parties"), "customer detail must carry Profiles & Parties module label");
+  assert.ok(
+    src.includes("Customer profile source"),
+    "customer detail must include 'Customer profile source' language"
+  );
+});
+
+test("Phase 9B-NF7A: customer detail attributes money, collections, contracts, and accounting to owning modules", () => {
+  const src = readPage(customerDetail);
+  assert.ok(
+    src.includes("Money posture belongs to Finance Operations"),
+    "customer detail must state money posture belongs to Finance Operations"
+  );
+  assert.ok(
+    src.includes("Collections belong to Collections & Cashier"),
+    "customer detail must state collections belong to Collections & Cashier"
+  );
+  assert.ok(
+    src.includes("Contracts belong to Sales & Contracts"),
+    "customer detail must state contracts belong to Sales & Contracts"
+  );
+  assert.ok(
+    src.includes("Accounting bridge and reconciliation evidence belong to Accounting & Reconciliation"),
+    "customer detail must attribute accounting bridge/reconciliation evidence to Accounting & Reconciliation"
+  );
+});
+
+test("Phase 9B-NF7A: customer detail does not imply payment/accounting posting from the profile page", () => {
+  const src = readPage(customerDetail);
+  assert.ok(
+    !src.includes("Post payment") &&
+      !src.includes("Post receipt") &&
+      !src.includes("Create journal") &&
+      !src.includes("Post journal"),
+    "customer detail must not imply payment posting or journal creation"
+  );
+});
+
+// 8.2 — Subscription detail cockpit (NF7B)
+test("Phase 9B-NF7B: subscription detail carries Sales & Contracts + 'Contract source workflow'", () => {
+  const src = readPage(subscriptionDetail);
+  assert.ok(src.includes("Sales & Contracts"), "subscription detail must carry Sales & Contracts module label");
+  assert.ok(
+    src.includes("Contract source workflow"),
+    "subscription detail must include 'Contract source workflow' language"
+  );
+});
+
+test("Phase 9B-NF7B: subscription detail preserves Advance EMI vs Rent/Lease Lucky ID boundary", () => {
+  const src = readPage(subscriptionDetail);
+  assert.ok(
+    src.includes("Advance EMI uses Lucky ID and batch"),
+    "subscription detail must state Advance EMI uses Lucky ID and batch"
+  );
+  assert.ok(
+    src.includes("Rent/Lease has no Lucky ID"),
+    "subscription detail must state Rent/Lease has no Lucky ID"
+  );
+});
+
+test("Phase 9B-NF7B: subscription detail states winner waiver means future EMI waiver only", () => {
+  const src = readPage(subscriptionDetail);
+  assert.ok(
+    src.includes("Winner waiver means future EMI waiver only"),
+    "subscription detail must state winner waiver means future EMI waiver only"
+  );
+});
+
+test("Phase 9B-NF7B: subscription detail attributes payment, delivery, and accounting to owning modules", () => {
+  const src = readPage(subscriptionDetail);
+  assert.ok(
+    src.includes("Payment and receipt belong to Collections & Cashier"),
+    "subscription detail must attribute payment and receipt to Collections & Cashier"
+  );
+  assert.ok(
+    src.includes("Delivery/handover belongs to Delivery & Service"),
+    "subscription detail must attribute delivery/handover to Delivery & Service"
+  );
+  assert.ok(
+    src.includes("Accounting bridge/reconciliation belongs to Accounting & Reconciliation"),
+    "subscription detail must attribute accounting bridge/reconciliation to Accounting & Reconciliation"
+  );
+});
+
+// 8.3 — Batch detail cockpit (NF7D)
+test("Phase 9B-NF7D: batch detail carries 'Lucky Plan Control — Batch source'", () => {
+  const src = readPage(batchDetail);
+  assert.ok(
+    src.includes("Lucky Plan Control — Batch source"),
+    "batch detail must include 'Lucky Plan Control — Batch source' language"
+  );
+  assert.ok(
+    src.includes("Lucky IDs 00–99 are batch-scoped"),
+    "batch detail must state Lucky IDs 00–99 are batch-scoped"
+  );
+});
+
+test("Phase 9B-NF7D: batch detail does not fake draw readiness or winner state", () => {
+  const src = readPage(batchDetail);
+  assert.ok(
+    src.includes("Draw readiness must come from real backend state"),
+    "batch detail must require draw readiness from real backend state"
+  );
+  assert.ok(
+    !src.includes("Draw ready: Yes") &&
+      !src.includes("Paid first EMI: Yes") &&
+      !src.includes(">Draw ready<") &&
+      !src.includes("draw is ready"),
+    "batch detail must not present a hardcoded fake draw-ready or winner claim"
+  );
+});
+
+test("Phase 9B-NF7D: batch detail states winner waiver future-EMI-only and links Lucky IDs/Draws + batch subscriptions", () => {
+  const src = readPage(batchDetail);
+  assert.ok(
+    src.includes("Winner waiver means future EMI waiver only"),
+    "batch detail must state winner waiver means future EMI waiver only"
+  );
+  assert.ok(src.includes("/admin/lucky-ids"), "batch detail must link to /admin/lucky-ids");
+  assert.ok(src.includes("/admin/lucky-draws"), "batch detail must link to /admin/lucky-draws");
+  assert.ok(
+    src.includes("Subscriptions filtered by batch") || src.includes("batch_id=${batchId}"),
+    "batch detail must surface subscriptions filtered by batch"
+  );
+  assert.ok(
+    src.includes("Payment/receipt belongs to Collections & Cashier"),
+    "batch detail must attribute payment/receipt to Collections & Cashier"
+  );
+  assert.ok(
+    src.includes("Accounting bridge/reconciliation belongs to Accounting & Reconciliation"),
+    "batch detail must attribute accounting bridge/reconciliation to Accounting & Reconciliation"
+  );
+});
+
+// 8.4 — Inventory item source cockpit (NF7C)
+test("Phase 9B-NF7C: inventory items source carries Inventory & Stock + 'Stock source workflow'", () => {
+  const src = readPage(inventoryItemsSource);
+  assert.ok(src.includes("Inventory & Stock"), "inventory items source must carry Inventory & Stock module label");
+  assert.ok(
+    src.includes("Stock source workflow"),
+    "inventory items source must include 'Stock source workflow' language"
+  );
+});
+
+test("Phase 9B-NF7C: inventory items source shows the stock movement vocabulary", () => {
+  const src = readPage(inventoryItemsSource);
+  for (const word of [
+    "Stock on hand",
+    "Available",
+    "Reserved",
+    "Delivery out",
+    "Adjustment",
+    "Purchase receipt",
+    "Return/hold/maintenance",
+  ]) {
+    assert.ok(src.includes(word), `inventory items source must show '${word}'`);
+  }
+});
+
+test("Phase 9B-NF7C: inventory items source attributes vendor purchase and accounting bridge to owning modules", () => {
+  const src = readPage(inventoryItemsSource);
+  assert.ok(
+    src.includes("Vendor purchase/payable belongs to Purchases & Vendors"),
+    "inventory items source must attribute vendor purchase/payable to Purchases & Vendors"
+  );
+  assert.ok(
+    src.includes("Accounting bridge belongs to Accounting & Reconciliation"),
+    "inventory items source must attribute accounting bridge to Accounting & Reconciliation"
+  );
+});
+
+test("Phase 9B-NF7C: inventory items source does not imply stock movement creation from page load", () => {
+  const src = readPage(inventoryItemsSource);
+  assert.ok(
+    !src.includes("Create stock movement") &&
+      !src.includes("Post stock movement") &&
+      !src.includes("Create vendor payment") &&
+      !src.includes("Post purchase bill"),
+    "inventory items source must not imply stock movement, vendor payment, or purchase bill creation"
+  );
+});
+
+// 8.5 — Cross-page: no unsafe mutation labels appear without source-module context
+test("Phase 9B-NF7: no unsafe finance/stock posting labels appear on touched detail pages", () => {
+  const unsafe = [
+    "Post payment",
+    "Post receipt",
+    "Create journal",
+    "Post journal",
+    "Auto-reconcile",
+    "Auto-post",
+    "Reconcile now",
+    "Settle now",
+    "Create stock movement",
+    "Post stock movement",
+  ];
+  for (const rel of [customerDetail, subscriptionDetail, batchDetail, inventoryItemsSource]) {
+    const src = readPage(rel);
+    for (const label of unsafe) {
+      assert.ok(!src.includes(label), `${rel} must not contain unsafe mutation label '${label}'`);
+    }
+  }
+});
+
+test("Phase 9B-NF7: cross-module money references on touched detail pages name the owning module", () => {
+  // Each touched page that references collection/money must name Collections & Cashier
+  // and/or Accounting & Reconciliation so no cross-boundary action is unattributed.
+  for (const rel of [customerDetail, subscriptionDetail, batchDetail]) {
+    const src = readPage(rel);
+    assert.ok(
+      src.includes("Collections & Cashier"),
+      `${rel} must name Collections & Cashier for collection/receipt context`
+    );
+    assert.ok(
+      src.includes("Accounting & Reconciliation"),
+      `${rel} must name Accounting & Reconciliation for bridge/reconciliation context`
+    );
+  }
+});

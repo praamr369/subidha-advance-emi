@@ -904,6 +904,36 @@ export default function AdminSubscriptionDetailPage() {
 
         {!loading && !error && subscription && financialSummary && reconciliationFlags ? (
           <>
+            {/* Phase 9B-NF7B — Object detail cockpit: contract source workflow
+                ownership. Additive copy only. EMI schedule, winner, and waiver
+                semantics are unchanged; money, delivery, and accounting truth
+                stay in their owning modules. */}
+            <section className="rounded-2xl border border-border bg-muted/30 p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Sales & Contracts · Contract source workflow
+              </p>
+              <h2 className="mt-2 text-base font-semibold text-foreground">
+                This subscription is the Contract source workflow. EMI schedule, winner, and waiver truth live here; money, delivery, and accounting stay in their owning modules.
+              </h2>
+              <ul className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Advance EMI uses Lucky ID and batch. Rent/Lease has no Lucky ID and no draw context.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Winner waiver means future EMI waiver only — already-paid installments are never rewritten.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Payment and receipt belong to Collections & Cashier.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Delivery/handover belongs to Delivery & Service.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2 sm:col-span-2">
+                  Accounting bridge/reconciliation belongs to Accounting & Reconciliation.
+                </li>
+              </ul>
+            </section>
+
             <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-900">Process Flow</p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">

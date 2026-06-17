@@ -191,6 +191,46 @@ export default function InventoryItemsPage() {
       ]}
       statusBadge={{ label: "Profile Governance", tone: "info" }}
     >
+      {/* Phase 9B-NF7C — Object detail cockpit: Inventory & Stock item source
+          ownership. Additive copy only. There is no per-item /inventory/items/[id]
+          detail route yet (documented gap); this is the existing item source
+          surface. No stock movement, valuation, or ledger row is created from
+          page load — quantities are read from the stock-on-hand and ledger views. */}
+      <section className="rounded-2xl border border-border bg-muted/30 p-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Inventory & Stock · Stock source workflow
+        </p>
+        <h2 className="mt-2 text-base font-semibold text-foreground">
+          This is the Inventory & Stock — Item source. Stock source workflow truth is read from real backend stock state; this page governs item profile fields only and creates no stock movement, valuation, or ledger row on load.
+        </h2>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+          {[
+            "Stock on hand",
+            "Available",
+            "Reserved",
+            "Delivery out",
+            "Adjustment",
+            "Purchase receipt",
+            "Return/hold/maintenance",
+          ].map((label) => (
+            <span
+              key={label}
+              className="inline-flex items-center rounded-full border border-border bg-background px-3 py-1 font-medium"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+        <ul className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+          <li className="rounded-xl border border-border bg-background px-3 py-2">
+            Vendor purchase/payable belongs to Purchases & Vendors.
+          </li>
+          <li className="rounded-xl border border-border bg-background px-3 py-2">
+            Accounting bridge belongs to Accounting & Reconciliation.
+          </li>
+        </ul>
+      </section>
+
       <WorkspaceDirectory
         title="Inventory route map"
         description="Move between stock masters, live stock review, movement registers, valuation, and counted-stock workflows from one inventory control surface."

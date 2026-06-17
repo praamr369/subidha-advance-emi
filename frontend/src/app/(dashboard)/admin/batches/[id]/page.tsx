@@ -581,6 +581,53 @@ export default function AdminBatchDetailPage() {
 
         {!loading && !error && batch && summary ? (
           <>
+            {/* Phase 9B-NF7D — Object detail cockpit: Lucky Plan Control batch
+                source ownership. Additive copy only. Lucky IDs, draw readiness,
+                and winner state are read from real backend rows below; no grid,
+                draw result, or winner state is fabricated here. */}
+            <section className="rounded-2xl border border-border bg-muted/30 p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Lucky Plan Control — Batch source
+              </p>
+              <h2 className="mt-2 text-base font-semibold text-foreground">
+                This batch is the Lucky Plan Control — Batch source. Lucky IDs, draw state, and winner truth are batch-scoped and read from real backend rows; money and accounting stay in their owning modules.
+              </h2>
+              <ul className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Lucky IDs 00–99 are batch-scoped and shown below from the live Lucky ID register, not a fabricated grid.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Draw readiness must come from real backend state — this page does not fake draw readiness, a draw result, or winner state.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Winner waiver means future EMI waiver only.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Subscriptions filtered by batch appear below from live subscription rows.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Payment/receipt belongs to Collections & Cashier.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Accounting bridge/reconciliation belongs to Accounting & Reconciliation.
+                </li>
+              </ul>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  href="/admin/lucky-ids"
+                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                >
+                  Lucky IDs (Lucky Plan Control)
+                </Link>
+                <Link
+                  href="/admin/lucky-draws"
+                  className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+                >
+                  Lucky Draws (Lucky Plan Control)
+                </Link>
+              </div>
+            </section>
+
             <section className="grid gap-6 xl:grid-cols-2">
               <DetailPanel
                 title="Batch overview"
