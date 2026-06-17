@@ -64,6 +64,7 @@ urlpatterns = [
     path("admin/", include("api.v1.routes.admin")),
     path("admin/", include("api.v1.routes.setup_readiness")),
     path("admin/", include("api.v1.routes.admin_customer_risk")),
+    path("admin/", include("api.v1.routes.admin_customer_timeline")),
     path("admin/", include("api.v1.routes.collection_control_center")),
     path("branch-control/", include("api.v1.routes.branch_control")),
     path("accounting/bridge-reconciliation/", AccountingBridgeReconciliationView.as_view()),
