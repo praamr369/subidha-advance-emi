@@ -266,6 +266,26 @@ def _milestone_requirements(subscription) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# P3C: Risk payload builder (advisory; never raises)
+# ---------------------------------------------------------------------------
+def _build_risk_payload(subscription) -> dict:
+    """Return the risk evaluation dict for *subscription* without ever raising."""
+    try:
+        from subscriptions.services.customer_risk_service import evaluate_contract_risk
+        customer = getattr(subscription, "customer", None)
+        return evaluate_contract_risk(subscription, customer=customer)
+    except Exception:
+        return {
+            "risk_score": 0,
+            "risk_band": "LOW",
+            "reason_codes": [],
+            "enforcement_enabled": False,
+            "approval_required": False,
+            "blocker_codes": [],
+        }
+
+
+# ---------------------------------------------------------------------------
 # Public readiness API
 # ---------------------------------------------------------------------------
 def evaluate_contract_activation_readiness(subscription) -> dict:
@@ -277,6 +297,7 @@ def evaluate_contract_activation_readiness(subscription) -> dict:
         return {
             "plan_type": plan,
             "is_direct_sale": True,
+            "risk": _build_risk_payload(subscription),
             "kyc_gating_enabled": enabled,
             "enforced": False,
             "kyc_verified": kyc.is_kyc_verified(subscription.customer),
@@ -367,6 +388,18 @@ def evaluate_contract_activation_readiness(subscription) -> dict:
 
     ready = docs_ok and (kyc_verified or not require_kyc_verified) and len(blocker_codes) == 0
 
+    # P3C: attach advisory risk payload (never blocks unless enforcement enabled)
+    risk_payload = _build_risk_payload(subscription)
+    if risk_payload.get("blocker_codes"):
+        blocker_codes.extend(
+            c for c in risk_payload["blocker_codes"] if c not in blocker_codes
+        )
+        if risk_payload["blocker_codes"]:
+            blocker_messages.append(
+                f"Customer risk policy blocked this contract: {', '.join(risk_payload['blocker_codes'])}."
+            )
+        ready = False
+
     return {
         "plan_type": plan,
         "is_direct_sale": False,
@@ -379,6 +412,7 @@ def evaluate_contract_activation_readiness(subscription) -> dict:
         "present_documents": present,
         "blocker_codes": blocker_codes,
         "blocker_messages": blocker_messages,
+        "risk": risk_payload,
     }
 
 
