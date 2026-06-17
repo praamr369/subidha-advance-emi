@@ -369,9 +369,14 @@ from api.v1.views.admin_crm_module import (
     AdminCustomerCrmProfileView,
 )
 from api.v1.views.admin_kyc import (
+    AdminCrmPartyKycView,
     AdminCustomerKycAuditTrailView,
     AdminCustomerKycRequestResubmissionView,
     AdminCustomerKycUploadView,
+    AdminKycReviewQueueApproveView,
+    AdminKycReviewQueueRejectView,
+    AdminKycReviewQueueResubmitView,
+    AdminKycReviewQueueView,
     AdminPartnerKycAuditTrailView,
     AdminPartnerKycDocumentApproveView,
     AdminPartnerKycDocumentDownloadView,
@@ -1013,6 +1018,12 @@ urlpatterns = [
     path("settlements/cashier-day-closes/<int:pk>/approve/", CashierDayCloseApproveView.as_view(), name="admin-cashier-day-closes-approve"),
     path("settlements/cashier-day-closes/<int:pk>/reject/", CashierDayCloseRejectView.as_view(), name="admin-cashier-day-closes-reject"),
     path("", include(router.urls)),
+    # KYC cross-owner review queue + CRM party KYC cockpit (Phase KYC – CRM-wide)
+    path("kyc/review-queue/", AdminKycReviewQueueView.as_view()),
+    path("kyc/review-queue/<str:owner_type>/<int:document_id>/approve/", AdminKycReviewQueueApproveView.as_view()),
+    path("kyc/review-queue/<str:owner_type>/<int:document_id>/reject/", AdminKycReviewQueueRejectView.as_view()),
+    path("kyc/review-queue/<str:owner_type>/<int:document_id>/request-resubmission/", AdminKycReviewQueueResubmitView.as_view()),
+    path("crm/parties/<int:pk>/kyc/", AdminCrmPartyKycView.as_view()),
     # KYC intake & review – new additive endpoints (Phase KYC)
     # Customer
     path("customers/<int:pk>/kyc-documents/upload/", AdminCustomerKycUploadView.as_view()),

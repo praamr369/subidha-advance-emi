@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import PartyKycPanel from "@/components/kyc/PartyKycPanel";
 import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -334,6 +335,13 @@ export default function AdminCrmPartyDetailPage() {
                 </div>
               </WorkspaceSection>
             </div>
+
+            <WorkspaceSection
+              title="KYC"
+              description="KYC routes to the party's linked canonical owner (customer, partner, vendor, or staff). Unconverted leads show a conversion-required state — no separate party KYC store is created."
+            >
+              <PartyKycPanel partyId={payload.party.id} />
+            </WorkspaceSection>
 
             <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
               <WorkspaceSection

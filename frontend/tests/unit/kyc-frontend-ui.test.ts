@@ -18,6 +18,10 @@ const partnerSelfSource = read("src/app/(dashboard)/partner/page.tsx");
 const vendorSelfSource = read("src/app/(dashboard)/vendor/profile/page.tsx");
 const staffSelfSource = read("src/app/(dashboard)/staff/profile/page.tsx");
 const customerSelfSource = read("src/app/(dashboard)/customer/profile/page.tsx");
+const kycServiceSource = read("src/services/kyc.ts");
+const reviewQueueSource = read("src/app/(dashboard)/admin/crm/kyc/page.tsx");
+const partyKycPanelSource = read("src/components/kyc/PartyKycPanel.tsx");
+const partyDetailSource = read("src/app/(dashboard)/admin/crm/parties/[id]/page.tsx");
 
 // --- The panel only consumes the real unified KYC service ---------------------
 
@@ -166,4 +170,88 @@ test("panel enforces backend file type/size limits client-side", () => {
   assert.ok(panelSource.includes('"image/jpeg", "image/png", "application/pdf"'));
   assert.ok(panelSource.includes("5 * 1024 * 1024"));
   assert.ok(panelSource.includes("File must be 5 MB or smaller."));
+});
+
+// --- CRM-wide KYC review queue service ---------------------------------------
+
+test("kyc service exposes the cross-owner review queue + party KYC clients", () => {
+  for (const fn of [
+    "listKycReviewQueue",
+    "approveKycQueueDocument",
+    "rejectKycQueueDocument",
+    "requestKycQueueResubmission",
+    "getPartyKyc",
+  ]) {
+    assert.ok(kycServiceSource.includes(`export async function ${fn}`), `expected kyc service to export ${fn}`);
+  }
+  // Review-queue + party endpoints hit the real additive admin routes.
+  assert.ok(kycServiceSource.includes("/admin/kyc/review-queue/"));
+  assert.ok(kycServiceSource.includes("/admin/crm/parties/"));
+  // Owner type from the backend (UPPER) is normalised to the lowercase client union.
+  assert.ok(kycServiceSource.includes(".toLowerCase() as KycOwnerType"));
+});
+
+// --- Admin KYC review queue page --------------------------------------------
+
+test("admin KYC review queue page renders the real queue (no redirect, no fake data)", () => {
+  // The page is now a real client page, not a redirect stub.
+  assert.ok(reviewQueueSource.includes('"use client"'));
+  assert.ok(!reviewQueueSource.includes("redirectToCanonicalPath"));
+  // It consumes the real queue + action service helpers.
+  for (const fn of [
+    "listKycReviewQueue",
+    "approveKycQueueDocument",
+    "rejectKycQueueDocument",
+    "requestKycQueueResubmission",
+  ]) {
+    assert.ok(reviewQueueSource.includes(fn), `expected review queue to use ${fn}`);
+  }
+  // Loading / error / empty states exist; empty state never fabricates verified rows.
+  assert.ok(reviewQueueSource.includes("LoadingBlock"));
+  assert.ok(reviewQueueSource.includes("ErrorState"));
+  assert.ok(reviewQueueSource.includes("EmptyState"));
+  assert.ok(reviewQueueSource.includes("No KYC documents awaiting review"));
+  assert.ok(!reviewQueueSource.includes(">Verified<"));
+});
+
+test("admin KYC review queue wires owner-type / status / search filters", () => {
+  assert.ok(reviewQueueSource.includes("Owner type filter"));
+  assert.ok(reviewQueueSource.includes("Status filter"));
+  assert.ok(reviewQueueSource.includes("Search owner name / phone / email"));
+  // Owner badges cover all four canonical owner types.
+  for (const owner of ["customer", "partner", "vendor", "staff"]) {
+    assert.ok(reviewQueueSource.includes(`${owner}:`), `expected owner badge for ${owner}`);
+  }
+});
+
+test("admin KYC review queue reject / resubmission require a reason", () => {
+  // Confirm button disabled until a trimmed reason is present.
+  assert.ok(reviewQueueSource.includes("disabled={actionBusy || !actionReason.trim()}"));
+  // Handler guards again before firing the request.
+  assert.ok(reviewQueueSource.includes('setActionError("A reason is required.");'));
+  assert.ok(reviewQueueSource.includes("rejectKycQueueDocument(row.owner_type, row.document_id, reason)"));
+  assert.ok(reviewQueueSource.includes("requestKycQueueResubmission(row.owner_type, row.document_id, reason)"));
+});
+
+// --- CRM party KYC panel ----------------------------------------------------
+
+test("CRM party KYC panel shows linked owner KYC or the conversion-required state", () => {
+  // Resolves party -> linked owner via the real service.
+  assert.ok(partyKycPanelSource.includes("getPartyKyc"));
+  // Linked owner reuses the shared admin KycDocumentPanel (existing owner endpoints).
+  assert.ok(partyKycPanelSource.includes('import KycDocumentPanel from "@/components/kyc/KycDocumentPanel"'));
+  assert.ok(partyKycPanelSource.includes('<KycDocumentPanel'));
+  assert.ok(partyKycPanelSource.includes('mode="admin"'));
+  // Unconverted party shows the controlled conversion-required message and no upload.
+  assert.ok(partyKycPanelSource.includes("kyc_available"));
+  assert.ok(
+    partyKycPanelSource.includes(
+      "KYC is available after this party is converted or linked to a customer, partner, vendor, or staff profile."
+    )
+  );
+});
+
+test("CRM party detail page mounts the party KYC panel", () => {
+  assert.ok(partyDetailSource.includes('import PartyKycPanel from "@/components/kyc/PartyKycPanel"'));
+  assert.ok(partyDetailSource.includes("<PartyKycPanel partyId={payload.party.id} />"));
 });

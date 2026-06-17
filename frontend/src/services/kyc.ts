@@ -389,6 +389,207 @@ export function buildStaffSelfKycDownloadPath(documentId: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// Admin: cross-owner KYC review queue (CRM-wide cockpit)
+// ---------------------------------------------------------------------------
+
+export type KycQueueRow = {
+  owner_type: KycOwnerType;
+  owner_id: number;
+  owner_name: string;
+  owner_phone: string;
+  owner_email: string;
+  document_id: number;
+  document_type: string;
+  category: string;
+  status: string;
+  uploaded_by: string | null;
+  upload_source: string;
+  uploaded_at: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string;
+  download_url: string;
+  allowed_actions: string[];
+};
+
+export type KycReviewQueueResponse = {
+  count: number;
+  summary: {
+    total: number;
+    by_status: Record<string, number>;
+    by_owner_type: Record<string, number>;
+  };
+  results: KycQueueRow[];
+};
+
+export type KycReviewQueueFilters = {
+  owner_type?: KycOwnerType | "";
+  status?: string;
+  document_type?: string;
+  category?: string;
+  search?: string;
+  upload_source?: string;
+  date_from?: string;
+  date_to?: string;
+};
+
+function normalizeQueueRow(raw: unknown): KycQueueRow {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const actions = Array.isArray(r.allowed_actions)
+    ? (r.allowed_actions as unknown[]).map((a) => String(a))
+    : [];
+  return {
+    owner_type: str(r.owner_type).toLowerCase() as KycOwnerType,
+    owner_id: Number(r.owner_id ?? 0),
+    owner_name: str(r.owner_name),
+    owner_phone: str(r.owner_phone),
+    owner_email: str(r.owner_email),
+    document_id: Number(r.document_id ?? 0),
+    document_type: str(r.document_type),
+    category: str(r.category),
+    status: str(r.status, "SUBMITTED"),
+    uploaded_by: strOrNull(r.uploaded_by),
+    upload_source: str(r.upload_source),
+    uploaded_at: strOrNull(r.uploaded_at),
+    reviewed_by: strOrNull(r.reviewed_by),
+    reviewed_at: strOrNull(r.reviewed_at),
+    rejection_reason: str(r.rejection_reason),
+    download_url: str(r.download_url),
+    allowed_actions: actions,
+  };
+}
+
+export async function listKycReviewQueue(
+  filters: KycReviewQueueFilters = {}
+): Promise<KycReviewQueueResponse> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) params.set(key, String(value));
+  }
+  const query = params.toString();
+  const response = await apiFetch<unknown>(
+    `/admin/kyc/review-queue/${query ? `?${query}` : ""}`
+  );
+  const root = (response ?? {}) as Record<string, unknown>;
+  const results = Array.isArray(root.results)
+    ? (root.results as unknown[]).map(normalizeQueueRow)
+    : [];
+  const summary = (root.summary ?? {}) as Record<string, unknown>;
+  return {
+    count: Number(root.count ?? results.length),
+    summary: {
+      total: Number(summary.total ?? results.length),
+      by_status: (summary.by_status as Record<string, number>) ?? {},
+      by_owner_type: (summary.by_owner_type as Record<string, number>) ?? {},
+    },
+    results,
+  };
+}
+
+export async function approveKycQueueDocument(
+  ownerType: KycOwnerType,
+  documentId: number
+): Promise<{ owner_type?: string; document_id?: number; status?: string }> {
+  return apiFetch(`/admin/kyc/review-queue/${ownerType}/${documentId}/approve/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function rejectKycQueueDocument(
+  ownerType: KycOwnerType,
+  documentId: number,
+  reason: string
+): Promise<{ owner_type?: string; document_id?: number; status?: string }> {
+  return apiFetch(`/admin/kyc/review-queue/${ownerType}/${documentId}/reject/`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function requestKycQueueResubmission(
+  ownerType: KycOwnerType,
+  documentId: number,
+  reason: string
+): Promise<{ owner_type?: string; document_id?: number; status?: string }> {
+  return apiFetch(
+    `/admin/kyc/review-queue/${ownerType}/${documentId}/request-resubmission/`,
+    { method: "POST", body: JSON.stringify({ reason }) }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Admin: CRM party KYC cockpit (resolves party -> linked canonical owner)
+// ---------------------------------------------------------------------------
+
+export type PartyKycLinkedOwner = {
+  role_type: string;
+  owner_type: KycOwnerType;
+  owner_id: number;
+  is_primary: boolean;
+};
+
+export type PartyKycResponse = {
+  kyc_available: boolean;
+  reason?: string;
+  party_id: number;
+  party_no?: string;
+  display_name?: string;
+  owner_type?: KycOwnerType;
+  owner_id?: number;
+  owner_name?: string;
+  owner_phone?: string;
+  owner_email?: string;
+  documents: KycQueueRow[];
+  summary?: { total: number; by_status: Record<string, number> };
+  linked_owners: PartyKycLinkedOwner[];
+};
+
+export async function getPartyKyc(partyId: number | string): Promise<PartyKycResponse> {
+  const response = await apiFetch<unknown>(`/admin/crm/parties/${partyId}/kyc/`);
+  const root = (response ?? {}) as Record<string, unknown>;
+  const documents = Array.isArray(root.documents)
+    ? (root.documents as unknown[]).map(normalizeQueueRow)
+    : [];
+  const linked = Array.isArray(root.linked_owners)
+    ? (root.linked_owners as unknown[]).map((raw) => {
+        const r = (raw ?? {}) as Record<string, unknown>;
+        return {
+          role_type: str(r.role_type),
+          owner_type: str(r.owner_type).toLowerCase() as KycOwnerType,
+          owner_id: Number(r.owner_id ?? 0),
+          is_primary: Boolean(r.is_primary),
+        };
+      })
+    : [];
+  return {
+    kyc_available: Boolean(root.kyc_available),
+    reason: typeof root.reason === "string" ? root.reason : undefined,
+    party_id: Number(root.party_id ?? 0),
+    party_no: typeof root.party_no === "string" ? root.party_no : undefined,
+    display_name: typeof root.display_name === "string" ? root.display_name : undefined,
+    owner_type:
+      typeof root.owner_type === "string"
+        ? (root.owner_type.toLowerCase() as KycOwnerType)
+        : undefined,
+    owner_id: root.owner_id == null ? undefined : Number(root.owner_id),
+    owner_name: typeof root.owner_name === "string" ? root.owner_name : undefined,
+    owner_phone: typeof root.owner_phone === "string" ? root.owner_phone : undefined,
+    owner_email: typeof root.owner_email === "string" ? root.owner_email : undefined,
+    documents,
+    summary:
+      root.summary && typeof root.summary === "object"
+        ? {
+            total: Number((root.summary as Record<string, unknown>).total ?? documents.length),
+            by_status:
+              ((root.summary as Record<string, unknown>).by_status as Record<string, number>) ?? {},
+          }
+        : undefined,
+    linked_owners: linked,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Status display helpers
 // ---------------------------------------------------------------------------
 

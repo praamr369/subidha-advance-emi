@@ -34,7 +34,13 @@ from subscriptions.services.kyc_workflow_service import (
     admin_approve_staff_kyc_document,
     admin_reject_staff_kyc_document,
     admin_request_staff_kyc_resubmission,
+    build_kyc_review_queue,
     get_kyc_audit_trail,
+    get_party_kyc_readiness,
+    queue_approve_kyc_document,
+    queue_reject_kyc_document,
+    queue_request_kyc_resubmission,
+    KycDocumentNotFound,
 )
 from subscriptions.models_kyc_workflow import KycOwnerType
 
@@ -592,3 +598,128 @@ class AdminStaffKycAuditTrailView(APIView):
         employee = get_object_or_404(EmployeeProfile, pk=staff_id)
         trail = get_kyc_audit_trail(KycOwnerType.STAFF, employee.pk)
         return Response({"owner_type": KycOwnerType.STAFF, "owner_id": employee.pk, "results": trail})
+
+
+# ---------------------------------------------------------------------------
+# CROSS-OWNER KYC REVIEW QUEUE (CRM-wide cockpit)
+# ---------------------------------------------------------------------------
+
+_QUEUE_OWNER_TYPES = {
+    KycOwnerType.CUSTOMER,
+    KycOwnerType.PARTNER,
+    KycOwnerType.VENDOR,
+    KycOwnerType.STAFF,
+}
+
+
+def _normalize_owner_type(raw: str) -> str:
+    ot = (raw or "").strip().upper()
+    if ot not in _QUEUE_OWNER_TYPES:
+        raise ValidationError({"owner_type": f"Unknown owner type: {raw}"})
+    return ot
+
+
+class AdminKycReviewQueueView(APIView):
+    """Cross-owner KYC review queue.
+
+    GET /admin/kyc/review-queue/
+
+    Aggregates pending/submitted/rejected/resubmission-required KYC documents
+    across customers, partners, vendors and staff from the canonical stores.
+    Read-only; admin-only.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        params = request.query_params
+        data = build_kyc_review_queue(
+            owner_type=params.get("owner_type", ""),
+            status=params.get("status", ""),
+            document_type=params.get("document_type", ""),
+            category=params.get("category", ""),
+            search=params.get("search", "") or params.get("q", ""),
+            upload_source=params.get("upload_source", ""),
+            date_from=params.get("date_from", ""),
+            date_to=params.get("date_to", ""),
+            limit=params.get("limit", 500),
+        )
+        return Response(data)
+
+
+class AdminKycReviewQueueApproveView(APIView):
+    """POST /admin/kyc/review-queue/{owner_type}/{document_id}/approve/"""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, owner_type, document_id):
+        ot = _normalize_owner_type(owner_type)
+        try:
+            doc = queue_approve_kyc_document(
+                owner_type=ot, document_id=document_id, performed_by=request.user
+            )
+        except KycDocumentNotFound as exc:
+            raise Http404(str(exc))
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)})
+        return Response({"owner_type": ot, "document_id": doc.pk, "status": doc.status})
+
+
+class AdminKycReviewQueueRejectView(APIView):
+    """POST /admin/kyc/review-queue/{owner_type}/{document_id}/reject/"""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, owner_type, document_id):
+        ot = _normalize_owner_type(owner_type)
+        reason = (request.data.get("reason") or "").strip()
+        if not reason:
+            raise ValidationError({"reason": "A reason is required."})
+        try:
+            doc = queue_reject_kyc_document(
+                owner_type=ot, document_id=document_id, reason=reason, performed_by=request.user
+            )
+        except KycDocumentNotFound as exc:
+            raise Http404(str(exc))
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)})
+        return Response({"owner_type": ot, "document_id": doc.pk, "status": doc.status})
+
+
+class AdminKycReviewQueueResubmitView(APIView):
+    """POST /admin/kyc/review-queue/{owner_type}/{document_id}/request-resubmission/"""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, owner_type, document_id):
+        ot = _normalize_owner_type(owner_type)
+        reason = (request.data.get("reason") or "").strip()
+        if not reason:
+            raise ValidationError({"reason": "A reason is required."})
+        try:
+            doc = queue_request_kyc_resubmission(
+                owner_type=ot, document_id=document_id, reason=reason, performed_by=request.user
+            )
+        except KycDocumentNotFound as exc:
+            raise Http404(str(exc))
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)})
+        return Response({"owner_type": ot, "document_id": doc.pk, "status": doc.status})
+
+
+# ---------------------------------------------------------------------------
+# CRM PARTY KYC COCKPIT
+# ---------------------------------------------------------------------------
+
+class AdminCrmPartyKycView(APIView):
+    """Party-level KYC cockpit.
+
+    GET /admin/crm/parties/{id}/kyc/
+
+    Resolves a CRM PartyMaster to its linked canonical owner and returns that
+    owner's existing KYC documents/readiness. Unconverted leads return a
+    controlled ``kyc_available: False`` response. No separate party KYC store.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk):
+        from crm.models import PartyMaster
+
+        party = get_object_or_404(PartyMaster.objects.prefetch_related("links"), pk=pk)
+        return Response(get_party_kyc_readiness(party))
