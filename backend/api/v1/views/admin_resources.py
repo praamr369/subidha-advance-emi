@@ -2996,6 +2996,23 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         queryset = self.get_queryset()
         return Response(build_reconciliation_attention_payload(queryset))
 
+    @action(detail=True, methods=["get"], url_path="document-readiness")
+    def document_readiness(self, request, pk=None):
+        """Document Vault checklist for a subscription (P3A, read-only).
+
+        Returns the required-document checklist with per-document vault status
+        (MISSING / PRESENT / VERIFIED / REJECTED / EXPIRED / NOT_REQUIRED),
+        expiry, signed_status, access_level, and overall ready + blocker_codes.
+        """
+        from subscriptions.services.document_vault_service import build_required_document_checklist
+
+        subscription = self.get_object()
+        include_handover = str(
+            request.query_params.get("include_handover", "")
+        ).strip().lower() in {"1", "true", "yes"}
+        result = build_required_document_checklist(subscription, include_handover=include_handover)
+        return Response(result, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=["get"], url_path="timeline")
     def timeline(self, request, pk=None):
         subscription = self.get_object()

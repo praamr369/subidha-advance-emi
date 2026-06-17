@@ -35,15 +35,18 @@ condition notes.
 """
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional
 
 from subscriptions.models import (
+    DocumentVerificationStatus,
     PlanType,
     RentLeaseBillingDemand,
     RentLeaseDemandType,
     RentLeaseDepositTransaction,
     RentLeaseDepositTransactionStatus,
     RentLeaseDepositTransactionType,
+    SubscriptionDocument,
     SubscriptionDocumentType,
 )
 from subscriptions.services import kyc_readiness_service as kyc
@@ -67,6 +70,12 @@ class MilestoneBlocker:
     SIGNED_CONTRACT_MISSING = kyc.BlockerCode.SIGNED_CONTRACT_MISSING
     DEPOSIT_RECEIPT_MISSING = "DEPOSIT_RECEIPT_MISSING"
     CONDITION_PROOF_MISSING = "CONDITION_PROOF_MISSING"
+    # P3A vault-state blockers
+    SIGNED_CONTRACT_REJECTED = "SIGNED_CONTRACT_REJECTED"
+    SIGNED_CONTRACT_EXPIRED = "SIGNED_CONTRACT_EXPIRED"
+    DEPOSIT_RECEIPT_REJECTED = "DEPOSIT_RECEIPT_REJECTED"
+    DEPOSIT_RECEIPT_EXPIRED = "DEPOSIT_RECEIPT_EXPIRED"
+    CONDITION_PROOF_REJECTED = "CONDITION_PROOF_REJECTED"
 
 
 _DOC_LABELS = {
@@ -94,6 +103,48 @@ class ContractActivationNotReady(kyc.KycGateError):
     """
 
     default_code = "CONTRACT_ACTIVATION_NOT_READY"
+
+
+# ---------------------------------------------------------------------------
+# P3A: Vault-aware subscription document helpers
+# ---------------------------------------------------------------------------
+def _subscription_docs_for_types(subscription, doc_types: set) -> list:
+    """Fetch SubscriptionDocument records matching any of doc_types."""
+    if not subscription or not getattr(subscription, "pk", None) or not doc_types:
+        return []
+    return list(
+        SubscriptionDocument.objects.filter(
+            subscription=subscription,
+            document_type__in=doc_types,
+        ).order_by("-created_at", "-id")
+    )
+
+
+def _vault_doc_blocker(docs: list, *, missing_code: str, rejected_code: str, expired_code: str) -> Optional[str]:
+    """Return a vault-state blocker code or None when the docs are acceptable.
+
+    Returns:
+    - missing_code   when there are no docs at all
+    - rejected_code  when all non-expired docs are rejected
+    - expired_code   when the best non-rejected doc is expired
+    - None           when at least one doc is verified/pending and not expired
+    """
+    if not docs:
+        return missing_code
+    today = date.today()
+    for doc in docs:
+        expired = doc.expires_on is not None and doc.expires_on < today
+        if doc.verification_status == DocumentVerificationStatus.REJECTED:
+            continue
+        if expired:
+            continue
+        # Found a non-rejected, non-expired doc → acceptable
+        return None
+    # Check if any expired (non-rejected)
+    for doc in docs:
+        if doc.verification_status != DocumentVerificationStatus.REJECTED:
+            return expired_code
+    return rejected_code
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +292,6 @@ def evaluate_contract_activation_readiness(subscription) -> dict:
     # EMI's lighter bar (identity + signed consent) does not require a KYC
     # status flip; rent/lease (asset leaves the shop) require verified KYC.
     require_kyc_verified = plan in {PlanType.RENT, PlanType.LEASE}
-    ready = docs_ok and (kyc_verified or not require_kyc_verified)
 
     missing = [
         row["code"] for row in requirements if row["required"] and not row["present"]
@@ -261,6 +311,58 @@ def evaluate_contract_activation_readiness(subscription) -> dict:
             if blocker:
                 blocker_codes.append(blocker)
                 blocker_messages.append(f"{row['label']} is required before handover.")
+
+    # P3A: Also check vault state (rejected / expired) for subscription-level docs.
+    # Only runs when at least one document of the relevant type exists — missing
+    # docs are already handled by the "present" check above.
+    _SIGNATURE_TYPES = {SubscriptionDocumentType.CUSTOMER_SIGNATURE}
+    _DEPOSIT_TYPES = {SubscriptionDocumentType.SECURITY_DEPOSIT_RECEIPT_PDF}
+    _CONDITION_TYPES = {
+        SubscriptionDocumentType.RETURN_INSPECTION_REPORT,
+        SubscriptionDocumentType.ASSET_HANDOVER_ACKNOWLEDGEMENT,
+        SubscriptionDocumentType.DELIVERY_HANDOVER_NOTE,
+    }
+
+    if plan in {PlanType.EMI, PlanType.RENT, PlanType.LEASE}:
+        sig_docs = _subscription_docs_for_types(subscription, _SIGNATURE_TYPES)
+        if sig_docs:
+            sig_blocker = _vault_doc_blocker(
+                sig_docs,
+                missing_code=MilestoneBlocker.SIGNED_CONTRACT_MISSING,
+                rejected_code=MilestoneBlocker.SIGNED_CONTRACT_REJECTED,
+                expired_code=MilestoneBlocker.SIGNED_CONTRACT_EXPIRED,
+            )
+            if sig_blocker and sig_blocker not in blocker_codes:
+                blocker_codes.append(sig_blocker)
+                blocker_messages.append("Signed contract / consent document is rejected or expired.")
+
+    if plan in {PlanType.RENT, PlanType.LEASE}:
+        dep_docs = _subscription_docs_for_types(subscription, _DEPOSIT_TYPES)
+        if dep_docs:
+            dep_blocker = _vault_doc_blocker(
+                dep_docs,
+                missing_code=MilestoneBlocker.DEPOSIT_RECEIPT_MISSING,
+                rejected_code=MilestoneBlocker.DEPOSIT_RECEIPT_REJECTED,
+                expired_code=MilestoneBlocker.DEPOSIT_RECEIPT_EXPIRED,
+            )
+            if dep_blocker and dep_blocker not in blocker_codes:
+                blocker_codes.append(dep_blocker)
+                blocker_messages.append("Security deposit receipt is rejected or expired.")
+
+    if plan == PlanType.LEASE:
+        cond_docs = _subscription_docs_for_types(subscription, _CONDITION_TYPES)
+        if cond_docs:
+            cond_blocker = _vault_doc_blocker(
+                cond_docs,
+                missing_code=MilestoneBlocker.CONDITION_PROOF_MISSING,
+                rejected_code=MilestoneBlocker.CONDITION_PROOF_REJECTED,
+                expired_code=MilestoneBlocker.CONDITION_PROOF_MISSING,
+            )
+            if cond_blocker and cond_blocker not in blocker_codes:
+                blocker_codes.append(cond_blocker)
+                blocker_messages.append("Asset condition proof is rejected or expired.")
+
+    ready = docs_ok and (kyc_verified or not require_kyc_verified) and len(blocker_codes) == 0
 
     return {
         "plan_type": plan,

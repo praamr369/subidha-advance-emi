@@ -6,8 +6,44 @@ import { apiFetch } from "@/lib/api";
  * Additive client for the backend `/admin/customers/<id>/contract-readiness/`
  * endpoint. Direct sale is reported as `is_direct_sale` with KYC optional; EMI /
  * Rent / Lease report can_activate / can_deliver and the document checklist.
+ *
+ * P3A: Also provides `fetchDocumentReadiness` for the per-subscription vault
+ * checklist at `/admin/subscriptions/<id>/document-readiness/`.
  */
 export type KycDocumentStatus = "VERIFIED" | "PENDING" | "MISSING" | string;
+
+/** P3A Document Vault — per-item status (superset of KycDocumentStatus). */
+export type VaultDocumentStatus =
+  | "MISSING"
+  | "PRESENT"
+  | "VERIFIED"
+  | "REJECTED"
+  | "EXPIRED"
+  | "NOT_REQUIRED"
+  | string;
+
+export type VaultDocumentItem = {
+  document_key: string;
+  label: string;
+  required: boolean;
+  status: VaultDocumentStatus;
+  blocker_code: string | null;
+  document_id: number | null;
+  expires_on: string | null;
+  signed_status: "UNSIGNED" | "SIGNED" | "NOT_REQUIRED" | "UNKNOWN" | string;
+  access_level: "INTERNAL" | "SENSITIVE" | "HIGHLY_SENSITIVE" | string;
+};
+
+export type DocumentReadiness = {
+  subscription_id: number;
+  plan_type: string;
+  is_direct_sale: boolean;
+  required_documents: VaultDocumentItem[];
+  overall: {
+    ready: boolean;
+    blocker_codes: string[];
+  };
+};
 
 export type KycRequiredDocument = {
   code: string;
@@ -83,5 +119,18 @@ export async function fetchContractKycReadiness(
 
   return apiFetch<ContractKycReadiness>(
     `/admin/customers/${customerId}/contract-readiness/?${params.toString()}`
+  );
+}
+
+/** P3A: Fetch the Document Vault checklist for a specific subscription. */
+export async function fetchDocumentReadiness(
+  subscriptionId: number,
+  opts: { includeHandover?: boolean } = {}
+): Promise<DocumentReadiness> {
+  const params = new URLSearchParams();
+  if (opts.includeHandover) params.set("include_handover", "1");
+  const qs = params.toString();
+  return apiFetch<DocumentReadiness>(
+    `/admin/subscriptions/${subscriptionId}/document-readiness/${qs ? `?${qs}` : ""}`
   );
 }

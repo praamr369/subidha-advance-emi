@@ -291,6 +291,28 @@ class DocumentVerificationStatus(models.TextChoices):
     REJECTED = "REJECTED", "Rejected"
 
 
+class DocumentSignedStatus(models.TextChoices):
+    UNSIGNED = "UNSIGNED", "Unsigned"
+    SIGNED = "SIGNED", "Signed"
+    NOT_REQUIRED = "NOT_REQUIRED", "Not Required"
+    UNKNOWN = "UNKNOWN", "Unknown"
+
+
+class DocumentAccessLevel(models.TextChoices):
+    INTERNAL = "INTERNAL", "Internal"
+    SENSITIVE = "SENSITIVE", "Sensitive"
+    HIGHLY_SENSITIVE = "HIGHLY_SENSITIVE", "Highly Sensitive"
+
+
+class DocumentAccessAction(models.TextChoices):
+    VIEW = "VIEW", "View"
+    DOWNLOAD = "DOWNLOAD", "Download"
+    VERIFY = "VERIFY", "Verify"
+    REJECT = "REJECT", "Reject"
+    REPLACE = "REPLACE", "Replace"
+    UPLOAD = "UPLOAD", "Upload"
+
+
 
 # =====================================================
 # BASE / HELPERS
@@ -2288,6 +2310,29 @@ class SubscriptionDocument(TimeStampedModel):
         related_name="generated_subscription_documents",
     )
     regeneration_reason = models.TextField(blank=True, default="")
+    # P3A: Document Vault extensions — additive, all have safe defaults for existing rows.
+    checksum_sha256 = models.CharField(max_length=64, blank=True, default="")
+    expires_on = models.DateField(null=True, blank=True)
+    signed_status = models.CharField(
+        max_length=20,
+        choices=DocumentSignedStatus.choices,
+        default=DocumentSignedStatus.UNKNOWN,
+    )
+    access_level = models.CharField(
+        max_length=20,
+        choices=DocumentAccessLevel.choices,
+        default=DocumentAccessLevel.INTERNAL,
+    )
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="verified_subscription_documents",
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
         db_table = "subscription_documents"
@@ -2315,6 +2360,40 @@ class SubscriptionDocument(TimeStampedModel):
 
     def __str__(self):
         return f"{self.document_type} for SUB-{self.subscription_id}"
+
+
+class DocumentAccessLog(TimeStampedModel):
+    """Append-only audit log for document access events (P3A)."""
+
+    document = models.ForeignKey(
+        SubscriptionDocument,
+        on_delete=models.CASCADE,
+        related_name="access_logs",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="document_access_logs",
+    )
+    action = models.CharField(
+        max_length=20,
+        choices=DocumentAccessAction.choices,
+        db_index=True,
+    )
+    accessed_at = models.DateTimeField(default=timezone.now, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "document_access_logs"
+        ordering = ["-accessed_at", "-id"]
+
+    def __str__(self):
+        return f"{self.action} on doc {self.document_id} by {self.user_id or 'anon'}"
+
 
 # =====================================================
 # DELIVERY

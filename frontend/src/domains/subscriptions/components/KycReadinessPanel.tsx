@@ -6,6 +6,7 @@ import {
   fetchContractKycReadiness,
   type ContractKycReadiness,
   type KycRequiredDocument,
+  type VaultDocumentItem,
 } from "@/services/kyc-readiness";
 
 type Props = {
@@ -40,6 +41,73 @@ function DocRow({ doc }: { doc: KycRequiredDocument }) {
       >
         {doc.present ? (doc.status || "PRESENT") : "MISSING"}
       </span>
+    </div>
+  );
+}
+
+/** P3A: Vault-enriched document row showing signed/access/expiry metadata. */
+function VaultDocRow({ doc }: { doc: VaultDocumentItem }) {
+  const statusClass =
+    doc.status === "VERIFIED"
+      ? "bg-green-100 text-green-700"
+      : doc.status === "PRESENT"
+        ? "bg-yellow-100 text-yellow-700"
+        : doc.status === "REJECTED"
+          ? "bg-red-200 text-red-800"
+          : doc.status === "EXPIRED"
+            ? "bg-orange-100 text-orange-800"
+            : doc.status === "NOT_REQUIRED"
+              ? "bg-slate-100 text-slate-500"
+              : "bg-red-100 text-red-700";
+
+  const isOk = doc.status === "VERIFIED" || doc.status === "NOT_REQUIRED";
+  const signedLabel =
+    doc.signed_status === "SIGNED"
+      ? "Signed"
+      : doc.signed_status === "UNSIGNED"
+        ? "Unsigned"
+        : null;
+
+  const accessLabel =
+    doc.access_level === "SENSITIVE"
+      ? "Sensitive"
+      : doc.access_level === "HIGHLY_SENSITIVE"
+        ? "Highly Sensitive"
+        : null;
+
+  return (
+    <div className="flex flex-col gap-0.5 text-xs">
+      <div className="flex items-center gap-2">
+        <span
+          className={`h-3.5 w-3.5 flex-none rounded-full ${isOk ? "bg-green-500" : doc.status === "PRESENT" ? "bg-yellow-400" : "bg-red-400"}`}
+          aria-hidden
+        />
+        <span className={isOk ? "text-green-800" : "text-red-700"}>
+          {doc.label}
+          {!doc.required && (
+            <span className="ml-1 text-muted-foreground">(optional)</span>
+          )}
+        </span>
+        <span
+          className={`ml-auto rounded px-1.5 py-0.5 font-medium ${statusClass}`}
+          data-testid="vault-doc-status"
+        >
+          {doc.status}
+        </span>
+      </div>
+      {(signedLabel || accessLabel || doc.expires_on) && (
+        <div className="ml-5 flex gap-2 text-muted-foreground">
+          {signedLabel && <span>{signedLabel}</span>}
+          {accessLabel && (
+            <span className="text-amber-700">{accessLabel}</span>
+          )}
+          {doc.expires_on && (
+            <span className={doc.status === "EXPIRED" ? "text-orange-700" : ""}>
+              Expires {doc.expires_on}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -236,3 +304,5 @@ export default function KycReadinessPanel({
     </div>
   );
 }
+
+export { VaultDocRow };
