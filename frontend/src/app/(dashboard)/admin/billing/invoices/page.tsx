@@ -13,6 +13,7 @@ import AdminCancellationDialog from "@/components/ui/AdminCancellationDialog";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
+import InvoiceDeliveryCell from "./InvoiceDeliveryCell";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import { toAmountInWordsINR } from "@/lib/print/formatters";
@@ -71,6 +72,11 @@ export default function BillingInvoicesPage() {
         ["VOID", "CANCELLED", "REVERSED", "CREDITED_FULLY"].includes(String(row.status || "").toUpperCase())
           ? "History only"
           : accountingMoney(row.balance_total),
+    },
+    {
+      key: "delivery",
+      header: "Delivery",
+      render: (row) => <InvoiceDeliveryCell invoice={row} onChanged={loadPage} />,
     },
     {
       key: "actions",

@@ -34,6 +34,7 @@ from billing.services.direct_sale_delivery_bridge_service import (
     get_direct_sale_delivery_case,
 )
 from billing.services.direct_sale_operational_state import get_direct_sale_operational_state
+from billing.services.invoice_delivery_service import get_invoice_delivery_readiness
 from billing.services.billing_service import (
     _ensure_credit_sequence,
     _ensure_debit_sequence,
@@ -759,6 +760,7 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
     blocking_reasons = serializers.SerializerMethodField()
     active_receipt_total = serializers.SerializerMethodField()
     void_receipt_total = serializers.SerializerMethodField()
+    delivery_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = BillingInvoice
@@ -810,6 +812,7 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
             "blocking_reasons",
             "active_receipt_total",
             "void_receipt_total",
+            "delivery_summary",
             "lines",
             "created_at",
             "updated_at",
@@ -924,6 +927,24 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
     def get_void_receipt_total(self, obj):
         _active_total, void_total = _receipt_totals(obj.receipts.all())
         return str(void_total)
+
+    def get_delivery_summary(self, obj):
+        try:
+            readiness = get_invoice_delivery_readiness(obj)
+        except Exception:  # pragma: no cover - delivery rail must never break billing reads
+            return None
+        return {
+            "delivery_status": readiness.get("delivery_status"),
+            "delivery_display": readiness.get("delivery_display"),
+            "delivery_required": readiness.get("delivery_required"),
+            "delivery_id": readiness.get("delivery_id"),
+            "stock_status": readiness.get("stock_status"),
+            "blockers": readiness.get("blockers") or [],
+            "can_create_delivery": readiness.get("can_create_delivery"),
+            "can_confirm_delivery": readiness.get("can_confirm_delivery"),
+            "delivery_workflow": readiness.get("delivery_workflow"),
+            "source_type": readiness.get("source_type"),
+        }
 
 
 class BillingCreditNoteLineSerializer(serializers.ModelSerializer):

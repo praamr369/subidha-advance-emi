@@ -38,6 +38,12 @@ from billing.services.billing_service import (
     void_receipt_document,
 )
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
+from billing.services.invoice_delivery_service import (
+    InvoiceDeliveryBlocked,
+    confirm_delivery_for_invoice,
+    create_delivery_from_invoice,
+    get_invoice_delivery_readiness,
+)
 from subscriptions.services.operational_cancellation_service import (
     cancel_billing_invoice,
     cancel_direct_sale,
@@ -456,6 +462,54 @@ class BillingInvoiceViewSet(AdminBillingModelViewSet):
             raise ValidationError({"detail": str(exc)}) from exc
         payload = BillingInvoiceSerializer(invoice, context=self.get_serializer_context())
         return Response({"updated": updated, "invoice": payload.data})
+
+    @action(detail=True, methods=["get"], url_path="delivery-readiness")
+    def delivery_readiness(self, request, pk=None):
+        invoice = self.get_object()
+        return Response(get_invoice_delivery_readiness(invoice))
+
+    @action(detail=True, methods=["get"], url_path="delivery")
+    def delivery(self, request, pk=None):
+        invoice = self.get_object()
+        readiness = get_invoice_delivery_readiness(invoice)
+        return Response(
+            {
+                "invoice_id": invoice.id,
+                "delivery_id": readiness.get("delivery_id"),
+                "linked_delivery": readiness.get("linked_delivery"),
+                "delivery_status": readiness.get("delivery_status"),
+                "delivery_workflow": readiness.get("delivery_workflow"),
+            }
+        )
+
+    @action(detail=True, methods=["post"], url_path="create-delivery")
+    def create_delivery(self, request, pk=None):
+        invoice = self.get_object()
+        try:
+            result = create_delivery_from_invoice(
+                invoice=invoice,
+                performed_by=request.user,
+                payload=request.data if isinstance(request.data, dict) else {},
+            )
+        except InvoiceDeliveryBlocked as exc:
+            raise ValidationError(
+                {"code": exc.code, "detail": exc.message, "blockers": exc.blockers}
+            ) from exc
+        return Response(result, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="confirm-delivery")
+    def confirm_delivery(self, request, pk=None):
+        invoice = self.get_object()
+        try:
+            result = confirm_delivery_for_invoice(
+                invoice=invoice,
+                performed_by=request.user,
+            )
+        except InvoiceDeliveryBlocked as exc:
+            raise ValidationError(
+                {"code": exc.code, "detail": exc.message, "blockers": exc.blockers}
+            ) from exc
+        return Response(result)
 
 
 class BillingCreditNoteViewSet(AdminBillingModelViewSet):

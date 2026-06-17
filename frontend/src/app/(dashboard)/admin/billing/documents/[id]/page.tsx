@@ -12,6 +12,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import BillingPrintDocument from "@/components/print/BillingPrintDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
+import InvoiceDeliveryPanel from "./InvoiceDeliveryPanel";
 import ActionButton from "@/components/ui/ActionButton";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -328,6 +329,8 @@ export default function BillingDocumentDetailPage() {
                 />
               </div>
             </WorkspaceSection>
+
+            <InvoiceDeliveryPanel invoiceId={invoice.id} documentNo={invoice.document_no} />
 
             <WorkspaceSection
               title="Invoice Lines"

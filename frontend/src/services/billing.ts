@@ -294,7 +294,59 @@ export type BillingInvoice = {
   blocking_reasons?: string[];
   active_receipt_total?: string;
   void_receipt_total?: string;
+  delivery_summary?: InvoiceDeliverySummary | null;
   lines: BillingInvoiceLine[];
+};
+
+export type InvoiceDeliveryStatus =
+  | "NOT_REQUIRED"
+  | "PENDING_DELIVERY"
+  | "PARTIALLY_DELIVERED"
+  | "DELIVERED"
+  | "RETURNED"
+  | "CANCELLED"
+  | "BLOCKED";
+
+export type InvoiceDeliverySummary = {
+  delivery_status: InvoiceDeliveryStatus;
+  delivery_display?: string | null;
+  delivery_required?: boolean;
+  delivery_id?: number | null;
+  stock_status?: string | null;
+  blockers: string[];
+  can_create_delivery?: boolean;
+  can_confirm_delivery?: boolean;
+  delivery_workflow?: string;
+  source_type?: string;
+};
+
+export type InvoiceDeliveryReadiness = InvoiceDeliverySummary & {
+  invoice_id: number;
+  invoice_no?: string | null;
+  invoice_status?: string;
+  source_id?: number | null;
+  source_reference?: string | null;
+  stock_location?: string | null;
+  linked_delivery?: {
+    kind: string;
+    id: number;
+    reference?: string | null;
+    service_desk_status?: string | null;
+    status: InvoiceDeliveryStatus;
+  } | null;
+  already_delivered_quantity?: string;
+  remaining_quantity?: string;
+  created?: boolean;
+  confirmed?: boolean;
+};
+
+export type CreateInvoiceDeliveryPayload = {
+  delivery_reference?: string;
+  scheduled_date?: string;
+  receiver_name?: string;
+  receiver_phone?: string;
+  delivery_address_snapshot?: string;
+  notes?: string;
 };
 
 export type BillingNoteLine = {
@@ -470,6 +522,27 @@ export function listBillingInvoices(params: Record<string, QueryValue> = {}) {
 
 export function getBillingInvoice(id: number | string) {
   return apiFetch<BillingInvoice>(`/billing/invoices/${id}/`);
+}
+
+export function getInvoiceDeliveryReadiness(id: number | string) {
+  return apiFetch<InvoiceDeliveryReadiness>(`/billing/invoices/${id}/delivery-readiness/`);
+}
+
+export function createDeliveryFromInvoice(
+  id: number | string,
+  payload: CreateInvoiceDeliveryPayload = {}
+) {
+  return apiFetch<InvoiceDeliveryReadiness>(`/billing/invoices/${id}/create-delivery/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function confirmInvoiceDelivery(id: number | string) {
+  return apiFetch<InvoiceDeliveryReadiness>(`/billing/invoices/${id}/confirm-delivery/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export function listDirectSales(params: Record<string, QueryValue> = {}) {
