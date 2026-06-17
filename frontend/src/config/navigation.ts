@@ -211,6 +211,7 @@ const ADMIN_MODULE_ICONS: Record<string, NavIconKey> = {
   "Delivery & Service": "deliveries",
   "HR & Staff": "payroll",
   "BI & Reports": "reports",
+  "Enterprise Control": "governance",
   "Settings & Governance": "settings",
 };
 

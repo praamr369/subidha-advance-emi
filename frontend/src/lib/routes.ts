@@ -217,6 +217,16 @@ export const ROUTES = {
     requestsSupport: "/admin/requests/support",
     requestsSubscriptions: "/admin/requests/subscriptions",
 
+    // P2D: Enterprise Control
+    controlRoot: "/admin/control",
+    controlApprovals: "/admin/control/approvals",
+    controlPolicies: "/admin/control/policies",
+    controlExceptions: "/admin/control/exceptions",
+    controlCashSessions: "/admin/control/cash-sessions",
+    controlDailyClose: "/admin/control/daily-close",
+    controlMonthEndClose: "/admin/control/month-end-close",
+    dataQuality: "/admin/data-quality",
+
     billing: "/admin/billing",
     billingDirectSales: "/admin/billing/direct-sales",
     billingDirectSaleWorkspace: "/admin/billing/direct-sale",

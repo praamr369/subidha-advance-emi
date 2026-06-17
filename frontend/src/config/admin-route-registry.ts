@@ -337,6 +337,16 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("BI & Reports", "Risk Monitor", ROUTES.admin.analyticsRiskMonitor, "Read-only overdue EMI risk watchlist for collection escalation. Source-linked report. Drill down to Finance Operations / Outstandings for action."),
   item("BI & Reports", "Churn Analysis", ROUTES.admin.analyticsChurnAnalysis, "Read-only churn-risk and defaulted subscription watchlist. Source-linked report. Drill down to Profiles / Customers for action."),
 
+  // ── 16. Enterprise Control ───────────────────────────────────────────────────
+  item("Enterprise Control", "Control Desk", ROUTES.admin.controlRoot, "Enterprise control hub: approvals, policies, exceptions, cash sessions, close controls, and data quality."),
+  item("Enterprise Control", "Approval Queue", ROUTES.admin.controlApprovals, "Maker-checker approvals pending a decision. Approve or reject controlled actions."),
+  item("Enterprise Control", "Business Policies", ROUTES.admin.controlPolicies, "Toggle enterprise control policies (e.g. cash variance approval requirement)."),
+  item("Enterprise Control", "Exception Desk", ROUTES.admin.controlExceptions, "Control exceptions raised by automated integrity checks. Open exceptions block month-end close."),
+  item("Enterprise Control", "Cash Counter Sessions", ROUTES.admin.controlCashSessions, "Open and closed cash counter sessions with declared cash and variance status."),
+  item("Enterprise Control", "Daily Close", ROUTES.admin.controlDailyClose, "Daily close readiness checks and execution history."),
+  item("Enterprise Control", "Month-End Close", ROUTES.admin.controlMonthEndClose, "Month-end close readiness, dry-run, and execute controls. No financial records are mutated."),
+  item("Enterprise Control", "Data Quality Center", ROUTES.admin.dataQuality, "11 read-only integrity checks across customers, contracts, payments, and accounting."),
+
   // ── 15. Settings & Governance ─────────────────────────────────────────────
   item("Settings & Governance", "Settings", ROUTES.admin.settings, "Settings cockpit."),
   item("Settings & Governance", "Staff Users", ROUTES.admin.settingsUsers, "Internal staff users."),
