@@ -55,6 +55,9 @@ from subscriptions.services.rent_lease_contract_service import (
     create_lease_contract,
     create_rent_contract,
 )
+from subscriptions.services.rent_lease_billing_service import (
+    collect_security_deposit,
+)
 from tests.helpers import (
     create_admin_user,
     create_batch,
@@ -468,6 +471,10 @@ class ActivationReadinessVaultIntegrationTests(TestCase):
         dep_doc = _make_doc(self.sub, SubscriptionDocumentType.SECURITY_DEPOSIT_RECEIPT_PDF)
         verify_document(sig_doc, self.admin)
         verify_document(dep_doc, self.admin)
+        collect_security_deposit(
+            subscription=self.sub,
+            amount=self.sub.rent_profile.security_deposit_amount,
+        )
         readiness = evaluate_contract_activation_readiness(self.sub)
         self.assertTrue(readiness["can_reach_active_or_handover"])
         self.assertEqual(readiness["blocker_codes"], [])

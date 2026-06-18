@@ -57,6 +57,15 @@ def customer_emi_count_in_batch(*, customer: Customer, batch: Batch) -> int:
     ).count()
 
 
+def customer_has_emi_in_batch(*, customer: Customer, batch: Batch) -> bool:
+    """Backward-compatible informational alias for legacy selector callers.
+
+    Subscription creation must not use this result as a uniqueness gate because
+    one customer may hold multiple Lucky IDs in the same batch.
+    """
+    return customer_emi_count_in_batch(customer=customer, batch=batch) > 0
+
+
 def get_latest_subscription_for_customer(customer: Customer) -> Optional[Subscription]:
     return (
         Subscription.objects.filter(customer=customer)
@@ -80,4 +89,3 @@ def get_distinct_customer_ids_for_partner(user) -> Iterable[int]:
         .values_list("customer_id", flat=True)
         .distinct()
     )
-

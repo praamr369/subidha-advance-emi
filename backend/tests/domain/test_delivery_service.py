@@ -12,6 +12,7 @@ from subscriptions.services.delivery_service import (
     mark_subscription_delivery_returned,
     request_subscription_delivery_return,
     transition_subscription_delivery_status,
+    update_subscription_delivery_metadata,
 )
 from tests.helpers import (
     create_admin_user,
@@ -221,3 +222,40 @@ class DeliveryServiceTests(TestCase):
         self.assertEqual(summary["pending"], 1)
         self.assertEqual(summary["delivered"], 1)
         self.assertEqual(summary["failed"], 1)
+
+    def test_metadata_update_is_audited_without_transition_side_effects(self):
+        delivery = create_subscription_delivery(
+            subscription=self.subscription,
+            performed_by=self.admin,
+        )
+
+        updated = update_subscription_delivery_metadata(
+            delivery=delivery,
+            performed_by=self.admin,
+            notes="Customer confirmed delivery window",
+        )
+
+        self.assertEqual(updated.status, DeliveryStatus.PENDING)
+        self.assertEqual(updated.notes, "Customer confirmed delivery window")
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action_type=AuditLog.ActionType.DELIVERY_UPDATED,
+                model_name="SubscriptionDelivery",
+                object_id=delivery.id,
+            ).exists()
+        )
+
+    def test_completed_delivery_cannot_be_recreated(self):
+        create_delivery(
+            subscription=self.subscription,
+            status=DeliveryStatus.DELIVERED,
+            delivery_reference="DLV-ALREADY-COMPLETE",
+            created_by=self.admin,
+            updated_by=self.admin,
+        )
+
+        with self.assertRaisesMessage(ValueError, "already delivered"):
+            create_subscription_delivery(
+                subscription=self.subscription,
+                performed_by=self.admin,
+            )

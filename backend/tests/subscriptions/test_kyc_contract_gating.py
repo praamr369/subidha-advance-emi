@@ -36,6 +36,7 @@ from subscriptions.models import (
 from subscriptions.services.contract_lifecycle_service import activate_contract
 from subscriptions.services.customer_service import exception_approve_kyc
 from subscriptions.services.delivery_service import create_subscription_delivery
+from subscriptions.services.emi_engine import generate_emi_schedule
 from subscriptions.services.kyc_readiness_service import (
     KycGateError,
     get_contract_kyc_readiness,
@@ -43,6 +44,9 @@ from subscriptions.services.kyc_readiness_service import (
 from subscriptions.services.rent_lease_contract_service import (
     create_lease_contract,
     create_rent_contract,
+)
+from subscriptions.services.rent_lease_billing_service import (
+    collect_security_deposit,
 )
 from tests.helpers import (
     create_admin_user,
@@ -154,6 +158,7 @@ class EmiActivationGateTests(TestCase):
             lucky_id=self.lucky,
             status=SubscriptionStatus.APPROVED,
         )
+        generate_emi_schedule(sub)
         return sub
 
     def test_emi_activation_blocked_when_kyc_missing(self):
@@ -295,6 +300,14 @@ class DeliveryHandoverGateTests(TestCase):
                 document_type=doc_type,
                 file=_small_file(f"{doc_type}.pdf"),
             )
+        collect_security_deposit(
+            subscription=self.sub,
+            amount=self.sub.rent_profile.security_deposit_amount,
+        )
+        type(self.sub).objects.filter(pk=self.sub.pk).update(
+            status=SubscriptionStatus.ACTIVE
+        )
+        self.sub.refresh_from_db()
         delivery = create_subscription_delivery(
             subscription=self.sub, performed_by=self.admin
         )

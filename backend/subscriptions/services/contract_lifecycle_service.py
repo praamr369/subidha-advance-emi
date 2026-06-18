@@ -70,6 +70,11 @@ def activate_contract(*, subscription: Subscription, performed_by) -> Subscripti
     from subscriptions.services.kyc_readiness_service import enforce_contract_kyc_gate
 
     enforce_contract_kyc_gate(subscription=subscription, stage="activate")
+    from subscriptions.services.contract_activation_readiness_service import (
+        assert_contract_activation_ready,
+    )
+
+    assert_contract_activation_ready(subscription, stage="activate")
     change_subscription_status(subscription, SubscriptionStatus.ACTIVE)
     _lock_financial_terms(subscription, performed_by)
 

@@ -8,7 +8,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from accounting.services.non_gst_document_service import build_non_gst_snapshot
-from subscriptions.models import LuckyIdStatus, PlanType, Subscription
+from subscriptions.models import Batch, LuckyId, LuckyIdStatus, PlanType, Subscription
 from subscriptions.services.emi_engine import generate_emi_schedule
 
 from api.v1.selectors.subscription_selector import (
@@ -59,16 +59,33 @@ def create_partner_emi_subscription(
 
     total_amount = product.base_price
     tenure = tenure_months
+    if tenure <= 0:
+        raise serializers.ValidationError("Tenure must be greater than zero")
+    if tenure != batch.duration_months:
+        raise serializers.ValidationError("Tenure must match selected batch duration")
     monthly = (total_amount / tenure).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     rounding = total_amount - (monthly * tenure)
 
     with transaction.atomic():
+        locked_batch = Batch.objects.select_for_update().get(pk=batch.pk)
+        locked_lucky = (
+            LuckyId.objects.select_for_update()
+            .select_related("batch")
+            .get(pk=lucky.pk)
+        )
+        if not is_batch_open(locked_batch):
+            raise serializers.ValidationError("Selected batch is not open")
+        if locked_lucky.batch_id != locked_batch.id:
+            raise serializers.ValidationError("Lucky ID does not belong to selected batch")
+        if not is_lucky_id_available(locked_lucky):
+            raise serializers.ValidationError("Lucky ID is not available")
+
         sub = Subscription.objects.create(
             customer=customer,
             product=product,
             partner=partner,
-            batch=batch,
-            lucky_id=lucky,
+            batch=locked_batch,
+            lucky_id=locked_lucky,
             plan_type=PlanType.EMI,
             tenure_months=tenure,
             start_date=start_date,
@@ -84,8 +101,8 @@ def create_partner_emi_subscription(
             ),
         )
 
-        lucky.status = LuckyIdStatus.ASSIGNED
-        lucky.save(update_fields=["status"])
+        locked_lucky.status = LuckyIdStatus.ASSIGNED
+        locked_lucky.save(update_fields=["status"])
 
         try:
             generate_emi_schedule(sub, rounding_difference=rounding)

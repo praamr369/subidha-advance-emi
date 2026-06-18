@@ -349,6 +349,14 @@ def create_subscription_delivery(
 ):
     if _active_delivery_for_subscription(subscription) is not None:
         raise ValueError("An active delivery already exists for this subscription.")
+    if SubscriptionDelivery.objects.filter(
+        subscription=subscription,
+        status=DeliveryStatus.DELIVERED,
+    ).exists():
+        raise ValueError(
+            "This subscription is already delivered. Use the audited return workflow "
+            "instead of creating another delivery."
+        )
 
     _enforce_delivery_kyc_gate(
         subscription, delivery_address_snapshot=delivery_address_snapshot
@@ -445,22 +453,6 @@ def update_subscription_delivery_metadata(
         performed_by=performed_by,
         metadata={"changed_fields": changed_fields},
     )
-    if next_status == DeliveryStatus.DELIVERED:
-        append_business_event(
-            event_type=BusinessEventType.DELIVERY_COMPLETED,
-            source_module="subscriptions.services.delivery_service.transition_subscription_delivery_status",
-            actor_user=performed_by,
-            customer=delivery.subscription.customer,
-            subscription=delivery.subscription,
-            batch=delivery.subscription.batch,
-            lucky_id=delivery.subscription.lucky_id,
-            payload={
-                "delivery_id": delivery.id,
-                "delivery_reference": delivery.delivery_reference,
-                "old_status": previous_status,
-                "new_status": next_status,
-            },
-        )
 
     return delivery
 
@@ -565,6 +557,22 @@ def transition_subscription_delivery_status(
             "notes": delivery.notes or "",
         },
     )
+    if next_status == DeliveryStatus.DELIVERED:
+        append_business_event(
+            event_type=BusinessEventType.DELIVERY_COMPLETED,
+            source_module="subscriptions.services.delivery_service.transition_subscription_delivery_status",
+            actor_user=performed_by,
+            customer=delivery.subscription.customer,
+            subscription=delivery.subscription,
+            batch=delivery.subscription.batch,
+            lucky_id=delivery.subscription.lucky_id,
+            payload={
+                "delivery_id": delivery.id,
+                "delivery_reference": delivery.delivery_reference,
+                "old_status": previous_status,
+                "new_status": next_status,
+            },
+        )
 
     if next_status in {DeliveryStatus.DELIVERED, DeliveryStatus.RETURNED}:
         from inventory.services.delivery_bridge_service import sync_delivery_inventory_bridge

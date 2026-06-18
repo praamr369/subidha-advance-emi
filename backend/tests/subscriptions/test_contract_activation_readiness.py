@@ -18,26 +18,48 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from subscriptions.models import (
+    Commission,
+    CommissionPayoutBatch,
     CustomerKycDocument,
     CustomerKycDocumentStatus,
     CustomerKycDocumentType,
     KycStatus,
     PlanType,
+    Payment,
+    RentLeaseBillingDemand,
     Product,
     SubscriptionDocument,
     SubscriptionDocumentType,
     SubscriptionStatus,
 )
+from accounting.models import (
+    AccountingBridgePosting,
+    JournalEntry,
+    MoneyMovement,
+    RentLeasePostingBridgeConfig,
+    SalaryPayment,
+)
+from billing.models import ReceiptDocument
+from inventory.models import StockLedger
+from reconciliation.models import ReconciliationItem
 from subscriptions.services.contract_activation_readiness_service import (
     ContractActivationNotReady,
     assert_contract_activation_ready,
     classify_legacy_activation_compatibility,
     evaluate_contract_activation_readiness,
 )
+from subscriptions.services.contract_lifecycle_service import (
+    activate_contract,
+    approve_contract,
+)
 from subscriptions.services.delivery_service import create_subscription_delivery
+from subscriptions.services.emi_engine import generate_emi_schedule
 from subscriptions.services.rent_lease_contract_service import (
     create_lease_contract,
     create_rent_contract,
+)
+from subscriptions.services.rent_lease_billing_service import (
+    collect_security_deposit,
 )
 from tests.helpers import (
     create_admin_user,
@@ -84,6 +106,18 @@ def _add_deposit_receipt(subscription):
         subscription=subscription,
         document_type=SubscriptionDocumentType.SECURITY_DEPOSIT_RECEIPT_PDF,
         file=_small_file("deposit.pdf"),
+    )
+
+
+def _collect_full_deposit(subscription):
+    profile = (
+        subscription.rent_profile
+        if subscription.plan_type == PlanType.RENT
+        else subscription.lease_profile
+    )
+    return collect_security_deposit(
+        subscription=subscription,
+        amount=profile.security_deposit_amount,
     )
 
 
@@ -136,9 +170,11 @@ class MilestoneReadinessComputationTests(TestCase):
         product = create_product(product_code="EMI-RDY-1")
         batch = create_batch(batch_code="RDYEMI2026")
         lucky = create_lucky_id(batch=batch, lucky_number=21)
-        return create_subscription(
+        subscription = create_subscription(
             customer=self.customer, product=product, batch=batch, lucky_id=lucky
         )
+        generate_emi_schedule(subscription)
+        return subscription
 
     def test_emi_blockers_identity_and_signed_consent(self):
         sub = self._emi_subscription()
@@ -149,11 +185,24 @@ class MilestoneReadinessComputationTests(TestCase):
 
     def test_emi_allowed_with_identity_and_signed_consent(self):
         sub = self._emi_subscription()
+        emi_snapshot = list(sub.emis.values_list("id", "status", "amount"))
+        payment_count = Payment.objects.filter(subscription=sub).count()
         _approve_id_and_address(self.customer)
         _add_signature(sub)
         readiness = evaluate_contract_activation_readiness(sub)
         self.assertTrue(readiness["can_reach_active_or_handover"])
         self.assertEqual(readiness["missing_documents"], [])
+        self.assertTrue(readiness["readiness_categories"]["emi_schedule"]["ready"])
+        self.assertFalse(
+            readiness["readiness_categories"]["contract_data"]["details"][
+                "rent_lease_profile_present"
+            ]
+        )
+        self.assertEqual(
+            list(sub.emis.values_list("id", "status", "amount")),
+            emi_snapshot,
+        )
+        self.assertEqual(Payment.objects.filter(subscription=sub).count(), payment_count)
 
     def test_rent_blockers_list_all_required(self):
         sub = create_rent_contract(
@@ -183,9 +232,15 @@ class MilestoneReadinessComputationTests(TestCase):
             performed_by=self.admin,
         )
         _add_signature(sub)
+        _collect_full_deposit(sub)
         _add_deposit_receipt(sub)
         readiness = evaluate_contract_activation_readiness(sub)
         self.assertTrue(readiness["can_reach_active_or_handover"])
+        self.assertFalse(
+            readiness["readiness_categories"]["payment_deposit"]["details"][
+                "monthly_demand_required_for_activation"
+            ]
+        )
 
     def test_lease_requires_condition_proof(self):
         self.customer.kyc_status = KycStatus.VERIFIED
@@ -199,8 +254,10 @@ class MilestoneReadinessComputationTests(TestCase):
             performed_by=self.admin,
         )
         _add_signature(sub)
+        _collect_full_deposit(sub)
         _add_deposit_receipt(sub)
         readiness = evaluate_contract_activation_readiness(sub)
+        self.assertTrue(readiness["can_activate"])
         self.assertFalse(readiness["can_reach_active_or_handover"])
         self.assertIn("CONDITION_PROOF_MISSING", readiness["blocker_codes"])
 
@@ -209,6 +266,50 @@ class MilestoneReadinessComputationTests(TestCase):
         sub.lease_profile.save(update_fields=["handover_notes"])
         readiness2 = evaluate_contract_activation_readiness(sub)
         self.assertTrue(readiness2["can_reach_active_or_handover"])
+
+    def test_deposit_document_without_collection_is_not_financial_readiness(self):
+        self.customer.kyc_status = KycStatus.VERIFIED
+        self.customer.save(update_fields=["kyc_status"])
+        _approve_id_and_address(self.customer)
+        sub = create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=12,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        _add_signature(sub)
+        _add_deposit_receipt(sub)
+
+        readiness = evaluate_contract_activation_readiness(sub)
+
+        self.assertFalse(readiness["can_activate"])
+        self.assertIn("DEPOSIT_NOT_FULLY_COLLECTED", readiness["activation_blocker_codes"])
+        deposit = readiness["readiness_categories"]["payment_deposit"]
+        self.assertFalse(deposit["ready"])
+        self.assertEqual(deposit["details"]["collected_amount"], "0.00")
+
+    def test_partial_deposit_stays_separate_from_monthly_demand_readiness(self):
+        sub = create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=12,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        profile = sub.rent_profile
+        collect_security_deposit(
+            subscription=sub,
+            amount=profile.security_deposit_amount / Decimal("2"),
+        )
+
+        readiness = evaluate_contract_activation_readiness(sub)
+        deposit = readiness["readiness_categories"]["payment_deposit"]
+
+        self.assertFalse(deposit["ready"])
+        self.assertGreater(Decimal(deposit["details"]["outstanding_amount"]), Decimal("0.00"))
+        self.assertEqual(deposit["details"]["monthly_demand_count"], 0)
+        self.assertFalse(deposit["details"]["monthly_demand_required_for_activation"])
 
 
 # ---------------------------------------------------------------------------
@@ -245,6 +346,55 @@ class MilestoneEnforcementGatingTests(TestCase):
         self.assertEqual(ctx.exception.code, "CONTRACT_ACTIVATION_NOT_READY")
         self.assertIn("DEPOSIT_RECEIPT_MISSING", ctx.exception.blocker_codes)
 
+    @override_settings(KYC_CONTRACT_GATING_ENABLED=True)
+    def test_rent_activation_requires_full_deposit_but_never_lucky_id(self):
+        self.customer.kyc_status = KycStatus.VERIFIED
+        self.customer.save(update_fields=["kyc_status"])
+        _approve_id_and_address(self.customer)
+        sub = self._incomplete_rent()
+        self.assertIsNone(sub.batch_id)
+        self.assertIsNone(sub.lucky_id_id)
+        approve_contract(subscription=sub, performed_by=self.admin)
+        _add_signature(sub)
+
+        with self.assertRaises(ContractActivationNotReady):
+            activate_contract(subscription=sub, performed_by=self.admin)
+
+        _collect_full_deposit(sub)
+        activated = activate_contract(subscription=sub, performed_by=self.admin)
+        self.assertEqual(activated.status, SubscriptionStatus.ACTIVE)
+        self.assertIsNone(activated.lucky_id_id)
+
+    @override_settings(KYC_CONTRACT_GATING_ENABLED=True)
+    def test_emi_activation_preserves_schedule_and_payment_state(self):
+        self.customer.kyc_status = KycStatus.VERIFIED
+        self.customer.save(update_fields=["kyc_status"])
+        _approve_id_and_address(self.customer)
+        product = create_product(product_code="EMI-ACT-RDY-1")
+        batch = create_batch(batch_code="EMIACT2026")
+        lucky = create_lucky_id(batch=batch, lucky_number=44)
+        sub = create_subscription(
+            customer=self.customer,
+            product=product,
+            batch=batch,
+            lucky_id=lucky,
+        )
+        generate_emi_schedule(sub)
+        type(sub).objects.filter(pk=sub.pk).update(status=SubscriptionStatus.DRAFT)
+        sub.refresh_from_db()
+        approve_contract(subscription=sub, performed_by=self.admin)
+        _add_signature(sub)
+        emi_snapshot = list(sub.emis.values_list("id", "status", "amount"))
+
+        activated = activate_contract(subscription=sub, performed_by=self.admin)
+
+        self.assertEqual(activated.status, SubscriptionStatus.ACTIVE)
+        self.assertEqual(
+            list(sub.emis.values_list("id", "status", "amount")),
+            emi_snapshot,
+        )
+        self.assertFalse(Payment.objects.filter(subscription=sub).exists())
+
 
 # ---------------------------------------------------------------------------
 # P0.4 — delivery/handover hard gate for lease condition proof
@@ -267,6 +417,11 @@ class LeaseHandoverConditionProofGateTests(TestCase):
             performed_by=self.admin,
             save_as_draft=True,
         )
+        type(self.sub).objects.filter(pk=self.sub.pk).update(
+            status=SubscriptionStatus.ACTIVE
+        )
+        self.sub.refresh_from_db()
+        _collect_full_deposit(self.sub)
         # Satisfy the existing base deliver gate (contract PDF, deposit, signed,
         # handover ack) so the NEW condition-proof gate is what we isolate.
         for doc_type in (
@@ -293,6 +448,21 @@ class LeaseHandoverConditionProofGateTests(TestCase):
             subscription=self.sub, performed_by=self.admin
         )
         self.assertIsNotNone(delivery.pk)
+
+    def test_lease_handover_blocked_when_deposit_is_not_fully_collected(self):
+        self.sub.lease_profile.handover_notes = "Condition documented at handover."
+        self.sub.lease_profile.save(update_fields=["handover_notes"])
+        self.sub.deposit_transactions.all().delete()
+        RentLeaseBillingDemand.objects.filter(subscription=self.sub).update(
+            collected_amount=Decimal("0.00"),
+            held_amount=Decimal("0.00"),
+        )
+
+        with self.assertRaises(ContractActivationNotReady) as ctx:
+            create_subscription_delivery(subscription=self.sub, performed_by=self.admin)
+
+        self.assertIn("DEPOSIT_NOT_FULLY_COLLECTED", ctx.exception.blocker_codes)
+        self.assertFalse(self.sub.deliveries.exists())
 
 
 # ---------------------------------------------------------------------------
@@ -333,9 +503,48 @@ class LegacyCompatibilityClassificationTests(TestCase):
             performed_by=self.admin,
         )
         _add_signature(sub)
+        _collect_full_deposit(sub)
         _add_deposit_receipt(sub)
         result = classify_legacy_activation_compatibility(sub)
         self.assertEqual(result["compatibility"], "COMPLIANT")
+
+
+class ReadinessSideEffectSafetyTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.customer = create_customer_profile(name="No Side Effects", phone="7870000001")
+        self.admin = create_admin_user(username="no_side_effects_admin", phone="9870000001")
+        self.product = _rent_product(code="RENT-NO-SIDE-EFFECTS")
+        self.sub = create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=12,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+            save_as_draft=True,
+        )
+
+    def test_readiness_check_creates_no_financial_inventory_or_setup_records(self):
+        tracked_models = (
+            Payment,
+            ReceiptDocument,
+            JournalEntry,
+            MoneyMovement,
+            StockLedger,
+            AccountingBridgePosting,
+            ReconciliationItem,
+            Commission,
+            CommissionPayoutBatch,
+            SalaryPayment,
+            RentLeaseBillingDemand,
+            RentLeasePostingBridgeConfig,
+        )
+        before = {model: model.objects.count() for model in tracked_models}
+
+        evaluate_contract_activation_readiness(self.sub)
+
+        after = {model: model.objects.count() for model in tracked_models}
+        self.assertEqual(after, before)
 
 
 # ---------------------------------------------------------------------------
