@@ -2129,6 +2129,92 @@ export function runCommissionSettlementBridge(payload: {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// P4D Close Cockpit
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type CloseCockpitSection = {
+  status: string;
+  deferred?: boolean;
+  message?: string;
+  [key: string]: unknown;
+};
+
+export type CloseCockpitBlocker = {
+  key: string;
+  severity: "CRITICAL" | "WARNING" | "INFO";
+  title: string;
+  description: string;
+  source_area: string;
+};
+
+export type CloseCockpitActionItem = {
+  key: string;
+  severity: "CRITICAL" | "WARNING" | "INFO";
+  title: string;
+  description: string;
+  source_area: string;
+  count: number;
+  deferred: boolean;
+  action_url?: string;
+};
+
+export type CloseCockpitPeriodState = {
+  year: number;
+  month: number;
+  period_start: string;
+  period_end: string;
+  period_code: string | null;
+  period_id: number | null;
+  status: string | null;
+  is_locked: boolean;
+  is_closed: boolean;
+};
+
+export type CloseCockpitPeriodLock = {
+  period_exists: boolean;
+  period_id: number | null;
+  period_code: string | null;
+  status: string | null;
+  is_locked: boolean;
+  is_closed: boolean;
+  lock_allowed: boolean;
+  lock_blockers: string[];
+  manual_lock_required: boolean;
+  existing_lock_endpoint: string;
+};
+
+export type CloseCockpitPayload = {
+  period: { year: number; month: number };
+  as_of: string;
+  overall_status: "OK" | "INFO" | "WARNING" | "CRITICAL";
+  can_close: boolean;
+  can_lock: boolean;
+  period_state: CloseCockpitPeriodState;
+  sections: {
+    month_end: CloseCockpitSection;
+    financial_intelligence: CloseCockpitSection;
+    trial_balance: CloseCockpitSection;
+    liability_reconciliation: CloseCockpitSection;
+    period_lock: CloseCockpitPeriodLock;
+  };
+  blockers: CloseCockpitBlocker[];
+  warnings: CloseCockpitBlocker[];
+  action_items: CloseCockpitActionItem[];
+  metadata: { generated_at: string; read_only: boolean; note: string };
+};
+
+export function getAccountingCloseCockpit(
+  params: { year?: number; month?: number; as_of?: string } = {}
+) {
+  const qs = new URLSearchParams();
+  if (params.year != null) qs.set("year", String(params.year));
+  if (params.month != null) qs.set("month", String(params.month));
+  if (params.as_of) qs.set("as_of", params.as_of);
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<CloseCockpitPayload>(`/admin/accounting/close-cockpit/${query}`);
+}
+
 export function runPayoutBatchBridge(payload: {
   start_date: string;
   end_date: string;

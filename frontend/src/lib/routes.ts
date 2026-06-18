@@ -324,6 +324,7 @@ export const ROUTES = {
     accountingAttendance: "/admin/accounting/attendance",
     accountingLeave: "/admin/accounting/leave",
     accountingSalary: "/admin/accounting/salary",
+    accountingCloseCockpit: "/admin/accounting/close-cockpit",
   },
 
   partner: {

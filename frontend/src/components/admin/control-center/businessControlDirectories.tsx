@@ -4,6 +4,7 @@ import {
   BanknoteArrowDown,
   Boxes,
   Building2,
+  CalendarCheck,
   ClipboardList,
   FileBarChart2,
   FileStack,
@@ -266,6 +267,24 @@ export const ACCOUNTING_REPORT_DIRECTORY_GROUPS: WorkspaceDirectoryGroup[] = [
         description: "Inspect posted purchase rows supporting expense and stock recognition.",
         href: ROUTES.admin.accountingBooksPurchase,
         icon: <FileStack className="h-4 w-4" />,
+      },
+    ],
+  },
+  {
+    title: "Period governance",
+    description: "Period-close readiness and lock posture without triggering any accounting mutations.",
+    items: [
+      {
+        title: "Close Cockpit",
+        description: "Combined P2C/P4A/P4B/P4C readiness view with can_close and can_lock indicators.",
+        href: ROUTES.admin.accountingCloseCockpit,
+        icon: <CalendarCheck className="h-4 w-4" />,
+      },
+      {
+        title: "Accounting Periods",
+        description: "Manage financial year periods and trigger the explicit audited period lock.",
+        href: ROUTES.admin.accountingPeriods,
+        icon: <ShieldCheck className="h-4 w-4" />,
       },
     ],
   },
