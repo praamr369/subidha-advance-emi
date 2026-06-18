@@ -154,7 +154,7 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
     effect: "accounting",
     safetyRule: "Accounting pages must not create operational source records. Posting remains explicit, idempotent, balanced, and auditable.",
     uiPattern: "audit_first",
-    primaryRoutes: [ROUTES.admin.accounting, ROUTES.admin.accountingSetup, ROUTES.admin.accountingChartOfAccounts, ROUTES.admin.accountingFinanceAccounts, ROUTES.admin.accountingJournals, ROUTES.admin.accountingBridgeReconciliation, ROUTES.admin.accountingPeriods, ROUTES.admin.accountingBooks, ROUTES.admin.accountingTrialBalance, ROUTES.admin.accountingProfitLoss, ROUTES.admin.accountingBalanceSheet],
+    primaryRoutes: [ROUTES.admin.accounting, ROUTES.admin.accountingSetup, ROUTES.admin.accountingChartOfAccounts, ROUTES.admin.accountingFinanceAccounts, ROUTES.admin.accountingJournals, ROUTES.admin.accountingBridgeReconciliation, ROUTES.admin.accountingPeriods, ROUTES.admin.accountingFinancialIntelligence, ROUTES.admin.accountingTrialBalanceCheck, ROUTES.admin.accountingLiabilityReconciliation, ROUTES.admin.accountingExports, ROUTES.admin.accountingBooks, ROUTES.admin.accountingTrialBalance, ROUTES.admin.accountingProfitLoss, ROUTES.admin.accountingBalanceSheet],
   },
   {
     key: "inventory_stock",

@@ -9,29 +9,26 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import {
-  type AccountingExportIndex,
-  type AccountingExportPayload,
   type AccountingExportReportMeta,
-  downloadAccountingExportCsv,
-  fetchAccountingExportIndex,
-  fetchBridgeAuditExport,
-  fetchJournalExport,
-  fetchLedgerExport,
-  fetchLiabilityExport,
-  fetchReceivablesExport,
-  fetchTrialBalanceExport,
 } from "@/services/accounting";
+import {
+  downloadAccountingExport,
+  fetchAccountingExport,
+  fetchAccountingExportIndex,
+  type AccountingExportIndex,
+  type AccountingExportReport,
+} from "@/services/financial-intelligence";
 
 const REPORT_FETCH_MAP: Record<
   string,
-  (params: { year: number; month: number }) => Promise<AccountingExportPayload>
+  (params: { year: number; month: number; as_of: string }) => Promise<AccountingExportReport>
 > = {
-  trial_balance_export: (p) => fetchTrialBalanceExport(p),
-  journal_export: (p) => fetchJournalExport(p),
-  ledger_export: (p) => fetchLedgerExport(p),
-  receivables_export: (p) => fetchReceivablesExport(p),
-  liability_export: (p) => fetchLiabilityExport(p),
-  bridge_audit_export: (p) => fetchBridgeAuditExport(p),
+  trial_balance_export: (p) => fetchAccountingExport("trial-balance", p),
+  journal_export: (p) => fetchAccountingExport("journals", p),
+  ledger_export: (p) => fetchAccountingExport("ledgers", p),
+  receivables_export: (p) => fetchAccountingExport("receivables", p),
+  liability_export: (p) => fetchAccountingExport("liabilities", p),
+  bridge_audit_export: (p) => fetchAccountingExport("bridge-audit", p),
 };
 
 const REPORT_CSV_KEY_MAP: Record<
@@ -51,11 +48,13 @@ const today = new Date();
 export default function AccountingExportReportsPage() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
+  const [asOf, setAsOf] = useState(today.toISOString().slice(0, 10));
+  const [reloadKey, setReloadKey] = useState(0);
   const [index, setIndex] = useState<AccountingExportIndex | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [reportData, setReportData] = useState<Record<string, AccountingExportPayload | null>>({});
+  const [reportData, setReportData] = useState<Record<string, AccountingExportReport | null>>({});
   const [reportLoading, setReportLoading] = useState<Record<string, boolean>>({});
   const [reportError, setReportError] = useState<Record<string, string | null>>({});
   const [csvLoading, setCsvLoading] = useState<Record<string, boolean>>({});
@@ -69,7 +68,7 @@ export default function AccountingExportReportsPage() {
     setReportData({});
     setReportError({});
 
-    fetchAccountingExportIndex({ year, month })
+    fetchAccountingExportIndex({ year, month, as_of: asOf })
       .then((payload) => {
         if (!cancelled) {
           setIndex(payload);
@@ -87,7 +86,7 @@ export default function AccountingExportReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [year, month]);
+  }, [asOf, year, month, reloadKey]);
 
   function handleFetchReport(reportKey: string) {
     const fetcher = REPORT_FETCH_MAP[reportKey];
@@ -95,7 +94,7 @@ export default function AccountingExportReportsPage() {
     setReportLoading((prev) => ({ ...prev, [reportKey]: true }));
     setReportError((prev) => ({ ...prev, [reportKey]: null }));
 
-    fetcher({ year, month })
+    fetcher({ year, month, as_of: asOf })
       .then((payload) => {
         setReportData((prev) => ({ ...prev, [reportKey]: payload }));
       })
@@ -117,7 +116,7 @@ export default function AccountingExportReportsPage() {
     setCsvError((prev) => ({ ...prev, [reportKey]: null }));
 
     try {
-      await downloadAccountingExportCsv(csvKey, { year, month });
+      await downloadAccountingExport(csvKey, { year, month, as_of: asOf });
     } catch (err: unknown) {
       setCsvError((prev) => ({
         ...prev,
@@ -137,25 +136,26 @@ export default function AccountingExportReportsPage() {
 
   return (
     <ERPPageShell
-      title="Accounting Report Exports"
+      title="Accounting Exports"
       subtitle="Read-only structured exports for manual review or import preparation. JSON and CSV available."
+      helperNote="No external accounting sync or export jobs run here. Reports are fetched directly from the read-only P4E endpoints."
+      helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Accounting", href: ROUTES.admin.accounting },
-        { label: "Exports", href: ROUTES.admin.accountingExports },
-        { label: "Reports" },
+        { label: "Exports" },
       ]}
       actions={[
-        { href: ROUTES.admin.accountingExports, label: "Export Jobs", variant: "secondary" },
+        { href: ROUTES.admin.accountingFinancialIntelligence, label: "Financial Intelligence", variant: "secondary" },
         { href: ROUTES.admin.accountingCloseCockpit, label: "Close Cockpit", variant: "secondary" },
       ]}
-      statusBadge={{ label: "Admin Only", tone: "info" }}
+      statusBadge={{ label: "Admin Only — Read Only", tone: "info" }}
     >
       <ERPSectionShell
         title="Period Selector"
         description="Select the accounting period for all reports below."
       >
-        <div className="flex flex-wrap gap-4">
+        <div className="grid gap-4 sm:grid-cols-3">
           <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             Year
             <select
@@ -167,6 +167,15 @@ export default function AccountingExportReportsPage() {
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-muted-foreground">
+            As of
+            <input
+              type="date"
+              value={asOf}
+              onChange={(event) => setAsOf(event.target.value)}
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm text-muted-foreground">
             Month
@@ -185,7 +194,11 @@ export default function AccountingExportReportsPage() {
 
       {loading ? <ERPLoadingState label="Loading export index…" /> : null}
       {!loading && error ? (
-        <ERPErrorState title="Export index unavailable" description={error} />
+        <ERPErrorState
+          title="Export index unavailable"
+          description={error}
+          onRetry={() => setReloadKey((value) => value + 1)}
+        />
       ) : null}
 
       {!loading && !error && index ? (
@@ -222,7 +235,7 @@ type ReportCardProps = {
   report: AccountingExportReportMeta;
   year: number;
   month: number;
-  data: AccountingExportPayload | null;
+  data: AccountingExportReport | null;
   isLoading: boolean;
   fetchError: string | null;
   isCsvLoading: boolean;
@@ -292,7 +305,7 @@ function ReportCard({
   );
 }
 
-function ReportSummary({ data }: { data: AccountingExportPayload }) {
+function ReportSummary({ data }: { data: AccountingExportReport }) {
   const rowCount = data.rows.length;
   const totalLineCount = typeof data.totals["total_line_count"] === "number"
     ? data.totals["total_line_count"]
