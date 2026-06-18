@@ -19,6 +19,8 @@ import {
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
+import { CustomerRiskPanel } from "@/components/customer-intelligence/CustomerRiskPanel";
+import { CustomerTimelinePanel } from "@/components/customer-intelligence/CustomerTimelinePanel";
 import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import { DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import PortalPage from "@/components/ui/PortalPage";
@@ -2129,6 +2131,20 @@ export default function AdminCustomerDetailPage() {
             </div>
 
             <KycDocumentPanel mode="admin" owner="customer" ownerId={customer.id} />
+
+            <SectionCard
+              title="Customer Risk Profile"
+              description="P3C read-only risk band and reason codes computed from operational history. No write actions are available."
+            >
+              <CustomerRiskPanel customerId={customer.id} />
+            </SectionCard>
+
+            <SectionCard
+              title="Customer Operational Timeline"
+              description="P3D aggregated read-only event history for this customer — newest first. Sensitive KYC file URLs are not exposed."
+            >
+              <CustomerTimelinePanel customerId={customer.id} />
+            </SectionCard>
 
             {operationalProfile ? (
               <div className="grid gap-6 xl:grid-cols-2">

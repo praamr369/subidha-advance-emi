@@ -9,6 +9,8 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
+import { DocumentReadinessPanel } from "@/components/customer-intelligence/DocumentReadinessPanel";
+import { RentalAssetReadinessPanel } from "@/components/customer-intelligence/RentalAssetReadinessPanel";
 import { DataTableShell, DetailPanel, Timeline } from "@/components/ui/operations";
 import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import {
@@ -1378,6 +1380,26 @@ export default function AdminSubscriptionDetailPage() {
                 </DetailPanel>
               )}
             </section>
+
+            {!isEmiSubscription ? (
+              <section className="grid gap-6 xl:grid-cols-2">
+                <DetailPanel
+                  title="Document vault readiness"
+                  description="P3A read-only per-document status for this subscription. Upload, verify, and reject actions are deferred."
+                  className="rounded-[28px]"
+                >
+                  <DocumentReadinessPanel subscriptionId={subscription.id} />
+                </DetailPanel>
+
+                <DetailPanel
+                  title="Rental asset readiness"
+                  description="P3B read-only asset linkage and activation readiness. Reserve, hand-over, and return actions are deferred."
+                  className="rounded-[28px]"
+                >
+                  <RentalAssetReadinessPanel subscriptionId={subscription.id} />
+                </DetailPanel>
+              </section>
+            ) : null}
 
             <DetailPanel
               title="Delivery tracking"

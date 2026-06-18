@@ -1,4 +1,107 @@
+import { apiFetch } from "@/lib/api";
 import { request } from "@/services/api";
+
+// =====================================================
+// P3C — Customer Risk Profile
+// =====================================================
+
+export type CustomerRiskBand = "LOW" | "MEDIUM" | "HIGH" | "BLOCKED";
+
+export type CustomerRiskProfile = {
+  customer_id: number;
+  risk_score: number;
+  risk_band: CustomerRiskBand;
+  reason_codes: string[];
+  last_calculated_at: string | null;
+  metadata: Record<string, unknown>;
+  is_persisted: boolean;
+};
+
+export async function fetchCustomerRiskProfile(customerId: number): Promise<CustomerRiskProfile> {
+  return apiFetch<CustomerRiskProfile>(`/admin/customers/${customerId}/risk-profile/`);
+}
+
+// =====================================================
+// P3D — Customer Timeline
+// =====================================================
+
+export type CustomerTimelineEventSeverity = "INFO" | "WARNING" | "HIGH" | "CRITICAL" | string;
+
+export type CustomerTimelineEvent = {
+  event_id: string;
+  event_type: string;
+  event_date: string | null;
+  title: string;
+  description: string;
+  source_model: string;
+  source_id: number | string | null;
+  status: string;
+  severity: CustomerTimelineEventSeverity;
+};
+
+export type CustomerTimelineResponse = {
+  count: number;
+  results: CustomerTimelineEvent[];
+};
+
+export type CustomerTimelineParams = {
+  event_type?: string;
+  source_model?: string;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+  ordering?: "asc" | "desc";
+};
+
+export async function fetchCustomerTimeline(
+  customerId: number,
+  params: CustomerTimelineParams = {}
+): Promise<CustomerTimelineResponse> {
+  const qs = new URLSearchParams();
+  if (params.event_type) qs.set("event_type", params.event_type);
+  if (params.source_model) qs.set("source_model", params.source_model);
+  if (params.date_from) qs.set("date_from", params.date_from);
+  if (params.date_to) qs.set("date_to", params.date_to);
+  if (params.limit != null) qs.set("limit", String(params.limit));
+  if (params.ordering) qs.set("ordering", params.ordering);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<CustomerTimelineResponse>(`/admin/customers/${customerId}/timeline/${suffix}`);
+}
+
+// =====================================================
+// P3B — Rental Asset Readiness (per subscription)
+// =====================================================
+
+export type RentalAssetSummary = {
+  id: number;
+  asset_code: string | null;
+  status: string | null;
+  condition_grade: string | null;
+};
+
+export type RentalAssetReadiness = {
+  subscription_id: number;
+  plan_type: string;
+  has_before_handover_snapshot: boolean;
+  linked_assets: RentalAssetSummary[];
+  activation_readiness: {
+    can_reach_active_or_handover: boolean;
+    blocker_codes: string[];
+    missing_documents: string[];
+  };
+};
+
+export async function fetchSubscriptionRentalAssetReadiness(
+  subscriptionId: number
+): Promise<RentalAssetReadiness> {
+  return apiFetch<RentalAssetReadiness>(
+    `/admin/rental-assets/subscription-readiness/${subscriptionId}/`
+  );
+}
+
+// =====================================================
+// Existing — Customer Operational Summary
+// =====================================================
 
 export type CustomerRiskStatus =
   | "GOOD"
