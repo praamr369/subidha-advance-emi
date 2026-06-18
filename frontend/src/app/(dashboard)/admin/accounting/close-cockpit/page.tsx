@@ -47,13 +47,15 @@ function SeverityDot({ severity }: { severity: string }) {
   return <span className="inline-block h-2 w-2 rounded-full bg-blue-400 mr-2" />;
 }
 
-function BlockerList({ items, emptyLabel }: { items: CloseCockpitBlocker[]; emptyLabel: string }) {
-  if (items.length === 0) {
+function BlockerList({ items, emptyLabel }: { items?: CloseCockpitBlocker[] | null; emptyLabel: string }) {
+  const safeItems = Array.isArray(items) ? items : [];
+
+  if (safeItems.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyLabel}</p>;
   }
   return (
     <ul className="space-y-2">
-      {items.map((b) => (
+      {safeItems.map((b) => (
         <li key={b.key} className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
           <SeverityDot severity={b.severity} />
           <div>
@@ -66,13 +68,15 @@ function BlockerList({ items, emptyLabel }: { items: CloseCockpitBlocker[]; empt
   );
 }
 
-function ActionItemList({ items }: { items: CloseCockpitActionItem[] }) {
-  if (items.length === 0) {
+function ActionItemList({ items }: { items?: CloseCockpitActionItem[] | null }) {
+  const safeItems = Array.isArray(items) ? items : [];
+
+  if (safeItems.length === 0) {
     return <p className="text-sm text-muted-foreground">No action items.</p>;
   }
   return (
     <ul className="space-y-2">
-      {items.map((item) => (
+      {safeItems.map((item) => (
         <li key={item.key} className="flex items-start gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
           <SeverityDot severity={item.severity} />
           <div className="flex-1">
@@ -139,6 +143,9 @@ export default function AccountingCloseCockpitPage() {
   }, [year, month]);
 
   const yearOptions = Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i);
+  const blockers = Array.isArray(cockpit?.blockers) ? cockpit.blockers : [];
+  const warnings = Array.isArray(cockpit?.warnings) ? cockpit.warnings : [];
+  const actionItems = Array.isArray(cockpit?.action_items) ? cockpit.action_items : [];
 
   return (
     <ERPPageShell
@@ -294,26 +301,26 @@ export default function AccountingCloseCockpitPage() {
 
           {/* Blockers */}
           <ERPSectionShell
-            title={`Blockers (${cockpit.blockers.length})`}
+            title={`Blockers (${blockers.length})`}
             description="Critical conditions that prevent period close. All must be resolved before can_close = true."
           >
-            <BlockerList items={cockpit.blockers} emptyLabel="No blockers — period is ready to close." />
+            <BlockerList items={blockers} emptyLabel="No blockers — period is ready to close." />
           </ERPSectionShell>
 
           {/* Warnings */}
           <ERPSectionShell
-            title={`Warnings (${cockpit.warnings.length})`}
+            title={`Warnings (${warnings.length})`}
             description="Non-blocking conditions that should be reviewed before close."
           >
-            <BlockerList items={cockpit.warnings} emptyLabel="No warnings." />
+            <BlockerList items={warnings} emptyLabel="No warnings." />
           </ERPSectionShell>
 
           {/* Action items */}
           <ERPSectionShell
-            title={`Action items (${cockpit.action_items.length})`}
+            title={`Action items (${actionItems.length})`}
             description="Prioritised items from all readiness layers. CRITICAL items must be resolved before close."
           >
-            <ActionItemList items={cockpit.action_items} />
+            <ActionItemList items={actionItems} />
           </ERPSectionShell>
 
           {/* Quick navigation */}

@@ -128,6 +128,7 @@ export default function AccountingExportReportsPage() {
   }
 
   const yearOptions = Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i);
+  const reports = Array.isArray(index?.reports) ? index.reports : [];
   const monthOptions = [
     [1, "Jan"], [2, "Feb"], [3, "Mar"], [4, "Apr"],
     [5, "May"], [6, "Jun"], [7, "Jul"], [8, "Aug"],
@@ -203,7 +204,7 @@ export default function AccountingExportReportsPage() {
 
       {!loading && !error && index ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {index.reports.map((report) => (
+          {reports.map((report) => (
             <ReportCard
               key={report.key}
               report={report}
@@ -221,7 +222,7 @@ export default function AccountingExportReportsPage() {
         </div>
       ) : null}
 
-      {!loading && !error && index?.reports.length === 0 ? (
+      {!loading && !error && index && reports.length === 0 ? (
         <ERPEmptyState
           title="No reports available"
           description="The export index returned no reports. Check backend configuration."
@@ -306,11 +307,15 @@ function ReportCard({
 }
 
 function ReportSummary({ data }: { data: AccountingExportReport }) {
-  const rowCount = data.rows.length;
-  const totalLineCount = typeof data.totals["total_line_count"] === "number"
-    ? data.totals["total_line_count"]
+  const rows = Array.isArray(data.rows) ? data.rows : [];
+  const columns = Array.isArray(data.columns) ? data.columns : [];
+  const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+  const totals = data.totals && typeof data.totals === "object" ? data.totals : {};
+  const rowCount = rows.length;
+  const totalLineCount = typeof totals["total_line_count"] === "number"
+    ? totals["total_line_count"]
     : null;
-  const truncated = data.totals["truncated"] === true;
+  const truncated = totals["truncated"] === true;
 
   return (
     <div className="flex flex-col gap-2 text-xs">
@@ -321,24 +326,24 @@ function ReportSummary({ data }: { data: AccountingExportReport }) {
             ? ` of ${totalLineCount}`
             : null}
         </span>
-        {data.totals["total_debit"] !== undefined ? (
+        {totals["total_debit"] !== undefined ? (
           <span className="text-muted-foreground">
-            Dr: <span className="font-medium text-foreground">{String(data.totals["total_debit"])}</span>
+            Dr: <span className="font-medium text-foreground">{String(totals["total_debit"])}</span>
           </span>
         ) : null}
-        {data.totals["total_credit"] !== undefined ? (
+        {totals["total_credit"] !== undefined ? (
           <span className="text-muted-foreground">
-            Cr: <span className="font-medium text-foreground">{String(data.totals["total_credit"])}</span>
+            Cr: <span className="font-medium text-foreground">{String(totals["total_credit"])}</span>
           </span>
         ) : null}
-        {data.totals["total_outstanding"] !== undefined ? (
+        {totals["total_outstanding"] !== undefined ? (
           <span className="text-muted-foreground">
-            Outstanding: <span className="font-medium text-foreground">{String(data.totals["total_outstanding"])}</span>
+            Outstanding: <span className="font-medium text-foreground">{String(totals["total_outstanding"])}</span>
           </span>
         ) : null}
-        {data.totals["overall_status"] !== undefined ? (
+        {totals["overall_status"] !== undefined ? (
           <span className="text-muted-foreground">
-            Status: <span className="font-medium text-foreground">{String(data.totals["overall_status"])}</span>
+            Status: <span className="font-medium text-foreground">{String(totals["overall_status"])}</span>
           </span>
         ) : null}
       </div>
@@ -347,9 +352,9 @@ function ReportSummary({ data }: { data: AccountingExportReport }) {
         <p className="text-amber-600">Result truncated. Narrow the period or use a smaller limit.</p>
       ) : null}
 
-      {data.warnings.length > 0 ? (
+      {warnings.length > 0 ? (
         <ul className="list-disc pl-4 text-amber-600 space-y-0.5">
-          {data.warnings.map((w, i) => (
+          {warnings.map((w, i) => (
             <li key={i}>{w}</li>
           ))}
         </ul>
@@ -364,7 +369,7 @@ function ReportSummary({ data }: { data: AccountingExportReport }) {
             <table className="min-w-full text-xs border-collapse">
               <thead>
                 <tr>
-                  {data.columns.map((col) => (
+                  {columns.map((col) => (
                     <th
                       key={col}
                       className="border border-border px-2 py-1 text-left font-medium text-muted-foreground bg-muted/40"
@@ -375,9 +380,9 @@ function ReportSummary({ data }: { data: AccountingExportReport }) {
                 </tr>
               </thead>
               <tbody>
-                {data.rows.slice(0, 3).map((row, i) => (
+                {rows.slice(0, 3).map((row, i) => (
                   <tr key={i}>
-                    {data.columns.map((col) => (
+                    {columns.map((col) => (
                       <td key={col} className="border border-border px-2 py-1 text-foreground">
                         {String(row[col] ?? "")}
                       </td>

@@ -46,6 +46,9 @@ export default function TrialBalanceCheckPage() {
     void load();
   }, [load]);
 
+  const checks = Array.isArray(data?.checks) ? data.checks : [];
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+
   return (
     <ERPPageShell
       title="Trial Balance Check"
@@ -88,7 +91,7 @@ export default function TrialBalanceCheckPage() {
 
           <ERPSectionShell title="Automation checks" description="Draft and void handling is reported as diagnostic messages only.">
             <div className="grid gap-3 md:grid-cols-2">
-              {data.checks.map((check) => (
+              {checks.map((check) => (
                 <article key={check.key} className="rounded-xl border border-border bg-background p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="font-semibold">{check.label ?? check.title ?? check.key}</div>
@@ -101,7 +104,7 @@ export default function TrialBalanceCheckPage() {
           </ERPSectionShell>
 
           <ERPSectionShell title="Account rows" description="Only accounts returned by the backend are shown.">
-            {data.rows.length === 0 ? (
+            {rows.length === 0 ? (
               <ERPEmptyState title="No posted account rows" description="No posted journal lines were returned for this period." />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
@@ -115,7 +118,7 @@ export default function TrialBalanceCheckPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {data.rows.map((row) => (
+                    {rows.map((row) => (
                       <tr key={row.account_id}>
                         <td className="px-3 py-3"><div className="font-medium">{row.account_code} · {row.account_name}</div>{!row.is_active ? <div className="text-xs text-amber-700">Inactive account</div> : null}</td>
                         <td className="px-3 py-3">{row.account_type}</td>

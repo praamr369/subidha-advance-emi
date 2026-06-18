@@ -29,17 +29,20 @@ export function FinancialStatusBadge({
   status,
   deferred,
 }: {
-  status: FinancialStatus;
+  status?: FinancialStatus | null;
   deferred?: boolean;
 }) {
+  const safeStatus: FinancialStatus =
+    status && status in STATUS_STYLES ? status : "INFO";
+
   return (
     <span
       className={cn(
         "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold tracking-wide",
-        STATUS_STYLES[status]
+        STATUS_STYLES[safeStatus]
       )}
     >
-      {deferred ? "DEFERRED" : status}
+      {deferred ? "DEFERRED" : safeStatus}
     </span>
   );
 }
@@ -97,14 +100,16 @@ export function FinancialActionItemsList({
   items,
   emptyLabel = "No action items returned for this period.",
 }: {
-  items: FinancialActionItem[];
+  items?: FinancialActionItem[] | null;
   emptyLabel?: string;
 }) {
-  if (items.length === 0) {
+  const safeItems = Array.isArray(items) ? items : [];
+
+  if (safeItems.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyLabel}</p>;
   }
 
-  const sorted = [...items].sort(
+  const sorted = [...safeItems].sort(
     (left, right) =>
       (SEVERITY_RANK[left.severity] ?? 9) - (SEVERITY_RANK[right.severity] ?? 9)
   );

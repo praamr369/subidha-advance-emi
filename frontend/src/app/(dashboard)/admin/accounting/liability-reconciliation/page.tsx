@@ -30,13 +30,15 @@ function DeferredBalance({ value }: { value?: string | null }) {
   return <>{accountingMoney(value)}</>;
 }
 
-function CheckList({ checks }: { checks: FinancialCheck[] }) {
-  if (checks.length === 0) {
+function CheckList({ checks }: { checks?: FinancialCheck[] | null }) {
+  const safeChecks = Array.isArray(checks) ? checks : [];
+
+  if (safeChecks.length === 0) {
     return <p className="text-sm text-muted-foreground">No checks returned.</p>;
   }
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      {checks.map((check) => (
+      {safeChecks.map((check) => (
         <article key={check.key} className="rounded-xl border border-border bg-background p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="font-semibold">{check.title ?? check.label ?? check.key}</div>
