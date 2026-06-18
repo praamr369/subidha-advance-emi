@@ -414,7 +414,7 @@ def build_reconciliation_posture(as_of: date | None = None, period: dict | None 
 # Section E — Customer advance / security deposit posture
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _advance_deposit_posture_internal(start: date, end: date) -> dict:
+def _advance_deposit_posture_internal(start: date, end: date, year: int = 0, month: int = 0) -> dict:
     try:
         from django.db.models import Count, Q, Sum
         from subscriptions.models import (
@@ -489,24 +489,51 @@ def _advance_deposit_posture_internal(start: date, end: date) -> dict:
                 f"{dep_without_bridge_count} deposit transaction(s) have no accounting bridge posting."
             )
 
+        # P4C: pull richer reconciliation detail if available.
+        p4c_adv: dict | None = None
+        p4c_dep: dict | None = None
+        try:
+            from accounting.services.liability_reconciliation_service import (
+                build_customer_advance_reconciliation,
+                build_security_deposit_reconciliation,
+            )
+            _period = {"year": year, "month": month} if year and month else None
+            p4c_adv = build_customer_advance_reconciliation(period=_period)
+            p4c_dep = build_security_deposit_reconciliation(period=_period)
+        except Exception:
+            pass
+
+        adv_section: dict = {
+            "total_count": adv_agg["total_count"] or 0,
+            "total_amount": _money(adv_agg["total_amount"]),
+            "total_unapplied_amount": _money(adv_agg["total_unapplied"]),
+            "open_unapplied_count": adv_unapplied_count,
+            "liability_mismatch_count": liability_mismatch_count,
+        }
+        if p4c_adv:
+            adv_section["expected_liability"] = p4c_adv.get("expected_liability")
+            adv_section["bridge_gap_count"] = p4c_adv.get("bridge_gap_count", 0)
+            adv_section["stale_unapplied_count"] = p4c_adv.get("stale_unapplied_count", 0)
+            adv_section["p4c_status"] = p4c_adv.get("status")
+
+        dep_section: dict = {
+            "collected_count": collected["count"] or 0,
+            "collected_amount": _money(collected["amount"]),
+            "refunded_count": refunded["count"] or 0,
+            "refunded_amount": _money(refunded["amount"]),
+            "deducted_count": deducted["count"] or 0,
+            "deducted_amount": _money(deducted["amount"]),
+            "deposit_transactions_without_bridge": dep_without_bridge_count,
+        }
+        if p4c_dep:
+            dep_section["expected_deposit_liability"] = p4c_dep.get("expected_deposit_liability")
+            dep_section["active_contract_deposit_gap_count"] = p4c_dep.get("active_contract_deposit_gap_count", 0)
+            dep_section["p4c_status"] = p4c_dep.get("status")
+
         return {
             "status": status,
-            "customer_advance": {
-                "total_count": adv_agg["total_count"] or 0,
-                "total_amount": _money(adv_agg["total_amount"]),
-                "total_unapplied_amount": _money(adv_agg["total_unapplied"]),
-                "open_unapplied_count": adv_unapplied_count,
-                "liability_mismatch_count": liability_mismatch_count,
-            },
-            "security_deposit": {
-                "collected_count": collected["count"] or 0,
-                "collected_amount": _money(collected["amount"]),
-                "refunded_count": refunded["count"] or 0,
-                "refunded_amount": _money(refunded["amount"]),
-                "deducted_count": deducted["count"] or 0,
-                "deducted_amount": _money(deducted["amount"]),
-                "deposit_transactions_without_bridge": dep_without_bridge_count,
-            },
+            "customer_advance": adv_section,
+            "security_deposit": dep_section,
             "warnings": warnings,
         }
     except Exception as exc:
@@ -941,6 +968,18 @@ def build_financial_action_items(as_of: date | None = None, period: dict | None 
     except Exception:
         pass
 
+    # P4C: liability reconciliation action items
+    try:
+        from accounting.services.liability_reconciliation_service import (
+            build_liability_reconciliation_action_items,
+        )
+        p4c_items = build_liability_reconciliation_action_items(
+            as_of=_as_of, period={"year": year, "month": month}
+        )
+        items.extend(p4c_items)
+    except Exception:
+        pass
+
     # Billing invoices without receipts
     try:
         from billing.models import BillingInvoice, BillingDocumentStatus
@@ -1037,7 +1076,7 @@ def build_financial_intelligence_snapshot(
     billing = _billing_posture(start, end)
     bridge = _bridge_posture_internal(start, end)
     reconciliation = _reconciliation_posture_internal()
-    advance_deposit = _advance_deposit_posture_internal(start, end)
+    advance_deposit = _advance_deposit_posture_internal(start, end, year, month)
     control = _control_posture_internal(year, month)
     inventory = _inventory_finance_posture_internal(start, end)
 

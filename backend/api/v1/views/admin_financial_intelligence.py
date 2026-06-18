@@ -22,6 +22,9 @@ from accounting.services.financial_intelligence_service import (
     build_reconciliation_posture,
 )
 from accounting.services.trial_balance_check_service import build_trial_balance_check
+from accounting.services.liability_reconciliation_service import (
+    build_liability_reconciliation_snapshot,
+)
 
 
 def _parse_params(request: Request) -> tuple[date | None, dict | None]:
@@ -153,6 +156,36 @@ class AdminFinancialIntelligenceActionItemsView(APIView):
 
         items = build_financial_action_items(as_of=as_of, period=period)
         return Response({"action_items": items, "count": len(items)}, status=status.HTTP_200_OK)
+
+
+class AdminLiabilityReconciliationView(APIView):
+    """
+    GET /api/v1/admin/financial-intelligence/liability-reconciliation/
+
+    Returns the P4C Liability Reconciliation Center snapshot covering:
+    - Customer advance collected / applied / refunded / expected liability
+    - Security deposit collected / refunded / deducted / expected liability
+    - Bridge gap detection for both subsystems
+    - Active rent/lease contracts without deposit posture
+    - Prioritised action items
+
+    Admin only. No financial records are mutated.
+
+    Query params:
+        as_of   - YYYY-MM-DD  (optional, defaults to today)
+        year    - integer      (optional, defaults to month of as_of)
+        month   - integer      (optional, defaults to month of as_of)
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request: Request) -> Response:
+        try:
+            as_of, period = _parse_params(request)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        result = build_liability_reconciliation_snapshot(as_of=as_of, period=period)
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class AdminTrialBalanceCheckView(APIView):
