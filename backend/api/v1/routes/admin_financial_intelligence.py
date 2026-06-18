@@ -6,6 +6,7 @@ from api.v1.views.admin_financial_intelligence import (
     AdminFinancialIntelligenceControlPostureView,
     AdminFinancialIntelligenceReconciliationPostureView,
     AdminFinancialIntelligenceView,
+    AdminTrialBalanceCheckView,
 )
 
 urlpatterns = [
@@ -14,4 +15,5 @@ urlpatterns = [
     path("financial-intelligence/reconciliation-posture/", AdminFinancialIntelligenceReconciliationPostureView.as_view()),
     path("financial-intelligence/control-posture/", AdminFinancialIntelligenceControlPostureView.as_view()),
     path("financial-intelligence/action-items/", AdminFinancialIntelligenceActionItemsView.as_view()),
+    path("financial-intelligence/trial-balance/", AdminTrialBalanceCheckView.as_view()),
 ]

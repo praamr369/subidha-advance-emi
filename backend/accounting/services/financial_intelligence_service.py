@@ -969,6 +969,53 @@ def build_financial_action_items(as_of: date | None = None, period: dict | None 
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Section H — Trial Balance posture (P4B)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _trial_balance_posture_internal(start: date, end: date) -> dict:
+    """
+    Delegate to P4B trial balance check service.  Returns a condensed summary
+    suitable for inclusion in the P4A snapshot.  Never raises — wrapped
+    defensively so a P4B failure cannot crash the full P4A snapshot.
+    """
+    try:
+        from accounting.services.trial_balance_check_service import build_trial_balance_check
+        check = build_trial_balance_check(
+            as_of=end,
+            period={"year": end.year, "month": end.month},
+        )
+        critical_count = check.get("critical_check_count", 0)
+        is_balanced = check.get("is_balanced", False)
+        status = check.get("status", STATUS_INFO)
+
+        action_item: dict | None = None
+        if not is_balanced:
+            action_item = {
+                "key": "trial_balance.imbalance",
+                "severity": "CRITICAL",
+                "title": "Trial Balance Imbalance",
+                "description": (
+                    f"Debit/credit totals do not match: "
+                    f"debit={check.get('total_debit')}, credit={check.get('total_credit')}, "
+                    f"difference={check.get('difference')}."
+                ),
+                "source_area": "trial_balance",
+            }
+
+        return {
+            "status": status,
+            "is_balanced": is_balanced,
+            "total_debit": check.get("total_debit"),
+            "total_credit": check.get("total_credit"),
+            "difference": check.get("difference"),
+            "critical_check_count": critical_count,
+            "action_item": action_item,
+        }
+    except Exception as exc:
+        return {**_deferred(f"Trial balance posture unavailable: {exc!s:.200}"), "section": "trial_balance"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Main snapshot entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -994,6 +1041,8 @@ def build_financial_intelligence_snapshot(
     control = _control_posture_internal(year, month)
     inventory = _inventory_finance_posture_internal(start, end)
 
+    trial_balance = _trial_balance_posture_internal(start, end)
+
     action_items = build_financial_action_items(
         as_of=resolved_as_of,
         period={"year": year, "month": month},
@@ -1007,6 +1056,7 @@ def build_financial_intelligence_snapshot(
         advance_deposit.get("status", STATUS_INFO),
         control.get("status", STATUS_INFO),
         inventory.get("status", STATUS_INFO),
+        trial_balance.get("status", STATUS_INFO),
     ]
     overall_status = STATUS_OK
     for s in section_statuses:
@@ -1024,6 +1074,7 @@ def build_financial_intelligence_snapshot(
             "advance_deposit": advance_deposit,
             "control": control,
             "inventory_finance": inventory,
+            "trial_balance": trial_balance,
         },
         "action_items": action_items,
     }

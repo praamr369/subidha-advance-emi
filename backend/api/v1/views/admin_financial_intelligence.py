@@ -21,6 +21,7 @@ from accounting.services.financial_intelligence_service import (
     build_financial_intelligence_snapshot,
     build_reconciliation_posture,
 )
+from accounting.services.trial_balance_check_service import build_trial_balance_check
 
 
 def _parse_params(request: Request) -> tuple[date | None, dict | None]:
@@ -152,3 +153,27 @@ class AdminFinancialIntelligenceActionItemsView(APIView):
 
         items = build_financial_action_items(as_of=as_of, period=period)
         return Response({"action_items": items, "count": len(items)}, status=status.HTTP_200_OK)
+
+
+class AdminTrialBalanceCheckView(APIView):
+    """
+    GET /api/v1/admin/financial-intelligence/trial-balance/
+
+    Returns the full P4B Trial Balance Automation Check payload.
+    Admin-only. No financial records are mutated.
+
+    Query params:
+        as_of   - YYYY-MM-DD  (optional, defaults to today)
+        year    - integer      (optional, defaults to month of as_of)
+        month   - integer      (optional, defaults to month of as_of)
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request: Request) -> Response:
+        try:
+            as_of, period = _parse_params(request)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        result = build_trial_balance_check(as_of=as_of, period=period)
+        return Response(result, status=status.HTTP_200_OK)
