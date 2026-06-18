@@ -15,6 +15,7 @@ import {
   ContractActivationReadinessPanel,
   type ActivationReadiness,
 } from "@/components/subscriptions/ContractActivationReadinessPanel";
+import { ReadinessGatedActionBanner } from "@/components/subscriptions/ReadinessGatedActionBanner";
 import { DataTableShell, DetailPanel, Timeline } from "@/components/ui/operations";
 import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import {
@@ -1438,12 +1439,26 @@ export default function AdminSubscriptionDetailPage() {
               )}
             </section>
 
-            {/* Phase 9D — Contract Activation Readiness panel */}
+            {/* Phase 9D/9E — Contract Activation Readiness panel with readiness-gated action gates */}
             <DetailPanel
               title="Contract Activation Readiness"
               description="Read-only readiness evaluation. Activation and handover blockers are separate. Accounting bridge is advisory. No payment, receipt, journal, stock movement, or reconciliation record is created from this panel."
               className="rounded-[28px]"
             >
+              {/* Phase 9E — compact activation/handover gate summary before the full panel */}
+              <div
+                className="mb-5 grid gap-2 sm:grid-cols-2"
+                data-testid="readiness-action-gate-summary"
+              >
+                <ReadinessGatedActionBanner
+                  stage="activation"
+                  readiness={subscription.activation_readiness}
+                />
+                <ReadinessGatedActionBanner
+                  stage="handover"
+                  readiness={subscription.activation_readiness}
+                />
+              </div>
               <ContractActivationReadinessPanel readiness={subscription.activation_readiness} />
             </DetailPanel>
 
@@ -1495,30 +1510,43 @@ export default function AdminSubscriptionDetailPage() {
                     <DetailValue label="Failure Reason" value={currentDelivery.failure_reason || "—"} />
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <Link
-                      href={`/admin/deliveries/${currentDelivery.id}`}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-                    >
-                      Open Delivery Detail
-                    </Link>
-                    <Link
-                      href={`/admin/deliveries?subscription=${subscription.id}&portfolio=${
-                        String(subscription.plan_type || "").toUpperCase() === "RENT"
-                          ? "RENT"
-                          : String(subscription.plan_type || "").toUpperCase() === "LEASE"
-                            ? "LEASE"
-                            : "ADVANCE_EMI"
-                      }`}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-                    >
-                      Open Delivery Workspace
-                    </Link>
+                  {/* Phase 9E — handover readiness gate before delivery action links */}
+                  <div className="mt-4 space-y-3">
+                    <ReadinessGatedActionBanner
+                      stage="handover"
+                      readiness={subscription.activation_readiness}
+                    />
+                    <div className="flex flex-wrap gap-3">
+                      <Link
+                        href={`/admin/deliveries/${currentDelivery.id}`}
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                      >
+                        Open Delivery Detail
+                      </Link>
+                      <Link
+                        href={`/admin/deliveries?subscription=${subscription.id}&portfolio=${
+                          String(subscription.plan_type || "").toUpperCase() === "RENT"
+                            ? "RENT"
+                            : String(subscription.plan_type || "").toUpperCase() === "LEASE"
+                              ? "LEASE"
+                              : "ADVANCE_EMI"
+                        }`}
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+                      >
+                        Open Delivery Workspace
+                      </Link>
+                    </div>
                   </div>
                 </>
               ) : (
-                <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
-                  No delivery record exists for this subscription yet. Create one from the delivery workspace when the item is ready for scheduling or dispatch.
+                <div className="space-y-3">
+                  <ReadinessGatedActionBanner
+                    stage="handover"
+                    readiness={subscription.activation_readiness}
+                  />
+                  <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                    No delivery record exists for this subscription yet. Create one from the delivery workspace when the item is ready for scheduling or dispatch.
+                  </div>
                 </div>
               )}
 

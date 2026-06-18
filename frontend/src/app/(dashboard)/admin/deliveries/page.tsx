@@ -960,6 +960,23 @@ export default function AdminDeliveriesPage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     Review the source and adjust receiver/address fields before creating the delivery record.
                   </p>
+                  {/* Phase 9E — readiness note: contract readiness is not evaluated here */}
+                  <div className="mt-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
+                    <span className="font-medium">Contract readiness is evaluated on subscription detail.</span>
+                    {" "}Backend readiness check remains authoritative.
+                    {" "}No payment, receipt, journal, stock movement, or reconciliation record is created from this action area.
+                    {selectedSource?.id ? (
+                      <span>
+                        {" "}
+                        <Link
+                          href={`/admin/subscriptions/${selectedSource.id}`}
+                          className="font-semibold text-primary underline-offset-4 hover:underline"
+                        >
+                          View readiness details →
+                        </Link>
+                      </span>
+                    ) : null}
+                  </div>
 
                   {sourcePrefillLoading ? (
                     <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-muted-foreground">
