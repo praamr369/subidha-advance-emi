@@ -318,6 +318,7 @@ export const ROUTES = {
     accountingBridges: "/admin/accounting/bridges",
     accountingExports: "/admin/accounting/exports",
     accountingItrPack: "/admin/accounting/exports/itr-pack",
+    accountingExportReports: "/admin/accounting/exports/reports",
     accountingStaff: "/admin/accounting/staff",
     accountingStaffLedger: "/admin/accounting/staff-ledger",
     accountingExpenseClaims: "/admin/accounting/expense-claims",

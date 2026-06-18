@@ -2225,3 +2225,147 @@ export function runPayoutBatchBridge(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+// ─── P4E Export-Ready Accounting Reports ─────────────────────────────────────
+
+export type AccountingExportRow = Record<string, string | number | boolean>;
+
+export type AccountingExportPayload = {
+  report_key: string;
+  period: { year: number; month: number };
+  as_of: string;
+  columns: string[];
+  rows: AccountingExportRow[];
+  totals: Record<string, string | number | boolean>;
+  warnings: string[];
+  metadata: Record<string, unknown>;
+};
+
+export type AccountingExportReportMeta = {
+  key: string;
+  title: string;
+  description: string;
+  endpoint: string;
+  formats: string[];
+};
+
+export type AccountingExportIndex = {
+  report_key: string;
+  period: { year: number; month: number };
+  as_of: string;
+  period_start: string;
+  period_end: string;
+  reports: AccountingExportReportMeta[];
+  metadata: Record<string, unknown>;
+};
+
+function _exportQuery(params: {
+  year?: number | null;
+  month?: number | null;
+  as_of?: string | null;
+  format?: string;
+  include_draft?: boolean;
+  limit?: number | null;
+}): string {
+  const qs = new URLSearchParams();
+  if (params.year != null) qs.set("year", String(params.year));
+  if (params.month != null) qs.set("month", String(params.month));
+  if (params.as_of) qs.set("as_of", params.as_of);
+  if (params.format) qs.set("export_format", params.format);
+  if (params.include_draft) qs.set("include_draft", "true");
+  if (params.limit != null) qs.set("limit", String(params.limit));
+  const s = qs.toString();
+  return s ? `?${s}` : "";
+}
+
+export function fetchAccountingExportIndex(params: {
+  year?: number | null;
+  month?: number | null;
+  as_of?: string | null;
+} = {}) {
+  return apiFetch<AccountingExportIndex>(
+    `/admin/accounting/exports/${_exportQuery(params)}`
+  );
+}
+
+export function fetchTrialBalanceExport(params: {
+  year?: number | null;
+  month?: number | null;
+  as_of?: string | null;
+} = {}) {
+  return apiFetch<AccountingExportPayload>(
+    `/admin/accounting/exports/trial-balance/${_exportQuery(params)}`
+  );
+}
+
+export function fetchJournalExport(params: {
+  year?: number | null;
+  month?: number | null;
+  as_of?: string | null;
+  include_draft?: boolean;
+  limit?: number | null;
+} = {}) {
+  return apiFetch<AccountingExportPayload>(
+    `/admin/accounting/exports/journals/${_exportQuery(params)}`
+  );
+}
+
+export function fetchLedgerExport(params: {
+  year?: number | null;
+  month?: number | null;
+  as_of?: string | null;
+} = {}) {
+  return apiFetch<AccountingExportPayload>(
+    `/admin/accounting/exports/ledgers/${_exportQuery(params)}`
+  );
+}
+
+export function fetchReceivablesExport(params: {
+  year?: number | null;
+  month?: number | null;
+  as_of?: string | null;
+} = {}) {
+  return apiFetch<AccountingExportPayload>(
+    `/admin/accounting/exports/receivables/${_exportQuery(params)}`
+  );
+}
+
+export function fetchLiabilityExport(params: {
+  year?: number | null;
+  month?: number | null;
+  as_of?: string | null;
+} = {}) {
+  return apiFetch<AccountingExportPayload>(
+    `/admin/accounting/exports/liabilities/${_exportQuery(params)}`
+  );
+}
+
+export function fetchBridgeAuditExport(params: {
+  year?: number | null;
+  month?: number | null;
+  as_of?: string | null;
+  limit?: number | null;
+} = {}) {
+  return apiFetch<AccountingExportPayload>(
+    `/admin/accounting/exports/bridge-audit/${_exportQuery(params)}`
+  );
+}
+
+export async function downloadAccountingExportCsv(
+  reportKey: "trial-balance" | "journals" | "ledgers" | "receivables" | "liabilities" | "bridge-audit",
+  params: {
+    year?: number | null;
+    month?: number | null;
+    as_of?: string | null;
+    include_draft?: boolean;
+  } = {}
+): Promise<void> {
+  const query = _exportQuery({ ...params, format: "csv" });
+  const period = params.year && params.month
+    ? `${params.year}-${String(params.month).padStart(2, "0")}`
+    : "export";
+  return downloadAuthenticatedFile(
+    `/admin/accounting/exports/${reportKey}/${query}`,
+    `${reportKey}-${period}.csv`
+  );
+}
