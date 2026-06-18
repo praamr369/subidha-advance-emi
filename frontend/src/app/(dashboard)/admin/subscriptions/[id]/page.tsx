@@ -11,6 +11,10 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { DocumentReadinessPanel } from "@/components/customer-intelligence/DocumentReadinessPanel";
 import { RentalAssetReadinessPanel } from "@/components/customer-intelligence/RentalAssetReadinessPanel";
+import {
+  ContractActivationReadinessPanel,
+  type ActivationReadiness,
+} from "@/components/subscriptions/ContractActivationReadinessPanel";
 import { DataTableShell, DetailPanel, Timeline } from "@/components/ui/operations";
 import { DetailItem as DetailValue } from "@/components/ui/workspace";
 import {
@@ -199,6 +203,7 @@ type SubscriptionDetailRecord = {
   rent_profile: RentProfile | null;
   lease_profile: LeaseProfile | null;
   documents: ContractDocument[];
+  activation_readiness: ActivationReadiness | null;
 };
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -569,6 +574,58 @@ function normalizeSubscriptionDetail(
     rent_profile: normalizeRentProfile(raw.rent_profile),
     lease_profile: normalizeLeaseProfile(raw.lease_profile),
     documents: toArray<Record<string, unknown>>(raw.documents).map(normalizeContractDocument),
+    activation_readiness: normalizeActivationReadiness(raw.activation_readiness),
+  };
+}
+
+function normalizeActivationReadiness(raw: unknown): ActivationReadiness | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  const categoriesRaw =
+    value.readiness_categories && typeof value.readiness_categories === "object"
+      ? (value.readiness_categories as Record<string, unknown>)
+      : {};
+
+  const normalizedCategories: ActivationReadiness["readiness_categories"] = {};
+  for (const [k, v] of Object.entries(categoriesRaw)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const cat = v as Record<string, unknown>;
+      normalizedCategories[k] = {
+        required: Boolean(cat.required),
+        ready: cat.ready === null || cat.ready === undefined ? null : Boolean(cat.ready),
+        advisory: Boolean(cat.advisory),
+        blocker_codes: Array.isArray(cat.blocker_codes) ? (cat.blocker_codes as string[]) : [],
+        details:
+          cat.details && typeof cat.details === "object" && !Array.isArray(cat.details)
+            ? (cat.details as Record<string, unknown>)
+            : {},
+      };
+    }
+  }
+
+  return {
+    readiness_status: String(value.readiness_status ?? "BLOCKED"),
+    can_activate: Boolean(value.can_activate),
+    can_deliver: Boolean(value.can_deliver),
+    activation_blockers: Array.isArray(value.activation_blockers)
+      ? (value.activation_blockers as ActivationReadiness["activation_blockers"])
+      : [],
+    handover_blockers: Array.isArray(value.handover_blockers)
+      ? (value.handover_blockers as ActivationReadiness["handover_blockers"])
+      : [],
+    readiness_categories: normalizedCategories,
+    advisory_warnings: Array.isArray(value.advisory_warnings)
+      ? (value.advisory_warnings as string[])
+      : [],
+    plan_notes: Array.isArray(value.plan_notes) ? (value.plan_notes as string[]) : [],
+    is_direct_sale: Boolean(value.is_direct_sale),
+    plan_type: String(value.plan_type ?? ""),
+    kyc_verified: Boolean(value.kyc_verified),
+    kyc_gating_enabled: Boolean(value.kyc_gating_enabled),
+    read_only_notice: String(
+      value.read_only_notice ??
+        "Read-only readiness evaluation. No payment, receipt, journal, stock movement, or reconciliation record is created from this panel."
+    ),
   };
 }
 
@@ -1380,6 +1437,15 @@ export default function AdminSubscriptionDetailPage() {
                 </DetailPanel>
               )}
             </section>
+
+            {/* Phase 9D — Contract Activation Readiness panel */}
+            <DetailPanel
+              title="Contract Activation Readiness"
+              description="Read-only readiness evaluation. Activation and handover blockers are separate. Accounting bridge is advisory. No payment, receipt, journal, stock movement, or reconciliation record is created from this panel."
+              className="rounded-[28px]"
+            >
+              <ContractActivationReadinessPanel readiness={subscription.activation_readiness} />
+            </DetailPanel>
 
             {!isEmiSubscription ? (
               <section className="grid gap-6 xl:grid-cols-2">

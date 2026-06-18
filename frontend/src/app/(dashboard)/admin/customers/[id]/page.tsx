@@ -2425,6 +2425,15 @@ export default function AdminCustomerDetailPage() {
               </>
             ) : null}
 
+            <div className="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3 text-sm text-sky-900">
+              <p className="font-semibold">Contract readiness is evaluated on each subscription detail.</p>
+              <p className="mt-1 text-xs">
+                Open an individual subscription to see its activation and handover readiness, blockers,
+                and category status. No readiness aggregation is performed here — each contract&apos;s
+                readiness is subscription-level and backend-evaluated.
+              </p>
+            </div>
+
             <SectionCard
               title="Active Linked Subscriptions"
               description="Operationally active subscription context for this customer."

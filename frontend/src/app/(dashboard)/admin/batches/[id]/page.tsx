@@ -606,6 +606,9 @@ export default function AdminBatchDetailPage() {
                   Subscriptions filtered by batch appear below from live subscription rows.
                 </li>
                 <li className="rounded-xl border border-border bg-background px-3 py-2">
+                  Draw and delivery readiness remain subscription-level and backend-evaluated. Open each subscription to see its activation and handover readiness.
+                </li>
+                <li className="rounded-xl border border-border bg-background px-3 py-2">
                   Payment/receipt belongs to Collections & Cashier.
                 </li>
                 <li className="rounded-xl border border-border bg-background px-3 py-2">

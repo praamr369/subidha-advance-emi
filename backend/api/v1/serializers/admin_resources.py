@@ -2130,6 +2130,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
     delivery_summary = serializers.SerializerMethodField()
     deliveries = serializers.SerializerMethodField()
     emis = serializers.SerializerMethodField()
+    activation_readiness = serializers.SerializerMethodField()
 
     class Meta(SubscriptionAdminSerializer.Meta):
         fields = SubscriptionAdminSerializer.Meta.fields + (
@@ -2143,6 +2144,7 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
             "delivery_summary",
             "deliveries",
             "emis",
+            "activation_readiness",
         )
         read_only_fields = fields
 
@@ -2294,6 +2296,131 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
         if deliveries is not None:
             return AdminSubscriptionDeliveryReadSerializer(deliveries, many=True).data
         return build_subscription_delivery_history(obj)
+
+    def get_activation_readiness(self, obj):
+        """P9D — Read-only activation/handover readiness surfacing.
+
+        Calls evaluate_contract_activation_readiness() which only reads state;
+        it never creates Payment, ReceiptDocument, JournalEntry, MoneyMovement,
+        StockLedger, ReconciliationItem, Commission, or Payout records.
+        Accounting bridge status is always labelled advisory here.
+        """
+        _SEVERITY = {
+            "KYC_NOT_VERIFIED": "HIGH",
+            "ID_PROOF_MISSING": "HIGH",
+            "ADDRESS_PROOF_MISSING": "HIGH",
+            "SIGNED_CONTRACT_MISSING": "HIGH",
+            "DEPOSIT_RECEIPT_MISSING": "HIGH",
+            "CONDITION_PROOF_MISSING": "MEDIUM",
+            "SIGNED_CONTRACT_REJECTED": "HIGH",
+            "SIGNED_CONTRACT_EXPIRED": "MEDIUM",
+            "DEPOSIT_RECEIPT_REJECTED": "HIGH",
+            "DEPOSIT_RECEIPT_EXPIRED": "MEDIUM",
+            "CONDITION_PROOF_REJECTED": "MEDIUM",
+            "CONTRACT_DATA_INCOMPLETE": "HIGH",
+            "EMI_SCHEDULE_NOT_READY": "HIGH",
+            "DEPOSIT_NOT_FULLY_COLLECTED": "HIGH",
+            "CONTRACT_STATUS_NOT_DELIVERABLE": "MEDIUM",
+            "STOCK_UNAVAILABLE": "MEDIUM",
+        }
+        _CATEGORIES = {
+            "KYC_NOT_VERIFIED": "KYC_PROFILE",
+            "ID_PROOF_MISSING": "KYC_PROFILE",
+            "ADDRESS_PROOF_MISSING": "KYC_PROFILE",
+            "SIGNED_CONTRACT_MISSING": "CONTRACT_DATA",
+            "SIGNED_CONTRACT_REJECTED": "CONTRACT_DATA",
+            "SIGNED_CONTRACT_EXPIRED": "CONTRACT_DATA",
+            "DEPOSIT_RECEIPT_MISSING": "PAYMENT_DEPOSIT",
+            "DEPOSIT_RECEIPT_REJECTED": "PAYMENT_DEPOSIT",
+            "DEPOSIT_RECEIPT_EXPIRED": "PAYMENT_DEPOSIT",
+            "CONDITION_PROOF_MISSING": "DELIVERY",
+            "CONDITION_PROOF_REJECTED": "DELIVERY",
+            "CONTRACT_DATA_INCOMPLETE": "CONTRACT_DATA",
+            "EMI_SCHEDULE_NOT_READY": "EMI_SCHEDULE",
+            "DEPOSIT_NOT_FULLY_COLLECTED": "PAYMENT_DEPOSIT",
+            "CONTRACT_STATUS_NOT_DELIVERABLE": "DELIVERY",
+            "STOCK_UNAVAILABLE": "INVENTORY_STOCK",
+        }
+        _MESSAGES = {
+            "KYC_NOT_VERIFIED": "Customer KYC must be verified before asset handover.",
+            "ID_PROOF_MISSING": "Customer identity proof document is required.",
+            "ADDRESS_PROOF_MISSING": "Customer address proof document is required.",
+            "SIGNED_CONTRACT_MISSING": "Signed contract or scheme consent document is required.",
+            "SIGNED_CONTRACT_REJECTED": "Signed contract document has been rejected — re-upload required.",
+            "SIGNED_CONTRACT_EXPIRED": "Signed contract document is expired — re-upload required.",
+            "DEPOSIT_RECEIPT_MISSING": "Security deposit receipt (collected) is required.",
+            "DEPOSIT_RECEIPT_REJECTED": "Security deposit receipt has been rejected — re-upload required.",
+            "DEPOSIT_RECEIPT_EXPIRED": "Security deposit receipt is expired — re-upload required.",
+            "CONDITION_PROOF_MISSING": "Asset condition proof at handover is required for lease contracts.",
+            "CONDITION_PROOF_REJECTED": "Asset condition proof document has been rejected.",
+            "CONTRACT_DATA_INCOMPLETE": "Contract data is incomplete — customer, product, tenure, or amounts are missing.",
+            "EMI_SCHEDULE_NOT_READY": "EMI schedule is not ready — row count or total does not match contract.",
+            "DEPOSIT_NOT_FULLY_COLLECTED": "Security deposit is not fully collected. Deposit readiness is separate from monthly demand readiness.",
+            "CONTRACT_STATUS_NOT_DELIVERABLE": "Contract status does not allow delivery.",
+            "STOCK_UNAVAILABLE": "Insufficient stock available for delivery.",
+        }
+
+        def _blocker_row(code: str) -> dict:
+            return {
+                "code": code,
+                "category": _CATEGORIES.get(code, "GENERAL"),
+                "severity": _SEVERITY.get(code, "MEDIUM"),
+                "message": _MESSAGES.get(code, f"{code.replace('_', ' ').title()}."),
+            }
+
+        try:
+            from subscriptions.services.contract_activation_readiness_service import (
+                evaluate_contract_activation_readiness,
+            )
+            data = evaluate_contract_activation_readiness(obj)
+        except Exception:
+            return None
+
+        categories_raw = data.get("readiness_categories", {})
+        categories_out = {}
+        for key, cat in categories_raw.items():
+            categories_out[key] = {
+                "required": cat["required"],
+                "ready": cat["ready"],
+                "advisory": key == "accounting_bridge",
+                "blocker_codes": cat["blocker_codes"],
+                "details": cat.get("details", {}),
+            }
+
+        advisory_warnings = []
+        acc = categories_raw.get("accounting_bridge", {})
+        if acc.get("applicable", True) and (acc.get("blocker_codes") or acc.get("status") == "DEFERRED_TO_ACCOUNTING_SETUP"):
+            advisory_warnings.append(
+                "Accounting bridge status is advisory here — Accounting & Reconciliation owns posting evidence."
+            )
+
+        plan_type = data.get("plan_type", "")
+        plan_notes = []
+        if plan_type in {"RENT", "LEASE"}:
+            plan_notes.append("Rent/Lease has no Lucky ID requirement.")
+            plan_notes.append("Deposit readiness is separate from monthly demand readiness.")
+        if plan_type == "EMI":
+            plan_notes.append("Winner waiver means future EMI waiver only.")
+
+        return {
+            "readiness_status": "READY" if data["can_activate"] else "BLOCKED",
+            "can_activate": data["can_activate"],
+            "can_deliver": data["can_handover"],
+            "activation_blockers": [_blocker_row(c) for c in data.get("activation_blocker_codes", [])],
+            "handover_blockers": [_blocker_row(c) for c in data.get("handover_blocker_codes", [])],
+            "readiness_categories": categories_out,
+            "advisory_warnings": advisory_warnings,
+            "plan_notes": plan_notes,
+            "is_direct_sale": data.get("is_direct_sale", False),
+            "plan_type": plan_type,
+            "kyc_verified": data.get("kyc_verified"),
+            "kyc_gating_enabled": data.get("kyc_gating_enabled"),
+            "read_only_notice": (
+                "Read-only readiness evaluation. "
+                "No payment, receipt, journal, stock movement, or reconciliation record "
+                "is created from this panel."
+            ),
+        }
 
 
 class PartnerAdminSerializer(serializers.ModelSerializer):

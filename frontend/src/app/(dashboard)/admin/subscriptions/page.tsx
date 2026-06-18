@@ -799,7 +799,7 @@ export default function AdminSubscriptionsPage() {
           <>
             <DetailPanel
               title="Subscription rows"
-              description="Review contract context and route into detail, customer, or payment operations."
+              description="Review contract context and route into detail, customer, or payment operations. Contract readiness is evaluated on each subscription detail — open a subscription to see its activation and handover readiness."
             >
               {count === 0 ? (
                 <ERPEmptyState

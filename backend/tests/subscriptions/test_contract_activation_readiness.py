@@ -583,3 +583,164 @@ class ContractReadinessEndpointMilestoneTests(APITestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertNotIn("activation_milestone", resp.data)
+
+
+# ---------------------------------------------------------------------------
+# P9D — subscription detail endpoint exposes activation_readiness
+# ---------------------------------------------------------------------------
+class SubscriptionDetailReadinessExposureTests(APITestCase):
+    """P9D: activation_readiness field is present on subscription detail endpoint."""
+
+    def setUp(self):
+        super().setUp()
+        self.admin = create_admin_user(username="p9d_api_admin", phone="9880000001")
+        self.client.force_authenticate(user=self.admin)
+        self.customer = create_customer_profile(name="P9D API Cust", phone="7880000001")
+        self.product = _rent_product(code="RENT-P9D-1")
+        self.sub = create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=12,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+
+    def _detail(self):
+        resp = self.client.get(f"/api/v1/admin/subscriptions/{self.sub.id}/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        return resp.data
+
+    def test_activation_readiness_present_on_detail_endpoint(self):
+        data = self._detail()
+        self.assertIn("activation_readiness", data)
+        readiness = data["activation_readiness"]
+        self.assertIsNotNone(readiness)
+
+    def test_activation_readiness_has_machine_readable_keys(self):
+        readiness = self._detail()["activation_readiness"]
+        for key in ("readiness_status", "can_activate", "can_deliver",
+                    "activation_blockers", "handover_blockers",
+                    "readiness_categories", "advisory_warnings"):
+            self.assertIn(key, readiness, f"Missing key: {key}")
+
+    def test_activation_readiness_has_seven_categories(self):
+        readiness = self._detail()["activation_readiness"]
+        cats = readiness["readiness_categories"]
+        expected = {
+            "kyc_profile", "contract_data", "emi_schedule",
+            "payment_deposit", "delivery", "inventory_stock", "accounting_bridge",
+        }
+        self.assertEqual(set(cats.keys()), expected)
+
+    def test_activation_blockers_have_required_shape(self):
+        readiness = self._detail()["activation_readiness"]
+        for blocker in readiness["activation_blockers"]:
+            for field in ("code", "category", "severity", "message"):
+                self.assertIn(field, blocker, f"Blocker missing field: {field}")
+
+    def test_handover_blockers_separate_from_activation_blockers(self):
+        readiness = self._detail()["activation_readiness"]
+        self.assertIn("activation_blockers", readiness)
+        self.assertIn("handover_blockers", readiness)
+
+    def test_deposit_receipt_missing_in_activation_blockers(self):
+        readiness = self._detail()["activation_readiness"]
+        codes = [b["code"] for b in readiness["activation_blockers"]]
+        self.assertIn("DEPOSIT_RECEIPT_MISSING", codes)
+
+    def test_accounting_bridge_advisory_flag(self):
+        readiness = self._detail()["activation_readiness"]
+        acc = readiness["readiness_categories"].get("accounting_bridge", {})
+        self.assertTrue(acc.get("advisory"), "accounting_bridge category must have advisory=True")
+
+    def test_rent_plan_notes_include_no_lucky_id_rule(self):
+        readiness = self._detail()["activation_readiness"]
+        notes = readiness.get("plan_notes", [])
+        self.assertTrue(
+            any("Lucky ID" in note or "Lucky" in note for note in notes),
+            "Rent readiness must note that Lucky ID is not required for Rent/Lease"
+        )
+
+    def test_deposit_monthly_demand_separation_note(self):
+        readiness = self._detail()["activation_readiness"]
+        notes = readiness.get("plan_notes", [])
+        self.assertTrue(
+            any("monthly demand" in note.lower() or "deposit readiness" in note.lower() for note in notes),
+            "Rent readiness must note that deposit readiness is separate from monthly demand"
+        )
+
+    def test_read_only_notice_present(self):
+        readiness = self._detail()["activation_readiness"]
+        self.assertIn("read_only_notice", readiness)
+        notice = readiness["read_only_notice"]
+        self.assertIn("Read-only", notice)
+
+    def test_readiness_evaluation_creates_no_records(self):
+        tracked_models = (
+            Payment,
+            ReceiptDocument,
+            JournalEntry,
+            MoneyMovement,
+            StockLedger,
+            AccountingBridgePosting,
+            ReconciliationItem,
+        )
+        before = {model: model.objects.count() for model in tracked_models}
+        self._detail()
+        after = {model: model.objects.count() for model in tracked_models}
+        self.assertEqual(after, before)
+
+    def test_activation_readiness_is_read_only(self):
+        """PUT/PATCH to the detail endpoint must not change activation_readiness semantics."""
+        data = self._detail()
+        readiness_before = data.get("activation_readiness")
+        self.assertIsNotNone(readiness_before)
+        readiness_after = self._detail().get("activation_readiness")
+        self.assertEqual(readiness_before["readiness_status"], readiness_after["readiness_status"])
+        self.assertEqual(readiness_before["can_activate"], readiness_after["can_activate"])
+
+    def test_emi_subscription_no_lucky_id_requirement_mentioned(self):
+        product = create_product(product_code="EMI-P9D-1")
+        batch = create_batch(batch_code="P9DEMI2026")
+        lucky = create_lucky_id(batch=batch, lucky_number=99)
+        emi_sub = create_subscription(
+            customer=self.customer, product=product, batch=batch, lucky_id=lucky
+        )
+        generate_emi_schedule(emi_sub)
+        resp = self.client.get(f"/api/v1/admin/subscriptions/{emi_sub.id}/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        readiness = resp.data.get("activation_readiness", {})
+        notes = readiness.get("plan_notes", [])
+        self.assertTrue(
+            any("winner waiver" in note.lower() or "future emi" in note.lower() for note in notes),
+            "EMI readiness must include winner waiver scope note"
+        )
+
+    def test_partial_deposit_stays_blocked(self):
+        profile = self.sub.rent_profile
+        collect_security_deposit(
+            subscription=self.sub,
+            amount=profile.security_deposit_amount / Decimal("2"),
+        )
+        readiness = self._detail()["activation_readiness"]
+        codes = [b["code"] for b in readiness["activation_blockers"]]
+        self.assertIn("DEPOSIT_NOT_FULLY_COLLECTED", codes)
+        self.assertFalse(readiness["can_activate"])
+
+    def test_deposit_document_alone_does_not_satisfy_readiness(self):
+        _add_deposit_receipt(self.sub)
+        readiness = self._detail()["activation_readiness"]
+        self.assertFalse(readiness["can_activate"])
+        codes = [b["code"] for b in readiness["activation_blockers"]]
+        self.assertIn("DEPOSIT_NOT_FULLY_COLLECTED", codes)
+
+    def test_rent_no_lucky_id_blocker_ever(self):
+        readiness = self._detail()["activation_readiness"]
+        all_blocker_codes = (
+            [b["code"] for b in readiness["activation_blockers"]]
+            + [b["code"] for b in readiness["handover_blockers"]]
+        )
+        self.assertNotIn(
+            "LUCKY_ID_MISSING", all_blocker_codes,
+            "Rent subscription must never have a Lucky ID blocker"
+        )
