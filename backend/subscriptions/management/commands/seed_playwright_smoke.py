@@ -11,7 +11,14 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import UserRole
-from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.models import (
+    ChartOfAccount,
+    ChartOfAccountType,
+    FinanceAccount,
+    FinanceAccountCoaMapping,
+    FinanceAccountKind,
+    FinanceAccountMappingPurpose,
+)
 from services.subscriptions.create_subscription import create_subscription
 from subscriptions.models import (
     Batch,
@@ -523,6 +530,20 @@ class Command(BaseCommand):
                 "opening_balance": Decimal("0.00"),
                 "is_active": True,
                 "notes": "Seeded operational finance account for Playwright smoke payments.",
+            },
+        )
+        # Required by finance_account_has_collection_mapping: an active CASH_COLLECTION
+        # purpose mapping must exist before record_emi_payment passes readiness checks.
+        # get_or_create on (finance_account, purpose, is_active) is idempotent —
+        # a second seed run finds the existing active row and does not duplicate it.
+        FinanceAccountCoaMapping.objects.get_or_create(
+            finance_account=finance_account,
+            purpose=FinanceAccountMappingPurpose.CASH_COLLECTION,
+            is_active=True,
+            defaults={
+                "chart_account": chart_account,
+                "is_default": True,
+                "notes": "Seeded for Playwright smoke automation.",
             },
         )
         return finance_account
