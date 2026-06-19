@@ -19,6 +19,15 @@ const smokeDbPath =
 const smokeManifestPath =
   process.env.PLAYWRIGHT_SMOKE_MANIFEST_PATH ||
   `/tmp/subidha-playwright-smoke-manifest-${randomUUID()}.json`;
+
+// Setup tests invoke Django commands directly. Keep them on the same isolated
+// SQLite database and generated artifacts as the backend webServer bootstrap.
+// Without this propagation they fall back to a second default database and
+// repeat the full migration chain inside Playwright's per-test timeout.
+process.env.PLAYWRIGHT_DB_PATH = smokeDbPath;
+process.env.PLAYWRIGHT_SMOKE_META_PATH = smokeMetaPath;
+process.env.PLAYWRIGHT_SMOKE_MANIFEST_PATH = smokeManifestPath;
+
 const resolvePythonExecutable = () => {
   const envConfigured =
     process.env.PLAYWRIGHT_PYTHON || process.env.PYTHON_BIN || "";

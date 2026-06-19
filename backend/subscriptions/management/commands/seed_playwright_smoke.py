@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -12,12 +12,25 @@ from django.utils import timezone
 
 from accounts.models import UserRole
 from accounting.models import (
+    AccountingPeriodStatus,
     ChartOfAccount,
     ChartOfAccountType,
     FinanceAccount,
     FinanceAccountCoaMapping,
     FinanceAccountKind,
     FinanceAccountMappingPurpose,
+    FinancialYear,
+)
+from accounting.services.document_sequence_service import (
+    DocumentType,
+    get_or_create_sequence_for_document_type,
+)
+from accounting.services.period_service import (
+    activate_financial_year,
+    financial_year_bounds,
+    financial_year_code,
+    generate_current_period,
+    validate_posting_date,
 )
 from services.subscriptions.create_subscription import create_subscription
 from subscriptions.models import (
@@ -126,6 +139,11 @@ class Command(BaseCommand):
             city="Dhaka",
             address="Winner Smoke Address",
         )
+        paid_payment_date, cashier_history_payment_date = self._smoke_payment_dates(today)
+        self._ensure_smoke_accounting_context(
+            reference_dates=(paid_payment_date, cashier_history_payment_date),
+            performed_by=admin,
+        )
         smoke_finance_account = self._ensure_smoke_finance_account()
 
         product = Product.objects.update_or_create(
@@ -231,7 +249,7 @@ class Command(BaseCommand):
             method="UPI",
             reference_no="SMOKE-PAID-001",
             note="Seeded payment for partner and customer smoke views.",
-            payment_date=today - timedelta(days=1),
+            payment_date=paid_payment_date,
             verified_by=admin,
         )
         cashier_history_payment = self._upsert_payment(
@@ -242,7 +260,7 @@ class Command(BaseCommand):
             method="CASH",
             reference_no="SMOKE-CASH-001",
             note="Seeded cashier history payment so Month 2 remains collectible.",
-            payment_date=today - timedelta(days=2),
+            payment_date=cashier_history_payment_date,
             verified_by=admin,
         )
 
@@ -478,6 +496,84 @@ class Command(BaseCommand):
         subscription.contract_reference = reference
         subscription.save(update_fields=["contract_reference"])
         return subscription
+
+    def _smoke_payment_dates(self, today: date) -> tuple[date, date]:
+        paid_payment_date = today - timedelta(days=1)
+        financial_year_start, _ = financial_year_bounds(paid_payment_date)
+        cashier_history_payment_date = max(
+            today - timedelta(days=2),
+            financial_year_start,
+        )
+        return paid_payment_date, cashier_history_payment_date
+
+    def _ensure_smoke_accounting_context(
+        self,
+        *,
+        reference_dates: tuple[date, ...],
+        performed_by,
+    ) -> dict:
+        dates = tuple(sorted(set(reference_dates)))
+        if not dates:
+            raise ValueError("At least one smoke accounting reference date is required.")
+
+        year_ranges = {financial_year_bounds(reference_date) for reference_date in dates}
+        if len(year_ranges) != 1:
+            raise ValueError(
+                "Playwright smoke payment dates must fall inside one financial year."
+            )
+
+        start_date, end_date = year_ranges.pop()
+        code = financial_year_code(dates[0])
+        financial_year, _ = FinancialYear.objects.get_or_create(
+            code=code,
+            defaults={
+                "name": f"Playwright Smoke {code}",
+                "start_date": start_date,
+                "end_date": end_date,
+                "is_active": False,
+                "notes": "Seeded only for deterministic Playwright accounting postings.",
+            },
+        )
+        if (
+            financial_year.start_date != start_date
+            or financial_year.end_date != end_date
+        ):
+            raise ValueError(
+                f"Existing financial year {financial_year.code} does not match "
+                "the required Playwright smoke date range."
+            )
+
+        if not financial_year.is_active:
+            financial_year = activate_financial_year(
+                financial_year.id,
+                performed_by=performed_by,
+            )
+
+        periods = []
+        for reference_date in dates:
+            period_result = generate_current_period(
+                reference_date=reference_date,
+                performed_by=performed_by,
+            )
+            period = validate_posting_date(reference_date)
+            if (
+                period.status != AccountingPeriodStatus.OPEN
+                or period.is_locked
+            ):
+                raise ValueError(
+                    f"Playwright smoke accounting period {period.code} must be open."
+                )
+            periods.append(period_result["period"])
+
+        journal_sequence = get_or_create_sequence_for_document_type(
+            DocumentType.JOURNAL_ENTRY,
+            dates[0],
+        )
+        return {
+            "financial_year": financial_year,
+            "periods": periods,
+            "journal_sequence": journal_sequence,
+        }
 
     def _upsert_payment(
         self,
