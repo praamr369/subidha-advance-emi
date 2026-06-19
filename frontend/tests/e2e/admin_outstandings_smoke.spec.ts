@@ -102,13 +102,13 @@ test("admin outstanding ledger loads, filters, and exposes export link", async (
   await page.goto("/admin/outstandings");
   const workspace = page.locator("#main-content");
   await expect(
-    page.getByRole("heading", { name: "Outstanding Ledger" })
+    page.getByRole("heading", { name: "Outstandings Register" })
   ).toBeVisible();
   await expect(page.getByText("Filter Customer")).toBeVisible();
   await workspace.getByRole("combobox").nth(0).selectOption("advance_emi");
   await expect(page.getByText("Sale Customer")).not.toBeVisible();
   await workspace.getByRole("combobox").nth(1).selectOption("overdue");
-  await page.getByPlaceholder("Search customer/reference/product").fill("filter");
+  await page.getByPlaceholder("Search customer / reference / product").fill("filter");
   await expect(page.getByText("Filter Customer")).toBeVisible();
 
   const exportLink = page.getByRole("link", { name: "Export CSV" });

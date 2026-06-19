@@ -30,19 +30,18 @@ test("admin dashboard, ERP, BI, HR surfaces load without duplicate key warnings"
   expect(keyWarnings).toEqual([]);
 });
 
-test("sidebar includes Admin Dashboard, ERP Home, BI Control Center, and HR entries", async ({ page }) => {
+test("sidebar includes current Admin, ERP, BI, and HR entries", async ({ page }) => {
   await page.goto("/admin");
 
   await expect(page.getByRole("link", { name: "Admin Dashboard" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "ERP Home" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "BI Control Center" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "BI Dashboards" }).first()).toBeVisible();
 
-  await expect(page.getByRole("link", { name: "Staff Workspace" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Staff Register" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "HR Dashboard" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Staff", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Attendance" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Salary / Payroll" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Payroll", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Salary Payments" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Leave Requests" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Expense Claims" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Leave", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Expenses", exact: true }).first()).toBeVisible();
 });
-

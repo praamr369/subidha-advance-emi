@@ -110,7 +110,7 @@ test.describe("accounting setup rent/lease workflow readiness", () => {
   test.use({ storageState: authStatePath("admin") });
 
   test("renders rent/lease and security deposit as live workflows without deferred copy", async ({ page }) => {
-    await page.route("**/api/v1/admin/accounting/setup/health/", async (route) => {
+    await page.route("**/api/v1/admin/accounting/setup-health/", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -122,6 +122,48 @@ test.describe("accounting setup rent/lease workflow readiness", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify(readinessPayload),
+      });
+    });
+    await page.route("**/api/v1/accounting/setup/matrix/", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(readinessPayload),
+      });
+    });
+    await page.route("**/api/v1/admin/rent-lease/accounting-bridge/config/", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          config: {
+            id: 1,
+            is_enabled: false,
+            enabled_at: null,
+            enabled_by_id: null,
+            disabled_at: null,
+            disabled_by_id: null,
+            reason: "",
+            last_readiness_snapshot: {},
+            created_at: null,
+            updated_at: null,
+          },
+          readiness: {
+            status: "READY",
+            reason: null,
+            source_collection_enabled: true,
+            accounting_bridge_enabled: false,
+            collection_ready: true,
+            mapping_ready: true,
+            posting_bridge_ready: false,
+            posting_bridge_approved: false,
+            posting_mode: "AUDIT_DEFERRED",
+            message: rentLeaseNote,
+            operator_action:
+              "Enable bridge posting through approved accounting bridge workflow.",
+            blockers: [],
+          },
+        }),
       });
     });
     await page.route("**/api/v1/admin/accounting/setup/defaults/preview/", async (route) => {
@@ -142,8 +184,8 @@ test.describe("accounting setup rent/lease workflow readiness", () => {
     await page.goto("/admin/accounting/setup");
 
     await expect(page.getByRole("heading", { name: "Accounting Setup" })).toBeVisible();
-    await expect(page.getByText("Rent / Lease Collection")).toBeVisible();
-    await expect(page.getByText("Security Deposit")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Rent / Lease Collection" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Security Deposit" })).toBeVisible();
     await expect(page.getByText(rentLeaseNote).first()).toBeVisible();
     await expect(page.locator("body")).toContainText("Posting mode");
     await expect(page.locator("body")).toContainText("AUDIT_DEFERRED");

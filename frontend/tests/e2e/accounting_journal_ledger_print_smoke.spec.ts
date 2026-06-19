@@ -155,6 +155,92 @@ const inactiveCashbookFixture = {
   },
 };
 
+const accountingBooksReadinessFixture = {
+  status: "READY",
+  blockers: [],
+  warnings: [
+    "Unmapped Wallet Account is not mapped to a posting-ready ASSET chart account.",
+  ],
+  counts: {
+    finance_accounts_total: 2,
+    active_finance_accounts: 2,
+    active_settlement_accounts: 2,
+    movement_eligible_accounts: 1,
+    cash_accounts: 2,
+    bank_accounts: 0,
+    upi_accounts: 0,
+    draft_money_movements: 0,
+    posted_money_movements: 0,
+    cancelled_money_movements: 0,
+  },
+  movement_eligible_accounts: [
+    {
+      id: 701,
+      name: "Main Cash Desk",
+      kind: "CASH",
+      branch_id: 2,
+      branch_code: "ASN",
+      branch_name: "Asansol Main Branch",
+      chart_account_id: 101,
+      chart_account_code: "CASH-001",
+      chart_account_name: "Cash in Hand",
+      chart_account_type: "ASSET",
+      opening_balance: "2000.00",
+      is_active: true,
+      is_real_settlement_account: true,
+      collection_ready: true,
+      collection_blocker_reason: null,
+      recommended_action: null,
+      posting_ready: true,
+      movement_eligible: true,
+    },
+  ],
+  finance_accounts: [
+    {
+      id: 701,
+      name: "Main Cash Desk",
+      kind: "CASH",
+      branch_id: 2,
+      branch_code: "ASN",
+      branch_name: "Asansol Main Branch",
+      chart_account_id: 101,
+      chart_account_code: "CASH-001",
+      chart_account_name: "Cash in Hand",
+      chart_account_type: "ASSET",
+      opening_balance: "2000.00",
+      is_active: true,
+      is_real_settlement_account: true,
+      collection_ready: true,
+      collection_blocker_reason: null,
+      recommended_action: null,
+      posting_ready: true,
+      movement_eligible: true,
+    },
+    {
+      id: 703,
+      name: "Unmapped Wallet Account",
+      kind: "CASH",
+      branch_id: 2,
+      branch_code: "ASN",
+      branch_name: "Asansol Main Branch",
+      chart_account_id: null,
+      chart_account_code: null,
+      chart_account_name: null,
+      chart_account_type: null,
+      opening_balance: "2000.00",
+      is_active: true,
+      is_real_settlement_account: true,
+      collection_ready: false,
+      collection_blocker_reason: "No linked chart account.",
+      recommended_action: "Map a posting-ready ASSET chart account.",
+      posting_ready: false,
+      movement_eligible: false,
+    },
+  ],
+  safety_note:
+    "Books can create only explicit admin-controlled inter-account money movement drafts. Posting remains a separate action and creates one controlled journal entry through the accounting service.",
+};
+
 const emptyPage = { count: 0, next: null, previous: null, results: [] };
 
 async function mockAccountingPrintApis(page: Parameters<typeof test>[0]["page"]) {
@@ -188,6 +274,13 @@ async function mockAccountingPrintApis(page: Parameters<typeof test>[0]["page"])
   });
   await page.route("**/accounting/money-movements/**", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(emptyPage) });
+  });
+  await page.route("**/accounting/books/readiness/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(accountingBooksReadinessFixture),
+    });
   });
   await page.route("**/accounting/chart-of-accounts/**", async (route) => {
     await route.fulfill({
@@ -316,7 +409,7 @@ test("accounting books exposes ledger and finance account statement print links"
   await page.goto("/admin/accounting/books");
 
   await expect(page.locator("div").filter({ hasText: /^Main Cash Desk$/ })).toBeVisible();
-  const financePrintLink = page.getByRole("link", { name: "Finance Account Statement PDF / Print" }).first();
+  const financePrintLink = page.getByRole("link", { name: "Finance Statement PDF / Print" }).first();
   await expect(financePrintLink).toBeVisible();
   await expect(financePrintLink).toHaveAttribute("href", "/admin/finance/accounts/701/statement/print");
 
@@ -331,7 +424,7 @@ test("accounting books withholds ledger statement link when finance account has 
   await page.goto("/admin/accounting/books");
 
   await expect(page.locator("div").filter({ hasText: /^Unmapped Wallet Account$/ })).toBeVisible();
-  await expect(page.getByText("Ledger Statement unavailable: no linked chart account")).toBeVisible();
+  await expect(page.getByText("No linked chart account.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Ledger Statement PDF / Print" })).toHaveCount(1);
-  await expect(page.getByRole("link", { name: "Finance Account Statement PDF / Print" })).toHaveCount(2);
+  await expect(page.getByRole("link", { name: "Finance Statement PDF / Print" })).toHaveCount(2);
 });

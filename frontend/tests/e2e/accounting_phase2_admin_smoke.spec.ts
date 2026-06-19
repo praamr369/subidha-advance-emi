@@ -31,5 +31,5 @@ test("admin accounting phase-2 routes load", async ({ page }) => {
   await expect(shellHeading(page, "ITR Export Pack")).toBeVisible();
 
   await page.goto("/admin/accounting/bridges");
-  await expect(shellHeading(page, "Bridge Runs")).toBeVisible();
+  await expect(shellHeading(page, "Accounting Bridge Readiness")).toBeVisible();
 });

@@ -7,9 +7,9 @@ test.use({ storageState: authStatePath("admin") });
 test("phase-3 admin accounting, inventory, billing, and reminders pages load", async ({ page }) => {
   await page.goto("/admin/accounting/periods");
   await expect(
-    page.getByRole("heading", { name: "Accounting Periods", level: 1 })
+    page.getByRole("heading", { name: "Accounting Period Cockpit", level: 1 })
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create Period" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Generate current period" })).toBeVisible();
 
   await page.goto("/admin/inventory/movements");
   await expect(
