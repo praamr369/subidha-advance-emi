@@ -51,15 +51,15 @@ const dayCloseFixture = {
 };
 
 async function mockDayCloseApis(page: Parameters<typeof test>[0]["page"]) {
-  await page.route("**/admin/settlements/cashier-day-closes/901/", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dayCloseFixture) });
-  });
   await page.route("**/admin/settlements/cashier-day-closes/**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ count: 1, next: null, previous: null, results: [dayCloseFixture] }),
     });
+  });
+  await page.route("**/admin/settlements/cashier-day-closes/901/", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dayCloseFixture) });
   });
 }
 
@@ -82,14 +82,14 @@ test("cashier day close print route renders branded unbalanced report", async ({
 
   await page.goto("/admin/settlements/day-closes/901/print");
 
-  await expect(page.getByText("Subidha Furniture")).toBeVisible();
+  await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
   await expect(page.getByText("CASHIER DAY CLOSE REPORT")).toBeVisible();
-  await expect(page.getByText("CDC-PRINT-901")).toBeVisible();
+  await expect(page.getByText("CDC-PRINT-901").first()).toBeVisible();
   await expect(page.getByText("UNBALANCED", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("cashier.print")).toBeVisible();
+  await expect(page.getByText("cashier.print").first()).toBeVisible();
   await expect(page.getByText("Asansol Main Branch")).toBeVisible();
   await expect(page.getByText("Main Cash Counter")).toBeVisible();
-  await expect(page.getByText("May 24, 2026")).toBeVisible();
+  await expect(page.getByText("24 May 2026").first()).toBeVisible();
   await expect(page.getByText("Opening Cash")).toBeVisible();
   await expect(page.getByText("Cash Collected / System Cash")).toBeVisible();
   await expect(page.getByText("UPI Collected")).toBeVisible();
@@ -97,9 +97,9 @@ test("cashier day close print route renders branded unbalanced report", async ({
   await expect(page.getByText("Variance / Shortage / Excess")).toBeVisible();
   await expect(page.getByText("This cashier day close has a non-zero variance")).toBeVisible();
   await expect(page.getByText("Payment Method Summary")).toBeVisible();
-  await expect(page.getByText("Cash")).toBeVisible();
-  await expect(page.getByText("UPI")).toBeVisible();
-  await expect(page.getByText("Bank / Card")).toBeVisible();
+  await expect(page.getByText("Cash", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("UPI", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Bank / Card", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("NEEDS_REVIEW")).toBeVisible();
   await expect(page.getByText("Cashier Signature")).toBeVisible();
   await expect(page.getByText("Manager / Admin Signature")).toBeVisible();
@@ -126,7 +126,7 @@ test("day close review exposes report print action", async ({ page }) => {
 
   await page.goto("/admin/settlements/day-closes/901");
 
-  await expect(page.getByText("CDC-PRINT-901")).toBeVisible();
+  await expect(page.getByText("CDC-PRINT-901").first()).toBeVisible();
   const printLink = page.getByRole("link", { name: "Day Close Report PDF / Print" }).first();
   await expect(printLink).toBeVisible();
   await expect(printLink).toHaveAttribute("href", "/admin/settlements/day-closes/901/print");

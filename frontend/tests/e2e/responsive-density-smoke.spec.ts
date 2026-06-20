@@ -34,7 +34,7 @@ for (const vp of VIEWPORTS) {
       await assertNoRunawayHorizontalOverflow(page);
 
       await page.goto("/login");
-      await expect(page.locator("#username")).toBeVisible();
+      await expect(page.locator("#identifier")).toBeVisible();
       await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
       await assertNoRunawayHorizontalOverflow(page);
     });

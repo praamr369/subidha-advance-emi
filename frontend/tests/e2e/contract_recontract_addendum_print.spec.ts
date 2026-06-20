@@ -131,6 +131,7 @@ const executedAmendment = {
   requested_by_username: "smoke.customer",
   requested_role: "CUSTOMER",
   amendment_type: "PRODUCT_CHANGE",
+  workflow_capability: { category: "PRODUCT_RECONTRACT" },
   status: "APPROVED",
   old_values: { product_id: 2001, product_name: "Old Sofa" },
   requested_values: { approved_product_id: 2002, approved_product_name: "New Sofa" },
@@ -217,17 +218,17 @@ test.describe("admin product recontract addendum print", () => {
     await mockAmendmentApis(page, "admin");
     await page.goto("/admin/contract-amendments/1/recontract-addendum/print");
 
-    await expect(page.getByText("Subidha Furniture")).toBeVisible();
+    await expect(page.getByText("Subidha Furniture").first()).toBeVisible();
     await expect(page.getByText("PRODUCT RECONTRACT ADDENDUM")).toBeVisible();
-    await expect(page.getByText("AMD-ADDENDUM-001")).toBeVisible();
+    await expect(page.getByText("AMD-ADDENDUM-001").first()).toBeVisible();
     await expect(page.getByText("SUB-ADDENDUM-001")).toBeVisible();
     await expect(page.getByText("Smoke Customer")).toBeVisible();
     await expect(page.getByText("Old Sofa / SOFA-OLD")).toBeVisible();
     await expect(page.getByText("New Sofa / SOFA-NEW")).toBeVisible();
-    await expect(page.getByText("Old Contract Total")).toBeVisible();
-    await expect(page.getByText("New Contract Total")).toBeVisible();
-    await expect(page.getByText("Old Monthly EMI")).toBeVisible();
-    await expect(page.getByText("New Monthly EMI")).toBeVisible();
+    await expect(page.getByText("Old Contract Total").first()).toBeVisible();
+    await expect(page.getByText("New Contract Total").first()).toBeVisible();
+    await expect(page.getByText("Old Monthly EMI").first()).toBeVisible();
+    await expect(page.getByText("New Monthly EMI").first()).toBeVisible();
     await expect(page.getByText("Historical payments unchanged.")).toBeVisible();
     await expect(page.getByText("Historical receipts unchanged.")).toBeVisible();
     await expect(page.getByText("Accounting evidence was created before execution.")).toBeVisible();

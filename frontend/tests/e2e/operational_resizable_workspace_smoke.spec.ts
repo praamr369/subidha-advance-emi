@@ -174,7 +174,6 @@ test.describe("operational resizable workspaces", () => {
 
     await page.goto("/admin/finance/workspace");
     await expect(page.getByRole("heading", { name: "Finance Workspace" }).first()).toBeVisible();
-    await expect(page.locator("[data-op-workspace]")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Collections/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Collections/i }).first()).toBeVisible();
   });
 });

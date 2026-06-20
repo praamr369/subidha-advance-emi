@@ -276,15 +276,15 @@ test.describe("PG-2C policy governance lifecycle UI", () => {
 
     const main = page.locator("#main-content");
     await expect(main.getByRole("heading", { name: "Policy governance" })).toBeVisible();
-    await expect(main.getByText("Under review", { exact: true })).toBeVisible();
-    await expect(main.getByText("Approved", { exact: true })).toBeVisible();
-    await expect(main.getByText("Archived", { exact: true })).toBeVisible();
+    await expect(main.getByText("Under review", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Approved", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Archived", { exact: true }).first()).toBeVisible();
     await expect(main.getByText("Metadata mismatch", { exact: true }).first()).toBeVisible();
-    await expect(main.getByText("Public published", { exact: true })).toBeVisible();
-    await expect(main.getByText("Internal ready", { exact: true })).toBeVisible();
-    await expect(main.getByText("Stored INTERNAL", { exact: true })).toBeVisible();
-    await expect(main.getByText("Catalog PUBLIC", { exact: true })).toBeVisible();
-    await expect(main.getByText("Mismatches: visibility", { exact: true })).toBeVisible();
+    await expect(main.getByText("Public published", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Internal ready", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Stored INTERNAL", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Catalog PUBLIC", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Mismatches: visibility", { exact: true }).first()).toBeVisible();
 
     await main.getByRole("button", { name: "Metadata mismatch" }).click();
     await expect(main.getByText("Business Compliance Policy", { exact: true })).toBeVisible();

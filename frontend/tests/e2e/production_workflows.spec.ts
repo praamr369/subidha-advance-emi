@@ -38,7 +38,7 @@ test.describe("production workflow readiness - admin", () => {
   test.use({ storageState: authStatePath("admin") });
 
   test("setup and bridge pages expose blockers without claiming posting readiness", async ({ page }) => {
-    await page.route("**/api/v1/admin/accounting/bridge-reconciliation/**", async (route) => {
+    await page.route("**/api/v1/admin/accounting/bridge-reconciliation*", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",

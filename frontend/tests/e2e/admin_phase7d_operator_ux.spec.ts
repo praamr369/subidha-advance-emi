@@ -68,7 +68,7 @@ test("bi charts show read-only report links", async ({ page }) => {
   });
 
   await page.goto("/admin/bi/cashflow");
-  await expect(page.locator("h1", { hasText: "Cashflow Dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cashflow Dashboard" }).first()).toBeVisible();
   if (await page.getByText("Failed to fetch").isVisible().catch(() => false)) {
     await expect(page.getByText("Failed to fetch")).toBeVisible();
   } else {

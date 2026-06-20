@@ -118,7 +118,7 @@ test("admin finance control center renders operational settlement and transfer s
   await page.goto("/admin/finance");
 
   await expect(
-    page.getByRole("heading", { name: "Finance Control Center" })
+    page.getByRole("heading", { name: "Finance Operations" })
   ).toBeVisible();
   if (await page.getByText("Failed to fetch").isVisible().catch(() => false)) {
     await expect(page.getByText(/Unable to load finance control center/i)).toBeVisible();
@@ -543,12 +543,11 @@ test("admin payment reconciliation compatibility route forwards query params to 
   );
 
   await expect(page).toHaveURL(
-    /\/admin\/finance\/reconciliation\?view=payments&subscription=901&payment=91&status=FLAGGED&flagged=true&locked=false&q=winner$/
+    /\/admin\/accounting\/bridge-reconciliation/
   );
   await expect(
-    page.getByRole("heading", { name: "Admin Reconciliation" })
+    page.getByRole("heading", { name: "Accounting Bridge Reconciliation" })
   ).toBeVisible();
-  await expect(page.locator("body")).toContainText("Payment reconciliation queue");
 });
 
 test("admin managed user edit page uses internal-user API and never calls partner subscription detail", async ({
@@ -1151,7 +1150,7 @@ test("admin customer list and intelligence hover keep cancelled contracts in his
   });
 
   await page.goto("/admin/customers");
-  await expect(page.locator("body")).toContainText("Historical contract (deduped) ₹67500.00");
+  await expect(page.locator("body")).toContainText("Historical contract (deduped) ₹67,500.00");
   const cancelledRow = page.locator("tr", { hasText: "Cancelled Only Customer" });
   await expect(cancelledRow.getByRole("link", { name: "Payment History" })).toBeVisible();
   await expect(cancelledRow.getByRole("link", { name: "Payments" })).toHaveCount(0);

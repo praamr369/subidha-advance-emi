@@ -206,6 +206,7 @@ function amendmentFor(event: RecontractEventFixture) {
     requested_by_username: "smoke.customer",
     requested_role: "CUSTOMER",
     amendment_type: "PRODUCT_CHANGE",
+    workflow_capability: { category: "PRODUCT_RECONTRACT" },
     status: "APPROVED",
     old_values: { product_id: 2001, product_name: "Old Sofa" },
     requested_values: { approved_product_id: 2002, approved_product_name: "New Sofa" },
@@ -345,12 +346,12 @@ test.describe("admin product recontract execution UI", () => {
     await page.goto("/admin/contract-amendments/1");
 
     await expect(page.getByText("Product recontract execution")).toBeVisible();
-    await expect(page.getByText("Customer consent accepted")).toBeVisible();
-    await expect(page.getByText("Admin approval approved")).toBeVisible();
-    await expect(page.getByText("Schedule preview generated")).toBeVisible();
-    await expect(page.getByText("Accounting posting exists")).toBeVisible();
-    await expect(page.getByText("Reconciliation bridge exists")).toBeVisible();
-    await expect(page.getByText("No previous execution")).toBeVisible();
+    await expect(page.getByText("Customer consent", { exact: true })).toBeVisible();
+    await expect(page.getByText("Admin approval", { exact: true })).toBeVisible();
+    await expect(page.getByText("Schedule preview", { exact: true })).toBeVisible();
+    await expect(page.getByText("Accounting bridge", { exact: true })).toBeVisible();
+    await expect(page.getByText("Reconciliation bridge", { exact: true })).toBeVisible();
+    await expect(page.getByText("Ready to execute", { exact: true }).first()).toBeVisible();
 
     const executeButton = page.getByRole("button", { name: "Execute approved recontract" });
     await expect(executeButton).toBeDisabled();

@@ -22,8 +22,8 @@ test("admin split surfaces load with expected role-safe posture", async ({ page 
   await expect(page.locator("body")).toContainText("windowed analytics summary");
 
   await page.goto("/admin/finance");
-  await expect(page.getByRole("heading", { name: "Finance Control Center" })).toBeVisible();
-  await expect(page.locator("body")).toContainText("Admin finance operations view");
+  await expect(page.getByRole("heading", { name: "Finance Operations" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("Finance source workflow");
 });
 
 test("reports and finance launch cards point to real routes", async ({ page }) => {
@@ -34,24 +34,25 @@ test("reports and finance launch cards point to real routes", async ({ page }) =
     { label: "Overdue EMI Report", hrefPrefix: "/admin/reports/overdue" },
     { label: "Batch Performance", hrefPrefix: "/admin/reports/batch-performance" },
     { label: "Collections Workspace", hrefPrefix: "/admin/collections" },
-    { label: "Reconciliation Workspace", hrefPrefix: "/admin/finance/reconciliation" },
+    { label: "Reconciliation Workspace", hrefPrefix: "/admin/accounting/bridge-reconciliation" },
     { label: "Finance Control", hrefPrefix: "/admin/finance" },
   ];
 
+  const mainContent = page.locator("#main-content");
   for (const link of reportLinks) {
-    const launch = page.getByRole("link", { name: link.label }).first();
+    const launch = mainContent.getByRole("link", { name: link.label }).first();
     await expect(launch).toBeVisible();
     await expect(launch).toHaveAttribute("href", new RegExp(`^${link.hrefPrefix}`));
   }
 
   await page.goto("/admin/finance");
-  await expect(page.getByRole("heading", { name: "Finance Control Center" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Finance Operations" })).toBeVisible();
   const financeLaunchpadLinks: Array<{ label: string; hrefPrefix: string }> = [
     { label: "Collections Workspace", hrefPrefix: "/admin/collections" },
     { label: "Payment Register", hrefPrefix: "/admin/payments" },
-    { label: "Purchase Bills", hrefPrefix: "/admin/accounting/purchase-bills" },
+    { label: "Purchase Bills", hrefPrefix: "/admin/purchases/bills" },
     { label: "Vendor Ledger View", hrefPrefix: "/admin/accounting/vendors" },
-    { label: "Flagged Queue", hrefPrefix: "/admin/finance/reconciliation" },
+    { label: "Flagged Queue", hrefPrefix: "/admin/accounting/bridge-reconciliation" },
     { label: "Payout Batches", hrefPrefix: "/admin/finance/payout-batches" },
     { label: "Open Direct Sale", hrefPrefix: "/admin/billing/direct-sales" },
     { label: "Open Subscriptions", hrefPrefix: "/admin/subscriptions" },

@@ -156,7 +156,7 @@ test("customer payments page shows separated EMI, rent/lease, and direct-sale re
 
   await page.goto("/customer/payments");
   await expect(page.getByRole("heading", { name: "My Payments" })).toBeVisible();
-  await expect(page.locator("body")).toContainText("EMI payment records");
+  await expect(page.locator("body")).toContainText("Recorded payments");
   await expect(page.locator("body")).toContainText("Rent / lease receipts");
   await expect(page.locator("body")).toContainText("RCT-RL-1");
   await expect(page.locator("body")).toContainText("Direct-sale receipts");
@@ -464,7 +464,7 @@ test("customer direct-sales list and detail routes load", async ({ page }) => {
   await page.goto("/customer/direct-sales");
   await expect(page.getByRole("heading", { name: "Direct Sales" }).last()).toBeVisible();
   await expect(page.locator("body")).toContainText("INV-2026-00701");
-  await expect(page.locator("body")).toContainText("₹1500.00");
+  await expect(page.locator("body")).toContainText("₹1,500.00");
   await page.getByRole("link", { name: "View" }).click();
   await expect(page).toHaveURL(/\/customer\/direct-sales\/701$/);
   await expect(page.locator("body")).toContainText("Customer snapshot");

@@ -72,7 +72,7 @@ test.describe.serial("cashier smoke", () => {
     await expectCashierSuccessOrControlledFetchError(page, async () => {
       await expect(page.getByText("Customer summary")).toBeVisible();
       await expect(
-        page.getByText(manifest.entities.cashier.customer_name)
+        page.getByText(manifest.entities.cashier.customer_name).first()
       ).toBeVisible();
     });
 

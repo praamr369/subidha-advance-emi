@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
@@ -18,7 +18,9 @@ import type { ReconciliationItem, ReconciliationModuleSummary, ReconciliationRun
 import ReconciliationExceptionQueue from "@/components/admin/reconciliation/ReconciliationExceptionQueue";
 import ReconciliationModuleMatrix from "@/components/admin/reconciliation/ReconciliationModuleMatrix";
 
-export default function AdminReconciliationRunDetailPage({ params }: { params: { id: string } }) {
+export default function AdminReconciliationRunDetailPage() {
+  const routeParams = useParams<{ id: string }>();
+  const id = routeParams?.id ?? "";
   const searchParams = useSearchParams();
   const moduleFilter = useMemo(() => (searchParams.get("module") || "").trim(), [searchParams]);
 
@@ -29,14 +31,15 @@ export default function AdminReconciliationRunDetailPage({ params }: { params: {
   const [items, setItems] = useState<ReconciliationItem[]>([]);
 
   const load = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
     setError(null);
     try {
       const [runPayload, modulePayload, itemsPayload] = await Promise.all([
-        getReconciliationRun(params.id),
-        getReconciliationModules(params.id),
+        getReconciliationRun(id),
+        getReconciliationModules(id),
         listReconciliationItems({
-          run: params.id,
+          run: id,
           module: moduleFilter || undefined,
         }),
       ]);
@@ -48,7 +51,7 @@ export default function AdminReconciliationRunDetailPage({ params }: { params: {
     } finally {
       setLoading(false);
     }
-  }, [params.id, moduleFilter]);
+  }, [id, moduleFilter]);
 
   useEffect(() => {
     void load();

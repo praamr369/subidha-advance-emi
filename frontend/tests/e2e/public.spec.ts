@@ -53,8 +53,8 @@ test("public home loads with apply nav, live stats, and latest winner widget", a
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Apply" }).first()).toBeVisible();
   await expect(page.locator(".public-hero").first()).toBeVisible();
-  await expect(page.getByText("Published batches")).toBeVisible();
-  await expect(page.getByText("Latest winner")).toBeVisible();
+  await expect(page.getByText("Published batches").first()).toBeVisible();
+  await expect(page.getByText("Latest winner").first()).toBeVisible();
 });
 
 test("public SEO metadata and global structured data are rendered", async ({ page }) => {
@@ -71,8 +71,9 @@ test("public SEO metadata and global structured data are rendered", async ({ pag
 
   const structuredData = page.locator("script#public-global-structured-data");
   await expect(structuredData).toHaveCount(1);
-  await expect(structuredData).toContainText("FurnitureStore");
-  await expect(structuredData).toContainText("WebSite");
+  const structuredDataContent = await structuredData.evaluate((el) => el.textContent ?? "");
+  expect(structuredDataContent).toContain("FurnitureStore");
+  expect(structuredDataContent).toContain("WebSite");
 });
 
 test("public generated visuals expose stable performance markers", async ({ page }) => {
@@ -86,7 +87,7 @@ test("public generated visuals expose stable performance markers", async ({ page
 test("public route smoke set renders without client error shell", async ({ page }) => {
   for (const route of publicRoutes) {
     await page.goto(route);
-    await expect(page.locator("main#main-content")).toBeVisible();
+    await expect(page.locator("main#main-content").first()).toBeVisible();
     await expect(page.locator("body")).not.toContainText("Unhandled Runtime Error");
     await expect(page.locator("body")).not.toContainText("Application error");
   }
@@ -160,8 +161,8 @@ test("public product detail supports plan-specific apply handoff", async ({ page
   await page.goto(`/products/${manifest.entities.public.product_id}`);
   await page.getByRole("link", { name: /rent enquiry/i }).click();
   await expect(page).toHaveURL(/plan_interest=RENT/);
-  await expect(page.getByText("Plan Interest")).toBeVisible();
-  await expect(page.getByText("Rent", { exact: true })).toBeVisible();
+  await expect(page.getByText("Plan Interest", { exact: true })).toBeVisible();
+  await expect(page.getByText("Rent", { exact: true }).first()).toBeVisible();
 });
 
 test("public winner history page loads with live data", async ({ page }) => {

@@ -406,7 +406,7 @@ test("admin Customer 360 loads operational cockpit sections and real route links
 
   await expect(page.getByText("RCPT-360")).toBeVisible();
   await expect(page.getByText("INV-360", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("AADHAAR")).toBeVisible();
+  await expect(page.getByText("AADHAAR").last()).toBeVisible();
   await expect(page.getByText("Smoke Partner")).toBeVisible();
 
   await expect(page.getByRole("button", { name: /Generate receipt/i })).toHaveCount(0);

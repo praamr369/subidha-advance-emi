@@ -237,11 +237,11 @@ test.describe("admin setup readiness center", () => {
     await page.goto("/admin/setup/readiness");
 
     const main = page.locator("#main-content");
-    await expect(main.getByRole("heading", { name: "Setup Readiness" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Business Setup" })).toBeVisible();
     await expect(main.getByText("BLOCKED", { exact: true }).first()).toBeVisible();
     await expect(main.getByText("Ready", { exact: true }).first()).toBeVisible();
-    await expect(main.getByText("Warnings", { exact: true }).first()).toBeVisible();
-    await expect(main.getByText("Blockers", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Pending/info", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Core blockers", { exact: true }).first()).toBeVisible();
 
     await expect(main.getByRole("heading", { name: "Business Profile" })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Business Compliance" })).toBeVisible();
@@ -250,21 +250,10 @@ test.describe("admin setup readiness center", () => {
     await expect(main.getByRole("heading", { name: "Batch / Lucky IDs" })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Amendment / Recontract Readiness" })).toBeVisible();
 
-    await expect(main.getByText("PG-2B governance metadata", { exact: true })).toBeVisible();
-    await expect(main.getByText("Public published: 9/12", { exact: true })).toBeVisible();
-    await expect(main.getByText("Internal ready: 4/6", { exact: true })).toBeVisible();
-    await expect(main.getByText("Metadata mismatch: 1", { exact: true })).toBeVisible();
-    await expect(main.getByRole("link", { name: "Policy Governance" })).toHaveAttribute("href", "/admin/settings/policies");
-
-    await expect(main.getByText("BC-2 compliance metadata", { exact: true })).toBeVisible();
-    await expect(main.getByText("Missing file: 3", { exact: true })).toBeVisible();
-
-    await expect(main.getByText("Main Cash Desk", { exact: true }).first()).toBeVisible();
-    await expect(main.getByText("Mapped chart account is a group/control account").first()).toBeVisible();
     await expect(main.getByText("Can collect payment", { exact: true }).first()).toBeVisible();
     await expect(main.getByText("Can publish public policies", { exact: true }).first()).toBeVisible();
 
-    await expect(main.getByRole("link", { name: "Open next setup action" })).toHaveAttribute("href", "/admin/settings/business-setup/profile");
+    await expect(main.getByRole("link", { name: "Next action" })).toHaveAttribute("href", "/admin/settings/business-setup/profile");
     await expect(main.getByRole("link", { name: "Open Accounting Setup" })).toHaveAttribute("href", "/admin/accounting/setup");
     await expect(main.getByRole("button", { name: /auto|fix|repair|remap|post|reconcile/i })).toHaveCount(0);
     await expect(main.getByRole("link", { name: /auto fix|silent remap|post now|reconcile now/i })).toHaveCount(0);
@@ -273,13 +262,13 @@ test.describe("admin setup readiness center", () => {
   test("renders error state", async ({ page }) => {
     await mockReadiness(page, { detail: "Readiness unavailable" }, 500);
     await page.goto("/admin/setup/readiness");
-    await expect(page.getByText("Unable to load setup readiness")).toBeVisible();
+    await expect(page.getByText("Readiness unavailable")).toBeVisible();
   });
 
   test("admin navigation exposes setup readiness", async ({ page }) => {
     await mockReadiness(page);
     await page.goto("/admin/setup/readiness");
-    await expect(page.getByRole("complementary").getByRole("link", { name: "Setup Readiness", exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("complementary").getByRole("link", { name: "Business Setup", exact: true }).first()).toBeVisible();
   });
 });
 

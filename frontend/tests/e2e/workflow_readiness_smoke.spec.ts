@@ -105,7 +105,7 @@ test.describe("admin readiness banner", () => {
     await page.goto("/admin/settings/business-setup/checklist");
     await expect(page.getByRole("heading", { name: "Business setup checklist" })).toBeVisible();
     await expect(
-      page.locator("#main-content").getByText("Document Numbering")
+      page.locator("#main-content").getByText("Document Numbering").first()
     ).toBeVisible();
     await expect(
       page.locator("#main-content").getByText("Invoice numbering readiness", { exact: true })
@@ -164,16 +164,16 @@ test.describe("admin readiness banner", () => {
     await page.goto("/admin/subscriptions");
     await expect(page.locator("main h1", { hasText: "Subscriptions" })).toBeVisible();
     await expect(page.locator("body")).toContainText("Advance EMI");
-    await expect(page.locator("body")).toContainText("Rent does not expose Lucky ID or Lucky Draw workflows.");
+    await expect(page.locator("body")).toContainText("Rent and Lease contracts do not use Lucky IDs or Lucky Draws.");
 
     await page.goto("/admin/subscriptions/advance-emi/create");
     await expect(page.locator("main h1", { hasText: "Create Subscription" })).toBeVisible();
 
     await page.goto("/admin/finance");
-    await expect(page.locator("main h1", { hasText: "Finance Control Center" })).toBeVisible();
+    await expect(page.locator("main h1", { hasText: "Finance Operations" })).toBeVisible();
 
     await page.goto("/admin/inventory");
-    await expect(page.locator("main h1", { hasText: "Inventory Operations" })).toBeVisible();
+    await expect(page.locator("main h1", { hasText: "Stock Posture" })).toBeVisible();
 
     await page.goto("/admin/delivery");
     await expect(page.locator("main h1", { hasText: "Delivery Workspace" })).toBeVisible();

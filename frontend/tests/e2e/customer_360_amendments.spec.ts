@@ -279,19 +279,19 @@ test("Customer 360 shows amendment and executed recontract status with addendum 
   await expect(page.getByText("Contract Amendments & Recontracts")).toBeVisible();
   await expect(page.getByText("AMD-901")).toBeVisible();
   await expect(page.getByText("Product change")).toBeVisible();
-  await expect(page.getByText("Requested date")).toBeVisible();
-  await expect(page.getByText("Approved date")).toBeVisible();
-  await expect(page.getByText("Product recontract status chain")).toBeVisible();
-  await expect(page.getByText("Preview saved")).toBeVisible();
-  await expect(page.getByText("Customer consent")).toBeVisible();
-  await expect(page.getByText("Admin approval")).toBeVisible();
-  await expect(page.getByText("Schedule preview")).toBeVisible();
-  await expect(page.getByText("Accounting posted")).toBeVisible();
-  await expect(page.getByText("Reconciliation linked")).toBeVisible();
-  await expect(page.getByText("Executed")).toBeVisible();
-  await expect(page.getByText("ACCEPTED")).toBeVisible();
-  await expect(page.getByText("POSTED")).toBeVisible();
-  await expect(page.getByText("LINKED")).toBeVisible();
+  await expect(page.getByText("Requested date").first()).toBeVisible();
+  await expect(page.getByText("Approved date").first()).toBeVisible();
+  await expect(page.getByText("Product recontract status chain").first()).toBeVisible();
+  await expect(page.getByText("Preview saved").first()).toBeVisible();
+  await expect(page.getByText("Customer consent").first()).toBeVisible();
+  await expect(page.getByText("Admin approval").first()).toBeVisible();
+  await expect(page.getByText("Schedule preview").first()).toBeVisible();
+  await expect(page.getByText("Accounting posted").first()).toBeVisible();
+  await expect(page.getByText("Reconciliation linked").first()).toBeVisible();
+  await expect(page.getByText("Executed").first()).toBeVisible();
+  await expect(page.getByText("ACCEPTED").first()).toBeVisible();
+  await expect(page.getByText("POSTED").first()).toBeVisible();
+  await expect(page.getByText("LINKED").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Open amendment detail" }).first()).toHaveAttribute(
     "href",
     "/admin/contract-amendments/901",

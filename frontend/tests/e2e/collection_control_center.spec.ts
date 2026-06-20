@@ -206,7 +206,7 @@ test.describe("admin collection control center", () => {
     await expect(page.getByText("Deferred — backend collection endpoint is not enabled yet.")).toBeVisible();
     await expect(page.getByText("Rent/lease collection")).toHaveCount(0);
     await expect(page.getByText("Rent / lease due")).toBeVisible();
-    await expect(page.getByText("Not exposed")).toBeVisible();
+    await expect(page.getByText("Not exposed").first()).toBeVisible();
     await expect(page.getByRole("link", { name: /Collect rent/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Collect rent/i })).toHaveCount(0);
   });
@@ -237,7 +237,7 @@ test.describe("admin collection control center", () => {
     await expect(page.getByRole("region", { name: "Collection readiness" })).toBeVisible();
     await expect(page.getByText("Direct sale due")).toBeVisible();
     await expect(page.getByText("Rent / lease due")).toBeVisible();
-    await expect(page.getByText("Not exposed")).toBeVisible();
+    await expect(page.getByText("Not exposed").first()).toBeVisible();
     await expect(page.getByText("Rent/lease due")).toHaveCount(0);
     await expect(page.getByText("₹0.00")).toHaveCount(0);
     await expect(page.getByText("Finance account blocker guidance")).toBeVisible();

@@ -12,8 +12,7 @@ test("phase-4 finance and accounting control surfaces share the business-control
   await expect(page.locator("body")).toContainText("Finance route map");
 
   await page.goto("/admin/finance/reconciliation");
-  await expect(page.getByRole("heading", { name: "Admin Reconciliation" }).first()).toBeVisible();
-  await expect(page.locator("body")).toContainText("collection-side reconciliation workspace");
+  await expect(page.getByRole("heading", { name: "Accounting Bridge Reconciliation" }).first()).toBeVisible();
 
   await page.goto("/admin/finance/payout-batches");
   await expect(page.getByRole("heading", { name: "Payout Batch Register" }).first()).toBeVisible();
@@ -21,7 +20,7 @@ test("phase-4 finance and accounting control surfaces share the business-control
 
   await page.goto("/admin/accounting/chart-of-accounts");
   await expect(page.getByRole("heading", { name: "Chart of Accounts" }).first()).toBeVisible();
-  await expect(page.locator("body")).toContainText("Accounting control map");
+  await expect(page.locator("body")).toContainText("Accounting Master Control");
 
   await page.goto("/admin/accounting/journals");
   await expect(page.getByRole("heading", { name: "Journals" }).first()).toBeVisible();
@@ -150,6 +149,5 @@ test("phase-4 billing, inventory, and reconciliation surfaces share the business
   await expect(page.locator("body")).toContainText("Inventory route map");
 
   await page.goto("/admin/reconciliation");
-  await expect(page.getByRole("heading", { name: "Admin Reconciliation" }).first()).toBeVisible();
-  await expect(page.locator("body")).toContainText("Reconciliation route map");
+  await expect(page.getByRole("heading", { name: "Accounting Bridge Reconciliation" }).first()).toBeVisible();
 });

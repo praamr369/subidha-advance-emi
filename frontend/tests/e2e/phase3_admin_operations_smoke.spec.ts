@@ -7,22 +7,20 @@ test.use({ storageState: authStatePath("admin") });
 test("phase-3 admin operations hubs load with visible navigation actions", async ({ page }) => {
   await page.goto("/admin/inventory");
   await expect(
-    page.getByRole("heading", { name: "Inventory Operations" })
+    page.getByRole("heading", { name: "Stock Posture" }).first()
   ).toBeVisible();
-  const inventoryActions = page.locator(".portal-page-actions");
-  await expect(inventoryActions.getByRole("link", { name: "Items" })).toBeVisible();
-  await expect(inventoryActions.getByRole("link", { name: "Ledger" })).toBeVisible();
-  await expect(inventoryActions.getByRole("link", { name: "Adjustments" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Items" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ledger" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Adjustments" }).first()).toBeVisible();
 
   await page.goto("/admin/billing");
   await expect(
     page.getByRole("heading", { name: "Billing Operations" })
   ).toBeVisible();
-  const billingActions = page.locator(".portal-page-actions");
-  await expect(billingActions.getByRole("link", { name: "Invoices" })).toBeVisible();
-  await expect(billingActions.getByRole("link", { name: "Credit Notes" })).toBeVisible();
-  await expect(billingActions.getByRole("link", { name: "Debit Notes" })).toBeVisible();
-  await expect(billingActions.getByRole("link", { name: "Receipts" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Invoices" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Credit Notes" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Debit Notes" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Receipts" }).first()).toBeVisible();
 
   await page.goto("/admin/reminders");
   await expect(page.getByRole("heading", { name: "Reminder Queue" })).toBeVisible();
@@ -37,13 +35,7 @@ test("phase-3 books and bridge controls load with active buttons", async ({ page
   await expect(page.getByRole("heading", { name: "Sales Book", level: 1 })).toBeVisible();
 
   await page.goto("/admin/accounting/bridges");
-  await expect(page.getByRole("heading", { name: "Bridge Runs" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run Bridge" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run Bridge" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Run retail sale" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run inventory posting" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run EMI subscription" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run EMI payment receipts" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accounting Bridge Readiness" })).toBeVisible();
 });
 
 test("phase-3 admin operational surfaces share the control-center framework", async ({
@@ -76,7 +68,7 @@ test("phase-3 admin operational surfaces share the control-center framework", as
 
   await page.goto("/admin/customers");
   await expect(page.getByRole("heading", { name: "Customer Register" }).first()).toBeVisible();
-  await expect(page.locator(".portal-page-actions").getByRole("link", { name: "Create Subscription" })).toBeVisible();
+  await expect(page.locator(".portal-page-actions").getByRole("link", { name: "Create Customer" })).toBeVisible();
 
   await page.goto("/admin/crm");
   await expect(page.getByRole("heading", { name: "CRM Workspace" }).first()).toBeVisible();

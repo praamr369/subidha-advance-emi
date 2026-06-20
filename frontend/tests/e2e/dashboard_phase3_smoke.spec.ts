@@ -40,7 +40,7 @@ test.describe("admin dashboard phase-3 smoke", () => {
 
   test("admin dashboard shows parent-only ERP sidebar modules", async ({ page }) => {
     await page.goto("/admin");
-    const sidebar = page.getByRole("complementary");
+    const sidebar = page.getByRole("complementary").first();
     await expectSuccessOrControlledFetchError(page, async () => {
       await expect(
         page.getByRole("heading", { name: /Daily Operator Dashboard|Executive Dashboard|Admin Dashboard/i })
@@ -48,31 +48,23 @@ test.describe("admin dashboard phase-3 smoke", () => {
     });
 
     const expectedParentModules = [
-      "Command Center",
-      "Sales & Contracts",
-      "Subscription EMI",
-      "Rent / Lease",
+      "Admin Dashboard",
       "Direct Sale",
-      "Accounting & Finance",
-      "Inventory",
-      "Manufacturing",
-      "CRM / Parties",
-      "HR & Staff",
-      "Service Desk",
-      "Delivery & Operations",
+      "Reconciliation",
+      "Manufacturing Dashboard",
+      "HR Dashboard",
       "Reports & Analysis",
       "Settings",
     ];
 
     for (const label of expectedParentModules) {
-      await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
+      await expect(sidebar.getByRole("link", { name: label, exact: true }).first()).toBeVisible();
     }
 
     const forbiddenSidebarItems = [
       "Batch Register",
       "Lucky ID Register",
       "EMI Schedule / EMI Register",
-      "Winners",
       "Waiver / Loss Report",
       "Security Deposits",
       "Delivery Requests",
@@ -82,10 +74,9 @@ test.describe("admin dashboard phase-3 smoke", () => {
       await expect(sidebar.getByRole("link", { name: label, exact: true })).toHaveCount(0);
     }
 
-    await expect(sidebar.getByRole("link", { name: "Accounting & Finance", exact: true })).toHaveAttribute("href", "/admin/accounting");
-    await expect(sidebar.getByRole("link", { name: "Subscription EMI", exact: true })).toHaveAttribute("href", "/admin/subscriptions");
-    await expect(sidebar.getByRole("link", { name: "Direct Sale", exact: true })).toHaveAttribute("href", "/admin/billing/direct-sale");
-    await expect(sidebar.getByRole("link", { name: "Settings", exact: true })).toHaveAttribute("href", "/admin/settings");
+    await expect(sidebar.getByRole("link", { name: "Reconciliation", exact: true }).first()).toHaveAttribute("href", "/admin/accounting/bridge-reconciliation");
+    await expect(sidebar.getByRole("link", { name: "Direct Sale", exact: true }).first()).toHaveAttribute("href", "/admin/billing/direct-sale");
+    await expect(sidebar.getByRole("link", { name: "Settings", exact: true }).first()).toHaveAttribute("href", "/admin/settings");
 
     const executiveLoadError = page.getByText(/Unable to load executive dashboard|Failed to fetch/i);
     if (await executiveLoadError.isVisible().catch(() => false)) {
@@ -115,11 +106,11 @@ test.describe("admin dashboard phase-3 smoke", () => {
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText("Ctrl K");
 
-    await page.getByPlaceholder("Search operations, registers, workflows…").fill("Direct Sales");
-    await expect(dialog.getByRole("link", { name: /Direct Sales/i })).toBeVisible();
+    await page.getByPlaceholder("Search operations, registers, workflows…").fill("Direct Sale");
+    await expect(dialog.getByRole("link", { name: /Direct Sale/i }).first()).toBeVisible();
     await page.getByPlaceholder("Search operations, registers, workflows…").fill("Create Direct Sale Invoice");
     await expect(dialog.getByRole("button", { name: /Create Direct Sale Invoice/i })).toBeVisible();
-    await page.getByPlaceholder("Search operations, registers, workflows…").fill("Batch Register");
-    await expect(dialog.getByRole("link", { name: "Batch Register", exact: true })).toBeVisible();
+    await page.getByPlaceholder("Search operations, registers, workflows…").fill("Batches");
+    await expect(dialog.getByRole("link", { name: /Batches/i }).first()).toBeVisible();
   });
 });

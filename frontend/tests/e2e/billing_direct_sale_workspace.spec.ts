@@ -74,7 +74,7 @@ test("admin direct-sale workspace routes share the create-bill flow", async ({ p
 test("admin sales sidebar avoids duplicate direct-sale entries", async ({ page }) => {
   await page.goto("/admin");
   const sidebar = page.locator("nav").first();
-  await expect(sidebar.getByRole("link", { name: "Direct Sales" })).toHaveCount(1);
+  await expect(sidebar.getByRole("link", { name: "Direct Sale", exact: true })).toHaveCount(1);
   const createDirectSaleCount = await sidebar.getByRole("link", { name: "Create Direct Sale Invoice" }).count();
   expect(createDirectSaleCount).toBeLessThanOrEqual(1);
   await expect(sidebar.getByRole("link", { name: "Direct Sale Billing Workspace" })).toHaveCount(0);
@@ -278,7 +278,7 @@ test("direct-sale submit surfaces 400, 404, and 500 api errors clearly", async (
   await routeCreate(400, { customer: ["Existing customer mode requires selecting a registered customer."] });
   await page.getByRole("button", { name: "Create Direct Sale" }).first().click();
   await expect(page.getByText("Direct sale could not be created. Please fix the highlighted fields.")).toBeVisible();
-  await expect(page.getByText(/customer:/i)).toBeVisible();
+  await expect(page.getByText(/customer:/i).first()).toBeVisible();
 
   await routeCreate(400, {
     detail: "Direct sale invoice numbering is not configured. Complete Admin Settings -> Document Numbering.",

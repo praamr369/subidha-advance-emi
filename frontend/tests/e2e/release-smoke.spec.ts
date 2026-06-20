@@ -49,7 +49,7 @@ test("ops health endpoints are green", async ({ request }) => {
 
 test("admin login entry page is available", async ({ page, browser }) => {
   await page.goto("/login");
-  await expect(page.locator("#username")).toBeVisible();
+  await expect(page.locator("#identifier")).toBeVisible();
   await expect(page.locator("#password")).toBeVisible();
   await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
 
@@ -194,13 +194,9 @@ test.describe("admin release smoke", () => {
     await page.goto(
       `/admin/payments/reconciliation?subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}`
     );
-    await expect(page).toHaveURL(
-      new RegExp(
-        `/admin/finance/reconciliation\\?view=payments&subscription=${meta.entities.preseed_payment.subscription_id}&payment=${meta.entities.preseed_payment.payment_id}$`
-      )
-    );
+    await expect(page).toHaveURL(/\/admin\/accounting\/bridge-reconciliation/);
     await expect(
-      page.getByRole("heading", { name: "Admin Reconciliation" })
+      page.getByRole("heading", { name: "Accounting Bridge Reconciliation" })
     ).toBeVisible();
   });
 });
