@@ -18,6 +18,8 @@ class SubscriptionsConfig(AppConfig):
         import subscriptions.models_control_foundation  # noqa
         import subscriptions.models_cash_counter_session  # noqa
         import subscriptions.models_month_end_close  # noqa
+        import subscriptions.models_growth_offers  # noqa
+        import subscriptions.models_growth_requests  # noqa
 
     def ready(self):
         import subscriptions.signals  # noqa

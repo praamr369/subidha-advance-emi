@@ -329,6 +329,14 @@ export const ROUTES = {
     accountingLeave: "/admin/accounting/leave",
     accountingSalary: "/admin/accounting/salary",
     accountingCloseCockpit: "/admin/accounting/close-cockpit",
+
+    // P5: Growth & Offers
+    growth: "/admin/growth",
+    growthPlanTemplates: "/admin/growth/plan-templates",
+    growthOfferPackages: "/admin/growth/offer-packages",
+    growthRequests: "/admin/growth/requests",
+    growthPartnerPerformance: "/admin/growth/partner-performance",
+    growthRetention: "/admin/growth/retention",
   },
 
   partner: {

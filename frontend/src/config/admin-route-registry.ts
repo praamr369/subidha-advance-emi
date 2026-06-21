@@ -341,6 +341,14 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("BI & Reports", "Risk Monitor", ROUTES.admin.analyticsRiskMonitor, "Read-only overdue EMI risk watchlist for collection escalation. Source-linked report. Drill down to Finance Operations / Outstandings for action."),
   item("BI & Reports", "Churn Analysis", ROUTES.admin.analyticsChurnAnalysis, "Read-only churn-risk and defaulted subscription watchlist. Source-linked report. Drill down to Profiles / Customers for action."),
 
+  // ── 17. Growth & Offers ───────────────────────────────────────────────────────
+  item("Growth & Offers", "Growth Hub", ROUTES.admin.growth, "Growth configuration hub: plan templates, offer packages, growth requests, partner performance, and retention intelligence."),
+  item("Growth & Offers", "Plan Templates", ROUTES.admin.growthPlanTemplates, "Reusable EMI, RENT, and LEASE plan configuration blueprints. Admin config only — no subscription created automatically."),
+  item("Growth & Offers", "Offer Packages", ROUTES.admin.growthOfferPackages, "Time-bounded offers built on plan templates. Preview/config only — no subscription, EMI, or payment created."),
+  item("Growth & Offers", "Growth Requests", ROUTES.admin.growthRequests, "Customer renewal, upgrade, exchange, and plan conversion requests. Request workflow only — no subscription mutated automatically."),
+  item("Growth & Offers", "Partner Performance", ROUTES.admin.growthPartnerPerformance, "Read-only partner activity: referrals, collections, overdue, commissions, and risk flags. No payout or commission mutation."),
+  item("Growth & Offers", "Retention Intelligence", ROUTES.admin.growthRetention, "Customer retention signals and suggested follow-up actions. Read-only advisory — no payments, penalties, or messages sent."),
+
   // ── 16. Enterprise Control ───────────────────────────────────────────────────
   item("Enterprise Control", "Control Desk", ROUTES.admin.controlRoot, "Enterprise control hub: approvals, policies, exceptions, cash sessions, close controls, and data quality."),
   item("Enterprise Control", "Approval Queue", ROUTES.admin.controlApprovals, "Maker-checker approvals pending a decision. Approve or reject controlled actions."),
