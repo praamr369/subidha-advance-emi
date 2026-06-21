@@ -10,20 +10,43 @@ from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from api.v1.permissions import HasRole
 from api.v1.pagination import build_paginated_payload
-from brochures.models import BrochureDocument, ProductBrochureSettings
+from brochures.models import (
+    BrochureDocument,
+    BrochureEnquiry,
+    BrochureEnquiryProduct,
+    ProductBrochureSettings,
+)
 from brochures.serializers import (
+    BrochureEnquiryAdminSerializer,
+    BrochureEnquiryAssignSerializer,
+    BrochureEnquiryCloseSerializer,
+    BrochureEnquiryUpdateSerializer,
     BrochureDocumentSerializer,
     BrochureProductQuerySerializer,
     BrochureRequestSerializer,
     ProductBrochureSettingsBulkSerializer,
     ProductBrochureSettingsUpdateSerializer,
+    PublicBrochureEnquirySerializer,
     PublicBrochureSerializer,
+    SAFE_SNAPSHOT_FIELDS,
+    brochure_pdf_url,
     brochure_settings_warnings,
     serialize_product_brochure_settings,
+)
+from brochures.services.brochure_crm_link_service import link_brochure_enquiry_to_crm
+from brochures.services.brochure_enquiry_duplicate_service import (
+    mark_possible_duplicate,
+    normalize_phone_for_comparison,
+)
+from brochures.services.brochure_enquiry_lifecycle_service import (
+    mark_enquiry_contacted,
+    record_initial_enquiry_history,
+    update_enquiry_follow_up,
 )
 from brochures.services.brochure_pdf_service import build_brochure_pdf
 from brochures.services.brochure_product_query_service import get_brochure_products
@@ -32,6 +55,11 @@ from subscriptions.models import Product
 
 class CanManageBrochures(HasRole):
     allowed_roles = ("ADMIN", "CASHIER", "STAFF")
+
+
+class BrochureEnquiryAnonThrottle(AnonRateThrottle):
+    def get_rate(self):
+        return "30/hour"
 
 
 DEFAULT_TITLES = {
@@ -66,6 +94,31 @@ def _public_token() -> str:
         if not BrochureDocument.objects.filter(public_token=candidate).exists():
             return candidate
     raise RuntimeError("Unable to allocate a unique public brochure token.")
+
+
+def _enquiry_no() -> str:
+    date_part = timezone.localdate().strftime("%Y%m%d")
+    for _ in range(10):
+        candidate = f"ENQ-BR-{date_part}-{secrets.token_hex(3).upper()}"
+        if not BrochureEnquiry.objects.filter(enquiry_no=candidate).exists():
+            return candidate
+    raise RuntimeError("Unable to allocate a unique brochure enquiry number.")
+
+
+def _active_public_brochure(public_token):
+    document = get_object_or_404(
+        BrochureDocument,
+        public_token=public_token,
+        status=BrochureDocument.Status.GENERATED,
+    )
+    if document.expires_at and document.expires_at <= timezone.now():
+        return None
+    return document
+
+
+def _client_ip(request):
+    forwarded = str(request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
+    return forwarded or request.META.get("REMOTE_ADDR") or None
 
 
 def _safe_products(validated_data: dict) -> tuple[str, list[dict]]:
@@ -432,3 +485,295 @@ class PublicBrochureDetailView(APIView):
         return Response(
             PublicBrochureSerializer(document, context={"request": request}).data
         )
+
+
+class PublicBrochureProductsView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, public_token):
+        document = _active_public_brochure(public_token)
+        if document is None:
+            return Response(
+                {"detail": "This brochure link has expired."},
+                status=status.HTTP_410_GONE,
+            )
+        return Response(
+            {
+                "brochure_no": document.brochure_no,
+                "title": document.title,
+                "brochure_type": document.brochure_type,
+                "pdf_url": brochure_pdf_url(document, request),
+                "products": [
+                    {
+                        key: value
+                        for key, value in row.items()
+                        if key in SAFE_SNAPSHOT_FIELDS
+                    }
+                    for row in (document.product_snapshot or [])
+                    if isinstance(row, dict)
+                ],
+            }
+        )
+
+
+class PublicBrochureEnquiryCreateView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [BrochureEnquiryAnonThrottle]
+
+    def post(self, request, public_token):
+        document = _active_public_brochure(public_token)
+        if document is None:
+            return Response(
+                {"detail": "This brochure link has expired."},
+                status=status.HTTP_410_GONE,
+            )
+        serializer = PublicBrochureEnquirySerializer(
+            data=request.data,
+            context={"brochure": document},
+        )
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        resolved_products = validated.pop("resolved_products", [])
+        validated.pop("products", None)
+        with transaction.atomic():
+            enquiry = BrochureEnquiry.objects.create(
+                enquiry_no=_enquiry_no(),
+                brochure=document,
+                brochure_token_snapshot=document.public_token,
+                source="BROCHURE",
+                phone_normalized=normalize_phone_for_comparison(validated["phone"]),
+                ip_address=_client_ip(request),
+                user_agent=str(request.META.get("HTTP_USER_AGENT") or "")[:2000],
+                **validated,
+            )
+            product_ids = [item["product_id"] for item in resolved_products]
+            products = {
+                product.id: product
+                for product in Product.objects.filter(id__in=product_ids)
+            }
+            BrochureEnquiryProduct.objects.bulk_create(
+                [
+                    BrochureEnquiryProduct(
+                        enquiry=enquiry,
+                        product=products.get(item["product_id"]),
+                        product_snapshot=item["snapshot"],
+                        brochure_product_code=str(item["snapshot"].get("product_code") or ""),
+                        brochure_product_name=str(item["snapshot"].get("name") or ""),
+                        requested_quantity=item["requested_quantity"],
+                        preferred_plan=item.get("preferred_plan"),
+                        notes=item.get("notes", ""),
+                    )
+                    for item in resolved_products
+                ]
+            )
+            record_initial_enquiry_history(enquiry)
+            mark_possible_duplicate(enquiry)
+        link_brochure_enquiry_to_crm(enquiry)
+        return Response(
+            {
+                "enquiry_no": enquiry.enquiry_no,
+                "status": enquiry.status,
+                "message": "Thank you. Our team will contact you soon.",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+def _enquiry_queryset():
+    return BrochureEnquiry.objects.select_related(
+        "brochure",
+        "assigned_to",
+        "crm_party",
+        "crm_interaction",
+        "crm_lead",
+        "duplicate_of",
+    ).prefetch_related("products", "status_history__changed_by")
+
+
+class AdminBrochureEnquiryListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+
+    def get(self, request):
+        queryset = _enquiry_queryset()
+        q = str(request.query_params.get("q") or "").strip()
+        if q:
+            queryset = queryset.filter(
+                Q(enquiry_no__icontains=q)
+                | Q(customer_name__icontains=q)
+                | Q(phone__icontains=q)
+                | Q(location__icontains=q)
+                | Q(products__brochure_product_name__icontains=q)
+            ).distinct()
+        for field in ("status", "preferred_plan", "priority"):
+            value = str(request.query_params.get(field) or "").strip()
+            if value:
+                queryset = queryset.filter(**{field: value})
+        brochure_type = str(request.query_params.get("brochure_type") or "").strip()
+        if brochure_type:
+            queryset = queryset.filter(brochure__brochure_type=brochure_type)
+        assigned_to = str(request.query_params.get("assigned_to") or "").strip()
+        if assigned_to.isdigit():
+            queryset = queryset.filter(assigned_to_id=int(assigned_to))
+        product_id = str(request.query_params.get("product_id") or "").strip()
+        if product_id.isdigit():
+            queryset = queryset.filter(products__product_id=int(product_id)).distinct()
+        date_from = str(request.query_params.get("date_from") or "").strip()
+        date_to = str(request.query_params.get("date_to") or "").strip()
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+        follow_up_due = _bool_query(request.query_params.get("follow_up_due"))
+        if follow_up_due is True:
+            queryset = queryset.filter(
+                follow_up_at__isnull=False,
+                follow_up_at__lte=timezone.now(),
+                status__in=[
+                    BrochureEnquiry.Status.NEW,
+                    BrochureEnquiry.Status.CONTACTED,
+                    BrochureEnquiry.Status.QUOTED,
+                ],
+            )
+        possible_duplicate = _bool_query(
+            request.query_params.get("possible_duplicate")
+        )
+        if possible_duplicate is not None:
+            queryset = queryset.filter(is_possible_duplicate=possible_duplicate)
+        crm_link_status = str(
+            request.query_params.get("crm_link_status") or ""
+        ).strip()
+        if crm_link_status:
+            queryset = queryset.filter(crm_link_status=crm_link_status)
+        return Response(
+            build_paginated_payload(
+                request,
+                queryset,
+                lambda rows: BrochureEnquiryAdminSerializer(rows, many=True).data,
+                default_page_size=25,
+            )
+        )
+
+
+class AdminBrochureEnquiryDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+
+    def get_object(self, pk):
+        return get_object_or_404(_enquiry_queryset(), pk=pk)
+
+    def get(self, request, pk):
+        return Response(
+            BrochureEnquiryAdminSerializer(
+                self.get_object(pk),
+                context={"include_internal_detail": True},
+            ).data
+        )
+
+    def patch(self, request, pk):
+        enquiry = self.get_object(pk)
+        serializer = BrochureEnquiryUpdateSerializer(
+            enquiry,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        enquiry = update_enquiry_follow_up(
+            enquiry,
+            changes=serializer.validated_data,
+            changed_by=request.user,
+        )
+        _sync_crm_follow_up(enquiry)
+        return Response(
+            BrochureEnquiryAdminSerializer(
+                self.get_object(pk),
+                context={"include_internal_detail": True},
+            ).data
+        )
+
+
+class AdminBrochureEnquiryAssignView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+
+    def post(self, request, pk):
+        enquiry = get_object_or_404(BrochureEnquiry, pk=pk)
+        serializer = BrochureEnquiryAssignSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        enquiry = update_enquiry_follow_up(
+            enquiry,
+            changes={"assigned_to": serializer.validated_data["assigned_to"]},
+            changed_by=request.user,
+        )
+        _sync_crm_follow_up(enquiry)
+        return Response(
+            BrochureEnquiryAdminSerializer(
+                _enquiry_queryset().get(pk=pk),
+                context={"include_internal_detail": True},
+            ).data
+        )
+
+
+class AdminBrochureEnquiryMarkContactedView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+
+    def post(self, request, pk):
+        enquiry = get_object_or_404(BrochureEnquiry, pk=pk)
+        enquiry = mark_enquiry_contacted(
+            enquiry,
+            changed_by=request.user,
+            note=str(request.data.get("note") or ""),
+        )
+        _sync_crm_follow_up(enquiry)
+        return Response(
+            BrochureEnquiryAdminSerializer(
+                _enquiry_queryset().get(pk=pk),
+                context={"include_internal_detail": True},
+            ).data
+        )
+
+
+class AdminBrochureEnquiryCloseView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+
+    def post(self, request, pk):
+        enquiry = get_object_or_404(BrochureEnquiry, pk=pk)
+        serializer = BrochureEnquiryCloseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        changes = {"status": serializer.validated_data["status"]}
+        if "internal_note" in serializer.validated_data:
+            changes["internal_note"] = serializer.validated_data["internal_note"]
+        enquiry = update_enquiry_follow_up(
+            enquiry,
+            changes=changes,
+            changed_by=request.user,
+            history_note=serializer.validated_data.get("internal_note", ""),
+        )
+        _sync_crm_follow_up(enquiry)
+        return Response(
+            BrochureEnquiryAdminSerializer(
+                _enquiry_queryset().get(pk=pk),
+                context={"include_internal_detail": True},
+            ).data
+        )
+
+
+def _sync_crm_follow_up(enquiry):
+    if not enquiry.crm_lead_id:
+        return
+    stage_map = {
+        BrochureEnquiry.Status.NEW: "NEW",
+        BrochureEnquiry.Status.CONTACTED: "CONTACTED",
+        BrochureEnquiry.Status.QUOTED: "INTERESTED",
+        BrochureEnquiry.Status.CONVERTED: "CONVERTED",
+        BrochureEnquiry.Status.LOST: "LOST",
+    }
+    update_fields = []
+    next_stage = stage_map.get(enquiry.status)
+    if next_stage and enquiry.crm_lead.stage != next_stage:
+        enquiry.crm_lead.stage = next_stage
+        update_fields.append("stage")
+    if enquiry.crm_lead.assigned_to_id != enquiry.assigned_to_id:
+        enquiry.crm_lead.assigned_to = enquiry.assigned_to
+        update_fields.append("assigned_to")
+    if update_fields:
+        enquiry.crm_lead.save(update_fields=[*update_fields, "updated_at"])

@@ -19,9 +19,42 @@ test("brochure service uses implemented admin endpoints", () => {
     "/admin/brochures/product-settings/",
     "/admin/brochures/product-settings/bulk-update/",
     "/admin/brochures/",
+    "/admin/brochures/enquiries/",
+    "/public/brochures/",
   ]) {
     assert.ok(serviceSource.includes(endpoint), `Missing brochure endpoint ${endpoint}`);
   }
+});
+
+test("brochure enquiry services and UI routes are wired", () => {
+  for (const serviceName of [
+    "createPublicBrochureEnquiry",
+    "listPublicBrochureProducts",
+    "listBrochureEnquiries",
+    "getBrochureEnquiry",
+    "updateBrochureEnquiry",
+    "assignBrochureEnquiry",
+    "markBrochureEnquiryContacted",
+    "closeBrochureEnquiry",
+  ]) {
+    assert.ok(serviceSource.includes(serviceName), `Missing service ${serviceName}`);
+  }
+  const publicPage = readFileSync(
+    join(here, "../../src/app/(public)/brochures/[token]/page.tsx"),
+    "utf8"
+  );
+  const adminPage = readFileSync(
+    join(here, "../../src/app/(dashboard)/admin/brochures/enquiries/page.tsx"),
+    "utf8"
+  );
+  assert.ok(publicPage.includes("Submit enquiry"));
+  assert.ok(publicPage.includes("does not reserve stock"));
+  assert.ok(adminPage.includes("Brochure Enquiries"));
+  assert.ok(adminPage.includes("Mark contacted"));
+  assert.ok(adminPage.includes("Possible duplicate"));
+  assert.ok(adminPage.includes("CRM status"));
+  assert.ok(adminPage.includes("Follow-up date/time"));
+  assert.ok(adminPage.includes("Enquiry history"));
 });
 
 test("brochure page exposes operational share and custom-selection states", () => {

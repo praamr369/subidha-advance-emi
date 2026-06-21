@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from brochures.models import BrochureDocument, ProductBrochureSettings
+from brochures.models import (
+    BrochureDocument,
+    BrochureEnquiry,
+    BrochureEnquiryProduct,
+    BrochureEnquiryStatusHistory,
+    ProductBrochureSettings,
+)
 
 
 @admin.register(ProductBrochureSettings)
@@ -49,4 +55,100 @@ class BrochureDocumentAdmin(admin.ModelAdmin):
         "created_by",
         "created_at",
         "updated_at",
+    )
+
+
+class BrochureEnquiryProductInline(admin.TabularInline):
+    model = BrochureEnquiryProduct
+    extra = 0
+    readonly_fields = (
+        "product",
+        "product_snapshot",
+        "brochure_product_code",
+        "brochure_product_name",
+        "requested_quantity",
+        "preferred_plan",
+        "notes",
+    )
+
+
+class BrochureEnquiryStatusHistoryInline(admin.TabularInline):
+    model = BrochureEnquiryStatusHistory
+    extra = 0
+    readonly_fields = (
+        "event_type",
+        "from_status",
+        "to_status",
+        "note",
+        "changed_by",
+        "created_at",
+    )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BrochureEnquiry)
+class BrochureEnquiryAdmin(admin.ModelAdmin):
+    list_display = (
+        "enquiry_no",
+        "customer_name",
+        "phone",
+        "preferred_plan",
+        "status",
+        "priority",
+        "is_possible_duplicate",
+        "crm_link_status",
+        "assigned_to",
+        "follow_up_at",
+        "created_at",
+    )
+    list_filter = (
+        "status",
+        "priority",
+        "preferred_plan",
+        "is_possible_duplicate",
+        "crm_link_status",
+        "created_at",
+    )
+    search_fields = (
+        "enquiry_no",
+        "customer_name",
+        "phone",
+        "phone_normalized",
+        "location",
+    )
+    readonly_fields = (
+        "enquiry_no",
+        "brochure",
+        "brochure_token_snapshot",
+        "customer_name",
+        "phone",
+        "phone_normalized",
+        "alternate_phone",
+        "email",
+        "location",
+        "address_text",
+        "preferred_plan",
+        "message",
+        "crm_party",
+        "crm_interaction",
+        "crm_lead",
+        "crm_sync_warning",
+        "crm_link_status",
+        "crm_link_message",
+        "crm_linked_at",
+        "duplicate_of",
+        "duplicate_reason",
+        "is_possible_duplicate",
+        "last_contacted_at",
+        "source",
+        "ip_address",
+        "user_agent",
+        "created_at",
+        "updated_at",
+    )
+    inlines = (
+        BrochureEnquiryProductInline,
+        BrochureEnquiryStatusHistoryInline,
     )

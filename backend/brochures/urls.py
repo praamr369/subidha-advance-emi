@@ -2,6 +2,11 @@ from django.urls import path
 
 from brochures.views import (
     AdminBrochureDetailView,
+    AdminBrochureEnquiryAssignView,
+    AdminBrochureEnquiryCloseView,
+    AdminBrochureEnquiryDetailView,
+    AdminBrochureEnquiryListView,
+    AdminBrochureEnquiryMarkContactedView,
     AdminBrochureGenerateView,
     AdminBrochureListView,
     AdminBrochurePreviewView,
@@ -10,9 +15,36 @@ from brochures.views import (
     AdminProductBrochureSettingsDetailView,
     AdminProductBrochureSettingsListView,
     PublicBrochureDetailView,
+    PublicBrochureEnquiryCreateView,
+    PublicBrochureProductsView,
 )
 
 admin_urlpatterns = [
+    path(
+        "enquiries/<int:pk>/mark-contacted/",
+        AdminBrochureEnquiryMarkContactedView.as_view(),
+        name="admin-brochure-enquiry-mark-contacted",
+    ),
+    path(
+        "enquiries/<int:pk>/assign/",
+        AdminBrochureEnquiryAssignView.as_view(),
+        name="admin-brochure-enquiry-assign",
+    ),
+    path(
+        "enquiries/<int:pk>/close/",
+        AdminBrochureEnquiryCloseView.as_view(),
+        name="admin-brochure-enquiry-close",
+    ),
+    path(
+        "enquiries/<int:pk>/",
+        AdminBrochureEnquiryDetailView.as_view(),
+        name="admin-brochure-enquiry-detail",
+    ),
+    path(
+        "enquiries/",
+        AdminBrochureEnquiryListView.as_view(),
+        name="admin-brochure-enquiry-list",
+    ),
     path(
         "product-settings/bulk-update/",
         AdminProductBrochureSettingsBulkUpdateView.as_view(),
@@ -40,6 +72,16 @@ admin_urlpatterns = [
 ]
 
 public_urlpatterns = [
+    path(
+        "<str:public_token>/enquiries/",
+        PublicBrochureEnquiryCreateView.as_view(),
+        name="public-brochure-enquiry-create",
+    ),
+    path(
+        "<str:public_token>/products/",
+        PublicBrochureProductsView.as_view(),
+        name="public-brochure-products",
+    ),
     path(
         "<str:public_token>/",
         PublicBrochureDetailView.as_view(),

@@ -319,3 +319,123 @@ subscription data.
 - Explicit, audited quote-to-subscription or quote-to-direct-sale conversion.
 - Public rental/lease marketplace catalog with search and availability windows.
 - Brochure expiry/revocation controls and access analytics.
+# BROCHURE-2 — Customer Enquiry Capture and CRM Lead Tracking
+
+Public brochure links now support customer enquiry capture without creating an
+order or financial transaction.
+
+## Public enquiry flow
+
+1. Customer opens `/brochures/{token}`.
+2. The page loads the frozen, public-safe product snapshot from
+   `GET /api/v1/public/brochures/{token}/products/`.
+3. The customer may select one or more products and submit name, phone,
+   location, preferred plan, message, and an optional expected delivery date.
+4. `POST /api/v1/public/brochures/{token}/enquiries/` creates a
+   `BrochureEnquiry` and frozen `BrochureEnquiryProduct` snapshots.
+5. The customer receives an enquiry number in the
+   `ENQ-BR-YYYYMMDD-XXXXXX` format.
+
+Expired, non-generated, and invalid brochure links cannot accept enquiries.
+Submitted products must exist in the brochure's frozen snapshot.
+
+## Admin follow-up workflow
+
+Admin, cashier, and staff users can use `/admin/brochures/enquiries` and the
+matching `/api/v1/admin/brochures/enquiries/` endpoints to search, filter,
+review, prioritize, assign, mark contacted, or close enquiries. Customer name
+and phone are intentionally not editable through this workflow. Internal notes
+and lifecycle status remain separate from the customer's original message.
+
+Lifecycle:
+
+`NEW → CONTACTED → QUOTED → CONVERTED / CLOSED / LOST`
+
+Conversion remains manual and belongs to a future controlled workflow.
+
+## CRM linkage
+
+The CRM link service matches `PartyMaster` by phone before creating a new
+party. Each enquiry gets its own `PartyLink`, `PartyInteraction`, and CRM
+`Lead`. The brochure enquiry stores relational links to those records. If CRM
+linkage fails, the brochure enquiry remains valid and an admin-visible warning
+is stored for follow-up.
+
+## Data safety and non-automation boundary
+
+Product enquiry snapshots are allow-listed and exclude internal cost, vendor,
+accounting, ledger, and finance fields. Public responses expose no enquiry or
+CRM lists.
+
+BROCHURE-2 does not create or modify:
+
+- invoices, receipts, payments, subscriptions, or EMI schedules;
+- journals, reconciliation records, or accounting bridge records;
+- stock movements, reservations, delivery records, or rent/lease demands;
+- quotations, direct sales, or automatic order conversion.
+
+BROCHURE-3 may add an explicit, permission-controlled quote conversion path.
+That future workflow must preserve the original enquiry and CRM audit trail.
+
+# BROCHURE-2A — Enquiry Closeout and CRM Safety Hardening
+
+BROCHURE-2A stabilizes enquiry follow-up before quotation conversion is added.
+
+## Lifecycle and terminal states
+
+Allowed transitions are:
+
+- `NEW → CONTACTED / CLOSED / LOST`
+- `CONTACTED → QUOTED / CLOSED / LOST`
+- `QUOTED → CONVERTED / CLOSED / LOST`
+- `CONVERTED`, `CLOSED`, and `LOST` are terminal.
+
+`QUOTED` and `CONVERTED` are tracking labels only in this phase. They do not
+create a quotation, customer, contract, order, subscription, invoice, payment,
+delivery, or stock movement.
+
+Every enquiry records an initial history row. Status, assignment, priority, and
+follow-up changes create additional immutable history rows with the acting
+internal user where available.
+
+## Duplicate detection
+
+Enquiries are softly flagged as possible duplicates when all of the following
+match within 24 hours:
+
+- normalized phone;
+- the same brochure;
+- at least one overlapping selected product;
+- the earlier enquiry is still `NEW` or `CONTACTED`.
+
+The submission is never blocked by duplicate detection. Admin users see the
+original enquiry number and reason. Same-phone interest in a different product
+is not automatically treated as a duplicate.
+
+## Phone and CRM safety
+
+The originally submitted phone remains on the enquiry. A separate
+`phone_normalized` value removes formatting and consistently represents Indian
+10-digit numbers with `+91`. Duplicate detection and CRM party matching use the
+normalized value.
+
+CRM linking is idempotent. Re-running it does not duplicate a party, lead, or
+interaction. A possible duplicate may reuse the earlier active CRM lead, while
+each enquiry keeps its own interaction. Link state is visible as
+`NOT_ATTEMPTED`, `LINKED`, `PARTIAL`, `SKIPPED`, or `FAILED`; a CRM failure
+never rolls back the public enquiry.
+
+## Follow-up operations
+
+Internal users can set `follow_up_at`, view `last_contacted_at`, edit
+`internal_note`, filter overdue follow-ups and duplicates, and inspect status
+history. Mark-contacted records the current timestamp and applies lifecycle
+validation.
+
+Public users cannot read or write assignment, internal notes, follow-up dates,
+duplicate metadata, CRM identifiers/status, or enquiry history. Public product
+snapshots remain allow-listed against internal cost, vendor, purchase,
+accounting, ledger, and stock fields.
+
+This phase remains enquiry and CRM lead tracking only. Quotation conversion is
+reserved for a future BROCHURE-3 workflow.

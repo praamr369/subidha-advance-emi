@@ -4,7 +4,18 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import serializers
 
-from brochures.models import BrochureDocument, ProductBrochureSettings
+from accounts.models import User
+from brochures.models import (
+    BrochureDocument,
+    BrochureEnquiry,
+    BrochureEnquiryProduct,
+    BrochureEnquiryStatusHistory,
+    ProductBrochureSettings,
+)
+from brochures.services.brochure_enquiry_duplicate_service import (
+    normalize_phone_for_comparison,
+)
+from subscriptions.models import Product
 
 BROCHURE_SETTINGS_WRITE_FIELDS = (
     "visible_on_public_catalog",
@@ -302,7 +313,7 @@ class BrochureDocumentSerializer(serializers.ModelSerializer):
 class PublicBrochureSerializer(serializers.ModelSerializer):
     pdf_url = serializers.SerializerMethodField()
     product_count = serializers.SerializerMethodField()
-    products = serializers.JSONField(source="product_snapshot", read_only=True)
+    products = serializers.SerializerMethodField()
 
     class Meta:
         model = BrochureDocument
@@ -324,3 +335,274 @@ class PublicBrochureSerializer(serializers.ModelSerializer):
 
     def get_product_count(self, obj):
         return len(obj.product_snapshot or [])
+
+    def get_products(self, obj):
+        return [
+            {
+                key: value
+                for key, value in row.items()
+                if key in SAFE_SNAPSHOT_FIELDS
+            }
+            for row in (obj.product_snapshot or [])
+            if isinstance(row, dict)
+        ]
+
+
+SAFE_SNAPSHOT_FIELDS = {
+    "id",
+    "product_code",
+    "name",
+    "category",
+    "short_description",
+    "public_badge",
+    "sale_price",
+    "monthly_rent",
+    "lease_monthly_amount",
+    "security_deposit",
+    "availability_label",
+    "public_product_url",
+    "featured",
+    "sort_order",
+}
+
+
+class PublicBrochureEnquiryProductInputSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField(min_value=1)
+    requested_quantity = serializers.IntegerField(min_value=1, max_value=100, default=1)
+    preferred_plan = serializers.ChoiceField(
+        choices=BrochureEnquiry.PreferredPlan.choices,
+        required=False,
+        allow_null=True,
+    )
+    notes = serializers.CharField(max_length=240, required=False, allow_blank=True)
+
+
+class PublicBrochureEnquirySerializer(serializers.Serializer):
+    customer_name = serializers.CharField(max_length=120)
+    phone = serializers.CharField(max_length=30)
+    alternate_phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    location = serializers.CharField(max_length=180, required=False, allow_blank=True)
+    address_text = serializers.CharField(required=False, allow_blank=True)
+    preferred_plan = serializers.ChoiceField(choices=BrochureEnquiry.PreferredPlan.choices)
+    message = serializers.CharField(required=False, allow_blank=True)
+    expected_delivery_date = serializers.DateField(required=False, allow_null=True)
+    products = PublicBrochureEnquiryProductInputSerializer(
+        many=True,
+        required=False,
+        default=list,
+    )
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError("Expected an object.")
+        allowed = set(self.fields)
+        unknown = sorted(set(data) - allowed)
+        if unknown:
+            raise serializers.ValidationError(
+                {"unknown_fields": [f"Unsupported public field: {field}" for field in unknown]}
+            )
+        return super().to_internal_value(data)
+
+    def validate_phone(self, value):
+        normalized = normalize_phone_for_comparison(value)
+        digit_count = sum(character.isdigit() for character in normalized)
+        if digit_count < 7 or digit_count > 15:
+            raise serializers.ValidationError("Enter a phone number containing 7 to 15 digits.")
+        return value.strip()
+
+    def validate_alternate_phone(self, value):
+        if not value:
+            return ""
+        normalized = normalize_phone_for_comparison(value)
+        digit_count = sum(character.isdigit() for character in normalized)
+        if digit_count < 7 or digit_count > 15:
+            raise serializers.ValidationError("Enter a phone number containing 7 to 15 digits.")
+        return value.strip()
+
+    def validate(self, attrs):
+        brochure = self.context["brochure"]
+        snapshots = {
+            int(row["id"]): row
+            for row in (brochure.product_snapshot or [])
+            if isinstance(row, dict) and str(row.get("id", "")).isdigit()
+        }
+        seen = set()
+        resolved_products = []
+        for item in attrs.get("products", []):
+            product_id = item["product_id"]
+            if product_id in seen:
+                raise serializers.ValidationError(
+                    {"products": f"Product {product_id} was selected more than once."}
+                )
+            snapshot = snapshots.get(product_id)
+            if snapshot is None:
+                raise serializers.ValidationError(
+                    {"products": f"Product {product_id} is not part of this brochure."}
+                )
+            seen.add(product_id)
+            resolved_products.append(
+                {
+                    **item,
+                    "snapshot": {
+                        key: value for key, value in snapshot.items() if key in SAFE_SNAPSHOT_FIELDS
+                    },
+                }
+            )
+        attrs["resolved_products"] = resolved_products
+        return attrs
+
+
+class BrochureEnquiryProductAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BrochureEnquiryProduct
+        fields = [
+            "id",
+            "product_id",
+            "product_snapshot",
+            "brochure_product_code",
+            "brochure_product_name",
+            "requested_quantity",
+            "preferred_plan",
+            "notes",
+        ]
+        read_only_fields = fields
+
+
+class BrochureEnquiryStatusHistorySerializer(serializers.ModelSerializer):
+    changed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BrochureEnquiryStatusHistory
+        fields = [
+            "id",
+            "event_type",
+            "from_status",
+            "to_status",
+            "note",
+            "changed_by",
+            "changed_by_name",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_changed_by_name(self, obj):
+        if not obj.changed_by:
+            return ""
+        return obj.changed_by.get_full_name().strip() or obj.changed_by.username
+
+
+class BrochureEnquiryAdminSerializer(serializers.ModelSerializer):
+    products = BrochureEnquiryProductAdminSerializer(many=True, read_only=True)
+    brochure_no = serializers.CharField(source="brochure.brochure_no", read_only=True)
+    brochure_type = serializers.CharField(source="brochure.brochure_type", read_only=True)
+    assigned_to_name = serializers.SerializerMethodField()
+    duplicate_of_enquiry_no = serializers.CharField(
+        source="duplicate_of.enquiry_no",
+        read_only=True,
+        default="",
+    )
+    crm_summary = serializers.SerializerMethodField()
+    status_history = BrochureEnquiryStatusHistorySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = BrochureEnquiry
+        fields = [
+            "id",
+            "enquiry_no",
+            "brochure_id",
+            "brochure_no",
+            "brochure_type",
+            "customer_name",
+            "phone",
+            "alternate_phone",
+            "email",
+            "location",
+            "address_text",
+            "preferred_plan",
+            "message",
+            "internal_note",
+            "expected_delivery_date",
+            "follow_up_at",
+            "last_contacted_at",
+            "status",
+            "priority",
+            "assigned_to",
+            "assigned_to_name",
+            "source",
+            "is_possible_duplicate",
+            "duplicate_of",
+            "duplicate_of_enquiry_no",
+            "duplicate_reason",
+            "crm_link_status",
+            "crm_link_message",
+            "products",
+            "crm_summary",
+            "status_history",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_assigned_to_name(self, obj):
+        if not obj.assigned_to:
+            return ""
+        return obj.assigned_to.get_full_name().strip() or obj.assigned_to.username
+
+    def get_crm_summary(self, obj):
+        return {
+            "party_id": obj.crm_party_id,
+            "interaction_id": obj.crm_interaction_id,
+            "lead_id": obj.crm_lead_id,
+            "warning": obj.crm_sync_warning,
+        }
+
+    def to_representation(self, instance):
+        output = super().to_representation(instance)
+        if not self.context.get("include_internal_detail", False):
+            output.pop("internal_note", None)
+            output.pop("status_history", None)
+        return output
+
+
+class BrochureEnquiryUpdateSerializer(serializers.ModelSerializer):
+    assigned_to = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(
+            is_active=True,
+            role__in=["ADMIN", "CASHIER", "STAFF"],
+        ),
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = BrochureEnquiry
+        fields = [
+            "status",
+            "priority",
+            "assigned_to",
+            "internal_note",
+            "expected_delivery_date",
+            "follow_up_at",
+        ]
+
+
+class BrochureEnquiryAssignSerializer(serializers.Serializer):
+    assigned_to = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(
+            is_active=True,
+            role__in=["ADMIN", "CASHIER", "STAFF"],
+        ),
+        allow_null=True,
+    )
+
+
+class BrochureEnquiryCloseSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=[
+            BrochureEnquiry.Status.CLOSED,
+            BrochureEnquiry.Status.LOST,
+        ],
+        default=BrochureEnquiry.Status.CLOSED,
+    )
+    internal_note = serializers.CharField(required=False, allow_blank=True)
