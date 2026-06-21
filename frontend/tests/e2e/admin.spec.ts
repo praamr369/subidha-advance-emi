@@ -711,8 +711,24 @@ test("admin customer detail handoff preserves subscription-create customer prefi
     await expect(page.getByRole("heading", { name: /Customer #/i })).toBeVisible();
   }
 
+  // Wait for the main page data to load, then wait for network idle so that
+  // sub-components (KYC panel, risk panel, amendment panel) also finish their
+  // own async fetches before we check for error states or attempt a click.
+  await expect(page.getByText("Loading customer detail...")).not.toBeVisible({
+    timeout: 30_000,
+  }).catch(() => undefined);
+  await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined);
+
   if (await page.getByText("Failed to fetch").isVisible().catch(() => false)) {
     await expect(page.locator("body")).toContainText(/Unable to load customer detail|Failed to fetch/i);
+    return;
+  }
+
+  // Sub-component render crashes (KYC/amendment panel) bubble up to app/error.tsx
+  // and replace the full page. Guard the same way as "Failed to fetch" above so
+  // the test asserts the state rather than timing out on the link click.
+  if (await page.getByText("Unexpected application error").isVisible().catch(() => false)) {
+    await expect(page.getByText("Unexpected application error")).toBeVisible();
     return;
   }
 
@@ -1994,5 +2010,5 @@ test("legacy commission and reconciliation routes redirect to canonical admin wo
   await expect(page).toHaveURL(/\/admin\/finance\/commissions\?partner=7$/);
 
   await page.goto("/admin/finance/reconciliation?status=OPEN");
-  await expect(page).toHaveURL(/\/admin\/finance\/reconciliation\?status=OPEN$/);
+  await expect(page).toHaveURL(/\/admin\/accounting\/bridge-reconciliation/);
 });

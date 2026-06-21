@@ -183,7 +183,11 @@ test.describe.serial("cashier smoke", () => {
     await page.getByRole("button", { name: /EMI Month 2/i }).click();
     await expect(page.locator("#collect-amount")).toHaveValue("200.00");
     await page.selectOption("#collect-method", "CASH");
-    await page.locator("#collect-finance-account").selectOption({ index: 1 });
+    const collectAcctId = await page
+      .locator("#collect-finance-account option[value]:not([disabled]):not([value=''])")
+      .first()
+      .getAttribute("value");
+    await page.locator("#collect-finance-account").selectOption(collectAcctId ?? "");
     await page.getByRole("button", { name: /^Collect Payment$/ }).click();
 
     await expect(page.getByRole("link", { name: "Open Receipt" })).toBeVisible();
@@ -233,7 +237,11 @@ test.describe.serial("cashier smoke", () => {
 
     await expect(page.getByText("Step 4 · Collect unapplied customer advance")).toBeVisible();
     await page.locator("#collect-advance-amount").fill("50.00");
-    await page.locator("#collect-advance-finance-account").selectOption({ index: 1 });
+    const advanceAcctId = await page
+      .locator("#collect-advance-finance-account option[value]:not([disabled]):not([value=''])")
+      .first()
+      .getAttribute("value");
+    await page.locator("#collect-advance-finance-account").selectOption(advanceAcctId ?? "");
     await page.getByRole("button", { name: /^Collect Advance$/ }).click();
 
     await expect(page.getByText(/Customer advance collected successfully/i)).toBeVisible();

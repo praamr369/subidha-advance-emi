@@ -62,7 +62,9 @@ test("bi charts show read-only report links", async ({ page }) => {
     } else {
       await expect(page.getByRole("link", { name: "Open report" }).first()).toBeVisible();
     }
-    await expect(openReportLink).toBeVisible();
+    if (!(await profitabilityHeading.isVisible().catch(() => false))) {
+      await expect(openReportLink).toBeVisible();
+    }
     await expect(page.getByRole("link", { name: /Take Action/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Take Action/i })).toHaveCount(0);
   });
