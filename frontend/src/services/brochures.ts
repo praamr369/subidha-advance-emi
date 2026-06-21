@@ -60,10 +60,98 @@ export type BrochurePreview = {
   terms: string[];
 };
 
-function queryString(params: Record<string, string | null | undefined>): string {
+export type BrochureProductSettingsRow = {
+  product_id: number;
+  product_code: string;
+  name: string;
+  category: string;
+  base_price: string | null;
+  is_active: boolean;
+  lifecycle_status: string;
+  image_url: string | null;
+  is_emi_enabled: boolean;
+  is_rent_enabled: boolean;
+  is_lease_enabled: boolean;
+  is_direct_sale_enabled: boolean;
+  has_settings: boolean;
+  visible_on_public_catalog: boolean;
+  visible_on_rent_catalog: boolean;
+  visible_on_lease_catalog: boolean;
+  visible_on_lucky_emi_catalog: boolean;
+  visible_on_sale_catalog: boolean;
+  monthly_rent: string | null;
+  lease_monthly_amount: string | null;
+  security_deposit: string | null;
+  brochure_sort_order: number;
+  brochure_featured: boolean;
+  short_description: string;
+  public_badge: string;
+  updated_at: string | null;
+};
+
+export type BrochureProductSettingsUpdate = Partial<{
+  visible_on_public_catalog: boolean;
+  visible_on_rent_catalog: boolean;
+  visible_on_lease_catalog: boolean;
+  visible_on_lucky_emi_catalog: boolean;
+  visible_on_sale_catalog: boolean;
+  monthly_rent: string | null;
+  lease_monthly_amount: string | null;
+  security_deposit: string | null;
+  brochure_sort_order: number;
+  brochure_featured: boolean;
+  short_description: string;
+  public_badge: string;
+}>;
+
+export type BrochureSettingsWarning = {
+  product_id?: number;
+  message: string;
+};
+
+export type BrochureProductSettingsPage = {
+  count: number;
+  results: BrochureProductSettingsRow[];
+  page: number;
+  page_size: number;
+  num_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+};
+
+export type BrochureProductSettingsListParams = {
+  q?: string;
+  category?: string;
+  brochure_type?: Exclude<BrochureType, "CUSTOM"> | "";
+  visible_only?: boolean;
+  missing_settings?: boolean;
+  has_rent_price?: boolean;
+  has_lease_price?: boolean;
+  has_sale_price?: boolean;
+  featured?: boolean;
+  page?: number;
+  page_size?: number;
+};
+
+export type BrochureProductSettingsUpdateResponse = {
+  row: BrochureProductSettingsRow;
+  warnings: string[];
+};
+
+export type BrochureProductSettingsBulkResponse = {
+  updated_count: number;
+  skipped_count: number;
+  rows: BrochureProductSettingsRow[];
+  warnings: BrochureSettingsWarning[];
+};
+
+function queryString(
+  params: Record<string, string | number | boolean | null | undefined>
+): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value && value.trim()) search.set(key, value.trim());
+    if (value === undefined || value === null || value === "") return;
+    search.set(key, String(value));
   });
   const query = search.toString();
   return query ? `?${query}` : "";
@@ -109,3 +197,44 @@ export async function getBrochure(id: number): Promise<BrochureDocument> {
   return request<BrochureDocument>(`/admin/brochures/${id}/`);
 }
 
+export async function listBrochureProductSettings(
+  params: BrochureProductSettingsListParams = {}
+): Promise<BrochureProductSettingsPage> {
+  return request<BrochureProductSettingsPage>(
+    `/admin/brochures/product-settings/${queryString(params)}`
+  );
+}
+
+export async function getBrochureProductSettings(
+  productId: number
+): Promise<BrochureProductSettingsRow> {
+  return request<BrochureProductSettingsRow>(
+    `/admin/brochures/product-settings/${productId}/`
+  );
+}
+
+export async function updateBrochureProductSettings(
+  productId: number,
+  payload: BrochureProductSettingsUpdate
+): Promise<BrochureProductSettingsUpdateResponse> {
+  return request<BrochureProductSettingsUpdateResponse>(
+    `/admin/brochures/product-settings/${productId}/`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function bulkUpdateBrochureProductSettings(payload: {
+  product_ids: number[];
+  updates: BrochureProductSettingsUpdate;
+}): Promise<BrochureProductSettingsBulkResponse> {
+  return request<BrochureProductSettingsBulkResponse>(
+    "/admin/brochures/product-settings/bulk-update/",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}

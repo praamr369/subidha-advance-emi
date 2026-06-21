@@ -56,10 +56,75 @@ without changing its contract or sale semantics.
 6. Download the PDF, copy the public link, or copy the prepared WhatsApp message.
 7. Use the recent brochure list to re-open an existing generated snapshot.
 
+## BROCHURE-1B — Product Settings Manager
+
+Open **Admin → Brochures → Product Settings** or use **Manage Product Brochure
+Settings** from the brochure generator. This operational register replaces the
+need to use Django admin for routine brochure publication setup.
+
+### Enable one product
+
+1. Search by product name or code.
+2. Open **Edit** on the product row.
+3. Enable **Public catalog**.
+4. Enable only the required type catalogs: Rent, Lease, Lucky EMI, or Sale.
+5. Enter the applicable brochure prices and security deposit.
+6. Add a short public description, optional badge, featured status, and sort
+   order.
+7. Save and review any warnings.
+
+Missing `ProductBrochureSettings` always means unpublished. When the settings
+manager creates a row, every visibility flag starts disabled unless the operator
+explicitly enables it. A partial update therefore cannot publish a product to
+unrelated catalogs.
+
+### Minimum fields by brochure type
+
+- Rent: active rent-enabled product, public visibility, rent visibility, and a
+  positive monthly rent. Security deposit is strongly recommended.
+- Lease: active lease-enabled product, public visibility, lease visibility, and
+  a positive lease monthly amount. Security deposit is strongly recommended.
+- Lucky EMI: active EMI-enabled product, public visibility, Lucky EMI
+  visibility, and the existing positive product base price.
+- Direct Sale: active direct-sale-enabled product, public visibility, sale
+  visibility, and the existing positive product base price.
+
+Product name, code, category, short description, and image are recommended for
+every customer-facing catalog.
+
+### Bulk update
+
+Select products in the settings register and use the bulk panel. Visibility
+selectors default to **No change**; blank prices also mean no change. Bulk update
+can create missing settings rows, but it enables only the visibility flags
+explicitly selected by the operator.
+
+Warnings are advisory rather than financial or stock actions. Typical warnings
+identify visible rent/lease catalogs without monthly pricing or rent/lease
+products without a brochure security deposit.
+
+### Daily operator workflow
+
+1. Filter **Missing settings** to find unpublished products.
+2. Configure and review each product or use a controlled bulk update.
+3. Filter by Rent, Lease, Lucky EMI, Direct Sale, or Featured to audit current
+   publication setup.
+4. Return to the brochure generator.
+5. Generate and inspect the intended catalog before sharing it.
+
+Settings management writes only `ProductBrochureSettings`. It does not create
+brochures by itself and never creates invoices, receipts, payments,
+subscriptions, EMIs, journals, reconciliation records, stock movements, or
+reservations.
+
 ## API endpoints
 
 Internal endpoints require an authenticated `ADMIN`, `CASHIER`, or `STAFF` role.
 
+- `GET /api/v1/admin/brochures/product-settings/`
+- `GET /api/v1/admin/brochures/product-settings/{product_id}/`
+- `PATCH /api/v1/admin/brochures/product-settings/{product_id}/`
+- `POST /api/v1/admin/brochures/product-settings/bulk-update/`
 - `GET /api/v1/admin/brochures/products/?brochure_type=RENT`
 - `POST /api/v1/admin/brochures/preview/`
 - `POST /api/v1/admin/brochures/generate/`

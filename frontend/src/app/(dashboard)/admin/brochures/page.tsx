@@ -165,6 +165,7 @@ export default function AdminBrochuresPage() {
       title="Product Brochure Generator"
       subtitle="Generate customer-facing catalogs from brochure-safe product and price fields. This workflow never reserves stock or creates billing, contracts, payments, or accounting entries."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Products", href: "/admin/products" }, { label: "Brochures" }]}
+      actions={[{ href: "/admin/brochures/settings", label: "Manage Product Brochure Settings", variant: "secondary" }]}
       statusBadge={{ label: "Read-only catalog workflow", tone: "success" }}
       stats={[
         { label: "Eligible products", value: products.length },

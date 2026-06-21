@@ -361,3 +361,222 @@ class BrochureGenerationTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+
+    def test_settings_list_returns_products_missing_settings(self):
+        configured = self.create_product(code="BRO-SET", name="Configured Product")
+        missing = Product.objects.create(
+            product_code="BRO-MISSING",
+            name="Missing Settings Product",
+            base_price=Decimal("15000.00"),
+            category="Bedroom",
+            is_active=True,
+            is_emi_enabled=True,
+            is_direct_sale_enabled=True,
+        )
+
+        response = self.client.get(
+            "/api/v1/admin/brochures/product-settings/?missing_settings=true"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = {row["product_id"] for row in response.data["results"]}
+        self.assertIn(missing.id, ids)
+        self.assertNotIn(configured.id, ids)
+        row = next(
+            row for row in response.data["results"] if row["product_id"] == missing.id
+        )
+        self.assertFalse(row["has_settings"])
+
+    def test_patch_creates_settings_without_auto_publishing_other_catalogs(self):
+        product = Product.objects.create(
+            product_code="BRO-PATCH",
+            name="Patch Rent Product",
+            base_price=Decimal("18000.00"),
+            category="Bedroom",
+            is_active=True,
+            is_emi_enabled=True,
+            is_rent_enabled=True,
+            is_direct_sale_enabled=True,
+        )
+
+        response = self.client.patch(
+            f"/api/v1/admin/brochures/product-settings/{product.id}/",
+            {
+                "visible_on_public_catalog": True,
+                "visible_on_rent_catalog": True,
+                "monthly_rent": "1200.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        settings_row = ProductBrochureSettings.objects.get(product=product)
+        self.assertTrue(settings_row.visible_on_public_catalog)
+        self.assertTrue(settings_row.visible_on_rent_catalog)
+        self.assertFalse(settings_row.visible_on_lease_catalog)
+        self.assertFalse(settings_row.visible_on_lucky_emi_catalog)
+        self.assertFalse(settings_row.visible_on_sale_catalog)
+        self.assertEqual(settings_row.monthly_rent, Decimal("1200.00"))
+
+    def test_patch_rejects_negative_monthly_rent(self):
+        product = self.create_product(code="BRO-NEG", name="Negative Price Product")
+
+        response = self.client.patch(
+            f"/api/v1/admin/brochures/product-settings/{product.id}/",
+            {"monthly_rent": "-1.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_patch_returns_advisory_warning_for_visible_rent_without_price(self):
+        product = Product.objects.create(
+            product_code="BRO-WARN",
+            name="Warning Rent Product",
+            base_price=Decimal("19000.00"),
+            category="Living Room",
+            is_active=True,
+            is_emi_enabled=True,
+            is_rent_enabled=True,
+            is_direct_sale_enabled=True,
+        )
+
+        response = self.client.patch(
+            f"/api/v1/admin/brochures/product-settings/{product.id}/",
+            {
+                "visible_on_public_catalog": True,
+                "visible_on_rent_catalog": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "Rent catalog is visible but monthly rent is missing.",
+            response.data["warnings"],
+        )
+        self.assertTrue(
+            ProductBrochureSettings.objects.filter(product=product).exists()
+        )
+
+    def test_patch_rejects_unknown_fields_and_exposes_only_safe_fields(self):
+        product = self.create_product(code="BRO-ALLOW", name="Allowed Fields Product")
+        original_name = product.name
+
+        rejected = self.client.patch(
+            f"/api/v1/admin/brochures/product-settings/{product.id}/",
+            {"name": "Unsafe Rename", "purchase_unit_cost": "1.00"},
+            format="json",
+        )
+        self.assertEqual(rejected.status_code, 400)
+        product.refresh_from_db()
+        self.assertEqual(product.name, original_name)
+
+        response = self.client.patch(
+            f"/api/v1/admin/brochures/product-settings/{product.id}/",
+            {"public_badge": "Popular", "brochure_sort_order": 5},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        keys = _collect_keys(response.data)
+        leaked_keys = {
+            key
+            for key in keys
+            if any(fragment in key for fragment in PUBLIC_FORBIDDEN_KEY_FRAGMENTS)
+        }
+        self.assertEqual(leaked_keys, set())
+        self.assertEqual(response.data["row"]["public_badge"], "Popular")
+        self.assertEqual(response.data["row"]["brochure_sort_order"], 5)
+
+    def test_bulk_update_creates_and_updates_multiple_settings(self):
+        first = Product.objects.create(
+            product_code="BRO-BULK-1",
+            name="Bulk Product One",
+            base_price=Decimal("20000.00"),
+            category="Living Room",
+            is_active=True,
+            is_emi_enabled=True,
+            is_rent_enabled=True,
+            is_direct_sale_enabled=True,
+        )
+        second = self.create_product(code="BRO-BULK-2", name="Bulk Product Two")
+
+        response = self.client.post(
+            "/api/v1/admin/brochures/product-settings/bulk-update/",
+            {
+                "product_ids": [first.id, second.id],
+                "updates": {
+                    "visible_on_public_catalog": True,
+                    "visible_on_rent_catalog": True,
+                    "monthly_rent": "1400.00",
+                    "security_deposit": "3500.00",
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["updated_count"], 2)
+        self.assertEqual(response.data["skipped_count"], 0)
+        for product in (first, second):
+            settings_row = ProductBrochureSettings.objects.get(product=product)
+            self.assertTrue(settings_row.visible_on_public_catalog)
+            self.assertTrue(settings_row.visible_on_rent_catalog)
+            self.assertEqual(settings_row.monthly_rent, Decimal("1400.00"))
+            self.assertEqual(settings_row.security_deposit, Decimal("3500.00"))
+
+    def test_bulk_update_rejects_unknown_fields(self):
+        product = self.create_product(code="BRO-BULK-BAD", name="Bulk Unsafe Product")
+
+        response = self.client.post(
+            "/api/v1/admin/brochures/product-settings/bulk-update/",
+            {
+                "product_ids": [product.id],
+                "updates": {"vendor_id": 99},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_settings_endpoints_block_public_and_customer_access(self):
+        self.client.force_authenticate(user=None)
+        public_response = self.client.get("/api/v1/admin/brochures/product-settings/")
+        self.assertEqual(public_response.status_code, 401)
+
+        customer = create_customer_user(
+            username="brochure_settings_customer",
+            phone="9200000105",
+        )
+        self.client.force_authenticate(customer)
+        customer_response = self.client.get("/api/v1/admin/brochures/product-settings/")
+        self.assertEqual(customer_response.status_code, 403)
+
+    def test_product_becomes_rent_brochure_eligible_after_settings_patch(self):
+        product = Product.objects.create(
+            product_code="BRO-RENT-PUBLISH",
+            name="Rent Publish Product",
+            base_price=Decimal("22000.00"),
+            category="Living Room",
+            is_active=True,
+            is_emi_enabled=True,
+            is_rent_enabled=True,
+            is_direct_sale_enabled=True,
+        )
+        before = self.client.get("/api/v1/admin/brochures/products/?brochure_type=RENT")
+        self.assertNotIn(product.id, {row["id"] for row in before.data["results"]})
+
+        patch_response = self.client.patch(
+            f"/api/v1/admin/brochures/product-settings/{product.id}/",
+            {
+                "visible_on_public_catalog": True,
+                "visible_on_rent_catalog": True,
+                "monthly_rent": "1600.00",
+                "security_deposit": "4000.00",
+            },
+            format="json",
+        )
+        self.assertEqual(patch_response.status_code, 200)
+
+        after = self.client.get("/api/v1/admin/brochures/products/?brochure_type=RENT")
+        self.assertIn(product.id, {row["id"] for row in after.data["results"]})

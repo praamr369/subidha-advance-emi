@@ -137,6 +137,7 @@ export const ADMIN_ENTERPRISE_MODULES: AdminEnterpriseModule[] = [
     routes: [
       { label: "Products", href: ROUTES.admin.products },
       { label: "Brochures", href: ROUTES.admin.brochures },
+      { label: "Brochure Settings", href: ROUTES.admin.brochureSettings },
       { label: "Inventory", href: ROUTES.admin.inventory },
       { label: "Manufacturing", href: ROUTES.admin.manufacturing },
       { label: "Locations", href: ROUTES.admin.inventoryLocations },

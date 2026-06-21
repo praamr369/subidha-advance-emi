@@ -6,10 +6,28 @@ from brochures.views import (
     AdminBrochureListView,
     AdminBrochurePreviewView,
     AdminBrochureProductsView,
+    AdminProductBrochureSettingsBulkUpdateView,
+    AdminProductBrochureSettingsDetailView,
+    AdminProductBrochureSettingsListView,
     PublicBrochureDetailView,
 )
 
 admin_urlpatterns = [
+    path(
+        "product-settings/bulk-update/",
+        AdminProductBrochureSettingsBulkUpdateView.as_view(),
+        name="admin-brochure-product-settings-bulk-update",
+    ),
+    path(
+        "product-settings/<int:product_id>/",
+        AdminProductBrochureSettingsDetailView.as_view(),
+        name="admin-brochure-product-settings-detail",
+    ),
+    path(
+        "product-settings/",
+        AdminProductBrochureSettingsListView.as_view(),
+        name="admin-brochure-product-settings-list",
+    ),
     path(
         "products/", AdminBrochureProductsView.as_view(), name="admin-brochure-products"
     ),
