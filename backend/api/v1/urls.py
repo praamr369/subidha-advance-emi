@@ -2,6 +2,7 @@ from django.urls import path, include
 
 from brochures.urls import admin_urlpatterns as brochure_admin_urlpatterns
 from brochures.urls import public_urlpatterns as brochure_public_urlpatterns
+from brochures.urls import public_quotation_urlpatterns
 
 from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
 from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
@@ -105,6 +106,7 @@ urlpatterns = [
     path("notifications/", include("api.v1.routes.notifications")),
     path("public/", include("api.v1.routes.public")),
     path("public/brochures/", include(brochure_public_urlpatterns)),
+    path("public/quotations/", include(public_quotation_urlpatterns)),
     path("executive/", include("api.v1.routes.executive")),
     path("winner/", include("api.v1.route_modules.winner_urls")),
 ]

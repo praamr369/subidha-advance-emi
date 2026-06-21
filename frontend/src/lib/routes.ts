@@ -199,6 +199,7 @@ export const ROUTES = {
     brochures: "/admin/brochures",
     brochureSettings: "/admin/brochures/settings",
     brochureEnquiries: "/admin/brochures/enquiries",
+    brochureQuotations: "/admin/brochures/quotations",
     productsCreate: "/admin/products/create",
     productsImport: "/admin/products/import",
     productsWorkspace: "/admin/products/workspace",

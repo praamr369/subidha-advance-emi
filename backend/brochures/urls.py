@@ -11,15 +11,70 @@ from brochures.views import (
     AdminBrochureListView,
     AdminBrochurePreviewView,
     AdminBrochureProductsView,
+    AdminBrochureQuotationAcceptView,
+    AdminBrochureQuotationCancelView,
+    AdminBrochureQuotationDetailView,
+    AdminBrochureQuotationFromEnquiryView,
+    AdminBrochureQuotationListCreateView,
+    AdminBrochureQuotationRecalculateView,
+    AdminBrochureQuotationRegeneratePdfView,
+    AdminBrochureQuotationRejectView,
+    AdminBrochureQuotationSendView,
     AdminProductBrochureSettingsBulkUpdateView,
     AdminProductBrochureSettingsDetailView,
     AdminProductBrochureSettingsListView,
     PublicBrochureDetailView,
     PublicBrochureEnquiryCreateView,
+    PublicBrochureQuotationDetailView,
     PublicBrochureProductsView,
 )
 
 admin_urlpatterns = [
+    path(
+        "quotations/from-enquiry/<int:enquiry_id>/",
+        AdminBrochureQuotationFromEnquiryView.as_view(),
+        name="admin-brochure-quotation-from-enquiry",
+    ),
+    path(
+        "quotations/<int:pk>/recalculate/",
+        AdminBrochureQuotationRecalculateView.as_view(),
+        name="admin-brochure-quotation-recalculate",
+    ),
+    path(
+        "quotations/<int:pk>/send/",
+        AdminBrochureQuotationSendView.as_view(),
+        name="admin-brochure-quotation-send",
+    ),
+    path(
+        "quotations/<int:pk>/accept/",
+        AdminBrochureQuotationAcceptView.as_view(),
+        name="admin-brochure-quotation-accept",
+    ),
+    path(
+        "quotations/<int:pk>/reject/",
+        AdminBrochureQuotationRejectView.as_view(),
+        name="admin-brochure-quotation-reject",
+    ),
+    path(
+        "quotations/<int:pk>/cancel/",
+        AdminBrochureQuotationCancelView.as_view(),
+        name="admin-brochure-quotation-cancel",
+    ),
+    path(
+        "quotations/<int:pk>/regenerate-pdf/",
+        AdminBrochureQuotationRegeneratePdfView.as_view(),
+        name="admin-brochure-quotation-regenerate-pdf",
+    ),
+    path(
+        "quotations/<int:pk>/",
+        AdminBrochureQuotationDetailView.as_view(),
+        name="admin-brochure-quotation-detail",
+    ),
+    path(
+        "quotations/",
+        AdminBrochureQuotationListCreateView.as_view(),
+        name="admin-brochure-quotation-list",
+    ),
     path(
         "enquiries/<int:pk>/mark-contacted/",
         AdminBrochureEnquiryMarkContactedView.as_view(),
@@ -86,6 +141,14 @@ public_urlpatterns = [
         "<str:public_token>/",
         PublicBrochureDetailView.as_view(),
         name="public-brochure-detail",
+    ),
+]
+
+public_quotation_urlpatterns = [
+    path(
+        "<str:public_token>/",
+        PublicBrochureQuotationDetailView.as_view(),
+        name="public-brochure-quotation-detail",
     ),
 ]
 

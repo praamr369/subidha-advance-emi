@@ -10,6 +10,9 @@ from brochures.models import (
     BrochureEnquiry,
     BrochureEnquiryProduct,
     BrochureEnquiryStatusHistory,
+    BrochureQuotation,
+    BrochureQuotationLine,
+    BrochureQuotationStatusHistory,
     ProductBrochureSettings,
 )
 from brochures.services.brochure_enquiry_duplicate_service import (
@@ -504,6 +507,7 @@ class BrochureEnquiryAdminSerializer(serializers.ModelSerializer):
     )
     crm_summary = serializers.SerializerMethodField()
     status_history = BrochureEnquiryStatusHistorySerializer(many=True, read_only=True)
+    quotation_summaries = serializers.SerializerMethodField()
 
     class Meta:
         model = BrochureEnquiry
@@ -539,6 +543,7 @@ class BrochureEnquiryAdminSerializer(serializers.ModelSerializer):
             "products",
             "crm_summary",
             "status_history",
+            "quotation_summaries",
             "created_at",
             "updated_at",
         ]
@@ -556,6 +561,18 @@ class BrochureEnquiryAdminSerializer(serializers.ModelSerializer):
             "lead_id": obj.crm_lead_id,
             "warning": obj.crm_sync_warning,
         }
+
+    def get_quotation_summaries(self, obj):
+        return [
+            {
+                "id": quote.id,
+                "quotation_no": quote.quotation_no,
+                "status": quote.status,
+                "quotation_type": quote.quotation_type,
+                "created_at": quote.created_at,
+            }
+            for quote in obj.quotations.all()
+        ]
 
     def to_representation(self, instance):
         output = super().to_representation(instance)
@@ -606,3 +623,358 @@ class BrochureEnquiryCloseSerializer(serializers.Serializer):
         default=BrochureEnquiry.Status.CLOSED,
     )
     internal_note = serializers.CharField(required=False, allow_blank=True)
+
+
+def quotation_pdf_url(quotation: BrochureQuotation, request=None) -> str:
+    if not quotation.pdf_file:
+        return ""
+    url = quotation.pdf_file.url
+    return request.build_absolute_uri(url) if request else url
+
+
+def quotation_public_url(quotation: BrochureQuotation, request=None) -> str:
+    path = f"/quotations/{quotation.public_token}"
+    return request.build_absolute_uri(path) if request else path
+
+
+def quotation_whatsapp_message(quotation: BrochureQuotation, request=None) -> str:
+    return (
+        "Hello, your Subidha Furniture quotation is ready:\n"
+        f"{quotation_public_url(quotation, request)}\n\n"
+        f"Quotation No: {quotation.quotation_no}\n"
+        "Please review the products, pricing, deposit, delivery charges, and terms. "
+        "Final booking is subject to admin confirmation and stock availability."
+    )
+
+
+class BrochureQuotationLineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BrochureQuotationLine
+        fields = [
+            "id",
+            "product_id",
+            "product_snapshot",
+            "product_code",
+            "product_name",
+            "description",
+            "plan_type",
+            "quantity",
+            "unit_price",
+            "monthly_amount",
+            "tenure_months",
+            "security_deposit",
+            "discount_amount",
+            "line_total",
+            "availability_label",
+            "sort_order",
+        ]
+        read_only_fields = fields
+
+
+class PublicBrochureQuotationLineSerializer(serializers.ModelSerializer):
+    product_snapshot = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BrochureQuotationLine
+        fields = [
+            "product_snapshot",
+            "product_code",
+            "product_name",
+            "description",
+            "plan_type",
+            "quantity",
+            "unit_price",
+            "monthly_amount",
+            "tenure_months",
+            "security_deposit",
+            "discount_amount",
+            "line_total",
+            "availability_label",
+        ]
+        read_only_fields = fields
+
+    def get_product_snapshot(self, obj):
+        return {
+            key: value
+            for key, value in (obj.product_snapshot or {}).items()
+            if key in SAFE_SNAPSHOT_FIELDS
+        }
+
+
+class BrochureQuotationStatusHistorySerializer(serializers.ModelSerializer):
+    changed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BrochureQuotationStatusHistory
+        fields = [
+            "id",
+            "from_status",
+            "to_status",
+            "note",
+            "changed_by",
+            "changed_by_name",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_changed_by_name(self, obj):
+        if not obj.changed_by:
+            return ""
+        return obj.changed_by.get_full_name().strip() or obj.changed_by.username
+
+
+class BrochureQuotationAdminSerializer(serializers.ModelSerializer):
+    lines = BrochureQuotationLineSerializer(many=True, read_only=True)
+    status_history = BrochureQuotationStatusHistorySerializer(many=True, read_only=True)
+    pdf_url = serializers.SerializerMethodField()
+    public_url = serializers.SerializerMethodField()
+    whatsapp_message = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    enquiry_summary = serializers.SerializerMethodField()
+    brochure_summary = serializers.SerializerMethodField()
+    crm_summary = serializers.SerializerMethodField()
+    totals = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BrochureQuotation
+        fields = [
+            "id",
+            "quotation_no",
+            "enquiry_id",
+            "brochure_id",
+            "customer_name",
+            "phone",
+            "email",
+            "location",
+            "address_text",
+            "quotation_type",
+            "status",
+            "validity_date",
+            "expected_delivery_date",
+            "subtotal_amount",
+            "discount_amount",
+            "delivery_charge",
+            "security_deposit_total",
+            "total_payable_now",
+            "recurring_monthly_total",
+            "grand_total",
+            "totals",
+            "terms_text",
+            "internal_note",
+            "sent_at",
+            "accepted_at",
+            "created_at",
+            "updated_at",
+            "created_by_name",
+            "lines",
+            "status_history",
+            "enquiry_summary",
+            "brochure_summary",
+            "crm_summary",
+            "pdf_url",
+            "public_url",
+            "whatsapp_message",
+        ]
+        read_only_fields = fields
+
+    def get_pdf_url(self, obj):
+        return quotation_pdf_url(obj, self.context.get("request"))
+
+    def get_public_url(self, obj):
+        return quotation_public_url(obj, self.context.get("request"))
+
+    def get_whatsapp_message(self, obj):
+        return quotation_whatsapp_message(obj, self.context.get("request"))
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name().strip() or obj.created_by.username
+
+    def get_enquiry_summary(self, obj):
+        if not obj.enquiry:
+            return None
+        return {
+            "id": obj.enquiry_id,
+            "enquiry_no": obj.enquiry.enquiry_no,
+            "status": obj.enquiry.status,
+        }
+
+    def get_brochure_summary(self, obj):
+        if not obj.brochure:
+            return None
+        return {
+            "id": obj.brochure_id,
+            "brochure_no": obj.brochure.brochure_no,
+            "title": obj.brochure.title,
+        }
+
+    def get_crm_summary(self, obj):
+        return {
+            "party_id": obj.crm_party_id,
+            "lead_id": obj.crm_lead_id,
+        }
+
+    def get_totals(self, obj):
+        return {
+            "subtotal_amount": obj.subtotal_amount,
+            "discount_amount": obj.discount_amount,
+            "delivery_charge": obj.delivery_charge,
+            "security_deposit_total": obj.security_deposit_total,
+            "total_payable_now": obj.total_payable_now,
+            "recurring_monthly_total": obj.recurring_monthly_total,
+            "grand_total": obj.grand_total,
+        }
+
+    def to_representation(self, instance):
+        output = super().to_representation(instance)
+        if not self.context.get("include_internal_detail", False):
+            output.pop("internal_note", None)
+            output.pop("status_history", None)
+        return output
+
+
+class BrochureQuotationLineWriteSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    product_snapshot = serializers.JSONField(required=False, default=dict)
+    product_code = serializers.CharField(max_length=80, required=False, allow_blank=True)
+    product_name = serializers.CharField(
+        max_length=180, required=False, allow_blank=True
+    )
+    description = serializers.CharField(max_length=240, required=False, allow_blank=True)
+    plan_type = serializers.ChoiceField(choices=BrochureQuotationLine.PlanType.choices)
+    quantity = serializers.IntegerField(min_value=1, default=1)
+    unit_price = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, required=False
+    )
+    monthly_amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, required=False
+    )
+    tenure_months = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    security_deposit = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, required=False
+    )
+    discount_amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, required=False, default=0
+    )
+    availability_label = serializers.CharField(
+        max_length=80, required=False, allow_blank=True
+    )
+    sort_order = serializers.IntegerField(min_value=0, required=False, default=100)
+
+
+class BrochureQuotationCreateSerializer(serializers.Serializer):
+    enquiry_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    brochure_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    crm_party_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    crm_lead_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    customer_name = serializers.CharField(max_length=120)
+    phone = serializers.CharField(max_length=30)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    location = serializers.CharField(max_length=180, required=False, allow_blank=True)
+    address_text = serializers.CharField(required=False, allow_blank=True)
+    quotation_type = serializers.ChoiceField(choices=BrochureQuotation.QuotationType.choices)
+    validity_date = serializers.DateField(required=False, allow_null=True)
+    expected_delivery_date = serializers.DateField(required=False, allow_null=True)
+    discount_amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, required=False, default=0
+    )
+    delivery_charge = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, required=False, default=0
+    )
+    terms_text = serializers.CharField(required=False, allow_blank=True)
+    internal_note = serializers.CharField(required=False, allow_blank=True)
+    lines = BrochureQuotationLineWriteSerializer(many=True, allow_empty=False)
+
+    def validate(self, attrs):
+        if attrs.get("enquiry_id"):
+            attrs["enquiry"] = BrochureEnquiry.objects.filter(
+                pk=attrs.pop("enquiry_id")
+            ).first()
+            if attrs["enquiry"] is None:
+                raise serializers.ValidationError({"enquiry_id": "Enquiry not found."})
+        if attrs.get("brochure_id"):
+            attrs["brochure"] = BrochureDocument.objects.filter(
+                pk=attrs.pop("brochure_id")
+            ).first()
+            if attrs["brochure"] is None:
+                raise serializers.ValidationError({"brochure_id": "Brochure not found."})
+        return attrs
+
+
+class BrochureQuotationUpdateSerializer(serializers.Serializer):
+    customer_name = serializers.CharField(max_length=120, required=False)
+    phone = serializers.CharField(max_length=30, required=False)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    location = serializers.CharField(max_length=180, required=False, allow_blank=True)
+    address_text = serializers.CharField(required=False, allow_blank=True)
+    validity_date = serializers.DateField(required=False, allow_null=True)
+    expected_delivery_date = serializers.DateField(required=False, allow_null=True)
+    discount_amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, required=False
+    )
+    delivery_charge = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=0, required=False
+    )
+    terms_text = serializers.CharField(required=False, allow_blank=True)
+    internal_note = serializers.CharField(required=False, allow_blank=True)
+    lines = BrochureQuotationLineWriteSerializer(many=True, allow_empty=False, required=False)
+
+
+class BrochureQuotationStatusActionSerializer(serializers.Serializer):
+    note = serializers.CharField(required=False, allow_blank=True)
+
+
+class PublicBrochureQuotationSerializer(serializers.ModelSerializer):
+    lines = PublicBrochureQuotationLineSerializer(many=True, read_only=True)
+    pdf_url = serializers.SerializerMethodField()
+    business_contact = serializers.SerializerMethodField()
+    customer_display_name = serializers.SerializerMethodField()
+    disclaimer = serializers.CharField(
+        default=(
+            "This quotation is not an invoice, receipt, contract, subscription, or "
+            "stock reservation. Final billing, payment, stock availability, delivery, "
+            "and contract creation require admin approval and separate confirmation."
+        ),
+        read_only=True,
+    )
+
+    class Meta:
+        model = BrochureQuotation
+        fields = [
+            "quotation_no",
+            "status",
+            "validity_date",
+            "customer_display_name",
+            "quotation_type",
+            "lines",
+            "subtotal_amount",
+            "discount_amount",
+            "delivery_charge",
+            "security_deposit_total",
+            "total_payable_now",
+            "recurring_monthly_total",
+            "grand_total",
+            "terms_text",
+            "pdf_url",
+            "business_contact",
+            "disclaimer",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_pdf_url(self, obj):
+        return quotation_pdf_url(obj, self.context.get("request"))
+
+    def get_customer_display_name(self, obj):
+        parts = obj.customer_name.split()
+        return parts[0] if parts else "Customer"
+
+    def get_business_contact(self, obj):
+        from subscriptions.services.pdf_branding_service import get_branding_context
+
+        branding = get_branding_context()
+        return {
+            "business_name": branding.business_name,
+            "phone": branding.phone,
+            "email": branding.email,
+            "address": branding.address,
+        }

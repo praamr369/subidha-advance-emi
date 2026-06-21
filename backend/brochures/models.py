@@ -300,3 +300,177 @@ class BrochureEnquiryStatusHistory(models.Model):
 
     def __str__(self):
         return f"{self.enquiry.enquiry_no}: {self.event_type}"
+
+
+class BrochureQuotation(models.Model):
+    class QuotationType(models.TextChoices):
+        RENT = "RENT", "Rent"
+        LEASE = "LEASE", "Lease"
+        LUCKY_EMI = "LUCKY_EMI", "Lucky EMI"
+        DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+        MIXED = "MIXED", "Mixed"
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        SENT = "SENT", "Sent"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        REJECTED = "REJECTED", "Rejected"
+        EXPIRED = "EXPIRED", "Expired"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    quotation_no = models.CharField(max_length=40, unique=True)
+    enquiry = models.ForeignKey(
+        BrochureEnquiry,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="quotations",
+    )
+    brochure = models.ForeignKey(
+        BrochureDocument,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="quotations",
+    )
+    crm_party_id = models.PositiveIntegerField(null=True, blank=True)
+    crm_lead_id = models.PositiveIntegerField(null=True, blank=True)
+    customer_name = models.CharField(max_length=120)
+    phone = models.CharField(max_length=30)
+    phone_normalized = models.CharField(max_length=32, db_index=True, blank=True)
+    email = models.EmailField(blank=True)
+    location = models.CharField(max_length=180, blank=True)
+    address_text = models.TextField(blank=True)
+    quotation_type = models.CharField(
+        max_length=20,
+        choices=QuotationType.choices,
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+        db_index=True,
+    )
+    validity_date = models.DateField(null=True, blank=True)
+    expected_delivery_date = models.DateField(null=True, blank=True)
+    subtotal_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    discount_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    delivery_charge = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    security_deposit_total = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    total_payable_now = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    recurring_monthly_total = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    grand_total = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    terms_text = models.TextField(blank=True)
+    internal_note = models.TextField(blank=True)
+    public_token = models.CharField(max_length=80, unique=True, db_index=True)
+    pdf_file = models.FileField(upload_to="quotations/", blank=True, null=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_brochure_quotations",
+    )
+    sent_at = models.DateTimeField(null=True, blank=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status", "quotation_type", "created_at"]),
+            models.Index(fields=["enquiry", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.quotation_no} - {self.customer_name}"
+
+
+class BrochureQuotationLine(models.Model):
+    class PlanType(models.TextChoices):
+        RENT = "RENT", "Rent"
+        LEASE = "LEASE", "Lease"
+        LUCKY_EMI = "LUCKY_EMI", "Lucky EMI"
+        DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+
+    quotation = models.ForeignKey(
+        BrochureQuotation,
+        on_delete=models.CASCADE,
+        related_name="lines",
+    )
+    product = models.ForeignKey(
+        Product,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="brochure_quotation_lines",
+    )
+    product_snapshot = models.JSONField(default=dict, blank=True)
+    product_code = models.CharField(max_length=80, blank=True)
+    product_name = models.CharField(max_length=180)
+    description = models.CharField(max_length=240, blank=True)
+    plan_type = models.CharField(max_length=20, choices=PlanType.choices)
+    quantity = models.PositiveIntegerField(default=1)
+    unit_price = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    monthly_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    tenure_months = models.PositiveIntegerField(null=True, blank=True)
+    security_deposit = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    discount_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    line_total = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    availability_label = models.CharField(max_length=80, blank=True)
+    sort_order = models.PositiveIntegerField(default=100)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return f"{self.quotation.quotation_no} - {self.product_name}"
+
+
+class BrochureQuotationStatusHistory(models.Model):
+    quotation = models.ForeignKey(
+        BrochureQuotation,
+        on_delete=models.CASCADE,
+        related_name="status_history",
+    )
+    from_status = models.CharField(max_length=30, blank=True)
+    to_status = models.CharField(max_length=30)
+    note = models.TextField(blank=True)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="brochure_quotation_status_changes",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"{self.quotation.quotation_no}: {self.from_status} -> {self.to_status}"

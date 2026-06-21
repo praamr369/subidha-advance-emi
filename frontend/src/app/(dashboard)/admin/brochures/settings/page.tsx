@@ -298,7 +298,7 @@ export default function BrochureProductSettingsPage() {
       title="Brochure Product Settings"
       subtitle="Products require brochure settings before they can appear in generated brochures."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Brochures", href: "/admin/brochures" }, { label: "Product Settings" }]}
-      actions={[{ href: "/admin/brochures", label: "Back to Brochure Generator", variant: "secondary" }]}
+      actions={[{ href: "/admin/brochures", label: "Back to Brochure Generator", variant: "secondary" }, { href: "/admin/brochures/enquiries", label: "Enquiries", variant: "secondary" }, { href: "/admin/brochures/quotations", label: "Quotations", variant: "secondary" }]}
       statusBadge={{ label: "Explicit publication control", tone: "info" }}
       stats={[{ label: "Filtered products", value: count }, { label: "Selected", value: selectedIds.size }, { label: "Page", value: `${page} / ${numPages || 1}` }]}
     >

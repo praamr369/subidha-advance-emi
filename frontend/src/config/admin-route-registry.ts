@@ -150,6 +150,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Sales & Contracts", "Product Brochures", ROUTES.admin.brochures, "Read-only customer catalog PDF generation and sharing. No stock reservation, billing, contract, payment, or accounting posting."),
   item("Sales & Contracts", "Brochure Settings", ROUTES.admin.brochureSettings, "Operational publication visibility, brochure pricing, descriptions, featured order, and badges. Settings only; no operational or financial posting."),
   item("Sales & Contracts", "Brochure Enquiries", ROUTES.admin.brochureEnquiries, "Customer interest captured from public brochure links with CRM lead tracking and staff follow-up."),
+  item("Sales & Contracts", "Brochure Quotations", ROUTES.admin.brochureQuotations, "Non-financial quotation drafts, PDFs, public share links, and agreement-in-principle status tracking."),
   item("Sales & Contracts", "Product Workspace", ROUTES.admin.productsWorkspace, "Product operations workspace."),
   item("Sales & Contracts", "Product Masters", ROUTES.admin.productsMasters, "Product category, subcategory, and UOM setup."),
   // Rent / lease contract sub-section

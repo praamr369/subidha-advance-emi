@@ -19,6 +19,7 @@ from brochures.models import (
     BrochureDocument,
     BrochureEnquiry,
     BrochureEnquiryProduct,
+    BrochureQuotation,
     ProductBrochureSettings,
 )
 from brochures.serializers import (
@@ -28,14 +29,20 @@ from brochures.serializers import (
     BrochureEnquiryUpdateSerializer,
     BrochureDocumentSerializer,
     BrochureProductQuerySerializer,
+    BrochureQuotationAdminSerializer,
+    BrochureQuotationCreateSerializer,
+    BrochureQuotationStatusActionSerializer,
+    BrochureQuotationUpdateSerializer,
     BrochureRequestSerializer,
     ProductBrochureSettingsBulkSerializer,
     ProductBrochureSettingsUpdateSerializer,
     PublicBrochureEnquirySerializer,
+    PublicBrochureQuotationSerializer,
     PublicBrochureSerializer,
     SAFE_SNAPSHOT_FIELDS,
     brochure_pdf_url,
     brochure_settings_warnings,
+    quotation_public_url,
     serialize_product_brochure_settings,
 )
 from brochures.services.brochure_crm_link_service import link_brochure_enquiry_to_crm
@@ -50,6 +57,14 @@ from brochures.services.brochure_enquiry_lifecycle_service import (
 )
 from brochures.services.brochure_pdf_service import build_brochure_pdf
 from brochures.services.brochure_product_query_service import get_brochure_products
+from brochures.services.brochure_quotation_service import (
+    create_quotation,
+    create_quotation_from_enquiry,
+    recalculate_quotation,
+    regenerate_quotation_pdf,
+    transition_quotation_status,
+    update_quotation,
+)
 from subscriptions.models import Product
 
 
@@ -589,7 +604,7 @@ def _enquiry_queryset():
         "crm_interaction",
         "crm_lead",
         "duplicate_of",
-    ).prefetch_related("products", "status_history__changed_by")
+    ).prefetch_related("products", "status_history__changed_by", "quotations")
 
 
 class AdminBrochureEnquiryListView(APIView):
@@ -777,3 +792,236 @@ def _sync_crm_follow_up(enquiry):
         update_fields.append("assigned_to")
     if update_fields:
         enquiry.crm_lead.save(update_fields=[*update_fields, "updated_at"])
+
+
+def _quotation_queryset():
+    return BrochureQuotation.objects.select_related(
+        "created_by",
+        "enquiry",
+        "brochure",
+    ).prefetch_related(
+        "lines",
+        "status_history__changed_by",
+    )
+
+
+class AdminBrochureQuotationListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+
+    def get(self, request):
+        queryset = _quotation_queryset()
+        q = str(request.query_params.get("q") or "").strip()
+        if q:
+            queryset = queryset.filter(
+                Q(quotation_no__icontains=q)
+                | Q(customer_name__icontains=q)
+                | Q(phone__icontains=q)
+                | Q(location__icontains=q)
+                | Q(lines__product_name__icontains=q)
+            ).distinct()
+        for field in ("status", "quotation_type"):
+            value = str(request.query_params.get(field) or "").strip()
+            if value:
+                queryset = queryset.filter(**{field: value})
+        enquiry_id = str(request.query_params.get("enquiry_id") or "").strip()
+        if enquiry_id.isdigit():
+            queryset = queryset.filter(enquiry_id=int(enquiry_id))
+        date_from = str(request.query_params.get("date_from") or "").strip()
+        date_to = str(request.query_params.get("date_to") or "").strip()
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+        payload = build_paginated_payload(
+            request,
+            queryset,
+            lambda rows: BrochureQuotationAdminSerializer(
+                rows,
+                many=True,
+                context={"request": request},
+            ).data,
+            default_page_size=25,
+        )
+        return Response(payload)
+
+    def post(self, request):
+        serializer = BrochureQuotationCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        quotation = create_quotation(
+            payload=dict(serializer.validated_data),
+            created_by=request.user,
+        )
+        quotation = _quotation_queryset().get(pk=quotation.pk)
+        return Response(
+            BrochureQuotationAdminSerializer(
+                quotation,
+                context={"request": request, "include_internal_detail": True},
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminBrochureQuotationDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+
+    def get(self, request, pk):
+        quotation = get_object_or_404(_quotation_queryset(), pk=pk)
+        return Response(
+            BrochureQuotationAdminSerializer(
+                quotation,
+                context={"request": request, "include_internal_detail": True},
+            ).data
+        )
+
+    def patch(self, request, pk):
+        quotation = get_object_or_404(BrochureQuotation, pk=pk)
+        serializer = BrochureQuotationUpdateSerializer(
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        quotation = update_quotation(
+            quotation=quotation,
+            payload=dict(serializer.validated_data),
+            changed_by=request.user,
+        )
+        quotation = _quotation_queryset().get(pk=quotation.pk)
+        return Response(
+            BrochureQuotationAdminSerializer(
+                quotation,
+                context={"request": request, "include_internal_detail": True},
+            ).data
+        )
+
+
+class AdminBrochureQuotationFromEnquiryView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+
+    def post(self, request, enquiry_id):
+        enquiry = get_object_or_404(BrochureEnquiry, pk=enquiry_id)
+        quotation = create_quotation_from_enquiry(
+            enquiry=enquiry,
+            created_by=request.user,
+        )
+        quotation = _quotation_queryset().get(pk=quotation.pk)
+        return Response(
+            BrochureQuotationAdminSerializer(
+                quotation,
+                context={"request": request, "include_internal_detail": True},
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminBrochureQuotationRecalculateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+
+    def post(self, request, pk):
+        quotation = get_object_or_404(BrochureQuotation, pk=pk)
+        quotation = recalculate_quotation(quotation)
+        return Response(
+            BrochureQuotationAdminSerializer(
+                _quotation_queryset().get(pk=quotation.pk),
+                context={"request": request, "include_internal_detail": True},
+            ).data
+        )
+
+
+class AdminBrochureQuotationRegeneratePdfView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+
+    def post(self, request, pk):
+        quotation = get_object_or_404(BrochureQuotation, pk=pk)
+        quotation = regenerate_quotation_pdf(
+            quotation,
+            public_url=quotation_public_url(quotation, request),
+        )
+        return Response(
+            BrochureQuotationAdminSerializer(
+                _quotation_queryset().get(pk=quotation.pk),
+                context={"request": request, "include_internal_detail": True},
+            ).data
+        )
+
+
+class _AdminBrochureQuotationStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated, CanManageBrochures]
+    target_status = ""
+    regenerate_pdf = False
+
+    def post(self, request, pk):
+        quotation = get_object_or_404(BrochureQuotation, pk=pk)
+        serializer = BrochureQuotationStatusActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if self.regenerate_pdf:
+            regenerate_quotation_pdf(
+                quotation,
+                public_url=quotation_public_url(quotation, request),
+            )
+            quotation.refresh_from_db()
+        quotation = transition_quotation_status(
+            quotation=quotation,
+            to_status=self.target_status,
+            changed_by=request.user,
+            note=serializer.validated_data.get("note", ""),
+        )
+        return Response(
+            BrochureQuotationAdminSerializer(
+                _quotation_queryset().get(pk=quotation.pk),
+                context={"request": request, "include_internal_detail": True},
+            ).data
+        )
+
+
+class AdminBrochureQuotationSendView(_AdminBrochureQuotationStatusView):
+    target_status = BrochureQuotation.Status.SENT
+    regenerate_pdf = True
+
+
+class AdminBrochureQuotationAcceptView(_AdminBrochureQuotationStatusView):
+    target_status = BrochureQuotation.Status.ACCEPTED
+
+
+class AdminBrochureQuotationRejectView(_AdminBrochureQuotationStatusView):
+    target_status = BrochureQuotation.Status.REJECTED
+
+
+class AdminBrochureQuotationCancelView(_AdminBrochureQuotationStatusView):
+    target_status = BrochureQuotation.Status.CANCELLED
+
+
+class PublicBrochureQuotationDetailView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, public_token):
+        quotation = get_object_or_404(
+            _quotation_queryset(),
+            public_token=public_token,
+        )
+        if quotation.status in {
+            BrochureQuotation.Status.CANCELLED,
+            BrochureQuotation.Status.EXPIRED,
+        }:
+            return Response(
+                {
+                    "detail": "This quotation is no longer active.",
+                    "status": quotation.status,
+                },
+                status=status.HTTP_410_GONE,
+            )
+        if (
+            quotation.validity_date
+            and quotation.validity_date < timezone.localdate()
+            and quotation.status == BrochureQuotation.Status.SENT
+        ):
+            return Response(
+                {"detail": "This quotation has passed its validity date.", "status": "EXPIRED"},
+                status=status.HTTP_410_GONE,
+            )
+        return Response(
+            PublicBrochureQuotationSerializer(
+                quotation,
+                context={"request": request},
+            ).data
+        )

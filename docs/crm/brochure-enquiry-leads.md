@@ -61,3 +61,17 @@ Admin follow-up uses a guarded lifecycle:
 `CLOSED` and `LOST` are valid closeout paths from non-terminal workflow states.
 `CONVERTED`, `CLOSED`, and `LOST` are terminal. Assignment, priority,
 follow-up, and status changes are written to brochure enquiry history.
+# BROCHURE-3 quotation linkage
+
+Brochure quotations preserve optional CRM linkage through the enquiry’s party and lead identifiers. Quotation creation must still succeed if CRM interaction logging is unavailable.
+
+Best-effort, idempotent `PartyInteraction` records are written for quotation:
+
+- created
+- sent
+- accepted
+- rejected
+
+Each event is keyed by quotation and event so retries do not duplicate CRM history. CRM failures are logged and recorded as an internal quotation warning without exposing the failure publicly or blocking the admin/customer quotation workflow.
+
+An accepted quotation means the customer agreed in principle. It does not create a customer transaction, invoice, receipt, payment, subscription, EMI schedule, contract, order, delivery, journal/reconciliation entry, or stock movement/reservation.

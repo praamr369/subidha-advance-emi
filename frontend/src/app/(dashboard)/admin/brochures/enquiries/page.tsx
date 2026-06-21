@@ -11,6 +11,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import Modal from "@/components/ui/modal";
 import {
   closeBrochureEnquiry,
+  createBrochureQuotationFromEnquiry,
   getBrochureEnquiry,
   listBrochureEnquiries,
   markBrochureEnquiryContacted,
@@ -77,6 +78,20 @@ export default function BrochureEnquiriesPage() {
     }
   }
 
+  async function createQuotation() {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await createBrochureQuotationFromEnquiry(selected.id);
+      setSelected(await getBrochureEnquiry(selected.id));
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to create quotation.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function apply(event: FormEvent) {
     event.preventDefault();
     void load();
@@ -87,7 +102,7 @@ export default function BrochureEnquiriesPage() {
       title="Brochure Enquiries"
       subtitle="Follow up customer interest captured from public brochure links. Enquiries do not create orders, contracts, invoices, payments, EMI schedules, or stock reservations."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Brochures", href: "/admin/brochures" }, { label: "Enquiries" }]}
-      actions={[{ href: "/admin/brochures", label: "Brochure Generator", variant: "secondary" }, { href: "/admin/brochures/settings", label: "Product Settings", variant: "secondary" }]}
+      actions={[{ href: "/admin/brochures", label: "Brochure Generator", variant: "secondary" }, { href: "/admin/brochures/settings", label: "Product Settings", variant: "secondary" }, { href: "/admin/brochures/quotations", label: "Quotations", variant: "secondary" }]}
       stats={[{ label: "Visible enquiries", value: rows.length }, { label: "New", value: rows.filter((row) => row.status === "NEW").length }, { label: "High priority", value: rows.filter((row) => row.priority === "HIGH").length }]}
     >
       <div className="space-y-6">
@@ -125,7 +140,8 @@ export default function BrochureEnquiriesPage() {
           <div className="rounded-xl border border-border p-4 text-sm"><strong>CRM status:</strong> {selected.crm_link_status}<p className="mt-1 text-muted-foreground">{selected.crm_link_message || "No CRM linkage message."}</p><div className="mt-2">Party {selected.crm_summary.party_id ?? "pending"} · Lead {selected.crm_summary.lead_id ?? "pending"} · Interaction {selected.crm_summary.interaction_id ?? "pending"}</div>{selected.crm_summary.warning ? <p className="mt-2 text-amber-700">{selected.crm_summary.warning}</p> : null}</div>
           <div className="grid gap-3 md:grid-cols-2"><label className="space-y-1 text-sm"><span>Status</span><select value={selected.status} onChange={(event) => setSelected({ ...selected, status: event.target.value as BrochureEnquiry["status"] })} className="h-10 w-full rounded-xl border border-border px-3">{["NEW", "CONTACTED", "QUOTED", "CONVERTED", "CLOSED", "LOST"].map((value) => <option key={value}>{value}</option>)}</select></label><label className="space-y-1 text-sm"><span>Priority</span><select value={selected.priority} onChange={(event) => setSelected({ ...selected, priority: event.target.value as BrochureEnquiry["priority"] })} className="h-10 w-full rounded-xl border border-border px-3">{["LOW", "NORMAL", "HIGH"].map((value) => <option key={value}>{value}</option>)}</select></label><label className="space-y-1 text-sm"><span>Assign internal user ID</span><input type="number" min="1" value={selected.assigned_to ?? ""} onChange={(event) => setSelected({ ...selected, assigned_to: event.target.value ? Number(event.target.value) : null })} placeholder="Leave blank for unassigned" className="h-10 w-full rounded-xl border border-border px-3" /></label><label className="space-y-1 text-sm"><span>Follow-up date/time</span><input type="datetime-local" value={selected.follow_up_at ? selected.follow_up_at.slice(0, 16) : ""} onChange={(event) => setSelected({ ...selected, follow_up_at: event.target.value ? new Date(event.target.value).toISOString() : null })} className="h-10 w-full rounded-xl border border-border px-3" /></label><div className="text-sm"><strong>Last contacted:</strong> {selected.last_contacted_at ? new Date(selected.last_contacted_at).toLocaleString() : "Never"}</div><label className="space-y-1 text-sm md:col-span-2"><span>Internal note</span><textarea rows={4} value={selected.internal_note} onChange={(event) => setSelected({ ...selected, internal_note: event.target.value })} className="w-full rounded-xl border border-border p-3" /></label></div>
           {selected.status_history?.length ? <div><h3 className="font-semibold">Enquiry history</h3><ol className="mt-2 space-y-2">{selected.status_history.map((entry) => <li key={entry.id} className="rounded-xl border border-border p-3 text-sm"><div className="font-semibold">{entry.event_type} · {entry.from_status ? `${entry.from_status} → ` : ""}{entry.to_status}</div><div className="text-muted-foreground">{entry.note || "No note"} · {new Date(entry.created_at).toLocaleString()} {entry.changed_by_name ? `· ${entry.changed_by_name}` : ""}</div></li>)}</ol></div> : null}
-          <div className="flex flex-wrap justify-end gap-2"><button disabled={saving} onClick={() => void action(() => markBrochureEnquiryContacted(selected.id))} className="rounded-xl border border-border px-4 py-2 font-semibold">Mark contacted</button><button disabled={saving} onClick={() => void action(() => closeBrochureEnquiry(selected.id, { status: "CLOSED", internal_note: selected.internal_note }))} className="rounded-xl border border-border px-4 py-2 font-semibold">Close</button><button disabled={saving} onClick={() => void action(() => closeBrochureEnquiry(selected.id, { status: "LOST", internal_note: selected.internal_note }))} className="rounded-xl border border-border px-4 py-2 font-semibold">Mark lost</button><button disabled={saving} onClick={() => void action(() => updateBrochureEnquiry(selected.id, { status: selected.status, priority: selected.priority, assigned_to: selected.assigned_to, follow_up_at: selected.follow_up_at, internal_note: selected.internal_note }))} className="rounded-xl bg-primary px-4 py-2 font-semibold text-primary-foreground">Save changes</button></div>
+          {selected.quotation_summaries?.length ? <div><h3 className="font-semibold">Existing quotations</h3><div className="mt-2 flex flex-wrap gap-2">{selected.quotation_summaries.map((quotation) => <a key={quotation.id} href={`/admin/brochures/quotations?enquiry_id=${selected.id}`} className="rounded-xl border border-border px-3 py-2 text-sm font-semibold">{quotation.quotation_no} · {quotation.status}</a>)}</div></div> : null}
+          <div className="flex flex-wrap justify-end gap-2"><button disabled={saving || ["CONVERTED", "CLOSED", "LOST"].includes(selected.status)} onClick={() => void createQuotation()} className="rounded-xl bg-emerald-700 px-4 py-2 font-semibold text-white">Create quotation</button><button disabled={saving} onClick={() => void action(() => markBrochureEnquiryContacted(selected.id))} className="rounded-xl border border-border px-4 py-2 font-semibold">Mark contacted</button><button disabled={saving} onClick={() => void action(() => closeBrochureEnquiry(selected.id, { status: "CLOSED", internal_note: selected.internal_note }))} className="rounded-xl border border-border px-4 py-2 font-semibold">Close</button><button disabled={saving} onClick={() => void action(() => closeBrochureEnquiry(selected.id, { status: "LOST", internal_note: selected.internal_note }))} className="rounded-xl border border-border px-4 py-2 font-semibold">Mark lost</button><button disabled={saving} onClick={() => void action(() => updateBrochureEnquiry(selected.id, { status: selected.status, priority: selected.priority, assigned_to: selected.assigned_to, follow_up_at: selected.follow_up_at, internal_note: selected.internal_note }))} className="rounded-xl bg-primary px-4 py-2 font-semibold text-primary-foreground">Save changes</button></div>
         </div> : null}
       </Modal>
     </ERPPageShell>

@@ -439,3 +439,53 @@ accounting, ledger, and stock fields.
 
 This phase remains enquiry and CRM lead tracking only. Quotation conversion is
 reserved for a future BROCHURE-3 workflow.
+# BROCHURE-3 — Quotation Drafts from Brochure Enquiries
+
+BROCHURE-3 adds a non-financial quotation layer between public brochure enquiries/CRM leads and future business transactions:
+
+`Public brochure → Enquiry → CRM party/lead/interaction → Quotation draft → PDF/public link → Customer review`
+
+## Quotation workflow and statuses
+
+- Admin staff can create a quotation manually or from a brochure enquiry.
+- Creating from an enquiry copies customer display fields, brochure/enquiry references, safe product snapshots, requested quantities, preferred plans, and available CRM party/lead identifiers.
+- Status transitions are restricted to:
+  - `DRAFT → SENT` or `CANCELLED`
+  - `SENT → ACCEPTED`, `REJECTED`, `EXPIRED`, or `CANCELLED`
+- `ACCEPTED`, `REJECTED`, `EXPIRED`, and `CANCELLED` are terminal in this phase.
+- `ACCEPTED` means agreement in principle only. It is not a booking or financial transaction.
+- Enquiries are moved to `QUOTED` only when the existing enquiry lifecycle permits that transition. They are never marked `CONVERTED` automatically.
+
+## Plan calculations
+
+- Direct sale lines use quantity × unit price less line discount.
+- Rent lines show recurring monthly amount and security deposit separately. Payable-now totals contain deposit, delivery charge, and any direct-sale component.
+- Lease lines show monthly amount, tenure-based informational projection, and security deposit.
+- Lucky EMI lines are informational only. The quote uses a safe available monthly value or derives an indicative amount and defaults to 15 months when no safe duration is available.
+- Mixed quotations keep an explicit plan type on every line.
+- All values are validated server-side. Negative amounts and discounts above gross quoted value are rejected.
+
+## PDF and public sharing
+
+- Quotation PDFs use existing Subidha branding and include customer display details, quotation number/date/validity, lines, deposits, discounts, delivery charge, payable-now amount, recurring monthly amount, projected total, terms, and public link.
+- Public pages are accessed only by a secure URL-safe token.
+- Public serializers exclude internal notes, CRM identifiers, staff assignment, cost/vendor/purchase/accounting/ledger/stock internals, and unrelated private customer data.
+- Cancelled or explicitly expired quotations return a safe unavailable response. Sent quotations past their validity date are also unavailable.
+
+## Explicit non-financial boundary
+
+This phase creates only quotation records, status history, PDFs, share links, and best-effort CRM interaction notes. It does not create or modify invoices, receipts, payments, subscriptions, EMI schedules, rent/lease contracts, direct sales, deliveries, journal/reconciliation entries, stock ledgers, reservations, orders, or stock quantities.
+
+Every public quotation and PDF includes this disclaimer:
+
+> This quotation is not an invoice, receipt, contract, subscription, or stock reservation. Final billing, payment, stock availability, delivery, and contract creation require admin approval and separate confirmation.
+
+## Admin workflow
+
+- `/admin/brochures/quotations` provides search, status/type/date/enquiry filters, draft creation/editing, line editing, recalculation, PDF regeneration, lifecycle actions, public-link copy, and WhatsApp-message copy.
+- Brochure enquiry detail exposes “Create quotation” and links to existing quotations.
+- `/quotations/{token}` is the customer-safe review page. It has no payment or booking action.
+
+## Future conversion path
+
+A later separately approved phase may convert an accepted quotation into a rent contract, lease contract, direct sale, or Lucky EMI subscription. That future conversion must use the canonical domain services and independently enforce stock, contract, billing, payment, accounting, audit, and reconciliation rules.

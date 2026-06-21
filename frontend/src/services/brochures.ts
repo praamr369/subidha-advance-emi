@@ -244,8 +244,166 @@ export type BrochureEnquiry = {
     changed_by_name: string;
     created_at: string;
   }>;
+  quotation_summaries: Array<{
+    id: number;
+    quotation_no: string;
+    status: BrochureQuotationStatus;
+    quotation_type: BrochureQuotationType;
+    created_at: string;
+  }>;
   created_at: string;
   updated_at: string;
+};
+
+export type BrochureQuotationStatus =
+  | "DRAFT"
+  | "SENT"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "EXPIRED"
+  | "CANCELLED";
+
+export type BrochureQuotationType =
+  | "RENT"
+  | "LEASE"
+  | "LUCKY_EMI"
+  | "DIRECT_SALE"
+  | "MIXED";
+
+export type BrochureQuotationLine = {
+  id?: number;
+  product_id: number | null;
+  product_snapshot: Partial<BrochureProduct>;
+  product_code: string;
+  product_name: string;
+  description: string;
+  plan_type: Exclude<BrochureQuotationType, "MIXED">;
+  quantity: number;
+  unit_price: string;
+  monthly_amount: string;
+  tenure_months: number | null;
+  security_deposit: string;
+  discount_amount: string;
+  line_total: string;
+  availability_label: string;
+  sort_order?: number;
+};
+
+export type BrochureQuotationStatusHistory = {
+  id: number;
+  from_status: string;
+  to_status: BrochureQuotationStatus;
+  note: string;
+  changed_by: number | null;
+  changed_by_name: string;
+  created_at: string;
+};
+
+export type BrochureQuotationTotals = {
+  subtotal_amount: string;
+  discount_amount: string;
+  delivery_charge: string;
+  security_deposit_total: string;
+  total_payable_now: string;
+  recurring_monthly_total: string;
+  grand_total: string;
+};
+
+export type BrochureQuotation = BrochureQuotationTotals & {
+  id: number;
+  quotation_no: string;
+  enquiry_id: number | null;
+  brochure_id: number | null;
+  customer_name: string;
+  phone: string;
+  email: string;
+  location: string;
+  address_text: string;
+  quotation_type: BrochureQuotationType;
+  status: BrochureQuotationStatus;
+  validity_date: string | null;
+  expected_delivery_date: string | null;
+  totals: BrochureQuotationTotals;
+  terms_text: string;
+  internal_note: string;
+  sent_at: string | null;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by_name: string;
+  lines: BrochureQuotationLine[];
+  status_history: BrochureQuotationStatusHistory[];
+  enquiry_summary: { id: number; enquiry_no: string; status: string } | null;
+  brochure_summary: { id: number; brochure_no: string; title: string } | null;
+  crm_summary: { party_id: number | null; lead_id: number | null };
+  pdf_url: string;
+  public_url: string;
+  whatsapp_message: string;
+};
+
+export type BrochureQuotationList = {
+  count: number;
+  results: BrochureQuotation[];
+  page: number;
+  page_size: number;
+  num_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+};
+
+export type BrochureQuotationListParams = Partial<{
+  q: string;
+  status: BrochureQuotationStatus | "";
+  quotation_type: BrochureQuotationType | "";
+  date_from: string;
+  date_to: string;
+  enquiry_id: number;
+  page: number;
+  page_size: number;
+}>;
+
+export type BrochureQuotationWriteLine = Omit<
+  BrochureQuotationLine,
+  "id" | "line_total" | "product_snapshot"
+> & {
+  product_snapshot?: Partial<BrochureProduct>;
+};
+
+export type BrochureQuotationCreatePayload = {
+  enquiry_id?: number | null;
+  brochure_id?: number | null;
+  customer_name: string;
+  phone: string;
+  email?: string;
+  location?: string;
+  address_text?: string;
+  quotation_type: BrochureQuotationType;
+  validity_date?: string | null;
+  expected_delivery_date?: string | null;
+  discount_amount?: string;
+  delivery_charge?: string;
+  terms_text?: string;
+  internal_note?: string;
+  lines: BrochureQuotationWriteLine[];
+};
+
+export type PublicBrochureQuotation = BrochureQuotationTotals & {
+  quotation_no: string;
+  status: BrochureQuotationStatus;
+  validity_date: string | null;
+  customer_display_name: string;
+  quotation_type: BrochureQuotationType;
+  lines: BrochureQuotationLine[];
+  terms_text: string;
+  pdf_url: string;
+  business_contact: {
+    business_name: string;
+    phone: string;
+    email: string;
+    address: string;
+  };
+  disclaimer: string;
+  created_at: string;
 };
 
 export type BrochureEnquiryList = {
@@ -441,4 +599,111 @@ export async function closeBrochureEnquiry(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function listBrochureQuotations(
+  params: BrochureQuotationListParams = {}
+): Promise<BrochureQuotationList> {
+  return request<BrochureQuotationList>(
+    `/admin/brochures/quotations/${queryString(params)}`
+  );
+}
+
+export async function getBrochureQuotation(
+  id: number
+): Promise<BrochureQuotation> {
+  return request<BrochureQuotation>(`/admin/brochures/quotations/${id}/`);
+}
+
+export async function createBrochureQuotation(
+  payload: BrochureQuotationCreatePayload
+): Promise<BrochureQuotation> {
+  return request<BrochureQuotation>("/admin/brochures/quotations/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createBrochureQuotationFromEnquiry(
+  enquiryId: number
+): Promise<BrochureQuotation> {
+  return request<BrochureQuotation>(
+    `/admin/brochures/quotations/from-enquiry/${enquiryId}/`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+}
+
+export async function updateBrochureQuotation(
+  id: number,
+  payload: Partial<
+    Pick<
+      BrochureQuotation,
+      | "customer_name"
+      | "phone"
+      | "email"
+      | "location"
+      | "address_text"
+      | "validity_date"
+      | "expected_delivery_date"
+      | "discount_amount"
+      | "delivery_charge"
+      | "terms_text"
+      | "internal_note"
+    >
+  > & { lines?: BrochureQuotationWriteLine[] }
+): Promise<BrochureQuotation> {
+  return request<BrochureQuotation>(`/admin/brochures/quotations/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function recalculateBrochureQuotation(
+  id: number
+): Promise<BrochureQuotation> {
+  return request<BrochureQuotation>(
+    `/admin/brochures/quotations/${id}/recalculate/`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+}
+
+async function quotationStatusAction(
+  id: number,
+  action: "send" | "accept" | "reject" | "cancel",
+  payload: { note?: string } = {}
+): Promise<BrochureQuotation> {
+  return request<BrochureQuotation>(
+    `/admin/brochures/quotations/${id}/${action}/`,
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+}
+
+export const sendBrochureQuotation = (id: number) =>
+  quotationStatusAction(id, "send");
+export const acceptBrochureQuotation = (id: number) =>
+  quotationStatusAction(id, "accept");
+export const rejectBrochureQuotation = (
+  id: number,
+  payload: { note?: string } = {}
+) => quotationStatusAction(id, "reject", payload);
+export const cancelBrochureQuotation = (
+  id: number,
+  payload: { note?: string } = {}
+) => quotationStatusAction(id, "cancel", payload);
+
+export async function regenerateBrochureQuotationPdf(
+  id: number
+): Promise<BrochureQuotation> {
+  return request<BrochureQuotation>(
+    `/admin/brochures/quotations/${id}/regenerate-pdf/`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+}
+
+export async function getPublicQuotation(
+  token: string
+): Promise<PublicBrochureQuotation> {
+  return request<PublicBrochureQuotation>(
+    `/public/quotations/${encodeURIComponent(token)}/`
+  );
 }
