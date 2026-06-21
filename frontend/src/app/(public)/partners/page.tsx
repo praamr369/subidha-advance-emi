@@ -31,7 +31,7 @@ export default function PartnersPage() {
       }}
       actions={[
         { label: "Contact Store", href: ROUTES.public.contact, variant: "secondary" },
-        { label: "Apply / Enquire", href: ROUTES.public.apply, variant: "primary" },
+        { label: "Login", href: ROUTES.public.login, variant: "primary" },
       ]}
     >
       <section className="space-y-4">
@@ -54,7 +54,7 @@ export default function PartnersPage() {
       <PublicMarketingBanner
         eyebrow="Commission workflow"
         title="How partner commissions are handled"
-        description="Commission calculation, approval, and payout are internal controlled workflows. Partners can view their commission records in the partner portal but cannot self-approve or self-post payouts."
+        description="Commission calculation, approval, and payout are internal controlled workflows. Partners can view their commission records in the partner portal but cannot self-approve or self-post payouts. No guaranteed commission or instant payout is promised."
         items={[
           {
             title: "Controlled internal process",
@@ -62,14 +62,36 @@ export default function PartnersPage() {
               "Commissions are calculated based on approved partnership terms and customer onboarding status.",
           },
           {
-            title: "Partner portal visibility",
+            title: "No self-approval of payout",
             description:
-              "Partners can view their commission records, introduced customers, and subscription statuses after login.",
+              "A partner cannot approve their own payout. Payout batches require business approval before processing.",
           },
           {
-            title: "Approval required",
+            title: "Partner portal visibility",
             description:
-              "Payout batches require business approval. Partners cannot self-trigger or self-approve their own payouts.",
+              "Partners can view their commission records, introduced customers, and subscription statuses after login — but cannot trigger or post payments.",
+          },
+        ]}
+      />
+
+      <PublicMarketingBanner
+        eyebrow="Subject to store approval"
+        title="Partner work requires store approval at every stage"
+        description="Partner roles, commission structures, and payout processing are all subject to business approval. Partners are not employees or agents of the business and cannot act on behalf of the business without explicit authorisation."
+        items={[
+          {
+            title: "Activation requires approval",
+            description: "Becoming an active partner requires business review and signed agreement. Enquiry does not activate partner status.",
+          },
+          {
+            title: "No guaranteed commission",
+            description:
+              "Commission eligibility depends on approved terms, customer onboarding status, and business verification — not solely on introductions made.",
+          },
+          {
+            title: "No accounting entries by partners",
+            description:
+              "Partners cannot post accounting entries, approve financial records, or alter any customer payment or contract data.",
           },
         ]}
       />
@@ -85,8 +107,9 @@ export default function PartnersPage() {
         title="Interested in becoming a partner?"
         description="Contact the branch to discuss partnership eligibility and terms. Partnership activation requires business approval."
         actions={[
-          { href: ROUTES.public.contact, label: "Contact store", variant: "secondary" },
-          { href: ROUTES.public.apply, label: "Send enquiry", variant: "primary" },
+          { href: ROUTES.public.contact, label: "Contact Store", variant: "secondary" },
+          { href: ROUTES.public.contracts, label: "Explore Contracts", variant: "secondary" },
+          { href: ROUTES.public.login, label: "Login", variant: "primary" },
         ]}
       />
     </PublicPageShell>

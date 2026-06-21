@@ -68,6 +68,22 @@ const sections = [
     ],
   },
   {
+    id: "accounting-internal",
+    title: "Accounting and reconciliation are internal and controlled",
+    paragraphs: [
+      "All accounting records, journal entries, ledger postings, payment reconciliation, and bridge operations are internal controlled workflows. No public user — including customers, partners, or website visitors — can post, alter, or approve any accounting record through the public website.",
+      "Accounting reconciliation and reporting remain the sole responsibility of authorised staff and administrators operating within the authenticated core system.",
+    ],
+  },
+  {
+    id: "product-availability",
+    title: "Product availability and pricing",
+    paragraphs: [
+      "Product categories and descriptions shown on the public website are for informational purposes. Actual stock availability, product pricing, EMI amounts, rent/lease amounts, and batch availability must be confirmed directly with the Subidha Furniture branch before enrollment or payment.",
+      "Public product pages do not reserve stock, confirm pricing, or create any financial commitment.",
+    ],
+  },
+  {
     id: "public-content-limits",
     title: "Limits of public content",
     paragraphs: [

@@ -62,6 +62,17 @@ export default async function ContactPage() {
       </section>
 
       <CtaBanner
+        title="Already a customer?"
+        description="Log in to the customer portal to view your contracts, payment history, and receipts. Browse FAQ for quick answers."
+        actions={[
+          { href: ROUTES.public.login, label: "Login", variant: "secondary" },
+          { href: ROUTES.public.contracts, label: "Explore Contracts", variant: "secondary" },
+          { href: ROUTES.public.faq, label: "Read FAQ", variant: "secondary" },
+          { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },
+        ]}
+      />
+
+      <CtaBanner
         title="Need product-first assistance?"
         description="Browse products first, then submit an enquiry with product context. Product selection does not reserve stock or create financial records until branch review."
         actions={[

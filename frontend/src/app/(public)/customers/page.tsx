@@ -9,6 +9,8 @@ import SectionHeader from "@/components/public/SectionHeader";
 import TrustPillars from "@/components/public/TrustPillars";
 import {
   CUSTOMERS_PAGE_CONTENT,
+  CUSTOMER_LIMITATIONS,
+  CUSTOMER_MULTI_CONTRACT_INFO,
   PUBLIC_LEGAL_DISCLAIMER_POINTS,
 } from "@/lib/public-content";
 import { buildPublicMetadata } from "@/lib/public-seo";
@@ -35,8 +37,8 @@ export default function CustomersPage() {
         badges: ["Registration", "Payments", "Portal access", "Document safety"],
       }}
       actions={[
-        { label: "View FAQ", href: ROUTES.public.faq, variant: "secondary" },
-        { label: "Apply / Enquire", href: ROUTES.public.apply, variant: "primary" },
+        { label: "Explore Contracts", href: ROUTES.public.contracts, variant: "secondary" },
+        { label: "Login", href: ROUTES.public.login, variant: "primary" },
       ]}
     >
       <section className="space-y-4">
@@ -94,6 +96,54 @@ export default function CustomersPage() {
 
       <section className="space-y-4">
         <SectionHeader
+          eyebrow="Multiple contracts"
+          title="Multiple contracts and multiple Lucky IDs"
+          description="What happens when a customer holds more than one contract or more than one Lucky ID."
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <article className="public-card p-5">
+            <h3 className="text-sm font-semibold text-foreground">Multiple contracts</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {CUSTOMER_MULTI_CONTRACT_INFO.multipleContracts}
+            </p>
+          </article>
+          <article className="public-card p-5">
+            <h3 className="text-sm font-semibold text-foreground">Multiple Lucky IDs</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {CUSTOMER_MULTI_CONTRACT_INFO.multipleLuckyIds}
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <SectionHeader
+          eyebrow="What customers cannot do"
+          title="Customer limitations — for your protection"
+          description="These limitations are part of the controlled workflow that keeps your financial records safe and auditable."
+        />
+        <div className="rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)]">
+          <ul className="grid gap-3 sm:grid-cols-2" role="list">
+            {CUSTOMER_LIMITATIONS.map((item) => (
+              <li key={item} className="flex items-start gap-2.5">
+                <span
+                  className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-red-200/70 bg-red-50 text-[10px] font-bold text-red-600"
+                  aria-hidden="true"
+                >
+                  ✕
+                </span>
+                <span className="text-sm leading-6 text-muted-foreground">{item}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-xs leading-5 text-muted-foreground">
+            These restrictions ensure that payment records, delivery authorisations, and accounting entries remain controlled by authorised branch staff — protecting both the customer and the business.
+          </p>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <SectionHeader
           eyebrow="Document safety"
           title="Documents every customer should keep"
           description="Digital records in the portal are helpful, but always keep physical copies of signed documents."
@@ -118,13 +168,13 @@ export default function CustomersPage() {
       <TrustPillars />
 
       <PublicMarketingBanner
-        eyebrow="Payment safety"
-        title="How payment and receipts work"
-        description="Your payment is only considered valid when an official receipt is generated. Do not treat any payment as complete without receipt confirmation."
+        eyebrow="Why digital proof matters"
+        title="Digital contract tracking is safer than informal paper registers"
+        description="A structured digital system means your payment, contract, and receipt history is traceable, date-stamped, and preserved — unlike informal handwritten registers that can be lost or disputed."
         items={[
           {
             title: "Receipt-first validation",
-            description: "A payment without a receipt should not be treated as a confirmed transaction.",
+            description: "A payment without a digital receipt should not be treated as a confirmed transaction.",
           },
           {
             title: "Auditable history",
@@ -134,7 +184,7 @@ export default function CustomersPage() {
           {
             title: "Portal visibility",
             description:
-              "Receipts appear in your customer portal where you can review them at any time after login.",
+              "Receipts and contracts appear in your customer portal where you can review them at any time after login.",
           },
         ]}
       />
@@ -142,12 +192,13 @@ export default function CustomersPage() {
       <PublicDisclaimerBox points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />
 
       <CtaBanner
-        title="Ready to register as a customer?"
-        description="Submit an enquiry, choose a product, and the branch team will guide you through registration and KYC."
+        title="Ready to explore your options?"
+        description="Browse contracts to understand which plan suits you, then contact the branch or log in to your existing account."
         actions={[
-          { href: ROUTES.public.products, label: "View products", variant: "secondary" },
+          { href: ROUTES.public.contracts, label: "Explore Contracts", variant: "secondary" },
+          { href: ROUTES.public.contact, label: "Contact Store", variant: "secondary" },
           { href: ROUTES.public.faq, label: "View FAQ", variant: "secondary" },
-          { href: ROUTES.public.apply, label: "Apply / Enquire", variant: "primary" },
+          { href: ROUTES.public.login, label: "Login", variant: "primary" },
         ]}
       />
     </PublicPageShell>

@@ -635,3 +635,255 @@ export const PARTNERS_PAGE_CONTENT = {
   disclaimer:
     "Partner registration and activation require business approval. This page explains the partner role for informational purposes. It does not constitute an offer of employment, agency, or guaranteed income. Final terms are governed by the signed partnership agreement.",
 } as const;
+
+// ---------------------------------------------------------------------------
+// Phase 10C: Customer education — five journeys for How It Works
+// ---------------------------------------------------------------------------
+
+export const HOW_IT_WORKS_JOURNEY_A = [
+  {
+    title: "Choose product",
+    description:
+      "Visit the showroom or browse the public catalogue. Select furniture, electronics, or home appliances that suit your household need and monthly budget comfort.",
+  },
+  {
+    title: "Register as a customer",
+    description:
+      "The branch registers you as a customer after collecting required KYC documents (identity proof, address proof, photograph). Registration alone does not guarantee contract approval.",
+  },
+  {
+    title: "Select an active batch",
+    description:
+      "The branch assigns you to an active Advance EMI batch where Lucky ID slots are still available and the tenure timeline fits your plan.",
+  },
+  {
+    title: "Lucky ID assigned",
+    description:
+      "A Lucky ID (numbered 00–99) is assigned within your batch. One customer may hold multiple Lucky IDs across multiple approved subscriptions. Assignment does not guarantee winning.",
+  },
+  {
+    title: "EMI schedule generated",
+    description:
+      "An approved contract is created with your product, batch, Lucky ID, EMI amount, and tenure. Read this carefully — it is your official agreement.",
+  },
+  {
+    title: "Pay EMI monthly",
+    description:
+      "Pay your scheduled EMI each month using approved methods (cash, UPI, bank transfer). Each valid payment generates a receipt visible in your customer portal.",
+  },
+  {
+    title: "Monthly draw conducted as per rulebook",
+    description:
+      "Each month, a draw is conducted by the branch under published rules using a commit-then-reveal process. All active Lucky IDs in the batch participate. Winning is not guaranteed.",
+  },
+  {
+    title: "Winner gets future EMI waiver only",
+    description:
+      "If your Lucky ID is selected, future remaining EMI obligations (from the approved winning month onward) may be waived. Already-paid EMI is not automatically refunded. The waiver is future-facing only.",
+  },
+  {
+    title: "Delivery depends on readiness",
+    description:
+      "Delivery is scheduled separately based on KYC readiness, stock availability, payment status, contract completeness, and operational checks. Delivery is not automatic upon EMI payment.",
+  },
+  {
+    title: "Keep all receipts and documents",
+    description:
+      "Preserve your approved contract, all payment receipts, delivery/handover document, and winner communication (if applicable). These form your complete transaction proof.",
+  },
+] as const;
+
+export const HOW_IT_WORKS_JOURNEY_B = [
+  {
+    title: "Choose product",
+    description:
+      "Browse the catalogue or visit the showroom. Identify furniture, electronics, or appliances suited for temporary or flexible usage under a rent contract.",
+  },
+  {
+    title: "Register as a customer",
+    description:
+      "Provide KYC documents at the branch. Approval is subject to verification and business checks.",
+  },
+  {
+    title: "Rent contract created",
+    description:
+      "An approved rent contract is generated with product details, rent cycle, monthly demand, deposit terms, and tenure. Read and confirm before signing.",
+  },
+  {
+    title: "Deposit may be collected",
+    description:
+      "A refundable security/caution deposit may be required before delivery. Deposit is separate from monthly rent payments and is a refundable liability subject to return inspection.",
+  },
+  {
+    title: "Monthly demand billed separately",
+    description:
+      "Each month a rent demand is raised and must be paid by due date. Monthly rent payments are separate from the deposit. Both should generate receipts.",
+  },
+  {
+    title: "Delivery governed by contract and readiness",
+    description:
+      "Delivery is scheduled after contract approval, deposit confirmation, and operational readiness. Product remains business property throughout the rent tenure.",
+  },
+  {
+    title: "Return and service governed by terms",
+    description:
+      "At contract end, the product is returned for inspection. Deposit refund is subject to inspection outcome, pending dues clearance, and damage assessment. Renewal is not automatic.",
+  },
+] as const;
+
+export const HOW_IT_WORKS_JOURNEY_C = [
+  {
+    title: "Choose product for long-term use",
+    description:
+      "Identify furniture, electronics, or appliances for an extended usage period under a lease contract. Lease tenures are typically longer than rent (6, 9, or 12+ months).",
+  },
+  {
+    title: "Register as a customer",
+    description:
+      "KYC documents and branch verification are required. Lease approval may require additional checks compared to short rent.",
+  },
+  {
+    title: "Lease contract created",
+    description:
+      "An approved lease contract is generated with product, tenure, lease amount, deposit terms, and renewal/upgrade conditions. No Lucky ID is assigned for lease.",
+  },
+  {
+    title: "Deposit and monthly demand are separate",
+    description:
+      "A refundable deposit is collected as a separate liability. Monthly lease charges follow the approved billing cycle. Both should generate official receipts.",
+  },
+  {
+    title: "Delivery and handover",
+    description:
+      "Delivery is confirmed after contract and deposit readiness. A delivery/handover document is generated at completion. Product remains business property.",
+  },
+  {
+    title: "Renewal and upgrade require approval",
+    description:
+      "Lease renewal, extension, or product upgrade are not automatic. Each requires admin review of payment history, product condition, KYC, and eligibility.",
+  },
+  {
+    title: "Return, service, and deposit refund governed by terms",
+    description:
+      "Product is returned at contract end for inspection. Deposit refund depends on dues clearance, product condition, and business approval. Service requests follow the support workflow.",
+  },
+] as const;
+
+export const HOW_IT_WORKS_JOURNEY_D = [
+  {
+    title: "Pay through an approved method",
+    description:
+      "Accepted methods include cash, UPI, bank transfer, and other configured payment channels. Payments made outside approved channels may not be recognized.",
+  },
+  {
+    title: "Payment record created internally",
+    description:
+      "When a valid payment is recorded, the system creates an internal payment entry linked to your contract and EMI/demand schedule. Customers cannot self-post payments.",
+  },
+  {
+    title: "Official receipt generated",
+    description:
+      "Every valid payment generates an official receipt with date, amount, method, reference number, and collected-by trace. A payment without a receipt should not be treated as confirmed.",
+  },
+  {
+    title: "Receipt visible in customer portal",
+    description:
+      "After login, you can view and download your full receipt history from the customer portal. Contact the branch if any receipt is missing from your portal.",
+  },
+  {
+    title: "Documents should be preserved",
+    description:
+      "Keep physical copies of all receipts, contracts, and handover documents. Digital portal copies are convenient but do not replace signed originals.",
+  },
+] as const;
+
+export const HOW_IT_WORKS_JOURNEY_E = [
+  {
+    title: "KYC and profile readiness",
+    description:
+      "Customer identity, address, and KYC documents must be verified and accepted by the branch before delivery can be scheduled. Incomplete KYC can delay delivery.",
+  },
+  {
+    title: "Contract data readiness",
+    description:
+      "The contract must be approved and all required fields (product, tenure, Lucky ID for Advance EMI, deposit for rent/lease) must be correctly recorded.",
+  },
+  {
+    title: "EMI, deposit, and payment readiness",
+    description:
+      "Outstanding dues, deposit receipt confirmation, or EMI payment verification may be required before dispatch. The branch reviews payment status internally.",
+  },
+  {
+    title: "Stock and delivery readiness",
+    description:
+      "Product must be available in inventory and assigned for the customer. Delivery scheduling depends on stock movement workflow, which is controlled internally.",
+  },
+  {
+    title: "Accounting bridge is advisory and internal",
+    description:
+      "Accounting reconciliation and bridge checks are internal workflows. Public users cannot view or alter accounting records. The backend remains authoritative.",
+  },
+  {
+    title: "Backend remains authoritative for all readiness decisions",
+    description:
+      "Final delivery authorization is made by the branch system — not the public website. A delivery/handover document is generated at completion and serves as official proof.",
+  },
+] as const;
+
+// ---------------------------------------------------------------------------
+// Phase 10C: Additional FAQ items covering all required questions
+// ---------------------------------------------------------------------------
+
+export const PHASE10C_FAQ = [
+  {
+    question: "What is Subidha Core?",
+    answer:
+      "Subidha Core is the digital system that powers Subidha Furniture's contract, payment, and document management. It handles Advance EMI (Lucky Plan), Rent, Lease, and Direct Sale contracts — giving customers, partners, and staff a transparent, receipt-backed record system for all transactions.",
+  },
+  {
+    question: "What is Advance EMI / Lucky Plan?",
+    answer:
+      "Advance EMI (also called Lucky Plan) is a structured monthly instalment plan where a customer pays EMI over an approved tenure to purchase furniture, electronics, or home appliances. Each enrolled customer is assigned a Lucky ID within a batch and participates in a monthly draw. If their Lucky ID is selected, future remaining EMI may be waived. Winning is not guaranteed. The plan is not gambling — it is a transparent EMI plan with a draw feature governed by published rules and an approved contract.",
+  },
+  {
+    question: "Is winning the Lucky Plan draw guaranteed?",
+    answer:
+      "No. Winning is not guaranteed. Every active Lucky ID in the batch participates in the monthly draw, but only one Lucky ID is selected per draw cycle under published rules. Enrollment in the plan does not create any entitlement to a prize or waiver.",
+  },
+  {
+    question: "How do receipts work?",
+    answer:
+      "When a valid payment is recorded by the branch system, an official receipt is generated with the payment date, amount, method, reference number, and the staff member who collected it. You can view and download all your receipts from the customer portal after login. Never treat a payment as confirmed without a receipt. If a receipt is missing, contact the branch immediately.",
+  },
+  {
+    question: "Can a partner approve their own payout?",
+    answer:
+      "No. Partner commission calculation, approval, and payout are internal controlled workflows. A partner cannot self-approve or self-post their own commission payout. All payouts require business approval. Partners can view their commission records and statuses in the partner portal after login, but cannot trigger or approve payments themselves.",
+  },
+  {
+    question: "Where can I read the Terms & Conditions?",
+    answer:
+      "The Terms & Conditions are available on the Legal pages: Terms of Use at /legal/terms, Privacy Policy at /legal/privacy, and the Disclaimer at /legal/disclaimer. Additional business policy pages (delivery, warranty, payment, Lucky Plan, rent/lease) are also available from the Policies section. Your signed contract remains the governing document for your specific obligations.",
+  },
+] as const;
+
+// ---------------------------------------------------------------------------
+// Phase 10C: Customer limitations — what customers cannot do
+// ---------------------------------------------------------------------------
+
+export const CUSTOMER_LIMITATIONS = [
+  "Cannot self-post payments — all payments must be recorded by authorised branch staff",
+  "Cannot self-approve delivery — delivery authorisation is an internal branch workflow",
+  "Cannot edit accounting records — ledgers, journals, and financial entries are internal and controlled",
+  "Cannot alter EMI schedule or contract terms without branch approval",
+  "Cannot transfer their Lucky ID or contract rights to another person without admin authorisation",
+  "Cannot access admin, cashier, or staff-side records through the customer portal",
+  "Cannot approve their own KYC — KYC verification is done by the branch team",
+] as const;
+
+export const CUSTOMER_MULTI_CONTRACT_INFO = {
+  multipleContracts:
+    "A customer may hold more than one active contract — for example, one Advance EMI subscription and one Rent contract. Each contract has its own payment schedule, receipt history, and portal section. Managing multiple contracts does not combine their payment records.",
+  multipleLuckyIds:
+    "A customer may hold more than one Lucky ID if the business approves multiple Advance EMI subscriptions. Each Lucky ID belongs to a specific batch and operates independently. Holding multiple Lucky IDs means participating in the draw more than once, but does not guarantee winning in any draw cycle.",
+} as const;

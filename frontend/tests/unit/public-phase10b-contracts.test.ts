@@ -232,7 +232,6 @@ test("nav client links to /contracts not /lucky-plan", () => {
     nav.includes("ROUTES.public.contracts"),
     "Nav must reference ROUTES.public.contracts"
   );
-  const links = nav.match(/href: ROUTES\.public\.([a-zA-Z]+), label: dictionary\.links\[2\]/);
   const linkSrc = nav.includes("ROUTES.public.contracts") && nav.includes("dictionary.links[2]");
   assert.ok(linkSrc, "Nav link[2] must use ROUTES.public.contracts");
 });

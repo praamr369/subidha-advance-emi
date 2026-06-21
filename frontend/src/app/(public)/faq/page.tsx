@@ -6,14 +6,18 @@ import PublicDisclaimerBox from "@/components/public/PublicDisclaimerBox";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
-import { FULL_PUBLIC_FAQ, PUBLIC_LEGAL_DISCLAIMER_POINTS } from "@/lib/public-content";
+import {
+  FULL_PUBLIC_FAQ,
+  PHASE10C_FAQ,
+  PUBLIC_LEGAL_DISCLAIMER_POINTS,
+} from "@/lib/public-content";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "FAQ",
   description:
-    "Answers to common questions about Lucky Plan EMI, Lucky IDs, monthly draw, winner waiver, rent, lease, payment receipts, and delivery.",
+    "Answers to common questions about Subidha Core, Advance EMI (Lucky Plan), Lucky IDs, monthly draw, winner waiver, rent, lease, payment receipts, partner payouts, and delivery.",
   path: "/faq",
 });
 
@@ -21,29 +25,36 @@ export default function FaqPage() {
   return (
     <PublicPageShell
       title="Frequently Asked Questions"
-      subtitle="Clear answers to the questions customers ask most about Lucky Plan, rent, lease, payments, delivery, and more."
+      subtitle="Clear answers to the questions customers ask most about Subidha Core, Lucky Plan, rent, lease, payments, delivery, and more."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "FAQ" },
       ]}
       hero={{
         eyebrow: "Customer help",
-        badges: ["Lucky Plan", "Rent / Lease", "Payments", "Delivery"],
+        badges: ["Subidha Core", "Lucky Plan", "Rent / Lease", "Payments", "Delivery"],
       }}
       actions={[
         { label: "Contact Store", href: ROUTES.public.contact, variant: "secondary" },
-        { label: "Apply / Enquire", href: ROUTES.public.apply, variant: "primary" },
+        { label: "View Contracts", href: ROUTES.public.contracts, variant: "primary" },
       ]}
     >
+      <section className="space-y-4">
+        <SectionHeader
+          eyebrow="About Subidha Core and Advance EMI"
+          title="What is Subidha Core and Advance EMI / Lucky Plan?"
+          description="Start here if you are new to Subidha Furniture's digital system."
+        />
+        <FaqBlock items={PHASE10C_FAQ.filter((_, i) => i < 3)} />
+      </section>
+
       <section className="space-y-4">
         <SectionHeader
           eyebrow="Lucky Plan questions"
           title="Lucky Plan EMI & Lucky ID"
           description="Everything customers want to know about the Lucky Plan subscription, Lucky IDs, and the monthly draw."
         />
-        <FaqBlock
-          items={FULL_PUBLIC_FAQ.filter((_, i) => i < 5)}
-        />
+        <FaqBlock items={FULL_PUBLIC_FAQ.filter((_, i) => i < 5)} />
       </section>
 
       <section className="space-y-4">
@@ -53,7 +64,10 @@ export default function FaqPage() {
           description="How payments are recorded and how customers can access their receipt history."
         />
         <FaqBlock
-          items={FULL_PUBLIC_FAQ.filter((_, i) => i >= 5 && i < 9)}
+          items={[
+            PHASE10C_FAQ[3],
+            ...FULL_PUBLIC_FAQ.filter((_, i) => i >= 5 && i < 9),
+          ]}
         />
       </section>
 
@@ -62,9 +76,15 @@ export default function FaqPage() {
           eyebrow="Rent & lease"
           title="Rent, lease, and deposit questions"
         />
-        <FaqBlock
-          items={FULL_PUBLIC_FAQ.filter((_, i) => i >= 9 && i < 12)}
+        <FaqBlock items={FULL_PUBLIC_FAQ.filter((_, i) => i >= 9 && i < 12)} />
+      </section>
+
+      <section className="space-y-4">
+        <SectionHeader
+          eyebrow="Partners and payouts"
+          title="Partner role and commission questions"
         />
+        <FaqBlock items={[PHASE10C_FAQ[4]]} />
       </section>
 
       <section className="space-y-4">
@@ -72,9 +92,15 @@ export default function FaqPage() {
           eyebrow="Documents & transparency"
           title="Documents, draw transparency, and customer portal"
         />
-        <FaqBlock
-          items={FULL_PUBLIC_FAQ.filter((_, i) => i >= 12)}
+        <FaqBlock items={FULL_PUBLIC_FAQ.filter((_, i) => i >= 12)} />
+      </section>
+
+      <section className="space-y-4">
+        <SectionHeader
+          eyebrow="Legal and policies"
+          title="Where to find terms, policies, and contact"
         />
+        <FaqBlock items={[PHASE10C_FAQ[5]]} />
       </section>
 
       <PublicMarketingBanner
@@ -95,9 +121,9 @@ export default function FaqPage() {
         description="Browse products, explore plan options, or send an enquiry directly to the branch."
         actions={[
           { href: ROUTES.public.products, label: "View products", variant: "secondary" },
-          { href: ROUTES.public.luckyPlan, label: "Lucky Plan details", variant: "secondary" },
-          { href: ROUTES.public.rulebook, label: "View rulebook", variant: "secondary" },
-          { href: ROUTES.public.apply, label: "Apply / Enquire", variant: "primary" },
+          { href: ROUTES.public.contracts, label: "Explore Contracts", variant: "secondary" },
+          { href: ROUTES.public.rulebook, label: "View Rulebook", variant: "secondary" },
+          { href: ROUTES.public.contact, label: "Contact Store", variant: "primary" },
         ]}
       />
     </PublicPageShell>

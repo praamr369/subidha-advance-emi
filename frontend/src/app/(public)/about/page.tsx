@@ -73,10 +73,33 @@ export default async function AboutPage() {
 
       <section className="public-surface p-6">
         <SectionHeader
-          eyebrow="Brand story"
-          title="Built for daily retail reality"
-          description="Subidha CORE supports actual retail operations, including customer onboarding, payment follow-up, and winner publication clarity."
+          eyebrow="Subidha Core — purpose"
+          title="Why digital contract tracking matters"
+          description="Subidha Core is the digital system behind Subidha Furniture's operations. It replaces informal paper registers with structured, receipt-backed records for every contract, payment, and delivery."
         />
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <article className="public-card p-4">
+            <h3 className="text-sm font-semibold text-foreground">Transparent payment records</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Every payment generates a receipt linked to the contract. Customers can view their full history in the customer portal after login.
+            </p>
+          </article>
+          <article className="public-card p-4">
+            <h3 className="text-sm font-semibold text-foreground">Delivery readiness tracking</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Delivery is authorised only after KYC, contract, payment, and stock readiness checks. A handover document is generated at completion.
+            </p>
+          </article>
+          <article className="public-card p-4">
+            <h3 className="text-sm font-semibold text-foreground">Customer document access</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Contracts, invoices, receipts, and delivery documents are accessible in the customer portal — making transactions traceable and verifiable.
+            </p>
+          </article>
+        </div>
+        <p className="mt-4 text-xs leading-5 text-muted-foreground">
+          Subidha Furniture does not claim awards, government endorsements, or inflated customer counts. Our focus is practical, daily-use retail operation with honest digital records.
+        </p>
       </section>
 
       <PublicDisclaimerBox points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />
