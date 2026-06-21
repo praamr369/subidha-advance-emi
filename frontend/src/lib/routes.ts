@@ -196,6 +196,7 @@ export const ROUTES = {
     batches: "/admin/batches",
     batchesCreate: "/admin/batches/create",
     products: "/admin/products",
+    brochures: "/admin/brochures",
     productsCreate: "/admin/products/create",
     productsImport: "/admin/products/import",
     productsWorkspace: "/admin/products/workspace",

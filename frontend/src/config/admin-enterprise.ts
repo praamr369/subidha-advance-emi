@@ -136,6 +136,7 @@ export const ADMIN_ENTERPRISE_MODULES: AdminEnterpriseModule[] = [
       "Product category, subcategory, SKU, and unit live in the shared product master and flow outward into inventory and billing.",
     routes: [
       { label: "Products", href: ROUTES.admin.products },
+      { label: "Brochures", href: ROUTES.admin.brochures },
       { label: "Inventory", href: ROUTES.admin.inventory },
       { label: "Manufacturing", href: ROUTES.admin.manufacturing },
       { label: "Locations", href: ROUTES.admin.inventoryLocations },

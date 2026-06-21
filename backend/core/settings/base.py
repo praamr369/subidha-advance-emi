@@ -425,6 +425,7 @@ INSTALLED_APPS = [
     "inventory",
     "manufacturing",
     "billing",
+    "brochures",
     "reminders",
     "system_jobs",
     "subscriptions",

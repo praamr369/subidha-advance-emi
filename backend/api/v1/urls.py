@@ -1,5 +1,8 @@
 from django.urls import path, include
 
+from brochures.urls import admin_urlpatterns as brochure_admin_urlpatterns
+from brochures.urls import public_urlpatterns as brochure_public_urlpatterns
+
 from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
 from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
 from api.v1.views.accounting_bridge_reconciliation import (
@@ -34,6 +37,7 @@ urlpatterns = [
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/products/register/", AdminProductRegisterView.as_view()),
     path("admin/products/<int:pk>/prepare-inventory-profile/", AdminProductInventoryProfilePrepareView.as_view()),
+    path("admin/brochures/", include(brochure_admin_urlpatterns)),
     path("admin/accounting/mapping-audit/", AccountingMappingAuditView.as_view()),
     path("admin/accounting/mapping-audit/seed-safe-defaults/", AccountingMappingAuditSeedDefaultsView.as_view()),
     path("admin/accounting/mapping-audit/fix-event/", AccountingMappingAuditFixEventView.as_view()),
@@ -100,6 +104,7 @@ urlpatterns = [
     path("cashier/", include("api.v1.routes.cashier")),
     path("notifications/", include("api.v1.routes.notifications")),
     path("public/", include("api.v1.routes.public")),
+    path("public/brochures/", include(brochure_public_urlpatterns)),
     path("executive/", include("api.v1.routes.executive")),
     path("winner/", include("api.v1.route_modules.winner_urls")),
 ]
