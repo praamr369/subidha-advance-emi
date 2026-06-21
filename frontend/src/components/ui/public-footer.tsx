@@ -23,11 +23,25 @@ export default async function PublicFooter() {
 
   const footerLinks = [
     { href: ROUTES.public.products, label: dictionary.common.products },
-    { href: ROUTES.public.luckyPlan, label: dictionary.common.luckyPlan },
-    { href: ROUTES.public.policies, label: "Business policies" },
+    { href: ROUTES.public.contracts, label: "Contracts" },
+    { href: ROUTES.public.contractsAdvanceEmi, label: "Advance EMI (Lucky Plan)" },
+    { href: ROUTES.public.contractsRent, label: "Rent contract" },
+    { href: ROUTES.public.contractsLease, label: "Lease contract" },
+    { href: ROUTES.public.about, label: "About" },
+    { href: ROUTES.public.howItWorks, label: dictionary.common.howItWorks },
+    { href: ROUTES.public.faq, label: "FAQ" },
+    { href: ROUTES.public.rulebook, label: "Rulebook" },
+    { href: ROUTES.public.customers, label: "Customer guide" },
+    { href: ROUTES.public.partners, label: "Partner program" },
+    { href: ROUTES.public.winners, label: dictionary.common.winners },
+    { href: ROUTES.public.winnerHistory, label: dictionary.common.winnerHistory },
+    { href: ROUTES.public.contact, label: dictionary.common.contact },
     { href: ROUTES.public.terms, label: "Terms" },
     { href: ROUTES.public.privacy, label: "Privacy" },
+    { href: ROUTES.public.legalDisclaimer, label: "Disclaimer" },
+    { href: ROUTES.public.legalPolicies, label: "Legal policies" },
     { href: ROUTES.public.refundCancellation, label: "Refund / Cancellation" },
+    { href: ROUTES.public.policies, label: "Business policies" },
     { href: ROUTES.public.warranty, label: "Warranty" },
     { href: ROUTES.public.deliveryPolicy, label: "Delivery policy" },
     { href: ROUTES.public.rentalLeasePolicy, label: "Rental / Lease policy" },
@@ -39,10 +53,6 @@ export default async function PublicFooter() {
     { href: ROUTES.public.dataRequests, label: "Data request policy" },
     { href: ROUTES.public.businessCompliance, label: "Business compliance" },
     { href: ROUTES.public.udyamMsme, label: "Udyam / MSME info" },
-    { href: ROUTES.public.howItWorks, label: dictionary.common.howItWorks },
-    { href: ROUTES.public.winners, label: dictionary.common.winners },
-    { href: ROUTES.public.winnerHistory, label: dictionary.common.winnerHistory },
-    { href: ROUTES.public.contact, label: dictionary.common.contact },
   ];
 
   return (
@@ -108,6 +118,11 @@ export default async function PublicFooter() {
             </div>
           ) : null}
         </div>
+      </div>
+      <div className="border-t border-border/40 px-4 py-4 sm:px-6 lg:px-8">
+        <p className="mx-auto max-w-7xl text-center text-xs text-muted-foreground">
+          &copy; Subidha Furniture. All rights reserved.
+        </p>
       </div>
     </footer>
   );

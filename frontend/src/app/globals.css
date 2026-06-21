@@ -921,6 +921,169 @@ button {
   cursor: pointer;
 }
 
+/* ---------------------------------------------------------------------------
+ * Phase 10A: Scroll-reveal & stagger animation utilities
+ * Activated by ScrollRevealSection (IntersectionObserver) adding .is-revealed
+ * All animations respect prefers-reduced-motion.
+ * --------------------------------------------------------------------------- */
+
+.scroll-reveal-item {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 560ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scroll-reveal-item.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.scroll-reveal-item-left {
+  opacity: 0;
+  transform: translateX(-18px);
+  transition:
+    opacity 540ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 540ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scroll-reveal-item-left.is-revealed {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.scroll-reveal-item-right {
+  opacity: 0;
+  transform: translateX(18px);
+  transition:
+    opacity 540ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 540ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scroll-reveal-item-right.is-revealed {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.scroll-reveal-item-scale {
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scroll-reveal-item-scale.is-revealed {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Stagger delays for child items inside a revealed parent */
+.stagger-children .scroll-reveal-item:nth-child(1),
+.stagger-children .scroll-reveal-item-left:nth-child(1),
+.stagger-children .scroll-reveal-item-right:nth-child(1),
+.stagger-children .scroll-reveal-item-scale:nth-child(1) { transition-delay: 0ms; }
+.stagger-children .scroll-reveal-item:nth-child(2),
+.stagger-children .scroll-reveal-item-left:nth-child(2),
+.stagger-children .scroll-reveal-item-right:nth-child(2),
+.stagger-children .scroll-reveal-item-scale:nth-child(2) { transition-delay: 80ms; }
+.stagger-children .scroll-reveal-item:nth-child(3),
+.stagger-children .scroll-reveal-item-left:nth-child(3),
+.stagger-children .scroll-reveal-item-right:nth-child(3),
+.stagger-children .scroll-reveal-item-scale:nth-child(3) { transition-delay: 160ms; }
+.stagger-children .scroll-reveal-item:nth-child(4),
+.stagger-children .scroll-reveal-item-left:nth-child(4),
+.stagger-children .scroll-reveal-item-right:nth-child(4),
+.stagger-children .scroll-reveal-item-scale:nth-child(4) { transition-delay: 240ms; }
+.stagger-children .scroll-reveal-item:nth-child(5),
+.stagger-children .scroll-reveal-item-left:nth-child(5),
+.stagger-children .scroll-reveal-item-right:nth-child(5),
+.stagger-children .scroll-reveal-item-scale:nth-child(5) { transition-delay: 320ms; }
+.stagger-children .scroll-reveal-item:nth-child(6),
+.stagger-children .scroll-reveal-item-left:nth-child(6),
+.stagger-children .scroll-reveal-item-right:nth-child(6),
+.stagger-children .scroll-reveal-item-scale:nth-child(6) { transition-delay: 400ms; }
+.stagger-children .scroll-reveal-item:nth-child(n+7),
+.stagger-children .scroll-reveal-item-left:nth-child(n+7),
+.stagger-children .scroll-reveal-item-right:nth-child(n+7),
+.stagger-children .scroll-reveal-item-scale:nth-child(n+7) { transition-delay: 480ms; }
+
+/* Hero text staged reveal — each span fades up with a fixed delay */
+.hero-text-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(14px);
+  animation: hero-word-reveal 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hero-text-word:nth-child(1) { animation-delay: 80ms; }
+.hero-text-word:nth-child(2) { animation-delay: 160ms; }
+.hero-text-word:nth-child(3) { animation-delay: 240ms; }
+.hero-text-word:nth-child(4) { animation-delay: 320ms; }
+.hero-text-word:nth-child(5) { animation-delay: 400ms; }
+.hero-text-word:nth-child(6) { animation-delay: 460ms; }
+.hero-text-word:nth-child(n+7) { animation-delay: 520ms; }
+
+@keyframes hero-word-reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Lucky ID grid pulse — labels in the 00-99 grid */
+@keyframes lucky-id-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.lucky-id-cell {
+  animation: lucky-id-enter 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Trust pillar float */
+@keyframes trust-pillar-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.trust-pillar-icon {
+  animation: trust-pillar-float 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal-item,
+  .scroll-reveal-item-left,
+  .scroll-reveal-item-right,
+  .scroll-reveal-item-scale {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .hero-text-word {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+
+  .lucky-id-cell {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  .trust-pillar-icon {
+    animation: none !important;
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

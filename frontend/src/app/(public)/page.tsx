@@ -2,20 +2,24 @@ import type { Metadata } from "next";
 
 import { PublicMarketingShell } from "@/components/layout/page-shells";
 import CtaBanner from "@/components/public/CtaBanner";
+import FaqBlock from "@/components/public/FaqBlock";
 import HomeFeaturedProductsShowcase from "@/components/public/HomeFeaturedProductsShowcase";
 import HomeLandingHero from "@/components/public/HomeLandingHero";
 import HomePlanFlowPreview from "@/components/public/HomePlanFlowPreview";
 import PlanCategoryShowcase from "@/components/public/PlanCategoryShowcase";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
+import RentLeaseComparison from "@/components/public/RentLeaseComparison";
 import SectionHeader from "@/components/public/SectionHeader";
 import PublicTrustStrip from "@/components/public/PublicTrustStrip";
+import TrustPillars from "@/components/public/TrustPillars";
 import WinnerSpotlight from "@/components/public/WinnerSpotlight";
 import { asLocale, getPublicDictionary, getText, publicContent } from "@/lib/public-i18n";
 import { getPublicLanguage } from "@/lib/public-i18n.server";
 import { getPublicLatestWinner, getPublicStats, listPublicProducts } from "@/lib/public-api";
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
 import { buildPublicMetadata } from "@/lib/public-seo";
+import { FULL_PUBLIC_FAQ } from "@/lib/public-content";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -118,11 +122,37 @@ export default async function PublicHome() {
             )}
           </PublicSectionShell>
 
+          <TrustPillars />
+
+          <section className="space-y-4">
+            <SectionHeader
+              eyebrow="Rent vs Lease"
+              title="Understanding rent and lease"
+              description="Neither rent nor lease participates in Lucky Plan draws. Both use a deposit-plus-monthly-demand structure."
+            />
+            <RentLeaseComparison />
+          </section>
+
+          <PublicSectionShell className="space-y-4">
+            <SectionHeader
+              eyebrow="Common questions"
+              title="Quick answers"
+              description="A selection of the most-asked questions. Visit the FAQ page for the full list."
+            />
+            <FaqBlock items={FULL_PUBLIC_FAQ.slice(0, 5)} />
+            <div className="flex justify-center">
+              <a href={ROUTES.public.faq} className="public-action-secondary text-sm">
+                View all FAQs →
+              </a>
+            </div>
+          </PublicSectionShell>
+
           <CtaBanner
             title="Start with a product or talk to the branch"
             description="Choose a product, send an enquiry, or contact the store. Public actions create leads only after you submit the form."
             actions={[
               { href: ROUTES.public.products, label: dictionary.common.products, variant: "secondary" },
+              { href: ROUTES.public.faq, label: "View FAQ", variant: "secondary" },
               { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },
             ]}
           />

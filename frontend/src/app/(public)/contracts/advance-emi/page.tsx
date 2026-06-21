@@ -12,35 +12,33 @@ import PublicPolicySection from "@/components/public/PublicPolicySection";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import SectionHeader from "@/components/public/SectionHeader";
 import { ADVANCE_EMI_POLICY, FULL_PUBLIC_FAQ, PUBLIC_LEGAL_DISCLAIMER_POINTS, READ_BEFORE_APPLY } from "@/lib/public-content";
-import { getPublicDictionary } from "@/lib/public-i18n";
-import { getPublicLocale } from "@/lib/public-i18n.server";
 import { buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Lucky Plan",
-  description: "Understand batches, Lucky IDs, EMI payments, winner publication, and future EMI waiver rules.",
-  path: "/lucky-plan",
+  title: "Advance EMI (Lucky Plan) Contract",
+  description:
+    "Full details of the Advance EMI (Lucky Plan) contract: Lucky ID assignment, monthly draw, winner waiver on future EMI only, and transparent draw rules.",
+  path: "/contracts/advance-emi",
 });
 
-export default async function LuckyPlanPage() {
-  const locale = await getPublicLocale();
-  const dictionary = getPublicDictionary(locale);
-  const subtitle =
-    "Join a batch, receive a Lucky ID, pay monthly EMI, and follow transparent winner publication. Draws are run under published rules; participation does not guarantee a prize, and any waiver applies only to future EMI obligations as described in branch documents.";
+const subtitle =
+  "Join a batch, receive a Lucky ID, pay monthly EMI, and follow transparent winner publication. Draws are run under published rules; participation does not guarantee a prize, and any waiver applies only to future EMI obligations as described in branch documents.";
 
+export default function ContractsAdvanceEmiPage() {
   return (
     <PublicPageShell
-      title={dictionary.common.luckyPlan}
+      title="Advance EMI (Lucky Plan)"
       subtitle={subtitle}
-      heroSlot={<LuckyPlanAnimatedHero title={dictionary.common.luckyPlan} subtitle={subtitle} />}
+      heroSlot={<LuckyPlanAnimatedHero title="Advance EMI (Lucky Plan)" subtitle={subtitle} />}
       breadcrumbs={[
-        { label: dictionary.common.home, href: ROUTES.public.home },
-        { label: dictionary.common.luckyPlan },
+        { label: "Home", href: ROUTES.public.home },
+        { label: "Contracts", href: ROUTES.public.contracts },
+        { label: "Advance EMI" },
       ]}
       actions={[
-        { label: dictionary.common.howItWorks, href: ROUTES.public.howItWorks, variant: "secondary" },
-        { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },
+        { label: "How it works", href: ROUTES.public.howItWorks, variant: "secondary" },
+        { label: "Apply / Enquire", href: ROUTES.public.apply, variant: "primary" },
       ]}
     >
       <PublicMarketingBanner
@@ -93,17 +91,6 @@ export default async function LuckyPlanPage() {
         ]}
       />
 
-      <PublicMarketingBanner
-        eyebrow="Operations clarity"
-        title="Payment safety and delivery flow"
-        description="Receipt records and delivery tracking are visible in customer self-service without changing contract or reconciliation behavior. Lucky Plan public content remains separate from operational posting."
-        items={[
-          { title: "Receipt-first payments", description: "Collected payments are receipted and visible in customer payment/receipt pages." },
-          { title: "Delivery as separate workflow", description: "Delivery status is tracked separately from EMI and contract state." },
-          { title: "Warranty and return guidance", description: "Applicable return/warranty support is handled through documented policy and support flow." },
-        ]}
-      />
-
       <FaqBlock items={FULL_PUBLIC_FAQ.slice(0, 7)} />
 
       <PublicDisclaimerBox points={PUBLIC_LEGAL_DISCLAIMER_POINTS} />
@@ -112,11 +99,11 @@ export default async function LuckyPlanPage() {
         title="Talk to the branch before you enroll"
         description="Get help on product selection, batch availability, tenure, and monthly amount comfort."
         actions={[
+          { href: ROUTES.public.contracts, label: "View all contracts", variant: "secondary" },
           { href: ROUTES.public.rulebook, label: "View Rulebook", variant: "secondary" },
           { href: ROUTES.public.faq, label: "View FAQ", variant: "secondary" },
-          { href: ROUTES.public.fairDraw, label: "View fair draw", variant: "secondary" },
-          { href: ROUTES.public.contact, label: dictionary.common.contact, variant: "secondary" },
-          { href: ROUTES.public.apply, label: dictionary.common.apply, variant: "primary" },
+          { href: ROUTES.public.contact, label: "Contact store", variant: "secondary" },
+          { href: ROUTES.public.apply, label: "Apply / Enquire", variant: "primary" },
         ]}
       />
     </PublicPageShell>

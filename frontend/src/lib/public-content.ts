@@ -381,3 +381,257 @@ export const GENERIC_POLICIES = {
     ],
   },
 } as const;
+
+// ---------------------------------------------------------------------------
+// Phase 10A: Extended public content
+// ---------------------------------------------------------------------------
+
+export const FULL_PUBLIC_FAQ = [
+  {
+    question: "What is a Lucky ID?",
+    answer:
+      "A Lucky ID is a numbered slot (00–99) assigned to your subscription within a specific batch. It is used for the monthly lucky draw. Each customer can hold multiple Lucky IDs across different batches. Lucky ID assignment does not guarantee winning.",
+  },
+  {
+    question: "Can one customer have multiple Lucky IDs?",
+    answer:
+      "Yes. A customer may hold more than one Lucky ID, either within the same batch (if policy allows) or across different batches. Each Lucky ID corresponds to one subscription slot.",
+  },
+  {
+    question: "What happens if I win the lucky draw?",
+    answer:
+      "If your Lucky ID is selected as the winner for a draw month, future EMI obligations from that month onward may be waived according to the plan rules stated in your approved contract. You will receive official communication through the branch.",
+  },
+  {
+    question: "Do I get my already-paid EMI back if I win?",
+    answer:
+      "No. Winning the draw waives only future remaining EMI obligations. EMI that has already been paid and receipted is not automatically refunded. The waiver applies to unpaid future EMI only, from the approved winning month onward.",
+  },
+  {
+    question: "Is rent or lease part of the Lucky Plan?",
+    answer:
+      "No. Rent and lease are completely separate contract types. They do not use Lucky IDs, do not participate in the monthly draw, and do not carry any EMI waiver benefits.",
+  },
+  {
+    question: "Do rent or lease contracts have Lucky IDs?",
+    answer:
+      "No. Lucky IDs are only for Advance EMI / Lucky Plan subscriptions. Rent and lease customers do not receive Lucky IDs and are not eligible for the monthly draw.",
+  },
+  {
+    question: "What proof do I get after payment?",
+    answer:
+      "Every valid payment should generate an official receipt record. You can view your payment receipts from the customer portal after login. Always ask for a receipt if you do not receive one automatically.",
+  },
+  {
+    question: "When does delivery happen?",
+    answer:
+      "Delivery depends on your contract readiness, stock availability, payment verification, and any KYC or address checks required by the business. Delivery is a separate workflow from EMI payment. A delivery/handover document is generated at completion.",
+  },
+  {
+    question: "What if I miss an EMI payment?",
+    answer:
+      "Missed payments may affect your contract status, draw eligibility, delivery schedule, or service access as per your approved contract terms. Contact the branch immediately if you are unable to pay on time. Do not assume an unreceipted payment has been recorded.",
+  },
+  {
+    question: "How do I contact the store?",
+    answer:
+      "You can reach us through the Contact page on this website, by visiting the showroom in person, or by calling the branch directly. Contact details are listed on the Contact page.",
+  },
+  {
+    question: "Is participating in Lucky Plan a form of gambling?",
+    answer:
+      "No. Lucky Plan is a structured monthly EMI / subscription plan where winning results in a future EMI waiver benefit. Participation is tied to a real product purchase contract. It is not a wager or game of chance with no underlying value — it is an EMI payment plan with a transparent draw feature.",
+  },
+  {
+    question: "Is the deposit for rent or lease refundable?",
+    answer:
+      "The security deposit for rent or lease is treated as a refundable liability, subject to return inspection, pending dues clearance, and business approval. Deductions may apply for damage, missing parts, or approved charges. Final refund is governed by the contract and inspection outcome.",
+  },
+  {
+    question: "What documents should I keep after joining?",
+    answer:
+      "Keep your approved subscription contract, all payment receipts, any delivery/handover documents, and official winner communication (if applicable). These are your proof of the complete transaction history. Digital copies in the customer portal are available but you should also keep physical copies of signed documents.",
+  },
+  {
+    question: "Can I check my payment history online?",
+    answer:
+      "Yes. After logging in to the customer portal, you can view your subscriptions, payment history, receipts, Lucky ID assignments, delivery status, and support requests.",
+  },
+  {
+    question: "How is the monthly draw conducted transparently?",
+    answer:
+      "The draw uses a commit-then-reveal process. Before each draw, a commitment hash is published. After the draw, the reveal (actual result) is published and can be verified against the earlier commitment. This ensures that draw results cannot be secretly changed after commitment.",
+  },
+] as const;
+
+export const RULEBOOK_SECTIONS = [
+  {
+    id: "lucky-plan-structure",
+    title: "Lucky Plan — structure and eligibility",
+    rules: [
+      "Lucky Plan (Advance EMI) is a monthly instalment plan where the customer pays EMI for a product over an approved tenure.",
+      "Product base price is treated as the total contract value unless approved amendments state otherwise.",
+      "Default EMI is derived by dividing the total contract value by the tenure in months.",
+      "A customer must be enrolled in an approved batch to receive a Lucky ID.",
+      "Lucky IDs are numbered 00–99 within each batch. One batch slot holds one Lucky ID.",
+      "A customer may hold multiple Lucky IDs if the business approves multiple subscriptions.",
+      "Lucky ID assignment is controlled by the branch system and does not occur through the public website.",
+      "Eligibility to participate in the draw depends on subscription status, payment discipline, and KYC readiness.",
+    ],
+  },
+  {
+    id: "monthly-draw",
+    title: "Monthly draw — process and rules",
+    rules: [
+      "A monthly draw is conducted by the branch under published rules.",
+      "The draw uses a commit-then-reveal mechanism: a commitment hash is published before the draw, and the reveal is published afterward.",
+      "Published winner records include batch reference, draw month, Lucky ID, and commitment/reveal proof where available.",
+      "Winner names are masked on public pages to protect privacy.",
+      "No public page or customer action can alter a revealed draw result.",
+      "Participation in the draw does not guarantee winning.",
+      "Winning Lucky Plan is not a form of gambling — it is a structured EMI waiver benefit attached to a real product contract.",
+    ],
+  },
+  {
+    id: "winner-waiver",
+    title: "Winner benefit — future EMI waiver only",
+    rules: [
+      "If a customer's Lucky ID wins the monthly draw, remaining future EMI obligations (from the approved winning month onward) may be waived per plan rules.",
+      "Waiver applies only to future EMI — EMI that has already been paid and receipted is not refunded automatically.",
+      "Waiver does not remove KYC, delivery, documentation, or handover requirements.",
+      "Lucky ID or contract rights cannot be transferred without admin approval.",
+      "A winner must still complete all applicable contract steps (KYC, delivery, handover) unless separately waived by business policy.",
+    ],
+  },
+  {
+    id: "payment-discipline",
+    title: "Payment and receipt rules",
+    rules: [
+      "Customers must pay scheduled EMI using approved methods (cash, UPI, bank transfer, or configured channels).",
+      "Each valid payment must generate an official receipt. A payment without a receipt should not be treated as final.",
+      "Receipts are traceable and can be viewed in the customer portal after login.",
+      "Missed or late payments may affect draw eligibility, service, delivery, or contract status as per policy.",
+      "Corrections, reversals, or refunds must follow approved audit workflow — customers cannot self-post these entries.",
+    ],
+  },
+  {
+    id: "rent-lease-rules",
+    title: "Rent and lease — key rules",
+    rules: [
+      "Rent and lease do not use Lucky IDs and do not participate in the monthly draw.",
+      "No EMI waiver benefits apply to rent or lease contracts.",
+      "Security deposit for rent or lease is a refundable liability — it is separate from monthly demand.",
+      "Monthly demand (rent/lease charge) must be paid as per the approved billing cycle.",
+      "Deposit refund is subject to return inspection, dues clearance, and business approval.",
+      "Renewal, extension, or upgrade of a lease is not automatic and requires admin approval.",
+      "The product remains business property throughout rent or lease unless separately sold via direct sale invoice.",
+    ],
+  },
+  {
+    id: "delivery-handover",
+    title: "Delivery and handover",
+    rules: [
+      "Delivery is scheduled after contract readiness, payment verification, stock availability, and KYC checks.",
+      "A delivery/handover document is generated at completion — this is the official delivery record.",
+      "Customers should inspect product condition during handover and note any concerns before signing.",
+      "Visible damage or mismatch at delivery should be reported immediately at the time of handover.",
+      "Stock and inventory movement is an internal business workflow — public pages do not control delivery.",
+    ],
+  },
+  {
+    id: "cancellation-default",
+    title: "Cancellation, transfer, and default",
+    rules: [
+      "Cancellation, transfer, and default are governed by the approved contract terms.",
+      "Lucky ID or contract rights cannot be transferred to another person without admin approval.",
+      "Default (sustained missed payment) may lead to suspension, cancellation, or recovery actions per policy.",
+      "Customers who need to cancel or modify a contract should contact the branch immediately.",
+    ],
+  },
+  {
+    id: "customer-responsibilities",
+    title: "Customer responsibilities and document safety",
+    rules: [
+      "Customers should keep their approved contract, all payment receipts, delivery/handover documents, and winner communications.",
+      "Digital copies in the customer portal are available but do not replace physically signed documents.",
+      "Customers must keep contact information (phone, address) updated so the branch can reach them.",
+      "Customers must not share their login credentials or allow others to access their account.",
+    ],
+  },
+] as const;
+
+export const CUSTOMERS_PAGE_CONTENT = {
+  registrationSteps: [
+    {
+      title: "Make an enquiry",
+      description:
+        "Visit the showroom, call the branch, or submit an online enquiry through the Apply page. Mention the product you are interested in and the plan type (Lucky Plan EMI, Rent, Lease, or Direct Sale).",
+    },
+    {
+      title: "Provide KYC documents",
+      description:
+        "The branch will guide you on required KYC documents. These may include identity proof, address proof, photograph, and any other documents as per policy. KYC is required before contract activation.",
+    },
+    {
+      title: "Get your contract approved",
+      description:
+        "Once KYC is verified and the business approves your application, a contract is created in the system. This is your official record — read it carefully before signing.",
+    },
+    {
+      title: "Receive your Lucky ID (Lucky Plan only)",
+      description:
+        "If you enrolled in Lucky Plan EMI, a Lucky ID (00–99) is assigned within your batch. You can view this in the customer portal after login.",
+    },
+    {
+      title: "Pay monthly and track receipts",
+      description:
+        "Pay your EMI or monthly demand on time. Each payment generates a receipt. Log in to the customer portal to view your full payment history and receipts.",
+    },
+  ],
+  whatCustomerPortalProvides: [
+    "View active subscriptions, contracts, and Lucky ID assignments",
+    "View full payment history and download receipts",
+    "Track delivery status and handover documents",
+    "View outstanding dues and EMI schedule",
+    "Submit support or service requests",
+    "View KYC status and profile details",
+    "View direct sale invoices and orders",
+  ],
+  documentsToKeep: [
+    "Approved subscription / rent / lease contract (signed copy)",
+    "All payment receipts (physical and digital)",
+    "Delivery / handover document (signed at delivery)",
+    "Winner communication letter (if applicable)",
+    "KYC acknowledgement from the branch",
+    "Any amendment or modification letters",
+  ],
+} as const;
+
+export const PARTNERS_PAGE_CONTENT = {
+  roleExplanation:
+    "Partners support Subidha Furniture by connecting potential customers with the business. A partner may introduce new customers, assist with enquiry follow-ups, and support the onboarding process as defined in the approved partnership agreement.",
+  keyPoints: [
+    {
+      title: "Partners introduce customers",
+      description:
+        "A partner's primary role is to introduce customers who are interested in Subidha Furniture's products and plans. Customer enrollment, contract creation, and approval remain controlled by the branch system.",
+    },
+    {
+      title: "Commissions are an internal workflow",
+      description:
+        "Partner commissions and payouts are calculated and processed as internal controlled workflows. Partners cannot self-approve or self-post their own commission payouts.",
+    },
+    {
+      title: "No guaranteed payout promise",
+      description:
+        "Commission eligibility, calculation, and payment timing depend on approved partnership terms, customer onboarding status, and business verification — not on the number of introductions alone.",
+    },
+    {
+      title: "Partner portal access",
+      description:
+        "Approved partners receive login access to a partner dashboard where they can view their introduced customers, subscription statuses, commission records, and support requests.",
+    },
+  ],
+  disclaimer:
+    "Partner registration and activation require business approval. This page explains the partner role for informational purposes. It does not constitute an offer of employment, agency, or guaranteed income. Final terms are governed by the signed partnership agreement.",
+} as const;

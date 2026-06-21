@@ -57,7 +57,7 @@ export default function PublicNavClient({
   const links = [
     { href: ROUTES.public.home, label: dictionary.links[0] },
     { href: ROUTES.public.products, label: dictionary.links[1] },
-    { href: ROUTES.public.luckyPlan, label: dictionary.links[2] },
+    { href: ROUTES.public.contracts, label: dictionary.links[2] },
     { href: ROUTES.public.howItWorks, label: dictionary.links[3] },
     { href: ROUTES.public.winners, label: dictionary.links[4] },
     { href: ROUTES.public.winnerHistory, label: dictionary.links[5] },

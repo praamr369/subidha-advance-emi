@@ -36,7 +36,7 @@ export function buildPublicMetadata({
 export function getPublicDictionary(locale: PublicLocale) {
   const content = {
     en: {
-      nav: { links: ["Home", "Products", "Lucky Plan", "How It Works", "Winners", "Winner History", "About", "Contact", "Blog"], apply: "Apply", register: "Register", login: "Login", whatsapp: "WhatsApp", navigate: "Navigate", quickActions: "Quick actions", language: "Language" },
+      nav: { links: ["Home", "Products", "Contracts", "How It Works", "Winners", "Winner History", "About", "Contact", "Blog"], apply: "Apply", register: "Register", login: "Login", whatsapp: "WhatsApp", navigate: "Navigate", quickActions: "Quick actions", language: "Language" },
       footer: { intro: "Trusted local shopping support for furniture, electronics, and home appliances with simple monthly plans.", quickLinks: "Quick links", contact: "Contact", social: "Social", whatsapp: "WhatsApp the branch" },
       common: {
         home: "Home",
@@ -59,7 +59,7 @@ export function getPublicDictionary(locale: PublicLocale) {
       seo: { homeTitle: "Furniture Shop in Asansol | Easy Monthly Plan & Lucky Plan", homeDescription: "Subidha Furniture helps families in Asansol bring home furniture, electronics, and home appliances with easy monthly plans and transparent Lucky Plan rules." },
     },
     hi: {
-      nav: { links: ["होम", "प्रोडक्ट्स", "लकी प्लान", "कैसे काम करता है", "विजेताओं", "विजेता इतिहास", "हमारे बारे में", "संपर्क", "ब्लॉग"], apply: "आवेदन करें", register: "रजिस्टर", login: "लॉगिन", whatsapp: "व्हाट्सऐप", navigate: "नेविगेशन", quickActions: "त्वरित विकल्प", language: "भाषा" },
+      nav: { links: ["होम", "प्रोडक्ट्स", "अनुबंध", "कैसे काम करता है", "विजेताओं", "विजेता इतिहास", "हमारे बारे में", "संपर्क", "ब्लॉग"], apply: "आवेदन करें", register: "रजिस्टर", login: "लॉगिन", whatsapp: "व्हाट्सऐप", navigate: "नेविगेशन", quickActions: "त्वरित विकल्प", language: "भाषा" },
       footer: { intro: "फर्नीचर, इलेक्ट्रॉनिक्स और होम अप्लायंसेज़ के लिए भरोसेमंद स्थानीय सहायता और आसान मासिक योजना।", quickLinks: "क्विक लिंक", contact: "संपर्क", social: "सोशल", whatsapp: "ब्रांच को व्हाट्सऐप करें" },
       common: {
         home: "होम",
@@ -82,7 +82,7 @@ export function getPublicDictionary(locale: PublicLocale) {
       seo: { homeTitle: "आसनसोल फर्नीचर शॉप | आसान मासिक योजना और लकी प्लान", homeDescription: "Subidha Furniture आसनसोल के परिवारों को फर्नीचर, इलेक्ट्रॉनिक्स और होम अप्लायंसेज़ आसान मासिक योजना और पारदर्शी लकी प्लान के साथ उपलब्ध कराता है।" },
     },
     bn: {
-      nav: { links: ["হোম", "পণ্য", "লাকি প্ল্যান", "কীভাবে কাজ করে", "বিজয়ীরা", "বিজয়ীর ইতিহাস", "আমাদের সম্পর্কে", "যোগাযোগ", "ব্লগ"], apply: "আবেদন করুন", register: "রেজিস্টার", login: "লগইন", whatsapp: "হোয়াটসঅ্যাপ", navigate: "নেভিগেশন", quickActions: "দ্রুত অপশন", language: "ভাষা" },
+      nav: { links: ["হোম", "পণ্য", "চুক্তি", "কীভাবে কাজ করে", "বিজয়ীরা", "বিজয়ীর ইতিহাস", "আমাদের সম্পর্কে", "যোগাযোগ", "ব্লগ"], apply: "আবেদন করুন", register: "রেজিস্টার", login: "লগইন", whatsapp: "হোয়াটসঅ্যাপ", navigate: "নেভিগেশন", quickActions: "দ্রুত অপশন", language: "ভাষা" },
       footer: { intro: "ফার্নিচার, ইলেকট্রনিক্স ও হোম অ্যাপ্লায়েন্সসের জন্য বিশ্বস্ত স্থানীয় সহায়তা এবং সহজ মাসিক পরিকল্পনা।", quickLinks: "দ্রুত লিংক", contact: "যোগাযোগ", social: "সোশ্যাল", whatsapp: "ব্রাঞ্চে হোয়াটসঅ্যাপ করুন" },
       common: {
         home: "হোম",
