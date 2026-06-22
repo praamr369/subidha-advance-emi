@@ -90,3 +90,31 @@ The correct response is not to:
 ## Safe integration rule
 
 All API adaptation should happen in the frontend service layer, not in pages, and not by mutating API responses into false shapes.
+
+## Dashboard endpoints (M1 — verified)
+
+| Endpoint | Method | Used by | Notes |
+|---|---|---|---|
+| `/api/v1/admin/dashboard/` | GET | DashboardPage | Cached 60s server-side. Returns financial, EMI, subscriptions, batches, risk, collections, recent activity, winner surface, reconciliation, commission summary, portfolio mix, CRM leads, subscription KPIs, due subscriptions. |
+| `/api/v1/dashboards/summary-v2/` | GET | Not yet used | Role-based canonical summary with filter support. Available for future dashboard filter/window support. |
+| `/api/v1/dashboards/surfaces/upcoming/` | GET | Not yet used | Paginated upcoming due subscriptions. |
+| `/api/v1/dashboards/surfaces/overdue/` | GET | Not yet used | Paginated overdue subscriptions. |
+| `/api/v1/dashboards/surfaces/recent-payments/` | GET | Not yet used | Paginated recent payments. |
+| `/api/v1/dashboards/surfaces/winners/` | GET | Not yet used | Paginated winner items. |
+| `/api/v1/dashboards/surfaces/reconciliation-exceptions/` | GET | Not yet used | Paginated reconciliation exceptions. |
+
+### Dashboard response assumptions
+
+- All money values arrive as string decimals from backend (e.g., `"15000.00"`)
+- Counts arrive as integers
+- `collections` sub-object includes gross/net/reversed breakdown for today
+- `risk` includes healthy/at_risk/high_risk/defaulted counts + default_rate float
+- `reconciliation.results` may be empty; `flagged_count` indicates alert level
+- `due_subscriptions` is capped to top 10 server-side
+- `recent_activity` shows today's payments only
+
+### Dashboard API gaps
+
+- No time-window filtering on `/admin/dashboard/` (only `/dashboards/summary-v2/` supports `window` parameter). If admin needs date range filtering, either consume summary-v2 or request backend enhancement.
+- Stock/inventory alerts are not included in the admin dashboard response. If stock alerts are needed, a separate inventory endpoint is required.
+- Accounting bridge alerts are available via `/admin/accounting/bridge-reconciliation/` but not embedded in the dashboard response.

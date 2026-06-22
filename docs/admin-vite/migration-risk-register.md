@@ -44,3 +44,13 @@ Before any module is replaced, the team should be able to answer:
 - Which operational queue might be disrupted?
 
 If any answer is unclear, the module is not ready for cutover.
+
+## M1 Dashboard — risk notes
+
+- Dashboard is read-only. No mutations, no posting, no collection actions.
+- All KPI values come from `/api/v1/admin/dashboard/` which is cached 60s server-side. admin-vite does not fabricate any number.
+- Money formatting is display-only (Intl.NumberFormat); no financial calculations.
+- Reconciliation exceptions are shown as-is from backend; no client-side delta computation.
+- Risk assessment numbers (healthy/at_risk/high_risk/defaulted) come from backend risk engine.
+- API gap: no stock/inventory alerts in dashboard response. No accounting bridge alerts embedded in dashboard.
+- API gap: `/admin/dashboard/` has no date-window filtering. Future enhancement may consume `/dashboards/summary-v2/` which supports window params.
