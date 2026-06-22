@@ -66,6 +66,27 @@ Parity means the replacement module must match:
 - [migration-risk-register.md](./migration-risk-register.md)
 - [phase-roadmap.md](./phase-roadmap.md)
 
-## Status
+## Implementation status
 
-Phase A0 is documentation-only and does not authorize implementation work.
+| Phase | Description | Status |
+|---|---|---|
+| A0 | Boundary documentation | Done |
+| A1 | Vite + React + TS scaffold | Done |
+| A2 | Admin shell and enterprise layout | Done |
+| A3 | Auth and permission bridge | Done |
+| A4 | API client and server-state layer | Done |
+| A5 | Shared enterprise UI foundation | Done |
+| A6 | Foundation verification and hardening | Done |
+
+## Verified auth contract
+
+Backend auth endpoints (confirmed against `backend/api/v1/routes/auth.py`):
+
+| Action | Method | Path |
+|---|---|---|
+| Login | POST | `/api/v1/auth/login/` |
+| Refresh | POST | `/api/v1/auth/refresh/` |
+| Logout | POST | `/api/v1/auth/logout/` |
+| Current user | GET | `/api/v1/auth/me/` |
+
+Backend roles (from `backend/api/v1/permissions.py`): ADMIN, PARTNER, CUSTOMER, CASHIER, VENDOR, STAFF.

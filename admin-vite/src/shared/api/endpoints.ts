@@ -1,3 +1,4 @@
+// Confirmed paths (verified against backend/api/v1/routes/)
 export const endpoints = {
   auth: {
     login: "/auth/login/",
@@ -5,21 +6,25 @@ export const endpoints = {
     logout: "/auth/logout/",
     me: "/auth/me/",
   },
+
+  // Placeholder paths — confirm against actual backend admin routes before use.
+  // Many admin operations live under /admin/ prefix, not top-level.
   customers: {
     list: "/customers/",
     detail: (id: number) => `/customers/${id}/`,
   },
   products: {
-    list: "/products/",
-    detail: (id: number) => `/products/${id}/`,
+    list: "/admin/products/",
+    detail: (id: number) => `/admin/products/${id}/`,
   },
   subscriptions: {
-    list: "/subscriptions/",
-    detail: (id: number) => `/subscriptions/${id}/`,
+    list: "/admin/subscriptions/",
+    detail: (id: number) => `/admin/subscriptions/${id}/`,
   },
   payments: {
-    list: "/payments/",
-    detail: (id: number) => `/payments/${id}/`,
+    list: "/admin/payments/",
+    collect: "/admin/payments/collect/",
+    detail: (id: number) => `/admin/payments/${id}/`,
   },
   billing: {
     invoices: "/billing/invoices/",
@@ -29,7 +34,15 @@ export const endpoints = {
     list: "/inventory/",
     detail: (id: number) => `/inventory/${id}/`,
   },
+  accounting: {
+    bridgeReconciliation: "/admin/accounting/bridge-reconciliation/",
+    mappingAudit: "/admin/accounting/mapping-audit/",
+    yearEndReadiness: "/admin/accounting/year-end/readiness/",
+  },
+  dashboards: {
+    root: "/dashboards/",
+  },
   reports: {
-    summary: "/reports/summary/",
+    summary: "/dashboards/",
   },
 } as const;

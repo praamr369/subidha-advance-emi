@@ -10,10 +10,18 @@ export type LoginResult = {
   access: string;
   refresh: string;
   user?: {
-    id?: number;
-    username?: string;
-    name?: string;
-    role?: string;
+    id: number;
+    username: string;
+    email: string;
+    phone: string;
+    first_name: string;
+    last_name: string;
+    role: string;
+    staff_profile_id: number | null;
+    display_name: string;
+    is_active: boolean;
+    is_staff: boolean;
+    is_superuser: boolean;
   };
 };
 
@@ -51,12 +59,42 @@ async function parseOrThrow<T>(res: Response): Promise<T> {
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResult> {
+  const identifier = payload.identifier.trim();
+  const body = { identifier, password: payload.password };
+
   const res = await fetch(url("/auth/login/"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
-  return parseOrThrow<LoginResult>(res);
+
+  if (res.ok) return parseOrThrow<LoginResult>(res);
+
+  // Backward compat: older deployments may only accept { username, password }.
+  const ct = res.headers.get("content-type") ?? "";
+  const errBody = ct.includes("application/json") ? await res.json() : null;
+
+  const isShapeError =
+    res.status === 400 &&
+    errBody &&
+    typeof errBody === "object" &&
+    ("username" in errBody || "identifier" in errBody);
+
+  if (isShapeError) {
+    const fallback = await fetch(url("/auth/login/"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: identifier, password: payload.password }),
+    });
+    return parseOrThrow<LoginResult>(fallback);
+  }
+
+  // Re-throw the original error
+  if (typeof errBody === "object" && errBody !== null) {
+    const detail = (errBody as Record<string, unknown>).detail;
+    if (typeof detail === "string") throw new Error(detail);
+  }
+  throw new Error("Login failed");
 }
 
 export async function refreshToken(): Promise<{ access: string }> {

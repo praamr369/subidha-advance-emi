@@ -42,7 +42,6 @@ async function refreshAndRetry(
 
   if (!refreshRes.ok) {
     tokenStore.clear();
-    window.location.href = "/login";
     throw new ApiError("Session expired", 401);
   }
 
