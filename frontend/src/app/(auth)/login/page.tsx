@@ -48,6 +48,10 @@ function toMessage(error: unknown): string {
 
   return raw;
 }
+
+function isExternalUrl(target: string): boolean {
+  return /^https?:\/\//i.test(target);
+}
 export default function LoginPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -74,7 +78,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isAuthenticated || !role) return;
-    router.replace(getDashboardRouteForRole(role));
+    const target = getDashboardRouteForRole(role);
+    if (isExternalUrl(target) && typeof window !== "undefined") {
+      window.location.assign(target);
+      return;
+    }
+    router.replace(target);
   }, [isAuthenticated, role, router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -112,7 +121,11 @@ export default function LoginPage() {
         refreshToken,
       });
 
-      const target = nextUrl || getDashboardRouteForRole(resolvedRole);
+      const normalizedRole = (resolvedRole || "").trim().toUpperCase();
+      const target =
+        normalizedRole === "ADMIN"
+          ? getDashboardRouteForRole(resolvedRole)
+          : nextUrl || getDashboardRouteForRole(resolvedRole);
 
       if (typeof window !== "undefined") {
         window.location.assign(target);

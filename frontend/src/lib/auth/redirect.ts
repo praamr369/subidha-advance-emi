@@ -1,4 +1,5 @@
 import { ROUTES } from "@/lib/routes";
+import { ADMIN_APP_URL } from "@/lib/env";
 
 function normalizeRole(role: string | null | undefined): string {
   return (role || "").trim().toUpperCase();
@@ -7,7 +8,7 @@ function normalizeRole(role: string | null | undefined): string {
 export function getDashboardRouteForRole(role: string | null | undefined): string {
   switch (normalizeRole(role)) {
     case "ADMIN":
-      return ROUTES.admin.dashboard;
+      return ADMIN_APP_URL;
     case "PARTNER":
       return ROUTES.partner.dashboard;
     case "CUSTOMER":

@@ -94,3 +94,13 @@ If any answer is unclear, the module is not ready for cutover.
 - General `detail` errors from the backend are displayed as a top-level alert.
 - Zod validation prevents submission of empty required fields client-side.
 - Both Zod and server field errors can appear simultaneously (Zod for client-caught issues, server for uniqueness/business-rule violations).
+
+## C0 admin login cutover notes
+
+- Local PostgreSQL database name: `subidha_core`
+- admin-vite consumes the shared backend at `http://127.0.0.1:8000/api/v1`
+- Next.js admin login should link to `NEXT_PUBLIC_ADMIN_APP_URL`
+- Vite is the preferred admin login surface for owner/superuser/admin/cashier/staff
+- The legacy Next.js admin remains the fallback until cutover validation is complete
+- Public, customer, partner, and vendor portals stay in Next.js
+- Local superuser credentials used for setup are not committed to tracked files

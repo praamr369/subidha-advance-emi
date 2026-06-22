@@ -6,6 +6,19 @@ It defines how admin-vite must consume the existing backend contract during migr
 
 The backend remains the source of truth, and admin-vite must adapt to it rather than asking the backend to become a frontend-shaped API.
 
+## Local cutover configuration
+
+For local development during the admin login cutover:
+
+- backend database name: `subidha_core`
+- admin-vite API base URL: `http://127.0.0.1:8000/api/v1`
+- Next.js admin app URL env var: `NEXT_PUBLIC_ADMIN_APP_URL`
+- Vite admin is the preferred admin login surface
+- the legacy Next.js admin remains a fallback and must stay available
+- public, customer, partner, and vendor portals remain in Next.js
+- the backend + PostgreSQL database remain the source of truth
+- real local credentials used for setup are not committed to tracked source files
+
 ## Contract rules
 
 1. Use the existing `/api/v1` backend surface.
@@ -90,6 +103,14 @@ The correct response is not to:
 ## Safe integration rule
 
 All API adaptation should happen in the frontend service layer, not in pages, and not by mutating API responses into false shapes.
+
+## Admin login cutover rule
+
+admin-vite is the preferred login entry for admin, cashier, staff, and superuser accounts.
+
+The legacy Next.js admin route remains available only as a fallback for compatibility and verification.
+
+The Next.js login flow may still serve public, customer, partner, and vendor roles, but admin redirects should point to the Vite admin app configured by `NEXT_PUBLIC_ADMIN_APP_URL`.
 
 ## Dashboard endpoints (M1 — verified)
 

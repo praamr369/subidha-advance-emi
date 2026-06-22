@@ -192,3 +192,27 @@ Blockers before M4:
 
 - no backend or build blocker from this phase
 - the route-registry warning should be tracked if `check:routes` is used as a release gate
+
+## Phase C0 â€” Vite admin login cutover and local PostgreSQL setup
+
+Status: in progress.
+
+Goal:
+
+- configure local PostgreSQL for the shared backend source of truth
+- connect admin-vite to the existing Django auth contract
+- move the primary admin login entry away from the Next.js admin UI
+- preserve the legacy Next.js admin as a documented fallback
+
+Validation targets:
+
+- backend `check`, `makemigrations --check --dry-run`, and `migrate`
+- existing Next.js frontend typecheck/build/lint validation
+- admin-vite typecheck/build/lint validation
+- local auth smoke against `/api/v1/auth/login/`, `/refresh/`, `/logout/`, and `/me/`
+
+Blockers before M4:
+
+- admin login cutover must be verified locally against the shared backend
+- no backend or database regression may be introduced
+- the legacy Next.js admin fallback must remain reachable until the Vite admin is proven stable

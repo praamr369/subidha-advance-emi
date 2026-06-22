@@ -62,6 +62,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 frontend/.env.local
+admin-vite/.env.local
 frontend/.env.*
 !frontend/.env.production.template
 frontend/node_modules/
