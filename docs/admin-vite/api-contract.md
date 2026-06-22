@@ -87,6 +87,63 @@ For create, update, reversal, approval, or collection flows:
 | Reports | Reports must remain read-only and source-linked. |
 | Settings | Settings writes must use existing backend validation and permission checks. |
 
+## Lucky Plan contract (M4 - verified against existing backend routes)
+
+admin-vite Lucky Plan must use the existing Django admin surface only. It must not invent a new draw engine, waiver engine, or EMI calculator.
+
+### Endpoints used
+
+| Endpoint | Method | Purpose | Notes |
+|---|---|---|---|
+| `/api/v1/admin/batches/` | GET | Batch register | Used for the Batches tab. Paginated list with batch counts from `BatchAdminSerializer`. |
+| `/api/v1/admin/batches/<id>/` | GET | Batch detail | Used for batch detail drawer. Returns batch fields plus annotated counts. |
+| `/api/v1/admin/batches/<id>/summary/` | GET | Batch summary | Used for batch metrics, Lucky ID counts, and draw counts. |
+| `/api/v1/admin/batches/<id>/control-center/` | GET | Readiness state | Used for lock/commit/execute readiness and blocker display. |
+| `/api/v1/admin/lucky-ids/` | GET | Lucky ID register | Used for Lucky ID table and 100-slot grid. Query by `batch_id` or `batch`. |
+| `/api/v1/admin/lucky-ids/<id>/` | GET | Lucky ID detail | Used if a Lucky ID detail view is added later. |
+| `/api/v1/admin/lucky-ids/available/` | GET | Available Lucky IDs | Read-only helper. Used only if the UI needs the backend availability slice. |
+| `/api/v1/admin/lucky-draws/` | GET | Draw register | Used for monthly draw list, winner list, and waiver list. Query by `batch` and `is_revealed`. |
+| `/api/v1/admin/lucky-draws/<id>/` | GET | Draw detail | Used for commit/reveal/winner display. |
+| `/api/v1/admin/lucky-draws/<id>/timeline/` | GET | Draw audit timeline | Used for audit visibility. |
+| `/api/v1/admin/lucky-draws/<id>/winner-settlement/` | GET | Winner settlement | Used for waiver summary and waived EMI rows. |
+
+### Optional mutation endpoints already present in backend
+
+These endpoints exist in Django, but the current admin-vite workbench keeps draw/waiver execution read-only and does not surface them as buttons:
+
+| Endpoint | Method | Status in admin-vite |
+|---|---|---|
+| `/api/v1/admin/batches/<id>/lock/` | POST | Supported by backend, not surfaced in this phase. |
+| `/api/v1/admin/batches/<id>/commit-draw/` | POST | Supported by backend, not surfaced in this phase. |
+| `/api/v1/admin/batches/<id>/execute-draw/` | POST | Supported by backend, not surfaced in this phase. |
+| `/api/v1/admin/batches/<id>/create-commit/` | POST | Legacy flow exists, not surfaced in this phase. |
+| `/api/v1/admin/lucky-draws/<id>/reveal/` | POST | Legacy reveal flow exists, not surfaced in this phase. |
+| `/api/v1/admin/batches/` | POST | Safe batch create hook exists in the API layer. |
+| `/api/v1/admin/batches/<id>/` | PATCH | Safe batch update hook exists in the API layer. |
+
+### Lucky Plan response assumptions
+
+- batch rows include `batch_code`, `status`, `total_slots`, `duration_months`, `draw_day`, `start_date`, and annotation fields such as `subscription_count`, `lucky_id_count`, `winner_count`, and `available_slots`
+- batch summary includes `available_lucky_ids`, `assigned_lucky_ids`, `won_lucky_ids`, `draw_eligible_count`, and the monthly/historical booked values as backend strings
+- control-center includes `snapshot_status`, `commit_status`, `draw_status`, `finance_waiver_posting_status`, and `disabled_reasons`
+- Lucky ID rows include `status`, `assignment_state`, `assignment_note`, `is_currently_assigned`, `is_available`, and historical linkage fields
+- draw rows include `committed_hash`, `public_commit_hash`, `winner_lucky_number`, `winner_customer_name`, `waived_emi_count`, `waived_amount`, and `waiver_scope`
+- winner-settlement includes `waived_emis` rows with `month_no`, `due_date`, `amount`, and `status`
+
+### Lucky Plan API gaps
+
+- there is no dedicated backend endpoint for a pre-built 00-99 Lucky ID grid per batch; the UI assembles the grid from the Lucky ID list
+- there is no dedicated backend winners endpoint for the admin workbench; winner display comes from draw detail and winner-settlement
+- there is no dedicated backend waiver-summary endpoint separate from winner-settlement
+- the frontend must not calculate winner selection, waiver amount, EMI status, or draw outcomes
+- the frontend must treat missing rows as a data gap, not as a reason to invent backend state
+
+### Lucky Plan safety rules
+
+- draw, winner, and waiver screens are read-only in admin-vite for this phase
+- dangerous actions stay backend-authorized and require a separate follow-up if the UI ever exposes them
+- Lucky ID status display may show `BLOCKED` when backend assignment state is frozen, but the browser must not invent that state itself
+
 ## Unsupported assumptions
 
 If admin-vite needs a field, filter, or endpoint that does not already exist, that is a backend/API gap.

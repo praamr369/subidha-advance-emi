@@ -104,3 +104,12 @@ If any answer is unclear, the module is not ready for cutover.
 - The legacy Next.js admin remains the fallback until cutover validation is complete
 - Public, customer, partner, and vendor portals stay in Next.js
 - Local superuser credentials used for setup are not committed to tracked files
+
+## M4 Lucky Plan workbench notes
+
+- Lucky Plan workbench now uses backend read models for batches, Lucky IDs, draw rows, draw timelines, winner settlement, and readiness.
+- The browser does not calculate the winner, waiver amount, or EMI outcome. Those remain backend truth.
+- The Lucky ID 00-99 grid is assembled from Lucky ID rows. If a row is missing, the UI shows an empty slot rather than fabricating state.
+- Batch lock, draw commit, and draw execute endpoints exist in Django, but they remain hidden in this phase because the workbench transfer is read-only.
+- API gaps to track: no dedicated winners endpoint, no dedicated waiver-summary endpoint, and no backend-provided 00-99 grid payload.
+- Because admin-vite is now the preferred entry, any Lucky Plan access regression should be treated as cutover-critical even though Next.js admin fallback remains available.

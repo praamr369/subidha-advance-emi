@@ -216,3 +216,46 @@ Blockers before M4:
 - admin login cutover must be verified locally against the shared backend
 - no backend or database regression may be introduced
 - the legacy Next.js admin fallback must remain reachable until the Vite admin is proven stable
+
+## M4 â€” Lucky Plan workbench in admin-vite
+
+Status: in progress.
+
+Goal:
+
+- transfer Lucky Plan admin workflow into admin-vite without changing backend business logic
+- keep batch, Lucky ID, draw, winner, waiver, and readiness data aligned with Django
+- preserve the Next.js admin fallback for any missing or unsafe action surface
+
+Scope:
+
+- Batches tab with register, summary, and detail drawer
+- Lucky IDs tab with 00-99 grid and registry rows
+- Draws tab with monthly draw records and audit access
+- Winners tab with winner display and settlement visibility
+- Waivers tab with backend winner-settlement rows
+- Readiness tab with control-center blocker state
+
+Non-goals:
+
+- no frontend winner calculation
+- no frontend waiver calculation
+- no frontend EMI mutation
+- no direct payment mutation
+- no backend model or migration change
+- no alteration of draw commit/reveal logic
+
+Validation targets:
+
+- backend `check`
+- backend `makemigrations --check --dry-run`
+- focused Lucky Plan or subscription tests if they exist in the repo
+- admin-vite `typecheck`, `build`, and `lint`
+- Next.js `typecheck`, `build`, and `lint`
+- `git diff --check`
+- `git status`
+
+Completion signal:
+
+- Lucky Plan workbench renders the existing backend data safely
+- any missing backend surface is documented as a gap instead of being invented in the browser
