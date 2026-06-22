@@ -8,7 +8,6 @@ import type { CustomerAdmin } from "../api/customer.types";
 const col = createColumnHelper<CustomerAdmin>();
 
 function makeColumns(onSelect: (c: CustomerAdmin) => void) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return [
     col.accessor("name", {
       header: "Name",

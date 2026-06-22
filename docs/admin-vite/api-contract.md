@@ -127,7 +127,7 @@ All API adaptation should happen in the frontend service layer, not in pages, an
 | `/api/v1/admin/customers/` | POST | CustomerFormDrawer | Create customer with optional username/password. Admin only. |
 | `/api/v1/admin/customers/<id>/` | GET | CustomerDetailDrawer | Full customer with subscription aggregates and outstanding balances. Admin only. |
 | `/api/v1/admin/customers/<id>/` | PATCH | CustomerFormDrawer | Update name, phone, email, address, city. Admin only. |
-| `/api/v1/admin/customers/<id>/` | DELETE | Not yet wired | Soft-delete. Admin only. |
+| `/api/v1/admin/customers/<id>/` | DELETE | **Hidden — not exposed in UI** | Hard delete via Django ModelViewSet. No custom destroy override. PROTECT FK constraints on Subscription, Payment, SupportRequest, ContractReference, DirectSaleReturn, CreditLedgerEntry, CustomerRefund, RentLeaseCollection, etc. will raise unhandled ProtectedError (500) for any customer with business history. Deletion of brand-new customers with zero linked records would succeed and permanently destroy the record. UI intentionally does not expose this action. |
 | `/api/v1/admin/customers/<id>/kyc-decision/` | POST | KycDecisionDialog | Body: `{ status: "APPROVED"|"VERIFIED"|"REJECTED"|"PENDING"|"SUBMITTED", reason?: string }`. Returns updated KYC fields. Admin only. |
 | `/api/v1/admin/customers/<id>/operational-summary/` | GET | Not yet used | Full operational profile. Available for future detail expansion. |
 | `/api/v1/admin/customers/<id>/kyc-documents/upload/` | POST | Not yet used | KYC document upload. |
@@ -150,3 +150,5 @@ All API adaptation should happen in the frontend service layer, not in pages, an
 - No customer activity/timeline endpoint in the admin customers ViewSet; a separate `AdminCustomerTimelineView` exists at an unconfirmed route.
 - No inline subscription list on the customer detail — subscription aggregates are provided but individual subscription records require the subscriptions module endpoint.
 - No customer-specific payment history endpoint in admin customers — payment data lives in the payments module.
+- No safe archive/deactivate endpoint for customers. The DELETE endpoint is a hard delete with no soft-delete fallback. The only way to "deactivate" a customer is to set `user.is_active = False` via a separate mechanism (not available through the customer admin serializer's writable fields). This is a backend gap — admin-vite should not invent a workaround.
+- Customer delete returns unhandled ProtectedError (500) when linked records exist, not a clean 400 validation error. Until the backend adds proper error handling for this case, the delete action is intentionally hidden from the UI.

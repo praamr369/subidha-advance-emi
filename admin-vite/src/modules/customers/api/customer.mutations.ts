@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   createCustomer,
   updateCustomer,
-  deleteCustomer,
   submitKycDecision,
 } from "./customer.api";
 import { customerKeys } from "./customer.keys";
@@ -26,14 +25,6 @@ export function useUpdateCustomer() {
     mutationFn: ({ id, ...data }: { id: number } & CustomerUpdatePayload) =>
       updateCustomer(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: customerKeys.all }),
-  });
-}
-
-export function useDeleteCustomer() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) => deleteCustomer(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: customerKeys.lists() }),
   });
 }
 

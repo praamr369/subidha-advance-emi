@@ -41,10 +41,6 @@ export function updateCustomer(id: number, data: CustomerUpdatePayload) {
   return api.patch<CustomerAdmin>(endpoints.customers.detail(id), data);
 }
 
-export function deleteCustomer(id: number) {
-  return api.delete(endpoints.customers.detail(id));
-}
-
 export function submitKycDecision(id: number, data: KycDecisionPayload) {
   return api.post<KycDecisionResponse>(
     endpoints.customers.kycDecision(id),

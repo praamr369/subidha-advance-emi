@@ -61,8 +61,35 @@ If any answer is unclear, the module is not ready for cutover.
 - KYC decision flow calls backend `approve_kyc()`/`reject_kyc()` service functions via the `kyc-decision` action — admin-vite does not implement any KYC state machine logic.
 - Subscription aggregates (active count, due amounts, contract values) are backend-computed via annotated subqueries. The frontend displays but does not derive these.
 - Money values displayed via `formatMoney()` (Intl.NumberFormat) — no financial calculations.
-- Delete mutation is wired but not exposed in the UI (no delete button). Available for future use with appropriate confirmation safeguards.
-- Customer form validation (Zod) is UX-only. Backend validation is authoritative for all writes.
+- Customer form validation (Zod) is UX-only. Backend validation is authoritative for all writes. Server-side field errors (e.g., phone/email uniqueness) are displayed per-field.
 - API gap: no inline subscription/payment detail on customer — only aggregate counts and amounts are available from the customer serializer. Individual records require separate module endpoints.
 - API gap: no customer timeline/activity log endpoint confirmed in admin customer routes. `AdminCustomerTimelineView` exists but its route is not yet consumed.
 - API gap: KYC document management (upload, list, download) is available via separate endpoints but not yet wired into the customers workbench UI.
+
+### M2.1 Customer Safety Hardening
+
+**Customer delete behavior (inspected):**
+- `CustomerAdminViewSet` inherits from `AdminOnlyModelViewSet` → Django `ModelViewSet`. No `destroy` override, no `perform_destroy` override, no `http_method_names` restriction.
+- DELETE endpoint performs a **hard delete** (`instance.delete()`).
+- Multiple models reference Customer with `on_delete=models.PROTECT`: Subscription, CustomerSupportRequest, SubscriptionRequest, ContractReference, RentLeaseCollection, ContractAmendment, DirectSaleReturn, CreditLedgerEntry, CustomerRefund.
+- Deleting a customer with any linked business records raises Django `ProtectedError`, which produces an unhandled 500 response (not a clean 400).
+- Deleting a customer with zero linked records would permanently destroy the record.
+
+**Customer delete UI decision: HIDDEN.**
+- Delete function removed from `customer.api.ts` and `customer.mutations.ts`.
+- No delete button, confirmation, or action exists anywhere in the customer UI.
+- Rationale: hard delete is inappropriate for a business system with financial records. No safe archive/deactivate endpoint exists in the backend. Until the backend provides a proper soft-delete or deactivation mechanism, the frontend should not expose deletion.
+
+**KYC safety hardening:**
+- KYC Reject and Reset-to-Pending actions now require a two-step confirmation with explicit warning messages about consequences.
+- KYC Approve and Verify proceed directly (low-risk positive actions).
+- Reject confirmation shows: "Rejecting KYC will block this customer from active subscriptions until re-submitted and approved."
+- Reset confirmation shows: "Resetting KYC to Pending removes the current approval/rejection status. The customer may need to re-submit documents."
+- All KYC decisions show server errors. Mutation state resets on dialog close and on radio change.
+- KYC decision invalidates all customer queries on success — no stale status in the list or detail.
+
+**Form validation hardening:**
+- Server-side field errors from 400 responses are extracted via `ApiError.fieldErrors` and displayed inline per-field (e.g., phone uniqueness errors appear under the Phone field, not just as a generic banner).
+- General `detail` errors from the backend are displayed as a top-level alert.
+- Zod validation prevents submission of empty required fields client-side.
+- Both Zod and server field errors can appear simultaneously (Zod for client-caught issues, server for uniqueness/business-rule violations).

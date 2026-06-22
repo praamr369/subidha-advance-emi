@@ -6,8 +6,7 @@ import { EntityDrawer } from "@/shared/drawers/EntityDrawer";
 import { FormFieldError } from "@/shared/forms/FormFieldError";
 import { ServerErrorAlert } from "@/shared/forms/ServerErrorAlert";
 import { ApiError } from "@/shared/api/api-error";
-import { useCreateCustomer } from "../api/customer.mutations";
-import { useUpdateCustomer } from "../api/customer.mutations";
+import { useCreateCustomer, useUpdateCustomer } from "../api/customer.mutations";
 import type { CustomerAdmin } from "../api/customer.types";
 
 const createSchema = z.object({
@@ -44,6 +43,18 @@ function fieldClass(hasError: boolean) {
       ? "border-red-300 focus:border-red-500 focus:ring-red-500"
       : "border-stone-300 focus:border-brand-500 focus:ring-brand-500"
   }`;
+}
+
+function extractServerErrors(error: Error | null) {
+  if (!error || !(error instanceof ApiError)) {
+    return { general: error ? "An unexpected error occurred" : null, fields: {} as Record<string, string[]> };
+  }
+  const fields = error.fieldErrors;
+  const body = error.body as Record<string, unknown> | undefined;
+  const detail = typeof body?.detail === "string" ? body.detail : null;
+  const hasFieldErrors = Object.keys(fields).length > 0;
+  const general = detail ?? (!hasFieldErrors ? "Request failed" : null);
+  return { general, fields };
 }
 
 export function CustomerFormDrawer({
@@ -105,13 +116,19 @@ export function CustomerFormDrawer({
     }
   }
 
-  const serverError =
-    mutation.error instanceof ApiError
-      ? (mutation.error.body as Record<string, unknown> | undefined)?.detail as
-          string | undefined ?? "Request failed"
-      : mutation.error
-        ? "An unexpected error occurred"
-        : null;
+  const { general: serverError, fields: serverFieldErrors } =
+    extractServerErrors(mutation.error);
+
+  function fieldError(name: string): string | undefined {
+    return (
+      (errors as Record<string, { message?: string }>)[name]?.message ??
+      serverFieldErrors[name]?.join(". ")
+    );
+  }
+
+  function hasFieldError(name: string): boolean {
+    return !!(errors as Record<string, unknown>)[name] || !!serverFieldErrors[name];
+  }
 
   return (
     <EntityDrawer
@@ -126,16 +143,16 @@ export function CustomerFormDrawer({
           <label className="mb-1 block text-sm font-medium text-stone-700">
             Name *
           </label>
-          <input {...register("name")} className={fieldClass(!!errors.name)} />
-          <FormFieldError message={errors.name?.message} />
+          <input {...register("name")} className={fieldClass(hasFieldError("name"))} />
+          <FormFieldError message={fieldError("name")} />
         </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-stone-700">
             Phone *
           </label>
-          <input {...register("phone")} className={fieldClass(!!errors.phone)} />
-          <FormFieldError message={errors.phone?.message} />
+          <input {...register("phone")} className={fieldClass(hasFieldError("phone"))} />
+          <FormFieldError message={fieldError("phone")} />
         </div>
 
         <div>
@@ -145,23 +162,31 @@ export function CustomerFormDrawer({
           <input
             type="email"
             {...register("email")}
-            className={fieldClass(!!errors.email)}
+            className={fieldClass(hasFieldError("email"))}
           />
-          <FormFieldError message={errors.email?.message} />
+          <FormFieldError message={fieldError("email")} />
         </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-stone-700">
             Address
           </label>
-          <input {...register("address")} className={fieldClass(false)} />
+          <input
+            {...register("address")}
+            className={fieldClass(hasFieldError("address"))}
+          />
+          <FormFieldError message={fieldError("address")} />
         </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-stone-700">
             City
           </label>
-          <input {...register("city")} className={fieldClass(false)} />
+          <input
+            {...register("city")}
+            className={fieldClass(hasFieldError("city"))}
+          />
+          <FormFieldError message={fieldError("city")} />
         </div>
 
         {!isEdit && (
@@ -172,8 +197,9 @@ export function CustomerFormDrawer({
               </label>
               <input
                 {...register("username" as keyof CreateFormValues)}
-                className={fieldClass(false)}
+                className={fieldClass(hasFieldError("username"))}
               />
+              <FormFieldError message={fieldError("username")} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-stone-700">
@@ -182,16 +208,9 @@ export function CustomerFormDrawer({
               <input
                 type="password"
                 {...register("password" as keyof CreateFormValues)}
-                className={fieldClass(
-                  !!(errors as Record<string, { message?: string }>).password,
-                )}
+                className={fieldClass(hasFieldError("password"))}
               />
-              <FormFieldError
-                message={
-                  (errors as Record<string, { message?: string }>).password
-                    ?.message
-                }
-              />
+              <FormFieldError message={fieldError("password")} />
             </div>
           </>
         )}
