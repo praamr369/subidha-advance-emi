@@ -10,8 +10,9 @@ export const endpoints = {
   // Placeholder paths — confirm against actual backend admin routes before use.
   // Many admin operations live under /admin/ prefix, not top-level.
   customers: {
-    list: "/customers/",
-    detail: (id: number) => `/customers/${id}/`,
+    list: "/admin/customers/",
+    detail: (id: number) => `/admin/customers/${id}/`,
+    kycDecision: (id: number) => `/admin/customers/${id}/kyc-decision/`,
   },
   products: {
     list: "/admin/products/",

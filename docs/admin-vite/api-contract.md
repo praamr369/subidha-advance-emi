@@ -118,3 +118,35 @@ All API adaptation should happen in the frontend service layer, not in pages, an
 - No time-window filtering on `/admin/dashboard/` (only `/dashboards/summary-v2/` supports `window` parameter). If admin needs date range filtering, either consume summary-v2 or request backend enhancement.
 - Stock/inventory alerts are not included in the admin dashboard response. If stock alerts are needed, a separate inventory endpoint is required.
 - Accounting bridge alerts are available via `/admin/accounting/bridge-reconciliation/` but not embedded in the dashboard response.
+
+## Customer endpoints (M2 — verified)
+
+| Endpoint | Method | Used by | Notes |
+|---|---|---|---|
+| `/api/v1/admin/customers/` | GET | CustomersPage | Paginated list. Query params: `search`/`q`, `kyc_status`, `status` (ACTIVE/INACTIVE), `page`, `page_size`. Ordered by `-created_at`. Admin only. |
+| `/api/v1/admin/customers/` | POST | CustomerFormDrawer | Create customer with optional username/password. Admin only. |
+| `/api/v1/admin/customers/<id>/` | GET | CustomerDetailDrawer | Full customer with subscription aggregates and outstanding balances. Admin only. |
+| `/api/v1/admin/customers/<id>/` | PATCH | CustomerFormDrawer | Update name, phone, email, address, city. Admin only. |
+| `/api/v1/admin/customers/<id>/` | DELETE | Not yet wired | Soft-delete. Admin only. |
+| `/api/v1/admin/customers/<id>/kyc-decision/` | POST | KycDecisionDialog | Body: `{ status: "APPROVED"|"VERIFIED"|"REJECTED"|"PENDING"|"SUBMITTED", reason?: string }`. Returns updated KYC fields. Admin only. |
+| `/api/v1/admin/customers/<id>/operational-summary/` | GET | Not yet used | Full operational profile. Available for future detail expansion. |
+| `/api/v1/admin/customers/<id>/kyc-documents/upload/` | POST | Not yet used | KYC document upload. |
+| `/api/v1/admin/customers/<id>/kyc-documents/audit-trail/` | GET | Not yet used | KYC audit trail. |
+
+### Customer response assumptions
+
+- All money values arrive as string decimals from backend (e.g., `"15000.00"`)
+- `status` is computed from `user.is_active`: `"ACTIVE"` or `"INACTIVE"`
+- `kyc_status` choices: `PENDING`, `SUBMITTED`, `APPROVED`, `VERIFIED`, `REJECTED`
+- Subscription aggregates (`active_subscription_count`, `total_subscription_value`, etc.) are annotated via subqueries, not separate requests
+- `profile_photo_url` is null when no photo exists; otherwise absolute URL
+- `gstin` is derived from the customer's latest direct sale; may be null
+- `customer_code` and `customer_source` are read-only fields
+- Search supports: name, phone, email, username, customer_code, GSTIN, and numeric ID
+
+### Customer API gaps
+
+- No dedicated endpoint for customer KYC document list (only upload and audit-trail exist under admin routes). The KYC review queue (`/admin/kyc/review-queue/`) is cross-owner and may serve as a workaround.
+- No customer activity/timeline endpoint in the admin customers ViewSet; a separate `AdminCustomerTimelineView` exists at an unconfirmed route.
+- No inline subscription list on the customer detail — subscription aggregates are provided but individual subscription records require the subscriptions module endpoint.
+- No customer-specific payment history endpoint in admin customers — payment data lives in the payments module.

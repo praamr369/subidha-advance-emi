@@ -54,3 +54,15 @@ If any answer is unclear, the module is not ready for cutover.
 - Risk assessment numbers (healthy/at_risk/high_risk/defaulted) come from backend risk engine.
 - API gap: no stock/inventory alerts in dashboard response. No accounting bridge alerts embedded in dashboard.
 - API gap: `/admin/dashboard/` has no date-window filtering. Future enhancement may consume `/dashboards/summary-v2/` which supports window params.
+
+## M2 Customers Workbench — risk notes
+
+- Customer list, detail, create, edit, and KYC decisions all use existing `/admin/customers/` ViewSet endpoints. No new backend endpoints were created.
+- KYC decision flow calls backend `approve_kyc()`/`reject_kyc()` service functions via the `kyc-decision` action — admin-vite does not implement any KYC state machine logic.
+- Subscription aggregates (active count, due amounts, contract values) are backend-computed via annotated subqueries. The frontend displays but does not derive these.
+- Money values displayed via `formatMoney()` (Intl.NumberFormat) — no financial calculations.
+- Delete mutation is wired but not exposed in the UI (no delete button). Available for future use with appropriate confirmation safeguards.
+- Customer form validation (Zod) is UX-only. Backend validation is authoritative for all writes.
+- API gap: no inline subscription/payment detail on customer — only aggregate counts and amounts are available from the customer serializer. Individual records require separate module endpoints.
+- API gap: no customer timeline/activity log endpoint confirmed in admin customer routes. `AdminCustomerTimelineView` exists but its route is not yet consumed.
+- API gap: KYC document management (upload, list, download) is available via separate endpoints but not yet wired into the customers workbench UI.

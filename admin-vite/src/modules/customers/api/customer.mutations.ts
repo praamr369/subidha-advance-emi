@@ -1,11 +1,21 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createCustomer, updateCustomer, deleteCustomer } from "./customer.api";
+import {
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+  submitKycDecision,
+} from "./customer.api";
 import { customerKeys } from "./customer.keys";
+import type {
+  CustomerCreatePayload,
+  CustomerUpdatePayload,
+  KycDecisionPayload,
+} from "./customer.types";
 
 export function useCreateCustomer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: createCustomer,
+    mutationFn: (data: CustomerCreatePayload) => createCustomer(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: customerKeys.lists() }),
   });
 }
@@ -13,7 +23,7 @@ export function useCreateCustomer() {
 export function useUpdateCustomer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: number } & Record<string, unknown>) =>
+    mutationFn: ({ id, ...data }: { id: number } & CustomerUpdatePayload) =>
       updateCustomer(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: customerKeys.all }),
   });
@@ -22,7 +32,16 @@ export function useUpdateCustomer() {
 export function useDeleteCustomer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: deleteCustomer,
+    mutationFn: (id: number) => deleteCustomer(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: customerKeys.lists() }),
+  });
+}
+
+export function useKycDecision() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: number } & KycDecisionPayload) =>
+      submitKycDecision(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: customerKeys.all }),
   });
 }
