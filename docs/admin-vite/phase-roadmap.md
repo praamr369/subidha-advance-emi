@@ -154,3 +154,41 @@ For each module, confirm:
 ## Roadmap principle
 
 We should move slowly where money, stock, and audit history are involved, and only replace a module when the replacement has proven that it behaves the same way for real shop work.
+
+## M3.1 — Backend and existing frontend integrity check
+
+Status: complete, with one documented route-registry warning.
+
+Backend validation:
+
+- `python manage.py check` passed
+- `python manage.py makemigrations --check --dry-run` passed
+- Focused backend tests passed: 27 tests covering product, public, and customer-facing surfaces
+
+Existing Next.js frontend validation:
+
+- `npm run typecheck` passed
+- `npm run lint` passed
+- `npm run build` passed
+- `npm run check:routes` reported missing admin parent sidebar module entries for existing admin sections, but the Next.js build still enumerated the admin, public, customer, partner, and vendor routes
+
+admin-vite validation:
+
+- `npm run typecheck` passed
+- `npm run lint` passed
+- `npm run build` passed
+
+Route and boundary verification:
+
+- old Next.js admin routes still exist
+- public website routes still exist
+- customer portal routes still exist
+- partner portal routes still exist
+- vendor portal routes still exist
+- admin-vite routes build successfully
+- no backend business endpoints were changed in this phase
+
+Blockers before M4:
+
+- no backend or build blocker from this phase
+- the route-registry warning should be tracked if `check:routes` is used as a release gate

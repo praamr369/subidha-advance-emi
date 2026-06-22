@@ -7,6 +7,7 @@ Phase A0 is documentation-only, so this register is for planning and control rat
 | Risk | Where it appears | Why it matters | Mitigation | Status |
 |---|---|---|---|---|
 | Route ownership confusion | Shared admin navigation and module links | A route can appear migrated while the old Next.js admin still owns behavior. | Maintain explicit boundary docs and parity-based cutover rules. | Open |
+| Route-registry drift | Next.js route check and sidebar module registry | The route manifest can be healthy while the registry check still reports missing parent/module mappings, which creates false cutover pressure. | Treat `npm run check:routes` failures as a gate, reconcile registry expectations with actual route ownership, and do not remove fallback routes until the mismatch is explained. | Open |
 | Source-of-truth drift | Frontend service layer | The client may accidentally become a second truth source. | Keep backend and DB authoritative; normalize only in client helpers. | Open |
 | Finance behavior regression | Payments, billing, accounting, reconciliation | Any accidental change here can affect money and audit history. | Hard prohibition on behavior change until separate approval and tests exist. | Open |
 | EMI schedule drift | Lucky Plan and subscriptions | EMI changes can corrupt contract history and customer expectations. | Preserve existing schedule logic and do not redesign it in the client. | Open |
