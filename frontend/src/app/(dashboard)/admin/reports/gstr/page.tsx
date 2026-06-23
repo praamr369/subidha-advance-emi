@@ -50,7 +50,7 @@ export default function GstrReportPage() {
   return (
     <ERPPageShell
       title="GSTR Report"
-      description="GSTR-1 / GSTR-3B summary — B2B invoices, B2CS, and HSN breakdown"
+      subtitle="GSTR-1 / GSTR-3B summary — B2B invoices, B2CS, and HSN breakdown"
     >
       {/* Period picker */}
       <ERPSectionShell title="Report Period">

@@ -215,7 +215,7 @@ export default function SchemesPage() {
   return (
     <ERPPageShell
       title="Discount & Scheme Manager"
-      description="Festival and promotional EMI schemes — define discount rules, validity periods, and usage limits"
+      subtitle="Festival and promotional EMI schemes — define discount rules, validity periods, and usage limits"
     >
       <ERPSectionShell
         title="Schemes"
@@ -282,7 +282,7 @@ export default function SchemesPage() {
                       <div className="font-semibold text-foreground">{s.name}</div>
                       <div className="text-xs font-mono text-muted-foreground">{s.code}</div>
                     </td>
-                    <td className="px-4 py-3 text-xs">{PLAN_TYPE_LABELS[s.plan_type] ?? s.plan_type || "All"}</td>
+                    <td className="px-4 py-3 text-xs">{(PLAN_TYPE_LABELS[s.plan_type] ?? s.plan_type) || "All"}</td>
                     <td className="px-4 py-3 text-xs">
                       <div>{DISCOUNT_TYPE_LABELS[s.discount_type]}</div>
                       <div className="font-semibold text-foreground">

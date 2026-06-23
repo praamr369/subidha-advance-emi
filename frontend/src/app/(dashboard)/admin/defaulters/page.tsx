@@ -224,7 +224,7 @@ export default function DefaultersPage() {
   return (
     <ERPPageShell
       title="Defaulter Recovery"
-      description="Subscriptions with overdue EMIs, aging buckets, and recovery case management"
+      subtitle="Subscriptions with overdue EMIs, aging buckets, and recovery case management"
     >
       {/* Bucket summary chips */}
       <div className="flex flex-wrap gap-2 mb-4">

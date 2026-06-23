@@ -88,7 +88,7 @@ export default function LeaderboardPage() {
   return (
     <ERPPageShell
       title="Staff Leaderboard"
-      description="Monthly sales performance, lead conversion, and targets per staff member"
+      subtitle="Monthly sales performance, lead conversion, and targets per staff member"
     >
       {/* Period selector */}
       <ERPSectionShell title="Period">
