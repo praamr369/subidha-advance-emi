@@ -147,7 +147,7 @@ function scanApp(dir) {
 function routeMapFromRoutesTs(source) {
   const routeMap = new Map();
   let section = "";
-  for (const line of source.split("\n")) {
+  for (const line of source.split(/\r?\n/)) {
     const sectionMatch = line.match(/^  ([a-zA-Z0-9_]+): \{$/);
     if (sectionMatch) {
       section = sectionMatch[1];
