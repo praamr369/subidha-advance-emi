@@ -1,8 +1,4 @@
+// Handled by permanent HTTP redirect in next.config.ts → /admin/reports
+// This file is a no-op tombstone kept only because the mount does not support unlink.
 import { redirect } from "next/navigation";
-
-import { ROUTES } from "@/lib/routes";
-
-/** Legacy catalog URL: SME report center now lives on the unified Reports & analysis page. */
-export default function AdminReportsCenterRedirectPage() {
-  redirect(`${ROUTES.admin.reports}?catalog=1`);
-}
+export default function TombstonePage() { redirect("/admin/reports"); }

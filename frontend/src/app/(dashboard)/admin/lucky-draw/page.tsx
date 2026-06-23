@@ -1,7 +1,4 @@
+// Handled by permanent HTTP redirect in next.config.ts → /admin/lucky-draws
+// This file is a no-op tombstone kept only because the mount does not support unlink.
 import { redirect } from "next/navigation";
-
-import { ROUTES } from "@/lib/routes";
-
-export default function LegacyAdminLuckyDrawRedirectPage() {
-  redirect(ROUTES.admin.luckyDraws);
-}
+export default function TombstonePage() { redirect("/admin/lucky-draws"); }

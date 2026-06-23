@@ -48,6 +48,60 @@ function buildRemotePatterns() {
   return patterns;
 }
 
+// ─── Canonical admin route redirects ─────────────────────────────────────────
+// Server-level permanent redirects replacing individual page.tsx redirect shims.
+// Handled at HTTP layer before React rendering. page.tsx redirect files removed.
+const ADMIN_PERMANENT_REDIRECTS: Array<{ source: string; destination: string }> = [
+  // Legacy singular / old-name routes
+  { source: "/admin/emi/overdue", destination: "/admin/emis/overdue" },
+  { source: "/admin/lucky-draw", destination: "/admin/lucky-draws" },
+  { source: "/admin/lucky-draw/history", destination: "/admin/lucky-draws" },
+  { source: "/admin/staff", destination: "/admin/hr/staff" },
+  { source: "/admin/workspace", destination: "/admin/erp" },
+  // Reports-center landing → reports hub ([reportKey] sub-route stays)
+  { source: "/admin/reports-center", destination: "/admin/reports" },
+  // Finance alias routes
+  { source: "/admin/finance/outstandings", destination: "/admin/outstandings" },
+  { source: "/admin/finance/customer-advances", destination: "/admin/customer-advances" },
+  // Commission typo + wrong-group aliases (all → canonical)
+  { source: "/admin/finance/commisions", destination: "/admin/finance/commissions" },
+  { source: "/admin/partner/commisions", destination: "/admin/finance/commissions" },
+  { source: "/admin/partner/commissions", destination: "/admin/finance/commissions" },
+  { source: "/admin/partners/commisions", destination: "/admin/finance/commissions" },
+  // Lucky Plan alias
+  { source: "/admin/lucky-plan/lucky-ids", destination: "/admin/lucky-ids" },
+  // Delivery workspace alias → deliveries list
+  { source: "/admin/delivery", destination: "/admin/deliveries" },
+  { source: "/admin/delivery/workspace", destination: "/admin/deliveries" },
+  { source: "/admin/delivery/create", destination: "/admin/deliveries" },
+  { source: "/admin/delivery/returns", destination: "/admin/service-desk/returns" },
+  // Service workspace alias → service-desk
+  { source: "/admin/service", destination: "/admin/service-desk" },
+  // Leads alias (top-level → crm/leads)
+  { source: "/admin/leads", destination: "/admin/crm/leads" },
+  { source: "/admin/leads/:id*", destination: "/admin/crm/leads" },
+  // Settings roles alias
+  { source: "/admin/settings/roles", destination: "/admin/settings/roles-permissions" },
+  // Audit alias
+  { source: "/admin/audit/events", destination: "/admin/audit-logs" },
+  // Requests canonical flip: top-level legacy → canonical grouped
+  { source: "/admin/online-enquiries", destination: "/admin/requests/online-enquiries" },
+  { source: "/admin/online-enquiries/:id*", destination: "/admin/requests/online-enquiries" },
+  { source: "/admin/support-requests", destination: "/admin/requests/support" },
+  { source: "/admin/support-requests/:id*", destination: "/admin/requests/support" },
+  { source: "/admin/subscription-requests", destination: "/admin/requests/subscriptions" },
+  { source: "/admin/subscription-requests/:id*", destination: "/admin/requests/subscriptions" },
+  // Duplicate billing routes
+  { source: "/admin/billing/direct-sales", destination: "/admin/billing/direct-sale" },
+  { source: "/admin/sales/direct-sale/create", destination: "/admin/billing/direct-sale/create" },
+  { source: "/admin/sales/direct-sale", destination: "/admin/billing/direct-sale" },
+  { source: "/admin/sales", destination: "/admin/billing/direct-sale" },
+  // crm/customers detail alias
+  { source: "/admin/crm/customers/:id", destination: "/admin/customers/:id" },
+  // Setup alias
+  { source: "/admin/setup/readiness", destination: "/admin/settings/business-setup" },
+];
+
 const nextConfig: NextConfig = {
   experimental: {
     webpackBuildWorker: false,
@@ -59,6 +113,13 @@ const nextConfig: NextConfig = {
     dangerouslyAllowLocalIP: true,
     qualities: [75, 78, 80],
     remotePatterns: buildRemotePatterns(),
+  },
+  async redirects() {
+    return ADMIN_PERMANENT_REDIRECTS.map(({ source, destination }) => ({
+      source,
+      destination,
+      permanent: true,
+    }));
   },
 };
 

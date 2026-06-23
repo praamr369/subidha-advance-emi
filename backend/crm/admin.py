@@ -23,3 +23,42 @@ class PartyInteractionAdmin(admin.ModelAdmin):
     list_filter = ("interaction_type", "status")
     search_fields = ("party__party_no", "party__display_name", "subject", "note")
 
+
+
+from crm.models import CustomerInteraction, FollowUpTask, Lead, Opportunity
+
+
+@admin.register(Lead)
+class LeadAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "phone", "source", "stage", "created_at")
+    list_filter = ("source", "stage", "interested_plan_type")
+    search_fields = ("name", "phone", "email")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("-created_at",)
+
+
+@admin.register(Opportunity)
+class OpportunityAdmin(admin.ModelAdmin):
+    list_display = ("id", "lead", "stage", "created_at")
+    list_filter = ("stage",)
+    search_fields = ("lead__name", "lead__phone")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("-created_at",)
+
+
+@admin.register(FollowUpTask)
+class FollowUpTaskAdmin(admin.ModelAdmin):
+    list_display = ("id", "lead", "customer", "status", "due_at", "assigned_to", "created_at")
+    list_filter = ("status",)
+    search_fields = ("lead__name", "lead__phone")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("due_at",)
+
+
+@admin.register(CustomerInteraction)
+class CustomerInteractionAdmin(admin.ModelAdmin):
+    list_display = ("id", "customer", "lead", "created_at")
+    list_filter = ()
+    search_fields = ("customer__phone",)
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)

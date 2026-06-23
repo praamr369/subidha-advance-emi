@@ -1,5 +1,4 @@
+// Handled by permanent HTTP redirect in next.config.ts → /admin/hr/staff
+// This file is a no-op tombstone kept only because the mount does not support unlink.
 import { redirect } from "next/navigation";
-
-export default function AdminStaffAliasPage() {
-  redirect("/admin/hr/staff");
-}
+export default function TombstonePage() { redirect("/admin/hr/staff"); }

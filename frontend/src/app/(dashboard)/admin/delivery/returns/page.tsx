@@ -1,13 +1,3 @@
-import {
-  type AsyncRouteSearchParams,
-  redirectToCanonicalPath,
-} from "@/lib/route-redirect";
-import { ROUTES } from "@/lib/routes";
-
-type PageProps = {
-  searchParams?: AsyncRouteSearchParams;
-};
-
-export default async function AdminDeliveryReturnsPage({ searchParams }: PageProps) {
-  await redirectToCanonicalPath(ROUTES.admin.serviceDeskReturns, searchParams);
-}
+// Canonical: /admin/service-desk/returns
+import { redirect } from "next/navigation";
+export default function DeliveryReturnsPage() { redirect("/admin/service-desk/returns"); }

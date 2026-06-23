@@ -107,21 +107,16 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("CRM & Requests", "KYC", ROUTES.admin.crmKyc, "KYC review queue.", {
     badgeSource: "queue.customer_kyc_pending",
   }),
-  // Legacy routes (direct paths remain canonical for daily use):
-  item("CRM & Requests", "Online Enquiries", ROUTES.admin.onlineEnquiries, "Public enquiry queue. Request intake — no procurement or payment posting from this page."),
-  item("CRM & Requests", "Support Requests", ROUTES.admin.supportRequests, "Customer support intake. Request intake — service execution remains in Service Desk."),
-  item("CRM & Requests", "Subscription Requests", ROUTES.admin.subscriptionRequests, "Controlled approval queue for subscription requests. Approval follows existing backend workflow — no silent contract/payment creation.", {
-    badgeSource: "queue.subscription_requests_pending",
-  }),
+  // Legacy aliases — now redirect to /admin/requests/* canonical paths (see next.config.ts)
   // Phase 6: partner payment requests moved here from Profiles & Parties — intake queue only.
   // The page links to collection workspace for review context; no payment is posted from this page.
   item("CRM & Requests", "Partner Payment Requests", ROUTES.admin.partnerPaymentRequests, "Request intake queue for partner-submitted payment reports. No financial posting from this page.", {
     badgeSource: "queue.partner_payment_requests_pending",
   }),
   // Phase 6: canonical /admin/requests/* alias routes — thin server redirects to existing legacy pages.
-  item("CRM & Requests", "Online Enquiries (via /requests)", ROUTES.admin.requestsOnlineEnquiries, "Canonical alias → /admin/online-enquiries. Keeps legacy route intact."),
-  item("CRM & Requests", "Support (via /requests)", ROUTES.admin.requestsSupport, "Canonical alias → /admin/support-requests. Keeps legacy route intact."),
-  item("CRM & Requests", "Subscriptions (via /requests)", ROUTES.admin.requestsSubscriptions, "Canonical alias → /admin/subscription-requests. Keeps legacy route intact."),
+  item("CRM & Requests", "Online Enquiries", ROUTES.admin.requestsOnlineEnquiries, "Public enquiry queue. Request intake — no procurement or payment posting from this page."),
+  item("CRM & Requests", "Support", ROUTES.admin.requestsSupport, "Customer support intake. Request intake — service execution remains in Service Desk."),
+  item("CRM & Requests", "Subscription Requests", ROUTES.admin.requestsSubscriptions, "Controlled approval queue for subscription requests. No silent contract/payment creation.", { badgeSource: "queue.subscription_requests_pending" }),
 
   // ── 4. Sales & Contracts ──────────────────────────────────────────────────
   // Rent/lease contract items are included here (canonical route family:
@@ -244,6 +239,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Inventory & Stock", "Purchase Needs", ROUTES.admin.inventoryPurchaseNeeds, "Purchase need planning."),
   item("Inventory & Stock", "Readiness", ROUTES.admin.inventoryReadiness, "Inventory readiness checks."),
   item("Inventory & Stock", "Profiles", ROUTES.admin.inventoryProfiles, "Inventory profiles."),
+  item("Inventory & Stock", "Reservations", ROUTES.admin.inventoryReservations, "Active stock reservations by item and purpose. Read-only; release via source workflow."),
 
   // ── 10. Purchases & Vendors ───────────────────────────────────────────────
   // Purchase source workflow: vendor profile → request → order → receipt → stock increase
@@ -383,8 +379,18 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
 ];
 
 export const ADMIN_ROUTE_ALIASES: Record<string, string> = {
+  // ── All handled by permanent HTTP redirects in next.config.ts ─────────────
+  // Kept here for programmatic use (breadcrumb builders, link validators, tests).
+  // Source → canonical destination.
   "/admin/setup/readiness": ROUTES.admin.settingsBusinessSetup,
   "/admin/workspace": ROUTES.admin.erp,
+  "/admin/staff": ROUTES.admin.hrStaff,
+  "/admin/leads": ROUTES.admin.leads,
+  "/admin/service": ROUTES.admin.serviceDesk,
+  "/admin/delivery": ROUTES.admin.deliveries,
+  "/admin/settings/roles": ROUTES.admin.settingsRolesPermissions,
+  "/admin/audit/events": ROUTES.admin.auditLogs,
+  "/admin/reports-center": ROUTES.admin.reports,
   "/admin/lucky-draw": ROUTES.admin.luckyDraws,
   "/admin/lucky-draw/history": ROUTES.admin.luckyDraws,
   "/admin/emi/overdue": ROUTES.admin.emisOverdue,
@@ -392,19 +398,16 @@ export const ADMIN_ROUTE_ALIASES: Record<string, string> = {
   "/admin/payments/history": ROUTES.admin.payments,
   "/admin/payments/create": ROUTES.admin.financeCollect,
   "/admin/payments/reconciliation": ROUTES.admin.financeCanonicalReconciliation,
-  "/admin/finance/commisions": ROUTES.admin.financeCommissions,
-  "/admin/partners/commisions": ROUTES.admin.financeCommissions,
-  "/admin/partners/commissions": ROUTES.admin.financeCommissions,
-  "/admin/partner/commisions": ROUTES.admin.financeCommissions,
-  "/admin/partner/commissions": ROUTES.admin.financeCommissions,
-  // Phase 4: Finance Operations canonical alias — old /admin/outstandings still works directly.
-  // /admin/finance/outstandings is the new canonical navigation entry point.
+  "/admin/finance/commissions": ROUTES.admin.financeCommissions,
   "/admin/finance/reconciliation": ROUTES.admin.financeCanonicalReconciliation,
-  // Phase 6: canonical /admin/requests/* aliases → existing legacy request pages.
-  // Legacy paths remain live and unchanged; these are additive thin redirects only.
-  [ROUTES.admin.requestsOnlineEnquiries]: ROUTES.admin.onlineEnquiries,
-  [ROUTES.admin.requestsSupport]: ROUTES.admin.supportRequests,
-  [ROUTES.admin.requestsSubscriptions]: ROUTES.admin.subscriptionRequests,
+  "/admin/finance/outstandings": ROUTES.admin.outstandings,
+  "/admin/finance/customer-advances": ROUTES.admin.customerAdvances,
+  "/admin/billing/direct-sales": ROUTES.admin.billingDirectSaleWorkspace,
+  "/admin/sales": ROUTES.admin.billingDirectSaleWorkspace,
+  // ── requests/ is now canonical — old top-level paths are legacy aliases ───
+  "/admin/online-enquiries": ROUTES.admin.requestsOnlineEnquiries,
+  "/admin/support-requests": ROUTES.admin.requestsSupport,
+  "/admin/subscription-requests": ROUTES.admin.requestsSubscriptions,
 };
 
 function flattenTree(items: AdminRouteRegistryItem[]): AdminRouteRegistryItem[] {

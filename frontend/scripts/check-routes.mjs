@@ -40,7 +40,7 @@ const requiredRoutes = [
 
 const requiredAdminSidebarParents = [
   ["Command Center", "/admin"],
-  ["Sales & Contracts", "/admin/sales"],
+  ["Sales & Contracts", "/admin/billing/direct-sale"],
   // "Rent / Lease" dissolved into "Sales & Contracts" — no standalone group.
   ["Accounting & Reconciliation", "/admin/accounting/bridge-reconciliation"],
   ["Inventory & Stock", "/admin/inventory"],
