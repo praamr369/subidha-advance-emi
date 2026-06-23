@@ -20,6 +20,8 @@ class PaymentReminderSerializer(serializers.ModelSerializer):
     target_invoice_no = serializers.CharField(source="target_invoice.document_no", read_only=True)
     target_payment_reference = serializers.CharField(source="target_payment.reference_no", read_only=True)
     sent_by_username = serializers.CharField(source="sent_by.username", read_only=True)
+    customer_whatsapp_opted_in = serializers.BooleanField(source="target_customer.whatsapp_opted_in", read_only=True)
+    customer_preferred_reminder_channel = serializers.CharField(source="target_customer.preferred_reminder_channel", read_only=True)
 
     class Meta:
         model = PaymentReminder
@@ -30,6 +32,8 @@ class PaymentReminderSerializer(serializers.ModelSerializer):
             "reminder_type",
             "target_customer",
             "target_customer_name",
+            "customer_whatsapp_opted_in",
+            "customer_preferred_reminder_channel",
             "target_subscription",
             "target_subscription_id",
             "target_invoice",

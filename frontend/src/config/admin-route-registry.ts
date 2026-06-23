@@ -401,7 +401,7 @@ export const ADMIN_ROUTE_ALIASES: Record<string, string> = {
   "/admin/finance/commissions": ROUTES.admin.financeCommissions,
   "/admin/finance/reconciliation": ROUTES.admin.financeCanonicalReconciliation,
   "/admin/finance/outstandings": ROUTES.admin.outstandings,
-  "/admin/finance/customer-advances": ROUTES.admin.customerAdvances,
+  "/admin/finance/customer-advances": ROUTES.admin.financeCustomerAdvances,
   "/admin/billing/direct-sales": ROUTES.admin.billingDirectSaleWorkspace,
   "/admin/sales": ROUTES.admin.billingDirectSaleWorkspace,
   // ── requests/ is now canonical — old top-level paths are legacy aliases ───

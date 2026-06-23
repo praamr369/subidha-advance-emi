@@ -19,7 +19,11 @@ from inventory.models import (
     VendorPayment,
     VendorPaymentStatus,
     PurchaseOrder,
+    PurchaseOrderLine,
     PurchaseOrderStatus,
+    PurchaseRequest,
+    PurchaseRequestLine,
+    PurchaseRequestStatus,
 )
 from inventory.services.audit_service import log_inventory_event
 from inventory.services.purchase_need_reconciliation_service import (
@@ -55,6 +59,90 @@ def _create_vendor_ledger_entry(*, vendor_id: int, entry_type: str, source_type:
         created_by=posted_by,
         notes=(notes or "").strip(),
     )
+
+
+@transaction.atomic
+def approve_purchase_request(*, purchase_request_id: int, performed_by=None):
+    """Approve a DRAFT purchase request. Idempotent if already APPROVED."""
+    pr = PurchaseRequest.objects.select_for_update().get(pk=purchase_request_id)
+    if pr.status == PurchaseRequestStatus.APPROVED:
+        return pr, False
+    if pr.status != PurchaseRequestStatus.DRAFT:
+        raise ValueError(f"Only DRAFT purchase requests can be approved (current status: {pr.status}).")
+    pr.status = PurchaseRequestStatus.APPROVED
+    pr.save(update_fields=["status", "updated_at"])
+    log_inventory_event(
+        action_type=AuditLog.ActionType.PURCHASE_ORDER_CANCELLED,  # reuse closest available action type
+        instance=pr,
+        performed_by=performed_by,
+        event="PURCHASE_REQUEST_APPROVED",
+        metadata={"purchase_request_id": pr.id, "request_no": pr.request_no},
+    )
+    return pr, True
+
+
+@transaction.atomic
+def convert_purchase_request_to_po(*, purchase_request_id: int, performed_by=None, po_date=None, expected_date=None):
+    """Convert an APPROVED (or DRAFT) purchase request into a Purchase Order.
+
+    Copies lines from the request to the PO, sets status to PARTIALLY_ORDERED,
+    and marks the request as ORDERED.
+    """
+    from django.utils import timezone as _tz
+
+    pr = (
+        PurchaseRequest.objects.select_for_update()
+        .select_related("vendor", "stock_location", "branch")
+        .prefetch_related("lines", "lines__inventory_item")
+        .get(pk=purchase_request_id)
+    )
+    if pr.status == PurchaseRequestStatus.ORDERED:
+        raise ValueError("Purchase request has already been converted to a purchase order.")
+    if pr.status == PurchaseRequestStatus.CANCELLED:
+        raise ValueError("Cancelled purchase requests cannot be converted.")
+    if pr.vendor_id is None:
+        raise ValueError("A vendor must be assigned to the purchase request before converting to a PO.")
+    if not pr.lines.exists():
+        raise ValueError("Purchase request has no lines to convert.")
+
+    today = (_tz.now().date() if po_date is None else po_date)
+
+    po = PurchaseOrder.objects.create(
+        po_date=today,
+        vendor=pr.vendor,
+        status=PurchaseOrderStatus.DRAFT,
+        expected_date=expected_date,
+        branch=pr.branch,
+        stock_location=pr.stock_location,
+        notes=f"Converted from purchase request {pr.request_no}.",
+    )
+
+    for line in pr.lines.all():
+        PurchaseOrderLine.objects.create(
+            purchase_order=po,
+            inventory_item=line.inventory_item,
+            description=line.notes or "",
+            quantity=line.quantity_requested,
+            unit_cost=line.inventory_item.standard_unit_cost or Decimal("0.00"),
+            tax_amount=Decimal("0.00"),
+        )
+
+    pr.status = PurchaseRequestStatus.ORDERED
+    pr.save(update_fields=["status", "updated_at"])
+
+    log_inventory_event(
+        action_type=AuditLog.ActionType.PURCHASE_ORDER_CANCELLED,  # reuse closest available action type
+        instance=pr,
+        performed_by=performed_by,
+        event="PURCHASE_REQUEST_CONVERTED_TO_PO",
+        metadata={
+            "purchase_request_id": pr.id,
+            "request_no": pr.request_no,
+            "purchase_order_id": po.id,
+            "po_no": po.po_no,
+        },
+    )
+    return po, pr
 
 
 @transaction.atomic

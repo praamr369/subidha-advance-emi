@@ -24,7 +24,9 @@ from inventory.models import (
 )
 from inventory.services.audit_service import log_inventory_event
 from inventory.services.procurement_service import (
+    approve_purchase_request,
     cancel_purchase_order,
+    convert_purchase_request_to_po,
     post_goods_receipt,
     post_vendor_bill,
     post_vendor_payment,
@@ -395,6 +397,33 @@ class PurchaseRequestViewSet(AdminInventoryModelViewSet):
     search_fields = ["request_no", "vendor__name"]
     ordering_fields = ["request_date", "created_at", "request_no"]
     ordering = ["-request_date", "-created_at", "-id"]
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        try:
+            pr, updated = approve_purchase_request(purchase_request_id=int(pk), performed_by=request.user)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = PurchaseRequestSerializer(pr, context=self.get_serializer_context())
+        return Response({"updated": updated, "purchase_request": payload.data})
+
+    @action(detail=True, methods=["post"], url_path="convert-to-po")
+    def convert_to_po(self, request, pk=None):
+        po_date = request.data.get("po_date") or None
+        expected_date = request.data.get("expected_date") or None
+        try:
+            po, pr = convert_purchase_request_to_po(
+                purchase_request_id=int(pk),
+                performed_by=request.user,
+                po_date=po_date,
+                expected_date=expected_date,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        from api.v1.serializers.inventory import PurchaseOrderSerializer as POSerializer
+        po_payload = POSerializer(po, context=self.get_serializer_context())
+        pr_payload = PurchaseRequestSerializer(pr, context=self.get_serializer_context())
+        return Response({"purchase_order": po_payload.data, "purchase_request": pr_payload.data})
 
 
 class GoodsReceiptViewSet(AdminInventoryModelViewSet):

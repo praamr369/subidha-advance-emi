@@ -96,8 +96,17 @@ def send_password_reset_otp(*, user, otp: str, email_only: bool = False) -> str:
     1. SMS when explicitly enabled and available
     2. Email fallback when enabled and available
     3. Console in DEBUG/local dev
+
+    OTP_EMAIL_ENABLED=true is a shortcut that forces delivery_backend to "email",
+    overriding OTP_DELIVERY_BACKEND. Set this to enable email OTP without changing
+    OTP_DELIVERY_BACKEND.
     """
-    delivery_backend = getattr(settings, "OTP_DELIVERY_BACKEND", "auto").strip().lower()
+    otp_email_enabled = getattr(settings, "OTP_EMAIL_ENABLED", False)
+    if isinstance(otp_email_enabled, str):
+        otp_email_enabled = otp_email_enabled.strip().lower() in {"1", "true", "yes", "on"}
+
+    raw_backend = getattr(settings, "OTP_DELIVERY_BACKEND", "auto").strip().lower()
+    delivery_backend = "email" if otp_email_enabled else raw_backend
     allow_email_fallback = getattr(settings, "OTP_ALLOW_EMAIL_FALLBACK", True)
 
     if email_only:

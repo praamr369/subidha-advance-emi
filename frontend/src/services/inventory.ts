@@ -306,6 +306,21 @@ export type VendorLite = {
   is_active: boolean;
 };
 
+// ── Procurement types ────────────────────────────────────────────────────────
+
+export type PurchaseOrderLine = {
+  id?: number;
+  inventory_item: number;
+  inventory_item_sku?: string;
+  inventory_item_product_name?: string;
+  description?: string;
+  quantity: string;
+  unit_cost: string;
+  tax_amount?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type PurchaseOrder = {
   id: number;
   po_no: string;
@@ -313,7 +328,27 @@ export type PurchaseOrder = {
   vendor: number;
   vendor_name?: string;
   status: "DRAFT" | "SENT" | "PARTIALLY_RECEIVED" | "RECEIVED" | "BILLED" | "CANCELLED";
+  expected_date?: string | null;
+  branch?: number | null;
+  stock_location?: number | null;
+  stock_location_name?: string | null;
   notes?: string;
+  lines: PurchaseOrderLine[];
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type GoodsReceiptLine = {
+  id?: number;
+  purchase_order_line?: number | null;
+  inventory_item: number;
+  inventory_item_sku?: string;
+  inventory_item_product_name?: string;
+  quantity_received: string;
+  unit_cost?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type GoodsReceipt = {
@@ -324,6 +359,33 @@ export type GoodsReceipt = {
   purchase_order_no?: string;
   vendor_name?: string;
   status: "DRAFT" | "RECEIVED" | "CANCELLED";
+  branch?: number | null;
+  stock_location?: number | null;
+  stock_location_name?: string | null;
+  notes?: string;
+  allow_over_receive?: boolean;
+  over_receive_reason?: string;
+  posted_at?: string | null;
+  posted_by?: number | null;
+  posted_by_username?: string | null;
+  lines: GoodsReceiptLine[];
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type VendorBillLine = {
+  id?: number;
+  inventory_item: number;
+  inventory_item_sku?: string;
+  inventory_item_product_name?: string;
+  description?: string;
+  quantity: string;
+  unit_cost: string;
+  taxable_value?: string;
+  tax_amount?: string;
+  line_total?: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type VendorBill = {
@@ -332,10 +394,22 @@ export type VendorBill = {
   bill_date: string;
   vendor: number;
   vendor_name?: string;
+  purchase_order?: number | null;
+  purchase_order_no?: string | null;
+  goods_receipt?: number | null;
+  goods_receipt_no?: string | null;
+  finance_account?: number | null;
+  finance_account_name?: string | null;
   status: "DRAFT" | "POSTED" | "CANCELLED";
   subtotal: string;
   tax_total: string;
   grand_total: string;
+  posted_journal_entry?: number | null;
+  posted_journal_entry_no?: string | null;
+  notes?: string;
+  lines: VendorBillLine[];
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type VendorPayment = {
@@ -347,8 +421,15 @@ export type VendorPayment = {
   vendor_bill?: number | null;
   vendor_bill_no?: string;
   amount: string;
+  finance_account?: number | null;
+  finance_account_name?: string | null;
   status: "DRAFT" | "POSTED" | "CANCELLED";
+  posted_journal_entry?: number | null;
+  posted_journal_entry_no?: string | null;
   reference_no?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type VendorAgreement = {
@@ -362,16 +443,36 @@ export type VendorAgreement = {
   payment_terms?: string;
   credit_period_days: number;
   notes?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type PurchaseRequestLine = {
+  id?: number;
+  inventory_item: number;
+  inventory_item_sku?: string;
+  inventory_item_product_name?: string;
+  quantity_requested: string;
+  notes?: string;
 };
 
 export type PurchaseRequest = {
   id: number;
   request_no: string;
   request_date: string;
+  requested_by?: number | null;
+  requested_by_username?: string | null;
   status: "DRAFT" | "APPROVED" | "PARTIALLY_ORDERED" | "ORDERED" | "CANCELLED";
+  branch?: number | null;
+  stock_location?: number | null;
+  stock_location_name?: string | null;
   vendor?: number | null;
   vendor_name?: string;
+  source_purchase_need?: number | null;
   notes?: string;
+  lines: PurchaseRequestLine[];
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type StockLocationPayload = {
@@ -645,28 +746,174 @@ export function listVendorsLite(params: Record<string, QueryValue> = {}) {
   return apiFetch<{ count: number; results: VendorLite[] }>(`/inventory/vendors/${buildQuery(params)}`);
 }
 
+// ── Purchase Orders ──────────────────────────────────────────────────────────
+
 export function listPurchaseOrders(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<PurchaseOrder>>(`/inventory/purchase-orders/${buildQuery(params)}`);
 }
+
+export function getPurchaseOrder(id: number | string) {
+  return apiFetch<PurchaseOrder>(`/inventory/purchase-orders/${id}/`);
+}
+
+export function createPurchaseOrder(payload: {
+  po_date: string;
+  vendor: number;
+  expected_date?: string | null;
+  branch?: number | null;
+  stock_location?: number | null;
+  notes?: string;
+  lines: Array<{ inventory_item: number; description?: string; quantity: string; unit_cost: string; tax_amount?: string }>;
+}) {
+  return apiFetch<PurchaseOrder>("/inventory/purchase-orders/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updatePurchaseOrder(id: number | string, payload: Partial<Parameters<typeof createPurchaseOrder>[0]>) {
+  return apiFetch<PurchaseOrder>(`/inventory/purchase-orders/${id}/`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function cancelPurchaseOrder(id: number | string) {
+  return apiFetch<{ updated: boolean; purchase_order: PurchaseOrder }>(`/inventory/purchase-orders/${id}/cancel/`, { method: "POST", body: JSON.stringify({}) });
+}
+
+// ── Goods Receipts ───────────────────────────────────────────────────────────
 
 export function listGoodsReceipts(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<GoodsReceipt>>(`/inventory/goods-receipts/${buildQuery(params)}`);
 }
 
+export function getGoodsReceipt(id: number | string) {
+  return apiFetch<GoodsReceipt>(`/inventory/goods-receipts/${id}/`);
+}
+
+export function createGoodsReceipt(payload: {
+  receipt_date: string;
+  purchase_order: number;
+  branch?: number | null;
+  stock_location?: number | null;
+  notes?: string;
+  allow_over_receive?: boolean;
+  over_receive_reason?: string;
+  lines: Array<{ purchase_order_line?: number | null; inventory_item: number; quantity_received: string; unit_cost?: string; notes?: string }>;
+}) {
+  return apiFetch<GoodsReceipt>("/inventory/goods-receipts/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function postGoodsReceipt(id: number | string) {
+  return apiFetch<{ updated: boolean; goods_receipt: GoodsReceipt }>(`/inventory/goods-receipts/${id}/post/`, { method: "POST", body: JSON.stringify({}) });
+}
+
+// ── Vendor Bills ─────────────────────────────────────────────────────────────
+
 export function listVendorBills(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<VendorBill>>(`/inventory/vendor-bills/${buildQuery(params)}`);
 }
+
+export function getVendorBill(id: number | string) {
+  return apiFetch<VendorBill>(`/inventory/vendor-bills/${id}/`);
+}
+
+export function createVendorBill(payload: {
+  bill_no?: string;
+  bill_date: string;
+  vendor: number;
+  purchase_order?: number | null;
+  goods_receipt?: number | null;
+  finance_account?: number | null;
+  notes?: string;
+  lines: Array<{ inventory_item: number; description?: string; quantity: string; unit_cost: string; taxable_value?: string; tax_amount?: string; line_total?: string }>;
+}) {
+  return apiFetch<VendorBill>("/inventory/vendor-bills/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateVendorBill(id: number | string, payload: Partial<Parameters<typeof createVendorBill>[0]>) {
+  return apiFetch<VendorBill>(`/inventory/vendor-bills/${id}/`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function postVendorBill(id: number | string) {
+  return apiFetch<{ updated: boolean; vendor_bill: VendorBill }>(`/inventory/vendor-bills/${id}/post/`, { method: "POST", body: JSON.stringify({}) });
+}
+
+// ── Vendor Payments ──────────────────────────────────────────────────────────
 
 export function listVendorPayments(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<VendorPayment>>(`/inventory/vendor-payments/${buildQuery(params)}`);
 }
 
+export function getVendorPayment(id: number | string) {
+  return apiFetch<VendorPayment>(`/inventory/vendor-payments/${id}/`);
+}
+
+export function createVendorPayment(payload: {
+  payment_date: string;
+  vendor: number;
+  vendor_bill?: number | null;
+  amount: string;
+  finance_account?: number | null;
+  reference_no?: string;
+  notes?: string;
+}) {
+  return apiFetch<VendorPayment>("/inventory/vendor-payments/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function postVendorPayment(id: number | string) {
+  return apiFetch<{ updated: boolean; vendor_payment: VendorPayment }>(`/inventory/vendor-payments/${id}/post/`, { method: "POST", body: JSON.stringify({}) });
+}
+
+// ── Vendor Agreements ────────────────────────────────────────────────────────
+
 export function listVendorAgreements(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<VendorAgreement>>(`/inventory/vendor-agreements/${buildQuery(params)}`);
 }
 
+export function createVendorAgreement(payload: {
+  vendor: number;
+  effective_from: string;
+  effective_to?: string | null;
+  status?: string;
+  payment_terms?: string;
+  credit_period_days?: number;
+  notes?: string;
+}) {
+  return apiFetch<VendorAgreement>("/inventory/vendor-agreements/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateVendorAgreement(id: number | string, payload: Partial<Parameters<typeof createVendorAgreement>[0]>) {
+  return apiFetch<VendorAgreement>(`/inventory/vendor-agreements/${id}/`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+// ── Purchase Requests ────────────────────────────────────────────────────────
+
 export function listPurchaseRequests(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<PurchaseRequest>>(`/inventory/purchase-requests/${buildQuery(params)}`);
+}
+
+export function getPurchaseRequest(id: number | string) {
+  return apiFetch<PurchaseRequest>(`/inventory/purchase-requests/${id}/`);
+}
+
+export function createPurchaseRequest(payload: {
+  request_date: string;
+  vendor?: number | null;
+  stock_location?: number | null;
+  notes?: string;
+  lines: Array<{ inventory_item: number; quantity_requested: string; notes?: string }>;
+}) {
+  return apiFetch<PurchaseRequest>("/inventory/purchase-requests/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function approvePurchaseRequest(id: number | string) {
+  return apiFetch<{ updated: boolean; purchase_request: PurchaseRequest }>(
+    `/inventory/purchase-requests/${id}/approve/`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+}
+
+export function convertPurchaseRequestToPO(id: number | string, opts?: { po_date?: string; expected_date?: string }) {
+  return apiFetch<{ purchase_order: PurchaseOrder; purchase_request: PurchaseRequest }>(
+    `/inventory/purchase-requests/${id}/convert-to-po/`,
+    { method: "POST", body: JSON.stringify(opts ?? {}) }
+  );
 }
 
 export function listAdminOpeningStockEntries(params: Record<string, QueryValue> = {}) {

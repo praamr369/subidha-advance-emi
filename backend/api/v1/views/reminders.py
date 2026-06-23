@@ -8,6 +8,7 @@ from reminders.models import PaymentReminder
 from reminders.services.reminder_send_run_service import run_payment_reminders
 from reminders.services.reminder_service import (
     cancel_payment_reminder,
+    generate_whatsapp_link,
     schedule_payment_reminder,
     send_payment_reminder,
 )
@@ -90,6 +91,20 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
             raise ValidationError({"detail": str(exc)}) from exc
         payload = PaymentReminderSerializer(reminder, context=self.get_serializer_context())
         return Response({"updated": updated, "reminder": payload.data})
+
+    @action(detail=True, methods=["get"], url_path="whatsapp-link")
+    def whatsapp_link(self, request, pk=None):
+        """
+        Generate a wa.me deep-link for manual WhatsApp sending.
+        Returns the link and pre-filled message text. Staff must click and send manually.
+        After sending, call the 'send' action to record the manual send in the audit log.
+        This endpoint does NOT send any message — it only generates the link.
+        """
+        try:
+            result = generate_whatsapp_link(reminder_id=int(pk))
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(result)
 
 
 class PaymentReminderRunView(APIView):

@@ -394,6 +394,20 @@ class Customer(TimeStampedModel):
         help_text="Human-readable short code for receipts/contracts (auto-generated if blank).",
     )
 
+    # Reminder channel preference — additive, null/blank-safe for existing rows.
+    preferred_reminder_channel = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Customer's preferred channel for payment reminders (SMS / WHATSAPP / EMAIL / CALL). Blank = no preference recorded.",
+    )
+    whatsapp_opted_in = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="True when the customer has explicitly opted in to receive WhatsApp reminders.",
+    )
+
     class Meta:
         db_table = "customers"
         ordering = ["-created_at"]

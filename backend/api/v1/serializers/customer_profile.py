@@ -28,6 +28,8 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
             "kyc_status",
             "username",
             "summary",
+            "preferred_reminder_channel",
+            "whatsapp_opted_in",
         )
         read_only_fields = ("id", "kyc_status", "username", "summary")
 
