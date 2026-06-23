@@ -104,9 +104,9 @@ export const ROUTES = {
     biInventory: "/admin/bi/inventory",
     biHr: "/admin/bi/hr",
     crmWorkspace: "/admin/crm",
-    salesWorkspace: "/admin/billing/direct-sale" // was /admin/sales — now redirected,
-    serviceWorkspace: "/admin/service-desk" // was /admin/service — now redirected,
-    workspace: "/admin/erp" // was /admin/workspace — now redirected,
+    salesWorkspace: "/admin/billing/direct-sale", // was /admin/sales — now redirected
+    serviceWorkspace: "/admin/service-desk", // was /admin/service — now redirected
+    workspace: "/admin/erp", // was /admin/workspace — now redirected
     hr: "/admin/hr",
     hrStaff: "/admin/hr/staff",
     hrStaffProfile: "/admin/hr/staff",
@@ -166,7 +166,7 @@ export const ROUTES = {
     settlementsUpiImports: "/admin/settlements/upi-imports",
     settlementsBankImports: "/admin/settlements/bank-imports",
     reconciliation: "/admin/accounting/bridge-reconciliation",
-    reportsCenter: "/admin/reports" // was /admin/reports-center — now redirected,
+    reportsCenter: "/admin/reports", // was /admin/reports-center — now redirected
     reports: "/admin/reports",
     reportsRevenue: "/admin/reports/revenue",
     reportsCollections: "/admin/reports/collections",
@@ -175,8 +175,8 @@ export const ROUTES = {
     reportsBatchPerformance: "/admin/reports/batch-performance",
     reportsPartners: "/admin/reports/partners",
     reportsWaiverLoss: "/admin/reports/waiver-loss",
-    leads: "/admin/crm/leads" // was /admin/leads — now redirected,
-    supportRequests: "/admin/requests/support" // was /admin/support-requests — now canonical is requests/support,
+    leads: "/admin/crm/leads", // was /admin/leads — now redirected
+    supportRequests: "/admin/requests/support", // was /admin/support-requests — now canonical is requests/support
     customers: "/admin/customers",
     deliveries: "/admin/deliveries",
     delivery: "/admin/delivery",
@@ -192,7 +192,7 @@ export const ROUTES = {
     contractAmendments: "/admin/contract-amendments",
     contractAmendmentsNew: "/admin/contract-amendments/new",
     contractAmendmentsRecontractReport: "/admin/contract-amendments/recontract-report",
-    subscriptionRequests: "/admin/requests/subscriptions" // was /admin/subscription-requests — now canonical is requests/subscriptions,
+    subscriptionRequests: "/admin/requests/subscriptions", // was /admin/subscription-requests — now canonical is requests/subscriptions
     payments: "/admin/payments",
     paymentsCreate: "/admin/payments/create",
     paymentsHistory: "/admin/payments/history",
@@ -251,10 +251,10 @@ export const ROUTES = {
     dataQuality: "/admin/data-quality",
 
     billing: "/admin/billing",
-    billingDirectSales: "/admin/billing/direct-sale" // was /admin/billing/direct-sales — duplicate,
+    billingDirectSales: "/admin/billing/direct-sale", // was /admin/billing/direct-sales — duplicate
     billingDirectSaleWorkspace: "/admin/billing/direct-sale",
     billingDirectSaleCreate: "/admin/billing/direct-sale/create",
-    salesDirectSaleCreate: "/admin/billing/direct-sale/create" // was /admin/sales/direct-sale/create — duplicate,
+    salesDirectSaleCreate: "/admin/billing/direct-sale/create", // was /admin/sales/direct-sale/create — duplicate
     billingRegister: "/admin/billing/register",
     billingDailyBook: "/admin/billing/dailybook",
     billingCashBook: "/admin/billing/cashbook",
@@ -286,7 +286,7 @@ export const ROUTES = {
     vendorsCategories: "/admin/vendors/categories",
     vendorsQuotes: "/admin/vendors/quotes",
     vendorsSourcing: "/admin/vendors/sourcing",
-    onlineEnquiries: "/admin/requests/online-enquiries" // was /admin/online-enquiries — now canonical is requests/online-enquiries,
+    onlineEnquiries: "/admin/requests/online-enquiries", // was /admin/online-enquiries — now canonical is requests/online-enquiries
     vendorsLedger: "/admin/vendors/ledger",
     vendorsOutstanding: "/admin/vendors/outstanding",
     vendorsPurchases: "/admin/vendors/purchases",

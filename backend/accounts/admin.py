@@ -5,31 +5,32 @@ from accounts.models import Capability, RoleCapability, StaffIdentity, UserCapab
 
 @admin.register(StaffIdentity)
 class StaffIdentityAdmin(admin.ModelAdmin):
-    list_display = ("user", "staff_code", "display_name", "is_active", "created_at")
-    list_filter = ("is_active",)
-    search_fields = ("user__username", "staff_code", "display_name")
+    list_display = ("id", "user", "employee", "login_enabled", "created_at")
+    list_filter = ("login_enabled",)
+    search_fields = ("user__username", "employee__id")
     readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(Capability)
 class CapabilityAdmin(admin.ModelAdmin):
-    list_display = ("code", "label", "module", "description", "is_active")
-    list_filter = ("module", "is_active")
-    search_fields = ("code", "label", "module")
-    ordering = ("module", "code")
+    list_display = ("code", "label", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("code", "label")
+    ordering = ("code",)
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(RoleCapability)
 class RoleCapabilityAdmin(admin.ModelAdmin):
-    list_display = ("role", "capability", "is_granted", "granted_at")
-    list_filter = ("role", "is_granted")
-    search_fields = ("role", "capability__code")
-    readonly_fields = ("granted_at",)
+    list_display = ("role", "capability", "is_allowed", "created_at")
+    list_filter = ("role", "is_allowed")
+    search_fields = ("capability__code",)
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(UserCapabilityOverride)
 class UserCapabilityOverrideAdmin(admin.ModelAdmin):
-    list_display = ("user", "capability", "is_granted", "reason", "created_at")
-    list_filter = ("is_granted",)
-    search_fields = ("user__username", "capability__code", "reason")
-    readonly_fields = ("created_at",)
+    list_display = ("user", "capability", "is_allowed", "note", "created_at")
+    list_filter = ("is_allowed",)
+    search_fields = ("user__username", "capability__code")
+    readonly_fields = ("created_at", "updated_at")
