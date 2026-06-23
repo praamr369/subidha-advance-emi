@@ -46,6 +46,19 @@ class PartyInteractionStatus(models.TextChoices):
     CANCELLED = "CANCELLED", "Cancelled"
 
 
+class LeadSource(models.TextChoices):
+    WALK_IN = "WALK_IN", "Walk In"
+    REFERRAL = "REFERRAL", "Referral"
+    ONLINE_ENQUIRY = "ONLINE_ENQUIRY", "Online Enquiry"
+    PARTNER = "PARTNER", "Partner"
+    BROCHURE = "BROCHURE", "Brochure"
+    EVENT = "EVENT", "Event"
+    SOCIAL_MEDIA = "SOCIAL_MEDIA", "Social Media"
+    PHONE_CALL = "PHONE_CALL", "Phone Call"
+    INTERNAL = "INTERNAL", "Internal"
+    OTHER = "OTHER", "Other"
+
+
 class LeadPlanType(models.TextChoices):
     LUCKY_PLAN = "LUCKY_PLAN", "Lucky Plan"
     RENT = "RENT", "Rent"
