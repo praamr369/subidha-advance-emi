@@ -37,6 +37,7 @@ def _lead_queryset():
             "converted_direct_sale",
             "converted_by",
         )
+        .prefetch_related("crm_pipeline_lead")
         .order_by("-created_at", "-id")
     )
 

@@ -56,6 +56,17 @@ export const LEAD_STAGES: LeadStage[] = [
   "LOST",
 ];
 
+// Valid stage transitions (mirrors backend VALID_TRANSITIONS)
+export const VALID_TRANSITIONS: Record<LeadStage, LeadStage[]> = {
+  NEW: ["CONTACTED", "LOST"],
+  CONTACTED: ["INTERESTED", "LOST"],
+  INTERESTED: ["KYC_PENDING", "LOST"],
+  KYC_PENDING: ["READY_TO_CONVERT", "LOST"],
+  READY_TO_CONVERT: ["CONVERTED", "LOST"],
+  CONVERTED: [],
+  LOST: ["NEW"],
+};
+
 export type InternalLeadRow = {
   id: number;
   name: string;
@@ -63,6 +74,7 @@ export type InternalLeadRow = {
   email?: string;
   address?: string;
   source: string;
+  notes?: string;
   interested_product?: number | null;
   product_name?: string | null;
   interested_plan_type: LeadPlanType;
@@ -73,6 +85,7 @@ export type InternalLeadRow = {
   next_follow_up_at?: string | null;
   converted_customer?: number | null;
   converted_customer_name?: string | null;
+  public_lead_id?: number | null;
   created_at: string;
   updated_at?: string | null;
 };
@@ -107,6 +120,25 @@ export type Opportunity = {
   updated_at?: string | null;
 };
 
+export type CustomerInteraction = {
+  id: number;
+  customer: number;
+  lead?: number | null;
+  interaction_type: string;
+  note: string;
+  happened_at: string;
+  created_by?: number | null;
+  created_by_username?: string | null;
+  created_at: string;
+};
+
+export type StaffUser = {
+  id: number;
+  username: string;
+  full_name: string;
+  role: string;
+};
+
 export type InternalLeadDetail = {
   lead: InternalLeadRow;
   follow_up_tasks: FollowUpTask[];
@@ -115,8 +147,16 @@ export type InternalLeadDetail = {
   open_task_count: number;
 };
 
-export type InternalLeadListResponse = {
+export type PaginationMeta = {
   count: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+};
+
+export type InternalLeadListResponse = PaginationMeta & {
   stage_counts: Record<string, number>;
   results: InternalLeadRow[];
 };
@@ -163,6 +203,10 @@ export function getInternalCrmLeads(params: {
   source?: string;
   assigned_to?: string;
   plan_type?: string;
+  created_after?: string;
+  created_before?: string;
+  page?: number;
+  page_size?: number;
 } = {}) {
   return apiFetch<InternalLeadListResponse>(`/admin/crm/internal/leads/${buildQuery(params)}`);
 }
@@ -173,6 +217,7 @@ export function createInternalLead(payload: {
   email?: string;
   address?: string;
   source?: string;
+  notes?: string;
   interested_product?: number | null;
   interested_plan_type?: LeadPlanType;
   stage?: LeadStage;
@@ -197,6 +242,7 @@ export function updateInternalLead(
     email?: string;
     address?: string;
     source?: string;
+    notes?: string;
     interested_product?: number | null;
     interested_plan_type?: LeadPlanType;
     next_follow_up_at?: string | null;
@@ -242,8 +288,10 @@ export function convertLead(
 export function getInternalCrmFollowUps(params: {
   status?: string;
   assigned_to?: string;
+  page?: number;
+  page_size?: number;
 } = {}) {
-  return apiFetch<{ count: number; overdue_count: number; results: FollowUpTask[] }>(
+  return apiFetch<PaginationMeta & { overdue_count: number; results: FollowUpTask[] }>(
     `/admin/crm/internal/follow-ups/${buildQuery(params)}`
   );
 }
@@ -323,6 +371,44 @@ export function updateOpportunityStage(
     method: "POST",
     body: JSON.stringify({ stage, notes }),
   });
+}
+
+// ── Customer interactions ─────────────────────────────────────
+export function getCustomerInteractions(customerId: number | string) {
+  return apiFetch<{ count: number; results: CustomerInteraction[] }>(
+    `/admin/crm/internal/customers/${customerId}/interactions/`
+  );
+}
+
+export function createCustomerInteraction(
+  customerId: number | string,
+  payload: {
+    interaction_type?: string;
+    note: string;
+    happened_at?: string;
+    lead?: number | null;
+  }
+) {
+  return apiFetch<CustomerInteraction>(`/admin/crm/internal/customers/${customerId}/interactions/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// ── Staff list for assignment dropdown ────────────────────────
+export function getCrmStaffList() {
+  return apiFetch<{ count: number; results: StaffUser[] }>("/admin/crm/internal/staff/");
+}
+
+// ── PublicLead promotion ──────────────────────────────────────
+export function promotePublicLeadToCrm(
+  publicLeadId: number | string,
+  payload: { interested_plan_type?: string } = {}
+) {
+  return apiFetch<{ crm_lead: InternalLeadRow; public_lead_id: number }>(
+    `/admin/crm/internal/public-leads/${publicLeadId}/promote/`,
+    { method: "POST", body: JSON.stringify(payload) }
+  );
 }
 
 // ── Customer CRM profile ─────────────────────────────────────

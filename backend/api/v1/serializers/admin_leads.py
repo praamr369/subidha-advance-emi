@@ -76,6 +76,7 @@ class AdminLeadListSerializer(serializers.ModelSerializer):
     next_follow_up_at = serializers.SerializerMethodField()
     follow_up_state = serializers.SerializerMethodField()
     open_follow_up_count = serializers.SerializerMethodField()
+    crm_pipeline_lead = serializers.SerializerMethodField()
 
     class Meta:
         model = PublicLead
@@ -122,6 +123,7 @@ class AdminLeadListSerializer(serializers.ModelSerializer):
             "converted_at",
             "closed_at",
             "created_at",
+            "crm_pipeline_lead",
         )
 
     def _crm_snapshot(self, obj):
@@ -173,6 +175,10 @@ class AdminLeadListSerializer(serializers.ModelSerializer):
 
     def get_open_follow_up_count(self, obj):
         return self._crm_snapshot(obj).get("open_follow_up_count", 0)
+
+    def get_crm_pipeline_lead(self, obj):
+        qs = obj.crm_pipeline_lead.values("id", "stage").order_by("-id")[:1]
+        return list(qs)
 
 
 class AdminLeadDetailSerializer(AdminLeadListSerializer):

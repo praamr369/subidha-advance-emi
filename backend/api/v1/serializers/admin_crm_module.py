@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from crm.models import FollowUpTask, Lead, LeadSource, LeadStage, Opportunity, OpportunityStage
+from crm.models import (
+    CustomerInteraction,
+    FollowUpTask,
+    Lead,
+    LeadSource,
+    LeadStage,
+    Opportunity,
+    OpportunityStage,
+)
 
 
 class LeadSerializer(serializers.ModelSerializer):
@@ -10,6 +18,7 @@ class LeadSerializer(serializers.ModelSerializer):
     assigned_to_full_name = serializers.SerializerMethodField()
     converted_customer_name = serializers.CharField(source="converted_customer.name", read_only=True, default=None)
     product_name = serializers.CharField(source="interested_product.name", read_only=True, default=None)
+    public_lead_id = serializers.IntegerField(source="public_lead_id", read_only=True, default=None)
 
     class Meta:
         model = Lead
@@ -20,6 +29,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "email",
             "address",
             "source",
+            "notes",
             "interested_product",
             "product_name",
             "interested_plan_type",
@@ -30,6 +40,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "next_follow_up_at",
             "converted_customer",
             "converted_customer_name",
+            "public_lead_id",
             "created_at",
             "updated_at",
         ]
@@ -39,6 +50,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "assigned_to_full_name",
             "converted_customer_name",
             "product_name",
+            "public_lead_id",
             "created_at",
             "updated_at",
         ]
@@ -56,7 +68,8 @@ class LeadUpdateSerializer(serializers.Serializer):
     phone = serializers.CharField(required=False, allow_blank=False, trim_whitespace=True)
     email = serializers.EmailField(required=False, allow_blank=True)
     address = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
-    source = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    source = serializers.ChoiceField(choices=LeadSource.choices, required=False)
+    notes = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
     interested_product = serializers.IntegerField(required=False, allow_null=True)
     interested_plan_type = serializers.ChoiceField(
         choices=["LUCKY_PLAN", "RENT", "LEASE", "DIRECT_SALE"],
@@ -151,3 +164,29 @@ class OpportunityCreateSerializer(serializers.Serializer):
 class OpportunityStageUpdateSerializer(serializers.Serializer):
     stage = serializers.ChoiceField(choices=OpportunityStage.choices)
     notes = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+
+
+class CustomerInteractionSerializer(serializers.ModelSerializer):
+    created_by_username = serializers.CharField(source="created_by.username", read_only=True, default=None)
+
+    class Meta:
+        model = CustomerInteraction
+        fields = [
+            "id",
+            "customer",
+            "lead",
+            "interaction_type",
+            "note",
+            "happened_at",
+            "created_by",
+            "created_by_username",
+            "created_at",
+        ]
+        read_only_fields = ["id", "customer", "created_by", "created_by_username", "created_at"]
+
+
+class CustomerInteractionCreateSerializer(serializers.Serializer):
+    interaction_type = serializers.CharField(required=False, default="CALL", trim_whitespace=True)
+    note = serializers.CharField(trim_whitespace=True)
+    happened_at = serializers.DateTimeField(required=False)
+    lead = serializers.IntegerField(required=False, allow_null=True)

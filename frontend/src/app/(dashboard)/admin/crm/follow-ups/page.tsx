@@ -213,6 +213,9 @@ function TaskRow({
 export default function AdminCrmFollowUpsPage() {
   const [rows, setRows] = useState<FollowUpTask[]>([]);
   const [overdueCount, setOverdueCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("OPEN");
@@ -223,16 +226,20 @@ export default function AdminCrmFollowUpsPage() {
     try {
       const payload = await getInternalCrmFollowUps({
         status: statusFilter || undefined,
+        page,
+        page_size: 50,
       });
       setRows(payload.results);
       setOverdueCount(payload.overdue_count);
+      setTotalCount(payload.count);
+      setTotalPages(payload.total_pages);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load follow-up queue.");
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, page]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -282,6 +289,7 @@ export default function AdminCrmFollowUpsPage() {
         { label: "Overdue", value: String(overdueCount), tone: overdueCount > 0 ? "warning" : "success" },
         { label: "Open", value: String(openCount), tone: "info" },
         { label: "Done", value: String(doneCount), tone: "default" },
+        { label: "Total", value: String(totalCount), tone: "default" },
       ]}
     >
       <ERPSectionShell
@@ -295,7 +303,7 @@ export default function AdminCrmFollowUpsPage() {
               return (
                 <button
                   key={s}
-                  onClick={() => setStatusFilter(s)}
+                  onClick={() => { setStatusFilter(s); setPage(1); }}
                   className={`px-4 py-1.5 text-xs font-medium transition-colors ${
                     statusFilter === s
                       ? "bg-primary text-primary-foreground"
@@ -353,6 +361,20 @@ export default function AdminCrmFollowUpsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        ) : null}
+
+        {totalPages > 1 ? (
+          <div className="mt-4 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Page {page} of {totalPages} · {totalCount} tasks</span>
+            <div className="flex gap-2">
+              <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-9 rounded-xl border border-border bg-background px-4 font-medium hover:bg-muted disabled:opacity-40">
+                ← Prev
+              </button>
+              <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="h-9 rounded-xl border border-border bg-background px-4 font-medium hover:bg-muted disabled:opacity-40">
+                Next →
+              </button>
+            </div>
           </div>
         ) : null}
       </ERPSectionShell>

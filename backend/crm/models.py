@@ -319,7 +319,15 @@ class Lead(CrmTimeStampedModel):
     phone = models.CharField(max_length=20, db_index=True)
     email = models.EmailField(blank=True, default="")
     address = models.TextField(blank=True, default="")
-    source = models.CharField(max_length=60, db_index=True)
+    source = models.CharField(max_length=60, choices=LeadSource.choices, db_index=True)
+    notes = models.TextField(blank=True, default="")
+    public_lead = models.ForeignKey(
+        "subscriptions.PublicLead",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="crm_pipeline_lead",
+    )
     interested_product = models.ForeignKey(
         "subscriptions.Product",
         on_delete=models.SET_NULL,
@@ -368,7 +376,9 @@ class Lead(CrmTimeStampedModel):
         self.phone = (self.phone or "").strip()
         self.email = (self.email or "").strip().lower()
         self.address = (self.address or "").strip()
-        self.source = (self.source or "").strip().upper() or "INTERNAL"
+        raw_source = (self.source or "").strip().upper()
+        self.source = raw_source if raw_source in LeadSource.values else LeadSource.OTHER
+        self.notes = (self.notes or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 

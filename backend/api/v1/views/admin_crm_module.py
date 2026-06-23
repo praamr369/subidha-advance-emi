@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Q, Sum
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, serializers, status
@@ -9,6 +9,8 @@ from rest_framework.views import APIView
 
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.admin_crm_module import (
+    CustomerInteractionCreateSerializer,
+    CustomerInteractionSerializer,
     FollowUpTaskCreateSerializer,
     FollowUpTaskSerializer,
     LeadAssignSerializer,
@@ -20,14 +22,43 @@ from api.v1.serializers.admin_crm_module import (
     OpportunitySerializer,
     OpportunityStageUpdateSerializer,
 )
-from crm.models import FollowUpTask, Lead, LeadStage, Opportunity
-from subscriptions.models import AuditLog, Customer, Emi, Payment, Subscription
+from crm.models import CustomerInteraction, FollowUpTask, Lead, LeadSource, LeadStage, Opportunity
+from subscriptions.models import AuditLog, Customer, Emi, Payment, PublicLead, Subscription
 from subscriptions.services.audit_service import log_audit
 from subscriptions.services.customer_service import find_or_create_customer
 
+# Gap 2: valid forward transitions per stage
+VALID_TRANSITIONS: dict[str, list[str]] = {
+    LeadStage.NEW: [LeadStage.CONTACTED, LeadStage.LOST],
+    LeadStage.CONTACTED: [LeadStage.INTERESTED, LeadStage.LOST],
+    LeadStage.INTERESTED: [LeadStage.KYC_PENDING, LeadStage.LOST],
+    LeadStage.KYC_PENDING: [LeadStage.READY_TO_CONVERT, LeadStage.LOST],
+    LeadStage.READY_TO_CONVERT: [LeadStage.CONVERTED, LeadStage.LOST],
+    LeadStage.CONVERTED: [],
+    LeadStage.LOST: [LeadStage.NEW],
+}
 
-def _serialize_lead(lead: Lead) -> dict:
-    return LeadSerializer(lead).data
+
+def _paginate(qs, request, max_size: int = 200):
+    """Return (page_qs, pagination_meta_dict)."""
+    try:
+        page = max(1, int(request.query_params.get("page") or 1))
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        page_size = min(max_size, max(1, int(request.query_params.get("page_size") or 50)))
+    except (ValueError, TypeError):
+        page_size = 50
+    offset = (page - 1) * page_size
+    total = qs.count()
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    return qs[offset: offset + page_size], {
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_prev": page > 1,
+    }
 
 
 class AdminCrmLeadListCreateView(APIView):
@@ -44,7 +75,6 @@ class AdminCrmLeadListCreateView(APIView):
                 Q(name__icontains=q)
                 | Q(phone__icontains=q)
                 | Q(email__icontains=q)
-                | Q(source__icontains=q)
             )
 
         stage = (request.query_params.get("stage") or "").strip().upper()
@@ -52,7 +82,7 @@ class AdminCrmLeadListCreateView(APIView):
             qs = qs.filter(stage=stage)
 
         source = (request.query_params.get("source") or "").strip().upper()
-        if source:
+        if source and source in LeadSource.values:
             qs = qs.filter(source=source)
 
         assigned = (request.query_params.get("assigned_to") or "").strip()
@@ -65,20 +95,48 @@ class AdminCrmLeadListCreateView(APIView):
         if plan_type:
             qs = qs.filter(interested_plan_type=plan_type)
 
+        # Gap 10: date range filter
+        created_after = (request.query_params.get("created_after") or "").strip()
+        if created_after:
+            qs = qs.filter(created_at__date__gte=created_after)
+        created_before = (request.query_params.get("created_before") or "").strip()
+        if created_before:
+            qs = qs.filter(created_at__date__lte=created_before)
+
         stage_counts = {
             item["stage"]: item["count"]
             for item in Lead.objects.values("stage").annotate(count=Count("id"))
         }
 
+        total = qs.count()
+        # Gap 9: real pagination
+        page_qs, page_meta = _paginate(qs, request)
+
         return Response({
-            "count": qs.count(),
+            "count": total,
             "stage_counts": stage_counts,
-            "results": LeadSerializer(qs[:300], many=True).data,
+            **page_meta,
+            "results": LeadSerializer(page_qs, many=True).data,
         })
 
     def post(self, request):
         ser = LeadSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+
+        # Gap 8: duplicate phone check
+        phone = (request.data.get("phone") or "").strip()
+        if phone:
+            existing = Lead.objects.filter(phone=phone).exclude(stage=LeadStage.LOST).first()
+            if existing:
+                return Response(
+                    {
+                        "detail": f"A lead with phone {phone} already exists in the pipeline.",
+                        "existing_lead_id": existing.id,
+                        "existing_stage": existing.stage,
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
         lead = ser.save()
         log_audit(
             action_type=AuditLog.ActionType.CRM_PARTY_CREATED,
@@ -118,7 +176,7 @@ class AdminCrmLeadDetailView(APIView):
         data = ser.validated_data
 
         update_fields = []
-        for field in ("name", "phone", "email", "address", "source", "interested_plan_type", "next_follow_up_at"):
+        for field in ("name", "phone", "email", "address", "source", "notes", "interested_plan_type", "next_follow_up_at"):
             if field in data:
                 setattr(lead, field, data[field])
                 update_fields.append(field)
@@ -143,8 +201,20 @@ class AdminCrmLeadStageUpdateView(APIView):
         lead = get_object_or_404(Lead, pk=pk)
         ser = LeadStageUpdateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        new_stage = ser.validated_data["stage"]
+
+        # Gap 2: enforce valid transitions
+        allowed = VALID_TRANSITIONS.get(lead.stage, [])
+        if new_stage not in allowed:
+            raise serializers.ValidationError({
+                "stage": (
+                    f"Cannot move from {lead.stage} to {new_stage}. "
+                    f"Allowed next stages: {allowed or ['none']}."
+                )
+            })
+
         old_stage = lead.stage
-        lead.stage = ser.validated_data["stage"]
+        lead.stage = new_stage
         lead.save(update_fields=["stage", "updated_at"])
         log_audit(
             action_type=AuditLog.ActionType.CRM_INTERACTION_UPDATED,
@@ -218,10 +288,7 @@ class AdminCrmLeadConvertView(APIView):
             action_type=AuditLog.ActionType.CRM_INTERACTION_UPDATED,
             instance=lead,
             performed_by=request.user,
-            metadata={
-                "event": "CRM_LEAD_CONVERTED",
-                "customer_id": customer.id,
-            },
+            metadata={"event": "CRM_LEAD_CONVERTED", "customer_id": customer.id},
         )
         return Response({"lead": LeadSerializer(lead).data, "customer_id": customer.id})
 
@@ -287,17 +354,17 @@ class AdminCrmFollowUpListView(APIView):
 
         now = timezone.now()
         overdue = qs.filter(status="OPEN", due_at__lte=now).count()
+
+        # Gap 9: pagination
+        page_qs, page_meta = _paginate(qs, request, max_size=300)
+
         return Response({
             "count": qs.count(),
             "overdue_count": overdue,
-            "results": FollowUpTaskSerializer(qs[:300], many=True).data,
+            **page_meta,
+            "results": FollowUpTaskSerializer(page_qs, many=True).data,
         })
-
-    def post(self, request):
-        ser = FollowUpTaskSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        task = ser.save()
-        return Response(FollowUpTaskSerializer(task).data, status=status.HTTP_201_CREATED)
+    # Gap 3: removed incorrect POST — tasks are created via /leads/<pk>/tasks/
 
 
 class AdminCrmFollowUpCallNoteView(APIView):
@@ -463,6 +530,122 @@ class AdminCrmFunnelView(APIView):
             "source_breakdown": source_breakdown,
             "plan_type_breakdown": plan_type_counts,
         })
+
+
+# Gap 7: CustomerInteraction endpoints
+class AdminCrmCustomerInteractionView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk):
+        customer = get_object_or_404(Customer, pk=pk)
+        qs = CustomerInteraction.objects.filter(customer=customer).select_related("created_by", "lead").order_by("-happened_at", "-id")
+        return Response({
+            "count": qs.count(),
+            "results": CustomerInteractionSerializer(qs[:200], many=True).data,
+        })
+
+    def post(self, request, pk):
+        customer = get_object_or_404(Customer, pk=pk)
+        ser = CustomerInteractionCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+
+        lead = None
+        if ser.validated_data.get("lead"):
+            try:
+                lead = Lead.objects.get(pk=ser.validated_data["lead"])
+            except Lead.DoesNotExist:
+                raise serializers.ValidationError({"lead": "Lead not found."})
+
+        interaction = CustomerInteraction.objects.create(
+            customer=customer,
+            lead=lead,
+            interaction_type=(ser.validated_data.get("interaction_type") or "CALL").strip().upper(),
+            note=ser.validated_data["note"].strip(),
+            happened_at=ser.validated_data.get("happened_at") or timezone.now(),
+            created_by=request.user,
+        )
+        return Response(CustomerInteractionSerializer(interaction).data, status=status.HTTP_201_CREATED)
+
+
+# Gap 6: minimal staff list for assignment dropdowns
+class AdminCrmStaffListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from accounts.models import User
+        qs = User.objects.filter(is_active=True, role__in=["ADMIN", "CASHIER", "STAFF"]).order_by("first_name", "username")
+        results = [
+            {
+                "id": u.id,
+                "username": u.username,
+                "full_name": f"{u.first_name or ''} {u.last_name or ''}".strip() or u.username,
+                "role": getattr(u, "role", ""),
+            }
+            for u in qs[:200]
+        ]
+        return Response({"count": len(results), "results": results})
+
+
+# Gap 11: PublicLead → crm.Lead promotion
+class AdminCrmPromotePublicLeadView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        public_lead = get_object_or_404(PublicLead, pk=pk)
+
+        # Prevent double-promotion
+        existing = Lead.objects.filter(public_lead=public_lead).first()
+        if existing:
+            return Response(
+                {
+                    "detail": "This online enquiry has already been promoted to the CRM pipeline.",
+                    "crm_lead_id": existing.id,
+                    "crm_lead_stage": existing.stage,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # Map intent/source
+        source = "ONLINE_ENQUIRY"
+
+        # Determine plan type (default LUCKY_PLAN)
+        interested_plan_type = (request.data.get("interested_plan_type") or "LUCKY_PLAN").strip().upper()
+        if interested_plan_type not in ("LUCKY_PLAN", "RENT", "LEASE", "DIRECT_SALE"):
+            interested_plan_type = "LUCKY_PLAN"
+
+        notes_parts = []
+        if public_lead.notes:
+            notes_parts.append(f"Enquiry notes: {public_lead.notes}")
+        if public_lead.admin_notes:
+            notes_parts.append(f"Admin notes: {public_lead.admin_notes}")
+
+        crm_lead = Lead.objects.create(
+            name=public_lead.name,
+            phone=public_lead.phone,
+            email=public_lead.email or "",
+            address=getattr(public_lead, "city", "") or "",
+            source=source,
+            interested_plan_type=interested_plan_type,
+            stage=LeadStage.NEW,
+            notes="\n".join(notes_parts),
+            public_lead=public_lead,
+            assigned_to=request.user,
+        )
+
+        log_audit(
+            action_type=AuditLog.ActionType.CRM_PARTY_CREATED,
+            instance=crm_lead,
+            performed_by=request.user,
+            metadata={
+                "event": "CRM_LEAD_PROMOTED_FROM_PUBLIC",
+                "public_lead_id": public_lead.id,
+                "name": crm_lead.name,
+            },
+        )
+        return Response(
+            {"crm_lead": LeadSerializer(crm_lead).data, "public_lead_id": public_lead.id},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class AdminCustomerCrmProfileView(APIView):

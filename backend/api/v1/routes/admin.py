@@ -362,6 +362,7 @@ from api.v1.views.admin_erp import (
     AdminSalesWorkspaceView,
 )
 from api.v1.views.admin_crm_module import (
+    AdminCrmCustomerInteractionView,
     AdminCrmFollowUpCallNoteView,
     AdminCrmFollowUpCancelView,
     AdminCrmFollowUpCompleteView,
@@ -375,6 +376,8 @@ from api.v1.views.admin_crm_module import (
     AdminCrmLeadStageUpdateView,
     AdminCrmLeadTaskListCreateView,
     AdminCrmOpportunityStageView,
+    AdminCrmPromotePublicLeadView,
+    AdminCrmStaffListView,
     AdminCustomerCrmProfileView,
 )
 from api.v1.views.admin_kyc import (
@@ -891,6 +894,9 @@ urlpatterns = [
     path("crm/internal/opportunities/<int:pk>/stage/", AdminCrmOpportunityStageView.as_view()),
     path("crm/funnel/", AdminCrmFunnelView.as_view()),
     path("crm/internal/customers/<int:pk>/profile/", AdminCustomerCrmProfileView.as_view()),
+    path("crm/internal/customers/<int:pk>/interactions/", AdminCrmCustomerInteractionView.as_view()),
+    path("crm/internal/staff/", AdminCrmStaffListView.as_view()),
+    path("crm/internal/public-leads/<int:pk>/promote/", AdminCrmPromotePublicLeadView.as_view()),
     path("sales/workspace/", AdminSalesWorkspaceView.as_view()),
     path("product-operations/workspace/", AdminProductOperationsWorkspaceView.as_view()),
     path("inventory/workspace/", AdminInventoryWorkspaceView.as_view()),
