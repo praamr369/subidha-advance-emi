@@ -81,8 +81,69 @@ export type WhatsAppLinkResult = {
   note: string;
 };
 
+export function retryReminder(id: number) {
+  return apiFetch<{ updated: boolean; reminder: PaymentReminder }>(`/reminders/${id}/retry/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
 export function getWhatsAppReminderLink(id: number) {
   return apiFetch<WhatsAppLinkResult>(`/reminders/${id}/whatsapp-link/`);
+}
+
+// ── Notification Templates ──────────────────────────────────────────────────
+
+export type NotificationTemplate = {
+  id: number;
+  key: string;
+  name: string;
+  channel: string;
+  subject: string;
+  body: string;
+  is_active: boolean;
+  description: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type TemplatePreview = {
+  template_id: number;
+  key: string;
+  channel: string;
+  subject: string;
+  body: string;
+  placeholders_used: Record<string, string>;
+};
+
+export function listNotificationTemplates() {
+  return apiFetch<PaginatedResponse<NotificationTemplate>>("/reminders/templates/");
+}
+
+export function getNotificationTemplate(id: number) {
+  return apiFetch<NotificationTemplate>(`/reminders/templates/${id}/`);
+}
+
+export function createNotificationTemplate(payload: Omit<NotificationTemplate, "id" | "created_at" | "updated_at">) {
+  return apiFetch<NotificationTemplate>("/reminders/templates/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateNotificationTemplate(id: number, payload: Partial<NotificationTemplate>) {
+  return apiFetch<NotificationTemplate>(`/reminders/templates/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteNotificationTemplate(id: number) {
+  return apiFetch<void>(`/reminders/templates/${id}/`, { method: "DELETE" });
+}
+
+export function previewNotificationTemplate(id: number) {
+  return apiFetch<TemplatePreview>(`/reminders/templates/${id}/preview/`);
 }
 
 export function runPaymentReminders(payload: {

@@ -147,3 +147,54 @@ class PaymentReminder(ReminderTimeStampedModel):
         self.last_error = (self.last_error or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class NotificationTemplate(ReminderTimeStampedModel):
+    """Editable message templates used for email/WhatsApp/SMS reminders.
+
+    Placeholders: {name}, {amount}, {due_date}, {ref}, {company}.
+    """
+    key = models.CharField(max_length=80, unique=True, db_index=True)
+    name = models.CharField(max_length=120)
+    channel = models.CharField(max_length=20, choices=ReminderChannel.choices)
+    subject = models.CharField(max_length=200, blank=True, default="")
+    body = models.TextField()
+    is_active = models.BooleanField(default=True)
+    description = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "reminders_notification_templates"
+        ordering = ["channel", "key"]
+
+    def __str__(self):
+        return f"{self.key} ({self.channel})"
+
+    def save(self, *args, **kwargs):
+        self.key = (self.key or "").strip().upper().replace(" ", "_")
+        self.name = (self.name or "").strip()
+        self.subject = (self.subject or "").strip()
+        self.body = (self.body or "").strip()
+        super().save(*args, **kwargs)
+
+    def render_preview(self, **context) -> dict:
+        """Return rendered subject+body with sample data for preview."""
+        sample = {
+            "name": context.get("name", "Rahul Kumar"),
+            "amount": context.get("amount", "5,000.00"),
+            "due_date": context.get("due_date", "15 Jul 2026"),
+            "ref": context.get("ref", "SUB-2026-0001"),
+            "company": context.get("company", "SUBIDHA"),
+        }
+        try:
+            rendered_subject = self.subject.format(**sample) if self.subject else ""
+        except (KeyError, IndexError):
+            rendered_subject = self.subject
+        try:
+            rendered_body = self.body.format(**sample)
+        except (KeyError, IndexError):
+            rendered_body = self.body
+        return {
+            "subject": rendered_subject,
+            "body": rendered_body,
+            "placeholders_used": sample,
+        }

@@ -7,7 +7,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
-import { listLuckyDraws, type LuckyDrawRecord } from "@/services/draws";
+import { listLuckyDrawWinners, type LuckyDrawRecord } from "@/services/draws";
 
 function fmtDate(v?: string | null): string {
   if (!v) return "—";
@@ -25,6 +25,28 @@ function fmtMoney(v?: string | null): string {
   return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+const DELIVERY_LABELS: Record<string, { label: string; color: string }> = {
+  NOT_SCHEDULED: { label: "Not Scheduled", color: "bg-gray-100 text-gray-700" },
+  PENDING: { label: "Pending", color: "bg-yellow-100 text-yellow-800" },
+  SCHEDULED: { label: "Scheduled", color: "bg-blue-100 text-blue-800" },
+  DISPATCHED: { label: "Dispatched", color: "bg-indigo-100 text-indigo-800" },
+  OUT_FOR_DELIVERY: { label: "Out for Delivery", color: "bg-purple-100 text-purple-800" },
+  DELIVERED: { label: "Delivered", color: "bg-green-100 text-green-800" },
+  FAILED: { label: "Failed", color: "bg-red-100 text-red-800" },
+  CANCELLED: { label: "Cancelled", color: "bg-gray-200 text-gray-600" },
+  RETURNED: { label: "Returned", color: "bg-orange-100 text-orange-800" },
+};
+
+function DeliveryBadge({ status }: { status?: string | null }) {
+  const s = status ?? "NOT_SCHEDULED";
+  const info = DELIVERY_LABELS[s] ?? { label: s, color: "bg-gray-100 text-gray-700" };
+  return (
+    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${info.color}`}>
+      {info.label}
+    </span>
+  );
+}
+
 export default function LuckyPlanWinnersPage() {
   const [winners, setWinners] = useState<LuckyDrawRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,9 +60,9 @@ export default function LuckyPlanWinnersPage() {
     setLoading(true);
     setError(null);
     try {
-      const params: Parameters<typeof listLuckyDraws>[0] = { revealed: true, page };
+      const params: { batch?: string; page?: number } = { page };
       if (batchFilter) params.batch = batchFilter;
-      const data = await listLuckyDraws(params);
+      const data = await listLuckyDrawWinners(params);
       setWinners(data.results ?? []);
       setTotalCount(data.count ?? 0);
     } catch (e: unknown) {
@@ -57,7 +79,7 @@ export default function LuckyPlanWinnersPage() {
   return (
     <ERPPageShell
       title="Winners Register"
-      subtitle="All revealed Lucky Draw winners — EMI waiver audit trail across all batches"
+      subtitle="Complete Lucky Draw winner register — EMI waivers, delivery tracking, and audit trail"
       breadcrumbs={[
         { href: "/admin/lucky-plan", label: "Lucky Plan" },
         { label: "Winners" },
@@ -91,14 +113,14 @@ export default function LuckyPlanWinnersPage() {
 
       <ERPSectionShell
         title={`Winners${totalCount > 0 ? ` — ${totalCount} total` : ""}`}
-        description="Each row is a revealed draw with a confirmed winner and EMI waiver"
+        description="Each row is a confirmed winner with EMI waiver and delivery status"
       >
         {loading && <ERPLoadingState label="Loading winners…" />}
         {!loading && error && <ERPErrorState title="Error" description={error} />}
         {!loading && !error && winners.length === 0 && (
           <ERPEmptyState
             title="No winners yet"
-            description={batchFilter ? "No revealed draws for this batch." : "No Lucky Draws have been revealed yet. Winners appear here once a draw is executed and the seed is revealed."}
+            description={batchFilter ? "No winners found for this batch." : "No Lucky Draw winners yet. Winners appear here once a draw is revealed."}
           />
         )}
 
@@ -109,13 +131,15 @@ export default function LuckyPlanWinnersPage() {
                 <thead className="bg-[var(--surface-muted)]">
                   <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="px-4 py-3">Batch</th>
-                    <th className="px-4 py-3 text-right">Draw #</th>
-                    <th className="px-4 py-3 text-right">Lucky No.</th>
+                    <th className="px-4 py-3 text-right">Draw Month</th>
+                    <th className="px-4 py-3 text-right">Lucky ID</th>
                     <th className="px-4 py-3">Customer</th>
                     <th className="px-4 py-3">Subscription</th>
+                    <th className="px-4 py-3 text-right">Paid EMIs</th>
                     <th className="px-4 py-3 text-right">Waived EMIs</th>
                     <th className="px-4 py-3 text-right">Waived Amount</th>
-                    <th className="px-4 py-3">Revealed On</th>
+                    <th className="px-4 py-3">Delivery</th>
+                    <th className="px-4 py-3">Draw Date</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -141,13 +165,19 @@ export default function LuckyPlanWinnersPage() {
                         {w.winner_subscription_number ?? "—"}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
+                        {w.paid_emi_count ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
                         {w.waived_emi_count ?? "—"}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
                         {fmtMoney(w.waived_amount)}
                       </td>
+                      <td className="px-4 py-3">
+                        <DeliveryBadge status={w.delivery_status} />
+                      </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {fmtDate(w.revealed_at)}
+                        {fmtDate(w.draw_date ?? w.revealed_at)}
                       </td>
                     </tr>
                   ))}

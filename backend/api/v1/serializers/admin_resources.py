@@ -660,6 +660,8 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
     public_verification_status = serializers.SerializerMethodField()
     public_winner_name_masked = serializers.SerializerMethodField()
     public_explanation = serializers.SerializerMethodField()
+    paid_emi_count = serializers.SerializerMethodField()
+    delivery_status = serializers.SerializerMethodField()
 
     class Meta:
         model = LuckyDraw
@@ -690,6 +692,8 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
             "waived_emi_count",
             "waived_amount",
             "waiver_scope",
+            "paid_emi_count",
+            "delivery_status",
             "created_at",
         )
         read_only_fields = (
@@ -711,6 +715,8 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
             "waived_emi_count",
             "waived_amount",
             "waiver_scope",
+            "paid_emi_count",
+            "delivery_status",
             "created_at",
         )
 
@@ -785,6 +791,21 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
             "The commitment hash is like a sealed envelope: it is published first, "
             "then the seed is revealed later so the draw can be verified against the original commitment."
         )
+
+    def get_paid_emi_count(self, obj):
+        sub = getattr(obj, "winner_subscription", None)
+        if not sub:
+            return 0
+        return sub.emis.filter(status__in=["PAID", "WAIVED"]).count()
+
+    def get_delivery_status(self, obj):
+        sub = getattr(obj, "winner_subscription", None)
+        if not sub:
+            return None
+        delivery = sub.deliveries.order_by("-id").first() if hasattr(sub, "deliveries") else None
+        if not delivery:
+            return "NOT_SCHEDULED"
+        return delivery.status
 
     def validate(self, attrs):
         data = {}

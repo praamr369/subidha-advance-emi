@@ -216,6 +216,7 @@ export const ROUTES = {
     partnersCollectionRequests: "/admin/partners/collection-requests",
     reminders: "/admin/reminders",
     remindersPaymentReminders: "/admin/reminders/payment-reminders",
+    notificationTemplates: "/admin/reminders/templates",
     luckyIds: "/admin/lucky-ids",
     luckyDraws: "/admin/lucky-draws",
 

@@ -226,6 +226,7 @@ class AdminRecoveryCaseDetailView(APIView):
             "field_visit_at": rc.field_visit_at.isoformat() if rc.field_visit_at else None,
             "legal_at": rc.legal_at.isoformat() if rc.legal_at else None,
             "settled_amount": str(rc.settled_amount),
+            "settlement_type": rc.settlement_type or None,
             "settled_at": rc.settled_at.isoformat() if rc.settled_at else None,
             "last_contact_at": rc.last_contact_at.isoformat() if rc.last_contact_at else None,
         })
@@ -248,8 +249,26 @@ class AdminRecoveryCaseDetailView(APIView):
             rc.field_visit_at = now
         if new_stage == "LEGAL" and not rc.legal_at:
             rc.legal_at = now
-        if new_stage == "SETTLED" and not rc.settled_at:
-            rc.settled_at = now
+        if new_stage == "SETTLED":
+            from decimal import Decimal, InvalidOperation
+            try:
+                settled = Decimal(str(rc.settled_amount or "0"))
+            except (InvalidOperation, ValueError):
+                return Response({"detail": "Invalid settled_amount."}, status=400)
+            overdue = Decimal(str(rc.overdue_amount or "0"))
+            if settled <= Decimal("0"):
+                return Response(
+                    {"detail": "settled_amount is required when marking as SETTLED."},
+                    status=400,
+                )
+            if settled > overdue and overdue > Decimal("0"):
+                return Response(
+                    {"detail": f"settled_amount ({settled}) exceeds overdue_amount ({overdue})."},
+                    status=400,
+                )
+            rc.settlement_type = "FULL" if settled >= overdue else "PARTIAL"
+            if not rc.settled_at:
+                rc.settled_at = now
 
         rc.save()
         return self.get(request, pk)

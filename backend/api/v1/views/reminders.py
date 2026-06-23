@@ -4,11 +4,12 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from reminders.models import PaymentReminder
+from reminders.models import NotificationTemplate, PaymentReminder
 from reminders.services.reminder_send_run_service import run_payment_reminders
 from reminders.services.reminder_service import (
     cancel_payment_reminder,
     generate_whatsapp_link,
+    retry_failed_reminder,
     schedule_payment_reminder,
     send_payment_reminder,
 )
@@ -40,7 +41,7 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated(), IsAdmin()]
 
     def get_serializer_class(self):
-        if self.action in {"schedule", "send", "cancel"}:
+        if self.action in {"schedule", "send", "cancel", "retry"}:
             return ReminderActionSerializer
         return super().get_serializer_class()
 
@@ -92,6 +93,19 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         payload = PaymentReminderSerializer(reminder, context=self.get_serializer_context())
         return Response({"updated": updated, "reminder": payload.data})
 
+    @action(detail=True, methods=["post"], url_path="retry")
+    def retry(self, request, pk=None):
+        """Retry a FAILED reminder (email only). Max 3 attempts."""
+        try:
+            reminder, retried = retry_failed_reminder(
+                reminder_id=int(pk),
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = PaymentReminderSerializer(reminder, context=self.get_serializer_context())
+        return Response({"updated": retried, "reminder": payload.data})
+
     @action(detail=True, methods=["get"], url_path="whatsapp-link")
     def whatsapp_link(self, request, pk=None):
         """
@@ -119,3 +133,44 @@ class PaymentReminderRunView(APIView):
             performed_by=request.user,
         )
         return Response(payload, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# Notification Templates CRUD
+# ---------------------------------------------------------------------------
+from rest_framework import serializers as drf_serializers
+
+
+class NotificationTemplateSerializer(drf_serializers.ModelSerializer):
+    class Meta:
+        model = NotificationTemplate
+        fields = [
+            "id", "key", "name", "channel", "subject", "body",
+            "is_active", "description", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class NotificationTemplateViewSet(viewsets.ModelViewSet):
+    queryset = NotificationTemplate.objects.all()
+    serializer_class = NotificationTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    search_fields = ["key", "name", "channel"]
+    ordering_fields = ["key", "channel", "created_at"]
+    ordering = ["channel", "key"]
+
+    @action(detail=True, methods=["get"], url_path="preview")
+    def preview(self, request, pk=None):
+        template = self.get_object()
+        context = {}
+        for key in ("name", "amount", "due_date", "ref", "company"):
+            val = request.query_params.get(key)
+            if val:
+                context[key] = val
+        rendered = template.render_preview(**context)
+        return Response({
+            "template_id": template.id,
+            "key": template.key,
+            "channel": template.channel,
+            **rendered,
+        })

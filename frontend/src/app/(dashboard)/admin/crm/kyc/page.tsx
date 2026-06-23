@@ -259,6 +259,11 @@ export default function AdminCrmKycReviewQueuePage() {
       statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       <div className="space-y-6">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <strong>KYC Expiry Gate Active:</strong> Expired KYC documents now block contract activation and handover.
+          Use &quot;Mark renewal required&quot; on expired documents to notify the owner, then upload renewed documents via the owner&apos;s profile.
+        </div>
+
         <WorkspaceSection
           title="Filters"
           description="Narrow the queue by owner type, status, or owner name / phone / email."
@@ -431,6 +436,19 @@ export default function AdminCrmKycReviewQueuePage() {
                             disabled={actionBusy}
                           >
                             Approve
+                          </button>
+                        ) : null}
+                        {row.expiry_status === "EXPIRED" ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-9 items-center justify-center rounded-lg border border-red-300 bg-red-50 px-3 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                            onClick={() => {
+                              openAction(row, "resubmission");
+                              setActionReason("Document has expired. Please upload a renewed/valid document.");
+                            }}
+                            disabled={actionBusy}
+                          >
+                            Mark renewal required
                           </button>
                         ) : null}
                         <button

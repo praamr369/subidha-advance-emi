@@ -107,6 +107,7 @@ export interface RecoveryCase {
   field_visit_at: string | null;
   legal_at: string | null;
   settled_amount: string;
+  settlement_type: "FULL" | "PARTIAL" | null;
   settled_at: string | null;
   last_contact_at: string | null;
 }

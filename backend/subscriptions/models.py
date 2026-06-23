@@ -5554,6 +5554,12 @@ class RecoveryCase(TimeStampedModel):
     field_visit_at = models.DateTimeField(null=True, blank=True)
     legal_at = models.DateTimeField(null=True, blank=True)
     settled_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    settlement_type = models.CharField(
+        max_length=10,
+        choices=[("FULL", "Full Settlement"), ("PARTIAL", "Partial Settlement")],
+        blank=True,
+        default="",
+    )
     settled_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, default="")
     last_contact_at = models.DateTimeField(null=True, blank=True)

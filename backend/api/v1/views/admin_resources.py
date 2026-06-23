@@ -1313,6 +1313,18 @@ class LuckyDrawAdminViewSet(AdminOnlyModelViewSet):
 
         return queryset
 
+    @action(detail=False, methods=["get"], url_path="winners")
+    def winners(self, request):
+        """Dedicated winner register: GET /admin/lucky-draws/winners/"""
+        qs = self.get_queryset().filter(is_revealed=True, winner_subscription__isnull=False)
+        batch_id = request.query_params.get("batch")
+        if batch_id:
+            qs = qs.filter(batch_id=batch_id)
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return Response(self.get_serializer(qs[:200], many=True).data)
+
     @action(detail=True, methods=["get"], url_path="timeline")
     def timeline(self, request, pk=None):
         draw = self.get_object()

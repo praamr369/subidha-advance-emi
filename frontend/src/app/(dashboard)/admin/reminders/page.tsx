@@ -17,6 +17,7 @@ import {
   cancelReminder,
   getWhatsAppReminderLink,
   listReminders,
+  retryReminder,
   runPaymentReminders,
   scheduleReminder,
   sendReminder,
@@ -24,6 +25,64 @@ import {
 
 function nextHourIso() {
   return new Date(Date.now() + 60 * 60 * 1000).toISOString();
+}
+
+const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  DRAFT: { label: "Draft", className: "bg-gray-100 text-gray-700" },
+  PENDING: { label: "Pending", className: "bg-yellow-100 text-yellow-800" },
+  SCHEDULED: { label: "Scheduled", className: "bg-blue-100 text-blue-800" },
+  SENT: { label: "Sent", className: "bg-green-100 text-green-800" },
+  FAILED: { label: "Failed", className: "bg-red-100 text-red-700" },
+  ACKNOWLEDGED: { label: "Acknowledged", className: "bg-emerald-100 text-emerald-800" },
+  CANCELLED: { label: "Cancelled", className: "bg-gray-200 text-gray-600" },
+};
+
+const CHANNEL_BADGE: Record<string, { label: string; className: string }> = {
+  EMAIL: { label: "Email", className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  WHATSAPP: { label: "WhatsApp", className: "bg-green-50 text-green-700 border-green-200" },
+  SMS: { label: "SMS", className: "bg-orange-50 text-orange-700 border-orange-200" },
+  CALL: { label: "Call", className: "bg-purple-50 text-purple-700 border-purple-200" },
+  INTERNAL: { label: "Internal", className: "bg-gray-50 text-gray-600 border-gray-200" },
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const info = STATUS_BADGE[status] ?? { label: status, className: "bg-gray-100 text-gray-700" };
+  return (
+    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${info.className}`}>
+      {info.label}
+    </span>
+  );
+}
+
+function ChannelBadge({ channel }: { channel: string }) {
+  const info = CHANNEL_BADGE[channel] ?? { label: channel, className: "bg-gray-50 text-gray-600 border-gray-200" };
+  return (
+    <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${info.className}`}>
+      {info.label}
+    </span>
+  );
+}
+
+function sendLabel(channel: string): string {
+  switch (channel) {
+    case "EMAIL": return "Send Email";
+    case "WHATSAPP": return "Mark Manually Sent";
+    case "CALL": return "Mark Call Made";
+    default: return "Mark Sent";
+  }
+}
+
+function sendDescription(channel: string): string {
+  switch (channel) {
+    case "EMAIL":
+      return "Dispatches an email to the customer via Django email backend and marks this reminder as sent.";
+    case "WHATSAPP":
+      return "Records that you manually sent this WhatsApp message. Use after opening the WhatsApp link and confirming delivery. This is NOT automatic delivery.";
+    case "CALL":
+      return "Records that you made this call to the customer.";
+    default:
+      return "Records that this reminder was sent.";
+  }
 }
 
 export default function AdminRemindersPage() {
@@ -64,11 +123,36 @@ export default function AdminRemindersPage() {
 
   const columns: EnterpriseColumnDef<PaymentReminder>[] = [
     { key: "due_date", header: "Due Date", render: (row) => accountingDate(row.due_date) },
-    { key: "channel", header: "Channel" },
+    {
+      key: "channel",
+      header: "Channel",
+      render: (row) => <ChannelBadge channel={row.channel} />,
+    },
     { key: "reminder_type", header: "Type" },
     { key: "target_customer_name", header: "Customer" },
     { key: "amount_due", header: "Amount Due", render: (row) => accountingMoney(row.amount_due) },
-    { key: "status", header: "Status" },
+    {
+      key: "status",
+      header: "Status",
+      render: (row) => (
+        <div className="space-y-1">
+          <StatusBadge status={row.status} />
+          {row.status === "FAILED" && row.last_error ? (
+            <div className="text-xs text-red-600 max-w-[200px] truncate" title={row.last_error}>
+              {row.last_error}
+            </div>
+          ) : null}
+          {row.status === "FAILED" && (row.attempts ?? 0) > 0 ? (
+            <div className="text-xs text-muted-foreground">
+              Attempt {row.attempts}/3
+            </div>
+          ) : null}
+          {row.status === "SENT" && row.channel === "WHATSAPP" ? (
+            <div className="text-xs text-amber-600">Manual send</div>
+          ) : null}
+        </div>
+      ),
+    },
     { key: "scheduled_for", header: "Scheduled", render: (row) => accountingDate(row.scheduled_for) },
     {
       key: "actions",
@@ -94,7 +178,7 @@ export default function AdminRemindersPage() {
                 try {
                   const res = await getWhatsAppReminderLink(row.id);
                   window.open(res.link, "_blank", "noopener,noreferrer");
-                  setNotice(`WhatsApp link opened for reminder #${row.id}. After sending, click "Mark Sent" to record it.`);
+                  setNotice(`WhatsApp link opened for reminder #${row.id}. After sending in WhatsApp, click "${sendLabel(row.channel)}" to record it.`);
                 } catch (err) {
                   setError(accountingErrorMessage(err, "Could not generate WhatsApp link."));
                 }
@@ -105,15 +189,28 @@ export default function AdminRemindersPage() {
           ) : null}
           {["DRAFT", "PENDING", "SCHEDULED"].includes(row.status) ? (
             <ConfirmActionButton
-              label={row.channel === "EMAIL" ? "Send Email" : "Mark Sent"}
-              title={row.channel === "EMAIL" ? `Send email reminder #${row.id}?` : `Mark reminder #${row.id} as sent?`}
-              description={
-                row.channel === "EMAIL"
-                  ? "Dispatches an email to the customer via Django email backend and marks this reminder as sent."
-                  : "Records that you manually sent this reminder (WhatsApp, call, etc.). Use after opening the WhatsApp link."
-              }
+              label={sendLabel(row.channel)}
+              title={`${sendLabel(row.channel)} for reminder #${row.id}?`}
+              description={sendDescription(row.channel)}
               onConfirm={async () => {
-                await sendReminder(row.id, "Sent manually from admin reminder queue.");
+                await sendReminder(row.id, `${sendLabel(row.channel)} from admin reminder queue.`);
+                await loadPage();
+              }}
+              variant="primary"
+            />
+          ) : null}
+          {row.status === "FAILED" && (row.attempts ?? 0) < 3 ? (
+            <ConfirmActionButton
+              label="Retry"
+              title={`Retry failed reminder #${row.id}?`}
+              description={`Attempt ${(row.attempts ?? 0) + 1} of 3. Will re-attempt ${row.channel === "EMAIL" ? "email delivery" : "sending"}.`}
+              onConfirm={async () => {
+                try {
+                  await retryReminder(row.id);
+                  setNotice(`Retry successful for reminder #${row.id}.`);
+                } catch (err) {
+                  setError(accountingErrorMessage(err, `Retry failed for reminder #${row.id}.`));
+                }
                 await loadPage();
               }}
               variant="primary"
@@ -153,6 +250,7 @@ export default function AdminRemindersPage() {
       ]}
       actions={[
         { href: ROUTES.admin.remindersPaymentReminders, label: "Payment Reminders", variant: "secondary" },
+        { href: ROUTES.admin.notificationTemplates, label: "Message Templates", variant: "secondary" },
       ]}
       headerMode="erp"
     >
@@ -161,8 +259,10 @@ export default function AdminRemindersPage() {
 
         <ERPDataToolbar
           left={
-            <div className="text-sm font-medium text-muted-foreground">
-              Reminders can be scheduled, sent, or cancelled with explicit audit events.
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium">Email:</span> dispatched automatically via Django email backend.{" "}
+              <span className="font-medium">WhatsApp:</span> open link, send manually, then mark sent.{" "}
+              <span className="font-medium">Failed:</span> retry up to 3 times.
             </div>
           }
           right={
@@ -175,7 +275,7 @@ export default function AdminRemindersPage() {
         <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
           <ERPSectionShell
             title="Queue register"
-            description="Track reminder statuses across scheduled dispatch, manual send, and cancellations."
+            description="Track reminder statuses across scheduled dispatch, manual send, retry, and cancellations."
             className="xl:order-1"
           >
             <EnterpriseDataTable
@@ -189,14 +289,28 @@ export default function AdminRemindersPage() {
           </ERPSectionShell>
 
           <ERPActionPanel
-            title="Safety & audit posture"
-            description="Reminders are operational follow-ups; they must not mutate EMI, payment, or accounting records."
+            title="Channel guide"
+            description="How each channel works in this system."
             className="xl:order-2"
           >
-            <p className="text-sm leading-6 text-muted-foreground">
-              Use this workspace for controlled dispatch. Financial posting stays inside Payments, Receipts, and Accounting
-              workspaces.
-            </p>
+            <div className="space-y-3 text-sm leading-6 text-muted-foreground">
+              <div>
+                <ChannelBadge channel="EMAIL" />{" "}
+                <span className="ml-1">Sent via Django email backend. Failures set status to FAILED with error details. Retry up to 3 times.</span>
+              </div>
+              <div>
+                <ChannelBadge channel="WHATSAPP" />{" "}
+                <span className="ml-1">Manual only. Click &quot;Open WhatsApp&quot; to open wa.me link with pre-filled message. After sending, click &quot;Mark Manually Sent&quot;. No automatic delivery confirmation.</span>
+              </div>
+              <div>
+                <ChannelBadge channel="SMS" />{" "}
+                <span className="ml-1">Disabled. SMS delivery is not configured.</span>
+              </div>
+              <div>
+                <ChannelBadge channel="CALL" />{" "}
+                <span className="ml-1">Record that a call was made. No auto-dialing.</span>
+              </div>
+            </div>
           </ERPActionPanel>
         </div>
       </div>

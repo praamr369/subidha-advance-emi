@@ -42,6 +42,8 @@ export type LuckyDrawRecord = {
   waived_emi_count?: number | null;
   waived_amount?: string | null;
   waiver_scope?: string | null;
+  paid_emi_count?: number | null;
+  delivery_status?: string | null;
 };
 
 export type BatchDrawSummary = {
@@ -94,6 +96,15 @@ export async function listLuckyDraws(params?: { batch?: string | number; reveale
   if (params?.page) search.set("page", String(params.page));
   const query = search.toString();
   const payload = await request(`/admin/lucky-draws/${query ? `?${query}` : ""}`);
+  return toPaginated<LuckyDrawRecord>(payload);
+}
+
+export async function listLuckyDrawWinners(params?: { batch?: string | number; page?: number }): Promise<ApiPaginatedResponse<LuckyDrawRecord>> {
+  const search = new URLSearchParams();
+  if (params?.batch !== undefined) search.set("batch", String(params.batch));
+  if (params?.page) search.set("page", String(params.page));
+  const query = search.toString();
+  const payload = await request(`/admin/lucky-draws/winners/${query ? `?${query}` : ""}`);
   return toPaginated<LuckyDrawRecord>(payload);
 }
 

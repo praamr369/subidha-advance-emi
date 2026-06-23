@@ -74,6 +74,7 @@ class MilestoneDocCode:
 
 class MilestoneBlocker:
     KYC_NOT_VERIFIED = kyc.BlockerCode.KYC_NOT_VERIFIED
+    KYC_DOCUMENT_EXPIRED = kyc.BlockerCode.KYC_DOCUMENT_EXPIRED
     ID_PROOF_MISSING = kyc.BlockerCode.ID_PROOF_MISSING
     ADDRESS_PROOF_MISSING = kyc.BlockerCode.ADDRESS_PROOF_MISSING
     SIGNED_CONTRACT_MISSING = kyc.BlockerCode.SIGNED_CONTRACT_MISSING
@@ -628,6 +629,13 @@ def evaluate_contract_activation_readiness(subscription) -> dict:
         blocker_codes.append(MilestoneBlocker.KYC_NOT_VERIFIED)
         blocker_messages.append(
             "Customer KYC must be VERIFIED or EXCEPTION_APPROVED before the asset is handed over."
+        )
+    expired_cats = kyc._customer_expired_categories(subscription.customer)
+    if expired_cats:
+        blocker_codes.append(MilestoneBlocker.KYC_DOCUMENT_EXPIRED)
+        labels = [kyc.DOC_LABELS.get(c, c) for c in expired_cats]
+        blocker_messages.append(
+            f"Expired KYC document(s): {', '.join(labels)}. Upload renewed documents before activation."
         )
     for row in requirements:
         if row["required"] and not row["present"]:

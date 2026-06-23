@@ -120,7 +120,17 @@ function RecoveryDrawer({
             {rc.notice_sent_at && <div>📬 Notice sent: {new Date(rc.notice_sent_at).toLocaleString("en-IN")}</div>}
             {rc.field_visit_at && <div>🚗 Field visit: {new Date(rc.field_visit_at).toLocaleString("en-IN")}</div>}
             {rc.legal_at && <div>⚖️ Legal: {new Date(rc.legal_at).toLocaleString("en-IN")}</div>}
-            {rc.settled_at && <div>✅ Settled: {new Date(rc.settled_at).toLocaleString("en-IN")}</div>}
+            {rc.settled_at && (
+              <div>
+                ✅ Settled: {new Date(rc.settled_at).toLocaleString("en-IN")}
+                {rc.settlement_type === "PARTIAL" ? (
+                  <span className="ml-1 inline-flex rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-xs font-medium">Partial</span>
+                ) : rc.settlement_type === "FULL" ? (
+                  <span className="ml-1 inline-flex rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-xs font-medium">Full</span>
+                ) : null}
+                {rc.settled_amount && Number(rc.settled_amount) > 0 ? ` — ${fmt(rc.settled_amount)}` : ""}
+              </div>
+            )}
           </div>
         ) : null}
 
@@ -137,21 +147,46 @@ function RecoveryDrawer({
           </select>
         </div>
 
-        {stage === "SETTLED" && (
-          <div className="mb-4">
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Settled Amount (₹)</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={settledAmount}
-              onChange={(e) => setSettledAmount(e.target.value)}
-              className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
-              placeholder="Amount actually recovered/settled"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">Record the actual amount recovered. Leave blank to keep existing value.</p>
-          </div>
-        )}
+        {stage === "SETTLED" && (() => {
+          const overdue = Number(rc.overdue_amount || 0);
+          const settled = Number(settledAmount || 0);
+          const isPartial = settled > 0 && settled < overdue;
+          const isFull = settled > 0 && settled >= overdue;
+          const exceedsOverdue = settled > overdue && overdue > 0;
+          return (
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">Settled Amount (₹) *</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={settledAmount}
+                onChange={(e) => setSettledAmount(e.target.value)}
+                className={`w-full h-9 rounded-xl border bg-background px-3 text-sm ${
+                  exceedsOverdue ? "border-red-400" : "border-border"
+                }`}
+                placeholder="Amount actually recovered/settled"
+              />
+              {exceedsOverdue ? (
+                <p className="mt-1 text-xs text-red-600">
+                  Settled amount exceeds overdue amount ({fmt(rc.overdue_amount)}). This will be rejected.
+                </p>
+              ) : isPartial ? (
+                <p className="mt-1 text-xs text-amber-600">
+                  Partial settlement: {fmt(String(settled))} of {fmt(rc.overdue_amount)} ({Math.round((settled / overdue) * 100)}%).
+                </p>
+              ) : isFull ? (
+                <p className="mt-1 text-xs text-green-700">
+                  Full settlement: covers the entire overdue amount.
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Enter the actual amount recovered. Overdue: {fmt(rc.overdue_amount)}.
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="mb-4">
           <label className="block text-xs font-semibold text-muted-foreground mb-1">Notes</label>

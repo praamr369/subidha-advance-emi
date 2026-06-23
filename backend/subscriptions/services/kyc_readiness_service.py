@@ -23,6 +23,7 @@ Design notes
 """
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional
 
 from django.conf import settings
@@ -76,6 +77,7 @@ class DocCode:
 # ---------------------------------------------------------------------------
 class BlockerCode:
     KYC_NOT_VERIFIED = "KYC_NOT_VERIFIED"
+    KYC_DOCUMENT_EXPIRED = "KYC_DOCUMENT_EXPIRED"
     ID_PROOF_MISSING = "ID_PROOF_MISSING"
     ADDRESS_PROOF_MISSING = "ADDRESS_PROOF_MISSING"
     SIGNED_CONTRACT_MISSING = "SIGNED_CONTRACT_MISSING"
@@ -114,6 +116,7 @@ DOC_LABELS = {
 STATUS_VERIFIED = "VERIFIED"
 STATUS_PENDING = "PENDING"
 STATUS_MISSING = "MISSING"
+STATUS_EXPIRED = "EXPIRED"
 
 
 # ---------------------------------------------------------------------------
@@ -206,17 +209,25 @@ def _customer_doc_category_status(customer) -> dict[str, str]:
     """Map readiness category -> best document status for the customer.
 
     Best status precedence: VERIFIED (an APPROVED doc) > PENDING (uploaded but
-    not yet approved). Rejected-only documents do not register as present.
+    not yet approved). Rejected-only and expired documents do not register as
+    present — expired docs are tracked separately via EXPIRED status.
     """
     result: dict[str, str] = {}
     if not getattr(customer, "pk", None):
         return result
 
+    today = date.today()
     docs = CustomerKycDocument.objects.filter(customer=customer).only(
-        "document_type", "category", "status"
+        "document_type", "category", "status", "expiry_date"
     )
     for doc in docs:
         if doc.status == CustomerKycDocumentStatus.REJECTED:
+            continue
+        expiry = getattr(doc, "expiry_date", None)
+        if expiry is not None and expiry < today:
+            for category in _categories_for_document(doc):
+                if result.get(category) not in (STATUS_VERIFIED, STATUS_PENDING):
+                    result[category] = STATUS_EXPIRED
             continue
         approved = doc.status == CustomerKycDocumentStatus.APPROVED
         for category in _categories_for_document(doc):
@@ -225,6 +236,14 @@ def _customer_doc_category_status(customer) -> dict[str, str]:
                 continue
             result[category] = STATUS_VERIFIED if approved else STATUS_PENDING
     return result
+
+
+def _customer_expired_categories(customer) -> list[str]:
+    """Return readiness category codes where the BEST available doc is expired."""
+    if not getattr(customer, "pk", None):
+        return []
+    status_map = _customer_doc_category_status(customer)
+    return [cat for cat, status in status_map.items() if status == STATUS_EXPIRED]
 
 
 def _categories_for_document(doc) -> set[str]:
@@ -481,12 +500,21 @@ def get_contract_kyc_readiness(
         blocker_messages.append(
             "Customer KYC must be VERIFIED or EXCEPTION_APPROVED before activation."
         )
+    expired_cats = _customer_expired_categories(customer)
+    if expired_cats:
+        blocker_codes.append(BlockerCode.KYC_DOCUMENT_EXPIRED)
+        labels = [DOC_LABELS.get(c, c) for c in expired_cats]
+        blocker_messages.append(
+            f"Expired KYC document(s): {', '.join(labels)}. Upload renewed documents before activation."
+        )
     for row in requirements:
         if row["required"] and not row["present"] and row["stage"] == "activate":
             code = DOC_TO_BLOCKER.get(row["code"])
             if code:
                 blocker_codes.append(code)
                 blocker_messages.append(f"{row['label']} is required before activation.")
+
+    expired_categories = expired_cats
 
     return {
         "plan_type": plan,
@@ -507,6 +535,7 @@ def get_contract_kyc_readiness(
         "present_documents": present_documents,
         "blocker_codes": blocker_codes,
         "blocker_messages": blocker_messages,
+        "expired_categories": expired_categories,
         "optional_warnings": [],
     }
 

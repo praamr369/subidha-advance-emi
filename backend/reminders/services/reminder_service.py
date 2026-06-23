@@ -87,9 +87,16 @@ def send_payment_reminder(*, reminder_id: int, performed_by=None, notes: str = "
         try:
             _dispatch_email_reminder(reminder)
         except Exception as exc:
+            reminder.status = ReminderStatus.FAILED
             reminder.attempts = (reminder.attempts or 0) + 1
             reminder.last_error = str(exc)[:500]
-            reminder.save(update_fields=["attempts", "last_error", "updated_at"])
+            reminder.save(update_fields=["status", "attempts", "last_error", "updated_at"])
+            _audit(
+                reminder=reminder,
+                performed_by=performed_by,
+                event="PAYMENT_REMINDER_FAILED",
+                metadata={"error": str(exc)[:200], "attempt": reminder.attempts},
+            )
             raise ValueError(f"Email delivery failed: {exc}") from exc
 
     reminder.status = ReminderStatus.SENT
@@ -174,6 +181,48 @@ def _format_whatsapp_message(reminder: PaymentReminder) -> str:
 
     template = _WHATSAPP_TEMPLATES.get(reminder.reminder_type, _DEFAULT_WHATSAPP_TEMPLATE)
     return template.format(name=name, amount=amount, due_date=due_date, ref=ref)
+
+
+MAX_RETRY_ATTEMPTS = 3
+
+
+@transaction.atomic
+def retry_failed_reminder(*, reminder_id: int, performed_by=None):
+    """Retry a FAILED email reminder. Returns (reminder, retried_bool)."""
+    reminder = PaymentReminder.objects.select_for_update().get(pk=reminder_id)
+    if reminder.status != ReminderStatus.FAILED:
+        raise ValueError("Only FAILED reminders can be retried.")
+    if (reminder.attempts or 0) >= MAX_RETRY_ATTEMPTS:
+        raise ValueError(f"Maximum retry attempts ({MAX_RETRY_ATTEMPTS}) reached. Create a new reminder instead.")
+
+    if reminder.channel == ReminderChannel.EMAIL:
+        try:
+            _dispatch_email_reminder(reminder)
+        except Exception as exc:
+            reminder.attempts = (reminder.attempts or 0) + 1
+            reminder.last_error = str(exc)[:500]
+            reminder.save(update_fields=["attempts", "last_error", "updated_at"])
+            _audit(
+                reminder=reminder,
+                performed_by=performed_by,
+                event="PAYMENT_REMINDER_RETRY_FAILED",
+                metadata={"error": str(exc)[:200], "attempt": reminder.attempts},
+            )
+            raise ValueError(f"Retry failed: {exc}") from exc
+
+    reminder.status = ReminderStatus.SENT
+    reminder.sent_at = timezone.now()
+    reminder.sent_by = performed_by
+    reminder.attempts = (reminder.attempts or 0) + 1
+    reminder.last_error = ""
+    reminder.save(update_fields=["status", "sent_at", "sent_by", "attempts", "last_error", "updated_at"])
+    _audit(
+        reminder=reminder,
+        performed_by=performed_by,
+        event="PAYMENT_REMINDER_RETRIED",
+        metadata={"reminder_id": reminder.id, "attempt": reminder.attempts},
+    )
+    return reminder, True
 
 
 def generate_whatsapp_link(*, reminder_id: int) -> dict:
