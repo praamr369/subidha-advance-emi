@@ -72,6 +72,7 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
                 reminder_id=int(pk),
                 performed_by=request.user,
                 notes=serializer.validated_data.get("notes", ""),
+                manual_send=True,
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
@@ -115,7 +116,10 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         This endpoint does NOT send any message — it only generates the link.
         """
         try:
-            result = generate_whatsapp_link(reminder_id=int(pk))
+            result = generate_whatsapp_link(
+                reminder_id=int(pk),
+                performed_by=request.user,
+            )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         return Response(result)

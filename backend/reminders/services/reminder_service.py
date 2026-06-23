@@ -76,12 +76,19 @@ def _dispatch_email_reminder(reminder: PaymentReminder) -> None:
 
 
 @transaction.atomic
-def send_payment_reminder(*, reminder_id: int, performed_by=None, notes: str = ""):
+def send_payment_reminder(
+    *,
+    reminder_id: int,
+    performed_by=None,
+    notes: str = "",
+    manual_send: bool = True,
+):
     reminder = PaymentReminder.objects.select_for_update().get(pk=reminder_id)
     if reminder.status == ReminderStatus.SENT:
         return reminder, False
     if reminder.status == ReminderStatus.CANCELLED:
         raise ValueError("Cancelled reminders cannot be sent.")
+    dispatch_mode = "MANUAL_CONFIRM" if manual_send else "AUTOMATED_DISPATCH"
     # For EMAIL channel: attempt actual delivery before marking SENT.
     if reminder.channel == ReminderChannel.EMAIL:
         try:
@@ -95,7 +102,12 @@ def send_payment_reminder(*, reminder_id: int, performed_by=None, notes: str = "
                 reminder=reminder,
                 performed_by=performed_by,
                 event="PAYMENT_REMINDER_FAILED",
-                metadata={"error": str(exc)[:200], "attempt": reminder.attempts},
+                metadata={
+                    "error": str(exc)[:200],
+                    "attempt": reminder.attempts,
+                    "manual_send": manual_send,
+                    "dispatch_mode": dispatch_mode,
+                },
             )
             raise ValueError(f"Email delivery failed: {exc}") from exc
 
@@ -111,7 +123,12 @@ def send_payment_reminder(*, reminder_id: int, performed_by=None, notes: str = "
         reminder=reminder,
         performed_by=performed_by,
         event="PAYMENT_REMINDER_SENT",
-        metadata={"reminder_id": reminder.id, "channel": reminder.channel},
+        metadata={
+            "reminder_id": reminder.id,
+            "channel": reminder.channel,
+            "manual_send": manual_send,
+            "dispatch_mode": dispatch_mode,
+        },
     )
     return reminder, True
 
@@ -225,7 +242,7 @@ def retry_failed_reminder(*, reminder_id: int, performed_by=None):
     return reminder, True
 
 
-def generate_whatsapp_link(*, reminder_id: int) -> dict:
+def generate_whatsapp_link(*, reminder_id: int, performed_by=None) -> dict:
     """
     Generate a wa.me deep-link for manual WhatsApp sending.
 
@@ -253,6 +270,18 @@ def generate_whatsapp_link(*, reminder_id: int) -> dict:
 
     message = _format_whatsapp_message(reminder)
     link = f"https://wa.me/{phone_e164}?text={quote(message)}"
+
+    _audit(
+        reminder=reminder,
+        performed_by=performed_by,
+        event="WHATSAPP_LINK_OPENED",
+        metadata={
+            "reminder_id": reminder.id,
+            "channel": reminder.channel,
+            "manual_send": True,
+            "dispatch_mode": "MANUAL_CONFIRM",
+        },
+    )
 
     return {
         "reminder_id": reminder.id,

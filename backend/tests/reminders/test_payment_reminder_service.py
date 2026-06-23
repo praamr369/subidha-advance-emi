@@ -11,6 +11,7 @@ from reminders.services.reminder_service import (
     schedule_payment_reminder,
     send_payment_reminder,
 )
+from subscriptions.models import AuditLog
 from tests.helpers import create_admin_user, create_customer_profile
 
 
@@ -54,6 +55,34 @@ class PaymentReminderServiceTests(TestCase):
         self.assertTrue(sent)
         self.assertEqual(reminder.status, ReminderStatus.SENT)
 
+        audit = AuditLog.objects.order_by("-id").first()
+        self.assertEqual(audit.metadata.get("event"), "PAYMENT_REMINDER_SENT")
+        self.assertTrue(audit.metadata.get("manual_send"))
+
         with self.assertRaisesMessage(ValueError, "Sent reminders cannot be cancelled."):
             cancel_payment_reminder(reminder_id=reminder.id, performed_by=self.admin)
+
+    def test_auto_dispatch_records_automated_mode(self):
+        reminder = create_payment_reminder(
+            performed_by=self.admin,
+            channel="EMAIL",
+            reminder_type="EMI_DUE",
+            target_customer=self.customer,
+            due_date=timezone.localdate() + timedelta(days=2),
+            amount_due=Decimal("450.00"),
+            customer_contact="reminder@example.com",
+            notes="Upcoming EMI reminder",
+        )
+
+        reminder, sent = send_payment_reminder(
+            reminder_id=reminder.id,
+            performed_by=self.admin,
+            manual_send=False,
+        )
+
+        self.assertTrue(sent)
+        self.assertEqual(reminder.status, ReminderStatus.SENT)
+        audit = AuditLog.objects.order_by("-id").first()
+        self.assertEqual(audit.metadata.get("dispatch_mode"), "AUTOMATED_DISPATCH")
+        self.assertFalse(audit.metadata.get("manual_send"))
 

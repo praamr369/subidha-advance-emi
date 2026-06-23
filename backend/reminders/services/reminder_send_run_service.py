@@ -26,6 +26,7 @@ def run_payment_reminders(*, due_date_on_or_before: date | None = None, send_now
                 reminder_id=reminder.id,
                 performed_by=performed_by,
                 notes="Sent during reminder run.",
+                manual_send=False,
             )
             sent_count += 1 if updated else 0
             skipped_count += 0 if updated else 1

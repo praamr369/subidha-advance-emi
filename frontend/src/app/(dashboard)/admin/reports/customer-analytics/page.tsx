@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -158,7 +159,7 @@ export default function CustomerAnalyticsReportPage() {
             {/* Customer list */}
             <ERPSectionShell
               title={`At-Risk Customers${sevFilter ? ` — ${sevFilter}` : ""} (${filtered.length} of ${total})`}
-              description="Sorted by highest severity first. Click 'View signals' to drill into individual customer retention profile."
+              description="Sorted by highest severity first. Click 'Open profile' to drill into the individual customer profile."
             >
               {sevFilter ? (
                 <button onClick={() => setSevFilter("")} className="mb-3 text-xs font-semibold text-primary hover:underline">
@@ -207,12 +208,12 @@ export default function CustomerAnalyticsReportPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <a
-                                href={ROUTES.admin.growthRetention}
+                              <Link
+                                href={`${ROUTES.admin.customers}/${p.customer_id}`}
                                 className="text-xs font-semibold text-primary hover:underline"
                               >
-                                View signals →
-                              </a>
+                                Open profile →
+                              </Link>
                             </td>
                           </tr>
                         );
@@ -264,7 +265,7 @@ export default function CustomerAnalyticsReportPage() {
 
               <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-xs text-muted-foreground">
                 Signals are advisory only. No payment, EMI, or subscription record is created or mutated from this page. Use
-                {" "}<a href={ROUTES.admin.growthRetention} className="font-medium text-primary hover:underline">Retention Intelligence</a> to see per-customer detail.
+                {" "}<a href={ROUTES.admin.growthRetention} className="font-medium text-primary hover:underline">Retention Intelligence</a> to see the full retention workspace.
               </div>
             </ERPSectionShell>
           </div>

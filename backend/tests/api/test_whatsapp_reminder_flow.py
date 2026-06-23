@@ -18,6 +18,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from reminders.models import PaymentReminder, ReminderChannel, ReminderStatus, ReminderType
+from subscriptions.models import AuditLog
 from reminders.services.reminder_service import generate_whatsapp_link, send_payment_reminder
 from tests.helpers import create_admin_user, create_customer_profile, create_partner_user
 
@@ -140,12 +141,18 @@ class WhatsAppLinkAPITests(APITestCase):
         reminder = self._make_reminder()
         self.client.force_authenticate(user=self.admin)
         url = f"{_WA_BASE}/{reminder.id}/whatsapp-link/"
+        before = AuditLog.objects.count()
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("link", response.data)
         self.assertIn("wa.me", response.data["link"])
         self.assertIn("message", response.data)
         self.assertIn("note", response.data)
+        self.assertEqual(AuditLog.objects.count(), before + 1)
+        audit = AuditLog.objects.order_by("-id").first()
+        self.assertEqual(audit.metadata.get("event"), "WHATSAPP_LINK_OPENED")
+        self.assertTrue(audit.metadata.get("manual_send"))
+        self.assertEqual(audit.performed_by_id, self.admin.id)
 
     def test_missing_phone_returns_400(self):
         reminder = self._make_reminder(phone="")
@@ -171,3 +178,7 @@ class WhatsAppLinkAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["updated"])
         self.assertEqual(response.data["reminder"]["status"], "SENT")
+        audit = AuditLog.objects.order_by("-id").first()
+        self.assertEqual(audit.metadata.get("event"), "PAYMENT_REMINDER_SENT")
+        self.assertTrue(audit.metadata.get("manual_send"))
+        self.assertEqual(audit.metadata.get("dispatch_mode"), "MANUAL_CONFIRM")

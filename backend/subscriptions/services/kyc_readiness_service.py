@@ -481,10 +481,18 @@ def get_contract_kyc_readiness(
             if row["required"] and row["stage"] in stages
         )
 
-    activate_ok = kyc_verified and stage_satisfied({"activate"})
-    generate_ok = kyc_verified and stage_satisfied({"activate", "generate_contract"})
-    deliver_ok = kyc_verified and stage_satisfied(
-        {"activate", "generate_contract", "deliver"}
+    expired_cats = _customer_expired_categories(customer)
+
+    activate_ok = kyc_verified and not expired_cats and stage_satisfied({"activate"})
+    generate_ok = (
+        kyc_verified
+        and not expired_cats
+        and stage_satisfied({"activate", "generate_contract"})
+    )
+    deliver_ok = (
+        kyc_verified
+        and not expired_cats
+        and stage_satisfied({"activate", "generate_contract", "deliver"})
     )
 
     missing_documents = [
@@ -500,7 +508,6 @@ def get_contract_kyc_readiness(
         blocker_messages.append(
             "Customer KYC must be VERIFIED or EXCEPTION_APPROVED before activation."
         )
-    expired_cats = _customer_expired_categories(customer)
     if expired_cats:
         blocker_codes.append(BlockerCode.KYC_DOCUMENT_EXPIRED)
         labels = [DOC_LABELS.get(c, c) for c in expired_cats]

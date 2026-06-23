@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.db.models import Count, Q, Sum, Value
 from django.db.models.functions import Coalesce
@@ -239,10 +239,16 @@ class AdminRecoveryCaseDetailView(APIView):
         now = timezone.now()
         allowed = {"stage", "notes", "assigned_to_id", "settled_amount", "last_contact_at"}
         for field in allowed:
-            if field in request.data:
+            if field in request.data and field != "settled_amount":
                 setattr(rc, field, request.data[field])
 
         new_stage = request.data.get("stage")
+        settled_raw = request.data.get("settled_amount")
+        if settled_raw is not None and str(settled_raw).strip() and new_stage != "SETTLED":
+            try:
+                rc.settled_amount = Decimal(str(settled_raw))
+            except (InvalidOperation, ValueError):
+                return Response({"detail": "Invalid settled_amount."}, status=400)
         if new_stage == "NOTICE_SENT" and not rc.notice_sent_at:
             rc.notice_sent_at = now
         if new_stage == "FIELD_VISIT" and not rc.field_visit_at:
@@ -250,9 +256,13 @@ class AdminRecoveryCaseDetailView(APIView):
         if new_stage == "LEGAL" and not rc.legal_at:
             rc.legal_at = now
         if new_stage == "SETTLED":
-            from decimal import Decimal, InvalidOperation
             try:
-                settled = Decimal(str(rc.settled_amount or "0"))
+                if settled_raw is None or str(settled_raw).strip() == "":
+                    return Response(
+                        {"detail": "settled_amount is required when marking as SETTLED."},
+                        status=400,
+                    )
+                settled = Decimal(str(settled_raw))
             except (InvalidOperation, ValueError):
                 return Response({"detail": "Invalid settled_amount."}, status=400)
             overdue = Decimal(str(rc.overdue_amount or "0"))
@@ -266,6 +276,7 @@ class AdminRecoveryCaseDetailView(APIView):
                     {"detail": f"settled_amount ({settled}) exceeds overdue_amount ({overdue})."},
                     status=400,
                 )
+            rc.settled_amount = settled
             rc.settlement_type = "FULL" if settled >= overdue else "PARTIAL"
             if not rc.settled_at:
                 rc.settled_at = now

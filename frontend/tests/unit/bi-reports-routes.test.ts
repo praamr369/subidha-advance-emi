@@ -65,7 +65,7 @@ test("BI route paths are correct in ROUTES", () => {
   assert.ok(routesSource.includes('"/admin/bi/cashflow"'), "Missing /admin/bi/cashflow");
   assert.ok(routesSource.includes('"/admin/bi/inventory"'), "Missing /admin/bi/inventory");
   assert.ok(routesSource.includes('"/admin/bi/hr"'), "Missing /admin/bi/hr");
-  assert.ok(routesSource.includes('"/admin/reports-center"'), "Missing /admin/reports-center");
+  assert.ok(routesSource.includes('"/admin/reports"'), "Missing /admin/reports");
   assert.ok(routesSource.includes('"/admin/reports"'), "Missing /admin/reports");
   assert.ok(routesSource.includes('"/admin/reports/revenue"'), "Missing /admin/reports/revenue");
   assert.ok(routesSource.includes('"/admin/reports/collections"'), "Missing /admin/reports/collections");
@@ -260,6 +260,18 @@ test("Report page files exist for all /admin/reports/* routes", () => {
   for (const p of pages) {
     assert.ok(existsSync(join(reportsPageDir, p)), `Missing report page: /admin/reports/${p}`);
   }
+});
+
+test("customer-analytics report links each row to customer profile detail", () => {
+  const source = readFileSync(join(reportsPageDir, "customer-analytics/page.tsx"), "utf8");
+  assert.ok(
+    source.includes("ROUTES.admin.customers") || source.includes("/admin/customers/"),
+    "customer-analytics page must link to customer profile routes"
+  );
+  assert.ok(
+    source.includes("<Link") || source.includes("href={`${ROUTES.admin.customers}"),
+    "customer-analytics page must use a navigable row action link"
+  );
 });
 
 test("Analytics page files exist for all /admin/analytics/* routes", () => {

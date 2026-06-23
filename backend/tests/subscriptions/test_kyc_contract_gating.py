@@ -12,6 +12,7 @@ Covers (per spec):
 """
 from __future__ import annotations
 
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -138,6 +139,36 @@ class KycReadinessComputationTests(TestCase):
         id_row = next(r for r in readiness["required_documents"] if r["code"] == "ID_PROOF")
         self.assertFalse(id_row["present"])
         self.assertEqual(id_row["status"], "PENDING")
+
+    def test_expired_optional_document_blocks_activation(self):
+        self.customer.kyc_status = KycStatus.VERIFIED
+        self.customer.save(update_fields=["kyc_status"])
+        CustomerKycDocument.objects.create(
+            customer=self.customer,
+            document_type=CustomerKycDocumentType.AADHAAR,
+            category=KycDocumentCategory.ID_PROOF,
+            file=_small_file("id-proof.pdf"),
+            status=CustomerKycDocumentStatus.APPROVED,
+        )
+        CustomerKycDocument.objects.create(
+            customer=self.customer,
+            document_type=CustomerKycDocumentType.OTHER,
+            category=KycDocumentCategory.ADDRESS_PROOF,
+            file=_small_file("address-proof.pdf"),
+            status=CustomerKycDocumentStatus.APPROVED,
+        )
+        CustomerKycDocument.objects.create(
+            customer=self.customer,
+            document_type=CustomerKycDocumentType.OTHER,
+            category=KycDocumentCategory.CUSTOMER_PHOTO,
+            file=_small_file("customer-photo.pdf"),
+            status=CustomerKycDocumentStatus.APPROVED,
+            expiry_date=date.today() - timedelta(days=1),
+        )
+        readiness = get_contract_kyc_readiness(self.customer, PlanType.RENT)
+        self.assertFalse(readiness["can_activate"])
+        self.assertIn(KycDocumentCategory.CUSTOMER_PHOTO, readiness["expired_categories"])
+        self.assertIn("KYC_DOCUMENT_EXPIRED", readiness["blocker_codes"])
 
 
 @override_settings(KYC_CONTRACT_GATING_ENABLED=True)

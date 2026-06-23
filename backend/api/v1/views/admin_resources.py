@@ -11,7 +11,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
 from django.db import transaction
-from django.db.models import Count, Q, Sum, Value, DecimalField, IntegerField, OuterRef, Subquery
+from django.db.models import Count, Prefetch, Q, Sum, Value, DecimalField, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -83,6 +83,7 @@ from subscriptions.models import (
     ProductSubcategoryMaster,
     ProductUnitOfMeasureMaster,
     Subscription,
+    SubscriptionDelivery,
     SubscriptionDocument,
     SubscriptionStatus,
     KycStatus,
@@ -1294,6 +1295,16 @@ class LuckyDrawAdminViewSet(AdminOnlyModelViewSet):
             "winner_lucky_id",
             "winner_subscription",
             "winner_subscription__customer",
+        )
+        .prefetch_related(
+            Prefetch(
+                "winner_subscription__emis",
+                queryset=Emi.objects.order_by("month_no", "id"),
+            ),
+            Prefetch(
+                "winner_subscription__deliveries",
+                queryset=SubscriptionDelivery.objects.order_by("-id"),
+            ),
         )
         .all()
         .order_by("-draw_date", "-id")

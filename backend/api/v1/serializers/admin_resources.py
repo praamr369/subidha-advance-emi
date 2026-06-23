@@ -796,12 +796,18 @@ class LuckyDrawAdminSerializer(serializers.ModelSerializer):
         sub = getattr(obj, "winner_subscription", None)
         if not sub:
             return 0
+        prefetched_emis = getattr(sub, "_prefetched_objects_cache", {}).get("emis")
+        if prefetched_emis is not None:
+            return sum(1 for emi in prefetched_emis if emi.status in {"PAID", "WAIVED"})
         return sub.emis.filter(status__in=["PAID", "WAIVED"]).count()
 
     def get_delivery_status(self, obj):
         sub = getattr(obj, "winner_subscription", None)
         if not sub:
             return None
+        prefetched_deliveries = getattr(sub, "_prefetched_objects_cache", {}).get("deliveries")
+        if prefetched_deliveries is not None:
+            return prefetched_deliveries[0].status if prefetched_deliveries else "NOT_SCHEDULED"
         delivery = sub.deliveries.order_by("-id").first() if hasattr(sub, "deliveries") else None
         if not delivery:
             return "NOT_SCHEDULED"

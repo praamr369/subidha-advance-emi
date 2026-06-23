@@ -9,9 +9,11 @@ Usage:
 Intended to run via cron or task scheduler (e.g. every 5-15 minutes).
 """
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 
 from reminders.models import PaymentReminder, ReminderChannel, ReminderStatus
+from reminders.services.reminder_service import send_payment_reminder
 
 
 MAX_ATTEMPTS = 3
@@ -31,63 +33,53 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         retry_failed = options["retry_failed"]
 
-        qs = PaymentReminder.objects.filter(
-            channel=ReminderChannel.EMAIL,
-        ).select_related("target_customer", "target_subscription")
-
-        pending_qs = qs.filter(
-            status__in=[ReminderStatus.PENDING, ReminderStatus.SCHEDULED],
-        ).filter(
-            # PENDING: always due. SCHEDULED: due when scheduled_for <= now.
-            **{}  # base filter
-        ).exclude(
-            status=ReminderStatus.SCHEDULED,
-            scheduled_for__gt=now,
-        )
-
+        statuses = [ReminderStatus.PENDING, ReminderStatus.SCHEDULED]
         if retry_failed:
-            failed_qs = qs.filter(
-                status=ReminderStatus.FAILED,
-                attempts__lt=MAX_ATTEMPTS,
+            statuses.append(ReminderStatus.FAILED)
+
+        with transaction.atomic():
+            qs = PaymentReminder.objects.filter(
+                channel=ReminderChannel.EMAIL,
+                status__in=statuses,
+            ).select_related("target_customer", "target_subscription")
+
+            if not retry_failed:
+                qs = qs.exclude(status=ReminderStatus.SCHEDULED, scheduled_for__gt=now)
+            else:
+                qs = qs.exclude(status=ReminderStatus.SCHEDULED, scheduled_for__gt=now)
+                qs = qs.filter(attempts__lt=MAX_ATTEMPTS)
+
+            reminders = list(
+                qs.select_for_update(skip_locked=True).order_by("created_at", "id")[:limit]
             )
-            combined = (pending_qs | failed_qs).distinct().order_by("created_at")[:limit]
-        else:
-            combined = pending_qs.order_by("created_at")[:limit]
 
-        reminders = list(combined)
+            if not reminders:
+                self.stdout.write("No reminders due for dispatch.")
+                return
 
-        if not reminders:
-            self.stdout.write("No reminders due for dispatch.")
-            return
+            self.stdout.write(f"Found {len(reminders)} reminder(s) to dispatch.")
 
-        self.stdout.write(f"Found {len(reminders)} reminder(s) to dispatch.")
+            sent = 0
+            failed = 0
+            for reminder in reminders:
+                if dry_run:
+                    self.stdout.write(f"  [DRY-RUN] Would send #{reminder.reminder_no} to {reminder.customer_contact}")
+                    continue
 
-        sent = 0
-        failed = 0
-        for reminder in reminders:
+                try:
+                    send_payment_reminder(
+                        reminder_id=reminder.id,
+                        performed_by=None,
+                        notes="Sent during reminder dispatch command.",
+                        manual_send=False,
+                    )
+                    sent += 1
+                    self.stdout.write(f"  SENT #{reminder.reminder_no}")
+                except Exception as exc:
+                    failed += 1
+                    self.stderr.write(f"  FAILED #{reminder.reminder_no}: {exc}")
+
             if dry_run:
-                self.stdout.write(f"  [DRY-RUN] Would send #{reminder.reminder_no} to {reminder.customer_contact}")
-                continue
-
-            try:
-                from reminders.services.reminder_service import _dispatch_email_reminder
-                _dispatch_email_reminder(reminder)
-                reminder.status = ReminderStatus.SENT
-                reminder.sent_at = now
-                reminder.attempts = (reminder.attempts or 0) + 1
-                reminder.last_error = ""
-                reminder.save(update_fields=["status", "sent_at", "attempts", "last_error", "updated_at"])
-                sent += 1
-                self.stdout.write(f"  SENT #{reminder.reminder_no}")
-            except Exception as exc:
-                reminder.status = ReminderStatus.FAILED
-                reminder.attempts = (reminder.attempts or 0) + 1
-                reminder.last_error = str(exc)[:500]
-                reminder.save(update_fields=["status", "attempts", "last_error", "updated_at"])
-                failed += 1
-                self.stderr.write(f"  FAILED #{reminder.reminder_no}: {exc}")
-
-        if dry_run:
-            self.stdout.write(f"Dry run complete. {len(reminders)} would be dispatched.")
-        else:
-            self.stdout.write(f"Dispatch complete: {sent} sent, {failed} failed.")
+                self.stdout.write(f"Dry run complete. {len(reminders)} would be dispatched.")
+            else:
+                self.stdout.write(f"Dispatch complete: {sent} sent, {failed} failed.")
