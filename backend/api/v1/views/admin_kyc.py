@@ -94,13 +94,19 @@ class AdminCustomerKycUploadView(APIView):
                 category=(request.data.get("category") or "").strip(),
                 notes=(request.data.get("notes") or "").strip(),
                 document_reference=(request.data.get("document_reference") or "").strip(),
+                expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)})
 
         return Response(
-            {"id": doc.pk, "status": doc.status, "document_type": doc.document_type},
+            {
+                "id": doc.pk,
+                "status": doc.status,
+                "document_type": doc.document_type,
+                "expiry_date": doc.expiry_date.isoformat() if doc.expiry_date else None,
+            },
             status=status.HTTP_201_CREATED,
         )
 
@@ -211,6 +217,7 @@ class AdminPartnerKycDocumentListUploadView(APIView):
                 category=(request.data.get("category") or "").strip(),
                 notes=(request.data.get("notes") or "").strip(),
                 document_reference=(request.data.get("document_reference") or "").strip(),
+                expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
             )
         except ValueError as exc:
@@ -363,6 +370,7 @@ class AdminVendorKycDocumentListUploadView(APIView):
                 category=(request.data.get("category") or "").strip(),
                 notes=(request.data.get("notes") or "").strip(),
                 document_reference=(request.data.get("document_reference") or "").strip(),
+                expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
             )
         except ValueError as exc:
@@ -511,6 +519,7 @@ class AdminStaffKycDocumentListUploadView(APIView):
                 category=(request.data.get("category") or "").strip(),
                 notes=(request.data.get("notes") or "").strip(),
                 document_reference=(request.data.get("document_reference") or "").strip(),
+                expiry_date=(request.data.get("expiry_date") or None),
                 performed_by=request.user,
             )
         except ValueError as exc:
@@ -632,6 +641,13 @@ class AdminKycReviewQueueView(APIView):
 
     def get(self, request):
         params = request.query_params
+        expires_within_days = None
+        raw_exp = params.get("expires_within_days", "")
+        if raw_exp:
+            try:
+                expires_within_days = max(0, int(raw_exp))
+            except (TypeError, ValueError):
+                pass
         data = build_kyc_review_queue(
             owner_type=params.get("owner_type", ""),
             status=params.get("status", ""),
@@ -641,6 +657,7 @@ class AdminKycReviewQueueView(APIView):
             upload_source=params.get("upload_source", ""),
             date_from=params.get("date_from", ""),
             date_to=params.get("date_to", ""),
+            expires_within_days=expires_within_days,
             limit=params.get("limit", 500),
         )
         return Response(data)

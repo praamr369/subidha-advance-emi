@@ -102,6 +102,7 @@ def admin_upload_customer_kyc(
     category: str = "",
     notes: str = "",
     document_reference: str = "",
+    expiry_date: str | None = None,
     performed_by,
     upload_source: str = KycUploadSource.ADMIN_UPLOAD,
 ) -> "CustomerKycDocument":
@@ -125,6 +126,12 @@ def admin_upload_customer_kyc(
         uploaded_by=performed_by,
         upload_source=upload_source,
     )
+    if expiry_date:
+        try:
+            from datetime import date as _date
+            doc.expiry_date = _date.fromisoformat(expiry_date)
+        except ValueError:
+            pass
     doc.save()
 
     if customer.kyc_status not in (
@@ -252,6 +259,7 @@ def admin_upload_partner_kyc(
     category: str = "",
     notes: str = "",
     document_reference: str = "",
+    expiry_date: str | None = None,
     performed_by,
     upload_source: str = KycUploadSource.ADMIN_UPLOAD,
 ) -> PartnerKycDocument:
@@ -267,6 +275,12 @@ def admin_upload_partner_kyc(
         uploaded_by=performed_by,
         upload_source=upload_source,
     )
+    if expiry_date:
+        try:
+            from datetime import date as _date
+            doc.expiry_date = _date.fromisoformat(expiry_date)
+        except ValueError:
+            pass
     doc.save()
     _record_action(
         owner_type=KycOwnerType.PARTNER,
@@ -425,6 +439,7 @@ def admin_upload_vendor_kyc(
     category: str = "",
     notes: str = "",
     document_reference: str = "",
+    expiry_date: str | None = None,
     performed_by,
     upload_source: str = KycUploadSource.ADMIN_UPLOAD,
 ):
@@ -442,6 +457,12 @@ def admin_upload_vendor_kyc(
         uploaded_by=performed_by,
         upload_source=upload_source,
     )
+    if expiry_date:
+        try:
+            from datetime import date as _date
+            doc.expiry_date = _date.fromisoformat(expiry_date)
+        except ValueError:
+            pass
     doc.save()
     _record_action(
         owner_type=KycOwnerType.VENDOR,
@@ -596,6 +617,7 @@ def admin_upload_staff_kyc(
     category: str = "",
     notes: str = "",
     document_reference: str = "",
+    expiry_date: str | None = None,
     performed_by,
     upload_source: str = KycUploadSource.ADMIN_UPLOAD,
 ):
@@ -613,6 +635,12 @@ def admin_upload_staff_kyc(
         uploaded_by=performed_by,
         upload_source=upload_source,
     )
+    if expiry_date:
+        try:
+            from datetime import date as _date
+            doc.expiry_date = _date.fromisoformat(expiry_date)
+        except ValueError:
+            pass
     doc.save()
     _record_action(
         owner_type=KycOwnerType.STAFF,
@@ -913,11 +941,25 @@ def _allowed_actions(status: str, has_file: bool) -> list:
     return actions
 
 
+def _kyc_expiry_status(expiry_date) -> str:
+    """Compute a human-readable expiry status for a KYC document."""
+    if expiry_date is None:
+        return "NOT_SET"
+    from django.utils import timezone
+    today = timezone.now().date()
+    if expiry_date < today:
+        return "EXPIRED"
+    if (expiry_date - today).days <= 30:
+        return "EXPIRING_SOON"
+    return "VALID"
+
+
 def _normalize_queue_row(owner_type: str, doc, cfg) -> dict:
     owner_obj = getattr(doc, cfg["owner_attr"], None)
     owner_id = getattr(doc, f"{cfg['owner_attr']}_id", None)
     name, phone, email = cfg["identity"](owner_obj)
     has_file = bool(getattr(doc, "file", None))
+    expiry_date = getattr(doc, "expiry_date", None)
     return {
         "owner_type": owner_type,
         "owner_id": owner_id,
@@ -936,6 +978,8 @@ def _normalize_queue_row(owner_type: str, doc, cfg) -> dict:
         "rejection_reason": getattr(doc, "rejection_reason", "") or "",
         "download_url": cfg["download"](owner_id, doc.pk) if has_file else "",
         "allowed_actions": _allowed_actions(doc.status, has_file),
+        "expiry_date": expiry_date.isoformat() if expiry_date else None,
+        "expiry_status": _kyc_expiry_status(expiry_date),
     }
 
 
@@ -949,6 +993,7 @@ def build_kyc_review_queue(
     upload_source: str = "",
     date_from: str = "",
     date_to: str = "",
+    expires_within_days: int | None = None,
     limit: int = 500,
 ) -> dict:
     """Aggregate non-approved (by default) KYC documents across all owner types.
@@ -998,6 +1043,12 @@ def build_kyc_review_queue(
             qs = qs.filter(created_at__date__gte=df)
         if dt:
             qs = qs.filter(created_at__date__lte=dt)
+        if expires_within_days is not None:
+            from django.utils import timezone
+            from datetime import timedelta
+            today = timezone.now().date()
+            deadline = today + timedelta(days=expires_within_days)
+            qs = qs.filter(expiry_date__isnull=False, expiry_date__lte=deadline)
 
         store_count = 0
         for entry in qs.values("status").annotate(c=Count("id")):

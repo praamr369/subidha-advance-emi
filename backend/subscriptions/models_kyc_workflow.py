@@ -206,6 +206,12 @@ class PartnerKycDocument(models.Model):
         related_name="reviewed_partner_kyc_documents",
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    expiry_date = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Document expiry date. Leave blank for non-expiring documents.",
+    )
     rejection_reason = models.TextField(blank=True, default="")
     resubmission_of = models.ForeignKey(
         "self",

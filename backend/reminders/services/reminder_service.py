@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
+from django.conf import settings
+from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
-from reminders.models import PaymentReminder, ReminderStatus, ReminderType
+from reminders.models import PaymentReminder, ReminderChannel, ReminderStatus, ReminderType
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
@@ -51,6 +53,28 @@ def schedule_payment_reminder(*, reminder_id: int, scheduled_for, performed_by=N
     return reminder, True
 
 
+def _dispatch_email_reminder(reminder: PaymentReminder) -> None:
+    """Dispatch a reminder via Django email backend. Raises on delivery failure."""
+    customer = reminder.target_customer
+    recipient = (reminder.customer_contact or "").strip()
+    if not recipient and customer:
+        recipient = getattr(customer, "email", "") or ""
+    if not recipient:
+        raise ValueError("No email address on file for this reminder. Set customer_contact (email) before sending.")
+
+    subject_map = {
+        ReminderType.EMI_DUE: "EMI Due Reminder",
+        ReminderType.EMI_OVERDUE: "EMI Overdue — Immediate Action Required",
+        ReminderType.RENT_DUE: "Rental Instalment Due Reminder",
+        ReminderType.RETAIL_DUE: "Payment Due Reminder",
+        ReminderType.FOLLOWUP: "Payment Follow-Up",
+    }
+    subject = f"[SUBIDHA] {subject_map.get(reminder.reminder_type, 'Payment Reminder')}"
+    body = _format_whatsapp_message(reminder)
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@subidha.in")
+    send_mail(subject, body, from_email, [recipient], fail_silently=False)
+
+
 @transaction.atomic
 def send_payment_reminder(*, reminder_id: int, performed_by=None, notes: str = ""):
     reminder = PaymentReminder.objects.select_for_update().get(pk=reminder_id)
@@ -58,6 +82,16 @@ def send_payment_reminder(*, reminder_id: int, performed_by=None, notes: str = "
         return reminder, False
     if reminder.status == ReminderStatus.CANCELLED:
         raise ValueError("Cancelled reminders cannot be sent.")
+    # For EMAIL channel: attempt actual delivery before marking SENT.
+    if reminder.channel == ReminderChannel.EMAIL:
+        try:
+            _dispatch_email_reminder(reminder)
+        except Exception as exc:
+            reminder.attempts = (reminder.attempts or 0) + 1
+            reminder.last_error = str(exc)[:500]
+            reminder.save(update_fields=["attempts", "last_error", "updated_at"])
+            raise ValueError(f"Email delivery failed: {exc}") from exc
+
     reminder.status = ReminderStatus.SENT
     reminder.sent_at = timezone.now()
     reminder.sent_by = performed_by
@@ -70,7 +104,7 @@ def send_payment_reminder(*, reminder_id: int, performed_by=None, notes: str = "
         reminder=reminder,
         performed_by=performed_by,
         event="PAYMENT_REMINDER_SENT",
-        metadata={"reminder_id": reminder.id},
+        metadata={"reminder_id": reminder.id, "channel": reminder.channel},
     )
     return reminder, True
 

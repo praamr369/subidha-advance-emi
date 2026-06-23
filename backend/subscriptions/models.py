@@ -4542,6 +4542,12 @@ class CustomerKycDocument(TimeStampedModel):
         related_name="reviewed_kyc_documents",
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    expiry_date = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Document expiry date. Leave blank for non-expiring documents (e.g. PAN, Voter ID).",
+    )
     rejection_reason = models.TextField(blank=True, default="")
     # Additive: tracks where the upload originated (admin / self-service / CRM / registration)
     upload_source = models.CharField(

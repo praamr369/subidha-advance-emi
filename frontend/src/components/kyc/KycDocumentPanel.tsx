@@ -210,6 +210,7 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
   const [docType, setDocType] = useState(documentTypeOptions[0]?.value ?? "OTHER");
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
   const [resubmissionOf, setResubmissionOf] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -316,6 +317,7 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
           document_type: docType,
           file,
           notes: trimmedNotes,
+          expiry_date: expiryDate.trim() || undefined,
         });
       } else {
         const payload = {
@@ -337,6 +339,7 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
       );
       setFile(null);
       setNotes("");
+      setExpiryDate("");
       setResubmissionOf(null);
       await refresh();
     } catch (err) {
@@ -507,6 +510,19 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
               className={inputClass}
             />
           </div>
+          {props.mode === "admin" && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Document expiry date (optional)</label>
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                disabled={uploading}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground">Leave blank for non-expiring documents (e.g. PAN, Voter ID).</p>
+            </div>
+          )}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">Accepted: JPG, PNG, or PDF up to 5 MB.</p>
         <div className="mt-3 flex justify-end">

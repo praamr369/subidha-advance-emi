@@ -130,6 +130,7 @@ export default function AdminCrmKycReviewQueuePage() {
   const [ownerType, setOwnerType] = useState<KycOwnerType | "">("");
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [expiresWithinDays, setExpiresWithinDays] = useState<number | undefined>(undefined);
 
   // Per-row reasoned action (reject / resubmission).
   const [actionRowKey, setActionRowKey] = useState<string | null>(null);
@@ -141,13 +142,15 @@ export default function AdminCrmKycReviewQueuePage() {
   const rowKey = (row: KycQueueRow) => `${row.owner_type}:${row.document_id}`;
 
   const load = useCallback(
-    async (filters?: { ownerType?: KycOwnerType | ""; statusFilter?: string; search?: string }) => {
+    async (filters?: { ownerType?: KycOwnerType | ""; statusFilter?: string; search?: string; expiresWithinDays?: number | undefined }) => {
       try {
         setLoading(true);
+        const expDays = filters?.expiresWithinDays !== undefined ? filters.expiresWithinDays : expiresWithinDays;
         const next = await listKycReviewQueue({
           owner_type: filters?.ownerType ?? ownerType,
           status: filters?.statusFilter ?? statusFilter,
           search: filters?.search ?? search,
+          ...(expDays !== undefined ? { expires_within_days: expDays } : {}),
         });
         setData(next);
         setError(null);
@@ -158,11 +161,11 @@ export default function AdminCrmKycReviewQueuePage() {
         setLoading(false);
       }
     },
-    [ownerType, statusFilter, search]
+    [ownerType, statusFilter, search, expiresWithinDays]
   );
 
   useEffect(() => {
-    void load({ ownerType: "", statusFilter: "", search: "" });
+    void load({ ownerType: "", statusFilter: "", search: "", expiresWithinDays: undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -293,6 +296,18 @@ export default function AdminCrmKycReviewQueuePage() {
               className={`${inputClass} min-w-[16rem]`}
               aria-label="Search owners"
             />
+            <select
+              value={expiresWithinDays ?? ""}
+              onChange={(e) => setExpiresWithinDays(e.target.value ? Number(e.target.value) : undefined)}
+              className={inputClass}
+              aria-label="Expiry filter"
+            >
+              <option value="">Any expiry</option>
+              <option value="0">Expired</option>
+              <option value="7">Expiring within 7 days</option>
+              <option value="30">Expiring within 30 days</option>
+              <option value="90">Expiring within 90 days</option>
+            </select>
             <button type="button" className={btnPrimary} onClick={() => void load()} disabled={loading}>
               {loading ? "Loading…" : "Apply filters"}
             </button>
@@ -303,7 +318,8 @@ export default function AdminCrmKycReviewQueuePage() {
                 setOwnerType("");
                 setStatusFilter("");
                 setSearch("");
-                void load({ ownerType: "", statusFilter: "", search: "" });
+                setExpiresWithinDays(undefined);
+                void load({ ownerType: "", statusFilter: "", search: "", expiresWithinDays: undefined });
               }}
               disabled={loading}
             >
@@ -378,6 +394,18 @@ export default function AdminCrmKycReviewQueuePage() {
                           Uploaded {formatDateTime(row.uploaded_at)}
                           {row.uploaded_by ? ` by ${row.uploaded_by}` : ""}
                         </div>
+                        {row.expiry_date ? (
+                          <div className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+                            row.expiry_status === "EXPIRED"
+                              ? "border-red-200 bg-red-50 text-red-700"
+                              : row.expiry_status === "EXPIRING_SOON"
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          }`}>
+                            {row.expiry_status === "EXPIRED" ? "Expired" : row.expiry_status === "EXPIRING_SOON" ? "Expiring soon" : "Valid until"}{" "}
+                            {row.expiry_date}
+                          </div>
+                        ) : null}
                         {row.status === "REJECTED" && row.rejection_reason ? (
                           <div className="mt-1 text-xs font-medium text-red-700">
                             Reason: {row.rejection_reason}

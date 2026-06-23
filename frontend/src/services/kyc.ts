@@ -58,6 +58,7 @@ export type KycUploadPayload = {
   category?: string;
   notes?: string;
   document_reference?: string;
+  expiry_date?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -164,6 +165,7 @@ export async function uploadAdminKycDocument(
   if (payload.notes) form.append("notes", payload.notes);
   if (payload.document_reference)
     form.append("document_reference", payload.document_reference);
+  if (payload.expiry_date) form.append("expiry_date", payload.expiry_date);
 
   const response = await apiFetch<unknown>(
     `${adminBasePath(owner, ownerId)}/upload/`,
@@ -410,6 +412,8 @@ export type KycQueueRow = {
   rejection_reason: string;
   download_url: string;
   allowed_actions: string[];
+  expiry_date: string | null;
+  expiry_status: "VALID" | "EXPIRING_SOON" | "EXPIRED" | "NOT_SET";
 };
 
 export type KycReviewQueueResponse = {
@@ -431,6 +435,7 @@ export type KycReviewQueueFilters = {
   upload_source?: string;
   date_from?: string;
   date_to?: string;
+  expires_within_days?: number;
 };
 
 function normalizeQueueRow(raw: unknown): KycQueueRow {
@@ -456,6 +461,8 @@ function normalizeQueueRow(raw: unknown): KycQueueRow {
     rejection_reason: str(r.rejection_reason),
     download_url: str(r.download_url),
     allowed_actions: actions,
+    expiry_date: strOrNull(r.expiry_date),
+    expiry_status: (str(r.expiry_status) || "NOT_SET") as KycQueueRow["expiry_status"],
   };
 }
 

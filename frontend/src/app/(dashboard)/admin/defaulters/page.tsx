@@ -61,6 +61,7 @@ function RecoveryDrawer({
 }) {
   const [stage, setStage] = useState(rc.stage);
   const [notes, setNotes] = useState(rc.notes);
+  const [settledAmount, setSettledAmount] = useState(rc.settled_amount ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -68,7 +69,9 @@ function RecoveryDrawer({
     setBusy(true);
     setErr(null);
     try {
-      const updated = await updateRecoveryCase(rc.id, { stage, notes });
+      const payload: Parameters<typeof updateRecoveryCase>[1] = { stage, notes };
+      if (stage === "SETTLED" && settledAmount) payload.settled_amount = settledAmount;
+      const updated = await updateRecoveryCase(rc.id, payload);
       onSaved(updated);
       onClose();
     } catch (e: unknown) {
@@ -133,6 +136,22 @@ function RecoveryDrawer({
             ))}
           </select>
         </div>
+
+        {stage === "SETTLED" && (
+          <div className="mb-4">
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">Settled Amount (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={settledAmount}
+              onChange={(e) => setSettledAmount(e.target.value)}
+              className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm"
+              placeholder="Amount actually recovered/settled"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Record the actual amount recovered. Leave blank to keep existing value.</p>
+          </div>
+        )}
 
         <div className="mb-4">
           <label className="block text-xs font-semibold text-muted-foreground mb-1">Notes</label>

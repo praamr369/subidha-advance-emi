@@ -3972,6 +3972,7 @@ class VendorKycDocument(AccountingTimeStampedModel):
         related_name="reviewed_vendor_kyc_documents",
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    expiry_date = models.DateField(null=True, blank=True, db_index=True)
     rejection_reason = models.TextField(blank=True, default="")
     resubmission_of = models.ForeignKey(
         "self",
@@ -4082,6 +4083,7 @@ class StaffKycDocument(AccountingTimeStampedModel):
         related_name="reviewed_staff_kyc_documents",
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    expiry_date = models.DateField(null=True, blank=True, db_index=True)
     rejection_reason = models.TextField(blank=True, default="")
     resubmission_of = models.ForeignKey(
         "self",

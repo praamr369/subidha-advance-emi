@@ -1,86 +1,195 @@
-import Link from "next/link";
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+import ERPEmptyState from "@/components/erp/ERPEmptyState";
+import ERPErrorState from "@/components/erp/ERPErrorState";
+import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import { listLuckyDraws, type LuckyDrawRecord } from "@/services/draws";
+
+function fmtDate(v?: string | null): string {
+  if (!v) return "—";
+  try {
+    return new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return v;
+  }
+}
+
+function fmtMoney(v?: string | null): string {
+  if (v == null || v === "") return "—";
+  const n = Number(v);
+  if (isNaN(n)) return v;
+  return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 export default function LuckyPlanWinnersPage() {
+  const [winners, setWinners] = useState<LuckyDrawRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [batchFilter, setBatchFilter] = useState("");
+  const PAGE_SIZE = 25;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params: Parameters<typeof listLuckyDraws>[0] = { revealed: true, page };
+      if (batchFilter) params.batch = batchFilter;
+      const data = await listLuckyDraws(params);
+      setWinners(data.results ?? []);
+      setTotalCount(data.count ?? 0);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load winners.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, batchFilter]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Winners</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Lucky Plan winner visibility and EMI waiver audit trail.
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 dark:border-amber-700 dark:bg-amber-900/20">
-        <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-          Gap — no dedicated winners endpoint
-        </h2>
-        <p className="mt-2 text-sm text-amber-800 dark:text-amber-300">
-          A standalone winners register requires a dedicated backend endpoint that aggregates
-          winner records with EMI waiver status across all batches. That endpoint does not
-          exist yet. No fake winner data is shown here.
-        </p>
-        <p className="mt-2 text-sm text-amber-800 dark:text-amber-300">
-          Winner information is currently accessible through individual Lucky Draw detail
-          pages. Each revealed draw record shows the winning Lucky ID, the winner subscriber,
-          and the linked subscription number.
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-foreground">Where to find winner data now</h2>
-        <div className="mt-4 space-y-3">
-          <div className="flex flex-col gap-1">
-            <Link
-              href="/admin/lucky-draws"
-              className="text-sm font-medium text-primary underline hover:no-underline"
-            >
-              Lucky Draw Register → /admin/lucky-draws
-            </Link>
-            <p className="text-sm text-muted-foreground">
-              Lists all draw records. Revealed draws show the winner Lucky ID and linked
-              subscriber. Filter by batch or reveal state to narrow to winners.
-            </p>
+    <ERPPageShell
+      title="Winners Register"
+      subtitle="All revealed Lucky Draw winners — EMI waiver audit trail across all batches"
+      breadcrumbs={[
+        { href: "/admin/lucky-plan", label: "Lucky Plan" },
+        { label: "Winners" },
+      ]}
+    >
+      <ERPSectionShell
+        title="Filters"
+        description="Narrow winners by batch ID"
+      >
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">Batch ID</label>
+            <input
+              type="number"
+              value={batchFilter}
+              onChange={(e) => { setBatchFilter(e.target.value); setPage(1); }}
+              placeholder="e.g. 5"
+              className="h-9 w-32 rounded-xl border border-border bg-background px-3 text-sm"
+            />
           </div>
-          <div className="flex flex-col gap-1">
-            <Link
-              href="/admin/batches"
-              className="text-sm font-medium text-primary underline hover:no-underline"
+          {batchFilter && (
+            <button
+              onClick={() => { setBatchFilter(""); setPage(1); }}
+              className="h-9 rounded-xl border border-border bg-background px-3 text-xs hover:bg-muted"
             >
-              Batch Register → /admin/batches
-            </Link>
-            <p className="text-sm text-muted-foreground">
-              Each batch detail page shows the batch winner count. Open a specific batch to
-              see which Lucky IDs were drawn and which subscription holds a waiver.
-            </p>
-          </div>
+              Clear filter
+            </button>
+          )}
         </div>
-      </div>
+      </ERPSectionShell>
 
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-foreground">Winner waiver rule</h2>
-        <p className="mt-3 text-sm text-muted-foreground">
-          When a Lucky Draw is revealed and a winner Lucky ID is confirmed, the linked
-          subscriber receives a waiver on{" "}
-          <span className="font-medium text-foreground">future EMI instalments only</span>.
+      <ERPSectionShell
+        title={`Winners${totalCount > 0 ? ` — ${totalCount} total` : ""}`}
+        description="Each row is a revealed draw with a confirmed winner and EMI waiver"
+      >
+        {loading && <ERPLoadingState label="Loading winners…" />}
+        {!loading && error && <ERPErrorState title="Error" description={error} />}
+        {!loading && !error && winners.length === 0 && (
+          <ERPEmptyState
+            title="No winners yet"
+            description={batchFilter ? "No revealed draws for this batch." : "No Lucky Draws have been revealed yet. Winners appear here once a draw is executed and the seed is revealed."}
+          />
+        )}
+
+        {!loading && !error && winners.length > 0 && (
+          <>
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--surface-muted)]">
+                  <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-3">Batch</th>
+                    <th className="px-4 py-3 text-right">Draw #</th>
+                    <th className="px-4 py-3 text-right">Lucky No.</th>
+                    <th className="px-4 py-3">Customer</th>
+                    <th className="px-4 py-3">Subscription</th>
+                    <th className="px-4 py-3 text-right">Waived EMIs</th>
+                    <th className="px-4 py-3 text-right">Waived Amount</th>
+                    <th className="px-4 py-3">Revealed On</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {winners.map((w) => (
+                    <tr key={w.id} className="border-t border-border/60 hover:bg-[var(--surface-muted)]/50">
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-xs bg-[var(--surface-muted)] px-2 py-0.5 rounded-lg">
+                          {w.batch_code ?? `#${w.batch}`}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">{w.draw_month ?? "—"}</td>
+                      <td className="px-4 py-3 text-right">
+                        {w.winner_lucky_number != null ? (
+                          <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-amber-100 text-amber-800 font-bold text-sm">
+                            {String(w.winner_lucky_number).padStart(2, "0")}
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        {w.winner_customer_name ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {w.winner_subscription_number ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {w.waived_emi_count ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
+                        {fmtMoney(w.waived_amount)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {fmtDate(w.revealed_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-xs text-muted-foreground">
+                  Page {page} of {totalPages} ({totalCount} records)
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => p - 1)}
+                    className="h-8 rounded-xl border border-border bg-background px-3 text-xs hover:bg-muted disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="h-8 rounded-xl border border-border bg-background px-3 text-xs hover:bg-muted disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </ERPSectionShell>
+
+      <ERPSectionShell title="Waiver rule" description="How the waiver is applied after a draw is revealed">
+        <p className="text-sm text-muted-foreground">
+          When a Lucky Draw is revealed and a winner Lucky ID is confirmed, the linked subscriber
+          receives a waiver on <span className="font-medium text-foreground">future EMI instalments only</span>.
           Past-paid EMIs are not reversed. The waiver is evidence-backed and audit-logged
           against the draw record. This rule cannot be changed from this page.
         </p>
-      </div>
-
-      <div className="flex gap-3">
-        <Link
-          href="/admin/lucky-draws"
-          className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-        >
-          Open Lucky Draws
-        </Link>
-        <Link
-          href="/admin/lucky-plan"
-          className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted"
-        >
-          Back to Lucky Plan Control
-        </Link>
-      </div>
-    </div>
+      </ERPSectionShell>
+    </ERPPageShell>
   );
 }

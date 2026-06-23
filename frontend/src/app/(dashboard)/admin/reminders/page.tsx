@@ -15,6 +15,7 @@ import { ROUTES } from "@/lib/routes";
 import type { PaymentReminder } from "@/services/reminders";
 import {
   cancelReminder,
+  getWhatsAppReminderLink,
   listReminders,
   runPaymentReminders,
   scheduleReminder,
@@ -86,11 +87,31 @@ export default function AdminRemindersPage() {
               variant="secondary"
             />
           ) : null}
+          {["DRAFT", "PENDING", "SCHEDULED"].includes(row.status) && row.channel === "WHATSAPP" ? (
+            <ActionButton
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  const res = await getWhatsAppReminderLink(row.id);
+                  window.open(res.link, "_blank", "noopener,noreferrer");
+                  setNotice(`WhatsApp link opened for reminder #${row.id}. After sending, click "Mark Sent" to record it.`);
+                } catch (err) {
+                  setError(accountingErrorMessage(err, "Could not generate WhatsApp link."));
+                }
+              }}
+            >
+              Open WhatsApp
+            </ActionButton>
+          ) : null}
           {["DRAFT", "PENDING", "SCHEDULED"].includes(row.status) ? (
             <ConfirmActionButton
-              label="Send"
-              title={`Send reminder #${row.id}?`}
-              description="Sending is auditable and marks the reminder as sent without claiming an external provider integration."
+              label={row.channel === "EMAIL" ? "Send Email" : "Mark Sent"}
+              title={row.channel === "EMAIL" ? `Send email reminder #${row.id}?` : `Mark reminder #${row.id} as sent?`}
+              description={
+                row.channel === "EMAIL"
+                  ? "Dispatches an email to the customer via Django email backend and marks this reminder as sent."
+                  : "Records that you manually sent this reminder (WhatsApp, call, etc.). Use after opening the WhatsApp link."
+              }
               onConfirm={async () => {
                 await sendReminder(row.id, "Sent manually from admin reminder queue.");
                 await loadPage();

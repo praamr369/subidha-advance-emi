@@ -71,6 +71,20 @@ export function cancelReminder(id: number, notes = "") {
   });
 }
 
+export type WhatsAppLinkResult = {
+  reminder_id: number;
+  phone: string;
+  phone_e164: string;
+  message: string;
+  link: string;
+  instructions: string;
+  note: string;
+};
+
+export function getWhatsAppReminderLink(id: number) {
+  return apiFetch<WhatsAppLinkResult>(`/reminders/${id}/whatsapp-link/`);
+}
+
 export function runPaymentReminders(payload: {
   due_date_on_or_before?: string;
   send_now?: boolean;
