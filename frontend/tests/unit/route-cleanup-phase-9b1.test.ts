@@ -8,7 +8,8 @@
  *   - delete a legacy content-owner page,
  *   - delete any future-`delete_later` legacy route,
  *   - flip a redirect direction (canonical pages must still redirect to legacy),
- *   - flip the finance / lucky-plan / requests families.
+ *   - flip the finance / lucky-plan families,
+ *   - accidentally treat the canonical /admin/requests/* pages as aliases.
  *
  * They also assert the plan document exists. All assertions are
  * file-content / file-existence based (no module imports), so they run under raw
@@ -29,7 +30,7 @@ const repoRoot = join(thisFileDir, "../../..");
 const pagePath = (rel: string) => join(appRoot, rel, "page.tsx");
 const readPage = (rel: string) => readFileSync(pagePath(rel), "utf8");
 
-// The four alias families, mapped canonical-alias → legacy content owner.
+// The alias families, mapped canonical-alias → legacy content owner.
 // This is the CURRENT (pre-flip) direction that Phase 9B.1 must preserve.
 const ALIAS_TO_LEGACY: Record<string, string> = {
   // Profiles & Parties
@@ -46,10 +47,15 @@ const ALIAS_TO_LEGACY: Record<string, string> = {
   // Finance Operations
   "finance/outstandings": "/admin/outstandings",
   "finance/customer-advances": "/admin/customer-advances",
-  // CRM & Requests
-  "requests/online-enquiries": "/admin/online-enquiries",
-  "requests/support": "/admin/support-requests",
-  "requests/subscriptions": "/admin/subscription-requests",
+};
+
+// Request hub routes are already canonical. The legacy request pages remain on
+// disk as redirects to the request hub.
+const REQUEST_HUB_PAGES = ["requests/online-enquiries", "requests/support", "requests/subscriptions"];
+const LEGACY_REQUEST_REDIRECTS: Record<string, string> = {
+  "online-enquiries": "/admin/requests/online-enquiries",
+  "support-requests": "/admin/requests/support",
+  "subscription-requests": "/admin/requests/subscriptions",
 };
 
 // Legacy content-owner pages that still host the real page today. After a future
@@ -67,9 +73,6 @@ const LEGACY_CONTENT_PAGES = [
   "lucky-draws",
   "outstandings",
   "customer-advances",
-  "online-enquiries",
-  "support-requests",
-  "subscription-requests",
 ];
 
 // ── 1. Canonical alias pages exist ─────────────────────────────────────────────
@@ -77,6 +80,14 @@ const LEGACY_CONTENT_PAGES = [
 test("Phase 9B.1: every canonical alias page exists", () => {
   for (const rel of Object.keys(ALIAS_TO_LEGACY)) {
     assert.ok(existsSync(pagePath(rel)), `Canonical alias page must exist: /admin/${rel}`);
+  }
+});
+
+test("Phase 9B.1: request hub pages are canonical and not aliases", () => {
+  for (const rel of REQUEST_HUB_PAGES) {
+    const src = readPage(rel);
+    assert.ok(existsSync(pagePath(rel)), `Canonical request page must exist: /admin/${rel}`);
+    assert.ok(!src.includes("redirect("), `/admin/${rel} must be a real page, not a redirect`);
   }
 });
 
@@ -133,15 +144,22 @@ test("Phase 9B.1: legacy content-owner pages are NOT redirects back to canonical
     "lucky-draws": "/admin/lucky-plan/draws",
     outstandings: "/admin/finance/outstandings",
     "customer-advances": "/admin/finance/customer-advances",
-    "online-enquiries": "/admin/requests/online-enquiries",
-    "support-requests": "/admin/requests/support",
-    "subscription-requests": "/admin/requests/subscriptions",
   };
   for (const [rel, canonical] of Object.entries(legacyToCanonical)) {
     const src = readPage(rel);
     assert.ok(
       !src.includes(`redirect("${canonical}")`),
       `/admin/${rel} must NOT yet redirect to canonical ${canonical} (no flip in Phase 9B.1)`
+    );
+  }
+});
+
+test("Phase 9B.1: legacy request pages redirect to the canonical request hub", () => {
+  for (const [rel, canonical] of Object.entries(LEGACY_REQUEST_REDIRECTS)) {
+    const src = readPage(rel);
+    assert.ok(
+      src.includes(`redirect("${canonical}")`),
+      `/admin/${rel} must redirect to canonical ${canonical}`
     );
   }
 });
@@ -195,14 +213,4 @@ test("Phase 9B.1: lucky-plan aliases are not flipped", () => {
 
 // ── 8. Requests aliases are not flipped in this phase ──────────────────────────
 
-test("Phase 9B.1: requests aliases are not flipped", () => {
-  const requests = ["requests/online-enquiries", "requests/support", "requests/subscriptions"];
-  for (const rel of requests) {
-    const src = readPage(rel);
-    assert.ok(src.includes("redirect("), `/admin/${rel} must still be a thin redirect (requests not flipped)`);
-    assert.ok(
-      src.includes(`redirect("${ALIAS_TO_LEGACY[rel]}")`),
-      `/admin/${rel} must still redirect to legacy ${ALIAS_TO_LEGACY[rel]}`
-    );
-  }
-});
+// Requests are already canonical and are covered by the request hub tests above.

@@ -84,15 +84,32 @@ test("Phase 9B-NF: lucky-plan and finance canonical routes still redirect to leg
     "lucky-plan/draws": "/admin/lucky-draws",
     "finance/outstandings": "/admin/outstandings",
     "finance/customer-advances": "/admin/customer-advances",
-    "requests/online-enquiries": "/admin/online-enquiries",
-    "requests/support": "/admin/support-requests",
-    "requests/subscriptions": "/admin/subscription-requests",
   };
   for (const [rel, target] of Object.entries(aliasTargets)) {
     const src = readPage(rel);
     assert.ok(
       src.includes(`redirect("${target}")`),
       `/admin/${rel} must still redirect to ${target} — no flip permitted`
+    );
+  }
+});
+
+test("Phase 9B-NF: request hub pages are canonical and legacy request pages still redirect", () => {
+  for (const rel of ["requests/online-enquiries", "requests/support", "requests/subscriptions"]) {
+    const src = readPage(rel);
+    assert.ok(!src.includes("redirect("), `/admin/${rel} must be a real page, not a redirect`);
+  }
+
+  const aliasTargets: Record<string, string> = {
+    "online-enquiries": "/admin/requests/online-enquiries",
+    "support-requests": "/admin/requests/support",
+    "subscription-requests": "/admin/requests/subscriptions",
+  };
+  for (const [rel, target] of Object.entries(aliasTargets)) {
+    const src = readPage(rel);
+    assert.ok(
+      src.includes(`redirect("${target}")`),
+      `/admin/${rel} must redirect to ${target} — no flip permitted`
     );
   }
 });

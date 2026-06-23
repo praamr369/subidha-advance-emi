@@ -53,13 +53,22 @@ test("Phase 6: CRM & Requests group contains core CRM routes", () => {
 });
 
 test("Phase 6: CRM & Requests group contains request intake routes", () => {
-  assert.ok(registrySource.includes("ROUTES.admin.onlineEnquiries"), "Missing onlineEnquiries in CRM & Requests");
-  assert.ok(registrySource.includes("ROUTES.admin.supportRequests"), "Missing supportRequests in CRM & Requests");
-  assert.ok(registrySource.includes("ROUTES.admin.subscriptionRequests"), "Missing subscriptionRequests in CRM & Requests");
-  assert.ok(registrySource.includes("ROUTES.admin.partnerPaymentRequests"), "Missing partnerPaymentRequests in CRM & Requests");
+  assert.ok(
+    registrySource.includes("ROUTES.admin.requestsOnlineEnquiries"),
+    "Missing requestsOnlineEnquiries in CRM & Requests"
+  );
+  assert.ok(registrySource.includes("ROUTES.admin.requestsSupport"), "Missing requestsSupport in CRM & Requests");
+  assert.ok(
+    registrySource.includes("ROUTES.admin.requestsSubscriptions"),
+    "Missing requestsSubscriptions in CRM & Requests"
+  );
+  assert.ok(
+    registrySource.includes("ROUTES.admin.partnerPaymentRequests"),
+    "Missing partnerPaymentRequests in CRM & Requests"
+  );
 });
 
-test("Phase 6: CRM & Requests group contains /admin/requests/* hub and alias routes", () => {
+test("Phase 6: CRM & Requests group contains /admin/requests/* hub routes", () => {
   assert.ok(registrySource.includes("ROUTES.admin.requestsHub"), "Missing requestsHub in CRM & Requests");
   assert.ok(registrySource.includes("ROUTES.admin.requestsOnlineEnquiries"), "Missing requestsOnlineEnquiries in CRM & Requests");
   assert.ok(registrySource.includes("ROUTES.admin.requestsSupport"), "Missing requestsSupport in CRM & Requests");
@@ -176,18 +185,18 @@ test("Phase 6: no request intake route is placed under Accounting & Reconciliati
 
 // ── ADMIN_ROUTE_ALIASES coverage ──────────────────────────────────────────────
 
-test("Phase 6: ADMIN_ROUTE_ALIASES contains /admin/requests/* → legacy route mappings", () => {
+test("Phase 6: ADMIN_ROUTE_ALIASES contains legacy request routes → /admin/requests/* mappings", () => {
   assert.ok(
-    registrySource.includes("requestsOnlineEnquiries") && registrySource.includes("onlineEnquiries"),
-    "ADMIN_ROUTE_ALIASES must map requestsOnlineEnquiries → onlineEnquiries"
+    registrySource.includes('"/admin/online-enquiries"') && registrySource.includes("ROUTES.admin.requestsOnlineEnquiries"),
+    "ADMIN_ROUTE_ALIASES must map /admin/online-enquiries → requestsOnlineEnquiries"
   );
   assert.ok(
-    registrySource.includes("requestsSupport") && registrySource.includes("supportRequests"),
-    "ADMIN_ROUTE_ALIASES must map requestsSupport → supportRequests"
+    registrySource.includes('"/admin/support-requests"') && registrySource.includes("ROUTES.admin.requestsSupport"),
+    "ADMIN_ROUTE_ALIASES must map /admin/support-requests → requestsSupport"
   );
   assert.ok(
-    registrySource.includes("requestsSubscriptions") && registrySource.includes("subscriptionRequests"),
-    "ADMIN_ROUTE_ALIASES must map requestsSubscriptions → subscriptionRequests"
+    registrySource.includes('"/admin/subscription-requests"') && registrySource.includes("ROUTES.admin.requestsSubscriptions"),
+    "ADMIN_ROUTE_ALIASES must map /admin/subscription-requests → requestsSubscriptions"
   );
 });
 

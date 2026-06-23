@@ -162,12 +162,12 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   //   /admin/batches      → /admin/lucky-plan/batches  (migrate_then_alias)
   //   /admin/lucky-ids    → /admin/lucky-plan/lucky-ids (migrate_then_alias)
   //   /admin/lucky-draws  → /admin/lucky-plan/draws    (migrate_then_alias)
-  // Winners route is a documented gap (no dedicated backend endpoint exists).
+  // Winners route is implemented as a read-only register page.
   item("Lucky Plan Control", "Lucky Plan Control", ROUTES.admin.luckyPlanControl, "Lucky Plan hub: batches, Lucky IDs, draws, and winner audit evidence."),
   item("Lucky Plan Control", "Batches", ROUTES.admin.luckyPlanBatches, "Batch lifecycle and draw scope."),
   item("Lucky Plan Control", "Lucky IDs", ROUTES.admin.luckyPlanLuckyIds, "Lucky ID register and 00–99 allocation grid."),
   item("Lucky Plan Control", "Lucky Draws", ROUTES.admin.luckyPlanDraws, "Draw schedule and execution: commit, reveal, winner evidence."),
-  item("Lucky Plan Control", "Winners", ROUTES.admin.luckyPlanWinners, "Winner visibility and EMI waiver audit trail. (Gap: no dedicated winners endpoint yet; see page for detail.)"),
+  item("Lucky Plan Control", "Winners", ROUTES.admin.luckyPlanWinners, "Winner visibility and EMI waiver audit trail."),
 
   // ── 6. Collections & Cashier ──────────────────────────────────────────────
   item("Collections & Cashier", "Collection", ROUTES.admin.financeCollect, "Unified collection workspace."),

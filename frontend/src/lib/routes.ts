@@ -59,11 +59,13 @@ export const ROUTES = {
     reportsSetup: "/admin/reports-setup",
 
     // ── Compatibility-alias topology (Phase 9A audit) ─────────────────────────
-    // Several canonical "new" routes are thin page-level redirect aliases that
+    // Most canonical "new" routes are thin page-level redirect aliases that
     // point BACK to the legacy route that still hosts the real page. The legacy
     // path is the content owner (classification: keep_temporarily); the canonical
     // path is the alias (classification: alias). These are intentionally preserved
-    // and must NOT be deleted in Phase 9A. Direction (canonical → legacy):
+    // and must NOT be deleted in Phase 9A. Request hub routes are the exception:
+    // the /admin/requests/* paths are now the real pages, and the legacy request
+    // routes redirect forward to them. Direction (canonical → target):
     //   /admin/profiles/customers        → /admin/customers
     //   /admin/profiles/partners         → /admin/partners
     //   /admin/profiles/vendors          → /admin/vendors
@@ -75,11 +77,11 @@ export const ROUTES = {
     //   /admin/lucky-plan/draws          → /admin/lucky-draws
     //   /admin/finance/outstandings      → /admin/outstandings
     //   /admin/finance/customer-advances → /admin/customer-advances
-    //   /admin/requests/online-enquiries → /admin/online-enquiries
-    //   /admin/requests/support          → /admin/support-requests
-    //   /admin/requests/subscriptions    → /admin/subscription-requests
-    // Phase 9B (deferred): move page content into the canonical path, then flip
-    // each redirect so the legacy path becomes the alias (migrate_then_alias).
+    //   /admin/online-enquiries          → /admin/requests/online-enquiries
+    //   /admin/support-requests          → /admin/requests/support
+    //   /admin/subscription-requests     → /admin/requests/subscriptions
+    // Phase 9B (deferred): move more page content into the canonical path, then
+    // flip each redirect so the legacy path becomes the alias (migrate_then_alias).
     profiles: "/admin/profiles",
     profilesCustomers: "/admin/profiles/customers",
     profilesPartners: "/admin/profiles/partners",

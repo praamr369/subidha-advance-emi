@@ -48,9 +48,9 @@ test("Phase 9A: all classified routes have constants in routes.ts", () => {
     // NOTE: legacy "/admin/customer-advances" intentionally omitted — it has a
     // page and is the active redirect target of financeCustomerAdvances, but it
     // has no named ROUTES constant (documented frontend gap / Phase 9B candidate).
-    "/admin/online-enquiries",
-    "/admin/support-requests",
-    "/admin/subscription-requests",
+    "/admin/requests/online-enquiries",
+    "/admin/requests/support",
+    "/admin/requests/subscriptions",
     "/admin/service-desk/cases",
     "/admin/vendors/ledger",
     "/admin/vendors/outstanding",
@@ -82,12 +82,30 @@ test("Phase 9A: legacy content-owning route pages are not deleted", () => {
     "lucky-draws",
     "outstandings",
     "customer-advances",
-    "online-enquiries",
-    "support-requests",
-    "subscription-requests",
   ];
   for (const rel of legacyPages) {
     assert.ok(existsSync(pagePath(rel)), `Legacy content page must remain: /admin/${rel}`);
+  }
+});
+
+test("Phase 9A: request hub legacy pages redirect to canonical request routes", () => {
+  const aliasTargets: Record<string, string> = {
+    "online-enquiries": "/admin/requests/online-enquiries",
+    "support-requests": "/admin/requests/support",
+    "subscription-requests": "/admin/requests/subscriptions",
+  };
+  for (const [rel, target] of Object.entries(aliasTargets)) {
+    const src = readPage(rel);
+    assert.ok(src.includes("redirect("), `/admin/${rel} must be a thin redirect alias`);
+    assert.ok(src.includes(`redirect("${target}")`), `/admin/${rel} must redirect to ${target}`);
+  }
+});
+
+test("Phase 9A: canonical request hub pages exist and are not redirects", () => {
+  for (const rel of ["requests/online-enquiries", "requests/support", "requests/subscriptions"]) {
+    const src = readPage(rel);
+    assert.ok(existsSync(pagePath(rel)), `Canonical request page must exist: /admin/${rel}`);
+    assert.ok(!src.includes("redirect("), `/admin/${rel} must be a real page, not a redirect`);
   }
 });
 
@@ -120,9 +138,6 @@ test("Phase 9A: lucky-plan and finance canonical routes redirect to legacy conte
     "lucky-plan/draws": "/admin/lucky-draws",
     "finance/outstandings": "/admin/outstandings",
     "finance/customer-advances": "/admin/customer-advances",
-    "requests/online-enquiries": "/admin/online-enquiries",
-    "requests/support": "/admin/support-requests",
-    "requests/subscriptions": "/admin/subscription-requests",
   };
   for (const [rel, target] of Object.entries(aliasTargets)) {
     const src = readPage(rel);
@@ -151,33 +166,33 @@ test("Phase 9A: documented gap routes remain pageless (no fake readiness)", () =
 
 // ── 5. Gap pages that DO exist are honest (no fetch, no fake numbers) ──────────
 
-test("Phase 9A: customer-analytics report is an honest empty state, not fake BI", () => {
+test("Phase 9A: customer-analytics report is implemented and links to customer profiles", () => {
   const src = readPage("reports/customer-analytics");
-  assert.ok(src.includes("EmptyState"), "customer-analytics must render an EmptyState");
+  assert.ok(src.includes("apiFetch"), "customer-analytics must fetch live retention data");
+  assert.ok(src.includes("Open profile"), "customer-analytics must link to customer profile drill-down");
   assert.ok(
-    src.includes("not yet implemented") || src.includes("Not yet implemented"),
-    "customer-analytics must say it is not yet implemented"
-  );
-  assert.ok(
-    !src.includes("apiFetch") && !src.includes("useEffect"),
-    "customer-analytics must not fetch (no backend aggregate exists)"
+    !src.includes("not yet implemented") && !src.includes("Not yet implemented"),
+    "customer-analytics must no longer claim it is unimplemented"
   );
 });
 
-test("Phase 9A: lucky-plan winners page documents the gap and shows no fake winner data", () => {
+test("Phase 9A: lucky-plan winners page is implemented and fetches live winner records", () => {
   const src = readPage("lucky-plan/winners");
-  assert.ok(src.includes("Gap"), "winners page must document the missing-endpoint gap");
+  assert.ok(src.includes("listLuckyDrawWinners"), "winners page must fetch live winner data");
+  assert.ok(src.includes("useEffect"), "winners page must load data on mount");
+  assert.ok(src.includes("future EMI"), "winners page must preserve the future-EMI waiver rule");
   assert.ok(
-    src.includes("No fake winner data") || src.includes("no fake winner") || src.includes("future EMI"),
-    "winners page must state no fake data and preserve the future-EMI waiver rule"
-  );
-  assert.ok(
-    !src.includes("apiFetch") && !src.includes("useEffect"),
-    "winners page must not fetch (no aggregate endpoint exists)"
+    !src.includes("Gap") && !src.includes("No fake winner data"),
+    "winners page must no longer describe itself as a missing-endpoint gap"
   );
 });
 
-test("Phase 9A: vendor ledger and outstanding pages are honest navigation stubs", () => {
+test("Phase 9A: second-pass stub pages remain honest stubs", () => {
+  const stubPages = ["vendors/ledger", "vendors/outstanding"];
+  for (const rel of stubPages) {
+    assert.ok(existsSync(pagePath(rel)), `Second-pass stub page must exist: /admin/${rel}`);
+  }
+
   const ledger = readPage("vendors/ledger");
   const outstanding = readPage("vendors/outstanding");
   assert.ok(ledger.includes("stub") || ledger.includes("detail page"), "vendor ledger must be an honest stub");
@@ -277,9 +292,9 @@ test("Phase 9A: canonical module hub routes that exist have page files", () => {
   }
 });
 
-// ── 10. Taxonomy still classifies the named gap routes (classified, not dropped) ─
+// ── 10. Taxonomy still classifies the named routes (classified, not dropped) ─
 
-test("Phase 9A: taxonomy still owns the classified gap routes", () => {
+test("Phase 9A: taxonomy still owns the classified routes", () => {
   assert.ok(taxonomySource.includes("serviceDeskCases"), "taxonomy must still classify serviceDeskCases");
   assert.ok(taxonomySource.includes("reportsCustomerAnalytics"), "taxonomy must still classify reportsCustomerAnalytics");
   assert.ok(taxonomySource.includes("purchaseVendorReturns"), "taxonomy must still classify purchaseVendorReturns");
