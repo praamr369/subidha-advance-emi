@@ -30,6 +30,7 @@ import {
 import { apiFetch, toArray } from "@/lib/api";
 import { formatPlanTypeLabel } from "@/lib/plan-labels";
 import { cn } from "@/lib/utils";
+import GuarantorSection from "@/components/subscriptions/GuarantorSection";
 import {
   normalizeDeliveryRecord,
   type DeliveryRecord,
@@ -1894,6 +1895,13 @@ export default function AdminSubscriptionDetailPage() {
               )}
             </DetailPanel>
           </>
+        ) : null}
+
+        {/* Guarantor / co-applicant section */}
+        {subscription ? (
+          <div className="mt-6">
+            <GuarantorSection subscriptionId={subscription.id} />
+          </div>
         ) : null}
       </div>
     </ERPPageShell>

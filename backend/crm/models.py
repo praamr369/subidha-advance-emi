@@ -495,3 +495,40 @@ class CustomerInteraction(CrmTimeStampedModel):
         self.full_clean()
         super().save(*args, **kwargs)
 
+
+# ---------------------------------------------------------------------------
+# StaffSalesTarget — monthly sales targets per staff member
+# ---------------------------------------------------------------------------
+
+class StaffSalesTarget(CrmTimeStampedModel):
+    staff = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sales_targets",
+        db_index=True,
+    )
+    month = models.PositiveSmallIntegerField()
+    year = models.PositiveSmallIntegerField()
+    target_leads = models.PositiveIntegerField(default=0)
+    target_conversions = models.PositiveIntegerField(default=0)
+    target_revenue = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "crm_staff_sales_targets"
+        unique_together = [("staff", "month", "year")]
+        ordering = ["-year", "-month", "staff"]
+        indexes = [
+            models.Index(fields=["year", "month"]),
+        ]
+
+    def __str__(self):
+        return f"Target({self.staff_id}) {self.year}-{self.month:02d}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError as DjValidationError
+        if not (1 <= (self.month or 0) <= 12):
+            raise DjValidationError({"month": "Month must be between 1 and 12."})
+        if not self.year or self.year < 2020:
+            raise DjValidationError({"year": "Year must be 2020 or later."})
+

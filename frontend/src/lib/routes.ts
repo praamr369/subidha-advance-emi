@@ -232,6 +232,11 @@ export const ROUTES = {
     crmKyc: "/admin/crm/kyc",
     crmCustomerDetail: "/admin/crm/customers",
     crmParties: "/admin/crm/parties",
+    crmLeaderboard: "/admin/crm/leaderboard",
+
+    defaulters: "/admin/defaulters",
+    schemes: "/admin/schemes",
+    gstrReport: "/admin/reports/gstr",
 
     // Phase 6: canonical /admin/requests/* request hub routes
     // These are thin redirect aliases that keep legacy routes intact.

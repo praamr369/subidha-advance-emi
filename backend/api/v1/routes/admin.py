@@ -221,6 +221,18 @@ from api.v1.views.admin_contracts import (
     ContractReturnInspectionRecordView,
     ContractReturnInspectionApproveView,
 )
+from api.v1.views.admin_gstr import AdminGstrReportView
+from api.v1.views.admin_recovery import (
+    AdminDefaulterListView,
+    AdminGuarantorDetailView,
+    AdminGuarantorListView,
+    AdminLeaderboardView,
+    AdminRecoveryCaseDetailView,
+    AdminRecoveryCaseListView,
+    AdminSchemeDetailView,
+    AdminSchemeListView,
+    AdminStaffTargetListView,
+)
 from api.v1.views.admin_reports import (
     AdminAnalyticsSummaryView,
     AdminBatchPerformanceAggregateView,
@@ -1077,4 +1089,24 @@ urlpatterns = [
     path("hr/staff/<int:staff_id>/kyc-documents/<int:doc_id>/reject/", AdminStaffKycDocumentRejectView.as_view()),
     path("hr/staff/<int:staff_id>/kyc-documents/<int:doc_id>/request-resubmission/", AdminStaffKycDocumentResubmitView.as_view()),
     path("hr/staff/<int:staff_id>/kyc-documents/<int:doc_id>/download/", AdminStaffKycDocumentDownloadView.as_view()),
+
+    # ── GSTR Report ──────────────────────────────────────────────────────────
+    path("reports/gstr/", AdminGstrReportView.as_view()),
+
+    # ── Defaulter Recovery ────────────────────────────────────────────────────
+    path("defaulters/", AdminDefaulterListView.as_view()),
+    path("recovery-cases/", AdminRecoveryCaseListView.as_view()),
+    path("recovery-cases/<int:pk>/", AdminRecoveryCaseDetailView.as_view()),
+
+    # ── Guarantors ────────────────────────────────────────────────────────────
+    path("subscriptions/<int:subscription_id>/guarantors/", AdminGuarantorListView.as_view()),
+    path("subscriptions/<int:subscription_id>/guarantors/<int:pk>/", AdminGuarantorDetailView.as_view()),
+
+    # ── EMI Schemes ───────────────────────────────────────────────────────────
+    path("schemes/", AdminSchemeListView.as_view()),
+    path("schemes/<int:pk>/", AdminSchemeDetailView.as_view()),
+
+    # ── Staff targets + leaderboard ───────────────────────────────────────────
+    path("crm/staff-targets/", AdminStaffTargetListView.as_view()),
+    path("crm/leaderboard/", AdminLeaderboardView.as_view()),
 ]

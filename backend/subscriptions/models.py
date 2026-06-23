@@ -5456,3 +5456,216 @@ class CustomerRiskProfile(TimeStampedModel):
 
     def __str__(self):
         return f"RiskProfile({self.customer_id}): {self.risk_band} [{self.risk_score}]"
+
+
+# ---------------------------------------------------------------------------
+# SubscriptionGuarantor — co-applicant / guarantor on an EMI contract
+# ---------------------------------------------------------------------------
+
+class GuarantorRelation(models.TextChoices):
+    SPOUSE = "SPOUSE", "Spouse"
+    PARENT = "PARENT", "Parent"
+    SIBLING = "SIBLING", "Sibling"
+    FRIEND = "FRIEND", "Friend"
+    EMPLOYER = "EMPLOYER", "Employer"
+    OTHER = "OTHER", "Other"
+
+
+class SubscriptionGuarantor(TimeStampedModel):
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.CASCADE,
+        related_name="guarantors",
+    )
+    name = models.CharField(max_length=200)
+    phone = models.CharField(max_length=20, db_index=True)
+    relation = models.CharField(
+        max_length=16,
+        choices=GuarantorRelation.choices,
+        default=GuarantorRelation.OTHER,
+    )
+    aadhaar_no = models.CharField(max_length=20, blank=True, default="")
+    address = models.TextField(blank=True, default="")
+    is_primary = models.BooleanField(default=False, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "subscriptions_guarantors"
+        ordering = ["-is_primary", "id"]
+        indexes = [
+            models.Index(fields=["subscription", "is_primary"]),
+        ]
+
+    def __str__(self):
+        return f"Guarantor({self.name}) for Sub#{self.subscription_id}"
+
+    def clean(self):
+        self.name = (self.name or "").strip()
+        self.phone = (self.phone or "").strip()
+        self.aadhaar_no = (self.aadhaar_no or "").strip()
+        if not self.name:
+            raise ValidationError({"name": "Guarantor name is required."})
+        if not self.phone:
+            raise ValidationError({"phone": "Guarantor phone is required."})
+
+
+# ---------------------------------------------------------------------------
+# RecoveryCase — defaulter recovery workflow
+# ---------------------------------------------------------------------------
+
+class RecoveryStage(models.TextChoices):
+    IDENTIFIED = "IDENTIFIED", "Identified"
+    NOTICE_SENT = "NOTICE_SENT", "Notice Sent"
+    FIELD_VISIT = "FIELD_VISIT", "Field Visit"
+    LEGAL = "LEGAL", "Legal"
+    SETTLED = "SETTLED", "Settled"
+    WRITTEN_OFF = "WRITTEN_OFF", "Written Off"
+
+
+class RecoveryCase(TimeStampedModel):
+    subscription = models.OneToOneField(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="recovery_case",
+    )
+    stage = models.CharField(
+        max_length=20,
+        choices=RecoveryStage.choices,
+        default=RecoveryStage.IDENTIFIED,
+        db_index=True,
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_recovery_cases",
+    )
+    overdue_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    overdue_emis = models.PositiveIntegerField(default=0)
+    first_overdue_date = models.DateField(null=True, blank=True, db_index=True)
+    notice_sent_at = models.DateTimeField(null=True, blank=True)
+    field_visit_at = models.DateTimeField(null=True, blank=True)
+    legal_at = models.DateTimeField(null=True, blank=True)
+    settled_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    settled_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+    last_contact_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "subscriptions_recovery_cases"
+        ordering = ["-first_overdue_date", "-id"]
+        indexes = [
+            models.Index(fields=["stage", "first_overdue_date"]),
+            models.Index(fields=["assigned_to", "stage"]),
+        ]
+
+    def __str__(self):
+        return f"RecoveryCase#{self.pk} Sub#{self.subscription_id} [{self.stage}]"
+
+    @property
+    def aging_days(self) -> int:
+        if not self.first_overdue_date:
+            return 0
+        return (timezone.localdate() - self.first_overdue_date).days
+
+    @property
+    def aging_bucket(self) -> str:
+        days = self.aging_days
+        if days <= 30:
+            return "0-30"
+        if days <= 60:
+            return "31-60"
+        if days <= 90:
+            return "61-90"
+        if days <= 120:
+            return "91-120"
+        return "120+"
+
+
+# ---------------------------------------------------------------------------
+# EMIScheme — festival / promotional scheme engine
+# ---------------------------------------------------------------------------
+
+class SchemeDiscountType(models.TextChoices):
+    PERCENT = "PERCENT", "Percentage discount"
+    FLAT_AMOUNT = "FLAT_AMOUNT", "Flat amount off"
+    WAIVE_INSTALLMENTS = "WAIVE_INSTALLMENTS", "Waive N installments"
+
+
+class EMIScheme(TimeStampedModel):
+    name = models.CharField(max_length=200, db_index=True)
+    code = models.CharField(max_length=40, unique=True, db_index=True)
+    plan_type = models.CharField(
+        max_length=12,
+        choices=PlanType.choices,
+        blank=True,
+        default="",
+        help_text="Leave blank to apply to all plan types.",
+    )
+    discount_type = models.CharField(
+        max_length=24,
+        choices=SchemeDiscountType.choices,
+        default=SchemeDiscountType.PERCENT,
+    )
+    value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Percent value, flat rupee amount, or number of installments to waive.",
+    )
+    valid_from = models.DateField(db_index=True)
+    valid_to = models.DateField(db_index=True)
+    applicable_products = models.ManyToManyField(
+        Product,
+        blank=True,
+        related_name="emi_schemes",
+        help_text="Leave empty to apply to all products.",
+    )
+    max_uses = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Maximum number of subscriptions this scheme can be applied to. Null = unlimited.",
+    )
+    used_count = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)
+    description = models.TextField(blank=True, default="")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_emi_schemes",
+    )
+
+    class Meta:
+        db_table = "subscriptions_emi_schemes"
+        ordering = ["-valid_from", "-id"]
+        indexes = [
+            models.Index(fields=["is_active", "valid_from", "valid_to"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+    def clean(self):
+        self.name = (self.name or "").strip()
+        self.code = (self.code or "").strip().upper()
+        if self.valid_to and self.valid_from and self.valid_to < self.valid_from:
+            raise ValidationError({"valid_to": "End date must be on or after start date."})
+        if not self.name:
+            raise ValidationError({"name": "Scheme name is required."})
+        if not self.code:
+            raise ValidationError({"code": "Scheme code is required."})
+
+    @property
+    def is_currently_active(self) -> bool:
+        today = timezone.localdate()
+        if not self.is_active:
+            return False
+        if self.valid_from and today < self.valid_from:
+            return False
+        if self.valid_to and today > self.valid_to:
+            return False
+        if self.max_uses is not None and self.used_count >= self.max_uses:
+            return False
+        return True
