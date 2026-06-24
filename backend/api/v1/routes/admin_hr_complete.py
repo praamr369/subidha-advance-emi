@@ -21,6 +21,7 @@ from api.v1.views.accounting import (
     EmployeeExpenseClaimViewSet,
     EmployeeExpenseClaimPaymentViewSet,
 )
+from api.v1.views.staff_tasks import StaffTaskAdminViewSet
 
 router = DefaultRouter()
 
@@ -85,6 +86,15 @@ router.register(
     r"expense-claims",
     EmployeeExpenseClaimViewSet,
     basename="hr-expense-claims"
+)
+
+# ============================================================================
+# STAFF TASK ASSIGNMENT (field/office task management)
+# ============================================================================
+router.register(
+    r"staff-tasks",
+    StaffTaskAdminViewSet,
+    basename="hr-staff-tasks"
 )
 
 # Export URL patterns

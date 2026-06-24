@@ -2789,6 +2789,62 @@ class EmployeeAttendance(AccountingTimeStampedModel):
         return f"{self.employee.employee_code} {self.attendance_date}"
 
 
+class StaffTask(AccountingTimeStampedModel):
+    """A task assigned to a field/office staff member."""
+
+    class Priority(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    class Status(models.TextChoices):
+        OPEN = "OPEN", "Open"
+        IN_PROGRESS = "IN_PROGRESS", "In Progress"
+        DONE = "DONE", "Done"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    assigned_to = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.CASCADE,
+        related_name="tasks",
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    priority = models.CharField(
+        max_length=10,
+        choices=Priority.choices,
+        default=Priority.MEDIUM,
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.OPEN,
+        db_index=True,
+    )
+    due_date = models.DateField(null=True, blank=True, db_index=True)
+    completion_note = models.TextField(blank=True, default="")
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_staff_tasks",
+    )
+
+    class Meta:
+        db_table = "accounting_staff_task"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["assigned_to", "status"]),
+            models.Index(fields=["due_date", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} → {self.assigned_to_id}"
+
+
 class SalarySheet(AccountingTimeStampedModel):
     employee = models.ForeignKey(
         EmployeeProfile,

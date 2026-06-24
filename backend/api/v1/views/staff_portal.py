@@ -109,6 +109,36 @@ class StaffAttendanceView(APIView):
             status=status.HTTP_200_OK,
         )
 
+    def post(self, request):
+        """Self check-in: marks the staff member present for today."""
+        from accounting.models import AttendanceStatus, EmployeeAttendance
+
+        identity = staff_identity_for_user(request.user)
+        today = timezone.localdate()
+        existing = EmployeeAttendance.objects.filter(
+            employee=identity.employee, attendance_date=today
+        ).first()
+        if existing is not None:
+            return Response(
+                {"detail": "Attendance already recorded for today.", "attendance_date": str(today)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        entry = EmployeeAttendance.objects.create(
+            employee=identity.employee,
+            attendance_date=today,
+            status=AttendanceStatus.PRESENT,
+            recorded_by=request.user,
+            notes=(request.data.get("note") or "").strip(),
+        )
+        return Response(
+            {
+                "detail": "Checked in successfully.",
+                "attendance_date": str(entry.attendance_date),
+                "status": entry.status,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
 
 class StaffPayslipListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsStaff]

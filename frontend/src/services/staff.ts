@@ -86,10 +86,23 @@ export type StaffReportsPayload = {
   read_only: boolean;
 };
 
+export type StaffTask = {
+  id: number;
+  assigned_to: number;
+  assigned_to_name: string;
+  title: string;
+  description: string;
+  priority: "LOW" | "MEDIUM" | "HIGH";
+  status: "OPEN" | "IN_PROGRESS" | "DONE" | "CANCELLED";
+  due_date: string | null;
+  completion_note: string;
+  completed_at: string | null;
+  created_at: string;
+};
+
 export type StaffTaskPayload = {
-  results: unknown[];
-  detail: string;
-  read_only: boolean;
+  count: number;
+  results: StaffTask[];
 };
 
 export type AdminStaffIdentity = {
@@ -151,8 +164,29 @@ export function getStaffReports() {
   return request<StaffReportsPayload>("/staff/reports/");
 }
 
-export function getStaffTasks() {
-  return request<StaffTaskPayload>("/staff/tasks/");
+export function getStaffTasks(status?: string) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request<StaffTaskPayload>(`/staff/tasks/${query}`);
+}
+
+export function completeStaffTask(
+  taskId: number,
+  payload: { status?: "IN_PROGRESS" | "DONE"; note?: string } = {}
+) {
+  return request<StaffTask>(`/staff/tasks/${taskId}/complete/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function staffCheckIn(note?: string) {
+  return request<{ detail: string; attendance_date: string; status: string }>(
+    "/staff/attendance/",
+    {
+      method: "POST",
+      body: JSON.stringify({ note: note ?? "" }),
+    }
+  );
 }
 
 export function listAdminStaffIdentities() {
