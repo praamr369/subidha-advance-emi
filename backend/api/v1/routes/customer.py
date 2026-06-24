@@ -53,6 +53,11 @@ from api.v1.views.notifications import (
     CustomerNotificationSummaryView,
 )
 from api.v1.views.username_change import CustomerSelfUsernameChangeView
+from api.v1.views.customer_lucky_draws import (
+    CustomerLuckyDrawListView,
+    CustomerLuckyDrawDetailView,
+    customer_lucky_draw_certificate_view,
+)
 
 urlpatterns = [
     path("dashboard/", CustomerDashboard.as_view()),
@@ -67,6 +72,9 @@ urlpatterns = [
     path("kyc-documents/", CustomerKycDocumentView.as_view()),
     path("referrals/", CustomerReferralListView.as_view()),
     path("referrals/create/", CustomerReferralCreateView.as_view()),
+    path("lucky-draws/", CustomerLuckyDrawListView.as_view()),
+    path("lucky-draws/<int:pk>/", CustomerLuckyDrawDetailView.as_view()),
+    path("lucky-draws/<int:pk>/certificate/", customer_lucky_draw_certificate_view),
     path("subscriptions/", PaginatedCustomerSubscriptionListView.as_view()),
     path("subscriptions/<int:pk>/", CustomerSubscriptionDetailView.as_view()),
     path("subscription-request-options/", CustomerSubscriptionRequestOptionsView.as_view()),

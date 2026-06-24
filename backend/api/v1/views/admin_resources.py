@@ -1441,6 +1441,107 @@ class LuckyDrawAdminViewSet(AdminOnlyModelViewSet):
 
         return Response(payload, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=["post"], url_path="verify-winner")
+    def verify_winner(self, request, pk=None):
+        """Verify or reject a lucky draw winner"""
+        action = (request.data.get("action") or "").strip().lower()
+        notes = (request.data.get("notes") or "").strip()
+
+        if action not in ["approve", "reject"]:
+            return Response(
+                {"action": ["Action must be 'approve' or 'reject'."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            draw = self.get_object()
+        except LuckyDraw.DoesNotExist:
+            return Response(
+                {"detail": "Lucky draw not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if action == "approve":
+            draw.winner_status = "VERIFIED"
+            draw.winner_verified_at = timezone.now()
+            draw.winner_verified_by = getattr(request.user, "staff_member", None)
+            draw.save()
+            message = "Winner verified successfully"
+        else:
+            draw.winner_status = "REJECTED"
+            draw.winner_rejected_reason = notes
+            draw.save()
+            message = "Winner rejected"
+
+        # Log audit entry
+        AuditLog.objects.create(
+            user=request.user,
+            action=f"lucky_draw_winner_{action}",
+            content_type_id=None,
+            object_id=draw.id,
+            notes=notes or f"Winner {action}ed",
+            change_message=f"Lucky draw {draw.id} winner {action}ed"
+        )
+
+        return Response({
+            "detail": message,
+            "draw_id": draw.id,
+            "winner_status": draw.winner_status,
+            "verified_at": draw.winner_verified_at
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="settle-winner")
+    def settle_winner(self, request, pk=None):
+        """Process winner waiver settlement (create accounting entry)"""
+        try:
+            draw = self.get_object()
+        except LuckyDraw.DoesNotExist:
+            return Response(
+                {"detail": "Lucky draw not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if draw.winner_status != "VERIFIED":
+            return Response(
+                {"detail": "Winner must be verified before settlement."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Create accounting entry for waived EMI
+        try:
+            waived_emis = draw.emis.filter(status="WAIVED")
+            settlement_data = {
+                "draw_id": draw.id,
+                "waived_emi_count": draw.waived_emi_count,
+                "waived_amount": draw.waived_amount,
+                "emis_settled": list(waived_emis.values_list("id", flat=True))
+            }
+
+            draw.settlement_status = "SETTLED"
+            draw.save()
+
+            # Log audit entry
+            AuditLog.objects.create(
+                user=request.user,
+                action="lucky_draw_winner_settled",
+                content_type_id=None,
+                object_id=draw.id,
+                notes=f"Settled {draw.waived_emi_count} waived EMIs",
+                change_message=f"Lucky draw {draw.id} settlement processed"
+            )
+
+            return Response({
+                "detail": "Winner settled successfully",
+                "settlement_data": settlement_data,
+                "status": "SETTLED"
+            }, status=status.HTTP_200_OK)
+
+        except Exception as exc:
+            return Response(
+                {"detail": f"Settlement failed: {str(exc)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
 
 # =====================================================
 # LUCKY ID
@@ -1512,6 +1613,119 @@ class LuckyIdAdminViewSet(AdminOnlyModelViewSet):
                 "count": len(serializer.data),
             }
         )
+
+    @action(detail=False, methods=["post"], url_path="bulk-assign")
+    def bulk_assign(self, request):
+        """Bulk assign lucky IDs to unassigned EMIs in a batch"""
+        batch_id = (request.data.get("batch_id") or "").strip()
+        lucky_ids = request.data.get("lucky_ids") or []
+
+        if not batch_id or not lucky_ids:
+            return Response(
+                {"detail": "batch_id and lucky_ids are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            batch_id = int(batch_id)
+        except (ValueError, TypeError):
+            return Response(
+                {"detail": "batch_id must be a valid integer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            emis = Emi.objects.filter(
+                batch_id=batch_id,
+                lucky_id__isnull=True
+            )[:len(lucky_ids)]
+
+            lucky_id_objects = LuckyId.objects.filter(id__in=lucky_ids)
+
+            if lucky_id_objects.count() != len(lucky_ids):
+                return Response(
+                    {"detail": "Some lucky IDs not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            assignments = []
+            for emi, lucky_id in zip(emis, lucky_id_objects):
+                emi.lucky_id = lucky_id
+                assignments.append(emi)
+
+            Emi.objects.bulk_update(assignments, ["lucky_id"])
+
+            AuditLog.objects.create(
+                user=request.user,
+                action="lucky_ids_bulk_assigned",
+                content_type_id=None,
+                object_id=batch_id,
+                notes=f"Assigned {len(assignments)} lucky IDs to EMIs in batch {batch_id}",
+                change_message=f"Bulk assignment completed for batch {batch_id}"
+            )
+
+            return Response({
+                "detail": f"Assigned {len(assignments)} lucky IDs successfully",
+                "assigned_count": len(assignments),
+                "batch_id": batch_id
+            }, status=status.HTTP_200_OK)
+
+        except Exception as exc:
+            return Response(
+                {"detail": f"Bulk assignment failed: {str(exc)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=True, methods=["post"], url_path="reassign")
+    def reassign(self, request, pk=None):
+        """Reassign a lucky ID from one EMI to another"""
+        new_emi_id = request.data.get("emi_id")
+
+        if not new_emi_id:
+            return Response(
+                {"detail": "emi_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            lucky_id = self.get_object()
+            old_emi = Emi.objects.filter(lucky_id=lucky_id).first()
+
+            new_emi = Emi.objects.get(id=new_emi_id)
+
+            if old_emi:
+                old_emi.lucky_id = None
+                old_emi.save()
+
+            new_emi.lucky_id = lucky_id
+            new_emi.save()
+
+            AuditLog.objects.create(
+                user=request.user,
+                action="lucky_id_reassigned",
+                content_type_id=None,
+                object_id=lucky_id.id,
+                notes=f"Reassigned from EMI {old_emi.id if old_emi else 'None'} to EMI {new_emi.id}",
+                change_message=f"Lucky ID {lucky_id.id} reassigned"
+            )
+
+            return Response({
+                "detail": "Lucky ID reassigned successfully",
+                "lucky_id": lucky_id.id,
+                "old_emi_id": old_emi.id if old_emi else None,
+                "new_emi_id": new_emi.id
+            }, status=status.HTTP_200_OK)
+
+        except Emi.DoesNotExist:
+            return Response(
+                {"detail": "EMI not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as exc:
+            return Response(
+                {"detail": f"Reassignment failed: {str(exc)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 # =====================================================

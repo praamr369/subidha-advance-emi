@@ -1,5 +1,6 @@
 "use client";
 import { formatRupee } from "@/lib/utils/currency";
+import { Download } from "lucide-react";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -8,13 +9,15 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
-import { listCustomerInvoices, type FinanceInvoiceRow } from "@/services/phase4-finance";
+import { listCustomerInvoices, downloadInvoicePdf, type FinanceInvoiceRow } from "@/services/phase4-finance";
 
 
 export default function CustomerInvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<FinanceInvoiceRow[]>([]);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -29,6 +32,21 @@ export default function CustomerInvoicesPage() {
     }
   }, []);
 
+  const handleDownload = useCallback(
+    async (invoiceId: number) => {
+      setDownloadingId(invoiceId);
+      setDownloadError(null);
+      try {
+        await downloadInvoicePdf(invoiceId);
+      } catch (err) {
+        setDownloadError(err instanceof Error ? err.message : "Failed to download invoice");
+      } finally {
+        setDownloadingId(null);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -41,6 +59,11 @@ export default function CustomerInvoicesPage() {
       actions={[{ href: "/customer/receipts", label: "Receipts", variant: "secondary" }]}
     >
       <WorkspaceSection title="Invoice Register" description="Immutable invoice numbers and current balances.">
+        {downloadError && (
+          <div className="mb-4 rounded-lg bg-red-50 p-3 border border-red-200 text-sm text-red-800">
+            {downloadError}
+          </div>
+        )}
         {loading ? (
           <ERPLoadingState label="Loading invoices..." />
         ) : error ? (
@@ -58,6 +81,7 @@ export default function CustomerInvoicesPage() {
                   <th className="px-3 py-2">Total</th>
                   <th className="px-3 py-2">Received</th>
                   <th className="px-3 py-2">Balance</th>
+                  <th className="px-3 py-2">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -69,6 +93,17 @@ export default function CustomerInvoicesPage() {
                     <td className="px-3 py-2">{formatRupee(row.grand_total)}</td>
                     <td className="px-3 py-2">{formatRupee(row.received_total)}</td>
                     <td className="px-3 py-2">{formatRupee(row.balance_total)}</td>
+                    <td className="px-3 py-2">
+                      <button
+                        onClick={() => handleDownload(row.id)}
+                        disabled={downloadingId === row.id}
+                        className="inline-flex items-center gap-2 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Download invoice PDF"
+                      >
+                        <Download className="h-4 w-4" />
+                        {downloadingId === row.id ? "Downloading..." : "Download"}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

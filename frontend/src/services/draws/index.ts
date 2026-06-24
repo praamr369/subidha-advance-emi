@@ -130,3 +130,32 @@ export function revealDraw(drawId: number | string, revealedSeed: string): Promi
     retryCount: 0,
   });
 }
+
+export async function verifyLuckyDrawWinner(
+  drawId: number | string,
+  action: "approve" | "reject",
+  notes: string = ""
+): Promise<{
+  detail: string;
+  draw_id: number;
+  winner_status: string;
+  verified_at: string | null;
+}> {
+  return request(`/admin/lucky-draws/${drawId}/verify-winner/`, {
+    method: "POST",
+    body: JSON.stringify({ action, notes }),
+  });
+}
+
+export async function settleLuckyDrawWinner(
+  drawId: number | string
+): Promise<{
+  detail: string;
+  settlement_data: Record<string, unknown>;
+  status: string;
+}> {
+  return request(`/admin/lucky-draws/${drawId}/settle-winner/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}

@@ -331,3 +331,33 @@ export async function listPartnerLinkedCustomerPayments() {
 export async function listPartnerReceipts() {
   return apiFetch<{ count?: number; results: Array<Record<string, unknown>> }>("/partner/receipts/");
 }
+
+export async function downloadInvoicePdf(invoiceId: number): Promise<void> {
+  try {
+    const response = await fetch(`/api/v1/customer/invoices/${invoiceId}/pdf/`, {
+      method: "GET",
+      headers: {
+        Accept: "application/pdf",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to download invoice: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Invoice-${invoiceId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to download invoice: ${error.message}`);
+    }
+    throw new Error("Failed to download invoice");
+  }
+}

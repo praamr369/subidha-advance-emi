@@ -1358,3 +1358,148 @@ export async function listCustomerReferrals(): Promise<CustomerReferralListRespo
     results,
   };
 }
+
+export async function createCustomerReferral(payload: {
+  referred_customer_id: number;
+  notes?: string;
+}): Promise<{ detail: string }> {
+  const response = await apiFetch<unknown>("/customer/referrals/create/", {
+    method: "POST",
+    body: JSON.stringify({
+      referred_customer_id: payload.referred_customer_id,
+      notes: payload.notes || "",
+    }),
+  });
+  const root = (response ?? {}) as Record<string, unknown>;
+  return {
+    detail:
+      typeof root.detail === "string"
+        ? root.detail
+        : "Referral created successfully",
+  };
+}
+
+export type CustomerLuckyDraw = {
+  id: number;
+  batch?: number;
+  batch_code?: string;
+  draw_date?: string;
+  lucky_id?: number;
+  lucky_number?: number;
+  status?: string;
+  winner_status?: string;
+  winner_month?: number | null;
+  waived_emi_count?: number;
+  waived_amount?: string | number;
+  created_at?: string;
+};
+
+export type CustomerLuckyDrawsResponse = {
+  count: number;
+  results: CustomerLuckyDraw[];
+};
+
+export async function listCustomerLuckyDraws(filters?: {
+  status?: string;
+  batch_id?: number;
+  date_from?: string;
+  date_to?: string;
+}): Promise<CustomerLuckyDrawsResponse> {
+  let url = "/customer/lucky-draws/";
+  if (filters) {
+    const params = new URLSearchParams();
+    if (filters.status) params.set("status", filters.status);
+    if (filters.batch_id) params.set("batch_id", String(filters.batch_id));
+    if (filters.date_from) params.set("draw_date__gte", filters.date_from);
+    if (filters.date_to) params.set("draw_date__lte", filters.date_to);
+    const query = params.toString();
+    if (query) url += `?${query}`;
+  }
+
+  const response = await apiFetch<unknown>(url);
+  const root = (response ?? {}) as Record<string, unknown>;
+  const results = Array.isArray(root.results)
+    ? (root.results as unknown[]).map((r) => {
+        const draw = (r ?? {}) as Record<string, unknown>;
+        return {
+          id: Number(draw.id ?? 0),
+          batch: Number(draw.batch ?? 0),
+          batch_code: typeof draw.batch_code === "string" ? draw.batch_code : "",
+          draw_date: typeof draw.draw_date === "string" ? draw.draw_date : "",
+          lucky_id: Number(draw.lucky_id ?? 0),
+          lucky_number: Number(draw.lucky_number ?? 0),
+          status: typeof draw.status === "string" ? draw.status : "",
+          winner_status: typeof draw.winner_status === "string" ? draw.winner_status : "",
+          waived_emi_count: Number(draw.waived_emi_count ?? 0),
+          waived_amount:
+            typeof draw.waived_amount === "string"
+              ? draw.waived_amount
+              : String(draw.waived_amount ?? "0"),
+          created_at: typeof draw.created_at === "string" ? draw.created_at : "",
+        };
+      })
+    : [];
+
+  return {
+    count: Number(root.count ?? results.length),
+    results,
+  };
+}
+
+export async function getCustomerLuckyDrawDetail(
+  drawId: number
+): Promise<CustomerLuckyDraw> {
+  const response = await apiFetch<unknown>(`/customer/lucky-draws/${drawId}/`);
+  const root = (response ?? {}) as Record<string, unknown>;
+  return {
+    id: Number(root.id ?? 0),
+    batch: Number(root.batch ?? 0),
+    batch_code: typeof root.batch_code === "string" ? root.batch_code : "",
+    draw_date: typeof root.draw_date === "string" ? root.draw_date : "",
+    lucky_id: Number(root.lucky_id ?? 0),
+    lucky_number: Number(root.lucky_number ?? 0),
+    status: typeof root.status === "string" ? root.status : "",
+    winner_status: typeof root.winner_status === "string" ? root.winner_status : "",
+    waived_emi_count: Number(root.waived_emi_count ?? 0),
+    waived_amount:
+      typeof root.waived_amount === "string"
+        ? root.waived_amount
+        : String(root.waived_amount ?? "0"),
+    created_at: typeof root.created_at === "string" ? root.created_at : "",
+  };
+}
+
+export async function downloadCustomerLuckyDrawCertificate(
+  drawId: number
+): Promise<void> {
+  try {
+    const response = await fetch(
+      `/api/v1/customer/lucky-draws/${drawId}/certificate/`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/pdf",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to download certificate: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Lucky-Draw-Certificate-${drawId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to download certificate: ${error.message}`);
+    }
+    throw new Error("Failed to download certificate");
+  }
+}
