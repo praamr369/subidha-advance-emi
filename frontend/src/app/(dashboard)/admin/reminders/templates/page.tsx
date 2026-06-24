@@ -7,6 +7,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import { ROUTES } from "@/lib/routes";
 import type { NotificationTemplate, TemplatePreview } from "@/services/reminders";
 import {
@@ -136,7 +137,6 @@ export default function NotificationTemplatesPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("Delete this template permanently?")) return;
     try {
       await deleteNotificationTemplate(id);
       setNotice("Template deleted.");
@@ -342,12 +342,14 @@ export default function NotificationTemplatesPage() {
                       >
                         Edit
                       </button>
-                      <button
-                        onClick={() => void handleDelete(t.id)}
-                        className="h-8 rounded-lg border border-red-200 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100"
-                      >
-                        Delete
-                      </button>
+                      <ConfirmActionButton
+                        label="Delete"
+                        confirmLabel="Delete Template"
+                        title="Delete this template?"
+                        description={`"${t.name}" will be permanently deleted. Any reminders referencing this template key will not be affected.`}
+                        onConfirm={() => handleDelete(t.id)}
+                        variant="destructive"
+                      />
                     </div>
                   </div>
 

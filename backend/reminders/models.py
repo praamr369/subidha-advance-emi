@@ -113,13 +113,16 @@ class PaymentReminder(ReminderTimeStampedModel):
 
     class Meta:
         db_table = "payment_reminders"
-        ordering = ["scheduled_for", "due_date", "-created_at", "-id"]
+        ordering = ["-id"]
         indexes = [
             models.Index(fields=["status", "scheduled_for", "due_date"]),
             models.Index(fields=["target_customer", "due_date"]),
             models.Index(fields=["target_subscription", "due_date"]),
             models.Index(fields=["target_invoice", "due_date"]),
         ]
+
+    def __str__(self):
+        return f"Rem#{self.reminder_no} [{self.channel}] due:{self.due_date}"
 
     def clean(self):
         errors = {}

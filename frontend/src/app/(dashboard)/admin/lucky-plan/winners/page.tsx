@@ -81,7 +81,7 @@ export default function LuckyPlanWinnersPage() {
       title="Winners Register"
       subtitle="Complete Lucky Draw winner register — EMI waivers, delivery tracking, and audit trail"
       breadcrumbs={[
-        { href: "/admin/lucky-plan", label: "Lucky Plan" },
+        { href: ROUTES.admin.luckyPlanControl, label: "Lucky Plan" },
         { label: "Winners" },
       ]}
     >

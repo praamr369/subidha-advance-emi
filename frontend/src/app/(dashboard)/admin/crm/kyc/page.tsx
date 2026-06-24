@@ -165,8 +165,11 @@ export default function AdminCrmKycReviewQueuePage() {
   );
 
   useEffect(() => {
-    void load({ ownerType: "", statusFilter: "", search: "", expiresWithinDays: undefined });
+    // Intentional empty-deps: runs once on mount with explicit empty filter overrides.
+    // Subsequent loads are triggered by the "Apply filters" button (calls load() with current state)
+    // or by post-action handlers (approve/reject). Not a missing-dep bug.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    void load({ ownerType: "", statusFilter: "", search: "", expiresWithinDays: undefined });
   }, []);
 
   function openAction(row: KycQueueRow, kind: "reject" | "resubmission") {

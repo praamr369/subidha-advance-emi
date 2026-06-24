@@ -111,10 +111,15 @@ export default function AdminRemindersPage() {
   async function handleRunGeneration() {
     try {
       const payload = await runPaymentReminders({ send_now: false });
-      setNotice(
-        `Reminder run completed. Created ${payload.created_count}, skipped ${payload.skipped_count}.`
-      );
-      await loadPage();
+      const msg = `Reminder run completed. Created ${payload.created_count}, skipped ${payload.skipped_count}.`;
+      setNotice(msg);
+      try {
+        await loadPage();
+        setTimeout(() => setNotice(null), 5000);
+      } catch (loadErr) {
+        setNotice(null);
+        setError(accountingErrorMessage(loadErr, "Failed to load updated reminders."));
+      }
     } catch (err) {
       setNotice(null);
       setError(accountingErrorMessage(err, "Failed to run reminder generation."));
@@ -180,7 +185,7 @@ export default function AdminRemindersPage() {
                   window.open(res.link, "_blank", "noopener,noreferrer");
                   setNotice(`WhatsApp link opened for reminder #${row.id}. After sending in WhatsApp, click "${sendLabel(row.channel)}" to record it.`);
                 } catch (err) {
-                  setError(accountingErrorMessage(err, "Could not generate WhatsApp link."));
+                  setError(accountingErrorMessage(err, "Could not generate WhatsApp link. Click again to retry."));
                 }
               }}
             >

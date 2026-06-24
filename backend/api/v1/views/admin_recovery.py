@@ -149,6 +149,12 @@ class AdminRecoveryCaseListView(APIView):
                 "aging_bucket": rc.aging_bucket,
                 "assigned_to": rc.assigned_to.get_full_name() or rc.assigned_to.username if rc.assigned_to else None,
                 "notes": rc.notes,
+                "notice_sent_at": rc.notice_sent_at.isoformat() if rc.notice_sent_at else None,
+                "field_visit_at": rc.field_visit_at.isoformat() if rc.field_visit_at else None,
+                "legal_at": rc.legal_at.isoformat() if rc.legal_at else None,
+                "settled_amount": str(rc.settled_amount),
+                "settlement_type": rc.settlement_type or None,
+                "settled_at": rc.settled_at.isoformat() if rc.settled_at else None,
                 "last_contact_at": rc.last_contact_at.isoformat() if rc.last_contact_at else None,
             })
 
@@ -237,9 +243,9 @@ class AdminRecoveryCaseDetailView(APIView):
             return Response({"detail": "Not found."}, status=404)
 
         now = timezone.now()
-        allowed = {"stage", "notes", "assigned_to_id", "settled_amount", "last_contact_at"}
+        allowed = {"stage", "notes", "assigned_to_id", "settled_amount", "settlement_type", "last_contact_at"}
         for field in allowed:
-            if field in request.data and field != "settled_amount":
+            if field in request.data and field not in {"settled_amount", "settlement_type"}:
                 setattr(rc, field, request.data[field])
 
         new_stage = request.data.get("stage")

@@ -29,6 +29,8 @@ from .models import (
     LuckyDraw,
     EmiStatus,
     LuckyIdStatus,
+    RecoveryCase,
+    RecoveryStage,
 )
 
 # =====================================================
@@ -457,7 +459,34 @@ class LuckyDrawAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
-    
+
+
+# =====================================================
+# RECOVERY CASE
+# =====================================================
+
+@admin.register(RecoveryCase)
+class RecoveryCaseAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "subscription",
+        "stage",
+        "assigned_to",
+        "overdue_amount",
+        "settled_amount",
+        "first_overdue_date",
+    )
+    list_filter = ("stage", "assigned_to", "first_overdue_date")
+    search_fields = ("subscription__customer__name", "subscription__id")
+    readonly_fields = ("created_at", "updated_at", "aging_days", "aging_bucket")
+    fieldsets = (
+        ("Subscription", {"fields": ("subscription",)}),
+        ("Recovery Status", {"fields": ("stage", "assigned_to")}),
+        ("Overdue Info", {"fields": ("overdue_amount", "overdue_emis", "first_overdue_date")}),
+        ("Timeline", {"fields": ("notice_sent_at", "field_visit_at", "legal_at", "last_contact_at")}),
+        ("Settlement", {"fields": ("settled_amount", "settlement_type", "settled_at")}),
+        ("Metadata", {"fields": ("notes", "aging_days", "aging_bucket", "created_at", "updated_at")}),
+    )
 
 # =====================================================
 # CUSTOM ADMIN SITE

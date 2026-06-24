@@ -65,6 +65,11 @@ function RecoveryDrawer({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const overdue = Number(rc.overdue_amount || 0);
+  const settled = Number(settledAmount || 0);
+  const exceedsOverdue = settled > overdue && overdue > 0;
+  const isInvalid = (stage === "SETTLED" && (exceedsOverdue || settled <= 0));
+
   async function save() {
     setBusy(true);
     setErr(null);
@@ -152,7 +157,6 @@ function RecoveryDrawer({
           const settled = Number(settledAmount || 0);
           const isPartial = settled > 0 && settled < overdue;
           const isFull = settled > 0 && settled >= overdue;
-          const exceedsOverdue = settled > overdue && overdue > 0;
           return (
             <div className="mb-4">
               <label className="block text-xs font-semibold text-muted-foreground mb-1">Settled Amount (₹) *</label>
@@ -203,7 +207,7 @@ function RecoveryDrawer({
 
         <button
           onClick={() => void save()}
-          disabled={busy}
+          disabled={busy || isInvalid}
           className="w-full h-10 rounded-xl border border-primary bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 disabled:opacity-50"
         >
           {busy ? "Saving…" : "Save Changes"}

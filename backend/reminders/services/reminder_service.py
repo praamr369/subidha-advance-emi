@@ -205,27 +205,28 @@ MAX_RETRY_ATTEMPTS = 3
 
 @transaction.atomic
 def retry_failed_reminder(*, reminder_id: int, performed_by=None):
-    """Retry a FAILED email reminder. Returns (reminder, retried_bool)."""
+    """Retry a FAILED reminder. Email only — non-email channels require manual resend. Returns (reminder, retried_bool)."""
     reminder = PaymentReminder.objects.select_for_update().get(pk=reminder_id)
     if reminder.status != ReminderStatus.FAILED:
         raise ValueError("Only FAILED reminders can be retried.")
+    if reminder.channel != ReminderChannel.EMAIL:
+        raise ValueError(f"Retry is only supported for EMAIL channel. {reminder.channel} requires manual resend.")
     if (reminder.attempts or 0) >= MAX_RETRY_ATTEMPTS:
         raise ValueError(f"Maximum retry attempts ({MAX_RETRY_ATTEMPTS}) reached. Create a new reminder instead.")
 
-    if reminder.channel == ReminderChannel.EMAIL:
-        try:
-            _dispatch_email_reminder(reminder)
-        except Exception as exc:
-            reminder.attempts = (reminder.attempts or 0) + 1
-            reminder.last_error = str(exc)[:500]
-            reminder.save(update_fields=["attempts", "last_error", "updated_at"])
-            _audit(
-                reminder=reminder,
-                performed_by=performed_by,
-                event="PAYMENT_REMINDER_RETRY_FAILED",
-                metadata={"error": str(exc)[:200], "attempt": reminder.attempts},
-            )
-            raise ValueError(f"Retry failed: {exc}") from exc
+    try:
+        _dispatch_email_reminder(reminder)
+    except Exception as exc:
+        reminder.attempts = (reminder.attempts or 0) + 1
+        reminder.last_error = str(exc)[:500]
+        reminder.save(update_fields=["attempts", "last_error", "updated_at"])
+        _audit(
+            reminder=reminder,
+            performed_by=performed_by,
+            event="PAYMENT_REMINDER_RETRY_FAILED",
+            metadata={"error": str(exc)[:200], "attempt": reminder.attempts},
+        )
+        raise ValueError(f"Retry failed: {exc}") from exc
 
     reminder.status = ReminderStatus.SENT
     reminder.sent_at = timezone.now()
@@ -253,6 +254,9 @@ def generate_whatsapp_link(*, reminder_id: int, performed_by=None) -> dict:
     reminder = PaymentReminder.objects.select_related(
         "target_customer", "target_subscription"
     ).get(pk=reminder_id)
+
+    if reminder.status in {ReminderStatus.SENT, ReminderStatus.CANCELLED}:
+        raise ValueError(f"Cannot generate WhatsApp link for {reminder.status} reminders.")
 
     phone = (reminder.customer_contact or "").strip()
     if not phone:
