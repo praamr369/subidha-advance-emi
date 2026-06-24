@@ -371,12 +371,13 @@ export const ROUTES = {
     accountingFinancialIntelligence: "/admin/accounting/financial-intelligence",
     accountingTrialBalanceCheck: "/admin/accounting/trial-balance-check",
     accountingLiabilityReconciliation: "/admin/accounting/liability-reconciliation",
-    accountingStaff: "/admin/accounting/staff",
-    accountingStaffLedger: "/admin/accounting/staff-ledger",
-    accountingExpenseClaims: "/admin/accounting/expense-claims",
-    accountingAttendance: "/admin/accounting/attendance",
-    accountingLeave: "/admin/accounting/leave",
-    accountingSalary: "/admin/accounting/salary",
+    // Session 4: HR Consolidation - Routes moved to HR module
+    accountingStaff: "/admin/hr/staff", // Redirects to HR (backward compat)
+    accountingStaffLedger: "/admin/accounting/staff-ledger", // Financial report - keep in accounting
+    accountingExpenseClaims: "/admin/hr/expense-claims", // Redirects to HR (backward compat)
+    accountingAttendance: "/admin/hr/attendance", // Redirects to HR (backward compat)
+    accountingLeave: "/admin/hr/leave", // Redirects to HR (backward compat)
+    accountingSalary: "/admin/hr/payroll", // Redirects to HR (backward compat)
     accountingCloseCockpit: "/admin/accounting/close-cockpit",
 
     // P5: Growth & Offers

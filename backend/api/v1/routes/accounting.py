@@ -14,21 +14,21 @@ from api.v1.views.accounting import (
     AccountingValidationView,
     AttendanceCalendarView,
     ChartOfAccountViewSet,
-    EmployeeExpenseClaimPaymentViewSet,
-    EmployeeExpenseClaimViewSet,
-    EmployeeAttendanceViewSet,
-    EmployeeProfileViewSet,
+    # MOVED TO HR (Session 4): EmployeeExpenseClaimPaymentViewSet,
+    # MOVED TO HR (Session 4): EmployeeExpenseClaimViewSet,
+    # MOVED TO HR (Session 4): EmployeeAttendanceViewSet,
+    # MOVED TO HR (Session 4): EmployeeProfileViewSet,
     ExpenseVoucherViewSet,
     FinanceAccountViewSet,
     JournalEntryViewSet,
     JournalGroupBalanceView,
     JournalGroupReverseView,
-    LeaveRequestViewSet,
-    LeaveTypeViewSet,
+    # MOVED TO HR (Session 4): LeaveRequestViewSet,
+    # MOVED TO HR (Session 4): LeaveTypeViewSet,
     MoneyMovementViewSet,
-    PayrollPeriodViewSet,
+    # MOVED TO HR (Session 4): PayrollPeriodViewSet,
     SalaryPaymentViewSet,
-    SalarySheetViewSet,
+    # MOVED TO HR (Session 4): SalarySheetViewSet,
     StaffLedgerView,
     VendorViewSet,
 )
@@ -89,15 +89,17 @@ router.register(r"finance-accounts", FinanceAccountViewSet, basename="accounting
 router.register(r"money-movements", MoneyMovementViewSet, basename="accounting-money-movements")
 router.register(r"vendors", VendorViewSet, basename="accounting-vendors")
 router.register(r"expenses", ExpenseVoucherViewSet, basename="accounting-expenses")
-router.register(r"employees", EmployeeProfileViewSet, basename="accounting-employees")
-router.register(r"attendance", EmployeeAttendanceViewSet, basename="accounting-attendance")
-router.register(r"payroll-periods", PayrollPeriodViewSet, basename="accounting-payroll-periods")
-router.register(r"leave-types", LeaveTypeViewSet, basename="accounting-leave-types")
-router.register(r"leave-requests", LeaveRequestViewSet, basename="accounting-leave-requests")
-router.register(r"salary-sheets", SalarySheetViewSet, basename="accounting-salary-sheets")
+# MOVED TO HR MODULE (Session 4 Consolidation - 2026-06-24)
+# router.register(r"employees", EmployeeProfileViewSet, basename="accounting-employees") # → hr/staff/
+# router.register(r"attendance", EmployeeAttendanceViewSet, basename="accounting-attendance") # → hr/attendance/
+# router.register(r"payroll-periods", PayrollPeriodViewSet, basename="accounting-payroll-periods") # → hr/payroll-periods/
+# router.register(r"leave-types", LeaveTypeViewSet, basename="accounting-leave-types") # → hr/leave-types/
+# router.register(r"leave-requests", LeaveRequestViewSet, basename="accounting-leave-requests") # → hr/leave-requests/
+# router.register(r"salary-sheets", SalarySheetViewSet, basename="accounting-salary-sheets") # → hr/payroll/
 router.register(r"salary-payments", SalaryPaymentViewSet, basename="accounting-salary-payments")
-router.register(r"expense-claims", EmployeeExpenseClaimViewSet, basename="accounting-expense-claims")
-router.register(r"expense-claim-payments", EmployeeExpenseClaimPaymentViewSet, basename="accounting-expense-claim-payments")
+# MOVED TO HR MODULE (Session 4 Consolidation - 2026-06-24)
+# router.register(r"expense-claims", EmployeeExpenseClaimViewSet, basename="accounting-expense-claims") # → hr/expense-claims/
+# router.register(r"expense-claim-payments", EmployeeExpenseClaimPaymentViewSet, basename="accounting-expense-claim-payments") # → hr/payroll-payments/
 router.register(r"tax-invoices", TaxInvoiceViewSet, basename="accounting-tax-invoices")
 router.register(r"credit-notes", CreditNoteViewSet, basename="accounting-credit-notes")
 router.register(r"debit-notes", DebitNoteViewSet, basename="accounting-debit-notes")

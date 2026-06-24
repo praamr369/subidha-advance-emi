@@ -1,6 +1,9 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+# HR Routes (Session 4 Consolidation - 2026-06-24)
+from api.v1.routes import admin_hr_complete
+
 from api.v1.views.admin_business_setup import (
     AdminLocalSandboxResetView,
     AdminLocalSandboxSeedView,
@@ -1027,6 +1030,8 @@ urlpatterns = [
     path("hr/expense-claims/<int:expense_claim_id>/", AdminHrExpenseClaimPatchView.as_view()),
     path("hr/payroll/", AdminHrPayrollView.as_view()),
     path("hr/salary-payments/", AdminHrSalaryPaymentsListCreateView.as_view()),
+    # Session 4 Consolidation (2026-06-24): HR ViewSet routes (attendance, leave, payroll, expense-claims)
+    path("hr/", include(admin_hr_complete.urlpatterns)),
     path("notifications/", AdminNotificationListView.as_view()),
     path("notifications/unread-count/", AdminUnreadNotificationCountView.as_view()),
     path("notifications/<int:pk>/read/", AdminNotificationMarkReadView.as_view()),

@@ -378,3 +378,157 @@ export function downloadHrStaffProfilePdf(staffId: number, fallbackFilename = "s
 export function downloadHrSalaryAgreementPdf(staffId: number, fallbackFilename = "salary-agreement.pdf") {
   return downloadAuthenticatedFile(`/admin/hr/staff/${staffId}/salary-agreement-pdf/`, fallbackFilename);
 }
+
+// ============================================================================
+// BACKWARD COMPATIBILITY EXPORTS
+// ============================================================================
+// Session 4 Consolidation (2026-06-24): These functions were moved from
+// /accounting/* endpoints to /admin/hr/* endpoints. Export them here for
+// backward compatibility with code that imports from accounting.ts
+
+/**
+ * @deprecated Use listHrStaff instead
+ * Backward compatibility: calls /admin/hr/staff/
+ */
+export const listEmployees = listHrStaff;
+
+/**
+ * @deprecated Use createHrStaff instead
+ * Backward compatibility: calls /admin/hr/staff/
+ */
+export const createEmployeeProfile = createHrStaff;
+
+/**
+ * @deprecated Use patchHrStaff instead
+ * Backward compatibility: calls /admin/hr/staff/<id>/
+ */
+export const updateEmployeeProfile = patchHrStaff;
+
+/**
+ * @deprecated Use listHrAttendance instead
+ * Backward compatibility: calls /admin/hr/attendance/
+ */
+export const listEmployeeAttendance = listHrAttendance;
+
+/**
+ * @deprecated Use markHrAttendance instead
+ * Backward compatibility: calls /admin/hr/attendance/
+ */
+export const recordEmployeeAttendance = markHrAttendance;
+
+/**
+ * @deprecated Endpoint no longer available at /accounting/reports/attendance-calendar/
+ * Use listHrAttendance instead
+ */
+export async function getAttendanceCalendar(params: {
+  employee: number;
+  year: number;
+  month: number;
+}) {
+  // This endpoint is moved to HR module - return empty for now
+  console.warn("getAttendanceCalendar moved to admin-hr module - update your imports");
+  return { dates: {}, summary: {} };
+}
+
+/**
+ * @deprecated Endpoint moved to /admin/hr/payroll-periods/
+ * Use listHrPayroll or listPayrollPeriods instead
+ */
+export async function listPayrollPeriods(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<{ count: number; results: any[] }>(`/admin/hr/payroll-periods/${queryString(params)}`);
+}
+
+/**
+ * @deprecated Use listHrLeaveRequests instead
+ * Backward compatibility: calls /admin/hr/leave-types/
+ */
+export const listLeaveTypes = async (params: Record<string, string | number | undefined | null> = {}) => {
+  return apiFetch<{ count: number; results: any[] }>(`/admin/hr/leave-types/${queryString(params)}`);
+};
+
+/**
+ * @deprecated Endpoint moved to /admin/hr/leave-types/
+ */
+export async function createLeaveType(payload: Record<string, unknown>) {
+  return apiFetch("/admin/hr/leave-types/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * @deprecated Use listHrLeaveRequests instead
+ * Backward compatibility: calls /admin/hr/leave-requests/
+ */
+export const listLeaveRequests = listHrLeaveRequests;
+
+/**
+ * @deprecated Use patchHrLeaveRequest instead
+ * Backward compatibility: calls /admin/hr/leave-requests/
+ */
+export async function createLeaveRequest(payload: Record<string, unknown>) {
+  return apiFetch("/admin/hr/leave-requests/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * @deprecated Use patchHrLeaveRequest with action="APPROVE" instead
+ */
+export async function approveLeaveRequest(id: number) {
+  return patchHrLeaveRequest(id, { action: "APPROVE" });
+}
+
+/**
+ * @deprecated Use patchHrLeaveRequest with action="REJECT" instead
+ */
+export async function rejectLeaveRequest(id: number, reason: string) {
+  return patchHrLeaveRequest(id, { action: "REJECT", reason });
+}
+
+/**
+ * @deprecated Endpoint no longer at /accounting/leave-requests/<id>/cancel/
+ */
+export async function cancelLeaveRequest(id: number, reason: string) {
+  console.warn("cancelLeaveRequest endpoint moved - contact admin");
+  return null;
+}
+
+/**
+ * @deprecated Use getHrPayroll or listHrSalaryPayments instead
+ */
+export async function listSalarySheets(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<{ count: number; results: any[] }>(`/admin/hr/payroll/${queryString(params)}`);
+}
+
+/**
+ * @deprecated Use patchHrExpenseClaim instead
+ */
+export const listExpenseClaims = listHrExpenseClaims;
+
+/**
+ * @deprecated Use patchHrExpenseClaim instead
+ */
+export async function createExpenseClaim(payload: Record<string, unknown>) {
+  return apiFetch("/admin/hr/expense-claims/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * @deprecated Use patchHrExpenseClaim with action="APPROVE" instead
+ */
+export async function approveExpenseClaim(id: number) {
+  return patchHrExpenseClaim(id, { action: "APPROVE" });
+}
+
+/**
+ * @deprecated Use patchHrExpenseClaim with action="REJECT" instead
+ */
+export async function rejectExpenseClaim(id: number, reason: string) {
+  return patchHrExpenseClaim(id, { action: "REJECT", reason });
+}
+
+// queryString helper already defined at line 223, no need to redefine
