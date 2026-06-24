@@ -1,5 +1,3 @@
-export { default as AdminWorkbenchShell } from "./AdminWorkbenchShell";
-export { default as CommandBar } from "./CommandBar";
 export { default as ConfirmActionDialog } from "./ConfirmActionDialog";
 export { default as EmptyState } from "./EmptyState";
 export { default as EntityDrawer } from "./EntityDrawer";
@@ -10,4 +8,3 @@ export { default as RightInspector } from "./RightInspector";
 export { default as StatusBadge } from "./StatusBadge";
 export { default as WorkbenchDataGrid } from "./WorkbenchDataGrid";
 export { default as WorkbenchHeader } from "./WorkbenchHeader";
-export { default as WorkbenchTabs } from "./WorkbenchTabs";

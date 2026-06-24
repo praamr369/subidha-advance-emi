@@ -1506,6 +1506,36 @@ export function listExpenseClaims(params: Record<string, string | number | undef
   );
 }
 
+/**
+ * Dashboard-safe expense claim summary.
+ * Expense claims moved from /accounting/expense-claims/ to
+ * /admin/hr/expense-claims/ (HR consolidation). That endpoint already returns
+ * { count, results } and filters by status server-side. Never throws, so a
+ * single widget can't break the dashboard.
+ */
+export async function listExpenseClaimsSafe(
+  params: Record<string, string | number | undefined | null> = {}
+): Promise<AccountingPaginatedResponse<EmployeeExpenseClaim>> {
+  const empty: AccountingPaginatedResponse<EmployeeExpenseClaim> = {
+    count: 0,
+    next: null,
+    previous: null,
+    results: [],
+  };
+  try {
+    const res = await apiFetch<Partial<AccountingPaginatedResponse<EmployeeExpenseClaim>>>(
+      `/admin/hr/expense-claims/${buildQuery(params)}`
+    );
+    return {
+      ...empty,
+      count: Number(res?.count ?? (res?.results?.length ?? 0)),
+      results: Array.isArray(res?.results) ? res.results : [],
+    };
+  } catch {
+    return empty;
+  }
+}
+
 export function createExpenseClaim(payload: Partial<EmployeeExpenseClaim>) {
   return apiFetch<EmployeeExpenseClaim>("/accounting/expense-claims/", {
     method: "POST",

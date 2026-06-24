@@ -61,7 +61,7 @@ import {
 } from "@/services/branch-control";
 import { getAdminDashboard } from "@/services/admin";
 import {
-  listExpenseClaims,
+  listExpenseClaimsSafe,
   listPurchaseBills,
   listSalarySheetsSafe,
   type AccountingPaginatedResponse,
@@ -578,7 +578,7 @@ export default function AdminDashboardPage() {
           ...branchScopedQuery,
           status: "POSTED",
         }),
-        listExpenseClaims({
+        listExpenseClaimsSafe({
           ...branchScopedQuery,
           status: "POSTED",
         }),

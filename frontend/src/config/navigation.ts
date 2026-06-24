@@ -248,17 +248,6 @@ function buildAdminNavigationGroups(): NavGroup[] {
 
 export const ADMIN_PARENT_NAVIGATION: NavGroup[] = buildAdminNavigationGroups();
 
-export const ADMIN_WORKBENCH_NAVIGATION: NavGroup[] = [
-  { title: "Command Center", icon: "dashboard", items: [{ label: "Command Center", href: ROUTES.admin.dashboard, icon: "dashboard", description: "Daily operating snapshot, queues, exceptions, and search." }] },
-  { title: "Customer 360", icon: "customers", items: [{ label: "Customer 360", href: ROUTES.admin.customer360, icon: "customers", description: "Customer identity, contracts, collections, delivery, and support context." }] },
-  { title: "Revenue", icon: "billing", items: [{ label: "Revenue Workbench", href: ROUTES.admin.revenueWorkbench, icon: "billing", description: "Sales, Lucky Plan, contracts, payments, receipts, and settlements." }] },
-  { title: "Inventory & Fulfillment", icon: "inventory", items: [{ label: "Inventory & Fulfillment", href: ROUTES.admin.inventoryFulfillment, icon: "inventory", description: "Products, stock, purchasing, delivery, returns, and service." }] },
-  { title: "Finance Control", icon: "finance", items: [{ label: "Finance Control", href: ROUTES.admin.financeControl, icon: "finance", description: "Money controls, reconciliation, accounting, audit, and compliance." }] },
-  { title: "CRM & Partners", icon: "crm", items: [{ label: "CRM & Partners", href: ROUTES.admin.crmPartners, icon: "crm", description: "Leads, enquiries, follow-ups, partners, offers, and retention." }] },
-  { title: "Operations & People", icon: "operations", items: [{ label: "Operations & People", href: ROUTES.admin.operationsPeople, icon: "operations", description: "Branches, staff, payroll, requests, amendments, and notifications." }] },
-  { title: "Reports & Setup", icon: "reports", items: [{ label: "Reports & Setup", href: ROUTES.admin.reportsSetup, icon: "reports", description: "Read-only reporting, users, permissions, setup, and audit." }] },
-];
-
 export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
   // Full 17-module taxonomy with sub-modules as expandable dropdowns.
   // (Was ADMIN_WORKBENCH_NAVIGATION — condensed dummy landing pages, retired.)

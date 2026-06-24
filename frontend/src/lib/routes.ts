@@ -51,13 +51,6 @@ export const ROUTES = {
   admin: {
     root: "/admin",
     dashboard: "/admin",
-    customer360: "/admin/customer-360",
-    revenueWorkbench: "/admin/revenue",
-    inventoryFulfillment: "/admin/inventory-fulfillment",
-    financeControl: "/admin/finance-control",
-    crmPartners: "/admin/crm-partners",
-    operationsPeople: "/admin/operations-people",
-    reportsSetup: "/admin/reports-setup",
 
     // ── Compatibility-alias topology (Phase 9A audit) ─────────────────────────
     // Most canonical "new" routes are thin page-level redirect aliases that
