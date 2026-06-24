@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 
 // ── TDS ──────────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,22 @@ export function createTCSCollection(payload: {
 
 export function markTCSDeposited(id: number, payload: { challan_no?: string; deposit_date?: string }): Promise<TCSCollection> {
   return apiFetch(`/accounting/tcs-collections/${id}/mark-deposited/`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function downloadTDS26Q(fy: string, quarter: string): Promise<void> {
+  const q = new URLSearchParams({ fy, quarter });
+  return downloadAuthenticatedFile(
+    `/accounting/tds-deductions/export-26q/?${q}`,
+    `Form_26Q_${fy}_${quarter}.csv`,
+  );
+}
+
+export function downloadTCS27EQ(fy: string, quarter: string): Promise<void> {
+  const q = new URLSearchParams({ fy, quarter });
+  return downloadAuthenticatedFile(
+    `/accounting/tcs-collections/export-27eq/?${q}`,
+    `Form_27EQ_${fy}_${quarter}.csv`,
+  );
 }
 
 // ── Statutory deductions on salary sheet ─────────────────────────────────

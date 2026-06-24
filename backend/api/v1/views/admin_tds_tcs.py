@@ -1,8 +1,11 @@
-"""TDS / TCS compliance views — record, list, and mark-deposited."""
+"""TDS / TCS compliance views — record, list, mark-deposited, and statutory return exports."""
 from __future__ import annotations
 
+import csv
+import io
 from decimal import Decimal, InvalidOperation
 
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -274,6 +277,117 @@ class AdminTCSCollectionMarkDepositedView(APIView):
         c.status = TCSCollectionStatus.DEPOSITED
         c.save(update_fields=["challan_no", "deposit_date", "status", "updated_at"])
         return Response(_tcs_row(c))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Form 26Q export — Quarterly TDS return (prescribed text/CSV layout)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AdminTDS26QExportView(APIView):
+    """
+    Export Form 26Q data as CSV for a given FY + Quarter.
+    GET /admin/accounting/tds/export-26q/?fy=2025-26&quarter=Q1
+    Returns CSV with all DEPOSITED TDS rows in the prescribed layout.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from accounting.models import TDSDeduction
+        fy = (request.query_params.get("fy") or "").strip()
+        quarter = (request.query_params.get("quarter") or "").strip()
+
+        qs = TDSDeduction.objects.select_related("vendor").filter(status__in=["DEPOSITED", "FILED"])
+        if fy:
+            qs = qs.filter(financial_year=fy)
+        if quarter:
+            qs = qs.filter(quarter=quarter)
+        qs = qs.order_by("transaction_date")
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        # Form 26Q prescribed header (simplified – matches TRACES format)
+        writer.writerow([
+            "Sr No", "Deductee Name", "PAN", "Section", "Payment Date",
+            "Gross Amount", "TDS Rate%", "TDS Amount", "Net Amount",
+            "Challan No", "Deposit Date", "FY", "Quarter", "Reference No", "Status"
+        ])
+        for i, d in enumerate(qs, 1):
+            writer.writerow([
+                i,
+                d.vendor.name if d.vendor_id else "",
+                "",  # PAN not stored on Vendor currently; placeholder
+                d.section,
+                str(d.transaction_date),
+                str(d.gross_amount),
+                str(d.tds_rate),
+                str(d.tds_amount),
+                str(d.net_amount),
+                d.challan_no,
+                str(d.deposit_date) if d.deposit_date else "",
+                d.financial_year,
+                d.quarter,
+                d.reference_no,
+                d.status,
+            ])
+
+        label = f"Form26Q_{fy or 'ALL'}_{quarter or 'ALL'}"
+        response = HttpResponse(buf.getvalue(), content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{label}.csv"'
+        return response
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Form 27EQ export — Quarterly TCS return
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AdminTCS27EQExportView(APIView):
+    """
+    Export Form 27EQ data as CSV for a given FY + Quarter.
+    GET /admin/accounting/tcs/export-27eq/?fy=2025-26&quarter=Q1
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from accounting.models import TCSCollection
+        fy = (request.query_params.get("fy") or "").strip()
+        quarter = (request.query_params.get("quarter") or "").strip()
+
+        qs = TCSCollection.objects.filter(status__in=["DEPOSITED", "FILED"])
+        if fy:
+            qs = qs.filter(financial_year=fy)
+        if quarter:
+            qs = qs.filter(quarter=quarter)
+        qs = qs.order_by("transaction_date")
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow([
+            "Sr No", "Customer Name", "PAN", "Section", "Transaction Date",
+            "Sale Amount", "TCS Rate%", "TCS Amount",
+            "Challan No", "Deposit Date", "FY", "Quarter", "Reference No", "Status"
+        ])
+        for i, c in enumerate(qs, 1):
+            writer.writerow([
+                i,
+                c.customer_name,
+                c.customer_pan,
+                c.section,
+                str(c.transaction_date),
+                str(c.sale_amount),
+                str(c.tcs_rate),
+                str(c.tcs_amount),
+                c.challan_no,
+                str(c.deposit_date) if c.deposit_date else "",
+                c.financial_year,
+                c.quarter,
+                c.reference_no,
+                c.status,
+            ])
+
+        label = f"Form27EQ_{fy or 'ALL'}_{quarter or 'ALL'}"
+        response = HttpResponse(buf.getvalue(), content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{label}.csv"'
+        return response
 
 
 # ─────────────────────────────────────────────────────────────────────────────

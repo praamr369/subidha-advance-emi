@@ -5848,3 +5848,72 @@ class ProofOfDelivery(models.Model):
 
     def __str__(self):
         return f"POD for delivery {self.delivery_id} on {self.delivery_date.date()}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Customer Dispute Workflow
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DisputeType(models.TextChoices):
+    PAYMENT_DISPUTE = "PAYMENT_DISPUTE", "Payment Dispute"
+    DELIVERY_DISPUTE = "DELIVERY_DISPUTE", "Delivery Dispute"
+    PRODUCT_DEFECT = "PRODUCT_DEFECT", "Product Defect"
+    BILLING_ERROR = "BILLING_ERROR", "Billing Error"
+    KYC_ISSUE = "KYC_ISSUE", "KYC Issue"
+    OTHER = "OTHER", "Other"
+
+
+class DisputeStage(models.TextChoices):
+    OPEN = "OPEN", "Open"
+    UNDER_REVIEW = "UNDER_REVIEW", "Under Review"
+    RESOLVED = "RESOLVED", "Resolved"
+    REJECTED = "REJECTED", "Rejected"
+    ESCALATED = "ESCALATED", "Escalated"
+
+
+class CustomerDispute(TimeStampedModel):
+    """Customer dispute lifecycle — payment, delivery, product, billing, KYC."""
+
+    dispute_ref = models.CharField(max_length=30, unique=True, db_index=True)
+    customer = models.ForeignKey(
+        "Customer", on_delete=models.CASCADE, related_name="disputes"
+    )
+    subscription = models.ForeignKey(
+        "Subscription", on_delete=models.SET_NULL, null=True, blank=True, related_name="disputes"
+    )
+    dispute_type = models.CharField(
+        max_length=30, choices=DisputeType.choices, db_index=True
+    )
+    subject = models.CharField(max_length=200)
+    description = models.TextField()
+    stage = models.CharField(
+        max_length=20, choices=DisputeStage.choices, default=DisputeStage.OPEN, db_index=True
+    )
+    priority = models.CharField(
+        max_length=10,
+        choices=[("LOW", "Low"), ("MEDIUM", "Medium"), ("HIGH", "High")],
+        default="MEDIUM",
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_disputes",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_disputes",
+    )
+    resolution_notes = models.TextField(blank=True, default="")
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "subscriptions_customer_disputes"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Dispute {self.dispute_ref} [{self.stage}] — {self.customer_id}"

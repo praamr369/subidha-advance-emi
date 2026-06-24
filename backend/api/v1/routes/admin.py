@@ -254,6 +254,31 @@ from api.v1.views.admin_pod import (
     pod_detail_view,
     pod_export_year_view,
 )
+from api.v1.views.admin_kyc_notifications import (
+    kyc_expiry_preview_view,
+    kyc_expiry_notify_view,
+)
+from api.v1.views.admin_disputes import (
+    dispute_list_create_view,
+    dispute_detail_view,
+    dispute_notify_customer_view,
+)
+from api.v1.views.admin_partial_payment import (
+    partial_payment_preview_view,
+    partial_payment_split_view,
+)
+from api.v1.views.admin_cashier_variance import (
+    cashier_variance_list_view,
+    cashier_variance_escalate_view,
+)
+from api.v1.views.admin_scheduled_reports import (
+    scheduled_report_types_view,
+    scheduled_report_export_view,
+)
+from api.v1.views.admin_batch_alerts import (
+    batch_performance_check_view,
+    batch_performance_alert_notify_view,
+)
 from api.v1.views.admin_finance_complete import (
     lease_calculate_rou_liability_view,
     lease_generate_schedule_view,
@@ -1180,4 +1205,29 @@ urlpatterns = [
     path("accounting/leases/", lease_contract_list_create_view),
     path("accounting/assets/", fixed_asset_list_create_view),
     path("accounting/cost-centres/", cost_centre_list_view),
+
+    # ── KYC expiry notifications ──────────────────────────────────────────────
+    path("kyc/expiry-preview/", kyc_expiry_preview_view),
+    path("kyc/expiry-notify/", kyc_expiry_notify_view),
+
+    # ── Customer Dispute Workflow ─────────────────────────────────────────────
+    path("crm/disputes/", dispute_list_create_view),
+    path("crm/disputes/<int:dispute_id>/", dispute_detail_view),
+    path("crm/disputes/<int:dispute_id>/notify/", dispute_notify_customer_view),
+
+    # ── Partial Payment Split ─────────────────────────────────────────────────
+    path("subscriptions/<int:subscription_id>/partial-payment/preview/", partial_payment_preview_view),
+    path("subscriptions/<int:subscription_id>/partial-payment/split/", partial_payment_split_view),
+
+    # ── Cashier Variance Escalation ───────────────────────────────────────────
+    path("cashier/variance/", cashier_variance_list_view),
+    path("cashier/day-closes/<int:close_id>/escalate/", cashier_variance_escalate_view),
+
+    # ── Scheduled Report Export ───────────────────────────────────────────────
+    path("reports/scheduled-export/types/", scheduled_report_types_view),
+    path("reports/scheduled-export/", scheduled_report_export_view),
+
+    # ── Batch Performance Alerts ──────────────────────────────────────────────
+    path("batches/performance-check/", batch_performance_check_view),
+    path("batches/performance-alert/", batch_performance_alert_notify_view),
 ]

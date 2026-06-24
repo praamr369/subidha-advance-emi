@@ -5,6 +5,7 @@ import {
   listTCSCollections,
   createTCSCollection,
   markTCSDeposited,
+  downloadTCS27EQ,
   TCS_SECTIONS,
   TCSCollection,
 } from "@/services/tds-tcs";
@@ -42,6 +43,24 @@ export default function TCSPage() {
   const [challan, setChallan] = useState("");
   const [depositDate, setDepositDate] = useState("");
   const [depositBusy, setDepositBusy] = useState(false);
+
+  const [exportFy, setExportFy] = useState("2025-26");
+  const [exportQ, setExportQ] = useState("Q1");
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
+
+  const handleExport27EQ = async () => {
+    if (!exportFy || !exportQ) { setExportErr("Select FY and Quarter."); return; }
+    setExportBusy(true);
+    setExportErr(null);
+    try {
+      await downloadTCS27EQ(exportFy, exportQ);
+    } catch {
+      setExportErr("Export failed. Ensure DEPOSITED records exist for selected period.");
+    } finally {
+      setExportBusy(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,13 +134,30 @@ export default function TCSPage() {
           <h1 className="text-xl font-bold text-foreground">TCS Collections</h1>
           <p className="text-sm text-muted-foreground">Tax Collected at Source on customer transactions</p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
-        >
-          + Record TCS
-        </button>
+        <div className="flex items-center gap-2">
+          <select value={exportFy} onChange={e => setExportFy(e.target.value)} className="h-9 rounded-xl border border-border bg-background px-2 text-sm">
+            {FY_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+          <select value={exportQ} onChange={e => setExportQ(e.target.value)} className="h-9 rounded-xl border border-border bg-background px-2 text-sm">
+            {QUARTER_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
+          </select>
+          <button
+            onClick={() => void handleExport27EQ()}
+            disabled={exportBusy}
+            className="h-9 px-3 rounded-xl border border-border bg-background text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {exportBusy ? "Exporting…" : "Form 27EQ CSV"}
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+          >
+            + Record TCS
+          </button>
+        </div>
       </div>
+
+      {exportErr && <div className="text-sm text-red-600 mb-3">{exportErr}</div>}
 
       {/* Filters */}
       <div className="flex gap-3 mb-4 flex-wrap">

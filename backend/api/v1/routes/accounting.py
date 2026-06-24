@@ -7,6 +7,8 @@ from api.v1.views.admin_tds_tcs import (
     AdminTCSCollectionListView,
     AdminTCSCollectionMarkDepositedView,
     AdminSalarySheetStatutoryView,
+    AdminTDS26QExportView,
+    AdminTCS27EQExportView,
 )
 from api.v1.views.accounting import (
     AccountingValidationView,
@@ -150,8 +152,10 @@ urlpatterns = [
     # ── TDS / TCS compliance ──────────────────────────────────────────────────
     path("tds-deductions/", AdminTDSDeductionListView.as_view()),
     path("tds-deductions/<int:pk>/mark-deposited/", AdminTDSDeductionMarkDepositedView.as_view()),
+    path("tds-deductions/export-26q/", AdminTDS26QExportView.as_view()),
     path("tcs-collections/", AdminTCSCollectionListView.as_view()),
     path("tcs-collections/<int:pk>/mark-deposited/", AdminTCSCollectionMarkDepositedView.as_view()),
+    path("tcs-collections/export-27eq/", AdminTCS27EQExportView.as_view()),
 
     # ── Statutory deductions on salary sheets ────────────────────────────────
     path("salary-sheets/<int:sheet_id>/statutory-deductions/", AdminSalarySheetStatutoryView.as_view()),
