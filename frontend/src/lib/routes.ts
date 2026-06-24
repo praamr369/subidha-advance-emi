@@ -344,6 +344,7 @@ export const ROUTES = {
     accountingDebitNotes: "/admin/accounting/gst/debit-notes",
     accountingTds: "/admin/accounting/tds",
     accountingTcs: "/admin/accounting/tcs",
+    accountingFinanceComplete: "/admin/accounting/finance-complete",
     accountingTrialBalance: "/admin/accounting/reports/trial-balance",
     accountingProfitLoss: "/admin/accounting/reports/profit-loss",
     accountingBalanceSheet: "/admin/accounting/reports/balance-sheet",

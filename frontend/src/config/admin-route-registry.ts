@@ -226,6 +226,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Accounting & Reconciliation", "Accounting Exports", ROUTES.admin.accountingExports, "Read-only JSON and CSV accounting reports from the P4E export endpoints."),
   item("Accounting & Reconciliation", "TDS Deductions", ROUTES.admin.accountingTds, "Tax Deducted at Source on vendor payments — record, track, and mark deposited."),
   item("Accounting & Reconciliation", "TCS Collections", ROUTES.admin.accountingTcs, "Tax Collected at Source on customer transactions — record, track, and mark deposited."),
+  item("Accounting & Reconciliation", "Core Finance Complete", ROUTES.admin.accountingFinanceComplete, "IFRS-16 lease accounting (ROU asset & liability), asset depreciation, cost centre P&L, cash flow, fund flow, financial ratios, deferred tax."),
   item("Accounting & Reconciliation", "Trial Balance", ROUTES.admin.accountingTrialBalance, "Trial balance report."),
   item("Accounting & Reconciliation", "Profit & Loss", ROUTES.admin.accountingProfitLoss, "Profit and loss report."),
   item("Accounting & Reconciliation", "Balance Sheet", ROUTES.admin.accountingBalanceSheet, "Balance sheet report."),

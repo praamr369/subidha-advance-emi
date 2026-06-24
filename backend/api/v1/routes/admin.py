@@ -254,6 +254,17 @@ from api.v1.views.admin_pod import (
     pod_detail_view,
     pod_export_year_view,
 )
+from api.v1.views.admin_finance_complete import (
+    lease_calculate_rou_liability_view,
+    lease_generate_schedule_view,
+    lease_post_to_gl_view,
+    depreciation_generate_schedule_view,
+    cost_centre_pl_view,
+    cash_flow_statement_view,
+    fund_flow_statement_view,
+    financial_ratios_view,
+    deferred_tax_list_view,
+)
 from api.v1.views.admin_reports import (
     AdminAnalyticsSummaryView,
     AdminBatchPerformanceAggregateView,
@@ -1151,4 +1162,15 @@ urlpatterns = [
     path("delivery/pod/", pod_list_view),
     path("delivery/pod/<int:pod_id>/", pod_detail_view),
     path("delivery/pod/export/", pod_export_year_view),
+
+    # ── Core Finance: IFRS-16 Lease, Depreciation, Cost Centre, Deferred Tax ──
+    path("accounting/subscriptions/<int:subscription_id>/lease/calculate-rou/", lease_calculate_rou_liability_view),
+    path("accounting/leases/<int:lease_id>/generate-schedule/", lease_generate_schedule_view),
+    path("accounting/leases/<int:lease_id>/post-to-gl/", lease_post_to_gl_view),
+    path("accounting/assets/<int:asset_id>/generate-depreciation/", depreciation_generate_schedule_view),
+    path("accounting/reports/cost-centre-pl/", cost_centre_pl_view),
+    path("accounting/reports/cash-flow/", cash_flow_statement_view),
+    path("accounting/reports/fund-flow/", fund_flow_statement_view),
+    path("accounting/reports/financial-ratios/", financial_ratios_view),
+    path("accounting/deferred-tax/", deferred_tax_list_view),
 ]
