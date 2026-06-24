@@ -12,9 +12,11 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import ActionButton from "@/components/ui/ActionButton";
 import { ROUTES } from "@/lib/routes";
-import type { PaymentReminder } from "@/services/reminders";
+import type { PaymentReminder, ReminderGatewayStatus } from "@/services/reminders";
 import {
   cancelReminder,
+  dispatchReminder,
+  getReminderGatewayStatus,
   getWhatsAppReminderLink,
   listReminders,
   retryReminder,
@@ -85,16 +87,25 @@ function sendDescription(channel: string): string {
   }
 }
 
+function gatewayConfigured(gateway: ReminderGatewayStatus | null, channel: string): boolean {
+  return Boolean(gateway?.channels?.[channel]?.configured);
+}
+
 export default function AdminRemindersPage() {
   const [rows, setRows] = useState<PaymentReminder[]>([]);
+  const [gateway, setGateway] = useState<ReminderGatewayStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   async function loadPage() {
     try {
-      const payload = await listReminders();
+      const [payload, gatewayPayload] = await Promise.all([
+        listReminders(),
+        getReminderGatewayStatus(),
+      ]);
       setRows(payload.results);
+      setGateway(gatewayPayload);
       setError(null);
     } catch (err) {
       setRows([]);
@@ -192,6 +203,18 @@ export default function AdminRemindersPage() {
               Open WhatsApp
             </ActionButton>
           ) : null}
+          {["DRAFT", "PENDING", "SCHEDULED", "FAILED"].includes(row.status) && ["EMAIL", "SMS", "WHATSAPP"].includes(row.channel) && (row.channel === "EMAIL" || gatewayConfigured(gateway, row.channel)) ? (
+            <ConfirmActionButton
+              label={row.channel === "EMAIL" ? "Send Email" : `Dispatch ${row.channel}`}
+              title={`Dispatch reminder #${row.id}?`}
+              description={row.channel === "EMAIL" ? "Sends through the configured Django email backend." : "Sends through the configured reminder gateway and records the provider result in the audit trail."}
+              onConfirm={async () => {
+                await dispatchReminder(row.id, `Automated ${row.channel} dispatch from admin reminder queue.`);
+                await loadPage();
+              }}
+              variant="primary"
+            />
+          ) : null}
           {["DRAFT", "PENDING", "SCHEDULED"].includes(row.status) ? (
             <ConfirmActionButton
               label={sendLabel(row.channel)}
@@ -265,8 +288,8 @@ export default function AdminRemindersPage() {
         <ERPDataToolbar
           left={
             <div className="text-sm text-muted-foreground">
-              <span className="font-medium">Email:</span> dispatched automatically via Django email backend.{" "}
-              <span className="font-medium">WhatsApp:</span> open link, send manually, then mark sent.{" "}
+              <span className="font-medium">Gateway:</span> {gateway?.provider ?? "loading"}.{" "}
+              <span className="font-medium">Automated:</span> {gateway?.automated_dispatch_available ? "available for configured channels" : "not configured"}.{" "}
               <span className="font-medium">Failed:</span> retry up to 3 times.
             </div>
           }
@@ -305,11 +328,11 @@ export default function AdminRemindersPage() {
               </div>
               <div>
                 <ChannelBadge channel="WHATSAPP" />{" "}
-                <span className="ml-1">Manual only. Click &quot;Open WhatsApp&quot; to open wa.me link with pre-filled message. After sending, click &quot;Mark Manually Sent&quot;. No automatic delivery confirmation.</span>
+                <span className="ml-1">{gatewayConfigured(gateway, "WHATSAPP") ? "Automated gateway dispatch is configured. Manual wa.me fallback remains available for staff confirmation." : "Gateway not configured. Use wa.me manual fallback, then mark manually sent."}</span>
               </div>
               <div>
                 <ChannelBadge channel="SMS" />{" "}
-                <span className="ml-1">Disabled. SMS delivery is not configured.</span>
+                <span className="ml-1">{gatewayConfigured(gateway, "SMS") ? "Automated SMS gateway dispatch is configured." : "SMS gateway is not configured."}</span>
               </div>
               <div>
                 <ChannelBadge channel="CALL" />{" "}

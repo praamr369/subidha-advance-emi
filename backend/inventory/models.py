@@ -258,6 +258,10 @@ class InventoryItem(InventoryTimeStampedModel):
         blank=True,
         validators=[MinValueValidator(MONEY_ZERO)],
     )
+    barcode = models.CharField(max_length=80, unique=True, null=True, blank=True, db_index=True)
+    qr_code = models.CharField(max_length=120, unique=True, null=True, blank=True, db_index=True)
+    lot_tracking_enabled = models.BooleanField(default=False, db_index=True)
+    expiry_tracking_enabled = models.BooleanField(default=False, db_index=True)
     manufacturing_cost_enabled = models.BooleanField(default=False, db_index=True)
     manufacturing_raw_material_cost = models.DecimalField(
         max_digits=12,
@@ -299,6 +303,8 @@ class InventoryItem(InventoryTimeStampedModel):
         self.sku = ((self.sku or product_sku or "").strip().upper()) or None
         self.unit_of_measure = (self.unit_of_measure or product_uom or "PCS").strip().upper()
         self.costing_method = (self.costing_method or "").strip().upper()
+        self.barcode = ((self.barcode or "").strip().upper()) or None
+        self.qr_code = ((self.qr_code or "").strip()) or None
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -363,6 +369,97 @@ class InventoryItem(InventoryTimeStampedModel):
 
     def __str__(self):
         return self.sku or self.product.product_code
+
+
+class InventoryLotStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Active"
+    QUARANTINED = "QUARANTINED", "Quarantined"
+    EXPIRED = "EXPIRED", "Expired"
+    CLOSED = "CLOSED", "Closed"
+
+
+class InventoryLot(InventoryTimeStampedModel):
+    inventory_item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.PROTECT,
+        related_name="lots",
+    )
+    stock_location = models.ForeignKey(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="inventory_lots",
+        null=True,
+        blank=True,
+    )
+    lot_code = models.CharField(max_length=80, db_index=True)
+    barcode = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    qr_code = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    received_date = models.DateField(null=True, blank=True, db_index=True)
+    expiry_date = models.DateField(null=True, blank=True, db_index=True)
+    quantity_on_hand = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        default=QUANTITY_ZERO,
+        validators=[MinValueValidator(QUANTITY_ZERO)],
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=InventoryLotStatus.choices,
+        default=InventoryLotStatus.ACTIVE,
+        db_index=True,
+    )
+    source_model = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    source_id = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    notes = models.TextField(blank=True, default="")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_inventory_lots",
+    )
+
+    class Meta:
+        db_table = "inventory_lots"
+        ordering = ["expiry_date", "lot_code", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["inventory_item", "lot_code", "stock_location"],
+                name="inventory_lot_unique_item_code_location",
+            ),
+            models.CheckConstraint(
+                condition=Q(quantity_on_hand__gte=QUANTITY_ZERO),
+                name="inventory_lot_quantity_non_negative",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["inventory_item", "status", "expiry_date"]),
+            models.Index(fields=["stock_location", "status", "expiry_date"]),
+            models.Index(fields=["barcode", "qr_code"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.expiry_date and self.received_date and self.expiry_date < self.received_date:
+            errors["expiry_date"] = "Expiry date cannot be before received date."
+        if self.inventory_item_id and self.expiry_date and not self.inventory_item.expiry_tracking_enabled:
+            errors["expiry_date"] = "Enable expiry tracking on the inventory item before assigning expiry dates."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.lot_code = (self.lot_code or "").strip().upper()
+        self.barcode = (self.barcode or "").strip().upper()
+        self.qr_code = (self.qr_code or "").strip()
+        self.source_model = (self.source_model or "").strip()
+        self.source_id = (self.source_id or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.status = (self.status or InventoryLotStatus.ACTIVE).strip().upper()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.inventory_item} lot {self.lot_code}"
 
 
 class StockLedger(InventoryTimeStampedModel):

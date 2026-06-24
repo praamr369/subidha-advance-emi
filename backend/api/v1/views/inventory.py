@@ -11,6 +11,7 @@ from accounts.capabilities import require_capability
 from inventory.models import (
     GoodsReceipt,
     InventoryItem,
+    InventoryLot,
     PurchaseBill,
     PurchaseOrder,
     PurchaseRequest,
@@ -52,6 +53,7 @@ from api.v1.permissions import IsAdmin
 from api.v1.serializers.inventory import (
     EmptyInventoryActionSerializer,
     InventoryItemSerializer,
+    InventoryLotSerializer,
     OpeningStockImportPostSerializer,
     OpeningStockImportPreviewSerializer,
     PurchaseBillSerializer,
@@ -98,14 +100,27 @@ class InventoryItemViewSet(AdminInventoryModelViewSet):
         stock_tracking_enabled = _parse_bool_query(
             self.request.query_params.get("stock_tracking_enabled")
         )
+        lot_tracking_enabled = _parse_bool_query(
+            self.request.query_params.get("lot_tracking_enabled")
+        )
+        expiry_tracking_enabled = _parse_bool_query(
+            self.request.query_params.get("expiry_tracking_enabled")
+        )
         stock_item_type = (self.request.query_params.get("stock_item_type") or "").strip().upper()
+        barcode_or_qr = (self.request.query_params.get("code") or "").strip()
 
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active)
         if stock_tracking_enabled is not None:
             queryset = queryset.filter(stock_tracking_enabled=stock_tracking_enabled)
+        if lot_tracking_enabled is not None:
+            queryset = queryset.filter(lot_tracking_enabled=lot_tracking_enabled)
+        if expiry_tracking_enabled is not None:
+            queryset = queryset.filter(expiry_tracking_enabled=expiry_tracking_enabled)
         if stock_item_type:
             queryset = queryset.filter(stock_item_type=stock_item_type)
+        if barcode_or_qr:
+            queryset = queryset.filter(Q(barcode__iexact=barcode_or_qr) | Q(qr_code__iexact=barcode_or_qr))
 
         return queryset
 
@@ -134,6 +149,69 @@ class InventoryItemViewSet(AdminInventoryModelViewSet):
             metadata={
                 "inventory_item_id": item.id,
                 "product_id": item.product_id,
+                "changed_fields": changed_fields,
+            },
+        )
+
+
+class InventoryLotViewSet(AdminInventoryModelViewSet):
+    queryset = (
+        InventoryLot.objects.select_related(
+            "inventory_item",
+            "inventory_item__product",
+            "stock_location",
+            "created_by",
+        )
+        .all()
+    )
+    serializer_class = InventoryLotSerializer
+    search_fields = ["lot_code", "barcode", "qr_code", "inventory_item__sku", "inventory_item__product__name"]
+    ordering_fields = ["expiry_date", "received_date", "created_at", "lot_code"]
+    ordering = ["expiry_date", "lot_code", "id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        item_id = self.request.query_params.get("inventory_item")
+        status_value = (self.request.query_params.get("status") or "").strip().upper()
+        expiring = _parse_bool_query(self.request.query_params.get("expiring"))
+        if item_id:
+            queryset = queryset.filter(inventory_item_id=item_id)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if expiring is True:
+            from datetime import timedelta
+            from django.utils import timezone
+
+            today = timezone.localdate()
+            queryset = queryset.filter(expiry_date__isnull=False, expiry_date__lte=today + timedelta(days=30))
+        return queryset
+
+    def perform_create(self, serializer):
+        lot = serializer.save(created_by=self.request.user)
+        log_inventory_event(
+            action_type=AuditLog.ActionType.INVENTORY_ITEM_UPDATED,
+            instance=lot.inventory_item,
+            performed_by=self.request.user,
+            event="INVENTORY_LOT_CREATED",
+            metadata={
+                "inventory_lot_id": lot.id,
+                "inventory_item_id": lot.inventory_item_id,
+                "lot_code": lot.lot_code,
+                "expiry_date": lot.expiry_date.isoformat() if lot.expiry_date else None,
+            },
+        )
+
+    def perform_update(self, serializer):
+        changed_fields = sorted(serializer.validated_data.keys())
+        lot = serializer.save()
+        log_inventory_event(
+            action_type=AuditLog.ActionType.INVENTORY_ITEM_UPDATED,
+            instance=lot.inventory_item,
+            performed_by=self.request.user,
+            event="INVENTORY_LOT_UPDATED",
+            metadata={
+                "inventory_lot_id": lot.id,
+                "inventory_item_id": lot.inventory_item_id,
                 "changed_fields": changed_fields,
             },
         )

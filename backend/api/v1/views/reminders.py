@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from reminders.models import NotificationTemplate, PaymentReminder
+from reminders.services.gateway_service import gateway_status
 from reminders.services.reminder_send_run_service import run_payment_reminders
 from reminders.services.reminder_service import (
     cancel_payment_reminder,
@@ -41,7 +42,7 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated(), IsAdmin()]
 
     def get_serializer_class(self):
-        if self.action in {"schedule", "send", "cancel", "retry"}:
+        if self.action in {"schedule", "send", "dispatch", "cancel", "retry"}:
             return ReminderActionSerializer
         return super().get_serializer_class()
 
@@ -57,6 +58,23 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
                 reminder_id=int(pk),
                 scheduled_for=scheduled_for,
                 performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        payload = PaymentReminderSerializer(reminder, context=self.get_serializer_context())
+        return Response({"updated": updated, "reminder": payload.data})
+
+    @action(detail=True, methods=["post"], url_path="dispatch")
+    def dispatch(self, request, pk=None):
+        """Automated gateway dispatch for EMAIL, SMS, and WhatsApp where configured."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            reminder, updated = send_payment_reminder(
+                reminder_id=int(pk),
+                performed_by=request.user,
+                notes=serializer.validated_data.get("notes", ""),
+                manual_send=False,
             )
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
@@ -137,6 +155,13 @@ class PaymentReminderRunView(APIView):
             performed_by=request.user,
         )
         return Response(payload, status=status.HTTP_200_OK)
+
+
+class PaymentReminderGatewayStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        return Response(gateway_status())
 
 
 # ---------------------------------------------------------------------------

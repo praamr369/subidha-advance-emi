@@ -4339,6 +4339,15 @@ class LeaseContract(models.Model):
         related_name="lease_expense_records",
         limit_choices_to={"account_type": "EXPENSE"},
     )
+    lease_payment_account = models.ForeignKey(
+        "ChartOfAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lease_payment_records",
+        limit_choices_to={"account_type": "ASSET"},
+        help_text="Cash/bank/payment clearing account credited when lease payments are posted.",
+    )
 
     status = models.CharField(
         max_length=20,

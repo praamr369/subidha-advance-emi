@@ -36,8 +36,54 @@ export type InventoryItem = {
   reorder_level_qty: string;
   valuation_method: "FIFO" | "AVG";
   standard_unit_cost?: string | null;
+  barcode?: string | null;
+  qr_code?: string | null;
+  lot_tracking_enabled?: boolean;
+  expiry_tracking_enabled?: boolean;
   is_active: boolean;
   current_stock_qty?: string;
+  active_lot_count?: number;
+  expiring_lot_count?: number;
+};
+
+export type InventoryLot = {
+  id: number;
+  inventory_item: number;
+  inventory_item_sku?: string | null;
+  product_code?: string | null;
+  product_name?: string | null;
+  stock_location?: number | null;
+  stock_location_code?: string | null;
+  stock_location_name?: string | null;
+  lot_code: string;
+  barcode: string;
+  qr_code: string;
+  received_date?: string | null;
+  expiry_date?: string | null;
+  quantity_on_hand: string;
+  status: "ACTIVE" | "QUARANTINED" | "EXPIRED" | "CLOSED";
+  source_model?: string;
+  source_id?: string;
+  notes?: string;
+  created_by?: number | null;
+  created_by_username?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type InventoryLotPayload = {
+  inventory_item: number;
+  stock_location?: number | null;
+  lot_code: string;
+  barcode?: string;
+  qr_code?: string;
+  received_date?: string | null;
+  expiry_date?: string | null;
+  quantity_on_hand: string | number;
+  status?: InventoryLot["status"];
+  source_model?: string;
+  source_id?: string;
+  notes?: string;
 };
 
 export type AdminInventoryItemSearchLocationRow = {
@@ -562,6 +608,10 @@ export type InventoryItemUpdatePayload = Partial<
     | "delivery_stock_bridge_enabled"
     | "reorder_level_qty"
     | "standard_unit_cost"
+    | "barcode"
+    | "qr_code"
+    | "lot_tracking_enabled"
+    | "expiry_tracking_enabled"
     | "is_active"
   >
 >;
@@ -628,6 +678,24 @@ export function updateInventoryItem(
   payload: InventoryItemUpdatePayload
 ) {
   return apiFetch<InventoryItem>(`/inventory/items/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listInventoryLots(params: Record<string, QueryValue> = {}) {
+  return apiFetch<PaginatedResponse<InventoryLot>>(`/inventory/lots/${buildQuery(params)}`);
+}
+
+export function createInventoryLot(payload: InventoryLotPayload) {
+  return apiFetch<InventoryLot>("/inventory/lots/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateInventoryLot(id: number | string, payload: Partial<InventoryLotPayload>) {
+  return apiFetch<InventoryLot>(`/inventory/lots/${id}/`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });

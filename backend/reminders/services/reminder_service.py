@@ -8,6 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from reminders.models import PaymentReminder, ReminderChannel, ReminderStatus, ReminderType
+from reminders.services.gateway_service import ReminderGatewayError, dispatch_gateway_message
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
 
@@ -89,7 +90,7 @@ def send_payment_reminder(
     if reminder.status == ReminderStatus.CANCELLED:
         raise ValueError("Cancelled reminders cannot be sent.")
     dispatch_mode = "MANUAL_CONFIRM" if manual_send else "AUTOMATED_DISPATCH"
-    # For EMAIL channel: attempt actual delivery before marking SENT.
+    # For EMAIL/SMS/WHATSAPP automated channels: attempt delivery before marking SENT.
     if reminder.channel == ReminderChannel.EMAIL:
         try:
             _dispatch_email_reminder(reminder)
@@ -110,6 +111,34 @@ def send_payment_reminder(
                 },
             )
             raise ValueError(f"Email delivery failed: {exc}") from exc
+    elif not manual_send and reminder.channel in {ReminderChannel.SMS, ReminderChannel.WHATSAPP}:
+        try:
+            gateway_result = dispatch_gateway_message(
+                reminder=reminder,
+                message=_format_whatsapp_message(reminder),
+            )
+        except ReminderGatewayError as exc:
+            reminder.status = ReminderStatus.FAILED
+            reminder.attempts = (reminder.attempts or 0) + 1
+            reminder.last_error = str(exc)[:500]
+            reminder.save(update_fields=["status", "attempts", "last_error", "updated_at"])
+            _audit(
+                reminder=reminder,
+                performed_by=performed_by,
+                event="PAYMENT_REMINDER_FAILED",
+                metadata={
+                    "error": str(exc)[:200],
+                    "attempt": reminder.attempts,
+                    "manual_send": manual_send,
+                    "dispatch_mode": dispatch_mode,
+                    "channel": reminder.channel,
+                },
+            )
+            raise ValueError(f"{reminder.channel} delivery failed: {exc}") from exc
+        if not gateway_result.get("accepted"):
+            raise ValueError(f"{reminder.channel} gateway did not accept the message.")
+        if notes:
+            notes = f"{notes.strip()}\nGateway: {gateway_result}".strip()
 
     reminder.status = ReminderStatus.SENT
     reminder.sent_at = timezone.now()

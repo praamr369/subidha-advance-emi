@@ -8,6 +8,7 @@ from inventory.models import (
     GoodsReceipt,
     GoodsReceiptLine,
     InventoryItem,
+    InventoryLot,
     OpeningStockEntry,
     PurchaseOrder,
     PurchaseOrderLine,
@@ -50,6 +51,8 @@ class InventoryItemSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(source="product.product_code", read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
     current_stock_qty = serializers.SerializerMethodField()
+    active_lot_count = serializers.SerializerMethodField()
+    expiring_lot_count = serializers.SerializerMethodField()
     default_stock_location_code = serializers.CharField(source="default_stock_location.code", read_only=True)
     default_stock_location_name = serializers.CharField(source="default_stock_location.name", read_only=True)
 
@@ -72,15 +75,80 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "reorder_level_qty",
             "valuation_method",
             "standard_unit_cost",
+            "barcode",
+            "qr_code",
+            "lot_tracking_enabled",
+            "expiry_tracking_enabled",
             "is_active",
             "current_stock_qty",
+            "active_lot_count",
+            "expiring_lot_count",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "current_stock_qty", "created_at", "updated_at"]
+        read_only_fields = ["id", "current_stock_qty", "active_lot_count", "expiring_lot_count", "created_at", "updated_at"]
 
     def get_current_stock_qty(self, obj):
         return f"{obj.current_stock_quantity():.3f}"
+
+    def get_active_lot_count(self, obj):
+        return obj.lots.filter(status="ACTIVE").count() if obj.pk else 0
+
+    def get_expiring_lot_count(self, obj):
+        from django.utils import timezone
+        from datetime import timedelta
+
+        if not obj.pk:
+            return 0
+        today = timezone.localdate()
+        return obj.lots.filter(status="ACTIVE", expiry_date__isnull=False, expiry_date__lte=today + timedelta(days=30)).count()
+
+
+class InventoryLotSerializer(serializers.ModelSerializer):
+    inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
+    product_code = serializers.CharField(source="inventory_item.product.product_code", read_only=True)
+    product_name = serializers.CharField(source="inventory_item.product.name", read_only=True)
+    stock_location_code = serializers.CharField(source="stock_location.code", read_only=True)
+    stock_location_name = serializers.CharField(source="stock_location.name", read_only=True)
+    created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+
+    class Meta:
+        model = InventoryLot
+        fields = [
+            "id",
+            "inventory_item",
+            "inventory_item_sku",
+            "product_code",
+            "product_name",
+            "stock_location",
+            "stock_location_code",
+            "stock_location_name",
+            "lot_code",
+            "barcode",
+            "qr_code",
+            "received_date",
+            "expiry_date",
+            "quantity_on_hand",
+            "status",
+            "source_model",
+            "source_id",
+            "notes",
+            "created_by",
+            "created_by_username",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_by", "created_by_username", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        item = attrs.get("inventory_item") or getattr(self.instance, "inventory_item", None)
+        expiry_date = attrs.get("expiry_date", getattr(self.instance, "expiry_date", None))
+        if item and not item.lot_tracking_enabled:
+            raise serializers.ValidationError({"inventory_item": "Enable lot tracking on this inventory item before creating lots."})
+        if expiry_date and item and not item.expiry_tracking_enabled:
+            raise serializers.ValidationError({"expiry_date": "Enable expiry tracking on this inventory item before assigning expiry dates."})
+        return attrs
 
 
 class StockLedgerSerializer(serializers.ModelSerializer):

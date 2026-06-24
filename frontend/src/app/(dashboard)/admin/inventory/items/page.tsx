@@ -30,6 +30,10 @@ type ItemFormState = {
   delivery_stock_bridge_enabled: boolean;
   reorder_level_qty: string;
   standard_unit_cost: string;
+  barcode: string;
+  qr_code: string;
+  lot_tracking_enabled: boolean;
+  expiry_tracking_enabled: boolean;
   is_active: boolean;
 };
 
@@ -41,6 +45,10 @@ function toFormState(item: InventoryItem): ItemFormState {
     delivery_stock_bridge_enabled: item.delivery_stock_bridge_enabled,
     reorder_level_qty: item.reorder_level_qty,
     standard_unit_cost: item.standard_unit_cost ?? "",
+    barcode: item.barcode ?? "",
+    qr_code: item.qr_code ?? "",
+    lot_tracking_enabled: Boolean(item.lot_tracking_enabled),
+    expiry_tracking_enabled: Boolean(item.expiry_tracking_enabled),
     is_active: item.is_active,
   };
 }
@@ -115,6 +123,11 @@ export default function InventoryItemsPage() {
       render: (row) => row.default_stock_location_name || "Unassigned",
     },
     { key: "current_stock_qty", header: "On Hand" },
+    {
+      key: "barcode",
+      header: "Trace",
+      render: (row) => row.lot_tracking_enabled ? `Lots ${row.active_lot_count ?? 0} / Exp ${row.expiring_lot_count ?? 0}` : (row.barcode || row.qr_code || "Not tracked"),
+    },
     { key: "reorder_level_qty", header: "Reorder" },
     {
       key: "delivery_stock_bridge_enabled",
@@ -166,6 +179,10 @@ export default function InventoryItemsPage() {
         delivery_stock_bridge_enabled: form.delivery_stock_bridge_enabled,
         reorder_level_qty: form.reorder_level_qty,
         standard_unit_cost: form.standard_unit_cost.trim() ? form.standard_unit_cost : null,
+        barcode: form.barcode.trim() ? form.barcode : null,
+        qr_code: form.qr_code.trim() ? form.qr_code : null,
+        lot_tracking_enabled: form.lot_tracking_enabled,
+        expiry_tracking_enabled: form.expiry_tracking_enabled,
         is_active: form.is_active,
       });
       await loadPage();
@@ -367,9 +384,37 @@ export default function InventoryItemsPage() {
                   className={FIELD_CLASS}
                 />
               </label>
+
+              <label className="grid gap-2 text-sm text-foreground">
+                <span className="font-medium">Barcode</span>
+                <input
+                  value={form.barcode}
+                  onChange={(event) =>
+                    setForm((current) =>
+                      current ? { ...current, barcode: event.target.value } : current
+                    )
+                  }
+                  disabled={saving}
+                  className={FIELD_CLASS}
+                />
+              </label>
+
+              <label className="grid gap-2 text-sm text-foreground">
+                <span className="font-medium">QR Code</span>
+                <input
+                  value={form.qr_code}
+                  onChange={(event) =>
+                    setForm((current) =>
+                      current ? { ...current, qr_code: event.target.value } : current
+                    )
+                  }
+                  disabled={saving}
+                  className={FIELD_CLASS}
+                />
+              </label>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-5">
               <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">
                 <input
                   type="checkbox"
@@ -399,6 +444,36 @@ export default function InventoryItemsPage() {
                   disabled={saving}
                 />
                 Delivery bridge enabled
+              </label>
+              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={form.lot_tracking_enabled}
+                  onChange={(event) =>
+                    setForm((current) =>
+                      current
+                        ? { ...current, lot_tracking_enabled: event.target.checked }
+                        : current
+                    )
+                  }
+                  disabled={saving}
+                />
+                Lot tracking enabled
+              </label>
+              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={form.expiry_tracking_enabled}
+                  onChange={(event) =>
+                    setForm((current) =>
+                      current
+                        ? { ...current, expiry_tracking_enabled: event.target.checked }
+                        : current
+                    )
+                  }
+                  disabled={saving}
+                />
+                Expiry tracking enabled
               </label>
               <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">
                 <input

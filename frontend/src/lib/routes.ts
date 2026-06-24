@@ -281,6 +281,7 @@ export const ROUTES = {
 
     inventory: "/admin/inventory",
     inventoryItems: "/admin/inventory/items",
+    inventoryLots: "/admin/inventory/lots",
     inventoryLocations: "/admin/inventory/locations",
     inventoryLedger: "/admin/inventory/ledger",
     inventoryMovements: "/admin/inventory/movements",

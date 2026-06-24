@@ -621,6 +621,23 @@ DEFAULT_FROM_EMAIL = (
     )
 ).strip()
 
+REMINDER_GATEWAY_PROVIDER = _parse_choice(
+    os.getenv("REMINDER_GATEWAY_PROVIDER"),
+    "console" if _is_local_dev_mode() else "disabled",
+    {"disabled", "console", "http_json"},
+    "REMINDER_GATEWAY_PROVIDER",
+)
+REMINDER_SMS_GATEWAY_URL = (os.getenv("REMINDER_SMS_GATEWAY_URL") or "").strip()
+REMINDER_SMS_GATEWAY_TOKEN = (os.getenv("REMINDER_SMS_GATEWAY_TOKEN") or "").strip()
+REMINDER_WHATSAPP_GATEWAY_URL = (os.getenv("REMINDER_WHATSAPP_GATEWAY_URL") or "").strip()
+REMINDER_WHATSAPP_GATEWAY_TOKEN = (os.getenv("REMINDER_WHATSAPP_GATEWAY_TOKEN") or "").strip()
+REMINDER_GATEWAY_TIMEOUT_SECONDS = _parse_int(
+    os.getenv("REMINDER_GATEWAY_TIMEOUT_SECONDS"),
+    10,
+    minimum=1,
+    name="REMINDER_GATEWAY_TIMEOUT_SECONDS",
+)
+
 CORS_ALLOW_CREDENTIALS = _parse_bool(
     os.getenv("CORS_ALLOW_CREDENTIALS"), default=bool(CORS_ALLOWED_ORIGINS)
 )

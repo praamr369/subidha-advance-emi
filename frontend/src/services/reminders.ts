@@ -64,6 +64,13 @@ export function sendReminder(id: number, notes = "") {
   });
 }
 
+export function dispatchReminder(id: number, notes = "") {
+  return apiFetch<{ updated: boolean; reminder: PaymentReminder }>(`/reminders/${id}/dispatch/`, {
+    method: "POST",
+    body: JSON.stringify({ notes }),
+  });
+}
+
 export function cancelReminder(id: number, notes = "") {
   return apiFetch<{ updated: boolean; reminder: PaymentReminder }>(`/reminders/${id}/cancel/`, {
     method: "POST",
@@ -90,6 +97,22 @@ export function retryReminder(id: number) {
 
 export function getWhatsAppReminderLink(id: number) {
   return apiFetch<WhatsAppLinkResult>(`/reminders/${id}/whatsapp-link/`);
+}
+
+export type ReminderGatewayStatus = {
+  provider: "disabled" | "console" | "http_json" | string;
+  automated_dispatch_available: boolean;
+  channels: Record<string, {
+    provider: string;
+    channel: string;
+    configured: boolean;
+    url: string;
+    token_configured: boolean;
+  }>;
+};
+
+export function getReminderGatewayStatus() {
+  return apiFetch<ReminderGatewayStatus>("/reminders/gateway/status/");
 }
 
 // ── Notification Templates ──────────────────────────────────────────────────

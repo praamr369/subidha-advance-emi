@@ -235,6 +235,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   // ── 9. Inventory & Stock ──────────────────────────────────────────────────
   item("Inventory & Stock", "Inventory Dashboard", ROUTES.admin.inventory, "Inventory operations workspace."),
   item("Inventory & Stock", "Items / Products", ROUTES.admin.inventoryItems, "Inventory item master."),
+  item("Inventory & Stock", "Barcode / Lots", ROUTES.admin.inventoryLots, "Barcode, QR, lot, and expiry tracking."),
   item("Inventory & Stock", "Stock on Hand", ROUTES.admin.inventoryStockOnHand, "Current stock posture."),
   item("Inventory & Stock", "Stock Ledger", ROUTES.admin.inventoryLedger, "Stock ledger."),
   item("Inventory & Stock", "Movements", ROUTES.admin.inventoryMovements, "Stock movement register."),

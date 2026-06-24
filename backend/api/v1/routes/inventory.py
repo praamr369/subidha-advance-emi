@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from api.v1.views.inventory import (
     GoodsReceiptViewSet,
     InventoryItemViewSet,
+    InventoryLotViewSet,
     InventoryValuationView,
     OpeningStockImportPostView,
     OpeningStockImportPreviewView,
@@ -31,6 +32,7 @@ from api.v1.views.inventory_phase2 import (
 
 router = DefaultRouter()
 router.register(r"items", InventoryItemViewSet, basename="inventory-items")
+router.register(r"lots", InventoryLotViewSet, basename="inventory-lots")
 router.register(r"locations", StockLocationViewSet, basename="inventory-locations")
 router.register(r"movements", StockLedgerViewSet, basename="inventory-movements")
 router.register(r"stock-adjustments", StockAdjustmentViewSet, basename="inventory-stock-adjustments")

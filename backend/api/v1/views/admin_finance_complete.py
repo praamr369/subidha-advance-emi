@@ -1,5 +1,5 @@
 """Complete Core Finance: Lease accounting, depreciation, cost centre P&L, deferred tax, cash flow, fund flow."""
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import timedelta, date
 from dateutil.relativedelta import relativedelta
 
@@ -18,6 +18,13 @@ from accounting.models import (
     JournalEntryType,
 )
 from subscriptions.models import Subscription
+
+
+MONEY = Decimal("0.01")
+
+
+def _money(value) -> Decimal:
+    return Decimal(str(value or "0")).quantize(MONEY, rounding=ROUND_HALF_UP)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -57,6 +64,7 @@ def lease_calculate_rou_liability_view(request, subscription_id):
     else:
         pv_factor = (Decimal("1") - (Decimal("1") + discount_rate_monthly) ** (-lease_term_months)) / discount_rate_monthly
         pv = monthly_payment * pv_factor
+    pv = _money(pv)
 
     return Response({
         "subscription_id": sub.id,
@@ -86,14 +94,17 @@ def lease_generate_schedule_view(request, lease_id):
     monthly_payment = lease.monthly_lease_payment
     discount_rate_monthly = Decimal(lease.discount_rate) / Decimal("12") / Decimal("100")
     initial_liability = lease.initial_lease_liability
-    rou_depreciation_monthly = lease.rou_asset_amount / Decimal(lease.lease_term_months)
+    rou_depreciation_monthly = _money(lease.rou_asset_amount / Decimal(lease.lease_term_months))
 
     # Generate schedule
     opening_liability = initial_liability
     for month in range(1, lease.lease_term_months + 1):
-        interest_expense = opening_liability * discount_rate_monthly
-        principal_payment = monthly_payment - interest_expense
-        closing_liability = opening_liability - principal_payment
+        interest_expense = _money(opening_liability * discount_rate_monthly)
+        principal_payment = _money(monthly_payment - interest_expense)
+        closing_liability = _money(opening_liability - principal_payment)
+        if month == lease.lease_term_months:
+            principal_payment = opening_liability
+            closing_liability = Decimal("0.00")
 
         payment_date = lease.lease_start_date + relativedelta(months=month)
 
@@ -127,9 +138,9 @@ def lease_post_to_gl_view(request, lease_id):
     """
     lease = get_object_or_404(LeaseContract, pk=lease_id)
 
-    if not all([lease.rou_asset_account, lease.lease_liability_account, lease.lease_expense_account]):
+    if not all([lease.rou_asset_account, lease.lease_liability_account, lease.lease_expense_account, lease.lease_payment_account]):
         return Response(
-            {"error": "GL accounts not configured for this lease."},
+            {"error": "GL accounts not configured for this lease. ROU asset, liability, expense, and payment accounts are required."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -142,7 +153,7 @@ def lease_post_to_gl_view(request, lease_id):
     now = timezone.now()
     with transaction.atomic():
         for schedule in unposted_schedules:
-            principal = schedule.opening_liability - schedule.closing_liability
+            principal = _money(schedule.opening_liability - schedule.closing_liability)
             # Guard: skip if amounts are zero/negative (shouldn't happen but safe)
             if principal <= Decimal("0") and schedule.interest_expense <= Decimal("0"):
                 continue
@@ -156,23 +167,45 @@ def lease_post_to_gl_view(request, lease_id):
                 posted_at=now,
             )
 
-            # Debit: Lease Expense (interest + ROU depreciation)
-            expense_amount = schedule.interest_expense + schedule.rou_depreciation
-            if expense_amount > Decimal("0"):
+            # Debit: interest expense and ROU depreciation expense.
+            expense_amount = _money(schedule.interest_expense + schedule.rou_depreciation)
+            if expense_amount > Decimal("0.00"):
                 JournalEntryLine.objects.create(
                     journal_entry=je,
                     chart_account=lease.lease_expense_account,
                     debit_amount=expense_amount,
                     credit_amount=Decimal("0"),
+                    description="Lease interest and ROU depreciation expense",
                 )
 
-            # Credit: Lease Liability (principal reduction)
-            if principal > Decimal("0"):
+            # Debit: lease liability principal reduction.
+            if principal > Decimal("0.00"):
                 JournalEntryLine.objects.create(
                     journal_entry=je,
                     chart_account=lease.lease_liability_account,
+                    debit_amount=principal,
+                    credit_amount=Decimal("0"),
+                    description="Lease liability principal reduction",
+                )
+
+            # Credit: payment account for the lease payment.
+            if schedule.payment_amount > Decimal("0.00"):
+                JournalEntryLine.objects.create(
+                    journal_entry=je,
+                    chart_account=lease.lease_payment_account,
                     debit_amount=Decimal("0"),
-                    credit_amount=principal,
+                    credit_amount=schedule.payment_amount,
+                    description="Lease payment cash/bank clearing",
+                )
+
+            # Credit: ROU asset for straight-line depreciation.
+            if schedule.rou_depreciation > Decimal("0.00"):
+                JournalEntryLine.objects.create(
+                    journal_entry=je,
+                    chart_account=lease.rou_asset_account,
+                    debit_amount=Decimal("0"),
+                    credit_amount=schedule.rou_depreciation,
+                    description="ROU asset depreciation",
                 )
 
             schedule.gl_posted = True
@@ -530,6 +563,8 @@ def lease_contract_list_create_view(request):
             "lease_start_date", "lease_end_date", "lease_term_months",
             "monthly_lease_payment", "discount_rate",
             "rou_asset_amount", "initial_lease_liability", "status",
+            "rou_asset_account_id", "lease_liability_account_id",
+            "lease_expense_account_id", "lease_payment_account_id",
         )
         return Response({"count": len(leases), "results": list(leases)})
 
@@ -555,6 +590,7 @@ def lease_contract_list_create_view(request):
     else:
         pv_factor = (Decimal("1") - (Decimal("1") + r) ** (-lease_term_months)) / r
         pv = monthly_payment * pv_factor
+    pv = _money(pv)
 
     lease = LeaseContract.objects.create(
         subscription_id=request.data["subscription_id"],
@@ -567,6 +603,10 @@ def lease_contract_list_create_view(request):
         discount_rate=discount_rate,
         rou_asset_amount=pv,
         initial_lease_liability=pv,
+        rou_asset_account_id=request.data.get("rou_asset_account_id") or None,
+        lease_liability_account_id=request.data.get("lease_liability_account_id") or None,
+        lease_expense_account_id=request.data.get("lease_expense_account_id") or None,
+        lease_payment_account_id=request.data.get("lease_payment_account_id") or None,
     )
     return Response({
         "id": lease.id,
