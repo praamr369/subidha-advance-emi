@@ -24,6 +24,7 @@ import {
   listHrStaff,
   listHrStaffDocuments,
   patchHrStaffDocument,
+  reviewHrStaffDocument,
   type HrStaff,
   type HrStaffDocument,
 } from "@/services/admin-hr";
@@ -43,6 +44,8 @@ export default function AdminHrStaffDocumentsPage() {
   const [filters, setFilters] = useState({ employee: initialEmployee, document_type: "", status: "" });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [upload, setUpload] = useState({ employee: initialEmployee, document_type: "OTHER", title: "", document_no: "", notes: "", file: null as File | null });
+  const [reviewModal, setReviewModal] = useState<{ documentId: number; action: "verify" | "reject"; title: string } | null>(null);
+  const [reviewNotes, setReviewNotes] = useState("");
 
   const selectedStaff = useMemo(
     () => staff.find((member) => String(member.id) === filters.employee),
@@ -107,6 +110,27 @@ export default function AdminHrStaffDocumentsPage() {
     await load(filters);
   }
 
+  function openReviewModal(row: HrStaffDocument, action: "verify" | "reject") {
+    setReviewModal({ documentId: row.id, action, title: row.title });
+    setReviewNotes("");
+  }
+
+  async function submitReview() {
+    if (!reviewModal) return;
+    try {
+      setSaving(true);
+      await reviewHrStaffDocument(reviewModal.documentId, reviewModal.action, reviewNotes);
+      setNotice(`Document "${reviewModal.title}" marked as ${reviewModal.action === "verify" ? "verified (active)" : "rejected (inactive)"}.`);
+      setReviewModal(null);
+      setReviewNotes("");
+      await load(filters);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to complete review.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <ERPPageShell
       eyebrow="Staff HR"
@@ -145,7 +169,7 @@ export default function AdminHrStaffDocumentsPage() {
 
       <FormSection
         title="Document filters"
-        description="Filters call the staff document API; verify/reject is disabled because only ACTIVE/INACTIVE status exists."
+        description="Filters call the staff document API. Use Verify/Reject buttons to record a document review decision (maps to ACTIVE/INACTIVE status)."
       >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <ActionButton variant="primary" onClick={() => { setUpload((current) => ({ ...current, employee: filters.employee })); setDrawerOpen(true); }}>
@@ -208,6 +232,50 @@ export default function AdminHrStaffDocumentsPage() {
       {!loading && error ? <ERPErrorState title="Staff documents unavailable" description={error} onRetry={() => void load()} /> : null}
       {!loading && !error && rows.length === 0 ? <ERPEmptyState title="No staff documents" description="Upload KYC, appointment, and salary agreement documents from this page or the staff profile." /> : null}
 
+      {reviewModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="text-lg font-bold mb-1">
+              {reviewModal.action === "verify" ? "Verify document" : "Reject document"}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              <span className="font-medium">{reviewModal.title}</span>
+              {reviewModal.action === "verify"
+                ? " will be marked ACTIVE (verified)."
+                : " will be marked INACTIVE (rejected)."}
+            </p>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">
+              Notes {reviewModal.action === "reject" ? "(recommended)" : "(optional)"}
+            </label>
+            <textarea
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm min-h-[72px] resize-none"
+              placeholder={reviewModal.action === "reject" ? "Reason for rejection…" : "Verification notes…"}
+              value={reviewNotes}
+              onChange={(e) => setReviewNotes(e.target.value)}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-border px-4 py-2 text-sm font-semibold"
+                onClick={() => setReviewModal(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+                  reviewModal.action === "verify" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"
+                }`}
+                onClick={() => void submitReview()}
+              >
+                {saving ? "Saving…" : reviewModal.action === "verify" ? "Confirm Verify" : "Confirm Reject"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {!loading && !error && rows.length > 0 ? (
         <ERPSectionShell title={`Documents (${rows.length})`} description="Register view returned by the existing staff document API.">
           <DataTableShell>
@@ -245,8 +313,19 @@ export default function AdminHrStaffDocumentsPage() {
                         <button type="button" className="rounded-md border border-border px-2 py-1 text-xs font-semibold" onClick={() => void toggleDocumentStatus(row)}>
                           {row.status === "ACTIVE" ? "Mark inactive" : "Mark active"}
                         </button>
-                        <button type="button" disabled title="Verify/reject statuses are not supported by the current staff document API." className="rounded-md border border-border px-2 py-1 text-xs font-semibold text-muted-foreground opacity-60">
-                          Verify / Reject unavailable
+                        <button
+                          type="button"
+                          className="rounded-md border border-emerald-500 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                          onClick={() => openReviewModal(row, "verify")}
+                        >
+                          Verify
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-md border border-red-400 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                          onClick={() => openReviewModal(row, "reject")}
+                        >
+                          Reject
                         </button>
                       </div>
                     </td>

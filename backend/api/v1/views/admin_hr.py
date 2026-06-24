@@ -544,6 +544,41 @@ class AdminHrStaffDocumentPatchView(_AdminBase):
         return Response(EmployeeDocumentSerializer(updated, context={"request": request}).data)
 
 
+class AdminHrStaffDocumentReviewView(_AdminBase):
+    """POST /admin/hr/staff-documents/<document_id>/review/
+    action='verify' sets status ACTIVE; action='reject' sets status INACTIVE.
+    Notes are appended to the document notes field for audit trail."""
+
+    def post(self, request, document_id: int):
+        document = get_object_or_404(EmployeeDocument, pk=document_id)
+        action = (request.data.get("action") or "").strip().lower()
+        notes = (request.data.get("notes") or "").strip()
+
+        if action not in ("verify", "reject"):
+            return Response(
+                {"detail": "action must be 'verify' or 'reject'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from django.utils import timezone
+        actor = request.user.get_username() if request.user else "admin"
+        timestamp = timezone.now().strftime("%Y-%m-%d %H:%M")
+
+        new_status = "ACTIVE" if action == "verify" else "INACTIVE"
+        audit_note = f"[{timestamp}] {actor} marked {action}."
+        if notes:
+            audit_note += f" Notes: {notes}"
+
+        document.status = new_status
+        if document.notes:
+            document.notes = f"{document.notes}\n{audit_note}"
+        else:
+            document.notes = audit_note
+        document.save(update_fields=["status", "notes"])
+
+        return Response(EmployeeDocumentSerializer(document, context={"request": request}).data)
+
+
 class HrAttendanceCreateSerializer(serializers.Serializer):
     employee = serializers.IntegerField()
     attendance_date = serializers.DateField(required=False)

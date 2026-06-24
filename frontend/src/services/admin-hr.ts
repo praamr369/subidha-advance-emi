@@ -338,6 +338,17 @@ export async function patchHrStaffDocument(documentId: number, payload: Record<s
   return apiFetch<HrStaffDocument>(`/admin/hr/staff-documents/${documentId}/`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
+export async function reviewHrStaffDocument(
+  documentId: number,
+  action: "verify" | "reject",
+  notes?: string,
+) {
+  return apiFetch<HrStaffDocument>(`/admin/hr/staff-documents/${documentId}/review/`, {
+    method: "POST",
+    body: JSON.stringify({ action, notes: notes ?? "" }),
+  });
+}
+
 export function downloadHrStaffProfilePdf(staffId: number, fallbackFilename = "staff-profile.pdf") {
   return downloadAuthenticatedFile(`/admin/hr/staff/${staffId}/profile-pdf/`, fallbackFilename);
 }
