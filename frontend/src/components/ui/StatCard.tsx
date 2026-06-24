@@ -23,33 +23,29 @@ type StatCardProps = {
 const toneColors = {
   default: {
     shell:
-      "border-[color-mix(in_oklab,var(--surface-border-strong)_82%,white_18%)] bg-[linear-gradient(180deg,var(--surface-card-elevated),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))]",
-    icon: "bg-[var(--surface-strong)] text-slate-700",
-    accent: "bg-slate-400/55",
+      "border-[color-mix(in_oklab,var(--surface-border-strong)_55%,transparent)] bg-[var(--surface-card-elevated)]",
+    icon: "bg-[var(--surface-muted)] text-slate-600",
+    accent: "bg-slate-400/45",
   },
   success: {
-    shell:
-      "border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.97),rgba(220,252,231,0.86))]",
+    shell: "border-emerald-200/60 bg-[var(--surface-card-elevated)]",
     icon: "bg-emerald-500/10 text-emerald-700",
-    accent: "bg-emerald-500/70",
+    accent: "bg-emerald-500/65",
   },
   warning: {
-    shell:
-      "border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(254,243,199,0.88))]",
+    shell: "border-amber-200/60 bg-[var(--surface-card-elevated)]",
     icon: "bg-amber-500/10 text-amber-700",
-    accent: "bg-amber-500/72",
+    accent: "bg-amber-500/65",
   },
   danger: {
-    shell:
-      "border-red-200/80 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.86))]",
+    shell: "border-red-200/60 bg-[var(--surface-card-elevated)]",
     icon: "bg-red-500/10 text-red-700",
-    accent: "bg-red-500/72",
+    accent: "bg-red-500/65",
   },
   info: {
-    shell:
-      "border-sky-200/80 bg-[linear-gradient(180deg,rgba(240,249,255,0.98),rgba(224,242,254,0.88))]",
+    shell: "border-sky-200/60 bg-[var(--surface-card-elevated)]",
     icon: "bg-sky-500/10 text-sky-700",
-    accent: "bg-sky-500/72",
+    accent: "bg-sky-500/65",
   },
 };
 
@@ -86,13 +82,12 @@ export default function StatCard({
   const card = (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-[1.6rem] border p-5 shadow-[0_18px_50px_-38px_rgba(15,23,42,0.42)] transition-colors-smooth motion-safe:transition-transform motion-safe:duration-150 motion-safe:hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-36px_rgba(15,23,42,0.52)]",
+        "group relative overflow-hidden rounded-2xl border p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition motion-safe:duration-150 hover:border-[color-mix(in_oklab,var(--surface-border-strong)_80%,transparent)] hover:shadow-[0_8px_24px_-18px_rgba(15,23,42,0.32)]",
         toneStyle.shell,
         className
       )}
     >
-      <div className={cn("absolute inset-x-5 top-0 h-px rounded-full", toneStyle.accent)} />
-      <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-[color-mix(in_oklab,var(--surface-card-elevated)_42%,transparent)] blur-2xl" />
+      <div className={cn("absolute left-0 top-0 h-full w-0.5 rounded-full", toneStyle.accent)} />
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="enterprise-eyebrow">{label}</div>
@@ -102,7 +97,7 @@ export default function StatCard({
         {icon ? (
           <div
             className={cn(
-              "rounded-2xl border border-slate-300 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]",
+              "rounded-xl p-2.5 ring-1 ring-inset ring-[color-mix(in_oklab,var(--surface-border-strong)_45%,transparent)]",
               toneStyle.icon
             )}
           >

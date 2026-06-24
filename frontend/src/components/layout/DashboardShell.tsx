@@ -62,6 +62,7 @@ import ThemeToggle from "@/components/ui/ThemeToggle";
 import NotificationBellDropdown from "@/components/layout/NotificationBellDropdown";
 import PortalHeader from "@/components/layout/PortalHeader";
 import PortalShell from "@/components/layout/PortalShell";
+import AdminSidebarNav from "@/components/layout/AdminSidebarNav";
 import RoleSidebar from "@/components/layout/RoleSidebar";
 import SidebarHoverCard from "@/components/layout/SidebarHoverCard";
 import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
@@ -875,6 +876,102 @@ function SidebarContent({
           ) : null}
         </div>
       );
+  }
+
+  if (role === "ADMIN" && !collapsed) {
+    const adminFooter = (
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <WorkspaceBrandMark size={32} variant="onSidebar" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-semibold text-[var(--sidebar-foreground)]">
+              {displayName}
+            </div>
+            <div className="truncate text-[11px] text-[var(--sidebar-section-label)]">
+              {formatRoleLabel(role)}
+            </div>
+          </div>
+          <ToggleGroup
+            type="single"
+            value={operatorMode}
+            aria-label="Operator mode"
+            title="Simple hides advanced finance modules. Advanced shows the full catalog."
+            onValueChange={(value: string) => {
+              if (value !== "SIMPLE" && value !== "ADVANCED") return;
+              persistOperatorMode(value as OperatorMode);
+            }}
+            className="gap-0.5 rounded-lg border-0 bg-white/[0.04] p-0.5 shadow-none ring-1 ring-inset ring-white/[0.06]"
+          >
+            <ToggleGroupItem
+              value="SIMPLE"
+              aria-label="Simple workflow view"
+              className="h-7 rounded-md px-2 text-[11px] font-semibold text-[var(--sidebar-item-muted)] shadow-none hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
+            >
+              Simple
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="ADVANCED"
+              aria-label="Advanced ERP view"
+              className="h-7 rounded-md px-2 text-[11px] font-semibold text-[var(--sidebar-item-muted)] shadow-none hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
+            >
+              Advanced
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+        <div className="flex gap-2">
+          <Link
+            href={getProfileHref(role)}
+            onClick={isMobile ? onClose : undefined}
+            className="inline-flex h-9 flex-1 items-center justify-center rounded-xl bg-white/[0.05] text-[12px] font-semibold text-[var(--sidebar-foreground)] transition-colors hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+          >
+            Profile
+          </Link>
+          <Link
+            href={getSettingsHref(role)}
+            onClick={isMobile ? onClose : undefined}
+            className="inline-flex h-9 w-10 items-center justify-center rounded-xl bg-white/[0.05] text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.09] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+            title="Settings"
+            aria-label="Settings"
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
+          <button
+            type="button"
+            onClick={onLogout}
+            disabled={isLoggingOut}
+            className="inline-flex h-9 flex-1 items-center justify-center rounded-xl bg-white/[0.05] text-[12px] font-semibold text-red-200/95 transition-colors hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/35 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLoggingOut ? "..." : "Logout"}
+          </button>
+        </div>
+      </div>
+    );
+
+    return (
+      <AdminSidebarNav
+        groups={visibleGroups}
+        activeHref={activeHref}
+        brandName={brandConfig.companyName}
+        roleLabel={formatRoleLabel(role)}
+        isMobile={isMobile}
+        navQuery={navQuery}
+        onNavQueryChange={setNavQuery}
+        expandedGroups={expandedGroups}
+        onToggleGroup={toggleGroup}
+        favorites={favorites}
+        onToggleFavorite={(href) => {
+          if (!sessionId) return;
+          setFavorites(toggleFavorite(sessionId, role, href));
+        }}
+        canFavorite={Boolean(sessionId)}
+        badges={queueBadges}
+        favoriteLinks={favoriteLinks}
+        brandSlot={<WorkspaceBrandMark size={32} variant="onSidebar" />}
+        footerSlot={adminFooter}
+        onToggleCollapse={onToggleCollapse}
+        onClose={onClose}
+      />
+    );
   }
 
   return (
