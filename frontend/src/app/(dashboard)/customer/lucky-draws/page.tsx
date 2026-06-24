@@ -1,10 +1,9 @@
 "use client";
-import { RefreshCw, Download, Trophy } from "lucide-react";
+import { Download, Trophy } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   ERPAuditNote,
-  ERPDataToolbar,
   ERPEmptyState,
   ERPErrorState,
   ERPLoadingState,
@@ -12,7 +11,6 @@ import {
   ERPSectionShell,
   ERPStatusBadge,
 } from "@/components/erp";
-import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import {
@@ -51,14 +49,6 @@ function drawStatus(record: CustomerLuckyDraw): string {
     return "WON";
   }
   return record.status || "PENDING";
-}
-
-function statusVariant(record: CustomerLuckyDraw): "success" | "warning" | "info" | "default" {
-  if (record.status === "COMPLETED" && record.winner_status === "VERIFIED") {
-    return "success";
-  }
-  if (record.status === "COMPLETED") return "info";
-  return "warning";
 }
 
 export default function CustomerLuckyDrawsPage() {
@@ -120,42 +110,37 @@ export default function CustomerLuckyDrawsPage() {
   const drawsColumns: Column<CustomerLuckyDraw>[] = [
     {
       key: "batch_code",
-      label: "Batch / Month",
+      title: "Batch / Month",
       render: (row) => row.batch_code || `Batch ${row.batch}`,
     },
     {
       key: "lucky_number",
-      label: "Lucky Number",
+      title: "Lucky Number",
       render: (row) => row.lucky_number || "—",
     },
     {
       key: "draw_date",
-      label: "Draw Date",
+      title: "Draw Date",
       render: (row) => formatDate(row.draw_date),
     },
     {
       key: "status",
-      label: "Status",
-      render: (row) => (
-        <ERPStatusBadge
-          status={drawStatus(row)}
-          variant={statusVariant(row)}
-        />
-      ),
+      title: "Status",
+      render: (row) => <ERPStatusBadge status={drawStatus(row)} />,
     },
     {
       key: "waived_emi_count",
-      label: "EMIs Waived",
+      title: "EMIs Waived",
       render: (row) => row.waived_emi_count || 0,
     },
     {
       key: "waived_amount",
-      label: "Waiver Amount",
+      title: "Waiver Amount",
       render: (row) => formatRupee(row.waived_amount),
     },
     {
       key: "actions",
-      label: "Action",
+      title: "Action",
       render: (row) => {
         const isWon =
           row.status === "COMPLETED" && row.winner_status === "VERIFIED";
@@ -226,43 +211,38 @@ export default function CustomerLuckyDrawsPage() {
             )}
 
             {loading ? (
-              <ERPLoadingState message="Loading lucky draws..." />
+              <ERPLoadingState label="Loading lucky draws..." />
             ) : error ? (
               <ERPErrorState
+                title="Unable to load lucky draws"
                 message={error}
-                action={
-                  <ActionButton onClick={loadData} icon={RefreshCw} label="Retry" />
-                }
+                onRetry={loadData}
               />
             ) : rows.length === 0 ? (
-              <ERPEmptyState message="No lucky draws yet. Lucky draws happen monthly for active subscriptions." />
+              <ERPEmptyState
+                title="No lucky draws yet"
+                description="Lucky draws happen monthly for active subscriptions."
+              />
             ) : (
-              <>
-                <ERPDataToolbar
-                  total={stats.totalParticipations}
-                  showing={rows.length}
-                  onRefresh={loadData}
-                />
-                <DataTableShell>
-                  <MobileSafeTable>
-                    <DataTable<CustomerLuckyDraw>
-                      columns={drawsColumns}
-                      rows={rows}
-                      keyExtractor={(row) => `lucky-draw-${row.id}`}
-                    />
-                  </MobileSafeTable>
-                </DataTableShell>
-              </>
+              <DataTableShell>
+                <MobileSafeTable>
+                  <DataTable<CustomerLuckyDraw>
+                    columns={drawsColumns}
+                    rows={rows}
+                  />
+                </MobileSafeTable>
+              </DataTableShell>
             )}
           </div>
         </ERPSectionShell>
 
         {/* Info Note */}
-        <ERPAuditNote
-          icon="info"
-          title="How Lucky Draws Work"
-          description="Every month, we conduct a draw from all active EMI subscriptions. If you win, your monthly EMI amount is waived! Your lucky number is automatically assigned when your subscription starts. You can verify the draw results and download your certificate if you win."
-        />
+        <ERPAuditNote title="How Lucky Draws Work">
+          Every month, we conduct a draw from all active EMI subscriptions. If you
+          win, your monthly EMI amount is waived! Your lucky number is
+          automatically assigned when your subscription starts. You can verify the
+          draw results and download your certificate if you win.
+        </ERPAuditNote>
       </div>
     </ERPPageShell>
   );

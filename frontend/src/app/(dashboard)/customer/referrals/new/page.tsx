@@ -124,11 +124,9 @@ export default function CreateReferralPage() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <ActionButton
-                type="submit"
-                disabled={loading}
-                label={loading ? "Creating..." : "Create Referral"}
-              />
+              <ActionButton type="submit" disabled={loading}>
+                {loading ? "Creating..." : "Create Referral"}
+              </ActionButton>
               <button
                 type="button"
                 onClick={() => router.back()}
@@ -140,11 +138,12 @@ export default function CreateReferralPage() {
           </form>
         </ERPSectionShell>
 
-        <ERPAuditNote
-          icon="info"
-          title="How Referrals Work"
-          description="When you refer a customer, they can place an order using your referral. Once their order is confirmed and payment is received, you'll be eligible to earn commission. Commission amounts vary based on the order value."
-        />
+        <ERPAuditNote title="How Referrals Work">
+          When you refer a customer, they can place an order using your referral.
+          Once their order is confirmed and payment is received, you&apos;ll be
+          eligible to earn commission. Commission amounts vary based on the order
+          value.
+        </ERPAuditNote>
       </div>
     </ERPPageShell>
   );

@@ -1,11 +1,10 @@
 "use client";
 import { formatRupee } from "@/lib/utils/currency";
-import { RefreshCw, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   ERPAuditNote,
-  ERPDataToolbar,
   ERPEmptyState,
   ERPErrorState,
   ERPLoadingState,
@@ -13,12 +12,10 @@ import {
   ERPSectionShell,
   ERPStatusBadge,
 } from "@/components/erp";
-import ActionButton from "@/components/ui/ActionButton";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import {
   listCustomerSubscriptions,
-  type CustomerSubscription,
   type CustomerEmi,
 } from "@/services/customer";
 
@@ -57,22 +54,6 @@ function emiStatus(emi: CustomerEmi): "PAID" | "PENDING" | "WAIVED" | "OVERDUE" 
   }
 
   return "PENDING";
-}
-
-function statusVariant(emi: CustomerEmi): "success" | "warning" | "info" | "error" | "default" {
-  const status = emiStatus(emi);
-  switch (status) {
-    case "PAID":
-      return "success";
-    case "WAIVED":
-      return "info";
-    case "OVERDUE":
-      return "error";
-    case "PENDING":
-      return "warning";
-    default:
-      return "default";
-  }
 }
 
 export default function CustomerEmisPage() {
@@ -139,48 +120,43 @@ export default function CustomerEmisPage() {
   const emiColumns: Column<EmiRecord>[] = [
     {
       key: "subscription_number",
-      label: "Subscription",
+      title: "Subscription",
       render: (row) => row.subscription_number || "—",
     },
     {
       key: "sequence_no",
-      label: "EMI #",
+      title: "EMI #",
       render: (row) => row.sequence_no || row.month_no || "—",
     },
     {
       key: "due_date",
-      label: "Due Date",
+      title: "Due Date",
       render: (row) => formatDate(row.due_date),
     },
     {
       key: "amount",
-      label: "Amount",
+      title: "Amount",
       render: (row) => formatRupee(row.amount),
     },
     {
       key: "paid_amount",
-      label: "Paid",
+      title: "Paid",
       render: (row) => formatRupee(row.paid_amount || 0),
     },
     {
       key: "waived_amount",
-      label: "Waived",
+      title: "Waived",
       render: (row) => formatRupee(row.waived_amount || 0),
     },
     {
       key: "outstanding",
-      label: "Outstanding",
+      title: "Outstanding",
       render: (row) => formatRupee(row.outstanding_amount || 0),
     },
     {
       key: "status",
-      label: "Status",
-      render: (row) => (
-        <ERPStatusBadge
-          status={emiStatus(row)}
-          variant={statusVariant(row)}
-        />
-      ),
+      title: "Status",
+      render: (row) => <ERPStatusBadge status={emiStatus(row)} />,
     },
   ];
 
@@ -299,43 +275,33 @@ export default function CustomerEmisPage() {
             </div>
 
             {loading ? (
-              <ERPLoadingState message="Loading EMI schedule..." />
+              <ERPLoadingState label="Loading EMI schedule..." />
             ) : error ? (
               <ERPErrorState
+                title="Unable to load EMIs"
                 message={error}
-                action={
-                  <ActionButton onClick={loadData} icon={RefreshCw} label="Retry" />
-                }
+                onRetry={loadData}
               />
             ) : filteredEmis.length === 0 ? (
-              <ERPEmptyState message="No EMIs found for the selected filter." />
+              <ERPEmptyState
+                title="No EMIs"
+                description="No EMIs found for the selected filter."
+              />
             ) : (
-              <>
-                <ERPDataToolbar
-                  total={stats.total}
-                  showing={filteredEmis.length}
-                  onRefresh={loadData}
-                />
-                <DataTableShell>
-                  <MobileSafeTable>
-                    <DataTable<EmiRecord>
-                      columns={emiColumns}
-                      rows={filteredEmis}
-                      keyExtractor={(row) => `emi-${row.subscription}-${row.id}`}
-                    />
-                  </MobileSafeTable>
-                </DataTableShell>
-              </>
+              <DataTableShell>
+                <MobileSafeTable>
+                  <DataTable<EmiRecord> columns={emiColumns} rows={filteredEmis} />
+                </MobileSafeTable>
+              </DataTableShell>
             )}
           </div>
         </ERPSectionShell>
 
         {/* Info Section */}
-        <ERPAuditNote
-          icon="info"
-          title="EMI Status Guide"
-          description="Pending: Payment due in future. Overdue: Payment past due date. Paid: Payment received. Waived: EMI amount waived through lucky draw win."
-        />
+        <ERPAuditNote title="EMI Status Guide">
+          Pending: Payment due in future. Overdue: Payment past due date. Paid:
+          Payment received. Waived: EMI amount waived through lucky draw win.
+        </ERPAuditNote>
       </div>
     </ERPPageShell>
   );

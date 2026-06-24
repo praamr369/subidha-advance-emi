@@ -90,7 +90,7 @@ export default function LuckyPlanAnalyticsPage() {
   if (loading) {
     return (
       <ERPPageShell title="Lucky Plan Analytics">
-        <ERPLoadingState message="Loading analytics..." />
+        <ERPLoadingState label="Loading analytics..." />
       </ERPPageShell>
     );
   }
@@ -99,10 +99,9 @@ export default function LuckyPlanAnalyticsPage() {
     return (
       <ERPPageShell title="Lucky Plan Analytics">
         <ERPErrorState
+          title="Unable to load analytics"
           message={error}
-          action={
-            <ActionButton onClick={loadData} icon={RefreshCw} label="Retry" />
-          }
+          onRetry={loadData}
         />
       </ERPPageShell>
     );
@@ -211,16 +210,12 @@ export default function LuckyPlanAnalyticsPage() {
 
         {/* Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ERPAuditNote
-            icon="info"
-            title="Draw Statistics"
-            description={`Monthly lucky draws with ${analytics.totalWinners} winners. Average EMI waiver per winner: ${formatRupee(analytics.averageWaiverAmount)}`}
-          />
-          <ERPAuditNote
-            icon="info"
-            title="Business Impact"
-            description={`Total customer value created through lucky draw waivers: ${formatRupee(analytics.totalWaivers)}`}
-          />
+          <ERPAuditNote title="Draw Statistics">
+            {`Monthly lucky draws with ${analytics.totalWinners} winners. Average EMI waiver per winner: ${formatRupee(analytics.averageWaiverAmount)}`}
+          </ERPAuditNote>
+          <ERPAuditNote title="Business Impact">
+            {`Total customer value created through lucky draw waivers: ${formatRupee(analytics.totalWaivers)}`}
+          </ERPAuditNote>
         </div>
 
         {/* Action Section */}
@@ -228,19 +223,18 @@ export default function LuckyPlanAnalyticsPage() {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Quick Actions</h3>
             <div className="flex flex-wrap gap-2">
-              <ActionButton
-                href="/admin/lucky-plan/winners"
-                label="View All Winners"
-              />
-              <ActionButton
-                href="/admin/lucky-plan/draws"
-                label="Manage Draws"
-              />
-              <ActionButton
-                href="/admin/lucky-plan/batches"
-                label="Batch Configuration"
-              />
-              <ActionButton onClick={loadData} icon={RefreshCw} label="Refresh" />
+              <ActionButton href="/admin/lucky-plan/winners">
+                View All Winners
+              </ActionButton>
+              <ActionButton href="/admin/lucky-plan/draws">
+                Manage Draws
+              </ActionButton>
+              <ActionButton href="/admin/lucky-plan/batches">
+                Batch Configuration
+              </ActionButton>
+              <ActionButton onClick={loadData} leftIcon={<RefreshCw className="h-4 w-4" />}>
+                Refresh
+              </ActionButton>
             </div>
           </div>
         </ERPSectionShell>

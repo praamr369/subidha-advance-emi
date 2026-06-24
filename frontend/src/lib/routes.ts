@@ -28,6 +28,7 @@ export const ROUTES = {
     winners: "/winners",
     winnerHistory: "/winner-history",
     fairDraw: "/lucky-plan/fair-draw",
+    verifyDraw: "/lucky-plan/verify",
     contact: "/contact",
     blog: "/blog",
     faq: "/faq",

@@ -1,12 +1,11 @@
 "use client";
 import { formatRupee } from "@/lib/utils/currency";
-import { RefreshCw, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   ERPAuditNote,
-  ERPDataToolbar,
   ERPEmptyState,
   ERPErrorState,
   ERPLoadingState,
@@ -95,38 +94,33 @@ export default function CustomerReferralsPage() {
   const commissionColumns: Column<CustomerReferralRecord>[] = [
     {
       key: "referred_name",
-      label: "Referred Customer",
+      title: "Referred Customer",
       render: (row) => row.referred_name || "—",
     },
     {
       key: "referred_phone",
-      label: "Phone",
+      title: "Phone",
       render: (row) => row.referred_phone || "—",
     },
     {
       key: "created_at",
-      label: "Referred Date",
+      title: "Referred Date",
       render: (row) => formatDate(row.created_at),
     },
     {
       key: "notes",
-      label: "Notes",
+      title: "Notes",
       render: (row) => row.notes || "—",
     },
     {
       key: "commission_amount",
-      label: "Commission",
+      title: "Commission",
       render: (row) => formatRupee(row.commission_amount),
     },
     {
       key: "commission_status",
-      label: "Status",
-      render: (row) => (
-        <ERPStatusBadge
-          status={commissionStatus(row)}
-          variant={row.commission_approved ? "success" : "warning"}
-        />
-      ),
+      title: "Status",
+      render: (row) => <ERPStatusBadge status={commissionStatus(row)} />,
     },
   ];
 
@@ -175,49 +169,44 @@ export default function CustomerReferralsPage() {
                 onClick={() => {
                   router.push("/customer/referrals/new");
                 }}
-                icon={Plus}
-                label="New Referral"
-              />
+                leftIcon={<Plus className="h-4 w-4" />}
+              >
+                New Referral
+              </ActionButton>
             </div>
 
             {loading ? (
-              <ERPLoadingState message="Loading referrals..." />
+              <ERPLoadingState label="Loading referrals..." />
             ) : error ? (
               <ERPErrorState
+                title="Unable to load referrals"
                 message={error}
-                action={
-                  <ActionButton onClick={loadData} icon={RefreshCw} label="Retry" />
-                }
+                onRetry={loadData}
               />
             ) : rows.length === 0 ? (
-              <ERPEmptyState message="No referrals yet. Start referring customers to earn commissions!" />
+              <ERPEmptyState
+                title="No referrals yet"
+                description="Start referring customers to earn commissions!"
+              />
             ) : (
-              <>
-                <ERPDataToolbar
-                  total={totalReferrals}
-                  showing={rows.length}
-                  onRefresh={loadData}
-                />
-                <DataTableShell>
-                  <MobileSafeTable>
-                    <DataTable<CustomerReferralRecord>
-                      columns={commissionColumns}
-                      rows={rows}
-                      keyExtractor={(row) => `referral-${row.id}`}
-                    />
-                  </MobileSafeTable>
-                </DataTableShell>
-              </>
+              <DataTableShell>
+                <MobileSafeTable>
+                  <DataTable<CustomerReferralRecord>
+                    columns={commissionColumns}
+                    rows={rows}
+                  />
+                </MobileSafeTable>
+              </DataTableShell>
             )}
           </div>
         </ERPSectionShell>
 
         {/* Info Note */}
-        <ERPAuditNote
-          icon="info"
-          title="Commission Policy"
-          description="Commissions are earned when you refer a new customer. Commission approval depends on the customer's subscription status and payment history."
-        />
+        <ERPAuditNote title="Commission Policy">
+          Commissions are earned when you refer a new customer. Commission
+          approval depends on the customer&apos;s subscription status and payment
+          history.
+        </ERPAuditNote>
       </div>
     </ERPPageShell>
   );
