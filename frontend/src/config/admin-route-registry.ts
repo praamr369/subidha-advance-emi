@@ -386,6 +386,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Settings & Governance", "Finance Setup", ROUTES.admin.settingsFinance, "Finance setup."),
   item("Settings & Governance", "Document Numbering", ROUTES.admin.settingsBusinessSetupDocumentNumbering, "Invoice and receipt sequence readiness and configuration."),
   item("Settings & Governance", "Public Site Settings", ROUTES.admin.settingsBusinessSetupPublicSite, "Public site settings."),
+  item("Settings & Governance", "KYC Compliance", ROUTES.admin.complianceKyc, "Free-only KYC governance across Lucky Plan, rent, lease, delivery, refunds, and winner settlement."),
   item("Settings & Governance", "Brand & Business Data Center", ROUTES.admin.brandData, "Public business profile, social links, and media reference center."),
   item("Settings & Governance", "Imports / Backups", ROUTES.admin.settingsImports, "Import, export, and readiness tools."),
   item("Settings & Governance", "Policies", ROUTES.admin.settingsPolicies, "Policy settings."),

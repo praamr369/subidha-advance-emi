@@ -18,6 +18,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -40,6 +41,7 @@ from subscriptions.services.delivery_service import create_subscription_delivery
 from subscriptions.services.emi_engine import generate_emi_schedule
 from subscriptions.services.kyc_readiness_service import (
     KycGateError,
+    evaluate_kyc_readiness,
     get_contract_kyc_readiness,
 )
 from subscriptions.services.rent_lease_contract_service import (
@@ -94,6 +96,20 @@ class KycReadinessComputationTests(TestCase):
         self.assertTrue(readiness["can_deliver"])
         self.assertEqual(readiness["missing_documents"], [])
         self.assertEqual(readiness["blocker_codes"], [])
+
+    def test_customer_level_action_readiness_keeps_low_risk_actions_open(self):
+        readiness = evaluate_kyc_readiness(self.customer, "lead_create")
+        self.assertTrue(readiness["ready"])
+        self.assertEqual(readiness["status"], "READY")
+        self.assertIn("LEAD_CREATE", readiness["allowed_actions"])
+        self.assertIn("BROCHURE_ENQUIRY", readiness["allowed_actions"])
+
+    def test_customer_level_action_readiness_blocks_lucky_plan_activation_without_kyc(self):
+        readiness = evaluate_kyc_readiness(self.customer, "lucky_plan_activation")
+        self.assertFalse(readiness["ready"])
+        self.assertEqual(readiness["status"], "BLOCKED")
+        self.assertIn("KYC_NOT_VERIFIED", readiness["blockers"])
+        self.assertNotIn("LUCKY_PLAN_ACTIVATION", readiness["allowed_actions"])
 
     def test_rent_readiness_lists_missing_id_and_address(self):
         self.customer.kyc_status = KycStatus.VERIFIED
@@ -169,6 +185,25 @@ class KycReadinessComputationTests(TestCase):
         self.assertFalse(readiness["can_activate"])
         self.assertIn(KycDocumentCategory.CUSTOMER_PHOTO, readiness["expired_categories"])
         self.assertIn("KYC_DOCUMENT_EXPIRED", readiness["blocker_codes"])
+
+    def test_customer_level_action_readiness_returns_verified_and_expiry_metadata(self):
+        self.customer.kyc_status = KycStatus.VERIFIED
+        self.customer.kyc_reviewed_at = timezone.now()
+        self.customer.save(update_fields=["kyc_status", "kyc_reviewed_at"])
+        CustomerKycDocument.objects.create(
+            customer=self.customer,
+            document_type=CustomerKycDocumentType.AADHAAR,
+            category=KycDocumentCategory.ID_PROOF,
+            file=_small_file("id-proof.pdf"),
+            status=CustomerKycDocumentStatus.APPROVED,
+            expiry_date=date.today() + timedelta(days=90),
+        )
+        readiness = evaluate_kyc_readiness(self.customer, "refund_release")
+        self.assertTrue(readiness["ready"])
+        self.assertEqual(readiness["status"], "READY")
+        self.assertEqual(readiness["kyc_profile_id"], self.customer.pk)
+        self.assertIsNotNone(readiness["verified_at"])
+        self.assertEqual(readiness["expires_at"], date.today() + timedelta(days=90))
 
 
 @override_settings(KYC_CONTRACT_GATING_ENABLED=True)

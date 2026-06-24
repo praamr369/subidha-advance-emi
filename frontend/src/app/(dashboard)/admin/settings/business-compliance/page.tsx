@@ -371,6 +371,9 @@ export default function AdminBusinessCompliancePage() {
             <Link href={ROUTES.admin.setupReadiness} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">
               Setup readiness
             </Link>
+            <Link href={ROUTES.admin.complianceKyc} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">
+              KYC compliance
+            </Link>
             <Link href={ROUTES.admin.settingsPolicies} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">
               Policy governance
             </Link>

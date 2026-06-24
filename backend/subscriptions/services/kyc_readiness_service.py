@@ -23,6 +23,7 @@ Design notes
 """
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Optional
 
@@ -544,6 +545,135 @@ def get_contract_kyc_readiness(
         "blocker_messages": blocker_messages,
         "expired_categories": expired_categories,
         "optional_warnings": [],
+    }
+
+
+ALWAYS_ALLOWED_ACTIONS = (
+    "LEAD_CREATE",
+    "QUOTATION_CREATE",
+    "BROCHURE_ENQUIRY",
+    "DRAFT_SUBSCRIPTION_CREATE",
+    "DRAFT_RENT_CREATE",
+    "DRAFT_LEASE_CREATE",
+    "ADMIN_MANUAL_REVIEW",
+)
+
+ACTION_MATRIX = {
+    "LUCKY_PLAN_ACTIVATION": {"plan_type": PlanType.EMI, "stage": "activate"},
+    "CONTRACT_GENERATION": {"plan_type": PlanType.EMI, "stage": "generate_contract"},
+    "RENT_ACTIVATION": {"plan_type": PlanType.RENT, "stage": "activate"},
+    "LEASE_ACTIVATION": {"plan_type": PlanType.LEASE, "stage": "activate"},
+    "DELIVERY_HANDOVER": {"plan_type": PlanType.RENT, "stage": "deliver"},
+    "REFUND_RELEASE": {"plan_type": PlanType.EMI, "stage": "deliver"},
+    "WINNER_SETTLEMENT": {"plan_type": PlanType.EMI, "stage": "deliver"},
+}
+
+
+def _normalize_action(action: str) -> str:
+    return re.sub(r"[^A-Z0-9]+", "_", str(action or "").strip().upper()).strip("_")
+
+
+def _customer_kyc_expires_at(customer):
+    if not getattr(customer, "pk", None):
+        return None
+    future_dates = [
+        doc.expiry_date
+        for doc in CustomerKycDocument.objects.filter(customer=customer, status=CustomerKycDocumentStatus.APPROVED)
+        .exclude(expiry_date__isnull=True)
+        .only("expiry_date")
+        if getattr(doc, "expiry_date", None)
+    ]
+    if not future_dates:
+        return None
+    return min(future_dates)
+
+
+def _customer_kyc_readiness_status(customer, plan_type):
+    readiness = get_contract_kyc_readiness(customer, plan_type)
+    blockers = list(readiness.get("blocker_codes", []))
+    if readiness.get("can_activate") or readiness.get("can_deliver"):
+        status = "READY"
+    elif BlockerCode.KYC_DOCUMENT_EXPIRED in blockers:
+        status = "EXPIRED"
+    elif BlockerCode.KYC_NOT_VERIFIED in blockers:
+        status = "BLOCKED"
+    else:
+        status = "BLOCKED"
+    return readiness, status
+
+
+def evaluate_kyc_readiness(customer, action: str, actor=None) -> dict:
+    """Evaluate customer-level KYC readiness for a business action.
+
+    This is additive to ``get_contract_kyc_readiness``:
+    it reuses the contract gate for module actions that are customer-KYC bound,
+    and it keeps always-allowed discovery actions available even when KYC is
+    not yet ready.
+    """
+
+    normalized_action = _normalize_action(action)
+    if normalized_action in ALWAYS_ALLOWED_ACTIONS:
+        return {
+            "action": normalized_action,
+            "ready": True,
+            "status": "READY",
+            "allowed_actions": list(ALWAYS_ALLOWED_ACTIONS),
+            "blockers": [],
+            "kyc_profile_id": getattr(customer, "pk", None),
+            "verified_at": getattr(customer, "kyc_reviewed_at", None),
+            "expires_at": _customer_kyc_expires_at(customer),
+            "kyc_status": kyc_status_of(customer),
+            "actor_id": getattr(actor, "pk", None) if actor is not None else None,
+            "actor_username": getattr(actor, "username", None) if actor is not None else None,
+        }
+
+    action_config = ACTION_MATRIX.get(normalized_action)
+    if action_config is None:
+        return {
+            "action": normalized_action,
+            "ready": False,
+            "status": "UNKNOWN_ACTION",
+            "allowed_actions": list(ALWAYS_ALLOWED_ACTIONS),
+            "blockers": ["UNKNOWN_ACTION"],
+            "kyc_profile_id": getattr(customer, "pk", None),
+            "verified_at": getattr(customer, "kyc_reviewed_at", None),
+            "expires_at": _customer_kyc_expires_at(customer),
+            "actor_id": getattr(actor, "pk", None) if actor is not None else None,
+            "actor_username": getattr(actor, "username", None) if actor is not None else None,
+        }
+
+    readiness, status_label = _customer_kyc_readiness_status(
+        customer, action_config["plan_type"]
+    )
+    gate_ok = bool(
+        readiness["can_activate"]
+        if action_config["stage"] == "activate"
+        else readiness["can_generate_final_contract"]
+        if action_config["stage"] == "generate_contract"
+        else readiness["can_deliver"]
+    )
+
+    allowed_actions = list(ALWAYS_ALLOWED_ACTIONS)
+    if gate_ok:
+        allowed_actions.extend(ACTION_MATRIX.keys())
+
+    blockers = list(readiness.get("blocker_codes", []))
+    if not gate_ok and not blockers:
+        blockers = ["KYC_NOT_READY"]
+
+    return {
+        "action": normalized_action,
+        "ready": gate_ok,
+        "status": "READY" if gate_ok else status_label,
+        "allowed_actions": list(dict.fromkeys(allowed_actions)),
+        "blockers": list(dict.fromkeys(blockers)),
+        "kyc_profile_id": getattr(customer, "pk", None),
+        "verified_at": getattr(customer, "kyc_reviewed_at", None),
+        "expires_at": _customer_kyc_expires_at(customer),
+        "kyc_status": kyc_status_of(customer),
+        "actor_id": getattr(actor, "pk", None) if actor is not None else None,
+        "actor_username": getattr(actor, "username", None) if actor is not None else None,
+        "contract_readiness": readiness,
     }
 
 

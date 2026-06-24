@@ -251,7 +251,7 @@ export default function AdminServiceDeskOverviewPage() {
                             </td>
                             <td className="px-3 py-2 text-right">
                               <Link
-                                href={`/admin/service-desk/${row.id}`}
+                                href={buildAdminServiceDeskCaseRoute(row.id)}
                                 className="text-primary underline-offset-2 hover:underline"
                               >
                                 Open
