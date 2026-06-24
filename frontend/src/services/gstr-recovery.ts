@@ -248,3 +248,30 @@ export function getLeaderboard(params: { year?: number; month?: number } = {}): 
   if (params.month) q.set("month", String(params.month));
   return apiFetch(`/admin/crm/leaderboard/?${q}`);
 }
+
+// ── Recovery automation ────────────────────────────────────────────────────
+
+export function sendLegalNotice(caseId: number, email: string): Promise<{
+  sent: boolean; to: string; case_id: number; new_stage: string; notice_sent_at: string;
+}> {
+  return apiFetch(`/admin/recovery-cases/${caseId}/send-legal-notice/`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function sendSettlementOffer(caseId: number, email: string): Promise<{ sent: boolean; to: string; case_id: number }> {
+  return apiFetch(`/admin/recovery-cases/${caseId}/send-settlement-offer/`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function bulkEscalateRecoveryCases(dryRun = false): Promise<{
+  dry_run: boolean; escalated_count: number; escalated: Array<{ case_id: number; customer: string; to_stage: string; aging_days: number }>;
+}> {
+  return apiFetch("/admin/recovery-cases/bulk-escalate/", {
+    method: "POST",
+    body: JSON.stringify({ dry_run: dryRun }),
+  });
+}

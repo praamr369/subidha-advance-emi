@@ -1,6 +1,13 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from api.v1.views.admin_tds_tcs import (
+    AdminTDSDeductionListView,
+    AdminTDSDeductionMarkDepositedView,
+    AdminTCSCollectionListView,
+    AdminTCSCollectionMarkDepositedView,
+    AdminSalarySheetStatutoryView,
+)
 from api.v1.views.accounting import (
     AccountingValidationView,
     AttendanceCalendarView,
@@ -139,5 +146,15 @@ urlpatterns = [
     path("bridges/run-emi-waiver/", EmiWaiverBridgeRunView.as_view()),
     path("bridges/run-commission-settlement/", CommissionSettlementBridgeRunView.as_view()),
     path("bridges/run-payout-batch/", PayoutBatchBridgeRunView.as_view()),
+
+    # ── TDS / TCS compliance ──────────────────────────────────────────────────
+    path("tds-deductions/", AdminTDSDeductionListView.as_view()),
+    path("tds-deductions/<int:pk>/mark-deposited/", AdminTDSDeductionMarkDepositedView.as_view()),
+    path("tcs-collections/", AdminTCSCollectionListView.as_view()),
+    path("tcs-collections/<int:pk>/mark-deposited/", AdminTCSCollectionMarkDepositedView.as_view()),
+
+    # ── Statutory deductions on salary sheets ────────────────────────────────
+    path("salary-sheets/<int:sheet_id>/statutory-deductions/", AdminSalarySheetStatutoryView.as_view()),
+
     path("", include(router.urls)),
 ]

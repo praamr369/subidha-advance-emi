@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 
 import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -23,13 +23,14 @@ type ProfilePayload = {
   audit_timeline: Array<{ id: number; action_type: string; model_name: string; created_at: string }>;
 };
 
-export default function AdminCustomerProfilePage({ params }: { params: { id: string } }) {
+export default function AdminCustomerProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [payload, setPayload] = useState<ProfilePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const customerId = Number(params.id);
+    const customerId = Number(id);
     if (!Number.isFinite(customerId)) return;
     let active = true;
     void (async () => {
@@ -55,7 +56,7 @@ export default function AdminCustomerProfilePage({ params }: { params: { id: str
     return () => {
       active = false;
     };
-  }, [params.id]);
+  }, [id]);
 
   return (
     <ERPPageShell

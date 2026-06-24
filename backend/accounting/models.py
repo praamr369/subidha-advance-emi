@@ -2340,6 +2340,18 @@ class EmployeeProfile(AccountingTimeStampedModel):
     )
     notes = models.TextField(blank=True, default="")
 
+    # ── Statutory deduction fields ──────────────────────────────────────────
+    pf_number = models.CharField(max_length=40, blank=True, default="", verbose_name="PF Account Number")
+    esi_number = models.CharField(max_length=40, blank=True, default="", verbose_name="ESI IP Number")
+    pt_registration_no = models.CharField(max_length=40, blank=True, default="", verbose_name="Professional Tax Reg No")
+    pf_eligible = models.BooleanField(default=False, verbose_name="PF Eligible")
+    esi_eligible = models.BooleanField(default=False, verbose_name="ESI Eligible")
+    pt_eligible = models.BooleanField(default=False, verbose_name="Professional Tax Eligible")
+    pt_monthly_amount = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        verbose_name="Professional Tax (₹/month)",
+    )
+
     class Meta:
         db_table = "accounting_employee_profiles"
         ordering = ["name", "id"]
@@ -4128,3 +4140,106 @@ class StaffKycDocument(AccountingTimeStampedModel):
 
     def __str__(self):
         return f"StaffKYC {self.document_type} for employee {self.employee_id} [{self.status}]"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TDS / TCS Compliance models
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TDSSection(models.TextChoices):
+    SEC_194C = "194C", "194C – Contractor/Sub-contractor"
+    SEC_194I = "194I", "194I – Rent"
+    SEC_194J = "194J", "194J – Professional/Technical Services"
+    SEC_194H = "194H", "194H – Commission/Brokerage"
+    SEC_194A = "194A", "194A – Interest (non-bank)"
+    SEC_194Q = "194Q", "194Q – Purchase of Goods"
+    OTHER = "OTHER", "Other"
+
+
+class TDSDeductionStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending Deposit"
+    DEPOSITED = "DEPOSITED", "Deposited to Govt"
+    FILED = "FILED", "Filed in Return"
+
+
+class TDSDeduction(AccountingTimeStampedModel):
+    """Records TDS deducted on vendor payments per Section."""
+
+    vendor = models.ForeignKey(
+        "accounting.Vendor",
+        on_delete=models.PROTECT,
+        related_name="tds_deductions",
+    )
+    section = models.CharField(max_length=20, choices=TDSSection.choices, default=TDSSection.OTHER, db_index=True)
+    transaction_date = models.DateField(db_index=True)
+    gross_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    tds_rate = models.DecimalField(max_digits=5, decimal_places=2, help_text="Rate %")
+    tds_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    net_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    reference_no = models.CharField(max_length=80, blank=True, default="")
+    challan_no = models.CharField(max_length=80, blank=True, default="")
+    deposit_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=TDSDeductionStatus.choices, default=TDSDeductionStatus.PENDING, db_index=True)
+    financial_year = models.CharField(max_length=10, blank=True, default="", db_index=True)
+    quarter = models.CharField(max_length=4, blank=True, default="", db_index=True)
+    notes = models.TextField(blank=True, default="")
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="recorded_tds_deductions",
+    )
+
+    class Meta:
+        db_table = "accounting_tds_deductions"
+        ordering = ["-transaction_date", "-id"]
+
+    def __str__(self):
+        return f"TDS {self.section} ₹{self.tds_amount} on {self.transaction_date}"
+
+
+class TCSSection(models.TextChoices):
+    SEC_206C1H = "206C(1H)", "206C(1H) – Sale of Goods (>₹50L)"
+    SEC_206C1 = "206C(1)", "206C(1) – Timber/Forest/Scrap"
+    SEC_206CCA = "206CCA", "206CCA – Non-filer higher rate"
+    OTHER = "OTHER", "Other"
+
+
+class TCSCollectionStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending Deposit"
+    DEPOSITED = "DEPOSITED", "Deposited to Govt"
+    FILED = "FILED", "Filed in Return"
+
+
+class TCSCollection(AccountingTimeStampedModel):
+    """Records TCS collected from customers on high-value contracts."""
+
+    customer_name = models.CharField(max_length=200, db_index=True)
+    customer_pan = models.CharField(max_length=20, blank=True, default="")
+    section = models.CharField(max_length=20, choices=TCSSection.choices, default=TCSSection.OTHER, db_index=True)
+    transaction_date = models.DateField(db_index=True)
+    sale_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    tcs_rate = models.DecimalField(max_digits=5, decimal_places=2, help_text="Rate %")
+    tcs_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    reference_no = models.CharField(max_length=80, blank=True, default="")
+    challan_no = models.CharField(max_length=80, blank=True, default="")
+    deposit_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=TCSCollectionStatus.choices, default=TCSCollectionStatus.PENDING, db_index=True)
+    financial_year = models.CharField(max_length=10, blank=True, default="", db_index=True)
+    quarter = models.CharField(max_length=4, blank=True, default="", db_index=True)
+    notes = models.TextField(blank=True, default="")
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="recorded_tcs_collections",
+    )
+
+    class Meta:
+        db_table = "accounting_tcs_collections"
+        ordering = ["-transaction_date", "-id"]
+
+    def __str__(self):
+        return f"TCS {self.section} ₹{self.tcs_amount} from {self.customer_name} on {self.transaction_date}"

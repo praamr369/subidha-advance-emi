@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
@@ -17,7 +17,8 @@ import ReconciliationImpactSummary from "@/components/admin/reconciliation/Recon
 import ReconciliationResolutionDrawer from "@/components/admin/reconciliation/ReconciliationResolutionDrawer";
 import ReconciliationSeverityBadge from "@/components/admin/reconciliation/ReconciliationSeverityBadge";
 
-export default function AdminReconciliationItemDetailPage({ params }: { params: { id: string } }) {
+export default function AdminReconciliationItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [item, setItem] = useState<ReconciliationItemDetail | null>(null);
@@ -28,14 +29,14 @@ export default function AdminReconciliationItemDetailPage({ params }: { params: 
     setLoading(true);
     setError(null);
     try {
-      const payload = await getReconciliationItem(params.id);
+      const payload = await getReconciliationItem(id);
       setItem(payload);
     } catch (e) {
       setError(normalizeApiError(e).message);
     } finally {
       setLoading(false);
     }
-  }, [params.id]);
+  }, [id]);
 
   useEffect(() => {
     void load();

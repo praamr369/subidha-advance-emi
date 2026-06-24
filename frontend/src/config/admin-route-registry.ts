@@ -107,6 +107,8 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("CRM & Requests", "KYC", ROUTES.admin.crmKyc, "KYC review queue.", {
     badgeSource: "queue.customer_kyc_pending",
   }),
+  item("CRM & Requests", "AML Screening", ROUTES.admin.amlScreening, "Anti-Money Laundering screening records and PEP flag management."),
+  item("CRM & Requests", "KYC Re-verification Queue", ROUTES.admin.kycReverification, "KYC documents expiring soon or overdue for re-verification."),
   // Legacy aliases — now redirect to /admin/requests/* canonical paths (see next.config.ts)
   // Phase 6: partner payment requests moved here from Profiles & Parties — intake queue only.
   // The page links to collection workspace for review context; no payment is posted from this page.
@@ -221,6 +223,8 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Accounting & Reconciliation", "Trial Balance Check", ROUTES.admin.accountingTrialBalanceCheck, "Read-only debit/credit automation checks over posted journals."),
   item("Accounting & Reconciliation", "Liability Reconciliation", ROUTES.admin.accountingLiabilityReconciliation, "Read-only customer advance and security deposit liability diagnostics."),
   item("Accounting & Reconciliation", "Accounting Exports", ROUTES.admin.accountingExports, "Read-only JSON and CSV accounting reports from the P4E export endpoints."),
+  item("Accounting & Reconciliation", "TDS Deductions", ROUTES.admin.accountingTds, "Tax Deducted at Source on vendor payments — record, track, and mark deposited."),
+  item("Accounting & Reconciliation", "TCS Collections", ROUTES.admin.accountingTcs, "Tax Collected at Source on customer transactions — record, track, and mark deposited."),
   item("Accounting & Reconciliation", "Trial Balance", ROUTES.admin.accountingTrialBalance, "Trial balance report."),
   item("Accounting & Reconciliation", "Profit & Loss", ROUTES.admin.accountingProfitLoss, "Profit and loss report."),
   item("Accounting & Reconciliation", "Balance Sheet", ROUTES.admin.accountingBalanceSheet, "Balance sheet report."),

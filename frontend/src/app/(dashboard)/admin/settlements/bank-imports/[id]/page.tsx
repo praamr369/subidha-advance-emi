@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
@@ -34,8 +34,9 @@ import type {
 } from "@/types/settlements";
 import { ROUTES } from "@/lib/routes";
 
-export default function BankImportDetail({ params }: { params: { id: string } }) {
-  const importId = Number(params.id);
+export default function BankImportDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const importId = Number(id);
 
   const [importData, setImportData] = useState<BankStatementImport | null>(null);
   const [lines, setLines] = useState<BankStatementLine[]>([]);

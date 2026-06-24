@@ -8,9 +8,12 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import {
+  bulkEscalateRecoveryCases,
   createRecoveryCase,
   listDefaulters,
   listRecoveryCases,
+  sendLegalNotice,
+  sendSettlementOffer,
   updateRecoveryCase,
   type DefaulterRow,
   type RecoveryCase,
@@ -64,6 +67,32 @@ function RecoveryDrawer({
   const [settledAmount, setSettledAmount] = useState(rc.settled_amount ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [noticeEmail, setNoticeEmail] = useState("");
+  const [noticeBusy, setNoticeBusy] = useState(false);
+  const [noticeMsg, setNoticeMsg] = useState<string | null>(null);
+  const [offerBusy, setOfferBusy] = useState(false);
+  const [offerMsg, setOfferMsg] = useState<string | null>(null);
+
+  async function handleSendLegalNotice() {
+    if (!noticeEmail.trim()) { setErr("Enter an email address first."); return; }
+    setNoticeBusy(true); setErr(null); setNoticeMsg(null);
+    try {
+      const result = await sendLegalNotice(rc.id, noticeEmail.trim());
+      setNoticeMsg(`Legal notice sent to ${result.to}. Stage: ${result.new_stage}`);
+      setStage(result.new_stage);
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : "Failed to send notice."); }
+    finally { setNoticeBusy(false); }
+  }
+
+  async function handleSendSettlementOffer() {
+    if (!noticeEmail.trim()) { setErr("Enter an email address first."); return; }
+    setOfferBusy(true); setErr(null); setOfferMsg(null);
+    try {
+      const result = await sendSettlementOffer(rc.id, noticeEmail.trim());
+      setOfferMsg(`Settlement offer sent to ${result.to}.`);
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : "Failed to send offer."); }
+    finally { setOfferBusy(false); }
+  }
 
   const overdue = Number(rc.overdue_amount || 0);
   const settled = Number(settledAmount || 0);
@@ -212,6 +241,37 @@ function RecoveryDrawer({
         >
           {busy ? "Saving…" : "Save Changes"}
         </button>
+
+        {!["SETTLED", "WRITTEN_OFF"].includes(rc.stage) && (
+          <div className="mt-5 border-t border-border pt-4">
+            <div className="text-xs font-semibold text-muted-foreground mb-2">Legal Notices & Settlement</div>
+            <input
+              type="email"
+              value={noticeEmail}
+              onChange={(e) => setNoticeEmail(e.target.value)}
+              placeholder="Customer email for legal notice"
+              className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mb-2"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => void handleSendLegalNotice()}
+                disabled={noticeBusy}
+                className="flex-1 h-9 rounded-xl border border-red-300 bg-red-50 text-red-800 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
+              >
+                {noticeBusy ? "Sending…" : "Send Legal Notice"}
+              </button>
+              <button
+                onClick={() => void handleSendSettlementOffer()}
+                disabled={offerBusy}
+                className="flex-1 h-9 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100 disabled:opacity-50"
+              >
+                {offerBusy ? "Sending…" : "Settlement Offer"}
+              </button>
+            </div>
+            {noticeMsg && <div className="mt-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">{noticeMsg}</div>}
+            {offerMsg && <div className="mt-2 text-xs text-blue-700 bg-blue-50 rounded-lg px-3 py-2">{offerMsg}</div>}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -228,6 +288,9 @@ export default function DefaultersPage() {
   const [selectedCase, setSelectedCase] = useState<RecoveryCase | null>(null);
   const [stageFilter, setStageFilter] = useState("");
   const [actionBusy, setActionBusy] = useState<number | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkDryRun, setBulkDryRun] = useState<{ count: number; escalated: Array<{ case_id: number; customer: string; to_stage: string; aging_days: number }> } | null>(null);
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
 
   const loadDefaulters = useCallback(async () => {
     setLoading(true);
@@ -268,6 +331,25 @@ export default function DefaultersPage() {
       setTab("recovery");
     } finally {
       setActionBusy(null);
+    }
+  }
+
+  async function handleBulkEscalate(dryRun: boolean) {
+    setBulkBusy(true);
+    setBulkMsg(null);
+    setBulkDryRun(null);
+    try {
+      const res = await bulkEscalateRecoveryCases(dryRun);
+      if (dryRun) {
+        setBulkDryRun({ count: res.escalated_count, escalated: res.escalated });
+      } else {
+        setBulkMsg(`Escalated ${res.escalated_count} case${res.escalated_count !== 1 ? "s" : ""}.`);
+        void loadCases();
+      }
+    } catch {
+      setBulkMsg("Bulk escalation failed.");
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -376,6 +458,65 @@ export default function DefaultersPage() {
           </div>
         )
       ) : null}
+
+      {/* Bulk escalate panel */}
+      {!loading && !error && tab === "recovery" && (
+        <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="text-sm font-semibold">Auto-Escalate Cases</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Advances stages based on aging: IDENTIFIED→NOTICE at 30d, NOTICE→FIELD at 60d, FIELD→LEGAL at 90d</div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={() => void handleBulkEscalate(true)}
+                disabled={bulkBusy}
+                className="h-8 px-3 rounded-xl border border-border text-xs font-semibold hover:bg-muted/40 disabled:opacity-50"
+              >
+                Dry Run
+              </button>
+              <button
+                onClick={() => void handleBulkEscalate(false)}
+                disabled={bulkBusy}
+                className="h-8 px-3 rounded-xl bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
+              >
+                {bulkBusy ? "Escalating…" : "Run Escalation"}
+              </button>
+            </div>
+          </div>
+          {bulkMsg && <div className="mt-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">{bulkMsg}</div>}
+          {bulkDryRun && (
+            <div className="mt-3">
+              <div className="text-xs font-semibold text-muted-foreground mb-2">Dry Run Preview — {bulkDryRun.count} case{bulkDryRun.count !== 1 ? "s" : ""} would be escalated</div>
+              {bulkDryRun.escalated.length > 0 && (
+                <div className="rounded-xl border border-border overflow-hidden text-xs">
+                  <table className="w-full">
+                    <thead className="bg-muted/40 text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Case ID</th>
+                        <th className="px-3 py-2 text-left">Customer</th>
+                        <th className="px-3 py-2 text-left">To Stage</th>
+                        <th className="px-3 py-2 text-right">Aging</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkDryRun.escalated.map(e => (
+                        <tr key={e.case_id} className="border-t border-border">
+                          <td className="px-3 py-2">{e.case_id}</td>
+                          <td className="px-3 py-2">{e.customer}</td>
+                          <td className="px-3 py-2 font-medium">{STAGE_LABELS[e.to_stage] ?? e.to_stage}</td>
+                          <td className="px-3 py-2 text-right">{e.aging_days}d</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {bulkDryRun.count === 0 && <div className="text-xs text-muted-foreground">No cases eligible for escalation right now.</div>}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Recovery cases tab */}
       {!loading && !error && tab === "recovery" ? (

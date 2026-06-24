@@ -240,6 +240,8 @@ export const ROUTES = {
     defaulters: "/admin/defaulters",
     schemes: "/admin/schemes",
     gstrReport: "/admin/reports/gstr",
+    amlScreening: "/admin/crm/aml",
+    kycReverification: "/admin/crm/kyc/reverification-queue",
 
     // Phase 6: canonical /admin/requests/* request hub routes
     // These are thin redirect aliases that keep legacy routes intact.
@@ -338,6 +340,8 @@ export const ROUTES = {
     accountingTaxInvoices: "/admin/accounting/gst/tax-invoices",
     accountingCreditNotes: "/admin/accounting/gst/credit-notes",
     accountingDebitNotes: "/admin/accounting/gst/debit-notes",
+    accountingTds: "/admin/accounting/tds",
+    accountingTcs: "/admin/accounting/tcs",
     accountingTrialBalance: "/admin/accounting/reports/trial-balance",
     accountingProfitLoss: "/admin/accounting/reports/profit-loss",
     accountingBalanceSheet: "/admin/accounting/reports/balance-sheet",

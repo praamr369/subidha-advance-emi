@@ -7,17 +7,19 @@ type Params = {
   slug: string;
 };
 
-export function generateMetadata({ params }: { params: Params }): Metadata {
-  const label = (params.slug || "policy").replace(/-/g, " ");
+export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
+  const { slug } = await params;
+  const label = (slug || "policy").replace(/-/g, " ");
   return buildPublicMetadata({
     title: `${label} policy`,
     description: "Published policy page",
-    path: `/policies/${params.slug}`,
+    path: `/policies/${slug}`,
   });
 }
 
-export default function GenericPolicyBySlugPage({ params }: { params: Params }) {
-  const label = (params.slug || "policy").replace(/-/g, " ");
+export default async function GenericPolicyBySlugPage({ params }: { params: Promise<Params> }) {
+  const { slug } = await params;
+  const label = (slug || "policy").replace(/-/g, " ");
   const title = label
     .split(" ")
     .filter(Boolean)
@@ -26,7 +28,7 @@ export default function GenericPolicyBySlugPage({ params }: { params: Params }) 
 
   return (
     <PolicyPublicPage
-      slug={params.slug}
+      slug={slug}
       pageTitle={title}
       heroTitle={title}
       heroSubtitle="Published legal policy text for customer reference."

@@ -227,11 +227,21 @@ from api.v1.views.admin_recovery import (
     AdminGuarantorDetailView,
     AdminGuarantorListView,
     AdminLeaderboardView,
+    AdminRecoveryCaseBulkEscalateView,
     AdminRecoveryCaseDetailView,
     AdminRecoveryCaseListView,
+    AdminRecoveryCaseSendLegalNoticeView,
+    AdminRecoveryCaseSendSettlementOfferView,
     AdminSchemeDetailView,
     AdminSchemeListView,
     AdminStaffTargetListView,
+)
+from api.v1.views.admin_aml import (
+    AdminAMLScreeningListView,
+    AdminCustomerAMLScreeningView,
+    AdminCustomerPEPFlagView,
+    AdminKYCReverificationQueueView,
+    AdminKYCRequestReverificationView,
 )
 from api.v1.views.admin_reports import (
     AdminAnalyticsSummaryView,
@@ -1096,7 +1106,17 @@ urlpatterns = [
     # ── Defaulter Recovery ────────────────────────────────────────────────────
     path("defaulters/", AdminDefaulterListView.as_view()),
     path("recovery-cases/", AdminRecoveryCaseListView.as_view()),
+    path("recovery-cases/bulk-escalate/", AdminRecoveryCaseBulkEscalateView.as_view()),
     path("recovery-cases/<int:pk>/", AdminRecoveryCaseDetailView.as_view()),
+    path("recovery-cases/<int:pk>/send-legal-notice/", AdminRecoveryCaseSendLegalNoticeView.as_view()),
+    path("recovery-cases/<int:pk>/send-settlement-offer/", AdminRecoveryCaseSendSettlementOfferView.as_view()),
+
+    # ── AML / KYC re-verification ──────────────────────────────────────────
+    path("aml/screenings/", AdminAMLScreeningListView.as_view()),
+    path("aml/customers/<int:customer_id>/screenings/", AdminCustomerAMLScreeningView.as_view()),
+    path("aml/customers/<int:customer_id>/pep-flag/", AdminCustomerPEPFlagView.as_view()),
+    path("kyc/reverification-queue/", AdminKYCReverificationQueueView.as_view()),
+    path("kyc/documents/<int:doc_id>/request-reverification/", AdminKYCRequestReverificationView.as_view()),
 
     # ── Guarantors ────────────────────────────────────────────────────────────
     path("subscriptions/<int:subscription_id>/guarantors/", AdminGuarantorListView.as_view()),
