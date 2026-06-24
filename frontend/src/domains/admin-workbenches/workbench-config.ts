@@ -96,6 +96,7 @@ export const ADMIN_WORKBENCHES: Record<
       { id: "finance-dashboard", label: "Finance Dashboard", description: "Current finance source workspace.", href: ROUTES.admin.finance },
       { id: "collections-review", label: "Collections Review", description: "Current collections control surface.", href: ROUTES.admin.collections },
       { id: "outstandings", label: "Outstandings", description: "Current collectible dues view.", href: ROUTES.admin.financeOutstandings },
+      { id: "customer-credits", label: "Customer Credits", description: "Current customer credit source records.", href: ROUTES.admin.financeCustomerCredits },
       { id: "customer-advances", label: "Customer Advances", description: "Current liability source records.", href: ROUTES.admin.financeCustomerAdvances },
       { id: "deposits", label: "Deposits", description: "Current security-deposit source workflow.", href: ROUTES.admin.financeDeposits },
       { id: "commissions", label: "Commissions", description: "Current commission source register.", href: ROUTES.admin.financeCommissions },

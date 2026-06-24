@@ -151,11 +151,7 @@ test("Phase 9A: lucky-plan and finance canonical routes redirect to legacy conte
 // yet. Phase 9A must NOT fabricate a page (that would be fake readiness).
 
 test("Phase 9A: documented gap routes remain pageless (no fake readiness)", () => {
-  const gapPages = [
-    "finance/customer-credits",
-    "finance/refunds",
-    "service-desk/cases",
-  ];
+  const gapPages = ["finance/refunds"];
   for (const rel of gapPages) {
     assert.ok(
       !existsSync(pagePath(rel)),
@@ -187,7 +183,7 @@ test("Phase 9A: lucky-plan winners page is implemented and fetches live winner r
   );
 });
 
-test("Phase 9A: second-pass stub pages remain honest stubs", () => {
+test("Phase 9A: vendor ledger and outstanding pages provide live drill-down", () => {
   const stubPages = ["vendors/ledger", "vendors/outstanding"];
   for (const rel of stubPages) {
     assert.ok(existsSync(pagePath(rel)), `Second-pass stub page must exist: /admin/${rel}`);
@@ -195,11 +191,10 @@ test("Phase 9A: second-pass stub pages remain honest stubs", () => {
 
   const ledger = readPage("vendors/ledger");
   const outstanding = readPage("vendors/outstanding");
-  assert.ok(ledger.includes("stub") || ledger.includes("detail page"), "vendor ledger must be an honest stub");
-  assert.ok(
-    outstanding.includes("vendor detail") || outstanding.includes("outstanding APIs"),
-    "vendor outstanding must point to per-vendor detail/API, not show fake aggregates"
-  );
+  assert.ok(ledger.includes("Ledger snapshot"), "vendor ledger must expose a live ledger snapshot");
+  assert.ok(ledger.includes("Open vendor detail"), "vendor ledger must link to vendor detail drill-down");
+  assert.ok(outstanding.includes("Outstanding summary"), "vendor outstanding must expose an outstanding summary");
+  assert.ok(outstanding.includes("Open vendor detail"), "vendor outstanding must link to vendor detail drill-down");
 });
 
 // ── 6. Safety boundary: classified read-only/stub pages claim no mutation ───────
@@ -254,19 +249,15 @@ test("Phase 9A: Manufacturing pages still exist (deferred, not deleted)", () => 
   }
 });
 
-// ── 8. service-desk/cases gap: no nav item links to the missing page ───────────
-//
-// serviceDeskCases is classified in the taxonomy but has no page. The "Cases"
-// navigation item must point at the service-desk hub (which has a page), never
-// at the pageless /admin/service-desk/cases — otherwise it is a dead link.
+// ── 8. service-desk cases navigation points at the live cases page ────────────
 
-test("Phase 9A: navigation 'Cases' item points at the service-desk hub, not the pageless cases route", () => {
+test("Phase 9A: navigation 'Cases' item points at the live service-desk cases route", () => {
   const lines = registrySource.split("\n");
   const casesItem = lines.find((l) => l.includes('item("Delivery & Service", "Cases"'));
   assert.ok(casesItem, "Delivery & Service must keep a 'Cases' navigation item");
   assert.ok(
-    casesItem!.includes("ROUTES.admin.serviceDesk") && !casesItem!.includes("serviceDeskCases"),
-    "'Cases' nav item must link to the service-desk hub, not the pageless serviceDeskCases route"
+    casesItem!.includes("ROUTES.admin.serviceDeskCases"),
+    "'Cases' nav item must link to the live serviceDeskCases route"
   );
 });
 

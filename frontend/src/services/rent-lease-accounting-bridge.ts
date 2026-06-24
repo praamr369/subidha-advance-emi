@@ -213,3 +213,22 @@ export function previewCustomerAdvancePosting(id: number | string) {
 export function executeCustomerAdvancePosting(id: number | string) {
   return postExecute(`/admin/customer-advances/${id}/posting-execute/`);
 }
+
+export function listCustomerCredits() {
+  return apiFetch<{ count: number; results: Array<Record<string, unknown>> }>("/admin/finance/customer-credits/");
+}
+
+export function createCustomerCredit(input: Record<string, unknown>) {
+  return apiFetch<Record<string, unknown>>("/admin/finance/customer-credits/", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function previewCustomerCreditPosting(id: number | string) {
+  return postPreview(`/admin/finance/customer-credits/${id}/posting-preview/`);
+}
+
+export function executeCustomerCreditPosting(id: number | string) {
+  return postExecute(`/admin/finance/customer-credits/${id}/post/`);
+}

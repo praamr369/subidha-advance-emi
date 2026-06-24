@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -129,17 +130,25 @@ export default function InventoryItemsPage() {
       key: "actions",
       header: "Actions",
       render: (row) => (
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedItemId(row.id);
-            setMessage(null);
-            setError(null);
-          }}
-          className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
-        >
-          Edit
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedItemId(row.id);
+              setMessage(null);
+              setError(null);
+            }}
+            className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+          >
+            Edit
+          </button>
+          <Link
+            href={`/admin/inventory/items/${row.id}`}
+            className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+          >
+            Open detail
+          </Link>
+        </div>
       ),
     },
   ];
@@ -192,10 +201,10 @@ export default function InventoryItemsPage() {
       statusBadge={{ label: "Profile Governance", tone: "info" }}
     >
       {/* Phase 9B-NF7C — Object detail cockpit: Inventory & Stock item source
-          ownership. Additive copy only. There is no per-item /inventory/items/[id]
-          detail route yet (documented gap); this is the existing item source
-          surface. No stock movement, valuation, or ledger row is created from
-          page load — quantities are read from the stock-on-hand and ledger views. */}
+          ownership. Additive copy only. Per-item /inventory/items/[id] detail
+          is now available as a read-only drill-down. No stock movement,
+          valuation, or ledger row is created from page load — quantities are
+          read from the stock-on-hand and ledger views. */}
       <section className="rounded-2xl border border-border bg-muted/30 p-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Inventory & Stock · Stock source workflow

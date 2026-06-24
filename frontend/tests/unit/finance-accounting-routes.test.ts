@@ -25,6 +25,11 @@ test("financeCustomerAdvances canonical route constant is defined in ROUTES", ()
   assert.ok(routesSource.includes('"/admin/finance/customer-advances"'), "Missing /admin/finance/customer-advances path");
 });
 
+test("financeCustomerCredits canonical route constant is defined in ROUTES", () => {
+  assert.ok(routesSource.includes("financeCustomerCredits:"), "Missing financeCustomerCredits route key");
+  assert.ok(routesSource.includes('"/admin/finance/customer-credits"'), "Missing /admin/finance/customer-credits path");
+});
+
 // ── Finance Operations alias pages exist ──────────────────────────────────────
 
 test("/admin/finance/outstandings alias page file exists", () => {
@@ -96,6 +101,7 @@ test("Finance Operations registry group uses canonical financeOutstandings route
 
   const block = lines.slice(financeStart, financeEnd).join("\n");
   assert.ok(block.includes("financeOutstandings"), "Finance Operations group must include financeOutstandings");
+  assert.ok(block.includes("financeCustomerCredits"), "Finance Operations group must include financeCustomerCredits");
   assert.ok(block.includes("financeCustomerAdvances"), "Finance Operations group must include financeCustomerAdvances");
 });
 
@@ -234,14 +240,13 @@ test("finance_operations taxonomy module includes canonical Phase 4 routes", () 
 
 // ── Documented gaps for Phase 4 ───────────────────────────────────────────────
 
-test("Phase 4 gap: /admin/finance/customer-credits is documented but has no page", () => {
-  // Per architecture: customer-credits has no dedicated backend endpoint.
-  // This test confirms the gap is acknowledged — the path does NOT yet have a page.
+test("/admin/finance/customer-credits is now implemented as a finance source surface", () => {
   const customerCreditsPath = join(financeAppRoot, "customer-credits/page.tsx");
-  assert.ok(
-    !existsSync(customerCreditsPath),
-    "/admin/finance/customer-credits must NOT have a page yet (documented gap: no backend endpoint)"
-  );
+  assert.ok(existsSync(customerCreditsPath), "/admin/finance/customer-credits/page.tsx must exist");
+  const page = readFileSync(customerCreditsPath, "utf8");
+  assert.ok(page.includes("Customer Credits"), "customer-credits page must expose customer credits wording");
+  assert.ok(page.includes("listCustomerCredits"), "customer-credits page must use the customer-credits list API");
+  assert.ok(page.includes("createCustomerCredit"), "customer-credits page must use the customer-credits create API");
 });
 
 test("Phase 4 gap: /admin/finance/refunds is documented but has no dedicated page", () => {

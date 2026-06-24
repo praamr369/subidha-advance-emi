@@ -185,6 +185,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   // or balance sheet — those are Accounting & Reconciliation.
   item("Finance Operations", "Finance Workspace", ROUTES.admin.finance, "Finance source workflow workspace: receivables, payables, deposits, commissions, payouts, and reversals."),
   item("Finance Operations", "Outstandings", ROUTES.admin.financeOutstandings, "Unified collectible dues across EMI, rent, lease, direct sale, and invoices. Finance source workflow."),
+  item("Finance Operations", "Customer Credits", ROUTES.admin.financeCustomerCredits, "Customer credit source records. Finance source workflow."),
   item("Finance Operations", "Customer Advances", ROUTES.admin.financeCustomerAdvances, "Customer advance liability source records. Finance source workflow."),
   item("Finance Operations", "Deposits", ROUTES.admin.financeDeposits, "Security deposit source records: receipt, refund posture, damage recovery. Finance source workflow.", {
     badgeSource: "queue.deposit_refunds_pending",
@@ -286,7 +287,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Delivery & Service", "Delivery Returns", ROUTES.admin.deliveryReturns, "Delivery return workflow."),
   item("Delivery & Service", "Possession / Handover", `${ROUTES.admin.deliveries}?plan_type=RENT_LEASE`, "Rent and lease possession and handover queue."),
   item("Delivery & Service", "Return Inspections", `${ROUTES.admin.serviceDeskReturns}?plan_type=RENT_LEASE`, "Rent and lease return inspection queue."),
-  item("Delivery & Service", "Cases", ROUTES.admin.serviceDesk, "Service desk cases."),
+  item("Delivery & Service", "Cases", ROUTES.admin.serviceDeskCases, "Service desk cases."),
   item("Delivery & Service", "Complaints", ROUTES.admin.serviceDeskComplaints, "Complaint register."),
   item("Delivery & Service", "Returns", ROUTES.admin.serviceDeskReturns, "Return queue."),
   item("Delivery & Service", "Tickets", ROUTES.admin.serviceDeskTickets, "Service ticket register."),

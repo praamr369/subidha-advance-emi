@@ -384,27 +384,29 @@ test("Phase 9B-NF6: inventory page does not link stock source to billing or paym
 
 // ── 8. Phase 9B-NF7: Object detail cockpit polish ──────────────────────────────
 // These guard the touched object/detail pages. They are file-content / existence
-// based (no module imports). Inventory has no per-item /inventory/items/[id]
-// detail route yet (documented gap) — its item source surface is the items list
-// page, which is asserted instead.
+// based (no module imports). Inventory per-item /inventory/items/[id] detail
+// now exists as a read-only drill-down and is asserted below.
 
 const customerDetail = "customers/[id]";
 const subscriptionDetail = "subscriptions/[id]";
 const batchDetail = "batches/[id]";
 const inventoryItemsSource = "inventory/items";
 
-// 8.0 — Touched detail pages exist; inventory per-item [id] detail is a documented gap.
+// 8.0 — Touched detail pages exist; inventory per-item [id] detail is now a live drill-down.
 test("Phase 9B-NF7: touched detail pages exist (customer, subscription, batch) and inventory items source exists", () => {
   for (const rel of [customerDetail, subscriptionDetail, batchDetail, inventoryItemsSource]) {
     assert.ok(existsSync(pagePath(rel)), `${rel}/page.tsx must exist`);
   }
 });
 
-test("Phase 9B-NF7C: inventory per-item /inventory/items/[id] detail route is a documented gap (not invented)", () => {
+test("Phase 9B-NF7C: inventory per-item /inventory/items/[id] detail route exists as a drill-down", () => {
   assert.ok(
-    !existsSync(pagePath("inventory/items/[id]")),
-    "no fake /inventory/items/[id] detail page should be invented; the items source page is improved instead"
+    existsSync(pagePath("inventory/items/[id]")),
+    "inventory items detail page must exist as a real drill-down"
   );
+  const src = readPage("inventory/items/[id]");
+  assert.ok(src.includes("Item summary"), "inventory item detail must include an item summary");
+  assert.ok(src.includes("Stock controls"), "inventory item detail must include stock controls");
 });
 
 // 8.1 — Customer detail cockpit (NF7A)

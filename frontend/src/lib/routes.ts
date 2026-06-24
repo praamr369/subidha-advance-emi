@@ -154,6 +154,7 @@ export const ROUTES = {
     finance: "/admin/finance",
     financeCollect: "/admin/finance/collect",
     financeOutstandings: "/admin/finance/outstandings",
+    financeCustomerCredits: "/admin/finance/customer-credits",
     financeCustomerAdvances: "/admin/finance/customer-advances",
     financeCanonicalReconciliation: "/admin/accounting/bridge-reconciliation",
     financeReconciliation: "/admin/finance/reconciliation",

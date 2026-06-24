@@ -136,6 +136,7 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
       ROUTES.admin.finance,
       // Phase 4 canonical Finance Operations routes
       ROUTES.admin.financeOutstandings,
+      ROUTES.admin.financeCustomerCredits,
       ROUTES.admin.financeCustomerAdvances,
       ROUTES.admin.financeDeposits,
       ROUTES.admin.financeCommissions,

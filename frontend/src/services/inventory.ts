@@ -613,6 +613,10 @@ export function listInventoryItems(params: Record<string, QueryValue> = {}) {
   return apiFetch<PaginatedResponse<InventoryItem>>(`/inventory/items/${buildQuery(params)}`);
 }
 
+export function getInventoryItem(id: number | string) {
+  return apiFetch<InventoryItem>(`/inventory/items/${id}/`);
+}
+
 export function searchAdminInventoryItems(params: { q: string }) {
   return apiFetch<{ count: number; results: AdminInventoryItemSearchRow[] }>(
     `/admin/inventory/items/search/${buildQuery({ q: params.q })}`

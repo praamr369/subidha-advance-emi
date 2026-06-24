@@ -335,3 +335,28 @@ class FinancePaymentOperationsApiTests(APITestCase):
                 metadata__reference_no="ADV-005",
             ).exists()
         )
+
+    def test_admin_customer_credits_alias_round_trip(self):
+        response = self.client.post(
+            "/api/v1/admin/finance/customer-credits/",
+            {
+                "customer_id": self.customer.id,
+                "amount": "275.00",
+                "transaction_type": "COLLECTION",
+                "payment_method": "UPI",
+                "finance_account_id": self.upi_finance.id,
+                "reference_no": "CR-001",
+                "notes": "Customer credit alias smoke test",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        record_id = response.data["id"]
+        self.assertEqual(response.data["transaction_type"], "COLLECTION")
+        self.assertEqual(response.data["amount"], "275.00")
+
+        detail = self.client.get(f"/api/v1/admin/finance/customer-credits/{record_id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
+        self.assertEqual(detail.data["id"], record_id)
+        self.assertEqual(detail.data["reference_no"], "CR-001")

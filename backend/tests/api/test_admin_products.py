@@ -459,3 +459,25 @@ class AdminProductsApiTests(APITestCase):
         self.assertEqual(item.standard_unit_cost, Decimal("12500.00"))
         self.assertFalse(item.is_active)
         self.assertEqual(product.base_price, Decimal("22000.00"))
+
+    def test_inventory_item_detail_retrieval_exposes_current_stock(self):
+        product = create_product(
+            name="Inventory Detail Product",
+            product_code="INV-DETAIL-001",
+            base_price=Decimal("33000.00"),
+        )
+        item = InventoryItem.objects.create(
+            product=product,
+            sku="INV-DETAIL-001",
+            opening_stock_qty=Decimal("4.000"),
+            reorder_level_qty=Decimal("1.000"),
+            standard_unit_cost=Decimal("15000.00"),
+        )
+
+        response = self.client.get(f"/api/v1/inventory/items/{item.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["id"], item.id)
+        self.assertEqual(response.data["product"], product.id)
+        self.assertEqual(response.data["product_code"], "INV-DETAIL-001")
+        self.assertEqual(response.data["current_stock_qty"], "4.000")
