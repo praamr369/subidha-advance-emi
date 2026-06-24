@@ -63,7 +63,7 @@ import { getAdminDashboard } from "@/services/admin";
 import {
   listExpenseClaims,
   listPurchaseBills,
-  listSalarySheets,
+  listSalarySheetsSafe,
   type AccountingPaginatedResponse,
   type AccountingPurchaseBill,
   type EmployeeExpenseClaim,
@@ -574,7 +574,7 @@ export default function AdminDashboardPage() {
           ...branchScopedQuery,
           status: "APPROVED",
         }),
-        listSalarySheets({
+        listSalarySheetsSafe({
           ...branchScopedQuery,
           status: "POSTED",
         }),

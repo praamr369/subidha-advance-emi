@@ -1421,6 +1421,41 @@ export function listSalarySheets(params: Record<string, string | number | undefi
   );
 }
 
+/**
+ * Dashboard-safe salary sheet summary.
+ * Salary sheets moved from /accounting/salary-sheets/ to /admin/hr/payroll/
+ * (HR consolidation). That endpoint returns { salary_sheets: [...] } (no
+ * pagination), so we adapt it to the paginated shape and optionally filter by
+ * status. Always resolves (never throws) so a single widget can't break the
+ * dashboard.
+ */
+export async function listSalarySheetsSafe(
+  params: Record<string, string | number | undefined | null> = {}
+): Promise<AccountingPaginatedResponse<SalarySheet>> {
+  const empty: AccountingPaginatedResponse<SalarySheet> = {
+    count: 0,
+    next: null,
+    previous: null,
+    results: [],
+  };
+  try {
+    const { status, ...rest } = params;
+    const res = await apiFetch<{ salary_sheets?: SalarySheet[] }>(
+      `/admin/hr/payroll/${buildQuery(rest)}`
+    );
+    let sheets = Array.isArray(res?.salary_sheets) ? res.salary_sheets : [];
+    if (status) {
+      const wanted = String(status).toUpperCase();
+      sheets = sheets.filter(
+        (sheet) => String((sheet as { status?: string }).status ?? "").toUpperCase() === wanted
+      );
+    }
+    return { ...empty, count: sheets.length, results: sheets };
+  } catch {
+    return empty;
+  }
+}
+
 export function createSalarySheet(payload: Partial<SalarySheet>) {
   return apiFetch<SalarySheet>("/accounting/salary-sheets/", {
     method: "POST",

@@ -205,6 +205,7 @@ const ADMIN_MODULE_ICONS: Record<string, NavIconKey> = {
   "Collections & Cashier": "collectPayment",
   "Finance Operations": "finance",
   "Accounting & Reconciliation": "accounting",
+  "Growth & Offers": "crm",
   "Inventory & Stock": "inventory",
   "Purchases & Vendors": "procurement",
   Manufacturing: "manufacturing",
@@ -259,7 +260,9 @@ export const ADMIN_WORKBENCH_NAVIGATION: NavGroup[] = [
 ];
 
 export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
-  ADMIN: ADMIN_WORKBENCH_NAVIGATION,
+  // Full 17-module taxonomy with sub-modules as expandable dropdowns.
+  // (Was ADMIN_WORKBENCH_NAVIGATION — condensed dummy landing pages, retired.)
+  ADMIN: ADMIN_PARENT_NAVIGATION,
   PARTNER: [
     { title: "Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: PARTNER_ROUTES.dashboard, icon: "dashboard" }] },
     { title: "My Customers", icon: "customers", items: [{ label: "My Customers", href: PARTNER_ROUTES.customers, icon: "customers" }] },

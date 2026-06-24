@@ -75,7 +75,7 @@ import { getAdminDashboard } from "@/services/admin";
 import {
   listExpenseClaims,
   listPurchaseBills,
-  listSalarySheets,
+  listSalarySheetsSafe,
   type AccountingPaginatedResponse,
   type AccountingPurchaseBill,
   type EmployeeExpenseClaim,
@@ -546,7 +546,7 @@ export default function AdminOperationsDashboard() {
           }
           case "payroll-queue": {
             const [salaryPayload, expensePayload] = await Promise.all([
-              listSalarySheets({ ...branchScopedQuery, status: "POSTED" }),
+              listSalarySheetsSafe({ ...branchScopedQuery, status: "POSTED" }),
               listExpenseClaims({ ...branchScopedQuery, status: "POSTED" }),
             ]);
             setSalaryPayables(salaryPayload);
