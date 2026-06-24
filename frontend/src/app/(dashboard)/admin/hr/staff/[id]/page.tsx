@@ -25,6 +25,7 @@ import { listBranches, type BranchRecord } from "@/services/branch-control";
 import { listAdminStaffIdentities, type AdminStaffIdentity } from "@/services/staff";
 import {
   createHrStaffDocument,
+  getAdminAuditTimeline,
   downloadHrSalaryAgreementPdf,
   downloadHrStaffProfilePdf,
   getHrPayroll,
@@ -37,7 +38,9 @@ import {
   patchHrStaff,
   patchHrStaffDocument,
   setHrStaffStatus,
+  reviewHrStaffDocument,
   type HrAttendance,
+  type AdminAuditEntry,
   type HrExpenseClaim,
   type HrLeaveRequest,
   type HrPayrollSheet,
@@ -50,6 +53,8 @@ const EMPLOYMENT_TYPES = ["PERMANENT_MONTHLY", "TEMPORARY", "DAILY_WAGE", "HOURL
 const DETAIL_TABS = ["Overview", "Employment", "Attendance", "Payroll", "Documents", "KYC", "Access", "Timeline"] as const;
 type DetailTab = (typeof DETAIL_TABS)[number];
 
+type StaffAuditEntry = AdminAuditEntry & { source_label: string };
+
 type EditForm = {
   name: string;
   phone: string;
@@ -58,6 +63,7 @@ type EditForm = {
   branch: string;
   joining_date: string;
   employment_type: string;
+  weekly_off: string;
   base_salary: string;
   daily_wage_rate: string;
   hourly_wage_rate: string;
@@ -70,6 +76,7 @@ type EditForm = {
   kyc_verified: boolean;
   address: string;
   emergency_contact_name: string;
+  emergency_contact_relation: string;
   emergency_contact_phone: string;
   cost_center_code: string;
   payroll_expense_account: string;
@@ -96,6 +103,7 @@ function formFromStaff(staff: HrStaff): EditForm {
     branch: staff.branch ? String(staff.branch) : "",
     joining_date: staff.joining_date || "",
     employment_type: staff.employment_type || "PERMANENT_MONTHLY",
+    weekly_off: staff.weekly_off || "",
     base_salary: staff.base_salary || "",
     daily_wage_rate: staff.daily_wage_rate || "",
     hourly_wage_rate: staff.hourly_wage_rate || "",
@@ -108,6 +116,7 @@ function formFromStaff(staff: HrStaff): EditForm {
     kyc_verified: Boolean(staff.kyc_verified),
     address: staff.address || "",
     emergency_contact_name: staff.emergency_contact_name || "",
+    emergency_contact_relation: staff.emergency_contact_relation || "",
     emergency_contact_phone: staff.emergency_contact_phone || "",
     cost_center_code: staff.cost_center_code || "",
     payroll_expense_account: staff.payroll_expense_account ? String(staff.payroll_expense_account) : "",
@@ -144,6 +153,28 @@ function Detail({ label, value }: { label: string; value?: ReactNode }) {
 
 function ReadinessBadge({ ready, label }: { ready?: boolean; label: string }) {
   return <span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${ready ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>{label}</span>;
+}
+
+function formatAuditMeta(metadata?: Record<string, unknown>) {
+  if (!metadata) return "";
+  const parts: string[] = [];
+  const documentType = metadata["document_type"] ? String(metadata["document_type"]) : "";
+  const title = metadata["title"] ? String(metadata["title"]) : "";
+  const status = metadata["status"] ? String(metadata["status"]) : "";
+  const reason = metadata["reason"] ? String(metadata["reason"]) : "";
+  const notes = metadata["notes"] ? String(metadata["notes"]) : "";
+  if (documentType || title) parts.push([documentType, title].filter(Boolean).join(" · "));
+  if (status) parts.push(`Status: ${status}`);
+  if (reason) parts.push(`Reason: ${reason}`);
+  if (notes) parts.push(notes);
+  return parts.join(" | ");
+}
+
+function formatAuditAction(actionType: string) {
+  return actionType
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function TinyTable({
@@ -201,6 +232,7 @@ function EditPanel({
         joining_date: form.joining_date || null,
         employment_status: form.employment_status,
         employment_type: form.employment_type,
+        weekly_off: form.weekly_off.trim(),
         reporting_manager: form.reporting_manager.trim(),
         work_location: form.work_location.trim(),
         probation_end_date: form.probation_end_date || null,
@@ -224,6 +256,7 @@ function EditPanel({
         kyc_verified: form.kyc_verified,
         address: form.address.trim(),
         emergency_contact_name: form.emergency_contact_name.trim(),
+        emergency_contact_relation: form.emergency_contact_relation.trim(),
         emergency_contact_phone: form.emergency_contact_phone.trim(),
         cost_center_code: form.cost_center_code.trim(),
         payroll_expense_account: form.payroll_expense_account ? Number(form.payroll_expense_account) : null,
@@ -266,6 +299,7 @@ function EditPanel({
         {tab === "EMPLOYMENT" ? (
           <>
             {field("Employment type", <select className={inputClass} value={form.employment_type} onChange={(event) => update("employment_type", event.target.value)}>{EMPLOYMENT_TYPES.map((item) => <option key={item} value={item}>{item}</option>)}</select>)}
+            {field("Weekly off", <input className={inputClass} value={form.weekly_off} onChange={(event) => update("weekly_off", event.target.value)} placeholder="SUNDAY" />)}
             {field("Reporting manager", <input className={inputClass} value={form.reporting_manager} onChange={(event) => update("reporting_manager", event.target.value)} />)}
             {field("Work location", <input className={inputClass} value={form.work_location} onChange={(event) => update("work_location", event.target.value)} />)}
             {field("Probation end date", <input type="date" className={inputClass} value={form.probation_end_date} onChange={(event) => update("probation_end_date", event.target.value)} />)}
@@ -296,6 +330,7 @@ function EditPanel({
         {tab === "EMERGENCY" ? (
           <>
             {field("Emergency contact", <input className={inputClass} value={form.emergency_contact_name} onChange={(event) => update("emergency_contact_name", event.target.value)} />)}
+            {field("Emergency relation", <input className={inputClass} value={form.emergency_contact_relation} onChange={(event) => update("emergency_contact_relation", event.target.value)} placeholder="SPOUSE" />)}
             {field("Emergency phone", <input className={inputClass} value={form.emergency_contact_phone} onChange={(event) => update("emergency_contact_phone", event.target.value)} />)}
             {field("Address", <textarea className="min-h-24 rounded-xl border border-border bg-background px-3 py-2 text-sm" value={form.address} onChange={(event) => update("address", event.target.value)} />)}
           </>
@@ -334,12 +369,16 @@ export default function AdminHrStaffProfilePage() {
   const [expenses, setExpenses] = useState<HrExpenseClaim[]>([]);
   const [salarySheets, setSalarySheets] = useState<HrPayrollSheet[]>([]);
   const [salaryPayments, setSalaryPayments] = useState<HrSalaryPayment[]>([]);
+  const [auditEntries, setAuditEntries] = useState<StaffAuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<DetailTab>("Overview");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [upload, setUpload] = useState({ document_type: "OTHER", title: "", document_no: "", notes: "", file: null as File | null });
+  const [reviewModal, setReviewModal] = useState<{ documentId: number; action: "verify" | "reject"; title: string } | null>(null);
+  const [reviewNotes, setReviewNotes] = useState("");
+  const [reviewSaving, setReviewSaving] = useState(false);
 
   const attendanceSummary = useMemo(() => {
     const count = (status: string) => attendance.filter((row) => row.status === status).length;
@@ -350,7 +389,7 @@ export default function AdminHrStaffProfilePage() {
     if (!staffId) return;
     try {
       setLoading(true);
-      const [staffPayload, branchPayload, docsPayload, attendancePayload, leavePayload, expensePayload, payrollPayload, paymentPayload] = await Promise.all([
+      const [staffPayload, branchPayload, docsPayload, attendancePayload, leavePayload, expensePayload, payrollPayload, paymentPayload, identityPayload] = await Promise.all([
         getHrStaff(staffId),
         listBranches({ status: "ACTIVE" }),
         listHrStaffDocuments({ employee: staffId }),
@@ -359,10 +398,16 @@ export default function AdminHrStaffProfilePage() {
         listHrExpenseClaims({ employee: staffId }),
         getHrPayroll({ employee: staffId }),
         listHrSalaryPayments({ employee: staffId }),
+        listAdminStaffIdentities(),
       ]);
-      const identityPayload = await listAdminStaffIdentities();
+      const identity = identityPayload.results.find((item) => item.employee === staffPayload.id) || null;
+      const auditPayloads = await Promise.all([
+        getAdminAuditTimeline("EmployeeProfile", staffPayload.id),
+        identity ? getAdminAuditTimeline("StaffIdentity", identity.id) : Promise.resolve([] as AdminAuditEntry[]),
+        getAdminAuditTimeline("EmployeeDocument", staffPayload.id),
+      ]);
       setStaff(staffPayload);
-      setIdentity(identityPayload.results.find((item) => item.employee === staffPayload.id) || null);
+      setIdentity(identity);
       setBranches(branchPayload.results);
       setDocuments(docsPayload.results);
       setAttendance(attendancePayload.results);
@@ -370,6 +415,11 @@ export default function AdminHrStaffProfilePage() {
       setExpenses(expensePayload.results);
       setSalarySheets(payrollPayload.salary_sheets);
       setSalaryPayments(paymentPayload.results);
+      setAuditEntries(
+        auditPayloads
+          .flatMap((entries, index) => entries.map((entry) => ({ ...entry, source_label: index === 0 ? "EmployeeProfile" : index === 1 ? "StaffIdentity" : "EmployeeDocument" })))
+          .sort((left, right) => (left.created_at < right.created_at ? 1 : left.created_at > right.created_at ? -1 : right.id - left.id))
+      );
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load staff profile.");
@@ -405,6 +455,26 @@ export default function AdminHrStaffProfilePage() {
     setUpload({ document_type: "OTHER", title: "", document_no: "", notes: "", file: null });
     setUploadOpen(false);
     await load();
+  }
+
+  function openReviewModal(documentId: number, action: "verify" | "reject", title: string) {
+    setReviewModal({ documentId, action, title });
+    setReviewNotes("");
+  }
+
+  async function submitReview() {
+    if (!reviewModal) return;
+    try {
+      setReviewSaving(true);
+      await reviewHrStaffDocument(reviewModal.documentId, reviewModal.action, reviewNotes);
+      setReviewModal(null);
+      setReviewNotes("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to update document review.");
+    } finally {
+      setReviewSaving(false);
+    }
   }
 
   if (loading) return <ERPPageShell title="Staff Profile"><ERPLoadingState label="Loading staff profile..." /></ERPPageShell>;
@@ -478,15 +548,17 @@ export default function AdminHrStaffProfilePage() {
           <ReadinessBadge ready={staff.access_ready} label="Access ready" />
         </div>
         {staff.readiness_warnings?.length ? (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{staff.readiness_warnings.join(" · ")}</div>
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{staff.readiness_warnings.join(" | ")}</div>
         ) : null}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Detail label="Phone" value={staff.phone} />
           <Detail label="Alternate phone" value="Not available on current staff API" />
           <Detail label="Email" value="Not available on current staff API" />
           <Detail label="Role / title" value={staff.designation} />
+          <Detail label="Weekly off" value={staff.weekly_off} />
           <Detail label="Address" value={staff.address} />
           <Detail label="Emergency contact" value={`${staff.emergency_contact_name || "Unavailable"} ${staff.emergency_contact_phone || ""}`.trim()} />
+          <Detail label="Emergency relation" value={staff.emergency_contact_relation} />
           <Detail label="Joining date" value={staff.joining_date} />
           <Detail label="Leaving date" value="Not available on current staff API" />
           <Detail label="KYC status" value={<ERPStatusBadge status={staff.kyc_verified ? "ACTIVE" : "PENDING"} label={staff.kyc_verified ? "Verified" : "Pending"} />} />
@@ -525,7 +597,7 @@ export default function AdminHrStaffProfilePage() {
         </div>
       </DetailPanel> : null}
 
-      {activeTab === "Documents" ? <DetailPanel title="Documents" description="Document actions use staff document APIs. Verification is deferred because the backend only supports ACTIVE/INACTIVE document status.">
+      {activeTab === "Documents" ? <DetailPanel title="Documents" description="Document actions use the staff document API and review endpoint. Verify and reject map to ACTIVE and INACTIVE status while preserving audit history.">
         <div className="mb-3 flex justify-end"><ActionButton variant="primary" onClick={() => setUploadOpen(!uploadOpen)}>Upload Document</ActionButton></div>
         {uploadOpen ? (
           <div className="mb-4 rounded-xl border border-border bg-background p-3">
@@ -554,7 +626,8 @@ export default function AdminHrStaffProfilePage() {
             <div key="actions" className="flex flex-wrap gap-2">
               {doc.file_url ? <a href={doc.file_url} target="_blank" rel="noreferrer" className="rounded-md border border-border px-2 py-1 text-xs font-semibold">Open file</a> : <span className="text-xs text-muted-foreground">No file URL</span>}
               <button type="button" className="rounded-md border border-border px-2 py-1 text-xs font-semibold" onClick={() => void patchHrStaffDocument(doc.id, { status: doc.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" }).then(load)}>{doc.status === "ACTIVE" ? "Mark inactive" : "Mark active"}</button>
-              <button type="button" disabled title="Verify/reject statuses are not exposed by the current backend document model." className="rounded-md border border-border px-2 py-1 text-xs font-semibold text-muted-foreground opacity-60">Verify / Reject unavailable</button>
+              <button type="button" className="rounded-md border border-emerald-500 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50" onClick={() => openReviewModal(doc.id, "verify", doc.title)}>Verify</button>
+              <button type="button" className="rounded-md border border-red-400 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50" onClick={() => openReviewModal(doc.id, "reject", doc.title)}>Reject</button>
             </div>,
           ])}
         />
@@ -603,9 +676,54 @@ export default function AdminHrStaffProfilePage() {
         </div>
       </DetailPanel> : null}
 
-      {activeTab === "Timeline" ? <Timeline title="Audit / Activity Timeline">
-        <ERPEmptyState title="Timeline deferred" description="Profile updates, document status changes, deactivate/reactivate events, and salary setup changes should be shown here once a dedicated audit endpoint is exposed." />
-      </Timeline> : null}
+      {activeTab === "Timeline" ? (
+        <Timeline title="Audit / Activity Timeline">
+          {auditEntries.length ? (
+            auditEntries.map((entry) => (
+              <div key={`${entry.source_label}-${entry.id}`} className="rounded-xl border border-border bg-card p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">{formatAuditAction(entry.action_type)}</div>
+                    <div className="text-xs text-muted-foreground">{entry.source_label} | {entry.performed_by_username || "system"}</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{entry.created_at?.slice(0, 19).replace("T", " ")}</div>
+                </div>
+                {formatAuditMeta(entry.metadata) ? <div className="mt-2 text-sm text-muted-foreground">{formatAuditMeta(entry.metadata)}</div> : null}
+              </div>
+            ))
+          ) : (
+            <ERPEmptyState title="No audit events yet" description="Staff profile, identity, and document changes will appear here after the first backend-backed action." />
+          )}
+        </Timeline>
+      ) : null}
+
+      {reviewModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="text-lg font-bold">
+              {reviewModal.action === "verify" ? "Verify document" : "Reject document"}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {reviewModal.title} will be marked {reviewModal.action === "verify" ? "ACTIVE" : "INACTIVE"} and written to the audit timeline.
+            </p>
+            <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Notes {reviewModal.action === "reject" ? "(recommended)" : "(optional)"}
+            </label>
+            <textarea
+              value={reviewNotes}
+              onChange={(event) => setReviewNotes(event.target.value)}
+              className="mt-1 min-h-24 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              placeholder={reviewModal.action === "reject" ? "Reason for rejection" : "Optional review notes"}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <ActionButton variant="ghost" onClick={() => setReviewModal(null)}>Cancel</ActionButton>
+              <ActionButton variant={reviewModal.action === "verify" ? "primary" : "destructive"} loading={reviewSaving} onClick={() => void submitReview()}>
+                {reviewModal.action === "verify" ? "Verify" : "Reject"}
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </ERPPageShell>
   );
 }

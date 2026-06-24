@@ -2320,7 +2320,9 @@ class EmployeeProfile(AccountingTimeStampedModel):
     kyc_verified = models.BooleanField(default=False, db_index=True)
     address = models.TextField(blank=True, default="")
     emergency_contact_name = models.CharField(max_length=120, blank=True, default="")
+    emergency_contact_relation = models.CharField(max_length=40, blank=True, default="")
     emergency_contact_phone = models.CharField(max_length=20, blank=True, default="")
+    weekly_off = models.CharField(max_length=20, blank=True, default="")
     cost_center_code = models.CharField(max_length=60, blank=True, default="")
     payroll_expense_account = models.ForeignKey(
         "ChartOfAccount",
@@ -2381,7 +2383,9 @@ class EmployeeProfile(AccountingTimeStampedModel):
         self.kyc_id_number = (self.kyc_id_number or "").strip()
         self.address = (self.address or "").strip()
         self.emergency_contact_name = (self.emergency_contact_name or "").strip()
+        self.emergency_contact_relation = (self.emergency_contact_relation or "").strip().upper()
         self.emergency_contact_phone = (self.emergency_contact_phone or "").strip()
+        self.weekly_off = (self.weekly_off or "").strip().upper()
         self.cost_center_code = (self.cost_center_code or "").strip().upper()
         self.deactivation_reason = (self.deactivation_reason or "").strip()
         self.notes = (self.notes or "").strip()

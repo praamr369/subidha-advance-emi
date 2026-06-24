@@ -83,6 +83,23 @@ class ReminderGatewayApiTests(APITestCase):
         self.client.force_authenticate(self.admin)
         self.customer = create_customer_profile(name="Gateway Customer", phone="9100000202")
 
+    def test_payment_reminder_list_get_does_not_shadow_dispatch(self):
+        PaymentReminder.objects.create(
+            channel=ReminderChannel.SMS,
+            reminder_type=ReminderType.FOLLOWUP,
+            target_customer=self.customer,
+            due_date=timezone.localdate(),
+            amount_due=Decimal("500.00"),
+            status=ReminderStatus.PENDING,
+            customer_contact="9100000202",
+        )
+
+        response = self.client.get("/api/v1/reminders/payment-reminders/?status=PENDING&page_size=1")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.data["count"], 1)
+        self.assertTrue(response.data["results"])
+
     @override_settings(REMINDER_GATEWAY_PROVIDER="console")
     def test_sms_reminder_dispatch_uses_gateway_and_marks_sent(self):
         reminder = PaymentReminder.objects.create(

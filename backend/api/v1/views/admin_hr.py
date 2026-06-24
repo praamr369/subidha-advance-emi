@@ -125,11 +125,7 @@ class AdminHrStaffOptionsView(_AdminBase):
                     "enabled": False,
                     "message": "Payroll accounting bridge is not enabled here. Staff creation stores HR/payroll setup only; salary sheets, salary payments, journals, money movements, receipts, and reconciliation remain separate controlled workflows.",
                 },
-                "unsupported_profile_fields": [
-                    {"field": "weekly_off", "reason": "No persisted EmployeeProfile field yet; captured only as operator context in notes if submitted."},
-                    {"field": "emergency_contact_relation", "reason": "No persisted EmployeeProfile field yet; emergency contact name and phone are stored."},
-                    {"field": "salary_type", "reason": "Mapped to employment_type/pay basis; no separate persisted salary_type field yet."},
-                ],
+                "unsupported_profile_fields": [],
             }
         )
 
@@ -363,12 +359,6 @@ class AdminHrStaffListCreateView(_AdminBase):
                     note_parts.append(vd.get("notes") or "")
                 if requested_status == ONBOARDING_STATUS:
                     note_parts.append("Workflow: ONBOARDING saved without activating payroll or accounting.")
-                if vd.get("weekly_off"):
-                    note_parts.append(f"Weekly off: {vd.get('weekly_off')}")
-                if vd.get("emergency_contact_relation"):
-                    note_parts.append(f"Emergency relation: {vd.get('emergency_contact_relation')}")
-                if vd.get("salary_type"):
-                    note_parts.append(f"Salary type: {vd.get('salary_type')}")
                 profile_data = {
                     "name": cleaned_name,
                     "phone": cleaned_phone,
@@ -384,6 +374,7 @@ class AdminHrStaffListCreateView(_AdminBase):
                     "probation_end_date": vd.get("probation_end_date"),
                     "attendance_policy": vd.get("attendance_policy") or "",
                     "shift_name": vd.get("shift_name") or "",
+                    "weekly_off": vd.get("weekly_off") or "",
                     "salary_effective_from": vd.get("salary_effective_from"),
                     "temporary_contract_end_date": vd.get("temporary_contract_end_date"),
                     "base_salary": vd.get("base_salary"),
@@ -402,6 +393,7 @@ class AdminHrStaffListCreateView(_AdminBase):
                     "kyc_verified": vd.get("kyc_status") == "VERIFIED" or vd.get("kyc_verified", False),
                     "address": vd.get("address") or "",
                     "emergency_contact_name": vd.get("emergency_contact_name") or "",
+                    "emergency_contact_relation": vd.get("emergency_contact_relation") or "",
                     "emergency_contact_phone": vd.get("emergency_contact_phone") or "",
                     "cost_center_code": vd.get("cost_center_code") or "",
                     "payroll_expense_account": vd.get("payroll_expense_account"),
@@ -438,7 +430,15 @@ class AdminHrStaffListCreateView(_AdminBase):
                     action_type="HR_STAFF_PROFILE_CREATED",
                     model_name="EmployeeProfile",
                     object_id=employee.id,
-                    metadata={"employee_code": employee.employee_code, "phone": cleaned_phone, "employment_status": requested_status, "stored_status": stored_status, "user_id": getattr(login_user, "id", None)},
+                    metadata={
+                        "employee_code": employee.employee_code,
+                        "phone": cleaned_phone,
+                        "employment_status": requested_status,
+                        "stored_status": stored_status,
+                        "user_id": getattr(login_user, "id", None),
+                        "weekly_off": employee.weekly_off,
+                        "emergency_contact_relation": employee.emergency_contact_relation,
+                    },
                 )
         except DjangoValidationError as exc:
             raise serializers.ValidationError(exc.message_dict) from exc
@@ -466,6 +466,18 @@ class AdminHrStaffPatchView(_AdminBase):
             updated = serializer.save()
         except DjangoValidationError as exc:
             raise serializers.ValidationError(exc.message_dict) from exc
+        _write_audit(
+            actor=request.user,
+            action_type="HR_STAFF_PROFILE_UPDATED",
+            model_name="EmployeeProfile",
+            object_id=updated.id,
+            metadata={
+                "employee_code": updated.employee_code,
+                "employment_status": updated.employment_status,
+                "employment_type": updated.employment_type,
+                "branch_id": updated.branch_id,
+            },
+        )
         return Response(EmployeeProfileSerializer(updated, context={"request": request}).data)
 
 
@@ -487,11 +499,24 @@ class AdminHrStaffStatusView(_AdminBase):
             employee.deactivated_at = timezone.now()
             employee.deactivated_by = request.user
             employee.save(update_fields=["is_active", "employment_status", "deactivation_reason", "deactivated_at", "deactivated_by", "updated_at"])
+            _write_audit(
+                actor=request.user,
+                action_type="HR_STAFF_DEACTIVATED",
+                model_name="EmployeeProfile",
+                object_id=employee.id,
+                metadata={"reason": serializer.validated_data.get("reason") or ""},
+            )
         else:
             validation = EmployeeProfileSerializer(employee, data={"is_active": True, "employment_status": EmployeeStatus.ACTIVE}, partial=True, context={"request": request})
             validation.is_valid(raise_exception=True)
             employee.employment_status = EmployeeStatus.ACTIVE
             employee.save(update_fields=["is_active", "employment_status", "updated_at"])
+            _write_audit(
+                actor=request.user,
+                action_type="HR_STAFF_REACTIVATED",
+                model_name="EmployeeProfile",
+                object_id=employee.id,
+            )
         return Response(EmployeeProfileSerializer(employee, context={"request": request}).data)
 
 
@@ -532,6 +557,18 @@ class AdminHrStaffDocumentsListCreateView(_AdminBase):
         serializer = EmployeeDocumentSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         document = serializer.save(uploaded_by=request.user)
+        _write_audit(
+            actor=request.user,
+            action_type="HR_STAFF_DOCUMENT_CREATED",
+            model_name="EmployeeDocument",
+            object_id=document.employee_id,
+            metadata={
+                "document_id": document.id,
+                "document_type": document.document_type,
+                "title": document.title,
+                "status": document.status,
+            },
+        )
         return Response(EmployeeDocumentSerializer(document, context={"request": request}).data)
 
 
@@ -541,6 +578,18 @@ class AdminHrStaffDocumentPatchView(_AdminBase):
         serializer = EmployeeDocumentSerializer(document, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         updated = serializer.save()
+        _write_audit(
+            actor=request.user,
+            action_type="HR_STAFF_DOCUMENT_UPDATED",
+            model_name="EmployeeDocument",
+            object_id=updated.employee_id,
+            metadata={
+                "document_id": updated.id,
+                "document_type": updated.document_type,
+                "title": updated.title,
+                "status": updated.status,
+            },
+        )
         return Response(EmployeeDocumentSerializer(updated, context={"request": request}).data)
 
 
@@ -575,6 +624,19 @@ class AdminHrStaffDocumentReviewView(_AdminBase):
         else:
             document.notes = audit_note
         document.save(update_fields=["status", "notes"])
+        _write_audit(
+            actor=request.user,
+            action_type="HR_STAFF_DOCUMENT_VERIFIED" if action == "verify" else "HR_STAFF_DOCUMENT_REJECTED",
+            model_name="EmployeeDocument",
+            object_id=document.employee_id,
+            metadata={
+                "document_id": document.id,
+                "document_type": document.document_type,
+                "title": document.title,
+                "status": new_status,
+                "notes": notes,
+            },
+        )
 
         return Response(EmployeeDocumentSerializer(document, context={"request": request}).data)
 

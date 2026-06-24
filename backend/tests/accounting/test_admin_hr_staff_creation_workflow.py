@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import StaffIdentity, UserRole
-from accounting.models import EmployeeProfile, JournalEntry, MoneyMovement, SalaryPayment
+from accounting.models import EmployeeDocument, EmployeeProfile, JournalEntry, MoneyMovement, SalaryPayment
 from branch_control.models import Branch
 
 
@@ -155,3 +156,94 @@ class AdminHrStaffCreationWorkflowTests(APITestCase):
         self.assertEqual(JournalEntry.objects.count(), 0)
         self.assertEqual(MoneyMovement.objects.count(), 0)
         self.assertEqual(SalaryPayment.objects.count(), 0)
+
+    def test_staff_profile_persists_weekly_off_and_salary_type_alias(self):
+        response = self.client.post(
+            self.url,
+            {
+                "full_name": "Alias Staff",
+                "phone": "9000000006",
+                "employment_status": "ONBOARDING",
+                "designation": "Cashier",
+                "branch": self.branch.id,
+                "department": "COLLECTION",
+                "joining_date": "2026-06-01",
+                "salary_type": "DAILY_WAGE",
+                "daily_wage_rate": "450.00",
+                "payroll_eligible": True,
+                "salary_effective_from": "2026-06-01",
+                "payment_mode": "CASH",
+                "weekly_off": "sunday",
+                "emergency_contact_name": "Sita",
+                "emergency_contact_relation": "spouse",
+                "emergency_contact_phone": "9000000099",
+                "attendance_policy": "DAY_SHIFT",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        employee = EmployeeProfile.objects.get(phone="9000000006")
+        self.assertEqual(employee.employment_type, "DAILY_WAGE")
+        self.assertEqual(employee.weekly_off, "SUNDAY")
+        self.assertEqual(employee.emergency_contact_relation, "SPOUSE")
+
+        timeline = self.client.get(f"/api/v1/admin/audit-logs/timeline/EmployeeProfile/{employee.id}/")
+        self.assertEqual(timeline.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            any(
+                item["metadata"].get("hr_event") == "HR_STAFF_PROFILE_CREATED"
+                for item in timeline.data["results"]
+            )
+        )
+
+    def test_staff_document_review_writes_audit_timeline(self):
+        create_response = self.client.post(
+            self.url,
+            {
+                "full_name": "Document Staff",
+                "phone": "9000000007",
+                "employment_status": "ONBOARDING",
+                "designation": "Inventory Staff",
+                "branch": self.branch.id,
+                "department": "INVENTORY",
+                "joining_date": "2026-06-01",
+                "employment_type": "PERMANENT_MONTHLY",
+                "attendance_policy": "DAY_SHIFT",
+                "payroll_eligible": False,
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        employee = EmployeeProfile.objects.get(phone="9000000007")
+
+        upload = SimpleUploadedFile("id-proof.txt", b"document", content_type="text/plain")
+        doc_response = self.client.post(
+            "/api/v1/admin/hr/staff-documents/",
+            {
+                "employee": employee.id,
+                "document_type": "ID_PROOF",
+                "title": "Identity proof",
+                "document_no": "ID-100",
+                "notes": "Uploaded for review.",
+                "file": upload,
+            },
+            format="multipart",
+        )
+        self.assertEqual(doc_response.status_code, status.HTTP_201_CREATED)
+        document_id = doc_response.data["id"]
+        self.assertTrue(EmployeeDocument.objects.filter(id=document_id, employee=employee).exists())
+
+        review_response = self.client.post(
+            f"/api/v1/admin/hr/staff-documents/{document_id}/review/",
+            {"action": "verify", "notes": "Matches records."},
+            format="json",
+        )
+        self.assertEqual(review_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(review_response.data["status"], "ACTIVE")
+
+        timeline = self.client.get(f"/api/v1/admin/audit-logs/timeline/EmployeeDocument/{employee.id}/")
+        self.assertEqual(timeline.status_code, status.HTTP_200_OK)
+        events = timeline.data["results"]
+        self.assertTrue(any(item["metadata"].get("hr_event") == "HR_STAFF_DOCUMENT_CREATED" for item in events))
+        self.assertTrue(any(item["metadata"].get("hr_event") == "HR_STAFF_DOCUMENT_VERIFIED" for item in events))

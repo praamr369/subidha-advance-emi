@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, toArray } from "@/lib/api";
 import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 
 export type HrSummary = {
@@ -46,6 +46,7 @@ export type HrStaff = {
   department?: string;
   employment_status?: string;
   employment_type?: string;
+  weekly_off?: string;
   reporting_manager?: string;
   work_location?: string;
   probation_end_date?: string | null;
@@ -68,6 +69,7 @@ export type HrStaff = {
   kyc_verified?: boolean;
   address?: string;
   emergency_contact_name?: string;
+  emergency_contact_relation?: string;
   emergency_contact_phone?: string;
   cost_center_code?: string;
   payroll_expense_account?: number | null;
@@ -83,6 +85,7 @@ export type HrStaff = {
   login_created?: boolean;
   readiness_warnings?: string[];
   pay_basis?: string;
+  salary_type?: string;
   notes?: string;
   joining_date: string;
   base_salary?: string | null;
@@ -177,8 +180,27 @@ export type HrSalaryPayment = {
   created_at?: string;
 };
 
+export type AdminAuditEntry = {
+  id: number;
+  action_type: string;
+  model_name: string;
+  object_id: string;
+  performed_by?: number | null;
+  performed_by_username?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+};
+
 export async function getHrSummary() {
   return apiFetch<HrSummary>("/admin/hr/summary/");
+}
+
+export async function getAdminAuditTimeline(modelName: string, objectId: number | string) {
+  const payload = await apiFetch<AdminAuditEntry[] | { results?: AdminAuditEntry[] }>(`/admin/audit-logs/timeline/${encodeURIComponent(modelName)}/${encodeURIComponent(String(objectId))}/`);
+  return toArray<AdminAuditEntry>(payload).map((entry) => ({
+    ...entry,
+    metadata: entry.metadata ?? {},
+  }));
 }
 
 export async function getHrStaffOptions() {

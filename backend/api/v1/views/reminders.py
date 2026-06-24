@@ -42,7 +42,7 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated(), IsAdmin()]
 
     def get_serializer_class(self):
-        if self.action in {"schedule", "send", "dispatch", "cancel", "retry"}:
+        if self.action in {"schedule", "send", "dispatch_reminder", "cancel", "retry"}:
             return ReminderActionSerializer
         return super().get_serializer_class()
 
@@ -65,7 +65,7 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         return Response({"updated": updated, "reminder": payload.data})
 
     @action(detail=True, methods=["post"], url_path="dispatch")
-    def dispatch(self, request, pk=None):
+    def dispatch_reminder(self, request, pk=None):
         """Automated gateway dispatch for EMAIL, SMS, and WhatsApp where configured."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -715,6 +715,7 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
     compensation_components = EmployeeCompensationComponentSerializer(many=True, required=False)
     branch_code = serializers.CharField(source="branch.code", read_only=True)
     branch_name = serializers.CharField(source="branch.name", read_only=True)
+    salary_type = serializers.CharField(required=False, allow_blank=True, write_only=True)
     profile_ready = serializers.SerializerMethodField()
     employment_ready = serializers.SerializerMethodField()
     payroll_ready = serializers.SerializerMethodField()
@@ -796,11 +797,18 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         instance = self.instance
+        salary_type = attrs.pop("salary_type", None)
 
         def value(name, default=None):
             if name in attrs:
                 return attrs[name]
             return getattr(instance, name, default) if instance is not None else default
+
+        if not attrs.get("employment_type") and salary_type:
+            mapped_salary_type = salary_type.strip().upper()
+            valid_types = {value for value, _label in EmploymentType.choices}
+            if mapped_salary_type in valid_types:
+                attrs["employment_type"] = mapped_salary_type
 
         employment_status = value("employment_status", EmployeeStatus.ACTIVE)
         employment_type = value("employment_type", EmploymentType.PERMANENT_MONTHLY)
@@ -891,6 +899,7 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "hourly_wage_rate",
             "piece_rate_amount",
             "piece_rate_unit_label",
+            "weekly_off",
             "payroll_eligible",
             "payment_mode",
             "bank_account_name",
@@ -902,6 +911,7 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "kyc_verified",
             "address",
             "emergency_contact_name",
+            "emergency_contact_relation",
             "emergency_contact_phone",
             "cost_center_code",
             "payroll_expense_account",
@@ -920,6 +930,7 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "login_created",
             "readiness_warnings",
             "pay_basis",
+            "salary_type",
             "created_at",
             "updated_at",
         ]

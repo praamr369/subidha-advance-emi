@@ -311,7 +311,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("HR & Staff", "Salary Payments", ROUTES.admin.hrSalaryPayments, "Salary payment source: record and view salary payments against existing salary sheets. Payroll accounting bridge status and reconciliation evidence are in Accounting & Reconciliation."),
   item("HR & Staff", "Leave", ROUTES.admin.hrLeave, "Onboarding workflow — leave: approve or reject staff leave requests through the existing leave workflow."),
   item("HR & Staff", "Expenses", ROUTES.admin.hrExpenses, "Employee expense claims: approve or reject claims through the existing expense workflow. No journal posting from this page."),
-  item("HR & Staff", "Staff Documents", ROUTES.admin.hrStaffDocuments, "Staff documents and KYC: upload, maintain, and toggle active/inactive status. Document verify/reject requires backend support — documented as a gap."),
+  item("HR & Staff", "Staff Documents", ROUTES.admin.hrStaffDocuments, "Staff documents and KYC: upload, maintain, toggle active/inactive status, and use the review endpoint for verify/reject decisions."),
 
   // ── 14. BI & Reports ──────────────────────────────────────────────────────
   // Phase 8: BI & Reports is read-only decision-support only.
