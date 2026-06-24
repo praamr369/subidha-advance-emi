@@ -233,6 +233,7 @@ export const ROUTES = {
     luckyPlanLuckyIds: "/admin/lucky-plan/lucky-ids",
     luckyPlanDraws: "/admin/lucky-plan/draws",
     luckyPlanWinners: "/admin/lucky-plan/winners",
+    luckyPlanAnalytics: "/admin/lucky-plan/analytics",
 
     crm: "/admin/crm",
     crmLeads: "/admin/crm/leads",

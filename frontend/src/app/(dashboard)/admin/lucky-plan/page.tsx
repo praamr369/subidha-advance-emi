@@ -29,6 +29,13 @@ const LUCKY_PLAN_SECTIONS = [
       "Winner register with EMI waiver status, delivery posture, and draw evidence for audit trail.",
     badge: null,
   },
+  {
+    href: "/admin/lucky-plan/analytics",
+    label: "Analytics",
+    description:
+      "Draw performance metrics: total draws, verified winners, waiver totals, average waiver, and success rate.",
+    badge: null,
+  },
 ];
 
 export default function LuckyPlanControlPage() {

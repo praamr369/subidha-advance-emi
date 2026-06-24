@@ -173,6 +173,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Lucky Plan Control", "Lucky IDs", ROUTES.admin.luckyPlanLuckyIds, "Lucky ID register and 00–99 allocation grid."),
   item("Lucky Plan Control", "Lucky Draws", ROUTES.admin.luckyPlanDraws, "Draw schedule and execution: commit, reveal, winner evidence."),
   item("Lucky Plan Control", "Winners", ROUTES.admin.luckyPlanWinners, "Winner visibility and EMI waiver audit trail."),
+  item("Lucky Plan Control", "Analytics", ROUTES.admin.luckyPlanAnalytics, "Draw performance metrics: winners, waiver totals, success rate."),
 
   // ── 6. Collections & Cashier ──────────────────────────────────────────────
   item("Collections & Cashier", "Collection", ROUTES.admin.financeCollect, "Unified collection workspace."),
