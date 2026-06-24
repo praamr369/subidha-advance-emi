@@ -199,6 +199,7 @@ class PaymentMethod(models.TextChoices):
     CASH = "CASH", "Cash"
     UPI = "UPI", "UPI"
     BANK = "BANK", "Bank"
+    CARD = "CARD", "Card"
 
 
 class KycStatus(models.TextChoices):

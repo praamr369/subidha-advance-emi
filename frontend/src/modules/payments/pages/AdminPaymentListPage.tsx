@@ -109,6 +109,7 @@ export default function AdminPaymentListPage() {
           <option value="CASH">CASH</option>
           <option value="UPI">UPI</option>
           <option value="BANK">BANK</option>
+          <option value="CARD">CARD</option>
         </select>
         <button type="button" onClick={() => setPage(1)}>
           Apply
@@ -124,7 +125,7 @@ export default function AdminPaymentListPage() {
             setPage(1);
             if (value === "ALL") {
               setMethod("");
-            } else if (value === "CASH" || value === "UPI" || value === "BANK") {
+            } else if (value === "CASH" || value === "UPI" || value === "BANK" || value === "CARD") {
               setMethod(value);
             }
           }}
@@ -134,6 +135,7 @@ export default function AdminPaymentListPage() {
           <ToggleGroupItem value="CASH">Cash</ToggleGroupItem>
           <ToggleGroupItem value="UPI">UPI</ToggleGroupItem>
           <ToggleGroupItem value="BANK">Bank</ToggleGroupItem>
+          <ToggleGroupItem value="CARD">Card</ToggleGroupItem>
         </ToggleGroup>
       </section>
 

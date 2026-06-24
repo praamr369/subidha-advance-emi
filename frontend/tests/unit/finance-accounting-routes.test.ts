@@ -11,6 +11,7 @@ const taxonomySource = readFileSync(join(thisFileDir, "../../src/config/admin-mo
 
 const financeAppRoot = join(thisFileDir, "../../src/app/(dashboard)/admin/finance");
 const accountingAppRoot = join(thisFileDir, "../../src/app/(dashboard)/admin/accounting");
+const legacyPaymentListPage = join(thisFileDir, "../../src/modules/payments/pages/AdminPaymentListPage.tsx");
 
 // ── Phase 4: canonical Finance Operations route constants ─────────────────────
 
@@ -50,6 +51,15 @@ test("/admin/finance/customer-advances page redirects to /admin/customer-advance
   assert.ok(
     page.includes('redirect("/admin/customer-advances")'),
     "customer-advances alias must redirect to /admin/customer-advances"
+  );
+});
+
+test("legacy payment register includes CARD filter option", () => {
+  const page = readFileSync(legacyPaymentListPage, "utf8");
+  assert.ok(page.includes('<option value="CARD">CARD</option>'), "Payment list filter must expose CARD");
+  assert.ok(
+    page.includes('<ToggleGroupItem value="CARD">Card</ToggleGroupItem>'),
+    "Payment quick filter must expose CARD"
   );
 });
 

@@ -65,6 +65,16 @@ class AdminPaymentApiTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        self.bank_finance = FinanceAccount.objects.create(
+            name="Admin Bank Settlement",
+            kind=FinanceAccountKind.BANK,
+            chart_account=ChartOfAccount.objects.create(
+                code="ADM-PAY-BANK-001",
+                name="Admin Payment Bank",
+                account_type=ChartOfAccountType.ASSET,
+            ),
+            opening_balance=Decimal("0.00"),
+        )
 
     def test_admin_payment_collect_success(self):
         response = self.client.post(
@@ -90,6 +100,28 @@ class AdminPaymentApiTests(APITestCase):
         self.assertIn("emi", response.data)
         self.assertIn("subscription", response.data)
         self.assertTrue(response.data["created"])
+
+    def test_admin_payment_collect_card_method_success(self):
+        response = self.client.post(
+            "/api/v1/admin/payments/collect/",
+            {
+                "emi": self.emi.id,
+                "amount": "1000.00",
+                "payment_method": "CARD",
+                "finance_account_id": self.bank_finance.id,
+                "payment_date": "2026-03-17",
+                "reference_no": "ADM-API-CARD-001",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+            msg=f"Unexpected card collect response: {response.status_code} {response.data}",
+        )
+        self.assertEqual(response.data["payment"]["method"], "CARD")
+        self.assertEqual(response.data["finance_account"]["id"], self.bank_finance.id)
 
     def test_admin_payment_collect_duplicate_safe(self):
         first = self.client.post(

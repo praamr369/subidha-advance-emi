@@ -3,16 +3,24 @@
 import { useState, useEffect } from "react";
 import {
   leaseCalculateROU,
+  leaseGenerateSchedule,
   getCostCentrePL,
   getCashFlowStatement,
   getFundFlowStatement,
   getFinancialRatios,
   listDeferredTax,
+  listLeaseContracts,
+  createLeaseContract,
+  listFixedAssets,
+  createFixedAsset,
+  depreciationGenerateSchedule,
   type CashFlowStatement,
   type FundFlowStatement,
   type FinancialRatios,
   type DeferredTaxList,
   type CostCentrePL,
+  type LeaseContractRecord,
+  type FixedAssetRecord,
 } from "@/services/finance-complete";
 
 type Tab = "lease" | "depreciation" | "cost-centre" | "cash-flow" | "fund-flow" | "ratios" | "deferred-tax";
@@ -23,7 +31,31 @@ export default function FinanceCompletePage() {
 
   // Lease state
   const [leaseSubId, setLeaseSubId] = useState("");
+  const [leaseDiscountRate, setLeaseDiscountRate] = useState("8.5");
   const [leaseCalc, setLeaseCalc] = useState<any>(null);
+  const [leaseContracts, setLeaseContracts] = useState<LeaseContractRecord[]>([]);
+  const [leaseCreateBusy, setLeaseCreateBusy] = useState(false);
+  const [leaseCreateMsg, setLeaseCreateMsg] = useState("");
+  const [leaseFormVisible, setLeaseFormVisible] = useState(false);
+  const [leaseForm, setLeaseForm] = useState({
+    asset_description: "", lease_type: "FINANCE",
+    lease_start_date: "", lease_end_date: "", monthly_lease_payment: "", discount_rate: "8.5",
+  });
+
+  // Depreciation state
+  const [fixedAssets, setFixedAssets] = useState<FixedAssetRecord[]>([]);
+  const [assetFormVisible, setAssetFormVisible] = useState(false);
+  const [assetForm, setAssetForm] = useState({
+    asset_code: "", asset_name: "", asset_type: "COMPUTERS",
+    acquisition_date: "", acquisition_cost: "", useful_life_years: "5",
+    salvage_value: "0", depreciation_method: "STRAIGHT_LINE",
+    asset_account_id: "", accumulated_depreciation_account_id: "", depreciation_expense_account_id: "",
+  });
+  const [assetMsg, setAssetMsg] = useState("");
+  const [selectedAssetId, setSelectedAssetId] = useState("");
+  const [deprStart, setDeprStart] = useState("");
+  const [deprEnd, setDeprEnd] = useState("");
+  const [deprMsg, setDeprMsg] = useState("");
 
   // Cost centre state
   const [ccPL, setCCPL] = useState<CostCentrePL | null>(null);

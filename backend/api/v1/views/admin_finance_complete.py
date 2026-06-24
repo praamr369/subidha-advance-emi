@@ -14,7 +14,8 @@ from django.db import transaction
 
 from accounting.models import (
     LeaseContract, LeaseSchedule, FixedAssetDepreciation, DepreciationSchedule,
-    CostCentre, CostAllocationRule, DeferredTax, ChartOfAccounts, JournalEntry, JournalEntryLine
+    CostCentre, CostAllocationRule, DeferredTax, ChartOfAccount, JournalEntry, JournalEntryLine,
+    JournalEntryType,
 )
 from subscriptions.models import Subscription
 
@@ -45,7 +46,8 @@ def lease_calculate_rou_liability_view(request, subscription_id):
     sub = get_object_or_404(Subscription, pk=subscription_id)
 
     monthly_payment = sub.monthly_amount
-    discount_rate_annual = Decimal("8.5")  # Example; should come from LeaseContract
+    # Accept discount_rate from query param; default 8.5%
+    discount_rate_annual = Decimal(request.query_params.get("discount_rate", "8.5"))
     discount_rate_monthly = discount_rate_annual / Decimal("12") / Decimal("100")
     lease_term_months = sub.tenure_months
 
@@ -137,35 +139,41 @@ def lease_post_to_gl_view(request, lease_id):
         return Response({"message": "No unposted schedules.", "posted_count": 0})
 
     posted_count = 0
+    now = timezone.now()
     with transaction.atomic():
         for schedule in unposted_schedules:
-            # Create journal entry for this month
+            principal = schedule.opening_liability - schedule.closing_liability
+            # Guard: skip if amounts are zero/negative (shouldn't happen but safe)
+            if principal <= Decimal("0") and schedule.interest_expense <= Decimal("0"):
+                continue
+
             je = JournalEntry.objects.create(
                 entry_date=schedule.payment_date,
-                description=f"Lease payment & interest — Month {schedule.month_number}",
+                entry_type=JournalEntryType.MANUAL,
+                memo=f"IFRS-16 Lease — Month {schedule.month_number}",
                 status="POSTED",
                 posted_by=request.user,
+                posted_at=now,
             )
 
-            # Debit: Lease Expense (interest + depreciation)
-            JournalEntryLine.objects.create(
-                journal_entry=je,
-                account=lease.lease_expense_account,
-                debit=schedule.interest_expense + schedule.rou_depreciation,
-                credit=Decimal("0"),
-            )
+            # Debit: Lease Expense (interest + ROU depreciation)
+            expense_amount = schedule.interest_expense + schedule.rou_depreciation
+            if expense_amount > Decimal("0"):
+                JournalEntryLine.objects.create(
+                    journal_entry=je,
+                    chart_account=lease.lease_expense_account,
+                    debit_amount=expense_amount,
+                    credit_amount=Decimal("0"),
+                )
 
-            # Debit: Lease Liability (principal)
-            debit_liability = schedule.opening_liability - schedule.closing_liability
-            # (Assume there's a cash account; simplified here)
-
-            # Credit: Lease Liability
-            JournalEntryLine.objects.create(
-                journal_entry=je,
-                account=lease.lease_liability_account,
-                debit=Decimal("0"),
-                credit=debit_liability,
-            )
+            # Credit: Lease Liability (principal reduction)
+            if principal > Decimal("0"):
+                JournalEntryLine.objects.create(
+                    journal_entry=je,
+                    chart_account=lease.lease_liability_account,
+                    debit_amount=Decimal("0"),
+                    credit_amount=principal,
+                )
 
             schedule.gl_posted = True
             schedule.gl_entry = je
@@ -252,20 +260,58 @@ def cost_centre_pl_view(request):
     period_start = request.query_params.get('period_start')
     period_end = request.query_params.get('period_end')
 
-    # Stub: Full implementation requires GL line filtering & aggregation by cost centre
-    # This demonstrates the structure
+    centres_qs = CostCentre.objects.filter(is_active=True)
+    if cost_centre_id:
+        centres_qs = centres_qs.filter(pk=cost_centre_id)
+
+    result = []
+    for cc in centres_qs:
+        # Revenue: sum credits on INCOME lines for allocations belonging to this CC
+        # (allocations via CostAllocationDetail link cost centre to source accounts)
+        allocation_rules = CostAllocationRule.objects.filter(
+            detail_lines__cost_centre=cc, is_active=True
+        ).values_list("source_account_id", flat=True)
+
+        base_qs = JournalEntryLine.objects.filter(
+            journal_entry__status="POSTED"
+        )
+        if period_start:
+            base_qs = base_qs.filter(journal_entry__entry_date__gte=period_start)
+        if period_end:
+            base_qs = base_qs.filter(journal_entry__entry_date__lte=period_end)
+
+        if allocation_rules:
+            revenue = base_qs.filter(
+                chart_account_id__in=list(allocation_rules),
+                chart_account__account_type="INCOME",
+            ).aggregate(t=Sum("credit_amount"))["t"] or Decimal("0")
+            expenses = base_qs.filter(
+                chart_account_id__in=list(allocation_rules),
+                chart_account__account_type="EXPENSE",
+            ).aggregate(t=Sum("debit_amount"))["t"] or Decimal("0")
+            alloc_pct = float(
+                CostAllocationRule.objects.filter(
+                    detail_lines__cost_centre=cc, is_active=True
+                ).first().detail_lines.filter(cost_centre=cc).first().allocation_percentage or 0
+            ) if CostAllocationRule.objects.filter(detail_lines__cost_centre=cc, is_active=True).exists() else 0.0
+        else:
+            # No allocation rules yet — show zeroes
+            revenue = Decimal("0")
+            expenses = Decimal("0")
+            alloc_pct = 0.0
+
+        result.append({
+            "centre_id": cc.id,
+            "centre_name": cc.name,
+            "revenue": str(revenue),
+            "expenses": str(expenses),
+            "gross_profit": str(revenue - expenses),
+            "allocation_percentage": alloc_pct,
+        })
+
     return Response({
         "period": {"start": period_start, "end": period_end},
-        "cost_centres": [
-            {
-                "centre_id": 1,
-                "centre_name": "Branch A",
-                "revenue": "500000.00",
-                "expenses": "300000.00",
-                "gross_profit": "200000.00",
-                "allocation_percentage": 25.0,
-            }
-        ],
+        "cost_centres": result,
         "message": "Cost centre P&L generated.",
     })
 
@@ -286,25 +332,67 @@ def cash_flow_statement_view(request):
     period_start = request.query_params.get('period_start')
     period_end = request.query_params.get('period_end')
 
-    # Stub: Full implementation aggregates GL entries by account type
+    base = JournalEntryLine.objects.filter(journal_entry__status="POSTED")
+    if period_start:
+        base = base.filter(journal_entry__entry_date__gte=period_start)
+    if period_end:
+        base = base.filter(journal_entry__entry_date__lte=period_end)
+
+    # Operating: income credits = customer receipts; expense debits = vendor payments
+    receipts = base.filter(chart_account__account_type="INCOME").aggregate(
+        t=Sum("credit_amount")
+    )["t"] or Decimal("0")
+    payments = base.filter(chart_account__account_type="EXPENSE").aggregate(
+        t=Sum("debit_amount")
+    )["t"] or Decimal("0")
+    net_op = receipts - payments
+
+    # Investing: ASSET account debits (capital purchases)
+    cap_purchases = base.filter(chart_account__account_type="ASSET").aggregate(
+        t=Sum("debit_amount")
+    )["t"] or Decimal("0")
+    net_inv = -cap_purchases
+
+    # Financing: LIABILITY credits = new loans, LIABILITY debits = repayments
+    loan_in = base.filter(chart_account__account_type="LIABILITY").aggregate(
+        t=Sum("credit_amount")
+    )["t"] or Decimal("0")
+    loan_out = base.filter(chart_account__account_type="LIABILITY").aggregate(
+        t=Sum("debit_amount")
+    )["t"] or Decimal("0")
+    net_fin = loan_in - loan_out
+
+    net_cf = net_op + net_inv + net_fin
+
+    # Opening cash: ASSET balances before period_start
+    opening_base = JournalEntryLine.objects.filter(
+        journal_entry__status="POSTED",
+        chart_account__account_type="ASSET",
+    )
+    if period_start:
+        opening_base = opening_base.filter(journal_entry__entry_date__lt=period_start)
+    opening_dr = opening_base.aggregate(t=Sum("debit_amount"))["t"] or Decimal("0")
+    opening_cr = opening_base.aggregate(t=Sum("credit_amount"))["t"] or Decimal("0")
+    opening_cash = opening_dr - opening_cr
+
     return Response({
         "period": {"start": period_start, "end": period_end},
         "operating_activities": {
-            "receipts_from_customers": "5000000.00",
-            "payments_to_vendors": "-2500000.00",
-            "net_operating_cf": "2500000.00",
+            "receipts_from_customers": str(receipts),
+            "payments_to_vendors": str(-payments),
+            "net_operating_cf": str(net_op),
         },
         "investing_activities": {
-            "capital_purchases": "-500000.00",
-            "net_investing_cf": "-500000.00",
+            "capital_purchases": str(-cap_purchases),
+            "net_investing_cf": str(net_inv),
         },
         "financing_activities": {
-            "loan_repayment": "-300000.00",
-            "net_financing_cf": "-300000.00",
+            "loan_repayment": str(loan_out - loan_in),
+            "net_financing_cf": str(net_fin),
         },
-        "net_cash_flow": "1700000.00",
-        "opening_cash": "500000.00",
-        "closing_cash": "2200000.00",
+        "net_cash_flow": str(net_cf),
+        "opening_cash": str(opening_cash),
+        "closing_cash": str(opening_cash + net_cf),
     })
 
 
@@ -426,3 +514,130 @@ def deferred_tax_list_view(request):
         dt.save()
 
         return Response({"id": dt.id, "code": dt.code, "message": "Deferred tax record created."}, status=status.HTTP_201_CREATED)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. LeaseContract CRUD
+# ─────────────────────────────────────────────────────────────────────────────
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def lease_contract_list_create_view(request):
+    """List all lease contracts (GET) or create a new one (POST)."""
+    if request.method == 'GET':
+        leases = LeaseContract.objects.select_related("subscription").values(
+            "id", "subscription_id", "asset_description", "lease_type",
+            "lease_start_date", "lease_end_date", "lease_term_months",
+            "monthly_lease_payment", "discount_rate",
+            "rou_asset_amount", "initial_lease_liability", "status",
+        )
+        return Response({"count": len(leases), "results": list(leases)})
+
+    # POST — create
+    required = ["subscription_id", "asset_description", "lease_start_date",
+                "lease_end_date", "monthly_lease_payment", "discount_rate", "lease_type"]
+    missing = [f for f in required if not request.data.get(f)]
+    if missing:
+        return Response({"error": f"Missing: {missing}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if LeaseContract.objects.filter(subscription_id=request.data["subscription_id"]).exists():
+        return Response({"error": "Lease contract already exists for this subscription."}, status=status.HTTP_400_BAD_REQUEST)
+
+    monthly_payment = Decimal(str(request.data["monthly_lease_payment"]))
+    discount_rate = Decimal(str(request.data["discount_rate"]))
+    start_date = date.fromisoformat(request.data["lease_start_date"])
+    end_date = date.fromisoformat(request.data["lease_end_date"])
+    lease_term_months = ((end_date.year - start_date.year) * 12 + (end_date.month - start_date.month))
+
+    r = discount_rate / Decimal("12") / Decimal("100")
+    if r == 0:
+        pv = monthly_payment * Decimal(lease_term_months)
+    else:
+        pv_factor = (Decimal("1") - (Decimal("1") + r) ** (-lease_term_months)) / r
+        pv = monthly_payment * pv_factor
+
+    lease = LeaseContract.objects.create(
+        subscription_id=request.data["subscription_id"],
+        asset_description=request.data["asset_description"],
+        lease_type=request.data["lease_type"],
+        lease_start_date=start_date,
+        lease_end_date=end_date,
+        lease_term_months=lease_term_months,
+        monthly_lease_payment=monthly_payment,
+        discount_rate=discount_rate,
+        rou_asset_amount=pv,
+        initial_lease_liability=pv,
+    )
+    return Response({
+        "id": lease.id,
+        "rou_asset_amount": str(lease.rou_asset_amount),
+        "initial_lease_liability": str(lease.initial_lease_liability),
+        "lease_term_months": lease_term_months,
+        "message": "Lease contract created. Run generate-schedule next.",
+    }, status=status.HTTP_201_CREATED)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. FixedAssetDepreciation CRUD
+# ─────────────────────────────────────────────────────────────────────────────
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def fixed_asset_list_create_view(request):
+    """List fixed assets (GET) or register a new asset (POST)."""
+    if request.method == 'GET':
+        assets = FixedAssetDepreciation.objects.values(
+            "id", "asset_code", "asset_name", "asset_type", "acquisition_date",
+            "acquisition_cost", "useful_life_years", "depreciation_method",
+            "salvage_value", "net_book_value", "accumulated_depreciation", "status",
+        )
+        return Response({"count": len(assets), "results": list(assets)})
+
+    # POST — create
+    required = ["asset_code", "asset_name", "asset_type", "acquisition_date",
+                "acquisition_cost", "useful_life_years", "asset_account_id",
+                "accumulated_depreciation_account_id", "depreciation_expense_account_id"]
+    missing = [f for f in required if not request.data.get(f)]
+    if missing:
+        return Response({"error": f"Missing: {missing}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if FixedAssetDepreciation.objects.filter(asset_code=request.data["asset_code"]).exists():
+        return Response({"error": "Asset code already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+    cost = Decimal(str(request.data["acquisition_cost"]))
+    salvage = Decimal(str(request.data.get("salvage_value", "0")))
+    asset = FixedAssetDepreciation.objects.create(
+        asset_code=request.data["asset_code"],
+        asset_name=request.data["asset_name"],
+        asset_type=request.data["asset_type"],
+        acquisition_date=date.fromisoformat(request.data["acquisition_date"]),
+        acquisition_cost=cost,
+        useful_life_years=int(request.data["useful_life_years"]),
+        depreciation_rate=Decimal(str(request.data.get("depreciation_rate", "0"))),
+        depreciation_method=request.data.get("depreciation_method", "STRAIGHT_LINE"),
+        salvage_value=salvage,
+        net_book_value=cost - salvage,
+        asset_account_id=request.data["asset_account_id"],
+        accumulated_depreciation_account_id=request.data["accumulated_depreciation_account_id"],
+        depreciation_expense_account_id=request.data["depreciation_expense_account_id"],
+    )
+    return Response({
+        "id": asset.id,
+        "asset_code": asset.asset_code,
+        "net_book_value": str(asset.net_book_value),
+        "message": "Asset registered. Run generate-depreciation next.",
+    }, status=status.HTTP_201_CREATED)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 10. CostCentre List
+# ─────────────────────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def cost_centre_list_view(request):
+    """List all active cost centres."""
+    centres = CostCentre.objects.filter(is_active=True).values(
+        "id", "code", "name", "centre_type", "branch_id"
+    )
+    return Response({"count": len(centres), "results": list(centres)})

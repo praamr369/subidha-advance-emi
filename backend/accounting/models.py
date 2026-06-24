@@ -4316,7 +4316,7 @@ class LeaseContract(models.Model):
 
     # GL Accounts
     rou_asset_account = models.ForeignKey(
-        "ChartOfAccounts",
+        "ChartOfAccount",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -4324,7 +4324,7 @@ class LeaseContract(models.Model):
         limit_choices_to={"account_type": "ASSET"},
     )
     lease_liability_account = models.ForeignKey(
-        "ChartOfAccounts",
+        "ChartOfAccount",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -4332,7 +4332,7 @@ class LeaseContract(models.Model):
         limit_choices_to={"account_type": "LIABILITY"},
     )
     lease_expense_account = models.ForeignKey(
-        "ChartOfAccounts",
+        "ChartOfAccount",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -4414,19 +4414,19 @@ class FixedAssetDepreciation(models.Model):
 
     # GL Accounts
     asset_account = models.ForeignKey(
-        "ChartOfAccounts",
+        "ChartOfAccount",
         on_delete=models.PROTECT,
         related_name="fixed_assets",
         limit_choices_to={"account_type": "ASSET"},
     )
     accumulated_depreciation_account = models.ForeignKey(
-        "ChartOfAccounts",
+        "ChartOfAccount",
         on_delete=models.PROTECT,
         related_name="accumulated_depreciation",
         limit_choices_to={"account_type": "ASSET"},
     )
     depreciation_expense_account = models.ForeignKey(
-        "ChartOfAccounts",
+        "ChartOfAccount",
         on_delete=models.PROTECT,
         related_name="depreciation_expenses",
         limit_choices_to={"account_type": "EXPENSE"},
@@ -4513,7 +4513,7 @@ class CostAllocationRule(models.Model):
     code = models.CharField(max_length=20, unique=True, db_index=True)
     name = models.CharField(max_length=100)
     source_account = models.ForeignKey(
-        "ChartOfAccounts",
+        "ChartOfAccount",
         on_delete=models.PROTECT,
         related_name="cost_allocation_rules",
         limit_choices_to={"account_type": "EXPENSE"},

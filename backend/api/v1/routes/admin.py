@@ -264,6 +264,9 @@ from api.v1.views.admin_finance_complete import (
     fund_flow_statement_view,
     financial_ratios_view,
     deferred_tax_list_view,
+    lease_contract_list_create_view,
+    fixed_asset_list_create_view,
+    cost_centre_list_view,
 )
 from api.v1.views.admin_reports import (
     AdminAnalyticsSummaryView,
@@ -1173,4 +1176,8 @@ urlpatterns = [
     path("accounting/reports/fund-flow/", fund_flow_statement_view),
     path("accounting/reports/financial-ratios/", financial_ratios_view),
     path("accounting/deferred-tax/", deferred_tax_list_view),
+    # CRUD helpers
+    path("accounting/leases/", lease_contract_list_create_view),
+    path("accounting/assets/", fixed_asset_list_create_view),
+    path("accounting/cost-centres/", cost_centre_list_view),
 ]

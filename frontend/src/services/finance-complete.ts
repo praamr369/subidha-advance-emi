@@ -164,3 +164,93 @@ export function createDeferredTax(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+// ─── LeaseContract CRUD ───
+
+export interface LeaseContractRecord {
+  id: number;
+  subscription_id: number;
+  asset_description: string;
+  lease_type: string;
+  lease_start_date: string;
+  lease_end_date: string;
+  lease_term_months: number;
+  monthly_lease_payment: string;
+  discount_rate: string;
+  rou_asset_amount: string;
+  initial_lease_liability: string;
+  status: string;
+}
+
+export function listLeaseContracts(): Promise<{ count: number; results: LeaseContractRecord[] }> {
+  return apiFetch("/admin/accounting/leases/");
+}
+
+export function createLeaseContract(payload: {
+  subscription_id: number;
+  asset_description: string;
+  lease_type: string;
+  lease_start_date: string;
+  lease_end_date: string;
+  monthly_lease_payment: string;
+  discount_rate: string;
+}): Promise<{ id: number; rou_asset_amount: string; initial_lease_liability: string; lease_term_months: number; message: string }> {
+  return apiFetch("/admin/accounting/leases/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// ─── FixedAsset CRUD ───
+
+export interface FixedAssetRecord {
+  id: number;
+  asset_code: string;
+  asset_name: string;
+  asset_type: string;
+  acquisition_date: string;
+  acquisition_cost: string;
+  useful_life_years: number;
+  depreciation_method: string;
+  salvage_value: string;
+  net_book_value: string;
+  accumulated_depreciation: string;
+  status: string;
+}
+
+export function listFixedAssets(): Promise<{ count: number; results: FixedAssetRecord[] }> {
+  return apiFetch("/admin/accounting/assets/");
+}
+
+export function createFixedAsset(payload: {
+  asset_code: string;
+  asset_name: string;
+  asset_type: string;
+  acquisition_date: string;
+  acquisition_cost: string;
+  useful_life_years: number;
+  salvage_value?: string;
+  depreciation_method?: string;
+  asset_account_id: number;
+  accumulated_depreciation_account_id: number;
+  depreciation_expense_account_id: number;
+}): Promise<{ id: number; asset_code: string; net_book_value: string; message: string }> {
+  return apiFetch("/admin/accounting/assets/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// ─── Cost Centres ───
+
+export interface CostCentreRecord {
+  id: number;
+  code: string;
+  name: string;
+  centre_type: string;
+  branch_id: number | null;
+}
+
+export function listCostCentres(): Promise<{ count: number; results: CostCentreRecord[] }> {
+  return apiFetch("/admin/accounting/cost-centres/");
+}

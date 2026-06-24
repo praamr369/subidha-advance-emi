@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from accounting.models import JournalEntryGroup
+from accounting.models import FinanceAccountKind
 from subscriptions.models import (
     Commission,
     FinancialLedger,
@@ -56,6 +57,11 @@ class PaymentServiceTests(TestCase):
             code="TEST-PAY-SVC-001",
             name="Payment Service Cash",
         )
+        self.bank_finance_account = create_finance_account(
+            code="TEST-PAY-SVC-002",
+            name="Payment Service Bank",
+            kind=FinanceAccountKind.BANK,
+        )
 
     def test_record_emi_payment_success(self):
         result = record_emi_payment(
@@ -85,6 +91,20 @@ class PaymentServiceTests(TestCase):
             ).count(),
             1,
         )
+
+    def test_record_card_payment_uses_bank_finance_account_fallback(self):
+        result = record_emi_payment(
+            emi_id=self.emi.id,
+            amount=Decimal("1000.00"),
+            collected_by=self.admin,
+            method="CARD",
+            reference_no="TEST-CARD-001",
+        )
+
+        payment = result["payment"]
+        self.assertTrue(result["created"])
+        self.assertEqual(payment.method, "CARD")
+        self.assertEqual(payment.finance_account_id, self.bank_finance_account.id)
 
     def test_record_emi_payment_duplicate_reference_returns_existing(self):
         first = record_emi_payment(

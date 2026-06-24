@@ -314,7 +314,7 @@ def _reconcile_after_payment(subscription: Subscription, emi: Emi):
 def _fallback_finance_account_for_method(method: str):
     normalized = (method or "CASH").strip().upper()
     kind = FinanceAccountKind.CASH
-    if normalized == "BANK":
+    if normalized in {"BANK", "CARD"}:
         kind = FinanceAccountKind.BANK
     elif normalized == "UPI":
         kind = FinanceAccountKind.UPI
