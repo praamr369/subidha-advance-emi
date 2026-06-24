@@ -119,11 +119,19 @@ test("lucky-plan redirect pages redirect to legacy routes", () => {
   assert.ok(drawsPage.includes('redirect("/admin/lucky-draws")'), "draws page must redirect to /admin/lucky-draws");
 });
 
-test("lucky-plan winners page documents gap without fake data", () => {
+test("lucky-plan winners page uses the service-backed winners register without fake data", () => {
   const winnersPage = readFileSync(join(appRoot, "winners/page.tsx"), "utf8");
-  assert.ok(winnersPage.includes("Gap"), "winners page must document the missing endpoint gap");
+  const drawsService = readFileSync(join(thisFileDir, "../../src/services/draws/index.ts"), "utf8");
   assert.ok(
-    !winnersPage.includes("apiFetch") && !winnersPage.includes("useEffect"),
-    "winners page must not fetch data (no backend endpoint exists)"
+    winnersPage.includes("listLuckyDrawWinners"),
+    "winners page must use the service-backed winners register"
+  );
+  assert.ok(
+    drawsService.includes("/admin/lucky-draws/winners/"),
+    "winners service must call the backend winners action"
+  );
+  assert.ok(
+    !winnersPage.toLowerCase().includes("mock") && !winnersPage.includes("fake winner"),
+    "winners page must not render mocked or fake winner data"
   );
 });

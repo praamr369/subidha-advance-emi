@@ -361,7 +361,7 @@ class Customer(TimeStampedModel):
     is_pep = models.BooleanField(default=False, db_index=True, verbose_name="Politically Exposed Person (PEP)")
     pep_flagged_at = models.DateTimeField(null=True, blank=True)
     pep_flagged_by = models.ForeignKey(
-        "auth.User",
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -5579,6 +5579,7 @@ class RecoveryCase(TimeStampedModel):
     )
     settled_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
     last_contact_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -5729,7 +5730,7 @@ class AMLScreeningRecord(models.Model):
         db_index=True,
     )
     screened_by = models.ForeignKey(
-        "auth.User",
+        settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -5764,7 +5765,7 @@ class AMLScreeningRecord(models.Model):
 # Delivery & Proof of Delivery
 # ─────────────────────────────────────────────────────────────────────────────
 
-class DeliveryStatus(models.TextChoices):
+class DeliveryOrderStatus(models.TextChoices):
     PENDING = "PENDING", "Pending — awaiting delivery"
     SCHEDULED = "SCHEDULED", "Scheduled"
     IN_TRANSIT = "IN_TRANSIT", "In transit"
@@ -5782,8 +5783,8 @@ class Delivery(models.Model):
     )
     status = models.CharField(
         max_length=20,
-        choices=DeliveryStatus.choices,
-        default=DeliveryStatus.PENDING,
+        choices=DeliveryOrderStatus.choices,
+        default=DeliveryOrderStatus.PENDING,
         db_index=True,
     )
     scheduled_date = models.DateField(null=True, blank=True)

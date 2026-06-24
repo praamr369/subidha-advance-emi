@@ -12,7 +12,7 @@ const LUCKY_PLAN_SECTIONS = [
     href: "/admin/lucky-plan/lucky-ids",
     label: "Lucky IDs",
     description:
-      "Lucky ID register: 00–99 allocation grid, batch linkage, and assignment status per subscriber.",
+      "Lucky ID register: 00-99 allocation grid, batch linkage, and assignment status per subscriber.",
     badge: null,
   },
   {
@@ -26,8 +26,8 @@ const LUCKY_PLAN_SECTIONS = [
     href: "/admin/lucky-plan/winners",
     label: "Winners",
     description:
-      "Winner visibility and EMI waiver status. Links to draw evidence for audit trail. See gap note below.",
-    badge: "Gap",
+      "Winner register with EMI waiver status, delivery posture, and draw evidence for audit trail.",
+    badge: null,
   },
 ];
 
@@ -45,11 +45,11 @@ export default function LuckyPlanControlPage() {
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-semibold text-foreground">Module safety contract</h2>
         <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
-          <li>• Lucky draw commit/reveal/winner logic is unchanged by navigation.</li>
-          <li>• Winner receives future EMI waiver only — no past payment changes.</li>
-          <li>• No fake draw readiness or fake winner data is shown.</li>
-          <li>• Rent/lease operations are not owned by this module.</li>
-          <li>• Direct sale is not owned by this module.</li>
+          <li>Lucky draw commit/reveal/winner logic is unchanged by navigation.</li>
+          <li>Winner receives future EMI waiver only; no past payment changes.</li>
+          <li>No fake draw readiness or fake winner data is shown.</li>
+          <li>Rent/lease operations are not owned by this module.</li>
+          <li>Direct sale is not owned by this module.</li>
         </ul>
       </div>
 
@@ -75,19 +75,14 @@ export default function LuckyPlanControlPage() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 dark:border-amber-700 dark:bg-amber-900/20">
-        <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-          Gap — dedicated winners route
+      <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5 dark:border-emerald-700 dark:bg-emerald-900/20">
+        <h2 className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+          Production register
         </h2>
-        <p className="mt-2 text-sm text-amber-800 dark:text-amber-300">
-          There is no dedicated <code>/admin/lucky-plan/winners</code> backend endpoint yet.
-          Winner visibility is currently available through the Lucky Draw detail pages at{" "}
-          <Link href="/admin/lucky-draws" className="underline hover:no-underline">
-            /admin/lucky-draws
-          </Link>
-          . A standalone winners register (showing all draw winners, EMI waiver status, and
-          audit evidence across batches) is deferred to a future release that adds a backend
-          winners aggregate endpoint. No fake winner data is shown in the interim.
+        <p className="mt-2 text-sm text-emerald-800 dark:text-emerald-300">
+          The winners page is backed by the admin Lucky Draw winners endpoint and shows only
+          revealed draw records with a linked winner subscription. Waiver status remains
+          backend-owned, and past-paid EMI records are not changed from this page.
         </p>
       </div>
     </div>

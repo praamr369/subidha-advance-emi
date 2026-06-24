@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 
-from subscriptions.models import Delivery, ProofOfDelivery, DeliveryStatus, PODStatus
+from subscriptions.models import Delivery, DeliveryOrderStatus, ProofOfDelivery, PODStatus
 
 
 @api_view(['POST'])
@@ -104,7 +104,7 @@ def pod_capture_view(request, delivery_id):
     pod.save()
 
     # Update delivery status
-    delivery.status = DeliveryStatus.DELIVERED
+    delivery.status = DeliveryOrderStatus.DELIVERED
     delivery.delivered_date = delivery_date.date()
     delivery.save(update_fields=['status', 'delivered_date'])
 
