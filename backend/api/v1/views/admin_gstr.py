@@ -1,15 +1,16 @@
-"""GSTR-1 / GSTR-3B export report view."""
+"""GSTR-1 / GSTR-3B export report and GSTR-2B ITC reconciliation views."""
 from __future__ import annotations
 
 import csv
 import io
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.db.models import Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -284,3 +285,181 @@ class AdminGstrReportView(APIView):
         response = HttpResponse(buf.getvalue(), content_type="text/csv")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
+
+
+def _dec(v, default=Decimal("0.00")) -> Decimal:
+    try:
+        return Decimal(str(v or 0)).quantize(Decimal("0.01"))
+    except (InvalidOperation, TypeError):
+        return default
+
+
+class AdminGstr2bReconcileView(APIView):
+    """POST /admin/gstr/2b-reconcile/
+
+    Accept a simplified GSTR-2B B2B invoice list and reconcile against
+    our purchase TaxInvoice records.
+
+    Expected body:
+        {
+          "b2b": [
+            {
+              "supplier_gstin": "27AADCM0804K1ZH",
+              "invoice_no": "INV-001",
+              "invoice_date": "2024-01-02",
+              "taxable_value": 100000,
+              "cgst": 9000,
+              "sgst": 9000,
+              "igst": 0
+            }
+          ]
+        }
+
+    Also accepts the raw GSTN portal format via the "gstn_raw" key:
+        {
+          "gstn_raw": {
+            "b2b": [{"ctin": "...", "inv": [...]}]
+          }
+        }
+    """
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        from accounting.models import TaxInvoice
+
+        data = request.data or {}
+
+        # Parse input — simplified format or GSTN raw format
+        b2b_input: list[dict] = []
+        if "b2b" in data:
+            b2b_input = list(data["b2b"])
+        elif "gstn_raw" in data:
+            raw = data["gstn_raw"] or {}
+            for supplier_block in raw.get("b2b", []):
+                gstin = (supplier_block.get("ctin") or "").strip().upper()
+                for inv in supplier_block.get("inv", []):
+                    items = inv.get("items", [])
+                    cgst_total = sum(_dec(item.get("itm_det", {}).get("cgst", 0)) for item in items)
+                    sgst_total = sum(_dec(item.get("itm_det", {}).get("sgst", 0)) for item in items)
+                    igst_total = sum(_dec(item.get("itm_det", {}).get("igst", 0)) for item in items)
+                    txval_total = sum(_dec(item.get("itm_det", {}).get("txval", 0)) for item in items)
+                    b2b_input.append({
+                        "supplier_gstin": gstin,
+                        "invoice_no": (inv.get("inum") or "").strip().upper(),
+                        "invoice_date": (inv.get("dt") or ""),
+                        "taxable_value": str(txval_total),
+                        "cgst": str(cgst_total),
+                        "sgst": str(sgst_total),
+                        "igst": str(igst_total),
+                    })
+
+        if not b2b_input:
+            return Response(
+                {"detail": "No B2B records found. Provide 'b2b' list or 'gstn_raw' object."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Normalise 2B records: key = (supplier_gstin, invoice_no_upper)
+        b2b_map: dict[tuple, dict] = {}
+        for rec in b2b_input:
+            gstin = (rec.get("supplier_gstin") or "").strip().upper()
+            inv_no = (rec.get("invoice_no") or "").strip().upper()
+            if not gstin or not inv_no:
+                continue
+            b2b_map[(gstin, inv_no)] = {
+                "supplier_gstin": gstin,
+                "invoice_no": inv_no,
+                "invoice_date": rec.get("invoice_date") or "",
+                "taxable_value_2b": str(_dec(rec.get("taxable_value", 0))),
+                "cgst_2b": str(_dec(rec.get("cgst", 0))),
+                "sgst_2b": str(_dec(rec.get("sgst", 0))),
+                "igst_2b": str(_dec(rec.get("igst", 0))),
+            }
+
+        # Fetch matching TaxInvoice records from books
+        all_gstins = [g for g, _ in b2b_map.keys()]
+        all_inv_nos = [i for _, i in b2b_map.keys()]
+        qs = TaxInvoice.objects.filter(
+            supplier_gstin__in=all_gstins,
+            invoice_no__in=all_inv_nos,
+        ).only(
+            "id", "invoice_no", "invoice_date",
+            "supplier_gstin", "supplier_name",
+            "subtotal_taxable", "cgst_amount", "sgst_amount", "igst_amount",
+        )
+        books_map: dict[tuple, TaxInvoice] = {
+            (obj.supplier_gstin.upper(), (obj.invoice_no or "").upper()): obj
+            for obj in qs
+        }
+
+        matched = []
+        unmatched_in_2b = []
+
+        for key, rec in b2b_map.items():
+            book = books_map.get(key)
+            if book is None:
+                unmatched_in_2b.append({
+                    **rec,
+                    "match_status": "NOT_IN_BOOKS",
+                    "note": "Invoice found in GSTR-2B but not in purchase records.",
+                })
+            else:
+                cgst_diff = _dec(rec["cgst_2b"]) - _dec(book.cgst_amount)
+                sgst_diff = _dec(rec["sgst_2b"]) - _dec(book.sgst_amount)
+                igst_diff = _dec(rec["igst_2b"]) - _dec(book.igst_amount)
+                taxable_diff = _dec(rec["taxable_value_2b"]) - _dec(book.subtotal_taxable)
+                has_discrepancy = any(
+                    abs(d) >= Decimal("0.50")
+                    for d in (cgst_diff, sgst_diff, igst_diff, taxable_diff)
+                )
+                matched.append({
+                    **rec,
+                    "tax_invoice_id": book.id,
+                    "supplier_name": book.supplier_name,
+                    "invoice_date_books": str(book.invoice_date),
+                    "taxable_value_books": str(_dec(book.subtotal_taxable)),
+                    "cgst_books": str(_dec(book.cgst_amount)),
+                    "sgst_books": str(_dec(book.sgst_amount)),
+                    "igst_books": str(_dec(book.igst_amount)),
+                    "taxable_diff": str(taxable_diff),
+                    "cgst_diff": str(cgst_diff),
+                    "sgst_diff": str(sgst_diff),
+                    "igst_diff": str(igst_diff),
+                    "match_status": "DISCREPANCY" if has_discrepancy else "MATCHED",
+                })
+
+        # Invoices in books but not in 2B
+        b2b_keys = set(b2b_map.keys())
+        unmatched_in_books = [
+            {
+                "tax_invoice_id": obj.id,
+                "supplier_gstin": obj.supplier_gstin,
+                "supplier_name": obj.supplier_name,
+                "invoice_no": obj.invoice_no or "",
+                "invoice_date_books": str(obj.invoice_date),
+                "taxable_value_books": str(_dec(obj.subtotal_taxable)),
+                "cgst_books": str(_dec(obj.cgst_amount)),
+                "sgst_books": str(_dec(obj.sgst_amount)),
+                "igst_books": str(_dec(obj.igst_amount)),
+                "match_status": "NOT_IN_2B",
+                "note": "Invoice in purchase records but not in GSTR-2B.",
+            }
+            for key, obj in books_map.items()
+            if key not in b2b_keys
+        ]
+
+        summary = {
+            "total_in_2b": len(b2b_map),
+            "matched": sum(1 for r in matched if r["match_status"] == "MATCHED"),
+            "discrepancies": sum(1 for r in matched if r["match_status"] == "DISCREPANCY"),
+            "not_in_books": len(unmatched_in_2b),
+            "not_in_2b": len(unmatched_in_books),
+        }
+
+        return Response({
+            "summary": summary,
+            "matched": matched,
+            "not_in_books": unmatched_in_2b,
+            "not_in_2b": unmatched_in_books,
+        })

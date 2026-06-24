@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import DataTable from "@/components/ui/DataTable";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -28,6 +29,9 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function AdminServiceDeskReturnsPage() {
+  const searchParams = useSearchParams();
+  const isRentLeaseInspection = searchParams?.get("plan_type") === "RENT_LEASE";
+
   const [rows, setRows] = useState<ServiceDeskCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -204,8 +208,38 @@ export default function AdminServiceDeskReturnsPage() {
           tone: "warning",
         },
       ]}
-      statusBadge={{ label: "Return Workflow", tone: "info" }}
+      statusBadge={{ label: isRentLeaseInspection ? "Rent/Lease Return Inspection" : "Return Workflow", tone: "info" }}
     >
+      {isRentLeaseInspection ? (
+        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm">
+          <p className="font-semibold text-blue-900">Rent/Lease Return Inspection Workflow</p>
+          <p className="mt-1 text-blue-800">
+            Rent and lease return inspections (condition grading, damage assessment, deposit deduction decisions)
+            are managed from the{" "}
+            <strong>Subscription Lifecycle page</strong> for each contract. Navigate to the relevant
+            subscription and use the &quot;Return Inspection&quot; section there to:
+          </p>
+          <ul className="mt-2 list-disc pl-5 text-blue-800 space-y-1">
+            <li>Initiate a return inspection record</li>
+            <li>Record condition (GOOD / FAIR / DAMAGED) and damage notes</li>
+            <li>Specify deposit deduction amount and reason</li>
+            <li>Approve the inspection to release or deduct the security deposit</li>
+            <li>Download inspection PDF for legal records</li>
+          </ul>
+          <div className="mt-3">
+            <a
+              href={ROUTES.admin.subscriptions}
+              className="inline-flex items-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+            >
+              Go to Subscriptions →
+            </a>
+          </div>
+          <p className="mt-3 text-xs text-blue-700">
+            This return register below shows service-desk cases for sales returns, delivery returns,
+            and exchanges — not rent/lease return inspections.
+          </p>
+        </div>
+      ) : null}
       <ApprovalQueuePageShell
         queueSummary={
           notice ? (

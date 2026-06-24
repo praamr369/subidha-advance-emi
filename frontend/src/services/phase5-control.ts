@@ -31,6 +31,20 @@ export async function getAdminPartnerOperationsSummary() {
 export async function getAdminPartnerPaymentRequests() {
   return request(`/admin/partner-payment-requests/`);
 }
+export async function approveAdminCollectionRequest(id: number, note?: string) {
+  return request(`/admin/collection-requests/${id}/approve/`, {
+    method: "POST",
+    body: JSON.stringify({ note: note ?? "" }),
+    headers: { "Content-Type": "application/json" },
+  });
+}
+export async function rejectAdminCollectionRequest(id: number, note?: string) {
+  return request(`/admin/collection-requests/${id}/reject/`, {
+    method: "POST",
+    body: JSON.stringify({ note: note ?? "" }),
+    headers: { "Content-Type": "application/json" },
+  });
+}
 export async function getAdminReportExecutiveSummary(query?: Query) {
   return request(`/admin/reports/executive-summary/${toQuery(query)}`);
 }

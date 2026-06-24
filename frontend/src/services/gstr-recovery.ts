@@ -58,6 +58,75 @@ export function buildGstrCsvUrl(params: { date_from?: string; date_to?: string }
   return `/api/v1/admin/reports/gstr/?${q}`;
 }
 
+// ── GSTR-2B ITC Reconciliation ───────────────────────────────────────────────
+
+export interface Gstr2bRow {
+  supplier_gstin: string;
+  invoice_no: string;
+  invoice_date: string;
+  taxable_value_2b: string;
+  cgst_2b: string;
+  sgst_2b: string;
+  igst_2b: string;
+}
+
+export interface Gstr2bMatchedRow extends Gstr2bRow {
+  tax_invoice_id: number;
+  supplier_name: string;
+  invoice_date_books: string;
+  taxable_value_books: string;
+  cgst_books: string;
+  sgst_books: string;
+  igst_books: string;
+  taxable_diff: string;
+  cgst_diff: string;
+  sgst_diff: string;
+  igst_diff: string;
+  match_status: "MATCHED" | "DISCREPANCY";
+}
+
+export interface Gstr2bNotInBooksRow extends Gstr2bRow {
+  match_status: "NOT_IN_BOOKS";
+  note: string;
+}
+
+export interface Gstr2bNotIn2bRow {
+  tax_invoice_id: number;
+  supplier_gstin: string;
+  supplier_name: string;
+  invoice_no: string;
+  invoice_date_books: string;
+  taxable_value_books: string;
+  cgst_books: string;
+  sgst_books: string;
+  igst_books: string;
+  match_status: "NOT_IN_2B";
+  note: string;
+}
+
+export interface Gstr2bReconcileResult {
+  summary: {
+    total_in_2b: number;
+    matched: number;
+    discrepancies: number;
+    not_in_books: number;
+    not_in_2b: number;
+  };
+  matched: Gstr2bMatchedRow[];
+  not_in_books: Gstr2bNotInBooksRow[];
+  not_in_2b: Gstr2bNotIn2bRow[];
+}
+
+export function reconcileGstr2b(body: {
+  b2b?: Gstr2bRow[];
+  gstn_raw?: unknown;
+}): Promise<Gstr2bReconcileResult> {
+  return apiFetch<Gstr2bReconcileResult>("/admin/gstr/2b-reconcile/", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 // ── Defaulters ───────────────────────────────────────────────────────────────
 
 export interface DefaulterRow {

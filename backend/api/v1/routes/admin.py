@@ -221,7 +221,7 @@ from api.v1.views.admin_contracts import (
     ContractReturnInspectionRecordView,
     ContractReturnInspectionApproveView,
 )
-from api.v1.views.admin_gstr import AdminGstrReportView
+from api.v1.views.admin_gstr import AdminGstrReportView, AdminGstr2bReconcileView
 from api.v1.views.admin_recovery import (
     AdminDefaulterListView,
     AdminGuarantorDetailView,
@@ -1152,8 +1152,9 @@ urlpatterns = [
     path("hr/staff/<int:staff_id>/kyc-documents/<int:doc_id>/request-resubmission/", AdminStaffKycDocumentResubmitView.as_view()),
     path("hr/staff/<int:staff_id>/kyc-documents/<int:doc_id>/download/", AdminStaffKycDocumentDownloadView.as_view()),
 
-    # ── GSTR Report ──────────────────────────────────────────────────────────
+    # ── GSTR Report + 2B Reconciliation ─────────────────────────────────────
     path("reports/gstr/", AdminGstrReportView.as_view()),
+    path("gstr/2b-reconcile/", AdminGstr2bReconcileView.as_view()),
 
     # ── Defaulter Recovery ────────────────────────────────────────────────────
     path("defaulters/", AdminDefaulterListView.as_view()),
