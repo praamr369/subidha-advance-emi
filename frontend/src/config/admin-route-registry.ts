@@ -126,6 +126,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   // for rent/lease live under Collections & Cashier and Delivery & Service.
   item("Sales & Contracts", "Sales Workspace", ROUTES.admin.salesWorkspace, "Sales pipeline and fulfillment handoff."),
   item("Sales & Contracts", "Advance EMI / Subscriptions", `${ROUTES.admin.subscriptions}?plan_type=EMI`, "Advance EMI subscription register."),
+  item("Sales & Contracts", "Prepayment & Advance Delivery", ROUTES.admin.subscriptions, "Advance EMI prepayment unlock — customers pay 60-70% of remaining EMIs to get product delivered immediately (no lucky draw)."),
   item("Sales & Contracts", "Create Advance EMI Contract", ROUTES.admin.subscriptionsAdvanceEmiCreate, "Create an Advance EMI contract."),
   item("Sales & Contracts", "Direct Sale", ROUTES.admin.billingDirectSaleWorkspace, "Direct-sale billing workspace and register."),
   item("Sales & Contracts", "Create Direct Sale Invoice", ROUTES.admin.billingDirectSaleCreate, "Open full-page direct-sale invoice creation."),
@@ -279,6 +280,8 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   // Includes rent/lease possession, handover, and return inspection routes.
   item("Delivery & Service", "Deliveries", ROUTES.admin.deliveries, "Delivery register for subscription and direct-sale handoffs."),
   item("Delivery & Service", "Delivery Workspace", ROUTES.admin.deliveryWorkspace, "Handover and delivery document workflow."),
+  item("Delivery & Service", "Proof of Delivery (POD) Capture", ROUTES.admin.deliveryPODCapture, "Capture photos + signature + GPS at delivery for audit trail."),
+  item("Delivery & Service", "POD Archive & Export", ROUTES.admin.deliveryPODArchive, "Year-end POD batch export (ZIP with JSON + CSV + images) for legal and security procedures."),
   item("Delivery & Service", "Delivery Returns", ROUTES.admin.deliveryReturns, "Delivery return workflow."),
   item("Delivery & Service", "Possession / Handover", `${ROUTES.admin.deliveries}?plan_type=RENT_LEASE`, "Rent and lease possession and handover queue."),
   item("Delivery & Service", "Return Inspections", `${ROUTES.admin.serviceDeskReturns}?plan_type=RENT_LEASE`, "Rent and lease return inspection queue."),

@@ -243,6 +243,17 @@ from api.v1.views.admin_aml import (
     AdminKYCReverificationQueueView,
     AdminKYCRequestReverificationView,
 )
+from api.v1.views.admin_prepayment import (
+    prepayment_calculate_view,
+    prepayment_unlock_delivery_view,
+    prepayment_list_view,
+)
+from api.v1.views.admin_pod import (
+    pod_capture_view,
+    pod_list_view,
+    pod_detail_view,
+    pod_export_year_view,
+)
 from api.v1.views.admin_reports import (
     AdminAnalyticsSummaryView,
     AdminBatchPerformanceAggregateView,
@@ -1129,4 +1140,15 @@ urlpatterns = [
     # ── Staff targets + leaderboard ───────────────────────────────────────────
     path("crm/staff-targets/", AdminStaffTargetListView.as_view()),
     path("crm/leaderboard/", AdminLeaderboardView.as_view()),
+
+    # ── Advance EMI Prepayment ────────────────────────────────────────────────
+    path("subscriptions/<int:subscription_id>/prepayment/calculate/", prepayment_calculate_view),
+    path("subscriptions/<int:subscription_id>/prepayment/unlock-delivery/", prepayment_unlock_delivery_view),
+    path("prepayments/", prepayment_list_view),
+
+    # ── Proof of Delivery (POD) ───────────────────────────────────────────────
+    path("delivery/<int:delivery_id>/pod/capture/", pod_capture_view),
+    path("delivery/pod/", pod_list_view),
+    path("delivery/pod/<int:pod_id>/", pod_detail_view),
+    path("delivery/pod/export/", pod_export_year_view),
 ]

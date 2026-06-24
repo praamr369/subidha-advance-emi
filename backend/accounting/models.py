@@ -4243,3 +4243,312 @@ class TCSCollection(AccountingTimeStampedModel):
 
     def __str__(self):
         return f"TCS {self.section} ₹{self.tcs_amount} from {self.customer_name} on {self.transaction_date}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Core Finance Gaps: IFRS-16 Lease, Cost Centre, Depreciation, Deferred Tax
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CostCentre(models.Model):
+    """Cost centre for P&L allocation by branch/team/department."""
+    code = models.CharField(max_length=20, unique=True, db_index=True)
+    name = models.CharField(max_length=100)
+    centre_type = models.CharField(
+        max_length=20,
+        choices=[("BRANCH", "Branch"), ("TEAM", "Team"), ("DEPT", "Department")],
+        db_index=True,
+    )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cost_centres",
+    )
+    manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="managed_cost_centres",
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "accounting_cost_centres"
+        ordering = ["code"]
+
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+
+class LeaseContractType(models.TextChoices):
+    OPERATING = "OPERATING", "Operating Lease"
+    FINANCE = "FINANCE", "Finance Lease"
+    EQUIPMENT = "EQUIPMENT", "Equipment Lease"
+
+
+class LeaseContract(models.Model):
+    """IFRS-16 lease contracts with ROU asset & lease liability."""
+    subscription = models.OneToOneField(
+        "subscriptions.Subscription",
+        on_delete=models.CASCADE,
+        related_name="lease_contract",
+    )
+    lease_type = models.CharField(
+        max_length=20,
+        choices=LeaseContractType.choices,
+        default=LeaseContractType.FINANCE,
+        db_index=True,
+    )
+    asset_description = models.CharField(max_length=200)
+    lease_start_date = models.DateField(db_index=True)
+    lease_end_date = models.DateField(db_index=True)
+    lease_term_months = models.PositiveIntegerField()
+    monthly_lease_payment = models.DecimalField(max_digits=14, decimal_places=2)
+    discount_rate = models.DecimalField(max_digits=5, decimal_places=2, help_text="Interest rate %")
+
+    # IFRS-16 computed fields
+    rou_asset_amount = models.DecimalField(max_digits=14, decimal_places=2, default=MONEY_ZERO)
+    initial_lease_liability = models.DecimalField(max_digits=14, decimal_places=2, default=MONEY_ZERO)
+
+    # GL Accounts
+    rou_asset_account = models.ForeignKey(
+        "ChartOfAccounts",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="rou_asset_leases",
+        limit_choices_to={"account_type": "ASSET"},
+    )
+    lease_liability_account = models.ForeignKey(
+        "ChartOfAccounts",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lease_liability_records",
+        limit_choices_to={"account_type": "LIABILITY"},
+    )
+    lease_expense_account = models.ForeignKey(
+        "ChartOfAccounts",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lease_expense_records",
+        limit_choices_to={"account_type": "EXPENSE"},
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=[("ACTIVE", "Active"), ("COMPLETED", "Completed"), ("TERMINATED", "Terminated")],
+        default="ACTIVE",
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "accounting_lease_contracts"
+        ordering = ["-lease_start_date"]
+
+    def __str__(self):
+        return f"Lease: {self.asset_description} ({self.lease_start_date} - {self.lease_end_date})"
+
+
+class LeaseSchedule(models.Model):
+    """Monthly lease payment schedule with liability & interest breakdown."""
+    lease = models.ForeignKey(LeaseContract, on_delete=models.CASCADE, related_name="payment_schedule")
+    month_number = models.PositiveIntegerField()  # 1-based
+    payment_date = models.DateField(db_index=True)
+    opening_liability = models.DecimalField(max_digits=14, decimal_places=2)
+    interest_expense = models.DecimalField(max_digits=14, decimal_places=2)
+    payment_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    closing_liability = models.DecimalField(max_digits=14, decimal_places=2)
+    rou_depreciation = models.DecimalField(max_digits=14, decimal_places=2)  # Straight-line over term
+    gl_posted = models.BooleanField(default=False, db_index=True)
+    gl_entry = models.ForeignKey(
+        "JournalEntry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lease_schedules",
+    )
+
+    class Meta:
+        db_table = "accounting_lease_schedules"
+        unique_together = ("lease", "month_number")
+        ordering = ["lease", "month_number"]
+
+    def __str__(self):
+        return f"Lease {self.lease.id} Month {self.month_number}: {self.payment_date}"
+
+
+class FixedAssetType(models.TextChoices):
+    PLANT_MACHINERY = "PLANT_MACHINERY", "Plant & Machinery"
+    BUILDING = "BUILDING", "Building"
+    FURNITURE_FIXTURES = "FURNITURE_FIXTURES", "Furniture & Fixtures"
+    VEHICLES = "VEHICLES", "Vehicles"
+    COMPUTERS = "COMPUTERS", "Computers & IT Equipment"
+    OTHER = "OTHER", "Other"
+
+
+class FixedAssetDepreciation(models.Model):
+    """Fixed asset depreciation schedule."""
+    asset_code = models.CharField(max_length=20, unique=True, db_index=True)
+    asset_name = models.CharField(max_length=100)
+    asset_type = models.CharField(max_length=30, choices=FixedAssetType.choices, db_index=True)
+    acquisition_date = models.DateField(db_index=True)
+    acquisition_cost = models.DecimalField(max_digits=14, decimal_places=2)
+    useful_life_years = models.PositiveIntegerField()
+    depreciation_rate = models.DecimalField(max_digits=5, decimal_places=2, help_text="Annual %")
+    depreciation_method = models.CharField(
+        max_length=20,
+        choices=[("STRAIGHT_LINE", "Straight-line"), ("DECLINING_BALANCE", "Declining Balance")],
+        default="STRAIGHT_LINE",
+    )
+    salvage_value = models.DecimalField(max_digits=14, decimal_places=2, default=MONEY_ZERO)
+    accumulated_depreciation = models.DecimalField(max_digits=14, decimal_places=2, default=MONEY_ZERO)
+    net_book_value = models.DecimalField(max_digits=14, decimal_places=2, default=MONEY_ZERO)
+
+    # GL Accounts
+    asset_account = models.ForeignKey(
+        "ChartOfAccounts",
+        on_delete=models.PROTECT,
+        related_name="fixed_assets",
+        limit_choices_to={"account_type": "ASSET"},
+    )
+    accumulated_depreciation_account = models.ForeignKey(
+        "ChartOfAccounts",
+        on_delete=models.PROTECT,
+        related_name="accumulated_depreciation",
+        limit_choices_to={"account_type": "ASSET"},
+    )
+    depreciation_expense_account = models.ForeignKey(
+        "ChartOfAccounts",
+        on_delete=models.PROTECT,
+        related_name="depreciation_expenses",
+        limit_choices_to={"account_type": "EXPENSE"},
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=[("ACTIVE", "Active"), ("FULLY_DEPRECIATED", "Fully Depreciated"), ("DISPOSED", "Disposed")],
+        default="ACTIVE",
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "accounting_fixed_assets"
+        ordering = ["-acquisition_date"]
+
+    def __str__(self):
+        return f"{self.asset_code} — {self.asset_name}"
+
+
+class DepreciationSchedule(models.Model):
+    """Monthly/annual depreciation entry for an asset."""
+    asset = models.ForeignKey(FixedAssetDepreciation, on_delete=models.CASCADE, related_name="depreciation_schedule")
+    period_start = models.DateField(db_index=True)
+    period_end = models.DateField()
+    opening_net_book_value = models.DecimalField(max_digits=14, decimal_places=2)
+    depreciation_expense = models.DecimalField(max_digits=14, decimal_places=2)
+    closing_net_book_value = models.DecimalField(max_digits=14, decimal_places=2)
+    gl_posted = models.BooleanField(default=False, db_index=True)
+    gl_entry = models.ForeignKey(
+        "JournalEntry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="depreciation_schedules",
+    )
+
+    class Meta:
+        db_table = "accounting_depreciation_schedules"
+        unique_together = ("asset", "period_start", "period_end")
+        ordering = ["asset", "-period_start"]
+
+    def __str__(self):
+        return f"{self.asset.asset_code} Depreciation {self.period_start} - {self.period_end}"
+
+
+class DeferredTaxType(models.TextChoices):
+    ASSET = "ASSET", "Deferred Tax Asset"
+    LIABILITY = "LIABILITY", "Deferred Tax Liability"
+
+
+class DeferredTax(models.Model):
+    """Track temporary differences causing deferred tax."""
+    code = models.CharField(max_length=20, unique=True, db_index=True)
+    description = models.CharField(max_length=200)
+    tax_type = models.CharField(max_length=20, choices=DeferredTaxType.choices, db_index=True)
+    originating_date = models.DateField(db_index=True)
+    book_amount = models.DecimalField(max_digits=14, decimal_places=2, default=MONEY_ZERO)
+    tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=MONEY_ZERO)
+    temporary_difference = models.DecimalField(max_digits=14, decimal_places=2, default=MONEY_ZERO)
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2)  # Tax rate %
+    dta_dtl_amount = models.DecimalField(max_digits=14, decimal_places=2, default=MONEY_ZERO)
+    expected_reversal_year = models.PositiveIntegerField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[("ACTIVE", "Active"), ("REVERSED", "Reversed")],
+        default="ACTIVE",
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "accounting_deferred_tax"
+        ordering = ["-originating_date"]
+
+    def __str__(self):
+        return f"{self.code} — {self.description}"
+
+
+class CostAllocationRule(models.Model):
+    """Rule to allocate expenses to cost centres."""
+    code = models.CharField(max_length=20, unique=True, db_index=True)
+    name = models.CharField(max_length=100)
+    source_account = models.ForeignKey(
+        "ChartOfAccounts",
+        on_delete=models.PROTECT,
+        related_name="cost_allocation_rules",
+        limit_choices_to={"account_type": "EXPENSE"},
+    )
+    allocation_method = models.CharField(
+        max_length=20,
+        choices=[
+            ("EQUAL", "Equal split"),
+            ("PERCENTAGE", "Percentage split"),
+            ("DRIVER", "Cost driver (headcount, revenue, etc)"),
+        ],
+        default="EQUAL",
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "accounting_cost_allocation_rules"
+        ordering = ["code"]
+
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+
+class CostAllocationDetail(models.Model):
+    """Percentage/amount split for each cost centre."""
+    rule = models.ForeignKey(CostAllocationRule, on_delete=models.CASCADE, related_name="detail_lines")
+    cost_centre = models.ForeignKey(CostCentre, on_delete=models.PROTECT, related_name="cost_allocations")
+    allocation_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    allocation_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        db_table = "accounting_cost_allocation_details"
+        unique_together = ("rule", "cost_centre")
+        ordering = ["rule", "cost_centre"]
+
+    def __str__(self):
+        return f"{self.rule.code} → {self.cost_centre.code} ({self.allocation_percentage}%)"

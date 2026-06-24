@@ -1309,6 +1309,10 @@ class Subscription(TimeStampedModel):
         blank=True,
         related_name="cancelled_subscriptions",
     )
+    # Advance EMI: prepayment + early delivery unlock
+    advance_delivery_unlocked = models.BooleanField(default=False, db_index=True)
+    prepayment_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO)
+    prepayment_date = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "subscriptions"
@@ -5753,3 +5757,92 @@ class AMLScreeningRecord(models.Model):
         if not self.pk:
             AMLScreeningRecord.objects.filter(customer=self.customer, is_latest=True).update(is_latest=False)
         super().save(*args, **kwargs)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Delivery & Proof of Delivery
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DeliveryStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending — awaiting delivery"
+    SCHEDULED = "SCHEDULED", "Scheduled"
+    IN_TRANSIT = "IN_TRANSIT", "In transit"
+    DELIVERED = "DELIVERED", "Delivered"
+    FAILED = "FAILED", "Delivery failed"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class Delivery(models.Model):
+    """Delivery order linked to Subscription — tracks fulfillment."""
+    subscription = models.OneToOneField(
+        Subscription,
+        on_delete=models.CASCADE,
+        related_name="delivery",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=DeliveryStatus.choices,
+        default=DeliveryStatus.PENDING,
+        db_index=True,
+    )
+    scheduled_date = models.DateField(null=True, blank=True)
+    delivered_date = models.DateField(null=True, blank=True, db_index=True)
+    driver_name = models.CharField(max_length=100, blank=True, default="")
+    driver_phone = models.CharField(max_length=20, blank=True, default="")
+    delivery_address = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "subscriptions_delivery"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Delivery for subscription {self.subscription_id} ({self.status})"
+
+
+class PODStatus(models.TextChoices):
+    CAPTURED = "CAPTURED", "Captured"
+    VERIFIED = "VERIFIED", "Verified"
+    ARCHIVED = "ARCHIVED", "Archived"
+
+
+class ProofOfDelivery(models.Model):
+    """Proof of Delivery — photos + signature + metadata captured at delivery."""
+    delivery = models.OneToOneField(
+        Delivery,
+        on_delete=models.CASCADE,
+        related_name="proof_of_delivery",
+    )
+    delivery_date = models.DateTimeField(db_index=True)
+
+    # Proof media
+    photo_1 = models.ImageField(upload_to="pod/photos/")
+    photo_2 = models.ImageField(upload_to="pod/photos/", blank=True, null=True)
+    signature_image = models.ImageField(upload_to="pod/signatures/")
+
+    # Metadata
+    driver_name = models.CharField(max_length=100)
+    driver_phone = models.CharField(max_length=20, blank=True, default="")
+    customer_signature_name = models.CharField(max_length=100)
+    gps_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    gps_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+
+    # Status
+    status = models.CharField(
+        max_length=20,
+        choices=PODStatus.choices,
+        default=PODStatus.CAPTURED,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "subscriptions_proof_of_delivery"
+        ordering = ["-delivery_date"]
+
+    def __str__(self):
+        return f"POD for delivery {self.delivery_id} on {self.delivery_date.date()}"
