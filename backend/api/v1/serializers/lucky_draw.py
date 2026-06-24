@@ -31,4 +31,10 @@ class LuckyDrawSerializer(serializers.ModelSerializer):
             "executed_at",
             "is_revealed",
             "winner_context",
+            "winner_status",
+            "winner_verified_at",
+            "winner_rejected_reason",
+            "settlement_status",
+            "waived_emi_count",
+            "waived_amount",
         )

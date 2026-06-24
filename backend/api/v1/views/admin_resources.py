@@ -1461,26 +1461,45 @@ class LuckyDrawAdminViewSet(AdminOnlyModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        if draw.winner_subscription_id is None:
+            return Response(
+                {"detail": "Draw has no winner to verify."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if action == "approve":
-            draw.winner_status = "VERIFIED"
+            draw.winner_status = LuckyDraw.WinnerStatus.VERIFIED
             draw.winner_verified_at = timezone.now()
-            draw.winner_verified_by = getattr(request.user, "staff_member", None)
-            draw.save()
+            draw.winner_verified_by = request.user
+            draw.winner_rejected_reason = ""
+            draw.save(
+                update_fields=[
+                    "winner_status",
+                    "winner_verified_at",
+                    "winner_verified_by",
+                    "winner_rejected_reason",
+                    "updated_at",
+                ]
+            )
             message = "Winner verified successfully"
         else:
-            draw.winner_status = "REJECTED"
+            draw.winner_status = LuckyDraw.WinnerStatus.REJECTED
             draw.winner_rejected_reason = notes
-            draw.save()
+            draw.save(
+                update_fields=["winner_status", "winner_rejected_reason", "updated_at"]
+            )
             message = "Winner rejected"
 
-        # Log audit entry
         AuditLog.objects.create(
-            user=request.user,
-            action=f"lucky_draw_winner_{action}",
-            content_type_id=None,
+            action_type=AuditLog.ActionType.WINNER_STATE_SYNCED,
+            model_name="LuckyDraw",
             object_id=draw.id,
-            notes=notes or f"Winner {action}ed",
-            change_message=f"Lucky draw {draw.id} winner {action}ed"
+            performed_by=request.user,
+            metadata={
+                "event": f"WINNER_{action.upper()}",
+                "winner_status": draw.winner_status,
+                "notes": notes,
+            },
         )
 
         return Response({
@@ -1501,33 +1520,48 @@ class LuckyDrawAdminViewSet(AdminOnlyModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if draw.winner_status != "VERIFIED":
+        if draw.winner_status != LuckyDraw.WinnerStatus.VERIFIED:
             return Response(
                 {"detail": "Winner must be verified before settlement."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Create accounting entry for waived EMI
+        if draw.settlement_status == LuckyDraw.SettlementStatus.SETTLED:
+            return Response(
+                {"detail": "Winner already settled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
-            waived_emis = draw.emis.filter(status="WAIVED")
+            waived_emi_ids = []
+            if draw.winner_subscription_id is not None:
+                waived_emi_ids = list(
+                    draw.winner_subscription.emis.filter(status="WAIVED").values_list(
+                        "id", flat=True
+                    )
+                )
+
             settlement_data = {
                 "draw_id": draw.id,
                 "waived_emi_count": draw.waived_emi_count,
-                "waived_amount": draw.waived_amount,
-                "emis_settled": list(waived_emis.values_list("id", flat=True))
+                "waived_amount": str(draw.waived_amount),
+                "emis_settled": waived_emi_ids,
             }
 
-            draw.settlement_status = "SETTLED"
-            draw.save()
+            draw.settlement_status = LuckyDraw.SettlementStatus.SETTLED
+            draw.save(update_fields=["settlement_status", "updated_at"])
 
-            # Log audit entry
             AuditLog.objects.create(
-                user=request.user,
-                action="lucky_draw_winner_settled",
-                content_type_id=None,
+                action_type=AuditLog.ActionType.WINNER_WAIVER_APPLIED,
+                model_name="LuckyDraw",
                 object_id=draw.id,
-                notes=f"Settled {draw.waived_emi_count} waived EMIs",
-                change_message=f"Lucky draw {draw.id} settlement processed"
+                performed_by=request.user,
+                metadata={
+                    "event": "WINNER_SETTLED",
+                    "waived_emi_count": draw.waived_emi_count,
+                    "waived_amount": str(draw.waived_amount),
+                    "emis_settled": waived_emi_ids,
+                },
             )
 
             return Response({
@@ -1656,12 +1690,14 @@ class LuckyIdAdminViewSet(AdminOnlyModelViewSet):
             Emi.objects.bulk_update(assignments, ["lucky_id"])
 
             AuditLog.objects.create(
-                user=request.user,
-                action="lucky_ids_bulk_assigned",
-                content_type_id=None,
+                action_type=AuditLog.ActionType.LUCKY_ID_BULK_ASSIGNED,
+                model_name="Batch",
                 object_id=batch_id,
-                notes=f"Assigned {len(assignments)} lucky IDs to EMIs in batch {batch_id}",
-                change_message=f"Bulk assignment completed for batch {batch_id}"
+                performed_by=request.user,
+                metadata={
+                    "assigned_count": len(assignments),
+                    "lucky_ids": list(lucky_id_objects.values_list("id", flat=True)),
+                },
             )
 
             return Response({
@@ -1701,12 +1737,14 @@ class LuckyIdAdminViewSet(AdminOnlyModelViewSet):
             new_emi.save()
 
             AuditLog.objects.create(
-                user=request.user,
-                action="lucky_id_reassigned",
-                content_type_id=None,
+                action_type=AuditLog.ActionType.LUCKY_ID_REASSIGNED,
+                model_name="LuckyId",
                 object_id=lucky_id.id,
-                notes=f"Reassigned from EMI {old_emi.id if old_emi else 'None'} to EMI {new_emi.id}",
-                change_message=f"Lucky ID {lucky_id.id} reassigned"
+                performed_by=request.user,
+                metadata={
+                    "old_emi_id": old_emi.id if old_emi else None,
+                    "new_emi_id": new_emi.id,
+                },
             )
 
             return Response({

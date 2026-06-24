@@ -56,7 +56,7 @@ from api.v1.views.username_change import CustomerSelfUsernameChangeView
 from api.v1.views.customer_lucky_draws import (
     CustomerLuckyDrawListView,
     CustomerLuckyDrawDetailView,
-    customer_lucky_draw_certificate_view,
+    CustomerLuckyDrawCertificateView,
 )
 
 urlpatterns = [
@@ -74,7 +74,7 @@ urlpatterns = [
     path("referrals/create/", CustomerReferralCreateView.as_view()),
     path("lucky-draws/", CustomerLuckyDrawListView.as_view()),
     path("lucky-draws/<int:pk>/", CustomerLuckyDrawDetailView.as_view()),
-    path("lucky-draws/<int:pk>/certificate/", customer_lucky_draw_certificate_view),
+    path("lucky-draws/<int:pk>/certificate/", CustomerLuckyDrawCertificateView.as_view()),
     path("subscriptions/", PaginatedCustomerSubscriptionListView.as_view()),
     path("subscriptions/<int:pk>/", CustomerSubscriptionDetailView.as_view()),
     path("subscription-request-options/", CustomerSubscriptionRequestOptionsView.as_view()),

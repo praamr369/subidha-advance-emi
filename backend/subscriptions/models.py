@@ -3541,6 +3541,37 @@ class LuckyDraw(TimeStampedModel):
         default="FUTURE_EMI_ONLY",
     )
 
+    class WinnerStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending Verification"
+        VERIFIED = "VERIFIED", "Verified"
+        REJECTED = "REJECTED", "Rejected"
+
+    class SettlementStatus(models.TextChoices):
+        UNSETTLED = "UNSETTLED", "Unsettled"
+        SETTLED = "SETTLED", "Settled"
+
+    winner_status = models.CharField(
+        max_length=20,
+        choices=WinnerStatus.choices,
+        default=WinnerStatus.PENDING,
+        db_index=True,
+    )
+    winner_verified_at = models.DateTimeField(null=True, blank=True)
+    winner_verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="verified_lucky_draws",
+    )
+    winner_rejected_reason = models.TextField(blank=True, default="")
+    settlement_status = models.CharField(
+        max_length=20,
+        choices=SettlementStatus.choices,
+        default=SettlementStatus.UNSETTLED,
+        db_index=True,
+    )
+
     class Meta:
         db_table = "lucky_draws"
         ordering = ["-draw_date", "-id"]
@@ -3709,6 +3740,8 @@ class AuditLog(models.Model):
         DRAW_COMMITTED = "DRAW_COMMITTED", "Draw Committed"
         DRAW_REVEALED = "DRAW_REVEALED", "Draw Revealed"
         DRAW_CERTIFICATE_PUBLISHED = "DRAW_CERTIFICATE_PUBLISHED", "Draw Certificate Published"
+        LUCKY_ID_BULK_ASSIGNED = "LUCKY_ID_BULK_ASSIGNED", "Lucky ID Bulk Assigned"
+        LUCKY_ID_REASSIGNED = "LUCKY_ID_REASSIGNED", "Lucky ID Reassigned"
         DRAW_PUBLIC_VERIFIED = "DRAW_PUBLIC_VERIFIED", "Public Draw Verification Generated"
         DRAW_PUBLIC_RESULT_PUBLISHED = "DRAW_PUBLIC_RESULT_PUBLISHED", "Public Draw Result Published"
         WINNER_WAIVER_APPLIED = "WINNER_WAIVER_APPLIED", "Winner Waiver Applied"
