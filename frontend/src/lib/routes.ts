@@ -166,6 +166,7 @@ export const ROUTES = {
     financeReversalReconciliation: "/admin/finance/reversal-reconciliation",
     settlements: "/admin/settlements",
     settlementsDayCloses: "/admin/settlements/day-closes",
+    settlementsCashierVariance: "/admin/settlements/cashier-variance",
     settlementsUpiImports: "/admin/settlements/upi-imports",
     settlementsBankImports: "/admin/settlements/bank-imports",
     reconciliation: "/admin/accounting/bridge-reconciliation",

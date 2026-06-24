@@ -179,6 +179,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Collections & Cashier", "Payments", ROUTES.admin.payments, "Payment register."),
   item("Collections & Cashier", "Settlements", ROUTES.admin.settlements, "Bank statement and UPI settlement evidence imports with manual allocations."),
   item("Collections & Cashier", "Day Closes", ROUTES.admin.settlementsDayCloses, "Cashier day close."),
+  item("Collections & Cashier", "Cashier Variance Monitor", ROUTES.admin.settlementsCashierVariance, "List day-close cash variance breaches and dispatch escalation emails to management."),
 
   // ── 7. Finance Operations ─────────────────────────────────────────────────
   // Finance Operations = source-of-money workflow records.
