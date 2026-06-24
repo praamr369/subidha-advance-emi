@@ -81,6 +81,9 @@ export default function FinanceCompletePage() {
       try {
         if (activeTab === "lease") {
           // Lease tab stays interactive (form-based)
+        } else if (activeTab === "depreciation") {
+          const assets = await listFixedAssets();
+          setFixedAssets(assets.results ?? assets);
         } else if (activeTab === "cost-centre") {
           const pl = await getCostCentrePL(undefined, periodStart, periodEnd);
           setCCPL(pl);
@@ -117,6 +120,71 @@ export default function FinanceCompletePage() {
       // Silent failure
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateLease = async () => {
+    if (!leaseForm.asset_description || !leaseForm.lease_start_date || !leaseForm.lease_end_date || !leaseForm.monthly_lease_payment) {
+      setLeaseCreateMsg("Please fill in all required fields.");
+      return;
+    }
+    setLeaseCreateBusy(true);
+    setLeaseCreateMsg("");
+    try {
+      await createLeaseContract({
+        subscription_id: leaseSubId ? Number(leaseSubId) : 0,
+        asset_description: leaseForm.asset_description,
+        lease_type: leaseForm.lease_type,
+        lease_start_date: leaseForm.lease_start_date,
+        lease_end_date: leaseForm.lease_end_date,
+        monthly_lease_payment: leaseForm.monthly_lease_payment,
+        discount_rate: leaseForm.discount_rate,
+      });
+      setLeaseCreateMsg("Lease contract created successfully.");
+      setLeaseFormVisible(false);
+      setLeaseForm({ asset_description: "", lease_type: "FINANCE", lease_start_date: "", lease_end_date: "", monthly_lease_payment: "", discount_rate: "8.5" });
+      const contracts = await listLeaseContracts();
+      setLeaseContracts(contracts.results ?? []);
+    } catch {
+      setLeaseCreateMsg("Failed to create lease contract.");
+    } finally {
+      setLeaseCreateBusy(false);
+    }
+  };
+
+  const handleCreateAsset = async () => {
+    setAssetMsg("");
+    try {
+      await createFixedAsset({
+        asset_code: assetForm.asset_code,
+        asset_name: assetForm.asset_name,
+        asset_type: assetForm.asset_type,
+        acquisition_date: assetForm.acquisition_date,
+        acquisition_cost: assetForm.acquisition_cost,
+        useful_life_years: Number(assetForm.useful_life_years),
+        salvage_value: assetForm.salvage_value,
+        depreciation_method: assetForm.depreciation_method,
+        asset_account_id: assetForm.asset_account_id ? Number(assetForm.asset_account_id) : undefined,
+        accumulated_depreciation_account_id: assetForm.accumulated_depreciation_account_id ? Number(assetForm.accumulated_depreciation_account_id) : undefined,
+        depreciation_expense_account_id: assetForm.depreciation_expense_account_id ? Number(assetForm.depreciation_expense_account_id) : undefined,
+      });
+      setAssetFormVisible(false);
+      setAssetMsg("Asset created.");
+      const assets = await listFixedAssets();
+      setFixedAssets(assets.results ?? assets);
+    } catch {
+      setAssetMsg("Failed to create asset.");
+    }
+  };
+
+  const handleGenerateDepr = async () => {
+    if (!selectedAssetId) return;
+    setDeprMsg("");
+    try {
+      const result = await depreciationGenerateSchedule(Number(selectedAssetId), deprStart, deprEnd);
+      setDeprMsg(result.message || "Depreciation schedule generated.");
+    } catch {
+      setDeprMsg("Failed to generate depreciation schedule.");
     }
   };
 
@@ -198,17 +266,217 @@ export default function FinanceCompletePage() {
               )}
             </div>
           </div>
+
+          {/* Lease Contract Create Form */}
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">Lease Contracts</h2>
+              <button onClick={() => setLeaseFormVisible(!leaseFormVisible)} className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+                {leaseFormVisible ? "Cancel" : "+ New Lease Contract"}
+              </button>
+            </div>
+            {leaseCreateMsg && <div className={`text-sm mb-3 ${leaseCreateMsg.startsWith("Failed") ? "text-red-600" : "text-green-700"}`}>{leaseCreateMsg}</div>}
+            {leaseFormVisible && (
+              <div className="bg-muted/20 rounded-xl p-4 mb-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="text-xs font-semibold text-muted-foreground">Asset Description</label>
+                    <input value={leaseForm.asset_description} onChange={e => setLeaseForm(p => ({...p, asset_description: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="Office building lease" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Lease Type</label>
+                    <select value={leaseForm.lease_type} onChange={e => setLeaseForm(p => ({...p, lease_type: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
+                      <option value="FINANCE">Finance Lease (IFRS-16)</option>
+                      <option value="OPERATING">Operating Lease</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Discount Rate (%)</label>
+                    <input type="number" step="0.1" value={leaseForm.discount_rate} onChange={e => setLeaseForm(p => ({...p, discount_rate: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="8.5" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Lease Start Date</label>
+                    <input type="date" value={leaseForm.lease_start_date} onChange={e => setLeaseForm(p => ({...p, lease_start_date: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Lease End Date</label>
+                    <input type="date" value={leaseForm.lease_end_date} onChange={e => setLeaseForm(p => ({...p, lease_end_date: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Monthly Lease Payment (₹)</label>
+                    <input value={leaseForm.monthly_lease_payment} onChange={e => setLeaseForm(p => ({...p, monthly_lease_payment: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="25000.00" />
+                  </div>
+                </div>
+                <button onClick={() => void handleCreateLease()} disabled={leaseCreateBusy} className="w-full h-9 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
+                  {leaseCreateBusy ? "Creating…" : "Create Lease Contract"}
+                </button>
+              </div>
+            )}
+            {leaseContracts.length === 0 && !leaseFormVisible && (
+              <div className="text-sm text-muted-foreground text-center py-8">No lease contracts. Create one above.</div>
+            )}
+            {leaseContracts.length > 0 && (
+              <div className="rounded-xl border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2 text-left">ID</th>
+                      <th className="px-4 py-2 text-left">Description</th>
+                      <th className="px-4 py-2 text-left">Type</th>
+                      <th className="px-4 py-2 text-right">Monthly</th>
+                      <th className="px-4 py-2 text-left">Start</th>
+                      <th className="px-4 py-2 text-left">End</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaseContracts.map((lc: LeaseContractRecord) => (
+                      <tr key={lc.id} className="border-t border-border hover:bg-muted/20">
+                        <td className="px-4 py-2 text-xs">{lc.id}</td>
+                        <td className="px-4 py-2">{lc.asset_description}</td>
+                        <td className="px-4 py-2 text-xs">{lc.lease_type}</td>
+                        <td className="px-4 py-2 text-right">₹{lc.monthly_lease_payment}</td>
+                        <td className="px-4 py-2 text-xs">{lc.lease_start_date}</td>
+                        <td className="px-4 py-2 text-xs">{lc.lease_end_date}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* DEPRECIATION */}
       {activeTab === "depreciation" && (
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <h2 className="text-lg font-bold mb-4">Fixed Asset Depreciation</h2>
-          <p className="text-sm text-muted-foreground mb-4">Straight-line or declining-balance depreciation schedules</p>
-          <div className="text-sm text-muted-foreground py-8 text-center">
-            Generate depreciation schedules from admin • Coming soon: Asset depreciation UI
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">Fixed Assets</h2>
+              <button onClick={() => setAssetFormVisible(!assetFormVisible)} className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+                {assetFormVisible ? "Cancel" : "+ Add Asset"}
+              </button>
+            </div>
+
+            {assetMsg && <div className={`text-sm mb-3 ${assetMsg.startsWith("Failed") ? "text-red-600" : "text-green-700"}`}>{assetMsg}</div>}
+
+            {assetFormVisible && (
+              <div className="bg-muted/20 rounded-xl p-4 mb-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Asset Code *</label>
+                    <input value={assetForm.asset_code} onChange={e => setAssetForm(p => ({...p, asset_code: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="COMP-001" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Asset Name *</label>
+                    <input value={assetForm.asset_name} onChange={e => setAssetForm(p => ({...p, asset_name: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="Laptop Dell XPS" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Asset Type</label>
+                    <select value={assetForm.asset_type} onChange={e => setAssetForm(p => ({...p, asset_type: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
+                      {["COMPUTERS", "FURNITURE", "VEHICLES", "MACHINERY", "BUILDING", "LAND", "OTHER"].map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Depreciation Method</label>
+                    <select value={assetForm.depreciation_method} onChange={e => setAssetForm(p => ({...p, depreciation_method: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1">
+                      <option value="STRAIGHT_LINE">Straight Line (SLM)</option>
+                      <option value="DECLINING_BALANCE">Declining Balance (WDV)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Acquisition Date *</label>
+                    <input type="date" value={assetForm.acquisition_date} onChange={e => setAssetForm(p => ({...p, acquisition_date: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Acquisition Cost *</label>
+                    <input value={assetForm.acquisition_cost} onChange={e => setAssetForm(p => ({...p, acquisition_cost: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="50000.00" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Useful Life (years)</label>
+                    <input type="number" min="1" value={assetForm.useful_life_years} onChange={e => setAssetForm(p => ({...p, useful_life_years: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Salvage Value</label>
+                    <input value={assetForm.salvage_value} onChange={e => setAssetForm(p => ({...p, salvage_value: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Asset Account ID</label>
+                    <input value={assetForm.asset_account_id} onChange={e => setAssetForm(p => ({...p, asset_account_id: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="GL Account ID" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Accum. Depr Account ID</label>
+                    <input value={assetForm.accumulated_depreciation_account_id} onChange={e => setAssetForm(p => ({...p, accumulated_depreciation_account_id: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="GL Account ID" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Depr Expense Account ID</label>
+                    <input value={assetForm.depreciation_expense_account_id} onChange={e => setAssetForm(p => ({...p, depreciation_expense_account_id: e.target.value}))} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" placeholder="GL Account ID" />
+                  </div>
+                </div>
+                <button onClick={() => void handleCreateAsset()} className="w-full h-9 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+                  Create Fixed Asset
+                </button>
+              </div>
+            )}
+
+            {loading && <div className="text-sm text-muted-foreground text-center py-4">Loading assets…</div>}
+            {!loading && fixedAssets.length === 0 && <div className="text-sm text-muted-foreground text-center py-8">No fixed assets recorded yet.</div>}
+            {fixedAssets.length > 0 && (
+              <div className="overflow-hidden rounded-xl border border-border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Code</th>
+                      <th className="px-4 py-2 text-left">Name</th>
+                      <th className="px-4 py-2 text-left">Type</th>
+                      <th className="px-4 py-2 text-right">Cost</th>
+                      <th className="px-4 py-2 text-left">Method</th>
+                      <th className="px-4 py-2 text-left">Life</th>
+                      <th className="px-4 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fixedAssets.map((a: FixedAssetRecord) => (
+                      <tr key={a.id} className="border-t border-border hover:bg-muted/20">
+                        <td className="px-4 py-2 font-mono text-xs">{a.asset_code}</td>
+                        <td className="px-4 py-2">{a.asset_name}</td>
+                        <td className="px-4 py-2 text-xs">{a.asset_type}</td>
+                        <td className="px-4 py-2 text-right">₹{a.acquisition_cost}</td>
+                        <td className="px-4 py-2 text-xs">{a.depreciation_method}</td>
+                        <td className="px-4 py-2 text-xs">{a.useful_life_years}y</td>
+                        <td className="px-4 py-2">
+                          <button onClick={() => setSelectedAssetId(String(a.id))} className={`text-xs px-2 py-1 rounded-lg border ${selectedAssetId === String(a.id) ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}>
+                            {selectedAssetId === String(a.id) ? "Selected" : "Select"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
+
+          {/* Depreciation schedule generator */}
+          {selectedAssetId && (
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <h3 className="text-sm font-bold mb-3">Generate Depreciation Schedule — Asset #{selectedAssetId}</h3>
+              <div className="flex gap-3 items-end mb-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Period Start</label>
+                  <input type="date" value={deprStart} onChange={e => setDeprStart(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Period End</label>
+                  <input type="date" value={deprEnd} onChange={e => setDeprEnd(e.target.value)} className="w-full h-9 rounded-xl border border-border bg-background px-3 text-sm mt-1" />
+                </div>
+                <button onClick={() => void handleGenerateDepr()} disabled={!deprStart || !deprEnd} className="h-9 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
+                  Generate
+                </button>
+              </div>
+              {deprMsg && <div className={`text-sm ${deprMsg.startsWith("Failed") ? "text-red-600" : "text-green-700"}`}>{deprMsg}</div>}
+            </div>
+          )}
         </div>
       )}
 

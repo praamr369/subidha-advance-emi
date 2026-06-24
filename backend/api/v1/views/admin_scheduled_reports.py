@@ -31,17 +31,14 @@ def _build_outstanding_emis_csv(date_from: str, date_to: str) -> tuple[str, str]
     from subscriptions.models import Emi
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["EMI ID", "Subscription ID", "EMI No", "Due Date", "Amount", "Amount Paid", "Balance", "Status"])
+    writer.writerow(["EMI ID", "Subscription ID", "Month No", "Due Date", "Amount", "Status"])
     qs = Emi.objects.filter(
-        status__in=["PENDING", "OVERDUE", "PARTIAL"],
+        status="PENDING",
         due_date__gte=date_from,
         due_date__lte=date_to,
     ).order_by("due_date")
     for e in qs:
-        writer.writerow([
-            e.id, e.subscription_id, e.emi_number, e.due_date,
-            e.amount, e.amount_paid, e.amount - e.amount_paid, e.status,
-        ])
+        writer.writerow([e.id, e.subscription_id, e.month_no, e.due_date, e.amount, e.status])
     return buf.getvalue(), f"outstanding_emis_{date_from}_to_{date_to}.csv"
 
 
@@ -50,17 +47,14 @@ def _build_overdue_emis_csv(date_from: str, date_to: str) -> tuple[str, str]:
     today = timezone.localdate()
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["EMI ID", "Subscription ID", "Customer ID", "EMI No", "Due Date", "Days Overdue", "Balance"])
+    writer.writerow(["EMI ID", "Subscription ID", "Customer ID", "Month No", "Due Date", "Days Past Due"])
     qs = Emi.objects.filter(
-        status="OVERDUE",
-        due_date__lte=today,
+        status="PENDING",
+        due_date__lt=today,
     ).select_related("subscription").order_by("due_date")
     for e in qs:
         overdue_days = (today - e.due_date).days
-        writer.writerow([
-            e.id, e.subscription_id, e.subscription.customer_id,
-            e.emi_number, e.due_date, overdue_days, e.amount - e.amount_paid,
-        ])
+        writer.writerow([e.id, e.subscription_id, e.subscription.customer_id, e.month_no, e.due_date, overdue_days])
     return buf.getvalue(), "overdue_emis.csv"
 
 
@@ -82,20 +76,19 @@ def _build_tds_pending_csv(date_from: str, date_to: str) -> tuple[str, str]:
     return buf.getvalue(), f"tds_pending_{date_from}_to_{date_to}.csv"
 
 
+ACTIVE_BATCH_STATUSES = ["OPEN", "FULL", "READY_TO_LOCK", "LOCKED", "DRAW_IN_PROGRESS", "DRAW_COMMITTED", "DRAW_COMPLETED"]
+
+
 def _build_batch_fill_rates_csv(date_from: str, date_to: str) -> tuple[str, str]:
     from subscriptions.models import Batch, Subscription
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["Batch ID", "Batch Ref", "Total Slots", "Filled", "Fill Rate %", "Status"])
-    for b in Batch.objects.filter(status="ACTIVE"):
+    writer.writerow(["Batch ID", "Batch Code", "Total Slots", "Filled", "Fill Rate %", "Status"])
+    for b in Batch.objects.filter(status__in=ACTIVE_BATCH_STATUSES):
         filled = Subscription.objects.filter(batch=b, status__in=["ACTIVE", "COMPLETED"]).count()
-        total = b.total_members or 1
+        total = b.total_slots or 1
         fill_rate = round(filled / total * 100, 1)
-        writer.writerow([
-            b.id,
-            b.batch_ref if hasattr(b, "batch_ref") else str(b.id),
-            total, filled, fill_rate, b.status,
-        ])
+        writer.writerow([b.id, b.batch_code, total, filled, fill_rate, b.status])
     return buf.getvalue(), "batch_fill_rates.csv"
 
 

@@ -109,6 +109,8 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   }),
   item("CRM & Requests", "AML Screening", ROUTES.admin.amlScreening, "Anti-Money Laundering screening records and PEP flag management."),
   item("CRM & Requests", "KYC Re-verification Queue", ROUTES.admin.kycReverification, "KYC documents expiring soon or overdue for re-verification."),
+  item("CRM & Requests", "KYC Expiry Notifications", ROUTES.admin.kycExpiryNotifications, "Preview and send email reminders to customers with expiring KYC documents."),
+  item("CRM & Requests", "Customer Disputes", ROUTES.admin.crmDisputes, "Manage customer complaints and dispute resolution workflow."),
   // Legacy aliases — now redirect to /admin/requests/* canonical paths (see next.config.ts)
   // Phase 6: partner payment requests moved here from Profiles & Parties — intake queue only.
   // The page links to collection workspace for review context; no payment is posted from this page.
@@ -350,6 +352,9 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("BI & Reports", "Analytics Workspace", ROUTES.admin.analytics, "Read-only analytics workspace — redirects to Reports & analysis live posture view. Decision support only. No posting from this page."),
   item("BI & Reports", "Risk Monitor", ROUTES.admin.analyticsRiskMonitor, "Read-only overdue EMI risk watchlist for collection escalation. Source-linked report. Drill down to Finance Operations / Outstandings for action."),
   item("BI & Reports", "Churn Analysis", ROUTES.admin.analyticsChurnAnalysis, "Read-only churn-risk and defaulted subscription watchlist. Source-linked report. Drill down to Profiles / Customers for action."),
+  item("BI & Reports", "Partial Payment Tool", ROUTES.admin.partialPaymentTool, "Waterfall allocation calculator — preview how a partial payment distributes across pending EMIs. Preview only; no records modified."),
+  item("BI & Reports", "Scheduled Report Export", ROUTES.admin.scheduledReportExport, "Generate and email CSV exports for outstanding EMIs, overdue, TDS, batch fill rates, or KYC expiry."),
+  item("BI & Reports", "Batch Alerts", ROUTES.admin.batchAlerts, "Run threshold-based batch performance health checks and dispatch alert emails."),
 
   // ── 17. Growth & Offers ───────────────────────────────────────────────────────
   item("Growth & Offers", "Growth Hub", ROUTES.admin.growth, "Growth configuration hub: plan templates, offer packages, growth requests, partner performance, and retention intelligence."),

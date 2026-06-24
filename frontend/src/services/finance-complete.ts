@@ -231,9 +231,9 @@ export function createFixedAsset(payload: {
   useful_life_years: number;
   salvage_value?: string;
   depreciation_method?: string;
-  asset_account_id: number;
-  accumulated_depreciation_account_id: number;
-  depreciation_expense_account_id: number;
+  asset_account_id?: number;
+  accumulated_depreciation_account_id?: number;
+  depreciation_expense_account_id?: number;
 }): Promise<{ id: number; asset_code: string; net_book_value: string; message: string }> {
   return apiFetch("/admin/accounting/assets/", {
     method: "POST",

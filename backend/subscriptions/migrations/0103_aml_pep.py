@@ -1,5 +1,6 @@
 import django.db.models.deletion
 import django.utils.timezone
+from django.conf import settings
 from django.db import migrations, models
 
 
@@ -7,6 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("subscriptions", "0102_settlement_type"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
@@ -28,7 +30,7 @@ class Migration(migrations.Migration):
                 blank=True, null=True,
                 on_delete=django.db.models.deletion.SET_NULL,
                 related_name="pep_flagged_customers",
-                to="auth.user",
+                to=settings.AUTH_USER_MODEL,
             ),
         ),
         migrations.AddField(
@@ -78,7 +80,7 @@ class Migration(migrations.Migration):
                     blank=True, null=True,
                     on_delete=django.db.models.deletion.PROTECT,
                     related_name="aml_screenings_performed",
-                    to="auth.user",
+                    to=settings.AUTH_USER_MODEL,
                 )),
             ],
             options={"db_table": "customer_aml_screenings", "ordering": ["-screening_date", "-id"]},

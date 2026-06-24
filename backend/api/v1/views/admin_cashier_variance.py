@@ -66,8 +66,6 @@ def cashier_variance_escalate_view(request, close_id):
     POST /admin/cashier/day-closes/{close_id}/escalate/
     Body: { "notify_email": "manager@example.com", "notes": "Please investigate..." }
     """
-    from subscriptions.models import CashierDayClose
-
     from settlements.models import CashierDayClose
 
     try:

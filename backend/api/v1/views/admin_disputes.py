@@ -54,8 +54,9 @@ def dispute_list_create_view(request):
             qs = qs.filter(dispute_type=dtype)
         if customer_id:
             qs = qs.filter(customer_id=customer_id)
-        qs = qs[:200]
-        return Response({"count": qs.count(), "results": [_row(d) for d in qs]})
+        total = qs.count()
+        rows = [_row(d) for d in qs[:200]]
+        return Response({"count": total, "results": rows})
 
     # POST — create
     customer_id = request.data.get("customer_id")

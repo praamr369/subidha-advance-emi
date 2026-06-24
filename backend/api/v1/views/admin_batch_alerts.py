@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from django.core.mail import send_mail
 from django.conf import settings
-from django.db.models import Count, Q, F
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
