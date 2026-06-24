@@ -193,6 +193,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Finance Operations", "Deposits", ROUTES.admin.financeDeposits, "Security deposit source records: receipt, refund posture, damage recovery. Finance source workflow.", {
     badgeSource: "queue.deposit_refunds_pending",
   }),
+  item("Finance Operations", "Refunds", ROUTES.admin.financeRefunds, "Customer refund source cases surfaced from reversal control."),
   item("Finance Operations", "Commissions", ROUTES.admin.financeCommissions, "Commission source register: partner earnings from subscription and sale workflows."),
   item("Finance Operations", "Payout Batches", ROUTES.admin.financePayoutBatches, "Partner payout batches: source payout obligations before accounting bridge."),
   item("Finance Operations", "Reversal Control", ROUTES.admin.financeReversalControl, "Audited admin pipeline for cancellation, reversal, returns, refunds, and customer-credit decisions."),

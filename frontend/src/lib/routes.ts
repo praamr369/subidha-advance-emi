@@ -163,6 +163,7 @@ export const ROUTES = {
     financeSettledCommissions: "/admin/finance/commissions/settled",
     financePayoutBatches: "/admin/finance/payout-batches",
     financeDeposits: "/admin/finance/deposits",
+    financeRefunds: "/admin/finance/refunds",
     financeReversalControl: "/admin/finance/reversal-control",
     financeReversalReconciliation: "/admin/finance/reversal-reconciliation",
     settlements: "/admin/settlements",

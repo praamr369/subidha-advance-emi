@@ -109,6 +109,7 @@ export default function AdminServiceDeskOverviewPage() {
         { label: "Service Desk" },
       ]}
       actions={[
+        { href: ROUTES.admin.serviceDeskCases, label: "Cases", variant: "primary" },
         { href: ROUTES.admin.serviceDeskComplaints, label: "Complaints", variant: "secondary" },
         { href: ROUTES.admin.serviceDeskReturns, label: "Returns", variant: "primary" },
         { href: ROUTES.admin.serviceDeskTickets, label: "Service Tickets", variant: "secondary" },
