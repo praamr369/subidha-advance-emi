@@ -7,6 +7,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import { ROUTES } from "@/lib/routes";
 import {
   bulkEscalateRecoveryCases,
   createRecoveryCase,
@@ -365,7 +366,19 @@ export default function DefaultersPage() {
     <ERPPageShell
       eyebrow="Collections"
       title="Defaulter Recovery"
-      subtitle="Subscriptions with overdue EMIs, aging buckets, and recovery case management"
+      subtitle="Subscriptions with overdue EMIs, aging buckets, and recovery case management."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Collections", href: ROUTES.admin.collections },
+        { label: "Defaulter Recovery" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Overdue Subscriptions", value: loading ? "—" : defaulters.length, tone: !loading && defaulters.length > 0 ? "warning" : "success" },
+        { label: "Recovery Cases", value: loading ? "—" : cases.length, tone: !loading && cases.length > 0 ? "warning" : "success" },
+        { label: "Critical (90+ days)", value: loading ? "—" : (bucketSummary["91-120"] || 0) + (bucketSummary["120+"] || 0), tone: !loading && ((bucketSummary["91-120"] || 0) + (bucketSummary["120+"] || 0)) > 0 ? "warning" : "success" },
+        { label: "30–60 day range", value: loading ? "—" : (bucketSummary["31-60"] || 0), tone: "default" },
+      ]}
     >
       {/* Bucket summary chips */}
       <div className="flex flex-wrap gap-2 mb-4">
