@@ -202,7 +202,12 @@ const ACCOUNT_CODES: Record<string, string[]> = {
   SALES_RETURNS: ["REV-4010"],
   ACCOUNTS_PAYABLE: ["AP-2000"],
   INVENTORY_ASSET: ["INV-1200"],
+  WORK_IN_PROGRESS_INVENTORY: ["INV-1210"],
+  COGS: ["COGS-5000"],
+  MANUFACTURING_WASTAGE: ["MFG-5200"],
+  INVENTORY_ADJUSTMENT: ["INV-5100"],
   INPUT_GST: ["GST-1100"],
+  OUTPUT_GST: ["GST-2100"],
 };
 
 const PROFILE_ROWS = [
@@ -215,11 +220,20 @@ const PROFILE_ROWS = [
   { key: "commission_payout", label: "Commission Payout", debit: ["COMMISSION_EXPENSE"], credit: ["COMMISSION_PAYABLE"], implemented: true },
   { key: "vendor_payment", label: "Vendor Payment", debit: ["ACCOUNTS_PAYABLE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
   { key: "purchase_inventory", label: "Purchase / Inventory", debit: ["INVENTORY_ASSET", "INPUT_GST"], credit: ["ACCOUNTS_PAYABLE"], implemented: true },
+  { key: "inventory_delivery_out", label: "Inventory Delivery Out", debit: ["COGS"], credit: ["INVENTORY_ASSET"], implemented: true },
+  { key: "stock_adjustment", label: "Stock Adjustment", debit: ["INVENTORY_ASSET", "INVENTORY_ADJUSTMENT"], credit: ["INVENTORY_ASSET", "INVENTORY_ADJUSTMENT"], implemented: true },
+  { key: "vendor_return", label: "Vendor Return", debit: ["ACCOUNTS_PAYABLE"], credit: ["INVENTORY_ASSET"], implemented: true },
   { key: "reconciliation_clearing", label: "Reconciliation Clearing", debit: ["EMI_COLLECTION_CLEARING", "CUSTOMER_RECEIVABLE"], credit: ["EMI_COLLECTION_CLEARING", "CUSTOMER_RECEIVABLE"], implemented: true },
+  { key: "settlement_allocation", label: "Settlement Allocation", debit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], credit: ["CUSTOMER_RECEIVABLE", "CUSTOMER_ADVANCE_UNEARNED_REVENUE"], implemented: true },
   { key: "payment_gateway_collection", label: "Payment Gateway Collection", debit: ["PAYMENT_GATEWAY_COLLECTION"], credit: ["CUSTOMER_RECEIVABLE"], implemented: true },
+  { key: "payment_reversal", label: "Payment Reversal", debit: ["CUSTOMER_RECEIVABLE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
+  { key: "receipt_void", label: "Receipt Void", debit: ["CUSTOMER_RECEIVABLE", "CUSTOMER_ADVANCE_UNEARNED_REVENUE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
   { key: "delivery_charges", label: "Delivery Charges", debit: ["CUSTOMER_RECEIVABLE"], credit: ["DELIVERY_CHARGES_INCOME"], implemented: true },
   { key: "waiver_expense", label: "EMI Waiver Expense", debit: ["WAIVER_LOSS"], credit: ["CUSTOMER_RECEIVABLE"], implemented: true },
   { key: "damage_recovery", label: "Damage Recovery", debit: ["CUSTOMER_RECEIVABLE"], credit: ["DAMAGE_RECOVERY"], implemented: true },
+  { key: "tax_invoice", label: "Tax Invoice", debit: ["CUSTOMER_RECEIVABLE"], credit: ["DIRECT_SALE_INCOME", "OUTPUT_GST"], implemented: true },
+  { key: "credit_debit_notes", label: "Credit / Debit Notes", debit: ["SALES_RETURNS", "CUSTOMER_RECEIVABLE"], credit: ["CUSTOMER_RECEIVABLE", "DIRECT_SALE_INCOME", "DAMAGE_RECOVERY"], implemented: true },
+  { key: "manufacturing", label: "Manufacturing", debit: ["WORK_IN_PROGRESS_INVENTORY", "INVENTORY_ASSET", "MANUFACTURING_WASTAGE"], credit: ["INVENTORY_ASSET", "WORK_IN_PROGRESS_INVENTORY", "DAMAGE_RECOVERY"], implemented: true },
   { key: "delivery_expense", label: "Delivery Expense", debit: ["DELIVERY_EXPENSE"], credit: ["ACCOUNTS_PAYABLE"], implemented: true },
   { key: "salary_payroll", label: "Salary / Payroll", debit: ["SALARY_EXPENSE"], credit: ["ACCOUNTS_PAYABLE"], implemented: true },
 ] as const;

@@ -64,6 +64,11 @@ ALIASES = {
     "lease_security_deposit": "security_deposit_collection",
     "purchase_inventory_receive": "inventory_purchase_receive",
     "commission_approval": "commission_accrual",
+    "credit_note": "credit_note_issue",
+    "debit_note": "debit_note_issue",
+    "stock_adjustment_gain": "inventory_adjustment_gain",
+    "stock_adjustment_loss": "inventory_adjustment_loss",
+    "customer_return_receive": "customer_return",
     "production_material_consume": "manufacturing_consumption",
     "production_output_receive": "manufacturing_output",
 }

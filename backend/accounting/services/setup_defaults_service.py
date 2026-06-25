@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
@@ -17,6 +17,7 @@ from accounting.models import (
     FinanceAccountKind,
     FinanceAccountMappingPurpose,
     JournalEntryLine,
+    RentLeaseAccountingAccountMapping,
 )
 from accounting.services.accounting_setup_catalog import (
     CANONICAL_CHART_ACCOUNT_BY_CODE,
@@ -281,6 +282,61 @@ def _ensure_collection_mappings(*, performed_by=None, finance_accounts: dict[str
     return {"created": created, "updated": updated}
 
 
+def _ensure_rent_lease_account_mapping(
+    *,
+    chart_accounts: dict[str, ChartOfAccount],
+    finance_accounts: dict[str, FinanceAccount],
+) -> dict[str, Any]:
+    required = {
+        "monthly_income_account": "RENT_INCOME",
+        "rent_income_account": "RENT_INCOME",
+        "lease_income_account": "LEASE_INCOME",
+        "deposit_liability_account": "SECURITY_DEPOSIT_LIABILITY",
+        "deposit_refund_account": "CASH_COLLECTION",
+        "damage_recovery_income_account": "DAMAGE_RECOVERY",
+        "customer_advance_liability_account": "CUSTOMER_ADVANCE_UNEARNED_REVENUE",
+    }
+    missing = [key for key in required.values() if key not in chart_accounts]
+    settlement = finance_accounts.get("CASH") or finance_accounts.get("UPI") or finance_accounts.get("BANK")
+    if settlement is None:
+        missing.append("settlement_finance_account")
+    if missing:
+        return {"status": "SKIPPED", "missing": sorted(set(missing))}
+
+    mapping = RentLeaseAccountingAccountMapping.objects.filter(is_active=True).order_by("-created_at", "-id").first()
+    created = mapping is None
+    if mapping is None:
+        mapping = RentLeaseAccountingAccountMapping(is_active=True)
+    mapping.monthly_income_account = chart_accounts["RENT_INCOME"]
+    mapping.deposit_liability_account = chart_accounts["SECURITY_DEPOSIT_LIABILITY"]
+    mapping.deposit_refund_account = chart_accounts["CASH_COLLECTION"]
+    mapping.damage_recovery_income_account = chart_accounts["DAMAGE_RECOVERY"]
+    mapping.settlement_finance_account = settlement
+    mapping.notes = "Auto-synced by accounting setup defaults from canonical COA/FA system codes."
+    mapping.full_clean()
+    mapping.save()
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE accounting_rent_lease_account_mappings
+            SET customer_advance_liability_account_id = %s,
+                rent_income_account_id = %s,
+                lease_income_account_id = %s,
+                updated_at = %s
+            WHERE id = %s
+            """,
+            [
+                chart_accounts["CUSTOMER_ADVANCE_UNEARNED_REVENUE"].id,
+                chart_accounts["RENT_INCOME"].id,
+                chart_accounts["LEASE_INCOME"].id,
+                timezone.now(),
+                mapping.id,
+            ],
+        )
+    return {"status": "CREATED" if created else "UPDATED", "mapping_id": mapping.id, "settlement_finance_account_id": settlement.id}
+
+
 @transaction.atomic
 def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
     canonical_results: dict[str, dict[str, Any]] = {}
@@ -329,9 +385,10 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
                 profile.save()
                 profiles_updated.append({"id": profile.id, "key": profile.key})
     mappings_result = _ensure_collection_mappings(performed_by=performed_by, finance_accounts=finance_accounts, chart_accounts=chart_accounts, ledger_anchor=ledger_anchor)
+    rent_lease_mapping = _ensure_rent_lease_account_mapping(chart_accounts=chart_accounts, finance_accounts=finance_accounts)
     journal_numbering = _ensure_journal_entry_numbering_profile()
     legacy_marked: list[dict[str, Any]] = []
     for cand in _legacy_duplicate_candidates():
         ChartOfAccount.objects.filter(pk=cand["id"]).update(is_legacy=True, legacy_reason=cand["reason"], superseded_by_id=cand["superseded_by_id"])
         legacy_marked.append({"id": cand["id"], "superseded_by_id": cand["superseded_by_id"]})
-    return {"applied_at": timezone.now().isoformat(), "canonical_accounts": canonical_results, "finance_accounts": {"seeded": {k: {"id": v.id, "name": v.name, "kind": v.kind, "is_active": v.is_active} for k, v in finance_accounts.items()}, "duplicate_actions": duplicate_actions, "ledger_anchor_id": ledger_anchor.id}, "posting_profiles": {"created": profiles_created, "updated": profiles_updated}, "document_numbering": {"journal_entry": journal_numbering}, "mappings": mappings_result, "legacy": {"marked": legacy_marked}}
+    return {"applied_at": timezone.now().isoformat(), "canonical_accounts": canonical_results, "finance_accounts": {"seeded": {k: {"id": v.id, "name": v.name, "kind": v.kind, "is_active": v.is_active} for k, v in finance_accounts.items()}, "duplicate_actions": duplicate_actions, "ledger_anchor_id": ledger_anchor.id}, "posting_profiles": {"created": profiles_created, "updated": profiles_updated}, "document_numbering": {"journal_entry": journal_numbering}, "mappings": mappings_result, "rent_lease_mapping": rent_lease_mapping, "legacy": {"marked": legacy_marked}}

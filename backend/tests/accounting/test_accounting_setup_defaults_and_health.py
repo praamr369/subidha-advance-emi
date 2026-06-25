@@ -17,6 +17,7 @@ from accounting.models import (
     JournalEntryLine,
     JournalEntryStatus,
     JournalEntryType,
+    RentLeaseAccountingAccountMapping,
 )
 from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
 from accounting.services.setup_health_service import get_accounting_setup_health
@@ -103,11 +104,27 @@ class SetupDefaultsAndHealthTests(TestCase):
         self.assertNotEqual(payload.get("status"), "BLOCKED")
 
         self.assertTrue(ChartOfAccount.objects.filter(system_code="CASH_COLLECTION", code="CASH-1000").exists())
+        self.assertTrue(ChartOfAccount.objects.filter(system_code="COGS", code="COGS-5000").exists())
+        self.assertTrue(ChartOfAccount.objects.filter(system_code="MANUFACTURING_WASTAGE", code="MFG-5200").exists())
         self.assertTrue(AccountingPostingProfile.objects.filter(key="CUSTOMER_RECEIVABLE", is_active=True).exists())
 
         legacy.refresh_from_db()
         self.assertTrue(legacy.is_legacy)
         self.assertTrue(bool(legacy.superseded_by_id))
+
+    def test_apply_defaults_syncs_rent_lease_account_mapping_without_posting_journals(self):
+        journal_before = JournalEntry.objects.count()
+
+        payload = apply_accounting_setup_defaults(performed_by=self.admin)
+
+        self.assertNotEqual(payload.get("status"), "BLOCKED")
+        self.assertEqual(JournalEntry.objects.count(), journal_before)
+        mapping = RentLeaseAccountingAccountMapping.objects.get(is_active=True)
+        self.assertEqual(mapping.monthly_income_account.system_code, "RENT_INCOME")
+        self.assertEqual(mapping.deposit_liability_account.system_code, "SECURITY_DEPOSIT_LIABILITY")
+        self.assertEqual(mapping.deposit_refund_account.system_code, "CASH_COLLECTION")
+        self.assertEqual(mapping.damage_recovery_income_account.system_code, "DAMAGE_RECOVERY")
+        self.assertIsNotNone(mapping.settlement_finance_account_id)
 
     def test_setup_health_reports_multiple_ready_cash_accounts_as_info(self):
         apply_accounting_setup_defaults(performed_by=self.admin)

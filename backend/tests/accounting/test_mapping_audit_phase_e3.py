@@ -3,6 +3,7 @@ from rest_framework.test import APITestCase
 
 from accounting.models import AccountingPeriodStatus, DocumentSequence, JournalEntry
 from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
+from api.v1.views.accounting_mapping_audit import REQUIRED_EVENTS
 from tests.helpers import create_admin_user, create_customer_user, ensure_test_accounting_posting_prerequisites
 
 
@@ -83,6 +84,24 @@ class AccountingMappingAuditPhaseE3Tests(APITestCase):
         self.assertEqual(response.data["journal_entries_created"], 0)
         self.assertEqual(JournalEntry.objects.count(), journal_before)
         self.assertTrue(DocumentSequence.objects.filter(document_type="JOURNAL_ENTRY", is_active=True).exists())
+
+    def test_seed_safe_defaults_covers_required_mapping_surface_without_posting_journals(self):
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
+        journal_before = JournalEntry.objects.count()
+
+        response = self.client.post("/api/v1/admin/accounting/mapping-audit/seed-safe-defaults/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        audit = response.data["after"]
+        rows = {row["event_key"]: row for row in audit["events"]}
+
+        self.assertEqual(set(rows), set(REQUIRED_EVENTS))
+        self.assertEqual(audit["summary"]["total_events"], len(REQUIRED_EVENTS))
+        self.assertEqual(audit["summary"]["blocked_by_mapping"], 0)
+        self.assertEqual(
+            {row["event_key"] for row in audit["unsupported_events"]},
+            {"staff_advance"},
+        )
+        self.assertEqual(JournalEntry.objects.count(), journal_before)
 
     def test_mapping_audit_does_not_mark_open_period_as_period_blocked(self):
         ensure_test_accounting_posting_prerequisites(performed_by=self.admin)

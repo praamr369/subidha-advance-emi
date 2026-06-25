@@ -19,9 +19,11 @@ INVENTORY_MANUFACTURING_EVENT_KEYS = {
     "inventory_adjustment_gain",
     "inventory_adjustment_loss",
     "inventory_delivery_out",
+    "vendor_return_out",
     "manufacturing_consumption",
     "manufacturing_output",
     "manufacturing_wastage",
+    "manufacturing_scrap_recovery",
 }
 
 INVENTORY_MANUFACTURING_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
@@ -65,6 +67,19 @@ INVENTORY_MANUFACTURING_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...]
         operator_action="Validate adjustment-loss mapping only. Readiness does not mutate stock quantities.",
     ),
     BridgeEventSpec(
+        event_key="vendor_return_out",
+        label="Vendor return out",
+        source_module="inventory",
+        source_app="inventory",
+        source_model="StockLedger",
+        event_group="Inventory",
+        debit_requirements=("ACCOUNTS_PAYABLE or vendor credit",),
+        credit_requirements=("INVENTORY_ASSET",),
+        debit_coa_system_codes=("ACCOUNTS_PAYABLE",),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
+        operator_action="Validate vendor-return stock-out mapping only. Readiness does not return goods, adjust vendor balances, or post journals.",
+    ),
+    BridgeEventSpec(
         event_key="manufacturing_consumption",
         label="Manufacturing material consumption",
         source_module="manufacturing",
@@ -89,6 +104,19 @@ INVENTORY_MANUFACTURING_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...]
         debit_mapping_purposes=(FinanceAccountMappingPurpose.INVENTORY_ASSET,),
         credit_coa_system_codes=("WORK_IN_PROGRESS_INVENTORY",),
         operator_action="Validate finished-goods output mapping only. Readiness does not receive finished stock or post WIP closeout.",
+    ),
+    BridgeEventSpec(
+        event_key="manufacturing_scrap_recovery",
+        label="Manufacturing scrap recovery",
+        source_module="manufacturing",
+        source_app="manufacturing",
+        source_model="ProductionJob",
+        event_group="Manufacturing",
+        debit_requirements=("Cash / Bank / UPI FinanceAccount or CUSTOMER_RECEIVABLE",),
+        credit_requirements=("DAMAGE_RECOVERY income",),
+        debit_mapping_purposes=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.DAMAGE_RECOVERY,),
+        operator_action="Validate scrap recovery income mapping only. Readiness does not sell scrap, receive cash, or post recovery journals.",
     ),
 )
 
