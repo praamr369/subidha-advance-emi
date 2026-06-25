@@ -83,6 +83,11 @@ export default function PODArchivePage() {
         { label: "POD Archive" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Total POD Records", value: loading ? "—" : count, tone: "info" },
+        { label: "Year Covered", value: year, tone: "default" },
+        { label: "Export Format", value: "ZIP", tone: "default" },
+      ]}
     >
 
       {/* Year Selection & Export */}
@@ -120,22 +125,6 @@ export default function PODArchivePage() {
             {exportMsg}
           </div>
         )}
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="text-xs text-muted-foreground">Total POD Records</div>
-          <div className="text-lg font-bold mt-1">{count}</div>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="text-xs text-muted-foreground">Export Format</div>
-          <div className="text-sm font-semibold mt-1">ZIP (JSON + CSV + Images)</div>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="text-xs text-muted-foreground">Year Covered</div>
-          <div className="text-sm font-semibold mt-1">{year}</div>
-        </div>
       </div>
 
       {/* POD List */}
