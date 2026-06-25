@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
@@ -48,6 +48,13 @@ export default function BillingReceiptsPage() {
   useEffect(() => {
     void loadPage();
   }, [loadPage]);
+
+  const receiptStats = useMemo(() => {
+    const posted = rows.filter((row) => String(row.status || "").toUpperCase() === "POSTED");
+    const postedAmount = posted.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const voided = rows.filter((row) => String(row.status || "").toUpperCase() === "VOID").length;
+    return { posted: posted.length, postedAmount, voided };
+  }, [rows]);
 
   const columns: EnterpriseColumnDef<ReceiptDocument>[] = [
     { key: "receipt_date", header: "Date", render: (row) => accountingDate(row.receipt_date) },
@@ -117,6 +124,12 @@ export default function BillingReceiptsPage() {
         { href: ROUTES.admin.billingInvoices, label: "Invoices", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Receipts", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Posted", value: loading ? "—" : receiptStats.posted, tone: "success" },
+        { label: "Posted Amount", value: loading ? "—" : accountingMoney(receiptStats.postedAmount), tone: "default" },
+        { label: "Voided", value: loading ? "—" : receiptStats.voided, tone: !loading && receiptStats.voided > 0 ? "warning" : "success" },
+      ]}
     >
       <ERPSectionShell
         title="Billing control directory"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -57,6 +57,18 @@ export default function BillingInvoicesPage() {
   useEffect(() => {
     void loadPage();
   }, [loadPage]);
+
+  const invoiceStats = useMemo(() => {
+    const isHistory = (status: unknown) =>
+      ["VOID", "CANCELLED", "REVERSED", "CREDITED_FULLY"].includes(String(status || "").toUpperCase());
+    const totalValue = rows.reduce((sum, row) => sum + Number(row.grand_total || 0), 0);
+    const outstanding = rows.reduce(
+      (sum, row) => (isHistory(row.status) ? sum : sum + Number(row.balance_total || 0)),
+      0
+    );
+    const posted = rows.filter((row) => String(row.status || "").toUpperCase() === "POSTED").length;
+    return { totalValue, outstanding, posted };
+  }, [rows]);
 
   const columns: EnterpriseColumnDef<BillingInvoice>[] = [
     { key: "invoice_date", header: "Date", render: (row) => accountingDate(row.invoice_date) },
@@ -172,6 +184,12 @@ export default function BillingInvoicesPage() {
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Invoices", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Posted", value: loading ? "—" : invoiceStats.posted, tone: "success" },
+        { label: "Total Value", value: loading ? "—" : accountingMoney(invoiceStats.totalValue), tone: "default" },
+        { label: "Active Outstanding", value: loading ? "—" : accountingMoney(invoiceStats.outstanding), tone: !loading && invoiceStats.outstanding > 0 ? "warning" : "success" },
+      ]}
     >
       <WorkspaceDirectory
         className="receipt-print-hide"

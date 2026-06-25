@@ -231,6 +231,15 @@ export default function BillingDocumentRegisterPage() {
 
   const filterBadges = Object.entries(filters).filter(([, value]) => Boolean(value));
 
+  const registerStats = useMemo(() => {
+    const count = (kind: RegisterRow["document_kind"]) => rows.filter((row) => row.document_kind === kind).length;
+    return {
+      invoices: count("INVOICE"),
+      receipts: count("RECEIPT"),
+      notes: count("CREDIT_NOTE") + count("DEBIT_NOTE"),
+    };
+  }, [rows]);
+
   return (
     <ERPPageShell
       className="receipt-print-page"
@@ -251,6 +260,12 @@ export default function BillingDocumentRegisterPage() {
         { href: buildAdminBillingInvoicesRoute(filters), label: "Invoice Register", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Documents", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Invoices", value: loading ? "—" : registerStats.invoices, tone: "default" },
+        { label: "Receipts", value: loading ? "—" : registerStats.receipts, tone: "default" },
+        { label: "Credit/Debit Notes", value: loading ? "—" : registerStats.notes, tone: "default" },
+      ]}
     >
       <WorkspaceDirectory
         className="receipt-print-hide"

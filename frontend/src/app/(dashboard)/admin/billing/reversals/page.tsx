@@ -201,6 +201,12 @@ export default function AdminBillingReversalsPage() {
       subtitle="Admin-only control center for direct sale cancellation, returns, receipt voids, customer refunds, and purchase returns."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.root }, { label: "Billing", href: ROUTES.admin.billing }, { label: "Reversals" }]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Pending Returns", value: loading ? "—" : grouped.pendingReturns, tone: !loading && grouped.pendingReturns > 0 ? "warning" : "success" },
+        { label: "Pending Refunds", value: loading ? "—" : grouped.pendingRefunds, tone: !loading && grouped.pendingRefunds > 0 ? "warning" : "success" },
+        { label: "Posted Returns", value: loading ? "—" : grouped.postedReturns, tone: "default" },
+        { label: "Voided Receipts", value: loading ? "—" : grouped.voidedReceipts, tone: "default" },
+      ]}
     >
       <div className="space-y-6">
         {notice ? <div className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{notice}</div> : null}

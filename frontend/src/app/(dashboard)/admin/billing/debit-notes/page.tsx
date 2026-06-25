@@ -83,6 +83,13 @@ export default function BillingDebitNotesPage() {
   ];
 
   const latestPosted = rows.find((row) => row.status === "POSTED");
+  const debitNoteStats = {
+    pending: rows.filter((row) => ["DRAFT", "APPROVED"].includes(String(row.status || "").toUpperCase())).length,
+    posted: rows.filter((row) => String(row.status || "").toUpperCase() === "POSTED").length,
+    postedValue: rows
+      .filter((row) => String(row.status || "").toUpperCase() === "POSTED")
+      .reduce((sum, row) => sum + Number(row.total_adjustment || 0), 0),
+  };
 
   return (
     <ERPPageShell
@@ -98,6 +105,12 @@ export default function BillingDebitNotesPage() {
         { label: "Debit Notes" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Debit Notes", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Pending", value: loading ? "—" : debitNoteStats.pending, tone: !loading && debitNoteStats.pending > 0 ? "warning" : "success" },
+        { label: "Posted", value: loading ? "—" : debitNoteStats.posted, tone: "default" },
+        { label: "Posted Value", value: loading ? "—" : accountingMoney(debitNoteStats.postedValue), tone: "default" },
+      ]}
     >
       <WorkspaceDirectory
         className="receipt-print-hide"
