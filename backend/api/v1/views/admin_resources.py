@@ -1640,6 +1640,17 @@ class LuckyDrawAdminViewSet(AdminOnlyModelViewSet):
 class LuckyIdAdminViewSet(AdminOnlyModelViewSet):
     queryset = (
         LuckyId.objects.select_related("batch")
+        .prefetch_related(
+            # Performance: prefetch linked subscriptions (ordered, with customer)
+            # so the serializer resolves active/latest assignment from cache
+            # instead of querying per row.
+            Prefetch(
+                "subscriptions",
+                queryset=Subscription.objects.select_related("customer").order_by(
+                    "-created_at", "-id"
+                ),
+            )
+        )
         .all()
         .order_by("batch_id", "lucky_number")
     )

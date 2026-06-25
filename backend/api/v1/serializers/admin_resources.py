@@ -54,7 +54,7 @@ from subscriptions.services.subscription_financial_service import (
     build_subscription_financial_snapshot,
 )
 from subscriptions.services.lucky_id_release_service import PRE_LOCK_BATCH_STATUSES
-from core.services.operational_visibility import subscription_batch_active_q
+from core.services.operational_visibility import ACTIVE_BATCH_SUBSCRIPTION_STATUSES
 
 
 def q2(value: Decimal) -> Decimal:
@@ -946,6 +946,22 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+    def _linked_subscriptions(self, obj):
+        """Linked subscriptions for this lucky id, newest first.
+
+        Uses the prefetched ``subscriptions`` (ordered -created_at, -id with
+        customer select_related) to keep list serialization at O(1) queries.
+        Falls back to a single query when not prefetched.
+        """
+        prefetched = getattr(obj, "_prefetched_objects_cache", {}) or {}
+        if "subscriptions" in prefetched:
+            return list(prefetched["subscriptions"])
+        return list(
+            Subscription.objects.select_related("customer")
+            .filter(lucky_id=obj)
+            .order_by("-created_at", "-id")
+        )
+
     def _active_linked_subscription(self, obj):
         cache = getattr(self, "_active_linked_subscription_cache", None)
         if cache is None:
@@ -953,12 +969,13 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             self._active_linked_subscription_cache = cache
 
         if obj.pk not in cache:
-            cache[obj.pk] = (
-                Subscription.objects.select_related("customer")
-                .filter(lucky_id=obj)
-                .filter(subscription_batch_active_q())
-                .order_by("-created_at", "-id")
-                .first()
+            cache[obj.pk] = next(
+                (
+                    sub
+                    for sub in self._linked_subscriptions(obj)
+                    if sub.status in ACTIVE_BATCH_SUBSCRIPTION_STATUSES
+                ),
+                None,
             )
 
         return cache[obj.pk]
@@ -970,12 +987,8 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             self._latest_linked_subscription_cache = cache
 
         if obj.pk not in cache:
-            cache[obj.pk] = (
-                Subscription.objects.select_related("customer")
-                .filter(lucky_id=obj)
-                .order_by("-created_at", "-id")
-                .first()
-            )
+            subs = self._linked_subscriptions(obj)
+            cache[obj.pk] = subs[0] if subs else None
 
         return cache[obj.pk]
 
@@ -1075,22 +1088,35 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
             ).exists()
         return cache[obj.pk]
 
-    def _latest_release_audit(self, obj):
-        cache = getattr(self, "_latest_release_audit_cache", None)
-        if cache is None:
-            cache = {}
-            self._latest_release_audit_cache = cache
-        if obj.pk not in cache:
-            cache[obj.pk] = (
-                AuditLog.objects.filter(
-                    model_name="Subscription",
-                    metadata__event="LUCKY_ID_RELEASED_FROM_CANCELLED_SUBSCRIPTION",
-                    metadata__lucky_id=obj.pk,
-                )
-                .order_by("-created_at", "-id")
-                .first()
+    def _release_audit_map(self):
+        """One-shot map {lucky_id_pk: audit_id} of lucky-id release events.
+
+        Built once per serializer instance (reused across all rows in a
+        ``many=True`` render) so the lucky-id list avoids a per-row AuditLog
+        query. The release event is a narrow, low-volume audit type.
+        """
+        cache = getattr(self, "_release_audit_map_cache", None)
+        if cache is not None:
+            return cache
+        mapping: dict[int, int] = {}
+        rows = (
+            AuditLog.objects.filter(
+                model_name="Subscription",
+                metadata__event="LUCKY_ID_RELEASED_FROM_CANCELLED_SUBSCRIPTION",
             )
-        return cache[obj.pk]
+            .order_by("-created_at", "-id")
+            .values("id", "metadata")
+        )
+        for row in rows:
+            lucky_pk = (row.get("metadata") or {}).get("lucky_id")
+            if lucky_pk is not None and lucky_pk not in mapping:
+                mapping[lucky_pk] = row["id"]  # first seen = latest (ordered)
+        self._release_audit_map_cache = mapping
+        return mapping
+
+    def _latest_release_audit(self, obj):
+        # Returns a truthy audit id (or None); callers only test truthiness.
+        return self._release_audit_map().get(obj.pk)
 
     def get_assignable(self, obj):
         return (
@@ -1854,20 +1880,23 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         )
 
     def get_emi_count(self, obj):
-        return obj.emis.count()
+        # Use the prefetched emis (prefetch_related("emis")) instead of .count()
+        # so list serialization stays O(1) queries instead of N+1. Falls back to
+        # a single query when emis isn't prefetched.
+        return len(obj.emis.all())
 
     def get_delivery_status(self, obj):
         current_delivery = get_current_subscription_delivery(obj)
         return getattr(current_delivery, "status", None)
 
     def get_paid_emi_count(self, obj):
-        return obj.emis.filter(status=EmiStatus.PAID).count()
+        return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.PAID)
 
     def get_pending_emi_count(self, obj):
-        return obj.emis.filter(status=EmiStatus.PENDING).count()
+        return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.PENDING)
 
     def get_waived_emi_count(self, obj):
-        return obj.emis.filter(status=EmiStatus.WAIVED).count()
+        return sum(1 for emi in obj.emis.all() if emi.status == EmiStatus.WAIVED)
 
     def validate(self, attrs):
         instance = self.instance
