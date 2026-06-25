@@ -592,7 +592,11 @@ class BatchAdminViewSet(AdminOnlyModelViewSet):
 # already imported, but ensure it's there
 
 class CustomerAdminViewSet(AdminOnlyModelViewSet):
-    queryset = Customer.objects.select_related("user").all().order_by("-created_at")
+    queryset = (
+        Customer.objects.select_related("user", "kyc_reviewed_by")
+        .all()
+        .order_by("-created_at")
+    )
     serializer_class = CustomerAdminSerializer
 
     def get_queryset(self):
@@ -702,6 +706,31 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
                 ),
                 zero_money,
             ),
+        )
+
+        # Performance: resolve latest non-empty GSTIN via subqueries so the
+        # serializer reads annotations instead of querying direct_sales and
+        # billing_invoices per customer row (function-level import avoids any
+        # cross-app circular import at module load).
+        from billing.models import BillingInvoice, DirectSale
+
+        gstin_from_sales_sq = (
+            DirectSale.objects.filter(customer_id=OuterRef("pk"))
+            .exclude(customer_gstin__isnull=True)
+            .exclude(customer_gstin__exact="")
+            .order_by("-id")
+            .values("customer_gstin")[:1]
+        )
+        gstin_from_invoices_sq = (
+            BillingInvoice.objects.filter(customer_id=OuterRef("pk"))
+            .exclude(customer_gstin__isnull=True)
+            .exclude(customer_gstin__exact="")
+            .order_by("-id")
+            .values("customer_gstin")[:1]
+        )
+        queryset = queryset.annotate(
+            gstin_from_sales=Subquery(gstin_from_sales_sq),
+            gstin_from_invoices=Subquery(gstin_from_invoices_sq),
         )
 
         search = (
@@ -1251,6 +1280,31 @@ class EmiAdminViewSet(AdminOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+
+        # Performance: precompute net-paid via two correlated subqueries so the
+        # serializer reads annotations instead of running aggregate queries per
+        # row. Mirrors Emi.net_paid_amount() = Σ(EMI_PAYMENT) − Σ(PAYMENT_REVERSAL).
+        zero_money = Value(
+            Decimal("0.00"),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+        ledger_base = FinancialLedger.objects.filter(emi_id=OuterRef("pk"))
+        paid_subquery = (
+            ledger_base.filter(entry_type=LedgerEntryType.EMI_PAYMENT)
+            .values("emi_id")
+            .annotate(total=Sum("amount"))
+            .values("total")[:1]
+        )
+        reversal_subquery = (
+            ledger_base.filter(entry_type=LedgerEntryType.PAYMENT_REVERSAL)
+            .values("emi_id")
+            .annotate(total=Sum("amount"))
+            .values("total")[:1]
+        )
+        queryset = queryset.annotate(
+            paid_ledger_total=Coalesce(Subquery(paid_subquery), zero_money),
+            reversal_ledger_total=Coalesce(Subquery(reversal_subquery), zero_money),
+        )
 
         subscription_id = self.request.query_params.get("subscription")
         customer_id = self.request.query_params.get("customer")

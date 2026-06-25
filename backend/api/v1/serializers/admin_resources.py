@@ -271,6 +271,15 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
         return "ACTIVE" if obj.user.is_active else "INACTIVE"
 
     def get_gstin(self, obj):
+        # Prefer list-view annotations (gstin_from_sales / gstin_from_invoices)
+        # to avoid querying direct_sales and billing_invoices per row. Falls back
+        # to live queries when annotations are absent (e.g. detail retrieve).
+        if hasattr(obj, "gstin_from_sales") or hasattr(obj, "gstin_from_invoices"):
+            return (
+                getattr(obj, "gstin_from_sales", None)
+                or getattr(obj, "gstin_from_invoices", None)
+                or ""
+            )
         latest_direct_sale_gstin = (
             obj.direct_sales.exclude(customer_gstin__isnull=True)
             .exclude(customer_gstin__exact="")
@@ -574,6 +583,25 @@ class EmiAdminSerializer(serializers.ModelSerializer):
             "overdue_days",
         )
 
+    def _net_paid(self, obj):
+        """Net paid for this EMI, preferring queryset annotations to avoid N+1.
+
+        Mirrors Emi.net_paid_amount(); falls back to the model method when the
+        list-view annotations (paid_ledger_total / reversal_ledger_total) are
+        absent (e.g. detail retrieve, or other callers).
+        """
+        cached = getattr(obj, "_net_paid_cache", None)
+        if cached is not None:
+            return cached
+        paid = getattr(obj, "paid_ledger_total", None)
+        reversal = getattr(obj, "reversal_ledger_total", None)
+        if paid is not None and reversal is not None:
+            net = q2(max(q2(paid) - q2(reversal), MONEY_ZERO))
+        else:
+            net = obj.net_paid_amount()
+        obj._net_paid_cache = net
+        return net
+
     def get_total_installments(self, obj):
         return getattr(obj.subscription, "tenure_months", None)
 
@@ -590,7 +618,7 @@ class EmiAdminSerializer(serializers.ModelSerializer):
     def get_paid_amount(self, obj):
         if obj.status == EmiStatus.WAIVED:
             return "0.00"
-        return str(obj.total_paid())
+        return str(self._net_paid(obj))
 
     def get_waived_amount(self, obj):
         return str(obj.amount if obj.status == EmiStatus.WAIVED else Decimal("0.00"))
@@ -598,14 +626,14 @@ class EmiAdminSerializer(serializers.ModelSerializer):
     def get_outstanding_amount(self, obj):
         if obj.status == EmiStatus.WAIVED:
             return "0.00"
-        outstanding = obj.amount - obj.total_paid()
+        outstanding = q2(obj.amount) - self._net_paid(obj)
         return str(max(outstanding, Decimal("0.00")))
 
     def get_total_paid(self, obj):
-        return str(obj.total_paid())
+        return str(self._net_paid(obj))
 
     def get_balance_amount(self, obj):
-        return str(obj.balance_amount())
+        return str(max(q2(obj.amount) - self._net_paid(obj), MONEY_ZERO))
 
     def get_is_overdue(self, obj):
         return bool(obj.is_overdue())
