@@ -236,7 +236,7 @@ export default function BusinessSetupDocumentNumberingPage() {
         <section className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">
           <div className="font-semibold">Readiness blockers</div>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            {data.setup_blockers.map((item) => <li key={item}>{item}</li>)}
+            {data.setup_blockers.map((item, index) => <li key={`setup-blocker-${index}`}>{item}</li>)}
           </ul>
         </section>
       ) : null}
@@ -311,8 +311,8 @@ export default function BusinessSetupDocumentNumberingPage() {
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="text-sm font-semibold text-foreground">Operator rules</div>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {data.operator_rules.map((rule) => (
-              <div key={rule} className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+            {data.operator_rules.map((rule, index) => (
+              <div key={`operator-rule-${index}`} className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
                 {rule}
               </div>
             ))}
@@ -377,11 +377,11 @@ export default function BusinessSetupDocumentNumberingPage() {
 
                 {[...(sequence.blockers || []), ...(sequence.warnings || [])].length ? (
                   <div className="grid gap-2">
-                    {(sequence.blockers || []).map((item) => (
-                      <div key={item} className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">{item}</div>
+                    {(sequence.blockers || []).map((item, index) => (
+                      <div key={`${sequence.key}-blocker-${index}`} className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">{item}</div>
                     ))}
-                    {(sequence.warnings || []).map((item) => (
-                      <div key={item} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">{item}</div>
+                    {(sequence.warnings || []).map((item, index) => (
+                      <div key={`${sequence.key}-warning-${index}`} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">{item}</div>
                     ))}
                   </div>
                 ) : null}
