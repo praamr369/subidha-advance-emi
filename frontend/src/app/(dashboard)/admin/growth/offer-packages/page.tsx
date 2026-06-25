@@ -55,6 +55,10 @@ export default function OfferPackagesPage() {
         { label: "Offer Packages" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Packages", value: loading ? "—" : packages.length, tone: "info" },
+        { label: "Active", value: loading ? "—" : packages.filter(p => String(p.status).toUpperCase() === "ACTIVE").length, tone: "success" },
+      ]}
     >
       {packages.length === 0 ? (
         <ERPEmptyState title="No offer packages" description="No offer packages configured yet." />

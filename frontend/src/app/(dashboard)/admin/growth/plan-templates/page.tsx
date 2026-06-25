@@ -49,6 +49,9 @@ export default function PlanTemplatesPage() {
         { label: "Plan Templates" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Plan Templates", value: loading ? "—" : templates.length, tone: "info" },
+      ]}
     >
       {templates.length === 0 ? (
         <ERPEmptyState title="No plan templates" description="No plan templates configured yet." />

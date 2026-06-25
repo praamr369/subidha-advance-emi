@@ -67,6 +67,9 @@ export default function PartnerPerformancePage() {
         { label: "Partner Performance" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Active Partners", value: loading ? "—" : partners.length, tone: "info" },
+      ]}
     >
       {partners.length === 0 ? (
         <ERPEmptyState title="No partners" description="No active partners found." />

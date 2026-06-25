@@ -117,6 +117,11 @@ export default function GrowthRequestsPage() {
         { label: "Growth Requests" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Requests", value: loading ? "—" : requests.length, tone: "info" },
+        { label: "Submitted", value: loading ? "—" : requests.filter(r => String(r.status).toUpperCase() === "SUBMITTED").length, tone: !loading && requests.filter(r => String(r.status).toUpperCase() === "SUBMITTED").length > 0 ? "warning" : "success" },
+        { label: "Approved", value: loading ? "—" : requests.filter(r => String(r.status).toUpperCase() === "APPROVED").length, tone: "success" },
+      ]}
     >
       {successMsg ? (
         <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">

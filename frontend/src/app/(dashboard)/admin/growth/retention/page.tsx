@@ -87,6 +87,10 @@ export default function RetentionIntelligencePage() {
         { label: "Retention Intelligence" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Signals", value: loading ? "—" : total, tone: !loading && total > 0 ? "warning" : "success" },
+        { label: "Critical / High", value: loading ? "—" : profiles.filter(p => p.has_critical || p.has_high).length, tone: !loading && profiles.filter(p => p.has_critical || p.has_high).length > 0 ? "danger" : "success" },
+      ]}
     >
       {profiles.length === 0 ? (
         <ERPEmptyState
