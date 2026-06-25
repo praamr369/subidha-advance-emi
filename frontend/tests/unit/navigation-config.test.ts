@@ -93,3 +93,19 @@ test("vendor role navigation exists", () => {
   assert.ok(navigationSource.includes('href: "/vendor/ledger"') || navigationSource.includes("VENDOR_ROUTES"));
   assert.ok(navigationSource.includes('href: "/vendor/notifications"') || navigationSource.includes("VENDOR_ROUTES"));
 });
+
+test("Settings & Governance sidebar includes business compliance route", () => {
+  const lines = registrySource.split("\n");
+  const settingsStart = lines.findIndex((line) => line.includes('"Settings & Governance"'));
+  assert.ok(settingsStart !== -1, "Settings & Governance group not found in registry");
+
+  const settingsBlock = lines.slice(settingsStart).join("\n");
+  assert.ok(
+    settingsBlock.includes("ROUTES.admin.settingsBusinessCompliance"),
+    "Settings & Governance sidebar must expose Business Compliance"
+  );
+  assert.ok(
+    settingsBlock.includes("Contract templates, e-sign evidence"),
+    "Business Compliance sidebar description must expose contract/e-sign governance scope"
+  );
+});

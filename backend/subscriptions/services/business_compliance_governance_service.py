@@ -144,6 +144,138 @@ BUSINESS_COMPLIANCE_TEMPLATES: tuple[BusinessComplianceTemplate, ...] = (
         readiness_impact="Recommended evidence. Missing evidence creates a warning only.",
     ),
     BusinessComplianceTemplate(
+        key="contract-template-family",
+        label="Contract Template Family",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="Versioned master, partner, vendor, customer EMI, rental, and lease agreement templates for movable furniture transactions.",
+        recommended_action="Upload the approved template pack or legal sign-off memo. Include template version, clause variants, and effective date.",
+        readiness_impact="Required legal architecture evidence for partner, vendor, customer EMI, rent, lease, and direct-sale contract flows.",
+    ),
+    BusinessComplianceTemplate(
+        key="seller-of-record-control",
+        label="Seller / Lessor of Record Control",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="Operational control proving every order or contract has one immutable seller, lessor, vendor, financier, and platform-role decision.",
+        recommended_action="Upload the implementation note, SOP, or test evidence showing direct-seller, marketplace, rent, lease, and GST invoice role separation.",
+        readiness_impact="Required to prevent mixed legal/GST responsibility inside one order, invoice, or contract chain.",
+    ),
+    BusinessComplianceTemplate(
+        key="explicit-consent-ui",
+        label="Explicit Consent UI",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="Unticked checkbox and consent-screen evidence for terms, commercial summary, electronic records, privacy, and e-KYC consent where used.",
+        recommended_action="Upload screenshots, QA notes, or release evidence confirming no pre-ticked consent and separate assent capture for high-risk flows.",
+        readiness_impact="Required evidence that customer, partner, and vendor acceptance flows avoid automatic or bundled consent.",
+    ),
+    BusinessComplianceTemplate(
+        key="signature-tiering-policy",
+        label="Signature Tiering Policy",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="Policy deciding when to use eSign/DSC versus clickwrap, covering partner, vendor, EMI, rental, lease, deposit, and high-value contracts.",
+        recommended_action="Upload the approved tiering matrix and make sure low-risk clickwrap is deliberately documented, not accidental fallback.",
+        readiness_impact="Required before relying on digital execution for credit-like, rent, lease, deposit, indemnity, or business-counterparty contracts.",
+    ),
+    BusinessComplianceTemplate(
+        key="signature-evidence-package",
+        label="Signature Evidence Package",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="Evidence retention design for document hash, template version, IP, device, user agent, OTP status, acknowledgement, and delivery/archive events.",
+        recommended_action="Upload the evidence schema, audit-vault SOP, or endpoint test proof showing signed/clickwrap records remain exportable and immutable in spirit.",
+        readiness_impact="Required so contract formation, dispatch, receipt, acknowledgement, and later proof are auditable.",
+    ),
+    BusinessComplianceTemplate(
+        key="certificate-validation-timestamping",
+        label="Certificate Validation & Timestamping",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="CCA/eSign readiness evidence for certificate-chain validation, OCSP/CRL status, certificate serial capture, and RFC 3161 timestamp handling.",
+        recommended_action="Upload eSign provider configuration evidence, sandbox validation logs, or a signed provider SOP before enabling eSign/DSC execution.",
+        readiness_impact="Required for high-assurance electronic signatures; unresolved evidence blocks production eSign reliance.",
+    ),
+    BusinessComplianceTemplate(
+        key="stamp-duty-control",
+        label="Stamp Duty / e-Stamp Control",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="Jurisdiction-sensitive stamping or e-stamping control for agreements where stamp duty applies.",
+        recommended_action="Upload the state-wise stamp matrix, e-stamp SOP, or legal sign-off that identifies which documents must be stamped before reliance.",
+        readiness_impact="Required because electronic signing does not cure stamp-duty defects.",
+    ),
+    BusinessComplianceTemplate(
+        key="gst-eco-tcs-workflow",
+        label="GST / ECO / TCS Workflow Control",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="Tax workflow evidence showing platform-versus-vendor invoice responsibility, advance receipt treatment, GST fields, and ECO/TCS posture.",
+        recommended_action="Upload tax SOP, invoice-role matrix, or release evidence tying seller-of-record and collection model to invoice and accounting behavior.",
+        readiness_impact="Required to prevent GST and seller-of-record mismatch across direct sale, EMI, rent, lease, and marketplace-style flows.",
+    ),
+    BusinessComplianceTemplate(
+        key="grievance-disclosure-sla",
+        label="Grievance Disclosure & SLA",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=SUMMARY_ONLY,
+        description="Consumer grievance officer details and workflow evidence for acknowledgement within 48 hours and target redressal within one month.",
+        recommended_action="Upload grievance SOP and approve only a public-safe summary for customer disclosure pages.",
+        readiness_impact="Required for e-commerce disclosure and complaint-routing readiness.",
+    ),
+    BusinessComplianceTemplate(
+        key="direct-selling-partner-control",
+        label="Direct-Selling Partner Control",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="Partner contract and compensation-control evidence showing transaction-linked earnings and no pyramid or recruitment-linked payout logic.",
+        recommended_action="Upload partner agreement approval, compensation SOP, or control evidence from commission setup.",
+        readiness_impact="Required before scaling partner/direct-selling activity.",
+    ),
+    BusinessComplianceTemplate(
+        key="privacy-kyc-data-minimisation",
+        label="Privacy / KYC Data Minimisation",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=REQUIRED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="Privacy architecture evidence for purpose limitation, consent, KYC data minimisation, no raw biometric storage, and future DPDP readiness.",
+        recommended_action="Upload privacy/KYC SOP, data-retention matrix, or provider evidence for Aadhaar/offline e-KYC handling.",
+        readiness_impact="Required before identity verification or e-KYC flows are treated as production-ready.",
+    ),
+    BusinessComplianceTemplate(
+        key="signed-document-delivery-archive",
+        label="Signed Document Delivery & Archive",
+        document_type=BusinessComplianceDocumentType.OTHER,
+        required_level=RECOMMENDED,
+        visibility_default=BusinessComplianceDocumentVisibility.PRIVATE,
+        allowed_public_exposure=PRIVATE_ONLY,
+        description="Post-sign delivery and archive proof for signed PDFs, acknowledgement receipts, dashboard downloads, and evidence export.",
+        recommended_action="Upload release evidence showing signed/clickwrap records are delivered and archived for customer, partner, and vendor dashboards.",
+        readiness_impact="Recommended operational proof. Missing evidence creates a warning until dashboard archive/export is verified.",
+    ),
+    BusinessComplianceTemplate(
         key="proprietor-id-proof",
         label="Proprietor ID Proof",
         document_type=BusinessComplianceDocumentType.OTHER,
@@ -485,6 +617,16 @@ def _approved_exists(document_types: set[str]) -> bool:
     ).exclude(file="").exists()
 
 
+def _approved_template_exists(template_key: str) -> bool:
+    return BusinessComplianceDocument.objects.filter(
+        review_state__source_template_key=template_key,
+        verification_status=BusinessComplianceDocumentVerificationStatus.VERIFIED,
+        is_active=True,
+        file__isnull=False,
+        review_state__review_status=BusinessComplianceReviewStatus.APPROVED,
+    ).exclude(file="").exists()
+
+
 def _pending_count() -> int:
     return BusinessComplianceDocument.objects.filter(
         is_active=True,
@@ -517,6 +659,15 @@ def build_business_compliance_readiness() -> dict[str, Any]:
             "ready": _approved_exists({BusinessComplianceDocumentType.BANK_PROOF}),
         },
     ]
+    requirement_checks.extend(
+        {
+            "key": template.key,
+            "label": template.label,
+            "ready": _approved_template_exists(template.key),
+        }
+        for template in BUSINESS_COMPLIANCE_TEMPLATES
+        if template.required_level == REQUIRED and template.document_type == BusinessComplianceDocumentType.OTHER
+    )
     missing_required = [row for row in requirement_checks if not row["ready"]]
     approved_required_count = len(requirement_checks) - len(missing_required)
 
@@ -537,6 +688,15 @@ def build_business_compliance_readiness() -> dict[str, Any]:
             "ready": _approved_exists({BusinessComplianceDocumentType.SHOP_LICENSE}),
         },
     ]
+    recommended_checks.extend(
+        {
+            "key": template.key,
+            "label": template.label,
+            "ready": _approved_template_exists(template.key),
+        }
+        for template in BUSINESS_COMPLIANCE_TEMPLATES
+        if template.required_level == RECOMMENDED and template.document_type == BusinessComplianceDocumentType.OTHER
+    )
     recommended_missing = [row for row in recommended_checks if not row["ready"]]
 
     active_documents = BusinessComplianceDocument.objects.filter(is_active=True)

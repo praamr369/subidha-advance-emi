@@ -12,7 +12,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -40,6 +40,13 @@ test("HR canonical route paths are correct", () => {
   assert.ok(routesSource.includes('"/admin/hr/leave"'), "Missing /admin/hr/leave");
   assert.ok(routesSource.includes('"/admin/hr/expenses"'), "Missing /admin/hr/expenses");
   assert.ok(routesSource.includes('"/admin/hr/staff-documents"'), "Missing /admin/hr/staff-documents");
+});
+
+test("/admin/hr/expense-claims compatibility alias page exists", () => {
+  const aliasPage = join(thisFileDir, "../../src/app/(dashboard)/admin/hr/expense-claims/page.tsx");
+  assert.ok(existsSync(aliasPage), "Missing /admin/hr/expense-claims compatibility alias page");
+  const aliasSource = readFileSync(aliasPage, "utf8");
+  assert.ok(aliasSource.includes('redirect("/admin/hr/expenses")'), "Expense claims alias must redirect to /admin/hr/expenses");
 });
 
 // ── 2. HR & Staff registry group contains all 8 HR source workflow routes ────

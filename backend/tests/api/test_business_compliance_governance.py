@@ -19,6 +19,7 @@ from subscriptions.models_business_setup import (
 from subscriptions.services.business_compliance_governance_service import (
     build_business_compliance_readiness,
     is_publicly_downloadable,
+    list_business_compliance_templates,
     seed_business_compliance_rows,
 )
 from subscriptions.services.business_compliance_public_summary_service import get_public_business_compliance_summary
@@ -48,6 +49,38 @@ class BusinessComplianceGovernanceTests(APITestCase):
         self.assertIn("ownership-proof", keys)
         self.assertIn("gst-certificate", keys)
         self.assertIn("other-compliance-proof", keys)
+        self.assertIn("contract-template-family", keys)
+        self.assertIn("seller-of-record-control", keys)
+        self.assertIn("signature-evidence-package", keys)
+        self.assertIn("certificate-validation-timestamping", keys)
+        self.assertIn("stamp-duty-control", keys)
+        self.assertIn("gst-eco-tcs-workflow", keys)
+        self.assertIn("grievance-disclosure-sla", keys)
+
+    def test_contracting_report_controls_are_seeded_with_distinct_template_keys(self):
+        seed_business_compliance_rows(performed_by=self.admin)
+
+        expected_keys = {
+            "contract-template-family",
+            "seller-of-record-control",
+            "explicit-consent-ui",
+            "signature-tiering-policy",
+            "signature-evidence-package",
+            "certificate-validation-timestamping",
+            "stamp-duty-control",
+            "gst-eco-tcs-workflow",
+            "grievance-disclosure-sla",
+            "direct-selling-partner-control",
+            "privacy-kyc-data-minimisation",
+        }
+        states = BusinessComplianceDocumentReviewState.objects.filter(source_template_key__in=expected_keys)
+        self.assertEqual(set(states.values_list("source_template_key", flat=True)), expected_keys)
+        self.assertFalse(
+            BusinessComplianceDocument.objects.filter(
+                review_state__source_template_key__in=expected_keys,
+                verification_status=BusinessComplianceDocumentVerificationStatus.VERIFIED,
+            ).exists()
+        )
 
     def test_seed_rows_is_idempotent_private_pending_and_does_not_overwrite_existing(self):
         existing = BusinessComplianceDocument.objects.create(
@@ -171,21 +204,18 @@ class BusinessComplianceGovernanceTests(APITestCase):
         self.assertGreater(readiness["pending_review_count"], 0)
         self.assertGreater(readiness["missing_file_count"], 0)
 
-        for document_type, title in [
-            (BusinessComplianceDocumentType.OWNERSHIP_PROOF, "Ownership Proof"),
-            (BusinessComplianceDocumentType.SHOP_LICENSE, "Business Address Proof"),
-            (BusinessComplianceDocumentType.PAN_OR_TAX_PROOF, "PAN / Tax Proof"),
-            (BusinessComplianceDocumentType.BANK_PROOF, "Bank Proof"),
-        ]:
-            row = BusinessComplianceDocument.objects.create(
-                document_type=document_type,
-                title=title,
-                public_visibility=BusinessComplianceDocumentVisibility.PRIVATE,
-                verification_status=BusinessComplianceDocumentVerificationStatus.PENDING,
-                file=self._evidence_file(f"{document_type.lower()}.pdf"),
-                uploaded_by=self.admin,
-                reviewed_by=self.admin,
-            )
+        required_template_keys = {
+            template["key"]
+            for template in list_business_compliance_templates()
+            if template["required_level"] == "REQUIRED"
+        }
+        seeded_keys = set(BusinessComplianceDocument.objects.values_list("review_state__source_template_key", flat=True))
+        self.assertTrue(required_template_keys.issubset(seeded_keys))
+
+        for row in BusinessComplianceDocument.objects.all():
+            row.file = self._evidence_file(f"{row.review_state.source_template_key}.pdf")
+            row.reviewed_by = self.admin
+            row.save(update_fields=["file", "reviewed_by", "updated_at"])
             approve_document(row, performed_by=self.admin)
 
         updated = build_business_compliance_readiness()
