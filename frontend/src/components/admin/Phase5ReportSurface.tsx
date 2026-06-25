@@ -48,6 +48,7 @@ export default function Phase5ReportSurface({
   fetcher,
   exportType,
   uiVariant = "default",
+  statusBadge = { label: "Backend Analytics", tone: "info" },
 }: {
   title: string;
   subtitle: string;
@@ -55,6 +56,7 @@ export default function Phase5ReportSurface({
   fetcher: Fetcher;
   exportType?: string;
   uiVariant?: "default" | "erp";
+  statusBadge?: { label: string; tone?: "default" | "success" | "warning" | "danger" | "info" };
 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export default function Phase5ReportSurface({
 
   if (uiVariant === "erp") {
     return (
-      <ERPPageShell title={title} subtitle={subtitle} breadcrumbs={breadcrumbs} headerMode="erp">
+      <ERPPageShell title={title} subtitle={subtitle} breadcrumbs={breadcrumbs} statusBadge={statusBadge} headerMode="erp">
         <ERPSectionShell
           title="Live BI Surface"
           description="Real-data API response with stable chart payload contract."
@@ -145,7 +147,7 @@ export default function Phase5ReportSurface({
   }
 
   return (
-    <PortalPage title={title} subtitle={subtitle} breadcrumbs={breadcrumbs}>
+    <PortalPage title={title} subtitle={subtitle} breadcrumbs={breadcrumbs} statusBadge={statusBadge}>
       <FormSection title="Live BI Surface" description="Real-data API response with stable chart payload contract.">
         <Phase5FilterBar value={filters} onChange={setFilters} />
         <div className="mt-3 flex gap-2">
