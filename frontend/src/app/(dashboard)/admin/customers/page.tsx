@@ -564,6 +564,12 @@ export default function AdminCustomersPage() {
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
       ]}
       statusBadge={{ label: "Customer Profile Source", tone: "info" }}
+      stats={[
+        { label: "Total Customers", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Active", value: loading ? "—" : activeCustomers, tone: "success" },
+        { label: "KYC Pending", value: loading ? "—" : pendingKyc, tone: !loading && pendingKyc > 0 ? "warning" : "success" },
+        { label: "Active Subscriptions", value: loading ? "—" : activeSubscriptions, tone: "default" },
+      ]}
     >
       <RegistryPageShell
         summary={

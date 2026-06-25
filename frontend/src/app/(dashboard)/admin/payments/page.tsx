@@ -544,6 +544,12 @@ export default function AdminPaymentsPage() {
         label: "Payment Register",
         tone: "info",
       }}
+      stats={[
+        { label: "Active Payments", value: loading ? "—" : summary.active_payments, tone: "success" },
+        { label: "Net Collected", value: loading ? "—" : formatRupee(summary.net_collected_amount), tone: "info" },
+        { label: "Reversed", value: loading ? "—" : summary.reversed_payments, tone: !loading && summary.reversed_payments > 0 ? "warning" : "success" },
+        { label: "Visible Total", value: loading ? "—" : summary.visible_payments, tone: "default" },
+      ]}
     >
       <AccountingBridgeReadinessIndicator
         title="EMI payment and collection bridge mappings"

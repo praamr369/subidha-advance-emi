@@ -577,6 +577,12 @@ export default function AdminSubscriptionsPage() {
         label: "Contract Source Workflow",
         tone: "info",
       }}
+      stats={[
+        { label: "Total Matching", value: loading ? "—" : count, tone: "info" },
+        { label: "Active (page)", value: loading ? "—" : pageActiveCount, tone: "success" },
+        { label: "Won (page)", value: loading ? "—" : pageWonCount, tone: "default" },
+        { label: "Page Contract Value", value: loading ? "—" : formatRupee(pageContractValue), tone: "default" },
+      ]}
     >
       <RegistryPageShell
         summary={
