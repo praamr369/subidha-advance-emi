@@ -12,7 +12,7 @@ import {
   accountingErrorMessage,
   accountingMoney,
 } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -99,7 +99,7 @@ export default function AdminSalarySheetDetailPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={salarySheet ? `${salarySheet.employee_code} Payroll` : "Salary Sheet"}
       subtitle="This detail view keeps payslip-ready earnings and deduction lines, approval posture, journal linkage, and payment settlement visible in one place while accounting remains the posted truth."
       breadcrumbs={[
@@ -272,6 +272,6 @@ export default function AdminSalarySheetDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

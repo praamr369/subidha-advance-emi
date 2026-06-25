@@ -7,7 +7,7 @@ import FinanceAccountMappingPanel from "@/components/admin/accounting/FinanceAcc
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   executeCollectionMappingRepair,
@@ -435,24 +435,25 @@ export default function AdminAccountingSetupPage() {
   ];
 
   const guidedSections = [
-    { title: "Money accounts", explanation: "Cash, bank, and UPI accounts are where staff receive or pay real money.", required: ["Cash Counter", "Bank Account", "UPI Account"], accounts: businessFinanceAccounts.filter((account) => ["CASH", "BANK", "UPI"].includes(String(account.kind).toUpperCase())), profiles: [] },
+    { title: "Money accounts", explanation: "Cash, bank, UPI, and payment gateway accounts are where staff receive or pay real money.", required: ["Cash Counter", "Bank Account", "UPI Account", "Payment Gateway"], accounts: businessFinanceAccounts.filter((account) => ["CASH", "BANK", "UPI"].includes(String(account.kind).toUpperCase())), profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["payment_gateway"])) },
     { title: "Liability accounts", explanation: "Customer advance, security deposit, and refund payable balances must remain separate from income.", required: ["Customer Advance", "Security Deposit", "Refund Payable"], accounts: [], profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["advance", "security_deposit", "refund"])) },
-    { title: "Income accounts", explanation: "EMI, rent, lease, and direct sale income mappings affect future postings only.", required: ["EMI Collection", "Rent Income", "Lease Income", "Direct Sale Income"], accounts: [], profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["emi", "rent_lease", "direct_sale"])) },
+    { title: "Income accounts", explanation: "EMI, rent, lease, direct sale, delivery charges, and damage recovery income mappings affect future postings only.", required: ["EMI Collection", "Rent Income", "Lease Income", "Direct Sale Income", "Delivery Charges", "Damage Recovery"], accounts: [], profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["emi", "rent_lease", "direct_sale", "delivery_charges", "damage_recovery"])) },
     { title: "Inventory/COGS", explanation: "Inventory asset, COGS, stock adjustment, and purchase clearing keep stock value auditable.", required: ["Inventory Asset", "COGS", "Stock Adjustment", "Purchase Clearing"], accounts: [], profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["inventory", "purchase"])) },
     { title: "Commission/payout", explanation: "Commission expense and partner payable mappings keep payout liability traceable.", required: ["Commission Expense", "Partner Payable"], accounts: [], profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["commission", "payout"])) },
+    { title: "Expense accounts", explanation: "Delivery expense and salary/payroll postings keep operational costs properly separated from revenue.", required: ["Delivery Expense", "Salary / Payroll"], accounts: [], profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["delivery_expense", "salary_payroll", "salary"])) },
     { title: "Reconciliation clearing", explanation: "Bank, UPI, and suspense clearing accounts help isolate settlement and exception differences.", required: ["Bank clearing", "UPI clearing", "Suspense/exception clearing"], accounts: businessFinanceAccounts.filter((account) => ["BANK", "UPI"].includes(String(account.kind).toUpperCase())), profiles: postingProfileReadiness.filter((item) => profileMatches(item, ["reconciliation", "clearing"])) },
   ];
 
   if (loading) {
     return (
-      <PortalPage title="Accounting Setup" subtitle="Operator-proof setup for finance accounts, posting profiles, and Chart of Accounts health.">
+      <ERPPageShell title="Accounting Setup" subtitle="Operator-proof setup for finance accounts, posting profiles, and Chart of Accounts health.">
         <LoadingBlock label="Loading accounting setup..." />
-      </PortalPage>
+      </ERPPageShell>
     );
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Accounting Setup"
       subtitle="Separate money destinations, ledger posting rules, bridge approval, and close readiness so operators cannot confuse system profiles with collection accounts."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Setup" }]}
@@ -509,6 +510,6 @@ export default function AdminAccountingSetupPage() {
 
         <section className="space-y-3"><div><h2 className="text-lg font-semibold text-foreground">3. Chart of Accounts Health</h2><p className="mt-1 text-sm text-muted-foreground">Chart of Accounts is the ledger structure. Collection accounts must point to active posting-enabled leaf ASSET accounts, not group/control accounts.</p></div><div className="grid gap-3 md:grid-cols-4"><div className="rounded-xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Group/control accounts</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.group_control_count ?? 0}</div></div><div className="rounded-xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Posting leaf accounts</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.posting_leaf_count ?? 0}</div></div><div className="rounded-xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Missing leaf assets</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.missing_posting_leaf_count ?? 0}</div></div><div className="rounded-xl border border-border bg-card p-4"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inactive/non-posting</div><div className="mt-2 text-2xl font-semibold text-foreground">{coaHealth?.counts?.inactive_or_non_posting_count ?? 0}</div></div></div><div className="rounded-xl border border-border bg-card p-4"><div className="text-sm font-semibold text-foreground">COA blockers</div>{(coaHealth?.inactive_or_non_posting_blockers ?? []).length === 0 ? <div className="mt-2 text-sm text-emerald-700">No inactive/non-posting blockers exposed.</div> : <div className="mt-3 overflow-x-auto"><table className="min-w-full text-left text-xs"><thead className="text-muted-foreground"><tr><th className="px-2 py-2">Code</th><th className="px-2 py-2">Name</th><th className="px-2 py-2">Type</th><th className="px-2 py-2">Issue</th></tr></thead><tbody>{(coaHealth?.inactive_or_non_posting_blockers ?? []).slice(0, 12).map((account) => <tr key={`${account.id}-${account.code}`} className="border-t border-border"><td className="px-2 py-2 font-medium text-foreground">{account.code}</td><td className="px-2 py-2">{account.name}</td><td className="px-2 py-2">{account.account_type || account.type}</td><td className="px-2 py-2 text-amber-700">{!account.is_active ? "Inactive" : account.is_group_control ? "Group/control or non-posting" : "Not collection-ready"}</td></tr>)}</tbody></table></div>}</div></section>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

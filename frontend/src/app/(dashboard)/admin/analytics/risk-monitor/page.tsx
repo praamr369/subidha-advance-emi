@@ -6,7 +6,7 @@ import DataTable from "@/components/ui/DataTable";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { listEmis, type EmiRecord } from "@/services/emis";
 
@@ -41,7 +41,7 @@ export default function RiskMonitorPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Risk Monitor"
       subtitle="Read-only overdue EMI risk watchlist for collection escalation. Source-linked report — drill down to Finance Operations / Outstandings to take action."
       headerMode="erp"
@@ -94,6 +94,6 @@ export default function RiskMonitorPage() {
           ]}
         />
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

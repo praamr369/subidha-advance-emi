@@ -6,7 +6,7 @@ import AiSafetyBanner from "@/components/admin/ai/AiSafetyBanner";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatusBadge from "@/components/ui/status-badge";
 import Table from "@/components/ui/table";
 import { ROUTES } from "@/lib/routes";
@@ -55,7 +55,7 @@ export default function AdminAiQueryLogPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="AI Assistant"
       title="AI Query Log"
       subtitle="Read-only audit trail for internal assistant questions and source-grounded responses."
@@ -116,6 +116,6 @@ export default function AdminAiQueryLogPage() {
           />
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

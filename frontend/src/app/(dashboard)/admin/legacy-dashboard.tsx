@@ -34,7 +34,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ADMIN_ENTERPRISE_MODULES } from "@/config/admin-enterprise";
 import {
@@ -817,7 +817,7 @@ export default function AdminDashboardPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Admin Dashboard"
       subtitle="Executive operating console for finance, collections, CRM, subscriptions (EMI / RENT / LEASE), direct sales, inventory, branches, staff, and governance."
       helperNote="All sections below use live module data only. No operational KPI here is synthetic or detached from source modules."
@@ -2152,6 +2152,6 @@ export default function AdminDashboardPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { getPolicies, type BusinessPolicy } from "@/services/control-enterprise";
 
@@ -31,7 +31,7 @@ export default function AdminControlPoliciesPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Enterprise Control"
       title="Business Policies"
       subtitle="Enterprise policy toggles. Changes take effect immediately and are audit-logged."
@@ -74,6 +74,6 @@ export default function AdminControlPoliciesPage() {
           </table>
         </div>
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

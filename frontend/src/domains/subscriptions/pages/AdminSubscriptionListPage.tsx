@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import DataTable from "@/components/ui/DataTable";
 import { listBatches } from "@/services/batches";
 import type { BatchRecord } from "@/services/batches";
@@ -73,7 +73,7 @@ export default function AdminSubscriptionListPage() {
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / 10)), [count]);
 
   return (
-    <PortalPage title="Subscriptions" subtitle="Operational contract list with customer, batch and financial status context.">
+    <ERPPageShell title="Subscriptions" subtitle="Operational contract list with customer, batch and financial status context.">
       <section style={{ display: "grid", gap: 8, gridTemplateColumns: "2fr 1fr 1fr auto", marginBottom: 16 }}>
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by customer, phone, product or lucky ID" />
 
@@ -154,6 +154,6 @@ export default function AdminSubscriptionListPage() {
           </button>
         </div>
       </section>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

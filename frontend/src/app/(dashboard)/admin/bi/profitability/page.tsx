@@ -1,12 +1,12 @@
 "use client";
 
 import BiInsightsDashboard from "@/components/admin/bi/BiInsightsDashboard";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 
 export default function BiProfitabilityPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="BI Control Center"
       title="Profitability View"
       subtitle="Read-only income, waiver, deposit liability, and monthly operating summary."
@@ -18,6 +18,6 @@ export default function BiProfitabilityPage() {
       statusBadge={{ label: "Read Only", tone: "info" }}
     >
       <BiInsightsDashboard mode="profitability" />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

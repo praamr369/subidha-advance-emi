@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { getDataQualityReport, type DQReport, type DQCheck } from "@/services/control-enterprise";
 
@@ -63,7 +63,7 @@ export default function AdminDataQualityPage() {
     : undefined;
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Enterprise Control"
       title="Data Quality Center"
       subtitle="11 read-only integrity checks across customers, products, contracts, payments, and accounting. No records are mutated."
@@ -100,6 +100,6 @@ export default function AdminDataQualityPage() {
           </div>
         </div>
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

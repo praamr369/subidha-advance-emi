@@ -119,7 +119,46 @@ export type AccountingSetupReadinessPayload = {
   };
 };
 
-export type AccountingSetupStatusPayload = Record<string, unknown>;
+export type AccountingSetupStatusPayload = {
+  status: "READY" | "NEEDS_ATTENTION" | string;
+  warnings_count: number;
+  warnings: Array<{ level: string; code: string; message: string; affected_ids?: number[]; repairable?: boolean; operator_action?: string }>;
+  last_validated_at: string;
+  coa_ready: boolean;
+  finance_accounts_ready: boolean;
+  mappings_complete: boolean;
+  missing_required_accounts: string[];
+  missing_required_mappings: string[];
+  required_coa_system_codes: string[];
+  required_mapping_purposes: string[];
+  ledger_anchor_present: boolean;
+  real_settlement_accounts_present: boolean;
+  chart_accounts_total: number;
+  chart_accounts_active: number;
+  chart_accounts_inactive: number;
+  chart_accounts_root: number;
+  chart_accounts_child: number;
+  chart_accounts_active_root: number;
+  chart_accounts_active_child: number;
+  finance_accounts_total: number;
+  finance_accounts_active: number;
+  finance_accounts_inactive: number;
+  required_system_accounts_total: number;
+  required_system_accounts_present: number;
+  required_system_accounts_missing: string[];
+  required_mappings_total: number;
+  required_mappings_complete: number;
+  required_mappings_missing: string[];
+  setup_complete: boolean;
+  journal_ready: boolean;
+  blocking_reasons: string[];
+  posting_readiness: "READY" | "BLOCKED" | string;
+  reconciliation_readiness: "READY" | "BLOCKED" | string;
+  setup_health_status?: string;
+  setup_health_blockers_count?: number;
+  setup_health_warnings_count?: number;
+  bridge_readiness?: Record<string, unknown>;
+};
 
 export type CollectionRepairPreviewPayload = {
   dry_run: boolean;
@@ -140,6 +179,7 @@ const ACCOUNT_CODES: Record<string, string[]> = {
   CASH_COLLECTION: ["CASH-1000", "CASH-1000-P"],
   BANK_COLLECTION: ["BANK-1010", "BANK-1010-P"],
   UPI_COLLECTION: ["UPI-1020", "UPI-1020-P"],
+  PAYMENT_GATEWAY_COLLECTION: ["PGW-1030", "PGW-1030-P"],
   CUSTOMER_RECEIVABLE: ["AR-1000"],
   CUSTOMER_ADVANCE_UNEARNED_REVENUE: ["ADV-2200"],
   EMI_INCOME: ["EMI-4000"],
@@ -149,10 +189,17 @@ const ACCOUNT_CODES: Record<string, string[]> = {
   RENT_INCOME: ["RENT-4000"],
   LEASE_INCOME: ["LEASE-4000"],
   SECURITY_DEPOSIT_LIABILITY: ["SEC-2300"],
-  SALES_RETURNS: ["REV-4010"],
+  DELIVERY_CHARGES_INCOME: ["DEL-4000"],
+  DAMAGE_RECOVERY: ["DMG-4000"],
+  WAIVER_LOSS: ["EMI-5200"],
+  EMI_WAIVER_EXPENSE: ["EMI-5200"],
   COMMISSION_EXPENSE: ["COM-5100"],
+  PARTNER_COMMISSION_EXPENSE: ["COM-5100"],
   COMMISSION_PAYABLE: ["COM-2100"],
   PARTNER_COMMISSION_PAYABLE: ["COM-2100"],
+  DELIVERY_EXPENSE: ["DEL-5100"],
+  SALARY_EXPENSE: ["PAY-5100"],
+  SALES_RETURNS: ["REV-4010"],
   ACCOUNTS_PAYABLE: ["AP-2000"],
   INVENTORY_ASSET: ["INV-1200"],
   INPUT_GST: ["GST-1100"],
@@ -169,6 +216,12 @@ const PROFILE_ROWS = [
   { key: "vendor_payment", label: "Vendor Payment", debit: ["ACCOUNTS_PAYABLE"], credit: ["CASH_COLLECTION", "BANK_COLLECTION", "UPI_COLLECTION"], implemented: true },
   { key: "purchase_inventory", label: "Purchase / Inventory", debit: ["INVENTORY_ASSET", "INPUT_GST"], credit: ["ACCOUNTS_PAYABLE"], implemented: true },
   { key: "reconciliation_clearing", label: "Reconciliation Clearing", debit: ["EMI_COLLECTION_CLEARING", "CUSTOMER_RECEIVABLE"], credit: ["EMI_COLLECTION_CLEARING", "CUSTOMER_RECEIVABLE"], implemented: true },
+  { key: "payment_gateway_collection", label: "Payment Gateway Collection", debit: ["PAYMENT_GATEWAY_COLLECTION"], credit: ["CUSTOMER_RECEIVABLE"], implemented: true },
+  { key: "delivery_charges", label: "Delivery Charges", debit: ["CUSTOMER_RECEIVABLE"], credit: ["DELIVERY_CHARGES_INCOME"], implemented: true },
+  { key: "waiver_expense", label: "EMI Waiver Expense", debit: ["WAIVER_LOSS"], credit: ["CUSTOMER_RECEIVABLE"], implemented: true },
+  { key: "damage_recovery", label: "Damage Recovery", debit: ["CUSTOMER_RECEIVABLE"], credit: ["DAMAGE_RECOVERY"], implemented: true },
+  { key: "delivery_expense", label: "Delivery Expense", debit: ["DELIVERY_EXPENSE"], credit: ["ACCOUNTS_PAYABLE"], implemented: true },
+  { key: "salary_payroll", label: "Salary / Payroll", debit: ["SALARY_EXPENSE"], credit: ["ACCOUNTS_PAYABLE"], implemented: true },
 ] as const;
 
 function normalizeFinanceAccount(account: AccountingSetupReadinessFinanceAccount): AccountingSetupReadinessFinanceAccount {

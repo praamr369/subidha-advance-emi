@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import DataTable from "@/components/ui/DataTable";
 import { getCustomer, type CustomerRecord } from "@/services/customers";
 import { listEmis, type EmiRecord } from "@/services/emis";
@@ -110,7 +110,7 @@ export default function AdminSubscriptionDetailPage() {
   }, [payments, subscription]);
 
   return (
-    <PortalPage title={subscription ? `Subscription #${subscription.id}` : "Subscription Detail"} subtitle="Contract, EMI, payment and reconciliation operational snapshot.">
+    <ERPPageShell title={subscription ? `Subscription #${subscription.id}` : "Subscription Detail"} subtitle="Contract, EMI, payment and reconciliation operational snapshot.">
       <section style={{ marginBottom: 12, display: "flex", gap: 8 }}>
         <button type="button" onClick={() => router.push("/admin/subscriptions")}>Back</button>
         {subscription ? (
@@ -211,6 +211,6 @@ export default function AdminSubscriptionDetailPage() {
           </section>
         </>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

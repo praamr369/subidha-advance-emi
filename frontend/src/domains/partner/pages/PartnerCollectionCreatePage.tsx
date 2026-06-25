@@ -17,7 +17,7 @@ import { normalizeApiError } from "@/services/api/errors";
 import ActionButton from "@/components/ui/ActionButton";
 import FormActions from "@/components/ui/FormActions";
 import FormSection from "@/components/ui/FormSection";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
@@ -335,7 +335,7 @@ export default function PartnerCollectionCreatePage({
   const showAside = variant === "page";
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Partner Collections"
       title={variant === "drawer" ? "Submit collection" : "Submit Collection"}
       subtitle="Partner-scoped collection submission. Verification, posting, and audit controls remain server-enforced."
@@ -691,6 +691,6 @@ export default function PartnerCollectionCreatePage({
           </div>
         </>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

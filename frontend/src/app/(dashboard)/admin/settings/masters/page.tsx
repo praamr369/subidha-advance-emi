@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ADMIN_MASTER_DATA_LANES } from "@/config/admin-enterprise";
 import { ROUTES } from "@/lib/routes";
 
 export default function AdminSettingsMastersPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       title="Master Data"
       subtitle="Reference data that operational modules reuse instead of duplicating product, inventory, or accounting truth."
       breadcrumbs={[
@@ -57,6 +57,6 @@ export default function AdminSettingsMastersPage() {
           </Link>
         </div>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

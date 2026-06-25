@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -59,7 +59,7 @@ export default function AdminInventoryReservationsPage() {
   const rows = useMemo(() => data, [data]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Stock Reservations"
       subtitle="Active stock reservations by item and purpose. Read-only visibility."
       headerMode="erp"
@@ -132,6 +132,6 @@ export default function AdminInventoryReservationsPage() {
           </table>
         </div>
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

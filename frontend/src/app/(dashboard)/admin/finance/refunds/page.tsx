@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { listReversalCases, type ReversalCase } from "@/services/reversal-control";
 
@@ -78,7 +78,7 @@ export default function AdminFinanceRefundsPage() {
   }, [refundRows]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Refunds"
       subtitle="Customer refunds stay source-driven inside reversal control so finance can reconcile, block, or approve them with a full audit trail."
       breadcrumbs={[
@@ -183,6 +183,6 @@ export default function AdminFinanceRefundsPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

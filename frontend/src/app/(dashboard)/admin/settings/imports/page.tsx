@@ -5,7 +5,7 @@ import { useState, type ChangeEvent } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -197,7 +197,7 @@ export default function AdminSettingsImportsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Import Hub"
       subtitle="Use preview and post flows for master-data imports. Live Lucky Plan finance history remains unchanged by these imports."
       breadcrumbs={[
@@ -336,6 +336,6 @@ export default function AdminSettingsImportsPage() {
           Subscription bulk import remains intentionally unavailable here. Opening-balance bulk import is also deferred. Those flows would risk bypassing EMI, reconciliation, posting, or audit controls if they were reduced to unchecked CSV writes.
         </div>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

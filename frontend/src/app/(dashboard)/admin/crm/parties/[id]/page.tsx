@@ -8,7 +8,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import PartyKycPanel from "@/components/kyc/PartyKycPanel";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import {
   buildAdminBillingDocumentRoute,
@@ -224,7 +224,7 @@ export default function AdminCrmPartyDetailPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={payload ? `${payload.party.display_name} · Party 360` : "Party 360 Profile"}
       subtitle="Cross-module Party 360 profile for customers, partners, vendors, and staff. This view supports additive party-profile edits and interaction follow-ups while preserving source-system ownership."
       breadcrumbs={[
@@ -639,6 +639,6 @@ export default function AdminCrmPartyDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

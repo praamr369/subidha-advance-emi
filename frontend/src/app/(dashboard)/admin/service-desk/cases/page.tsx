@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { buildAdminServiceDeskCaseRoute } from "@/lib/route-builders";
 import { getServiceDeskOverview, listServiceDeskCases, type ServiceDeskCase, type ServiceDeskCaseStatus, type ServiceDeskCaseType } from "@/services/service-desk";
@@ -84,7 +84,7 @@ export default function AdminServiceDeskCasesPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Service Desk Cases"
       subtitle="Canonical case register for returns, complaints, exchanges, and after-sales service."
       breadcrumbs={[
@@ -210,6 +210,6 @@ export default function AdminServiceDeskCasesPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

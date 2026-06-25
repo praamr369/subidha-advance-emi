@@ -13,7 +13,7 @@ import {
   accountingFieldClassName,
   accountingMoney,
 } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -167,7 +167,7 @@ export default function AccountingTaxInvoicesPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Tax Invoices"
       subtitle="GST-ready invoice skeletons with controlled numbering and accounting posting. This is additive document handling only, not a tax engine."
       breadcrumbs={[
@@ -393,6 +393,6 @@ export default function AccountingTaxInvoicesPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

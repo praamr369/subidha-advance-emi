@@ -7,7 +7,7 @@ import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -225,7 +225,7 @@ export default function AdminCountersPage() {
   const coverageCount = new Set(rows.map((row) => row.branch)).size;
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Counter & Cash Desk Master"
       subtitle="Map each collection desk to one branch and one finance account so cashier scope, cash discipline, and branch-linked collection reporting stay explicit."
       breadcrumbs={[
@@ -451,6 +451,6 @@ export default function AdminCountersPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

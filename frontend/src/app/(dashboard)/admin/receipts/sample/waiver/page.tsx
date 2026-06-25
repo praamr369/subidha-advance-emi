@@ -2,12 +2,12 @@
 
 import WaiverBenefitReceiptDocument from "@/components/receipts/WaiverBenefitReceiptDocument";
 import PrintActionBanner from "@/components/print/PrintActionBanner";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { toSafeMoney } from "@/lib/print/formatters";
 
 export default function SampleWaiverReceiptPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       title="Sample Waiver / Lucky Draw Benefit Receipt"
       subtitle="Future-EMI-only waiver confirmation document for winner communication."
@@ -43,7 +43,7 @@ export default function SampleWaiverReceiptPage() {
           { label: "Waived Amount", value: toSafeMoney(52500), emphasize: true },
         ]}
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }
 

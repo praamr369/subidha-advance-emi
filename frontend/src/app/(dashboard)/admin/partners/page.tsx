@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import DataTable from "@/components/ui/DataTable";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -222,7 +222,7 @@ export default function AdminPartnersPage() {
   }, [filteredPartners]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Partner Management"
       subtitle="Monitor partner productivity, customer acquisition, active subscriptions, collections workflow visibility, and commercial contribution."
       breadcrumbs={[
@@ -602,6 +602,6 @@ export default function AdminPartnersPage() {
           ) : null}
         </>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

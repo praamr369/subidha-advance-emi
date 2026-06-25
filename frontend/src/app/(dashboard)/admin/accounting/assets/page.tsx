@@ -12,7 +12,7 @@ import {
   accountingFieldClassName,
   accountingMoney,
 } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import type {
@@ -173,7 +173,7 @@ export default function AccountingAssetsPage() {
   ];
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Asset Register"
       subtitle="Asset categories and fixed assets for depreciation-ready accounting, kept separate from operational EMI and payment truth."
       breadcrumbs={[
@@ -317,6 +317,6 @@ export default function AccountingAssetsPage() {
           emptyDescription="Create an asset to begin the fixed-asset register."
         />
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

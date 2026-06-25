@@ -8,7 +8,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatCard from "@/components/ui/StatCard";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -113,7 +113,7 @@ export default function BatchPerformanceReportPage() {
   }, [rows]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Batch Performance"
       subtitle="Operational draw, enrollment, and Lucky ID progression by batch using live per-batch summary endpoints."
       headerMode="erp"
@@ -354,6 +354,6 @@ export default function BatchPerformanceReportPage() {
           </>
         )}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

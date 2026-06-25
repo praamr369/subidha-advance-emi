@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -408,7 +408,7 @@ export default function AccountingBridgeReadinessPage() {
   }, [allEvents]);
 
   if (loading) {
-    return <PortalPage title="Accounting Bridge Readiness" subtitle="Validating bridge mappings and canonical postability."><LoadingBlock label="Loading accounting bridge readiness..." /></PortalPage>;
+    return <ERPPageShell title="Accounting Bridge Readiness" subtitle="Validating bridge mappings and canonical postability."><LoadingBlock label="Loading accounting bridge readiness..." /></ERPPageShell>;
   }
 
   const summary: Partial<AccountingBridgeReadinessPayload["summary"]> = payload?.summary ?? { source_count: allEvents.length };
@@ -422,7 +422,7 @@ export default function AccountingBridgeReadinessPage() {
   const bridgeStatus = activeBlockerCount > 0 ? "Action required" : unsupportedCount > 0 ? "Boundary review" : setupReadyCount > 0 ? "Setup ready" : "Needs review";
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Accounting Bridge Readiness"
       subtitle="Read-only readiness matrix for setup definitions. Real source posting remains inside controlled bridge reconciliation."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Readiness" }]}
@@ -508,6 +508,6 @@ export default function AccountingBridgeReadinessPage() {
           )}
         </WorkspaceSection>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

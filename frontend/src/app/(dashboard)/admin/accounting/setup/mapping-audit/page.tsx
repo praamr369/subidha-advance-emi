@@ -6,7 +6,7 @@ import Link from "next/link";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -328,13 +328,13 @@ export default function AccountingMappingAuditPage() {
     return Array.from(map.entries()).sort(([a], [b]) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
   }, [visibleRows]);
 
-  if (loading) return <PortalPage title="Accounting Mapping Audit" subtitle="Full setup verification for accounting mappings."><LoadingBlock label="Loading mapping audit..." /></PortalPage>;
+  if (loading) return <ERPPageShell title="Accounting Mapping Audit" subtitle="Full setup verification for accounting mappings."><LoadingBlock label="Loading mapping audit..." /></ERPPageShell>;
 
   const summary = payload?.summary ?? { total_events: 0, ready: 0, missing_mapping: 0, conflicts: 0, unsupported: 0, blocked_by_period: 0, blocked_by_numbering: 0 };
   const period = payload?.period_readiness ?? {};
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Accounting Mapping Audit"
       subtitle="Operator remediation view for accounting mappings, blockers, unsupported workflows, and setup routes."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Setup", href: ROUTES.admin.accountingSetup }, { label: "Mapping Audit" }]}
@@ -432,6 +432,6 @@ export default function AccountingMappingAuditPage() {
           </div>
         </details>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

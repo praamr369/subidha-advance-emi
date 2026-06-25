@@ -12,7 +12,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import Card from "@/components/ui/card";
 import DrawerShell from "@/components/ui/DrawerShell";
 import FormField from "@/components/ui/FormField";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   createSource,
@@ -130,7 +130,7 @@ export default function AdminAiSourcesPage() {
   };
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="AI Assistant"
       title="AI Sources"
       subtitle="Approved internal documents for read-only assistant retrieval."
@@ -246,6 +246,6 @@ export default function AdminAiSourcesPage() {
           </FormField>
         </div>
       </DrawerShell>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

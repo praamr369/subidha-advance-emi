@@ -9,7 +9,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import Card from "@/components/ui/card";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -86,7 +86,7 @@ export default function AdminAiSourceDetailPage() {
   };
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="AI Assistant"
       title={source?.title || "AI Source"}
       subtitle="Source metadata and chunk previews for citation review."
@@ -181,6 +181,6 @@ export default function AdminAiSourceDetailPage() {
           </Card>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

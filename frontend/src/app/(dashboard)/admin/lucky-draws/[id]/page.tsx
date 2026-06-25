@@ -14,7 +14,7 @@ import {
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { apiFetch } from "@/lib/api";
 
 type BatchStatus =
@@ -540,7 +540,7 @@ export default function AdminLuckyDrawDetailPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={draw ? `Draw #${draw.id}` : `Lucky Draw #${drawId ?? "—"}`}
       subtitle="Detailed Lucky Draw audit view for commitment, reveal state, winner visibility, and seed-custody status."
       breadcrumbs={[
@@ -886,6 +886,6 @@ export default function AdminLuckyDrawDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

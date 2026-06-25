@@ -6,7 +6,7 @@ import AiSafetyBanner from "@/components/admin/ai/AiSafetyBanner";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import Card from "@/components/ui/card";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { getAiReadiness, isAiDisabledError, type AiReadinessResponse } from "@/services/admin-ai";
 
@@ -45,7 +45,7 @@ export default function AdminAiReadinessPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="AI Assistant"
       title="AI Readiness"
       subtitle="Read-only operational readiness checks for safe AI assistant usage."
@@ -120,7 +120,7 @@ export default function AdminAiReadinessPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }
 

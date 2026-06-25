@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 
 import { PipelineBoard } from "@/components/admin/erp/PipelineBoard";
-import { WorkspaceShell } from "@/components/admin/erp/WorkspaceShell";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import { ROUTES } from "@/lib/routes";
 import { getAdminTodayWork, type ErpCard } from "@/services/admin-erp";
 
 export default function AdminTodayWorkPage() {
@@ -36,9 +37,15 @@ export default function AdminTodayWorkPage() {
   }, []);
 
   return (
-    <WorkspaceShell
+    <ERPPageShell
+      eyebrow="Operations"
       title="Today's Work"
       subtitle="Daily admin action queues from the existing ERP summary service."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Today's Work" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       {error ? <ERPErrorState title="Unable to load today's work" description={error} /> : null}
       {loading ? (
@@ -48,6 +55,6 @@ export default function AdminTodayWorkPage() {
           <PipelineBoard title="Action Queues" cards={cards} />
         </ERPSectionShell>
       )}
-    </WorkspaceShell>
+    </ERPPageShell>
   );
 }

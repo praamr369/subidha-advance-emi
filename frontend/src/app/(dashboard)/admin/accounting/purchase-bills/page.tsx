@@ -15,7 +15,7 @@ import {
 import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import type { InventoryItem, StockLocation } from "@/services/inventory";
@@ -297,7 +297,7 @@ export default function AccountingPurchaseBillsPage() {
   ];
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Accounting Purchase Control"
       title="Purchase Bills"
       subtitle="Draft, approve, and post purchase-side stock inward documents through controlled inventory and accounting services without touching billing, EMI, or payment truth."
@@ -603,6 +603,6 @@ export default function AccountingPurchaseBillsPage() {
           />
         </WorkspaceSection>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

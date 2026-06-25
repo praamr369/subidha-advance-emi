@@ -6,7 +6,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import TableToolbar from "@/components/ui/TableToolbar";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import DataTable from "@/components/ui/DataTable";
 import StatusBadge from "@/components/ui/status-badge";
 import { DataTableShell, DetailPanel, FormSection, MobileSafeTable } from "@/components/ui/operations";
@@ -55,7 +55,7 @@ export default function AdminEmiLedgerPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Advance EMI Ledger"
       subtitle="Operational due/paid/waived register for collection routing and reconciliation checks."
       breadcrumbs={[
@@ -215,6 +215,6 @@ export default function AdminEmiLedgerPage() {
           </FormSection>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

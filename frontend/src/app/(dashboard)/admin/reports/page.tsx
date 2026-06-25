@@ -16,7 +16,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { DataTableShell } from "@/components/ui/operations";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -404,7 +404,7 @@ export default function AdminReportsPage() {
     0;
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Report Control"
       title="Reports & analysis"
       subtitle="Single hub: windowed analytics summary, live admin dashboard posture, SME read-only report catalog (CSV/PDF), and shortcuts into canonical report routes."
@@ -971,6 +971,6 @@ export default function AdminReportsPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

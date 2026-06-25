@@ -23,7 +23,7 @@ import { CustomerRiskPanel } from "@/components/customer-intelligence/CustomerRi
 import { CustomerTimelinePanel } from "@/components/customer-intelligence/CustomerTimelinePanel";
 import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
 import { DetailPanel, KpiCard, QuickActionGrid } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { DetailItem as DetailValue, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
 import {
@@ -1696,7 +1696,7 @@ export default function AdminCustomerDetailPage() {
       : "default";
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={customer?.name || `Customer #${customerId ?? "—"}`}
       subtitle="Inspect KYC state, direct-sale exposure, subscription contracts, collections, receipts, and partner linkage from one operational customer workspace."
       breadcrumbs={[
@@ -2766,6 +2766,6 @@ export default function AdminCustomerDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

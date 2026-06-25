@@ -15,7 +15,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { FINANCE_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
@@ -713,7 +713,7 @@ export default function AdminFinanceCommissionsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Finance Commission Control"
       title="Commission Register"
       subtitle="Track commission liability, partner earning history, settlement readiness, and payout handoff with payment-linked financial context."
@@ -1337,6 +1337,6 @@ export default function AdminFinanceCommissionsPage() {
           </SectionCard>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { getCashSessions, type CashCounterSession } from "@/services/control-enterprise";
 
@@ -31,7 +31,7 @@ export default function AdminControlCashSessionsPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Enterprise Control"
       title="Cash Counter Sessions"
       subtitle="Open and closed cash counter sessions with declared cash and variance."
@@ -93,6 +93,6 @@ export default function AdminControlCashSessionsPage() {
           </table>
         </div>
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

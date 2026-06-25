@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { apiFetch, toArray } from "@/lib/api";
 
 type BatchStatus =
@@ -460,7 +460,7 @@ export default function AdminLuckyDrawCreatePage() {
   const displayedCommit = success ?? persistedCommit;
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Create Draw Commitment"
       subtitle="Create a Lucky Draw commitment from a selected batch using the existing backend commit workflow."
       breadcrumbs={[
@@ -786,6 +786,6 @@ export default function AdminLuckyDrawCreatePage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -7,7 +7,7 @@ import { useParams } from "next/navigation";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   archiveReversalCase,
@@ -41,7 +41,7 @@ export default function ReversalCaseDetailPage() {
   }, [load]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={`Reversal Case ${String(row?.case_no || "")}`}
       subtitle="Operational reversal case detail, checklist, and controlled actions."
       breadcrumbs={[
@@ -106,6 +106,6 @@ export default function ReversalCaseDetailPage() {
           </div>
         </div>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

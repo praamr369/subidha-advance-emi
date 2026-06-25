@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   applyApprovedBrandItems,
@@ -114,7 +114,7 @@ export default function AdminBrandDataPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Brand & Business Data Center"
       subtitle="Manage Subidha Furniture profile, public content, social links, media, and verified business details."
       breadcrumbs={[
@@ -230,6 +230,6 @@ export default function AdminBrandDataPage() {
           )}
         </section>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

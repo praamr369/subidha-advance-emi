@@ -14,7 +14,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import DataTable from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
@@ -86,7 +86,7 @@ export default function RevenueReportPage() {
   };
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Revenue Report"
       subtitle="Operational revenue view sourced from the admin payment register so collection totals and reversal visibility stay aligned."
       headerMode="erp"
@@ -325,6 +325,6 @@ export default function RevenueReportPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

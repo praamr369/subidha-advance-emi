@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import KycDocumentPanel from "@/components/kyc/KycDocumentPanel";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import { apiFetch } from "@/lib/api";
 
@@ -78,7 +78,7 @@ export default function AdminPartnerDetailPage() {
   }, [loadPage, newUsername, partner?.id, reason]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={partner ? `Partner #${partner.id}` : "Partner Detail"}
       subtitle="Admin access handoff for partner login identity."
       breadcrumbs={[
@@ -143,6 +143,6 @@ export default function AdminPartnerDetailPage() {
           <KycDocumentPanel mode="admin" owner="partner" ownerId={partner.id} />
         </div>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { createProductTaxProfile, listProductTaxProfiles } from "@/services/compliance";
@@ -44,7 +44,7 @@ export default function AdminComplianceProductTaxProfilesPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Product Tax Readiness"
       subtitle="HSN and GST rate readiness master for future GST registration."
       breadcrumbs={[
@@ -137,6 +137,6 @@ export default function AdminComplianceProductTaxProfilesPage() {
           {!rows.length ? <p className="text-muted-foreground">No product tax profiles found.</p> : null}
         </div>
       </WorkspaceSection>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

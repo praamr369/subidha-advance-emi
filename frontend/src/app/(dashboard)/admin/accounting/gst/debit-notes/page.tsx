@@ -13,7 +13,7 @@ import {
   accountingFieldClassName,
   accountingMoney,
 } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -134,7 +134,7 @@ export default function AccountingDebitNotesPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Debit Notes"
       subtitle="Controlled GST debit notes for upward adjustments against an original invoice, posted through the accounting subsystem only."
       breadcrumbs={[
@@ -274,6 +274,6 @@ export default function AccountingDebitNotesPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

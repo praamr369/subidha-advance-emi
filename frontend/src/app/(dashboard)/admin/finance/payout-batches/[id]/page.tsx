@@ -14,7 +14,7 @@ import {
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { apiFetch, toArray } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 import { listFinanceAccounts } from "@/services/accounting";
@@ -417,7 +417,7 @@ export default function AdminPayoutBatchDetailPage() {
   const isCancelled = batch?.status === "CANCELLED";
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={`Payout Batch #${batchId ?? "—"}`}
       subtitle="Inspect payout batch composition, review included commission rows, and execute controlled finalize or cancel actions."
       breadcrumbs={[
@@ -830,6 +830,6 @@ export default function AdminPayoutBatchDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

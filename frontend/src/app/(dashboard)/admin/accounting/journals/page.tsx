@@ -9,7 +9,7 @@ import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import { AccountingControlShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminJournalEntryPrintRoute } from "@/lib/route-builders";
@@ -155,7 +155,7 @@ export default function AccountingJournalsPage() {
   const manualPostingAccounts = chartAccounts.filter((account) => account.allow_manual_posting);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Accounting Journal Control"
       title="Journals"
       subtitle="Manual journal entries live in draft until admin posts them, and posted entries can only move to controlled void state with an explicit reason."
@@ -448,6 +448,6 @@ export default function AccountingJournalsPage() {
           ) : null
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

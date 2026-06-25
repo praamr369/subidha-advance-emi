@@ -57,14 +57,14 @@ type PortalPageProps = {
 function getActionClassName(variant: PortalAction["variant"] = "secondary") {
   switch (variant) {
     case "primary":
-      return "border-primary/85 bg-primary text-primary-foreground shadow-[0_16px_36px_-22px_color-mix(in_oklab,var(--primary)_38%,transparent)] hover:bg-[color-mix(in_oklab,var(--primary)_88%,black_12%)]";
+      return "border-primary/85 bg-primary text-primary-foreground hover:bg-primary/90";
     case "danger":
-      return "border-destructive/70 bg-destructive text-destructive-foreground shadow-[0_18px_40px_-28px_rgba(127,29,29,0.75)]";
+      return "border-destructive/70 bg-destructive text-destructive-foreground hover:bg-destructive/90";
     case "ghost":
-      return "border-border bg-[var(--surface-card-elevated)] text-foreground hover:border-border hover:bg-muted/50";
+      return "border-border bg-card text-foreground hover:bg-muted/50";
     case "secondary":
     default:
-      return "border-border bg-background text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] hover:border-border hover:bg-muted/30";
+      return "border-border bg-background text-foreground hover:bg-muted/30";
   }
 }
 
@@ -264,7 +264,7 @@ export default function PortalPage({
         </>
       ) : (
         <section className="portal-page-header workspace-header-panel">
-          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
           <div className="relative flex min-w-0 flex-col gap-5 p-4 sm:p-6">
             {headerMode === "erp" ? (
               <>
@@ -316,7 +316,7 @@ export default function PortalPage({
                     {stats.map((stat, index) => (
                       <div
                         key={`${stat.label}-${index}`}
-                        className="portal-stat-tile rounded-[1.1rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine),0_12px_35px_-28px_rgba(15,23,42,0.22)]"
+                        className="portal-stat-tile rounded-xl border border-border bg-card p-4"
                       >
                         <div className="enterprise-eyebrow">{stat.label}</div>
 
@@ -376,9 +376,9 @@ export default function PortalPage({
                         className={cn(
                           "mt-3 inline-flex max-w-4xl items-start rounded-xl border px-3 py-2 text-xs font-medium leading-6",
                           helperTone === "warning"
-                            ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
+                            ? "chip-tone-warning"
                             : helperTone === "info"
-                              ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
+                              ? "chip-tone-info"
                               : "border-border bg-muted/50 text-foreground"
                         )}
                       >
@@ -410,7 +410,7 @@ export default function PortalPage({
                     {stats.map((stat, index) => (
                       <div
                         key={`${stat.label}-${index}`}
-                        className="portal-stat-tile rounded-[1.1rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine),0_12px_35px_-28px_rgba(15,23,42,0.22)]"
+                        className="portal-stat-tile rounded-xl border border-border bg-card p-4"
                       >
                         <div className="enterprise-eyebrow">{stat.label}</div>
 

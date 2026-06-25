@@ -13,7 +13,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -100,7 +100,7 @@ export default function AdminReportCenterDetailPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={payload?.title || reportKey || "Report"}
       subtitle="Read-only dataset. Exports require the reports.export capability."
       headerMode="erp"
@@ -266,6 +266,6 @@ export default function AdminReportCenterDetailPage() {
           <p className="text-sm text-muted-foreground">No row selected.</p>
         )}
       </DrawerShell>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

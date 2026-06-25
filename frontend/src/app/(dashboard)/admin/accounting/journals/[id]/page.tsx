@@ -7,7 +7,7 @@ import { useParams } from "next/navigation";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { buildAdminJournalEntryPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
@@ -118,7 +118,7 @@ export default function AccountingJournalDetailPage() {
     : [{ href: ROUTES.admin.accountingJournals, label: "Journal register", variant: "secondary" as const }];
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Accounting Journal Control"
       title={journal?.entry_no ? `Journal ${journal.entry_no}` : "Journal detail"}
       subtitle="Journal evidence, debit/credit lines, posting state, period state, and controlled actions. This page does not create or auto-post entries."
@@ -216,6 +216,6 @@ export default function AccountingJournalDetailPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

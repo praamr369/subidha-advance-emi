@@ -7,7 +7,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { DetailPageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { apiFetch } from "@/lib/api";
 import { buildAdminBillingRegisterRoute } from "@/lib/route-builders";
 import {
@@ -292,7 +292,7 @@ export default function AdminDeliveryDetailPage() {
   }, [delivery?.status]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={delivery ? delivery.delivery_reference : "Delivery Detail"}
       subtitle="Inspect delivery facts, update operational metadata, and perform explicit lifecycle transitions with audit history."
       breadcrumbs={[
@@ -577,6 +577,6 @@ export default function AdminDeliveryDetailPage() {
           ) : null
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

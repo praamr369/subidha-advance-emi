@@ -9,7 +9,7 @@ import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
 import DataTable from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
@@ -82,7 +82,7 @@ export default function OverdueReportPage() {
   }, [summary]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Overdue EMI Report"
       subtitle="Pending and overdue EMI exposure using backend KPIs with row-level drill-down for operator follow-up."
       headerMode="erp"
@@ -341,6 +341,6 @@ export default function OverdueReportPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

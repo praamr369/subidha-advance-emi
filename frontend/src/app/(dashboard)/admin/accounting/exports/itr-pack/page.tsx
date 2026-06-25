@@ -12,7 +12,7 @@ import {
   accountingErrorMessage,
   accountingFieldClassName,
 } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -83,7 +83,7 @@ export default function AccountingItrPackPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="ITR Export Pack"
       subtitle="Generate an additive accounting handoff pack containing trial balance, profit and loss, and balance sheet JSON extracts for tax and finance workflows."
       breadcrumbs={[
@@ -188,6 +188,6 @@ export default function AccountingItrPackPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

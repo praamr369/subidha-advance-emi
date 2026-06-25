@@ -13,7 +13,7 @@ import {
 import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import EmptyState from "@/components/feedback/EmptyState";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -190,7 +190,7 @@ export default function AccountingVendorsPage() {
   const activeCount = vendors.filter((vendor) => vendor.is_active).length;
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Accounting Payables Control"
       title="Vendor Register"
       subtitle="Maintain supplier and vendor master data for procurement, expenses, settlements, and future raw-material purchasing without mixing that truth into billing or payment tables."
@@ -456,6 +456,6 @@ export default function AccountingVendorsPage() {
           />
         </WorkspaceSection>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

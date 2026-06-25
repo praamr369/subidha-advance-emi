@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { createResource } from "@/services/admin";
 import { normalizeApiError } from "@/services/api/errors";
 
@@ -67,7 +67,7 @@ export default function EnterpriseCreatePage({
   }
 
   return (
-    <PortalPage title={title} subtitle={subtitle}>
+    <ERPPageShell title={title} subtitle={subtitle}>
       <section className="surface-panel-elevated mx-auto max-w-3xl rounded-xl border border-border bg-card p-6 shadow-sm">
         <form className="space-y-4" onSubmit={onSubmit}>
           {fields.map((field) => (
@@ -97,6 +97,6 @@ export default function EnterpriseCreatePage({
           {submitMessage ? <p className="text-sm text-emerald-600">{submitMessage}</p> : null}
         </form>
       </section>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

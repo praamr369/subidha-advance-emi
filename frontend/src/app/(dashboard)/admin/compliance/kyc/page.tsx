@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { listKycReviewQueue, type KycQueueRow, type KycReviewQueueResponse } from "@/services/kyc";
@@ -104,7 +104,7 @@ export default function AdminComplianceKycPage() {
   const queueRows: KycQueueRow[] = (expiryQueue?.results.length ? expiryQueue.results : queue?.results || []).slice(0, 8);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="KYC compliance"
       subtitle="Free-only KYC governance across Lucky Plan EMI, rent, lease, delivery, refund, and winner settlement workflows."
       breadcrumbs={[
@@ -245,6 +245,6 @@ export default function AdminComplianceKycPage() {
           )}
         </WorkspaceSection>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

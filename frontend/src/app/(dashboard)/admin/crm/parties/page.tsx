@@ -10,7 +10,7 @@ import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatCard from "@/components/ui/StatCard";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -110,7 +110,7 @@ export default function AdminCrmPartyDirectoryPage() {
   const staffLinkedCount = rows.filter((row) => row.role_types.includes("STAFF")).length;
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="CRM Directory"
       title="Party Directory"
       subtitle="A shared additive identity layer above leads, customers, partners, vendors, and staff. All party types are visible here in one directory without replacing underlying source models."
@@ -252,6 +252,6 @@ export default function AdminCrmPartyDirectoryPage() {
           </WorkspaceSection>
         </>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

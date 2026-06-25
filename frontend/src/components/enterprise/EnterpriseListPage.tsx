@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { EnterpriseColumnDef, GenericRecord } from "@/components/enterprise/columns";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import { toArray } from "@/lib/api";
 import { request } from "@/services/api";
@@ -130,7 +130,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
   }
 
   return (
-    <PortalPage title={title} subtitle={subtitle}>
+    <ERPPageShell title={title} subtitle={subtitle}>
       <section className="surface-panel-elevated mb-4 rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -268,6 +268,6 @@ export default function EnterpriseListPage<T extends GenericRecord>({
         error={error}
         onRetry={reload}
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -8,7 +8,7 @@ import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceD
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
@@ -215,7 +215,7 @@ export default function AdminPayoutBatchesPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Finance Payout Control"
       title="Payout Batch Register"
       subtitle="Review draft, finalized, and cancelled payout batches, then open a batch for controlled finance actions."
@@ -504,6 +504,6 @@ export default function AdminPayoutBatchesPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

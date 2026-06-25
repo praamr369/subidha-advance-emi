@@ -7,7 +7,7 @@ import { RefreshCw } from "lucide-react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatCard from "@/components/ui/StatCard";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
@@ -78,7 +78,7 @@ export default function CollectionsReportPage() {
   const overview = analytics?.overview;
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Collections Report"
       subtitle="Source-linked collection analytics for the current month — trend, payment method mix, and overdue exposure posture."
       headerMode="erp"
@@ -237,6 +237,6 @@ export default function CollectionsReportPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

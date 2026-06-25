@@ -7,7 +7,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { RegistryPageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { getAccountingBooksReadiness, type AccountingBooksReadiness, type AccountingBooksReadinessAccount } from "@/services/accounting-books";
@@ -157,7 +157,7 @@ export default function AccountingBooksPage() {
   const hasReadinessBlocker = Boolean(readiness?.blockers?.length);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Books"
       subtitle="Track finance accounts and explicit inter-account transfers inside accounting. This is not the EMI collection register and does not auto-post bridge rows."
       breadcrumbs={[
@@ -302,6 +302,6 @@ export default function AccountingBooksPage() {
           ) : null
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

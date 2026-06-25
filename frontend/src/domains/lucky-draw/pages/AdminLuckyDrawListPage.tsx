@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import DataTable from "@/components/ui/DataTable";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { downloadCsv } from "@/lib/export/csv";
 import { listBatches } from "@/services/batches";
 import type { BatchRecord } from "@/services/batches";
@@ -61,7 +61,7 @@ export default function AdminLuckyDrawListPage({ historyOnly = false }: { histor
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / 10)), [count]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={historyOnly ? "Lucky Draw History" : "Lucky Draw Operations"}
       subtitle="Track commitments, reveals, and winner outcomes with explicit draw actions."
       actions={[{ href: "/admin/lucky-draws/create", label: "Execute Draw" }]}
@@ -130,6 +130,6 @@ export default function AdminLuckyDrawListPage({ historyOnly = false }: { histor
           <button type="button" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Next</button>
         </div>
       </section>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

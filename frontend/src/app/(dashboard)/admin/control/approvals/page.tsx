@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { getApprovals, type ApprovalRequest } from "@/services/control-enterprise";
 
@@ -45,7 +45,7 @@ export default function AdminControlApprovalsPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Enterprise Control"
       title="Approval Queue"
       subtitle="Maker-checker approvals pending a decision."
@@ -88,6 +88,6 @@ export default function AdminControlApprovalsPage() {
           </table>
         </div>
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

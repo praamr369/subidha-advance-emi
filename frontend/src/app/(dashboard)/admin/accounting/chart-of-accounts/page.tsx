@@ -25,7 +25,7 @@ function pill(tone: "success" | "warning" | "info" | "muted" = "muted") {
 }
 
 function metric(payload: AccountingSetupStatusPayload | null, key: string, fallback: string) {
-  const value = payload?.[key];
+  const value = (payload as Record<string, unknown> | null)?.[key];
   return value === null || value === undefined || value === "" ? fallback : String(value);
 }
 

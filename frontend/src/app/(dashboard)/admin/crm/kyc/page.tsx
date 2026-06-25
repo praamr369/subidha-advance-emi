@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -243,7 +243,7 @@ export default function AdminCrmKycReviewQueuePage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="CRM & Requests"
       title="KYC Review Queue"
       subtitle="One admin queue for KYC documents awaiting review across customers, partners, vendors and staff. Documents are read from each owner's canonical KYC store — no duplicate KYC records are created here."
@@ -520,6 +520,6 @@ export default function AdminCrmKycReviewQueuePage() {
           </WorkspaceSection>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

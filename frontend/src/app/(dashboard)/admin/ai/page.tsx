@@ -4,12 +4,12 @@ import Link from "next/link";
 
 import AiAssistantPanel from "@/components/admin/ai/AiAssistantPanel";
 import Card from "@/components/ui/card";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 
 export default function AdminAiAssistantPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Command Center"
       title="AI Assistant"
       subtitle="Internal knowledge assistant (read-only)"
@@ -37,6 +37,6 @@ export default function AdminAiAssistantPage() {
         </Link>
       </Card>
       <AiAssistantPanel />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

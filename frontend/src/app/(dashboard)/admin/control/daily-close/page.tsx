@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   getDailyCloseReadiness,
@@ -62,7 +62,7 @@ export default function AdminControlDailyClosePage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Enterprise Control"
       title="Daily Close"
       subtitle="Current-day close readiness and execution history. Use the cashier day-close workflow to execute."
@@ -156,6 +156,6 @@ export default function AdminControlDailyClosePage() {
           </section>
         </div>
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

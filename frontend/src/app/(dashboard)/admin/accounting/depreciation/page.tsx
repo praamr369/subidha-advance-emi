@@ -13,7 +13,7 @@ import {
   accountingMoney,
 } from "@/components/accounting/shared";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import type { DepreciationRun } from "@/services/accounting";
@@ -136,7 +136,7 @@ export default function AccountingDepreciationPage() {
   ];
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Depreciation Runs"
       subtitle="Calculate and post depreciation from the asset register using explicit, admin-controlled run and post steps."
       breadcrumbs={[
@@ -191,6 +191,6 @@ export default function AccountingDepreciationPage() {
           emptyDescription="Create a depreciation run after assets are registered."
         />
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

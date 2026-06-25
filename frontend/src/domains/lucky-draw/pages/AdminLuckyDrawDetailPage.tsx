@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { getLuckyDraw, type LuckyDrawRecord } from "@/services/draws";
 
 function formatDateTime(value: string | null | undefined): string {
@@ -143,7 +143,7 @@ export default function AdminLuckyDrawDetailPage() {
   const verificationStatus = statusLabel(draw?.public_verification_status || draw?.verification_status);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={draw ? `Lucky Draw #${draw.id}` : "Lucky Draw Detail"}
       subtitle="Committed hash, reveal state, winner result and traceability context."
     >
@@ -306,6 +306,6 @@ export default function AdminLuckyDrawDetailPage() {
           </aside>
         </div>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

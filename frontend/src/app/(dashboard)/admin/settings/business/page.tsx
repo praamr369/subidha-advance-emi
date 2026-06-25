@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 
 const items = [
@@ -28,7 +28,7 @@ const items = [
 
 export default function AdminSettingsBusinessPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       title="Business Settings"
       subtitle="Operational control surfaces that affect day-to-day shop execution without changing Lucky Plan financial truth."
       breadcrumbs={[
@@ -50,6 +50,6 @@ export default function AdminSettingsBusinessPage() {
           </Link>
         ))}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

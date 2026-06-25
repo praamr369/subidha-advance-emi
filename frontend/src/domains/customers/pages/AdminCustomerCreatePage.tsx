@@ -22,7 +22,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import FormActions from "@/components/ui/FormActions";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { DetailItem as DetailRow, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
 import {
@@ -443,7 +443,7 @@ export default function AdminCustomerCreatePage({
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={variant === "drawer" ? "Customer onboarding" : "Create Customer"}
       subtitle="Create a customer profile and customer login for downstream subscription and collection workflows."
       breadcrumbs={
@@ -948,6 +948,6 @@ export default function AdminCustomerCreatePage({
           </SectionCard>
         )}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { getComplianceTaxReadiness, getComplianceTurnoverSummary } from "@/services/compliance";
@@ -34,7 +34,7 @@ export default function AdminComplianceTaxReadinessPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Tax Readiness"
       subtitle="Non-GST operations today with GST transition readiness tracking."
       breadcrumbs={[
@@ -80,6 +80,6 @@ export default function AdminComplianceTaxReadinessPage() {
           <p className="text-sm text-muted-foreground">Loading turnover summary...</p>
         )}
       </WorkspaceSection>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

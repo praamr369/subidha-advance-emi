@@ -7,7 +7,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { ApprovalQueuePageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { MetricStrip } from "@/components/ui/operations";
 import { ROUTES } from "@/lib/routes";
 import { fetchReversalReconciliationQueue, reconcileReversalCase, syncReversalCase } from "@/services/reversal-control";
@@ -55,7 +55,7 @@ export default function ReversalReconciliationPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Reversal Reconciliation"
       subtitle="Approval-style queue for unresolved reversal/refund/return links that must be reconciled with explicit evidence."
       breadcrumbs={[
@@ -176,6 +176,6 @@ export default function ReversalReconciliationPage() {
           ) : null
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

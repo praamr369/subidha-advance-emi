@@ -1,12 +1,12 @@
 "use client";
 
 import BiInsightsDashboard from "@/components/admin/bi/BiInsightsDashboard";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 
 export default function BiCashflowPage() {
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="BI Control Center"
       title="Cashflow Dashboard"
       subtitle="Read-only daily inflow, expected inflow, and overdue exposure."
@@ -18,6 +18,6 @@ export default function BiCashflowPage() {
       statusBadge={{ label: "Read Only", tone: "info" }}
     >
       <BiInsightsDashboard mode="cashflow" />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

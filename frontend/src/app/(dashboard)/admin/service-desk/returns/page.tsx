@@ -7,7 +7,7 @@ import DataTable from "@/components/ui/DataTable";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { ApprovalQueuePageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { buildAdminServiceDeskCaseRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -178,7 +178,7 @@ export default function AdminServiceDeskReturnsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Return Register"
       subtitle="Sales returns, delivery returns, and exchanges are captured as explicit service-desk cases. Stock and finance effects only happen through the linked delivery or billing-note actions on the case detail."
       breadcrumbs={[
@@ -428,6 +428,6 @@ export default function AdminServiceDeskReturnsPage() {
         </section>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

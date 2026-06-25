@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatusBadge from "@/components/ui/status-badge";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import TableToolbar from "@/components/ui/TableToolbar";
@@ -487,7 +487,7 @@ export default function AdminLuckyDrawsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Lucky Draw Register"
       subtitle="Operational register for Lucky Draw commitments, reveal state, winner visibility, and audit navigation."
       breadcrumbs={[
@@ -797,6 +797,6 @@ export default function AdminLuckyDrawsPage() {
           </SectionCard>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

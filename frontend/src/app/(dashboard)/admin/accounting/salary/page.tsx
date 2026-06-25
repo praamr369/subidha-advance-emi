@@ -14,7 +14,7 @@ import {
   accountingFieldClassName,
   accountingMoney,
 } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminSalarySheetRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
@@ -235,7 +235,7 @@ export default function AccountingSalaryPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Salary Register"
       subtitle="Payroll remains a separate operational workflow: period-aware salary sheets, payslip-ready line breakdowns, explicit posting, and controlled salary disbursement into the selected finance book."
       breadcrumbs={[
@@ -782,6 +782,6 @@ export default function AccountingSalaryPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

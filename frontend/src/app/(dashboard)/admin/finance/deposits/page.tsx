@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatusBadge from "@/components/ui/status-badge";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
@@ -285,7 +285,7 @@ export default function AdminFinanceDepositsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Rent/Lease Deposit Operations"
       subtitle={SOURCE_NOTE}
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Finance", href: "/admin/finance" }, { label: "Deposits" }]}
@@ -483,6 +483,6 @@ export default function AdminFinanceDepositsPage() {
         </div>
         <button type="button" disabled={!canSaveMapping} className="mt-3 rounded-xl border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" onClick={() => void handleSaveMapping()}>Save Manual Mapping</button>
       </WorkspaceSection>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

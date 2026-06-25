@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { getComplianceTaxProfile } from "@/services/compliance";
 import type { BusinessTaxMode } from "@/types/compliance";
@@ -52,7 +52,7 @@ export default function AdminSettingsFinancePage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Finance Configuration"
       subtitle="Accounting controls and reconciliation-adjacent configuration without overloading the live EMI/payment operational core."
       breadcrumbs={[
@@ -80,6 +80,6 @@ export default function AdminSettingsFinancePage() {
           </Link>
         ))}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -13,7 +13,7 @@ import {
   accountingFieldClassName,
   accountingMoney,
 } from "@/components/accounting/shared";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -134,7 +134,7 @@ export default function AccountingCreditNotesPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Credit Notes"
       subtitle="Controlled GST credit notes linked back to the original tax invoice. Posting remains explicit and admin-only."
       breadcrumbs={[
@@ -274,6 +274,6 @@ export default function AccountingCreditNotesPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

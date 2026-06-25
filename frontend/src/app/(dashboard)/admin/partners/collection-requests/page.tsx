@@ -2,7 +2,7 @@
 import { formatRupee } from "@/lib/utils/currency";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import DataTable from "@/components/ui/DataTable";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -213,7 +213,7 @@ export default function AdminPartnerCollectionRequestsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Partner Collection Requests"
       subtitle="Controlled approval queue for partner-submitted field collection reports. Approve or reject request status only."
       helperNote="This is a controlled approval queue. Approving or rejecting a request updates the request status through the existing backend workflow. No direct payment, commission, or payout record is created from this page."
@@ -372,6 +372,6 @@ export default function AdminPartnerCollectionRequestsPage() {
           ]}
         />
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

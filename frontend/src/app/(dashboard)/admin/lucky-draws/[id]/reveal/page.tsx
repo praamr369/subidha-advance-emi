@@ -13,7 +13,7 @@ import {
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ApiError, apiFetch } from "@/lib/api";
 
 type BatchStatus =
@@ -529,7 +529,7 @@ export default function AdminLuckyDrawRevealPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={draw ? `Reveal Draw #${draw.id}` : `Reveal Lucky Draw #${drawId ?? "—"}`}
       subtitle="Dedicated confirmation page for the final Lucky Draw reveal action."
       breadcrumbs={[
@@ -848,6 +848,6 @@ export default function AdminLuckyDrawRevealPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { getExceptions, type ControlException } from "@/services/control-enterprise";
 
@@ -45,7 +45,7 @@ export default function AdminControlExceptionsPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Enterprise Control"
       title="Exception Desk"
       subtitle="Control exceptions raised by automated integrity checks. Open and Acknowledged exceptions block month-end close."
@@ -92,6 +92,6 @@ export default function AdminControlExceptionsPage() {
           </table>
         </div>
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

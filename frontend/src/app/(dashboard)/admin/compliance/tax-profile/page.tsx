@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { activateComplianceTaxProfile, getComplianceTaxProfile } from "@/services/compliance";
@@ -40,7 +40,7 @@ export default function AdminComplianceTaxProfilePage() {
   const requiresGstin = useMemo(() => mode === "GST_REGULAR" || mode === "GST_COMPOSITION", [mode]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Compliance Tax Profile"
       subtitle="Current stage should remain GST Unregistered while keeping GST activation controls ready."
       breadcrumbs={[
@@ -103,6 +103,6 @@ export default function AdminComplianceTaxProfilePage() {
           </form>
         )}
       </WorkspaceSection>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -8,7 +8,7 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { CustomerIntelligenceTrigger } from "@/components/customer-intelligence/CustomerIntelligenceTrigger";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { RegistryPageShell } from "@/components/layout/page-shells";
 import {
   buildAdminBillingDocumentRoute,
@@ -458,7 +458,7 @@ export default function AdminDeliveriesPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Deliveries"
       subtitle="Create, track, and transition subscription-linked delivery records while keeping fulfillment summary and audit history consistent."
       breadcrumbs={[
@@ -1324,6 +1324,6 @@ export default function AdminDeliveriesPage() {
         </div>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

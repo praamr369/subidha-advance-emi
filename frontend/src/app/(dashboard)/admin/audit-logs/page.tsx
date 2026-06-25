@@ -12,7 +12,7 @@ import {
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
@@ -313,7 +313,7 @@ export default function AdminAuditLogsPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Audit Logs"
       subtitle="Operational and financial system audit trail with searchable event visibility for admin review."
       breadcrumbs={[
@@ -635,6 +635,6 @@ export default function AdminAuditLogsPage() {
           </SectionCard>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -16,7 +16,7 @@ import {
   KpiCard,
   QuickActionGrid,
 } from "@/components/ui/operations";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatusBadge from "@/components/ui/status-badge";
 import { downloadCsv } from "@/lib/export/csv";
 import { getOverdueSummary } from "@/services/reports";
@@ -260,7 +260,7 @@ export default function OverdueEmiPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Overdue EMIs"
       subtitle="Operational follow-up workspace for overdue pending installments. Use this page to review exposure, open linked subscriptions, and route to collection workflow."
       breadcrumbs={[
@@ -503,6 +503,6 @@ export default function OverdueEmiPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

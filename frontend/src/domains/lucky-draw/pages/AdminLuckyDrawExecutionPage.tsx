@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { listBatches } from "@/services/batches";
 import type { BatchRecord } from "@/services/batches";
 import { createDrawCommit, getBatchDrawSummary, revealDraw, type BatchDrawSummary, type DrawCommitResponse, type DrawRevealResponse } from "@/services/draws";
@@ -73,7 +73,7 @@ export default function AdminLuckyDrawExecutionPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Execute Lucky Draw"
       subtitle="Operator-controlled flow: select batch, create commitment, then reveal winner with seed."
       actions={[{ href: "/admin/lucky-draw", label: "Back to Draw List" }]}
@@ -133,6 +133,6 @@ export default function AdminLuckyDrawExecutionPage() {
 
         {message ? <p style={{ margin: 0 }}>{message}</p> : null}
       </section>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

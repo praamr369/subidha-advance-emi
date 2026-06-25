@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   getMonthEndReadiness,
@@ -92,7 +92,7 @@ export default function AdminControlMonthEndClosePage() {
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Enterprise Control"
       title="Month-End Close"
       subtitle="Run readiness checks, dry-run, or execute the month-end close for a period. No financial records are mutated."
@@ -253,6 +253,6 @@ export default function AdminControlMonthEndClosePage() {
           </section>
         </div>
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

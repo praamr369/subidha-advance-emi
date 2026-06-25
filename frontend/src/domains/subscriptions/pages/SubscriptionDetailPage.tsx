@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import SubscriptionContractDocument from "@/components/print/SubscriptionContractDocument";
 import ActionButton from "@/components/ui/ActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 
 import { useSubscriptionDetailData } from "@/domains/subscriptions/hooks";
 import { formatCurrency } from "@/domains/subscriptions/utils";
@@ -106,7 +106,7 @@ export default function AdminSubscriptionDetailPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       title={subscription ? `Subscription #${subscription.id}` : "Subscription Detail"}
       subtitle="Track EMI schedule, reconciliation checkpoints, and Lucky Plan allocation details."
@@ -349,6 +349,6 @@ export default function AdminSubscriptionDetailPage() {
           </section>
         </>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

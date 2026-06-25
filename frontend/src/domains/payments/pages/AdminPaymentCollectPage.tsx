@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import ActionButton from "@/components/ui/ActionButton";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import {
@@ -844,7 +844,7 @@ export default function AdminPaymentCollectPage({
 
   if (collectionWorkflow === "direct-sale") {
     return (
-      <PortalPage
+      <ERPPageShell
         title={variant === "drawer" ? "Collect direct-sale balance" : "Admin Direct-Sale Collection"}
         subtitle="Direct-sale receivable collection workflow for invoiced direct sales with outstanding balance."
         helperNote="This path creates a retail receipt against an existing direct-sale receivable. It stays separate from EMI allocation, winner waivers, and subscription reconciliation."
@@ -879,13 +879,13 @@ export default function AdminPaymentCollectPage({
           canonicalSelfHref={canonicalSelfHref}
           prefillDirectSaleId={prefillDirectSaleId}
         />
-      </PortalPage>
+      </ERPPageShell>
     );
   }
 
   if (collectionWorkflow === "unified") {
     return (
-      <PortalPage
+      <ERPPageShell
         title="Payment Collection"
         subtitle="Choose the collection workflow or search across live receivables, then route to the correct posting path."
         helperNote="Unified search does not post money directly. It routes Advance EMI and direct-sale receivables into their separate backend-safe collection workflows."
@@ -917,12 +917,12 @@ export default function AdminPaymentCollectPage({
             onSearch={handleUnifiedReceivableSearch}
           />
         </div>
-      </PortalPage>
+      </ERPPageShell>
     );
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title={variant === "drawer" ? "Admin Collection Entry" : "Admin Collection Entry"}
       subtitle="Enterprise payment collection workflow with subscription-led selection, EMI auto-fill, and typed service integration."
       helperNote="Advance EMI collections post against EMI schedules. Direct-sale receivable collections use the separate direct-sale retail receipt workflow."
@@ -1528,6 +1528,6 @@ export default function AdminPaymentCollectPage({
       ) : null}
       </div>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { accountingErrorMessage } from "@/components/accounting/shared";
@@ -55,7 +55,7 @@ export default function AccountingGstHubPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="GST Documents"
       subtitle="GST-ready invoice and note lifecycle controls with consecutive numbering, controlled posting, and additive cancellation through reversal journals."
       breadcrumbs={[
@@ -95,6 +95,6 @@ export default function AccountingGstHubPage() {
           </Link>
         </WorkspaceSection>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

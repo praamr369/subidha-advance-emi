@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { downloadCsv } from "@/lib/export/csv";
 import {
   createPayoutBatch,
@@ -251,7 +251,7 @@ export default function AdminCommissionPayoutQueuePage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Commission Payout Queue"
       subtitle="Build draft payout batches from live eligible commission rows. Pending rows settle on batch finalization, while legacy-settled rows remain batchable for backward compatibility."
       breadcrumbs={[
@@ -615,6 +615,6 @@ export default function AdminCommissionPayoutQueuePage() {
           </div>
         </SectionCard>
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

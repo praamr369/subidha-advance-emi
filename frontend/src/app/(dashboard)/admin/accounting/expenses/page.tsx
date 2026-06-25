@@ -5,7 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
@@ -193,7 +193,7 @@ export default function AccountingExpensesPage() {
   const postedCount = expenses.filter((item) => item.status === "POSTED").length;
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Expenses"
       subtitle="Vendor-side expense vouchers move from draft to approved to posted through the new accounting books, without mutating EMI payment history."
       breadcrumbs={[
@@ -576,6 +576,6 @@ export default function AccountingExpensesPage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

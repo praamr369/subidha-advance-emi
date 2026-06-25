@@ -6,7 +6,7 @@ import Link from "next/link";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   createReversalCase,
@@ -80,7 +80,7 @@ export default function ReversalControlPage() {
   };
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Reversal & Return Control"
       subtitle="Admin-only audited control center for cancellation, reversal, refund, and reconciliation decisions."
       breadcrumbs={[
@@ -184,6 +184,6 @@ export default function ReversalControlPage() {
           </div>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

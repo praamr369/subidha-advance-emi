@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ErrorState from "@/components/feedback/ErrorState";
 import { getResource } from "@/services/admin";
@@ -45,7 +45,7 @@ export default function EnterpriseDetailPage({ title, subtitle, resourcePath }: 
   }, [id, resourcePath]);
 
   return (
-    <PortalPage title={title} subtitle={subtitle}>
+    <ERPPageShell title={title} subtitle={subtitle}>
       <section className="surface-panel-elevated rounded-xl border border-border bg-card p-6 shadow-sm">
         {loading ? <LoadingBlock label="Loading detail..." /> : null}
         {!id ? <ErrorState title="Missing record id" description="Record identifier was not provided." /> : null}
@@ -62,6 +62,6 @@ export default function EnterpriseDetailPage({ title, subtitle, resourcePath }: 
           </dl>
         ) : null}
       </section>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

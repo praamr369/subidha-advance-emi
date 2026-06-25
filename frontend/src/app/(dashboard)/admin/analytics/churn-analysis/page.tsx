@@ -6,7 +6,7 @@ import DataTable from "@/components/ui/DataTable";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { listSubscriptions, type SubscriptionRecord } from "@/services/subscriptions";
 
@@ -42,7 +42,7 @@ export default function ChurnAnalysisPage() {
   );
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Churn Analysis"
       subtitle="Read-only churn-risk watchlist based on defaulted or high-outstanding subscriptions. Source-linked report — drill down to Profiles / Customers for action."
       headerMode="erp"
@@ -96,6 +96,6 @@ export default function ChurnAnalysisPage() {
           ]}
         />
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

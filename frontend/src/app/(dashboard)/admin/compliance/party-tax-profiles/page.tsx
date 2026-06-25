@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import { createPartyTaxProfile, listPartyTaxProfiles } from "@/services/compliance";
@@ -47,7 +47,7 @@ export default function AdminCompliancePartyTaxProfilesPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Party Tax Readiness"
       subtitle="Customer/supplier/partner/vendor tax master readiness for future GST transition."
       breadcrumbs={[
@@ -175,6 +175,6 @@ export default function AdminCompliancePartyTaxProfilesPage() {
           {!rows.length ? <p className="text-muted-foreground">No party tax profiles found.</p> : null}
         </div>
       </WorkspaceSection>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

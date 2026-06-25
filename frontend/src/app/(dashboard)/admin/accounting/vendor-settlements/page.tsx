@@ -15,7 +15,7 @@ import {
 import { ACCOUNTING_REGISTER_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import type {
@@ -160,7 +160,7 @@ export default function AccountingVendorSettlementsPage() {
   ];
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Accounting Payables Control"
       title="Vendor Settlements"
       subtitle="Admin-only payable settlements from finance accounts into vendor balances, posted through the separate accounting subsystem."
@@ -260,6 +260,6 @@ export default function AccountingVendorSettlementsPage() {
           emptyDescription="Create a settlement draft after recording and approving purchase bills."
         />
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

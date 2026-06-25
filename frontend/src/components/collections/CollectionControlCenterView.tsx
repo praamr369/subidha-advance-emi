@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatusBadge from "@/components/ui/status-badge";
 import { FormSection, KpiCard, QuickActionGrid, WorkflowCard } from "@/components/ui/operations";
 import {
@@ -266,7 +266,7 @@ export default function CollectionControlCenterView({ role }: { role: Collection
   const lanes = useMemo(() => payload?.collection_lanes ?? [], [payload?.collection_lanes]);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Collections"
       title={title}
       subtitle="One operational view for collection readiness, receivable lanes, finance account blockers, recent collections, and receipt/reconciliation posture exposed by existing services."
@@ -342,6 +342,6 @@ export default function CollectionControlCenterView({ role }: { role: Collection
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

@@ -9,7 +9,7 @@ import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWin
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import StatusBadge from "@/components/ui/status-badge";
 import { FormSection, KpiCard, QuickActionGrid } from "@/components/ui/operations";
 import { cn } from "@/lib/utils";
@@ -445,7 +445,7 @@ export default function AdminFinancePage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="Finance Operations · Finance source workflow"
       title="Finance Operations"
       subtitle="Finance source workflow: customer receivables, supplier payables, direct-sale recovery, subscription collections, deposits, commissions, and payouts. This is not an accounting or ledger surface. Accounting bridge posting and reconciliation evidence live in Accounting & Reconciliation (/admin/accounting)."
@@ -1309,6 +1309,6 @@ export default function AdminFinancePage() {
           </>
         ) : null}
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

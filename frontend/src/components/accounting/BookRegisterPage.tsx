@@ -10,7 +10,7 @@ import {
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import { RegistryPageShell } from "@/components/layout/page-shells";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { MetricStrip } from "@/components/ui/operations";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import RegisterPrintDocument from "@/components/print/RegisterPrintDocument";
@@ -112,7 +112,7 @@ export default function BookRegisterPage<T extends GenericRecord>({
   const overflowRows = Math.max(rows.length - previewLimit, 0);
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       eyebrow={eyebrow}
       title={title}
@@ -216,6 +216,6 @@ export default function BookRegisterPage<T extends GenericRecord>({
           </div>
         }
       />
-    </PortalPage>
+    </ERPPageShell>
   );
 }

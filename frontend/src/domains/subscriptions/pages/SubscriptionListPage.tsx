@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import SubscriptionContractDocument from "@/components/print/SubscriptionContractDocument";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import DataTable from "@/components/ui/DataTable";
 import SearchSelect from "@/components/ui/SearchSelect";
 import WizardShell from "@/components/ui/WizardShell";
@@ -221,7 +221,7 @@ export default function AdminSubscriptionsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       className="receipt-print-page"
       title="Subscription Management"
       subtitle="Create subscriptions, review portfolio health, and operate daily Lucky Plan workflows."
@@ -619,6 +619,6 @@ export default function AdminSubscriptionsPage() {
           ]}
         />
       </div>
-    </PortalPage>
+    </ERPPageShell>
   );
 }

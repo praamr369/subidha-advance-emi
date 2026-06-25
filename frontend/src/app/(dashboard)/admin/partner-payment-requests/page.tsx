@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
   approveAdminCollectionRequest,
@@ -89,7 +89,7 @@ export default function AdminPartnerPaymentRequestsPage() {
   }
 
   return (
-    <PortalPage
+    <ERPPageShell
       title="Partner Payment Requests"
       subtitle="SUBMITTED collection requests from partners awaiting admin approval. Approving a request posts the payment and EMI record — this action cannot be undone."
       helperNote="Approving a request posts a real payment and EMI record. Rejecting returns it to the partner for correction. No financial changes happen from reject."
@@ -237,6 +237,6 @@ export default function AdminPartnerPaymentRequestsPage() {
           </div>
         </div>
       ) : null}
-    </PortalPage>
+    </ERPPageShell>
   );
 }
