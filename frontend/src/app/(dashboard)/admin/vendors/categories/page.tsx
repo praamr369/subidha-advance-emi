@@ -44,10 +44,15 @@ export default function AdminVendorCategoriesPage() {
     <ERPPageShell
       eyebrow="Purchases & Vendors"
       title="Vendor Categories"
-      subtitle="Supplier category master."
+      subtitle="Supplier and vendor category taxonomy for procurement routing and vendor profile classification."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Purchases", href: ROUTES.admin.purchases },
         { label: "Vendor Categories" },
+      ]}
+      actions={[
+        { href: ROUTES.admin.purchases, label: "Purchases Hub", variant: "secondary" },
+        { href: ROUTES.admin.vendors, label: "Vendors", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
