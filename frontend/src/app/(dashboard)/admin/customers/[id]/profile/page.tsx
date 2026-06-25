@@ -8,6 +8,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import { ROUTES } from "@/lib/routes";
 import { getInternalCustomerCrmProfile } from "@/services/crm-module";
 
 type ProfilePayload = {
@@ -61,8 +62,15 @@ export default function AdminCustomerProfilePage({ params }: { params: Promise<{
   return (
     <ERPPageShell
       eyebrow="CRM"
-      title="Party 360 Profile"
+      title={payload ? `Party 360: ${payload.identity.name}` : "Party 360 Profile"}
       subtitle="Identity, contracts, dues, payments, delivery, notes, follow-ups, risk flags, and audit timeline."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "CRM", href: ROUTES.admin.crm },
+        { label: "Customers", href: ROUTES.admin.customers },
+        { label: payload ? payload.identity.name : "Party 360" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         {loading ? <ERPLoadingState label="Loading Party 360 profile..." /> : null}

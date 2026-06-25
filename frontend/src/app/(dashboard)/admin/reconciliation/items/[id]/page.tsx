@@ -8,6 +8,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPDetailGrid from "@/components/erp/ERPDetailGrid";
 import ActionButton from "@/components/ui/ActionButton";
+import { ROUTES } from "@/lib/routes";
 import { normalizeApiError } from "@/services/api";
 import { getReconciliationItem, reopenReconciliationItem, resolveReconciliationItem } from "@/services/reconciliation/control-tower";
 import type { ReconciliationItemDetail } from "@/types/reconciliation";
@@ -48,8 +49,16 @@ export default function AdminReconciliationItemDetailPage({ params }: { params: 
   }, [item]);
 
   return (
-    <ERPPageShell eyebrow="Finance"
-      title={title}>
+    <ERPPageShell
+      eyebrow="Finance · Reconciliation"
+      title={title}
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Reconciliation", href: ROUTES.admin.reconciliation },
+        { label: title },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
       <div className="space-y-6">
         <ERPSectionShell
           title="Exception Detail"

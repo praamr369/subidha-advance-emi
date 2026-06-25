@@ -6,6 +6,7 @@ import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import {
   buildGstrCsvUrl,
@@ -247,7 +248,13 @@ export default function GstrReportPage() {
     <ERPPageShell
       eyebrow="BI & Reports"
       title="GSTR Report"
-      subtitle="GSTR-1 / GSTR-3B summary — B2B invoices, B2CS, and HSN breakdown"
+      subtitle="GSTR-1 / GSTR-3B summary — B2B invoices, B2CS, and HSN breakdown."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Reports", href: ROUTES.admin.reports },
+        { label: "GSTR Report" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {/* Period picker */}
       <ERPSectionShell title="Report Period">

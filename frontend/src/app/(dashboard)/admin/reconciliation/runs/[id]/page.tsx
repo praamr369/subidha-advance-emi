@@ -11,6 +11,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
 import ActionButton from "@/components/ui/ActionButton";
 import { buildAdminReconciliationReportPrintRoute } from "@/lib/route-builders";
+import { ROUTES } from "@/lib/routes";
 import { normalizeApiError } from "@/services/api";
 import { getReconciliationModules, getReconciliationRun, listReconciliationItems } from "@/services/reconciliation/control-tower";
 import type { ReconciliationItem, ReconciliationModuleSummary, ReconciliationRun } from "@/types/reconciliation";
@@ -58,8 +59,16 @@ export default function AdminReconciliationRunDetailPage() {
   }, [load]);
 
   return (
-    <ERPPageShell eyebrow="Finance"
-      title={run ? `Reconciliation Run #${run.run_no}` : "Reconciliation Run"}>
+    <ERPPageShell
+      eyebrow="Finance · Reconciliation"
+      title={run ? `Reconciliation Run #${run.run_no}` : "Reconciliation Run"}
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Reconciliation", href: ROUTES.admin.reconciliation },
+        { label: run ? `Run #${run.run_no}` : "Run Detail" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
       <div className="space-y-6">
         <ERPSectionShell
           title="Run Summary"

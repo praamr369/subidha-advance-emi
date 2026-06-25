@@ -6,6 +6,7 @@ import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import {
   createScheme,
@@ -216,7 +217,17 @@ export default function SchemesPage() {
     <ERPPageShell
       eyebrow="Growth & Offers"
       title="Discount & Scheme Manager"
-      subtitle="Festival and promotional EMI schemes — define discount rules, validity periods, and usage limits"
+      subtitle="Festival and promotional EMI schemes — define discount rules, validity periods, and usage limits."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Growth & Offers", href: ROUTES.admin.growth },
+        { label: "Schemes" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Total Schemes", value: loading ? "—" : schemes.length, tone: "info" },
+        { label: "Active Now", value: loading ? "—" : schemes.filter(s => s.is_currently_active).length, tone: schemes.filter(s => s.is_currently_active).length > 0 ? "success" : "default" },
+      ]}
     >
       <ERPSectionShell
         title="Schemes"
