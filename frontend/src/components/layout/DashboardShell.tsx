@@ -266,6 +266,15 @@ function buildPageTitle(pathname: string) {
   return segmentToLabel(last);
 }
 
+function buildBreadcrumb(pathname: string): { label: string }[] {
+  const cleaned = pathname.replace(/^\/+|\/+$/g, "");
+  const segments = cleaned.split("/").filter(Boolean);
+  // Remove role prefix (admin/customer/…), skip pure numeric IDs
+  const relative = segments.slice(1).filter((seg) => !/^\d+$/.test(seg));
+  if (relative.length === 0) return [];
+  return relative.slice(0, 3).map((seg) => ({ label: segmentToLabel(seg) }));
+}
+
 function hrefPathname(href: string) {
   return href.split("?")[0] || href;
 }
@@ -1383,6 +1392,7 @@ function SidebarContent({
 
 function Topbar({
   title,
+  pathname,
   role,
   displayName,
   onOpenSidebar,
@@ -1393,6 +1403,7 @@ function Topbar({
   mobileOpen,
 }: {
   title: string;
+  pathname: string;
   role: NavigationRole;
   displayName: string;
   onOpenSidebar: () => void;
@@ -1409,14 +1420,122 @@ function Topbar({
           { key: "create-contract", label: "Contract", title: "Create contract", href: ROUTES.admin.subscriptionsAdvanceEmiCreate },
           { key: "create-direct-sale", label: "Direct Sale", title: "Create direct sale", href: ROUTES.admin.billingDirectSaleCreate },
           { key: "collect-payment", label: "Payment", title: "Collect payment", href: ROUTES.admin.financeCollect },
-          { key: "open-delivery", label: "Delivery", title: "Open delivery workspace", href: ROUTES.admin.deliveryCreate },
+          { key: "open-delivery", label: "Delivery", title: "Open delivery", href: ROUTES.admin.deliveryCreate },
         ]
       : [];
   const validTopbarActions = topbarActions.filter(hasValidTopbarHref);
 
+  // Admin: compact 52px desktop-app topbar with breadcrumb + centered search
+  if (role === "ADMIN") {
+    const crumbs = buildBreadcrumb(pathname);
+    return (
+      <PortalHeader>
+        <div className="flex h-[52px] items-center gap-2 px-3 sm:px-4">
+          {/* Left: mobile hamburger + breadcrumb */}
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenSidebar}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground transition hover:bg-[var(--surface-muted)] md:hidden"
+              aria-label="Open menu"
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-sidebar-nav"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+            {crumbs.length === 0 ? (
+              <span className="text-sm font-semibold text-foreground">{title}</span>
+            ) : (
+              <nav className="flex min-w-0 items-center gap-0.5 text-sm" aria-label="Breadcrumb">
+                {crumbs.map((crumb, i) => (
+                  <Fragment key={`${crumb.label}-${i}`}>
+                    {i > 0 && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" aria-hidden />}
+                    <span
+                      className={cn(
+                        "truncate",
+                        i === crumbs.length - 1
+                          ? "font-semibold text-foreground"
+                          : "hidden text-muted-foreground sm:block"
+                      )}
+                    >
+                      {crumb.label}
+                    </span>
+                  </Fragment>
+                ))}
+              </nav>
+            )}
+          </div>
+
+          {/* Center: command palette search bar */}
+          <button
+            type="button"
+            onClick={onOpenCommandPalette}
+            className="hidden h-9 shrink-0 items-center gap-2 rounded-lg border border-[var(--topbar-border)] bg-[color-mix(in_oklab,var(--topbar-control)_80%,var(--surface-muted)_20%)] px-3 text-xs text-muted-foreground transition hover:bg-[var(--surface-muted)] hover:text-foreground lg:flex"
+            style={{ width: "260px" }}
+            aria-label="Open command palette (Ctrl+K)"
+            title="Command palette (Ctrl+K)"
+            data-testid="command-palette-trigger"
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="flex-1 text-left">Search anything…</span>
+            <kbd className="shrink-0 rounded border border-border bg-[var(--surface-card-elevated)] px-1.5 py-0.5 text-[10px] font-medium">
+              Ctrl K
+            </kbd>
+          </button>
+
+          {/* Right: action bar */}
+          <div className="flex shrink-0 items-center gap-1">
+            {/* Search icon for ≤md */}
+            <button
+              type="button"
+              onClick={onOpenCommandPalette}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground transition hover:bg-[var(--surface-muted)] lg:hidden"
+              aria-label="Open command palette"
+              data-testid="command-palette-trigger"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+
+            {/* Quick-create chips (xl only) */}
+            <div className="hidden items-center gap-1 xl:flex">
+              {validTopbarActions.map((action) => (
+                <Link
+                  key={action.key}
+                  href={action.href}
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2 text-xs font-medium text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                  title={action.title}
+                >
+                  <Plus className="h-3 w-3 shrink-0" />
+                  {action.label}
+                </Link>
+              ))}
+            </div>
+
+            {/* Quick actions button */}
+            <button
+              type="button"
+              onClick={onOpenQuickActions}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-primary/80 bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-[0_10px_24px_-16px_color-mix(in_oklab,var(--primary)_55%,transparent)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
+              aria-label="Quick actions"
+              title="Quick actions"
+            >
+              <Plus className="h-3.5 w-3.5 shrink-0" />
+              <span className="hidden sm:inline">New</span>
+            </button>
+
+            <ThemeToggle variant="dashboard" />
+            <NotificationBellDropdown role={role} />
+            <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />
+          </div>
+        </div>
+      </PortalHeader>
+    );
+  }
+
+  // Non-admin: existing layout (cleaned up)
   return (
     <PortalHeader>
-      <div className="flex min-h-[4.5rem] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 sm:min-h-[4.75rem] sm:gap-x-4 sm:px-4 lg:px-6 xl:px-8">
+      <div className="flex min-h-[4rem] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 sm:gap-x-4 sm:px-4 lg:px-6">
         <div className="flex min-w-0 max-w-full flex-[1_1_10rem] items-center gap-2 sm:flex-[1_1_38%] sm:gap-3">
           <button
             type="button"
@@ -1428,42 +1547,19 @@ function Topbar({
           >
             <Menu className="h-5 w-5" />
           </button>
-
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="enterprise-eyebrow">{formatRoleLabel(role)} Workspace</span>
-              <span className="workspace-pill px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Role Scope Active
-              </span>
-            </div>
+            <span className="enterprise-eyebrow">{formatRoleLabel(role)} Portal</span>
             <h1 className="min-w-0 max-w-full break-words text-balance text-lg font-semibold tracking-tight text-foreground sm:text-xl">
               {title}
             </h1>
           </div>
         </div>
-
         <div className="flex min-w-0 max-w-full flex-[1_1_14rem] flex-wrap items-center justify-end gap-2 sm:flex-[0_1_auto]">
-          {role === "ADMIN" ? (
-            <div className="hidden min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 xl:flex">
-              {validTopbarActions.map((action) => (
-                <Link
-                  key={action.key || `topbar-${action.label}-${action.href}`}
-                  href={action.href}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2.5 text-xs font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
-                  title={action.title}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {action.label}
-                </Link>
-              ))}
-            </div>
-          ) : null}
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] sm:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] sm:hidden"
             aria-label="Open command palette"
-            title="Command palette"
             data-testid="command-palette-trigger"
           >
             <Search className="h-4 w-4" />
@@ -1471,26 +1567,15 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="hidden h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] sm:inline-flex"
+            className="hidden h-10 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] sm:inline-flex"
             aria-label="Open command palette (Ctrl+K)"
-            title="Command palette (Ctrl+K)"
             data-testid="command-palette-trigger"
           >
             <Search className="h-4 w-4" />
-            Command
+            Search
             <span className="ml-1 rounded-lg border border-border bg-[var(--surface-card-elevated)] px-2 py-1 text-[11px] font-semibold text-muted-foreground">
               Ctrl K
             </span>
-          </button>
-          <button
-            type="button"
-            onClick={onOpenQuickActions}
-            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-primary/80 bg-primary px-2.5 text-sm font-semibold text-primary-foreground shadow-[0_18px_34px_-24px_color-mix(in_oklab,var(--primary)_48%,transparent)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)] sm:px-3"
-            aria-label="Open quick actions"
-            title="Quick actions"
-          >
-            <ReceiptText className="h-4 w-4 shrink-0" />
-            <span className="max-[380px]:sr-only">Quick Actions</span>
           </button>
           <ThemeToggle variant="dashboard" />
           <NotificationBellDropdown role={role} />
@@ -1640,6 +1725,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               <Fragment>
                 <Topbar
                   title={title}
+                  pathname={pathname}
                   role={role}
                   displayName={displayName}
                   onOpenSidebar={openMobileMenu}
