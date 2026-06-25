@@ -87,6 +87,12 @@ export default function LuckyPlanWinnersPage() {
         { label: "Winners" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Total Winners", value: loading ? "—" : totalCount, tone: "info" },
+        { label: "Waived (page)", value: loading ? "—" : `₹${winners.reduce((s, w) => s + Number(w.waived_amount || 0), 0).toLocaleString("en-IN")}`, tone: "default" },
+        { label: "Delivered (page)", value: loading ? "—" : winners.filter(w => w.delivery_status === "DELIVERED").length, tone: "success" },
+        { label: "Delivery Pending (page)", value: loading ? "—" : winners.filter(w => !w.delivery_status || ["NOT_SCHEDULED", "PENDING", "SCHEDULED"].includes(w.delivery_status)).length, tone: !loading && winners.filter(w => !w.delivery_status || ["NOT_SCHEDULED", "PENDING", "SCHEDULED"].includes(w.delivery_status)).length > 0 ? "warning" : "success" },
+      ]}
     >
       <ERPSectionShell
         title="Filters"
