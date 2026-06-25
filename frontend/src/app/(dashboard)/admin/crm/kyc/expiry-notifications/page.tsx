@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import { apiFetch } from "@/lib/api";
 
 interface KycDocRow {
@@ -81,11 +84,18 @@ export default function KycExpiryNotificationsPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">KYC Expiry Notifications</h1>
-        <p className="text-sm text-muted-foreground mt-1">Preview expiring KYC documents and send email reminders to customers via Django email backend.</p>
-      </div>
+    <ERPPageShell
+      eyebrow="CRM · KYC"
+      title="KYC Expiry Notifications"
+      subtitle="Preview expiring KYC documents and send email reminders to customers via Django email backend."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "CRM", href: ROUTES.admin.crm },
+        { label: "KYC", href: ROUTES.admin.complianceKyc },
+        { label: "Expiry Notifications" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
 
       {/* Controls */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
@@ -232,6 +242,6 @@ export default function KycExpiryNotificationsPage() {
           )}
         </div>
       )}
-    </div>
+    </ERPPageShell>
   );
 }

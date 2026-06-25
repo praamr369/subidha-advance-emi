@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import {
   listDisputes,
   createDispute,
@@ -140,12 +143,18 @@ export default function DisputesPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Customer Disputes</h1>
-          <p className="text-sm text-muted-foreground">Raise, review, resolve and escalate customer disputes</p>
-        </div>
+    <ERPPageShell
+      eyebrow="CRM"
+      title="Customer Disputes"
+      subtitle="Raise, review, resolve, and escalate customer dispute records."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "CRM", href: ROUTES.admin.crm },
+        { label: "Customer Disputes" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setShowCreate(true)}
           className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
@@ -314,6 +323,6 @@ export default function DisputesPage() {
           </div>
         </div>
       )}
-    </div>
+    </ERPPageShell>
   );
 }

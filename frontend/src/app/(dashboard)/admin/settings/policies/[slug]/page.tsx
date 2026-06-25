@@ -4,7 +4,7 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 
 import PolicyMarkdown from "@/components/public/PolicyMarkdown";
-import PageHeader from "@/components/ui/PageHeader";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ApiError } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -163,17 +163,22 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Policy editor: ${slug}`}
-        description="Admin-only policy editor with lifecycle review, stored governance metadata, public/internal separation, and content locking."
-        actions={
-          <>
-            <Link href={ROUTES.admin.settingsPolicies} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">Policy list</Link>
-            <Link href={ROUTES.admin.settingsBusinessCompliance} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">Business compliance</Link>
-          </>
-        }
-      />
+    <ERPPageShell
+      eyebrow="Settings · Governance"
+      title={`Policy editor: ${slug}`}
+      subtitle="Admin-only policy editor with lifecycle review, stored governance metadata, public/internal separation, and content locking."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Settings", href: ROUTES.admin.settings },
+        { label: "Policy Governance", href: ROUTES.admin.settingsPolicies },
+        { label: slug },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link href={ROUTES.admin.settingsPolicies} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">Policy list</Link>
+        <Link href={ROUTES.admin.settingsBusinessCompliance} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">Business compliance</Link>
+      </div>
 
       <section className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
         Public policies become customer-visible only after PUBLISHED. Internal policies must use Accept internal policy and are never public.
@@ -287,6 +292,6 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
           </section>
         </>
       )}
-    </div>
+    </ERPPageShell>
   );
 }

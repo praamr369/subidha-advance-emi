@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import {
   listAMLScreenings,
   createAMLScreening,
@@ -115,12 +118,18 @@ export default function AMLScreeningPage() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">AML Screening</h1>
-          <p className="text-sm text-muted-foreground">Anti-Money Laundering screening records and PEP flags</p>
-        </div>
+    <ERPPageShell
+      eyebrow="CRM · Compliance"
+      title="AML Screening"
+      subtitle="Anti-Money Laundering screening records and PEP flags for customer risk management."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "CRM", href: ROUTES.admin.crm },
+        { label: "AML Screening" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setShowScreeningForm(true)}
           className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
@@ -311,6 +320,6 @@ export default function AMLScreeningPage() {
           </div>
         </div>
       )}
-    </div>
+    </ERPPageShell>
   );
 }

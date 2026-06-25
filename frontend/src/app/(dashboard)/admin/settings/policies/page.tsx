@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import PageHeader from "@/components/ui/PageHeader";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ApiError } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -350,11 +350,17 @@ export default function AdminPoliciesSettingsPage() {
   const isDefaultActionView = filter === "ACTION_REQUIRED" && !search.trim();
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Policy governance"
-        description="Admin-only policy lifecycle control, public/internal separation, metadata health, coverage readiness, publishing, and archival controls. Default view shows only action-required items."
-      />
+    <ERPPageShell
+      eyebrow="Settings · Governance"
+      title="Policy Governance"
+      subtitle="Admin-only policy lifecycle control, public/internal separation, metadata health, coverage readiness, publishing, and archival controls."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Settings", href: ROUTES.admin.settings },
+        { label: "Policy Governance" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
 
       <section className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
         Seeded templates remain DRAFT. Public launch requires PUBLISHED + PUBLIC. INTERNAL policies are never shown on public policy pages. Review dates are governance warnings, not customer-facing content.
@@ -530,6 +536,6 @@ export default function AdminPoliciesSettingsPage() {
           </div>
         ) : null}
       </section>
-    </div>
+    </ERPPageShell>
   );
 }

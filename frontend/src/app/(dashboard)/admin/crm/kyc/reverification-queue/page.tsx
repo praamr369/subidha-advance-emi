@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import { listKYCReverificationQueue, requestKYCReverification, KYCReverificationDoc } from "@/services/aml";
 
 const WINDOW_OPTIONS = [
@@ -58,22 +61,27 @@ export default function KYCReverificationQueuePage() {
   const docTypeLabel = (t: string) => t.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">KYC Re-verification Queue</h1>
-          <p className="text-sm text-muted-foreground">KYC documents expiring soon or overdue for re-verification</p>
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={withinDays}
-            onChange={e => setWithinDays(Number(e.target.value))}
-            className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
-          >
-            {WINDOW_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <button onClick={() => void load()} className="h-9 px-4 rounded-xl border border-border text-sm">Refresh</button>
-        </div>
+    <ERPPageShell
+      eyebrow="CRM · KYC"
+      title="KYC Re-verification Queue"
+      subtitle="KYC documents expiring soon or overdue for re-verification — review and request re-upload."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "CRM", href: ROUTES.admin.crm },
+        { label: "KYC", href: ROUTES.admin.complianceKyc },
+        { label: "Re-verification Queue" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={withinDays}
+          onChange={e => setWithinDays(Number(e.target.value))}
+          className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
+        >
+          {WINDOW_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <button onClick={() => void load()} className="h-9 px-4 rounded-xl border border-border bg-card text-sm">Refresh</button>
       </div>
 
       {/* Summary bar */}
@@ -143,6 +151,6 @@ export default function KYCReverificationQueuePage() {
           })}
         </div>
       )}
-    </div>
+    </ERPPageShell>
   );
 }
