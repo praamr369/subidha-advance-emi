@@ -114,6 +114,11 @@ export default function CashierVariancePage() {
         { label: "Cashier Variance" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Threshold", value: data ? `₹${Number(data.threshold).toLocaleString("en-IN")}` : `₹${Number(threshold).toLocaleString("en-IN")}`, tone: "default" },
+        { label: "Breaches", value: data ? data.total_breaches : "—", tone: data && data.total_breaches > 0 ? "danger" : "success" },
+        { label: "Records Shown", value: data ? data.results.length : "—", tone: "info" },
+      ]}
     >
 
       {/* Filters */}

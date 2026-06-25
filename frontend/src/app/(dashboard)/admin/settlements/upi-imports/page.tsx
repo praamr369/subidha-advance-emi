@@ -92,6 +92,9 @@ export default function UpiImportsList() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
       headerMode="erp"
+      stats={[
+        { label: "Imports", value: loading ? "—" : imports.length, tone: "info" },
+      ]}
     >
       <ERPSectionShell title="Import register" description="Uploaded settlement imports with status and checksum.">
         <ERPDataToolbar

@@ -172,6 +172,11 @@ export default function NotificationTemplatesPage() {
         { label: "Templates" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Templates", value: loading ? "—" : templates.length, tone: "info" },
+        { label: "Active", value: loading ? "—" : templates.filter(t => t.is_active).length, tone: "success" },
+        { label: "Inactive", value: loading ? "—" : templates.filter(t => !t.is_active).length, tone: "default" },
+      ]}
     >
       <div className="space-y-6">
         {notice && (

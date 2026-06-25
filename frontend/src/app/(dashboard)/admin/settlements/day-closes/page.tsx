@@ -146,6 +146,11 @@ export default function AdminDayClosesPage() {
         { href: ROUTES.admin.settlementsBankImports, label: "Bank imports", variant: "secondary" },
         { href: ROUTES.admin.settlementsUpiImports, label: "UPI imports", variant: "secondary" },
       ]}
+      stats={[
+        { label: "Day-closes", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Pending Review", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "PENDING").length, tone: !loading && rows.filter(r => String(r.status).toUpperCase() === "PENDING").length > 0 ? "warning" : "success" },
+        { label: "With Variance", value: loading ? "—" : rows.filter(r => Number(r.variance || 0) !== 0).length, tone: !loading && rows.filter(r => Number(r.variance || 0) !== 0).length > 0 ? "warning" : "success" },
+      ]}
     >
       <ERPSectionShell title="Register" description="Cashier day-close records pending admin review and archive.">
         <ERPDataToolbar
