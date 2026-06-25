@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import {
   leaseCalculateROU,
   leaseGenerateSchedule,
@@ -189,11 +192,17 @@ export default function FinanceCompletePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Core Finance — Complete Module</h1>
-        <p className="text-sm text-muted-foreground mt-2">IFRS-16 Lease, Depreciation, Cost Centre P&L, Cash Flow, Fund Flow, Ratios, Deferred Tax</p>
-      </div>
+    <ERPPageShell
+      eyebrow="Accounting"
+      title="Core Finance — Complete Module"
+      subtitle="IFRS-16 Lease, Asset Depreciation, Cost Centre P&L, Cash Flow, Fund Flow, Financial Ratios, and Deferred Tax."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Accounting", href: ROUTES.admin.accounting },
+        { label: "Finance Complete" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
 
       {/* Tab Navigation */}
       <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto">
@@ -685,6 +694,6 @@ export default function FinanceCompletePage() {
           )}
         </div>
       )}
-    </div>
+    </ERPPageShell>
   );
 }

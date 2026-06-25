@@ -44,6 +44,13 @@ export default function AccountingBankBookPage() {
         accountingMoney(row.debit_amount),
         accountingMoney(row.credit_amount),
       ]}
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Accounting", href: ROUTES.admin.accounting },
+        { label: "Books", href: ROUTES.admin.accountingBooks },
+        { label: "Bank Book" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     />
   );
 }

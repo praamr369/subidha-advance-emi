@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import {
   listTCSCollections,
   createTCSCollection,
@@ -128,33 +131,37 @@ export default function TCSPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">TCS Collections</h1>
-          <p className="text-sm text-muted-foreground">Tax Collected at Source on customer transactions</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <select value={exportFy} onChange={e => setExportFy(e.target.value)} className="h-9 rounded-xl border border-border bg-background px-2 text-sm">
-            {FY_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-          </select>
-          <select value={exportQ} onChange={e => setExportQ(e.target.value)} className="h-9 rounded-xl border border-border bg-background px-2 text-sm">
-            {QUARTER_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
-          </select>
-          <button
-            onClick={() => void handleExport27EQ()}
-            disabled={exportBusy}
-            className="h-9 px-3 rounded-xl border border-border bg-background text-sm font-medium hover:bg-muted disabled:opacity-50"
-          >
-            {exportBusy ? "Exporting…" : "Form 27EQ CSV"}
-          </button>
-          <button
-            onClick={() => setShowForm(true)}
-            className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
-          >
-            + Record TCS
-          </button>
-        </div>
+    <ERPPageShell
+      eyebrow="Accounting · Tax"
+      title="TCS Collections"
+      subtitle="Tax Collected at Source on customer transactions — Form 27EQ export and challan tracking."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Accounting", href: ROUTES.admin.accounting },
+        { label: "TCS" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={exportFy} onChange={e => setExportFy(e.target.value)} className="h-9 rounded-xl border border-border bg-background px-2 text-sm">
+          {FY_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <select value={exportQ} onChange={e => setExportQ(e.target.value)} className="h-9 rounded-xl border border-border bg-background px-2 text-sm">
+          {QUARTER_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
+        </select>
+        <button
+          onClick={() => void handleExport27EQ()}
+          disabled={exportBusy}
+          className="h-9 px-3 rounded-xl border border-border bg-card text-sm font-medium hover:bg-muted disabled:opacity-50"
+        >
+          {exportBusy ? "Exporting…" : "Form 27EQ CSV"}
+        </button>
+        <button
+          onClick={() => setShowForm(true)}
+          className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+        >
+          + Record TCS
+        </button>
       </div>
 
       {exportErr && <div className="text-sm text-red-600 mb-3">{exportErr}</div>}
@@ -336,6 +343,6 @@ export default function TCSPage() {
           </div>
         </div>
       )}
-    </div>
+    </ERPPageShell>
   );
 }

@@ -96,6 +96,7 @@ export default function AdminAccountingControlCenterPage() {
         { label: "Accounting", href: "/admin/accounting" },
         { label: "Control Center" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <AccountingControlShell
         readinessWarnings={

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import { ROUTES } from "@/lib/routes";
 import { generateCurrentAccountingPeriod } from "@/services/accounting-period-actions";
@@ -343,23 +344,24 @@ export default function AccountingPeriodsPage() {
   const closedPeriodCount = periods.filter((period) => statusForPeriod(period) === "CLOSED").length;
 
   return (
-    <main className="space-y-6 p-6">
-      <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Admin · Accounting · Periods</p>
-            <h1 className="mt-1 text-2xl font-semibold text-foreground">Accounting Period Cockpit</h1>
-            <p className="mt-2 max-w-4xl text-sm text-muted-foreground">Control the active financial year, monthly accounting periods, exact-date posting locks, and controlled year-end close. Bridge readiness is compact and shows only real source rows or blockers.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={refreshing} onClick={() => loadPage("refresh")} className="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">{refreshing ? "Refreshing…" : "Refresh"}</button>
-            <button type="button" disabled={actionBusy === "period"} onClick={handleGenerateCurrentPeriod} className="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">Generate current period</button>
-            <button type="button" disabled={actionBusy === "seed"} onClick={handleSeedMappings} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/90 disabled:opacity-50">Seed supported mappings</button>
-          </div>
-        </div>
-        {notice ? <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</div> : null}
-        {error ? <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div> : null}
-      </section>
+    <ERPPageShell
+      eyebrow="Accounting"
+      title="Accounting Period Cockpit"
+      subtitle="Control the active financial year, monthly accounting periods, exact-date posting locks, and controlled year-end close."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Accounting", href: ROUTES.admin.accounting },
+        { label: "Periods" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={refreshing} onClick={() => loadPage("refresh")} className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">{refreshing ? "Refreshing…" : "Refresh"}</button>
+        <button type="button" disabled={actionBusy === "period"} onClick={handleGenerateCurrentPeriod} className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">Generate current period</button>
+        <button type="button" disabled={actionBusy === "seed"} onClick={handleSeedMappings} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/90 disabled:opacity-50">Seed supported mappings</button>
+      </div>
+      {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</div> : null}
+      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div> : null}
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <MetricCard label="Financial years" value={financialYears.length} />
@@ -422,6 +424,6 @@ export default function AccountingPeriodsPage() {
           </div>
         </div>
       </section>
-    </main>
+    </ERPPageShell>
   );
 }

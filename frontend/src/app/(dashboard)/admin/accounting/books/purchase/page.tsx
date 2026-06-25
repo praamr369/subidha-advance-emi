@@ -44,6 +44,13 @@ export default function AccountingPurchaseBookPage() {
         accountingMoney(row.grand_total),
         row.journal_entry_no,
       ]}
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Accounting", href: ROUTES.admin.accounting },
+        { label: "Books", href: ROUTES.admin.accountingBooks },
+        { label: "Purchase Book" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     />
   );
 }

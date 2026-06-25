@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
+
 import {
   getAccountingBridgeReconciliation,
   isBlockedOrExceptionRow,
@@ -467,21 +470,25 @@ export default function AccountingBridgeReconciliationPage() {
     }
   }
 
-  if (loading && !payload) return <main className="p-6"><div className="rounded-xl border p-6 text-sm text-muted-foreground">Loading accounting bridge reconciliation…</div></main>;
-  if (error && !payload) return <main className="p-6"><div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">{error}</div></main>;
+  if (loading && !payload) return <ERPPageShell eyebrow="Accounting" title="Bridge Reconciliation" subtitle="" breadcrumbs={[{ label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Reconciliation" }]}><div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading accounting bridge reconciliation…</div></ERPPageShell>;
+  if (error && !payload) return <ERPPageShell eyebrow="Accounting" title="Bridge Reconciliation" subtitle="" breadcrumbs={[{ label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Reconciliation" }]}><div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">{error}</div></ERPPageShell>;
 
   return (
-    <main className="space-y-6 p-6">
-      <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Admin · Accounting · Bridge Reconciliation</p>
-            <h1 className="mt-1 text-2xl font-semibold text-foreground">Accounting Bridge Reconciliation</h1>
-            <p className="mt-2 max-w-4xl text-sm text-muted-foreground">{SAFETY_COPY}</p>
-          </div>
-          <button type="button" onClick={() => load(filters)} className="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-muted">Refresh</button>
-        </div>
-      </section>
+    <ERPPageShell
+      eyebrow="Accounting"
+      title="Bridge Reconciliation"
+      subtitle="Post unposted bridge candidates to accounting journals. All posting is explicit — no auto-post or auto-reconcile."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Accounting", href: ROUTES.admin.accounting },
+        { label: "Bridge Reconciliation" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex items-center gap-2">
+        <p className="flex-1 text-xs text-muted-foreground">{SAFETY_COPY}</p>
+        <button type="button" onClick={() => load(filters)} className="h-9 rounded-xl border border-border bg-card px-4 text-sm font-semibold hover:bg-muted">Refresh</button>
+      </div>
 
       {payload ? (
         <>
@@ -533,6 +540,6 @@ export default function AccountingBridgeReconciliationPage() {
           )}
         </>
       ) : null}
-    </main>
+    </ERPPageShell>
   );
 }
