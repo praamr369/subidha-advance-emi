@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import { apiFetch } from "@/lib/api";
 
 const REPORT_TYPES = [
@@ -58,11 +60,17 @@ export default function ScheduledExportPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-foreground">Scheduled Report Export</h1>
-        <p className="text-sm text-muted-foreground mt-1">Generate and email a report CSV to a recipient immediately.</p>
-      </div>
+    <ERPPageShell
+      eyebrow="BI & Reports"
+      title="Scheduled Report Export"
+      subtitle="Generate and email a report CSV to a recipient immediately."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Reports", href: ROUTES.admin.reports },
+        { label: "Scheduled Report Export" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
 
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <div>
@@ -158,6 +166,6 @@ export default function ScheduledExportPage() {
           ))}
         </ul>
       </div>
-    </div>
+    </ERPPageShell>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import { apiFetch } from "@/lib/api";
 
 interface VarianceRow {
@@ -102,13 +104,17 @@ export default function CashierVariancePage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Cashier Variance Monitor</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          List day-close records where cash variance exceeds the threshold. Send escalation emails to management for investigation.
-        </p>
-      </div>
+    <ERPPageShell
+      eyebrow="Finance · Settlements"
+      title="Cashier Variance Monitor"
+      subtitle="List day-close records where cash variance exceeds the threshold. Send escalation emails to management."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Settlements", href: ROUTES.admin.settlements },
+        { label: "Cashier Variance" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
 
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
@@ -277,6 +283,6 @@ export default function CashierVariancePage() {
           )}
         </div>
       )}
-    </div>
+    </ERPPageShell>
   );
 }

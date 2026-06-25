@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import { apiFetch } from "@/lib/api";
 
 interface BatchKpi {
@@ -103,11 +105,17 @@ export default function BatchAlertsPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-foreground">Batch Performance Alerts</h1>
-        <p className="text-sm text-muted-foreground mt-1">Check active batches against thresholds and send email alerts for under-performers.</p>
-      </div>
+    <ERPPageShell
+      eyebrow="BI & Reports"
+      title="Batch Performance Alerts"
+      subtitle="Check active batches against thresholds and send email alerts for under-performers."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Reports", href: ROUTES.admin.reports },
+        { label: "Batch Performance Alerts" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
 
       {/* Thresholds */}
       <div className="rounded-xl border border-border bg-card p-5 mb-5">
@@ -261,6 +269,6 @@ export default function BatchAlertsPage() {
           )}
         </>
       )}
-    </div>
+    </ERPPageShell>
   );
 }

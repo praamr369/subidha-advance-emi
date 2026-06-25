@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import { capturePOD } from "@/services/pod";
 
 export default function PODCapturePage() {
@@ -88,13 +90,17 @@ export default function PODCapturePage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Capture Proof of Delivery</h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          Record delivery proof: photos, signature, driver details, and GPS location for audit trail.
-        </p>
-      </div>
+    <ERPPageShell
+      eyebrow="Delivery"
+      title="Capture Proof of Delivery"
+      subtitle="Record delivery proof: photos, signature, driver details, and GPS location for audit trail."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Delivery", href: ROUTES.admin.delivery },
+        { label: "POD Capture" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
 
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         {/* Delivery Info */}
@@ -262,6 +268,6 @@ export default function PODCapturePage() {
           </button>
         </div>
       </div>
-    </div>
+    </ERPPageShell>
   );
 }

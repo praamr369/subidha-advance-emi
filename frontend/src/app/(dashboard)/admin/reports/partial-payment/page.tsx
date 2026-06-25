@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import { apiFetch } from "@/lib/api";
 
 interface EmiRow {
@@ -86,13 +88,17 @@ export default function PartialPaymentPage() {
   const partialEmi = split?.split.find(l => !l.fully_covered);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Partial Payment Waterfall</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Preview how a payment amount distributes across pending EMIs. <strong>This is a calculator only</strong> — record each EMI payment via the standard payment flow.
-        </p>
-      </div>
+    <ERPPageShell
+      eyebrow="BI & Reports"
+      title="Partial Payment Waterfall"
+      subtitle="Preview how a payment amount distributes across pending EMIs. Calculator only — record actual EMI payments via the standard payment flow."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Reports", href: ROUTES.admin.reports },
+        { label: "Partial Payment Waterfall" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
 
       {/* Input */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
@@ -246,6 +252,6 @@ export default function PartialPaymentPage() {
           </div>
         </div>
       )}
-    </div>
+    </ERPPageShell>
   );
 }

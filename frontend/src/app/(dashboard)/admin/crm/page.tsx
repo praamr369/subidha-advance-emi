@@ -204,6 +204,12 @@ export default function AdminCrmOverviewPage() {
         { href: ROUTES.admin.crmPipeline, label: "Pipeline", variant: "primary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
+      stats={[
+        { label: "Registered Customers", value: customerCount ?? "—", tone: "info" },
+        { label: "Active Leads", value: funnel ? funnel.summary.total_leads : (overview?.summary.lead_count ?? "—"), tone: "default" },
+        { label: "Due Follow-ups", value: overview?.summary.due_follow_up_count ?? "—", tone: typeof overview?.summary.due_follow_up_count === "number" && overview.summary.due_follow_up_count > 0 ? "warning" : "success" },
+        { label: "CRM Parties", value: overview?.summary.party_count ?? "—", tone: "default" },
+      ]}
     >
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>

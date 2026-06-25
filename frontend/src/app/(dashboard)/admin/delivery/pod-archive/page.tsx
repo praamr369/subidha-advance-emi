@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import { listPOD, getPODDetail, exportPODYear, PODRecord, PODDetail } from "@/services/pod";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -71,13 +73,17 @@ export default function PODArchivePage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">POD Archive</h1>
-          <p className="text-sm text-muted-foreground">Proof of Delivery records and year-end export for security & legal</p>
-        </div>
-      </div>
+    <ERPPageShell
+      eyebrow="Delivery"
+      title="POD Archive"
+      subtitle="Proof of Delivery records and year-end export for security and legal compliance."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Delivery", href: ROUTES.admin.delivery },
+        { label: "POD Archive" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
 
       {/* Year Selection & Export */}
       <div className="rounded-xl border border-border bg-card p-4 mb-5">
@@ -286,6 +292,6 @@ export default function PODArchivePage() {
           </div>
         </div>
       )}
-    </div>
+    </ERPPageShell>
   );
 }
