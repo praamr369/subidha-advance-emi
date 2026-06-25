@@ -224,7 +224,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-card p-5 shadow-sm">
       <div>
         <h2 className="text-base font-semibold text-foreground">{title}</h2>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
@@ -483,7 +483,7 @@ export default function AdminPayoutBatchDetailPage() {
             type="button"
             onClick={() => void loadPage("refresh")}
             disabled={refreshing || loading}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-card px-4 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {refreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -629,7 +629,7 @@ export default function AdminPayoutBatchDetailPage() {
                         onChange={(event) => setActionNote(event.target.value)}
                         rows={4}
                         placeholder="Optional finance note for finalize or cancel actions."
-                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                        className="w-full rounded-xl border border-slate-300 bg-card px-4 py-3 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                         disabled={acting}
                       />
                     </div>
@@ -646,7 +646,7 @@ export default function AdminPayoutBatchDetailPage() {
                           id="batch-finance-account"
                           value={selectedFinanceAccount}
                           onChange={(event) => setSelectedFinanceAccount(event.target.value)}
-                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                          className="h-10 w-full rounded-xl border border-slate-300 bg-card px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                           disabled={acting}
                         >
                           <option value="">Leave unassigned</option>
@@ -672,7 +672,7 @@ export default function AdminPayoutBatchDetailPage() {
                           value={referenceNo}
                           onChange={(event) => setReferenceNo(event.target.value)}
                           placeholder="Transfer, bank, or UPI reference"
-                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                          className="h-10 w-full rounded-xl border border-slate-300 bg-card px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                           disabled={acting}
                         />
                       </div>
@@ -806,7 +806,7 @@ export default function AdminPayoutBatchDetailPage() {
                               {typeof row.subscription_id === "number" ? (
                                 <Link
                                   href={`/admin/subscriptions/${row.subscription_id}`}
-                                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                                  className="inline-flex items-center rounded-md border border-slate-300 bg-card px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                                 >
                                   Subscription
                                 </Link>
@@ -814,7 +814,7 @@ export default function AdminPayoutBatchDetailPage() {
 
                               <Link
                                 href="/admin/finance/commissions"
-                                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                                className="inline-flex items-center rounded-md border border-slate-300 bg-card px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                               >
                                 Commission Register
                               </Link>

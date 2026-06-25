@@ -73,14 +73,14 @@ export default function AdminSubscriptionDetailLayout({ children }: { children: 
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={buildAdminSubscriptionContractPrintRoute(subscriptionId)}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-300 bg-card px-4 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
             >
               Contract PDF / Print
             </Link>
             {rentLeasePrintEligible ? (
               <Link
                 href={buildAdminRentLeaseContractPrintRoute(subscriptionId)}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-300 bg-card px-4 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
               >
                 Rent / Lease Contract PDF / Print
               </Link>

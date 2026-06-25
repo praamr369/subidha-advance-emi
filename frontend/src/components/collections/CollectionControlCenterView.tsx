@@ -80,34 +80,34 @@ function FinanceReadinessBanner({ payload }: { payload: CollectionControlPayload
         {payload.role === "admin" && payload.route_hints.accounting_setup ? (
           <Link
             href={payload.route_hints.accounting_setup}
-            className="inline-flex rounded-xl border border-current/25 bg-white px-3 py-2 text-sm font-semibold shadow-sm transition hover:bg-white/80"
+            className="inline-flex rounded-xl border border-current/25 bg-card px-3 py-2 text-sm font-semibold shadow-sm transition hover:bg-card"
           >
             Open Accounting Setup
           </Link>
         ) : (
-          <div className="rounded-xl border border-current/20 bg-white/60 px-3 py-2 text-sm font-medium">
+          <div className="rounded-xl border border-current/20 bg-card px-3 py-2 text-sm font-medium">
             Ask admin to fix accounting setup
           </div>
         )}
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-5">
-        <div className="rounded-xl border border-current/20 bg-white/60 p-4">
+        <div className="rounded-xl border border-current/20 bg-card p-4">
           <div className="text-xs font-medium uppercase tracking-wide">Selectable</div>
           <div className="mt-1 text-2xl font-semibold">{counts.selectable_count ?? counts.ready_count}</div>
         </div>
-        <div className="rounded-xl border border-current/20 bg-white/60 p-4">
+        <div className="rounded-xl border border-current/20 bg-card p-4">
           <div className="text-xs font-medium uppercase tracking-wide">Blocked</div>
           <div className="mt-1 text-2xl font-semibold">{counts.blocked_count}</div>
         </div>
-        <div className="rounded-xl border border-current/20 bg-white/60 p-4">
+        <div className="rounded-xl border border-current/20 bg-card p-4">
           <div className="text-xs font-medium uppercase tracking-wide">Diagnostic</div>
           <div className="mt-1 text-2xl font-semibold">{counts.diagnostic_count ?? 0}</div>
         </div>
-        <div className="rounded-xl border border-current/20 bg-white/60 p-4">
+        <div className="rounded-xl border border-current/20 bg-card p-4">
           <div className="text-xs font-medium uppercase tracking-wide">Cash ready</div>
           <div className="mt-1 text-2xl font-semibold">{counts.cash_ready_count}</div>
         </div>
-        <div className="rounded-xl border border-current/20 bg-white/60 p-4">
+        <div className="rounded-xl border border-current/20 bg-card p-4">
           <div className="text-xs font-medium uppercase tracking-wide">Bank / UPI ready</div>
           <div className="mt-1 text-2xl font-semibold">{counts.bank_ready_count + counts.upi_ready_count}</div>
         </div>

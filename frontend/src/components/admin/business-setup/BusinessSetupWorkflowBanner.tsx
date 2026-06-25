@@ -181,13 +181,13 @@ export default function BusinessSetupWorkflowBanner({
       <div className="mt-3 flex flex-wrap gap-3">
         <Link
           href={primaryActionHref}
-          className="inline-flex items-center rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
+          className="inline-flex items-center rounded-lg border border-amber-400 bg-card px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
         >
           Resolve top blocker
         </Link>
         <Link
           href={ROUTES.admin.settingsBusinessSetupChecklist}
-          className="inline-flex items-center rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
+          className="inline-flex items-center rounded-lg border border-amber-400 bg-card px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
         >
           Open setup checklist
         </Link>

@@ -68,7 +68,7 @@ export default function PlanCategoryShowcase({ className }: { className?: string
           return (
             <div key={category.key} className="public-card p-5">
               <div className="flex items-center gap-3">
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/80 bg-slate-950/90 text-white shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)]">
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-slate-950/90 text-white shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)]">
                   <Icon className="h-5 w-5" />
                 </span>
                 <div className="text-base font-semibold text-foreground">{category.title}</div>
@@ -80,7 +80,7 @@ export default function PlanCategoryShowcase({ className }: { className?: string
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link
                   href={category.cta.href}
-                  className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
+                  className="inline-flex h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
                 >
                   {category.cta.label}
                 </Link>

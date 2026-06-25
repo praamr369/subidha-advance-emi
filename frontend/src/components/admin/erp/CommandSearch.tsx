@@ -24,7 +24,7 @@ export function CommandSearch() {
   }
 
   return (
-    <section className="rounded-xl border border-white/80 bg-white/80 p-5">
+    <section className="rounded-xl border border-border bg-card p-5">
       <h2 className="text-base font-semibold text-foreground">Command Search</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Search customer, subscription, lucky ID, invoice, receipt, direct sale, product, partner, and lead records.

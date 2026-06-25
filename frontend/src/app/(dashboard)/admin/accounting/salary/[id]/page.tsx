@@ -196,7 +196,7 @@ export default function AdminSalarySheetDetailPage() {
                   {salarySheet.lines.map((line) => (
                     <div
                       key={line.id}
-                      className="rounded-xl border border-white/80 bg-white/75 p-4"
+                      className="rounded-xl border border-border bg-card p-4"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -239,7 +239,7 @@ export default function AdminSalarySheetDetailPage() {
                   {payments.map((payment) => (
                     <div
                       key={payment.id}
-                      className="rounded-xl border border-white/80 bg-white/75 p-4"
+                      className="rounded-xl border border-border bg-card p-4"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>

@@ -33,22 +33,22 @@ const noticeToneStyles: Record<
   info: {
     shell:
       "border-sky-200/90 bg-[linear-gradient(180deg,rgba(240,249,255,0.98),rgba(224,242,254,0.92))] text-sky-950",
-    icon: "border-sky-200/90 bg-white/90 text-sky-700",
+    icon: "border-sky-200/90 bg-card text-sky-700",
   },
   success: {
     shell:
       "border-emerald-200/90 bg-[linear-gradient(180deg,rgba(236,253,245,0.98),rgba(220,252,231,0.92))] text-emerald-950",
-    icon: "border-emerald-200/90 bg-white/90 text-emerald-700",
+    icon: "border-emerald-200/90 bg-card text-emerald-700",
   },
   warning: {
     shell:
       "border-amber-200/90 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(254,243,199,0.92))] text-amber-950",
-    icon: "border-amber-200/90 bg-white/90 text-amber-700",
+    icon: "border-amber-200/90 bg-card text-amber-700",
   },
   danger: {
     shell:
       "border-red-200/90 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.92))] text-red-950",
-    icon: "border-red-200/90 bg-white/90 text-red-700",
+    icon: "border-red-200/90 bg-card text-red-700",
   },
 };
 

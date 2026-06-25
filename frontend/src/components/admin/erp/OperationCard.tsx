@@ -8,7 +8,7 @@ import type { ErpCard } from "@/services/admin-erp";
 
 export function OperationCard({ card }: { card: ErpCard }) {
   return (
-    <article className="rounded-xl border border-white/80 bg-white/80 p-4 shadow-[0_14px_26px_-24px_rgba(15,23,42,0.45)]">
+    <article className="rounded-xl border border-border bg-card p-4 shadow-[0_14px_26px_-24px_rgba(15,23,42,0.45)]">
       <div className="flex items-start justify-between gap-3">
         <div className="text-sm font-semibold text-foreground">{card.label}</div>
         <SeverityBadge severity={card.severity} />

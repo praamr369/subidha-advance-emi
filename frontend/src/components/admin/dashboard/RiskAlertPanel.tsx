@@ -10,7 +10,7 @@ type RiskAlertPanelProps = {
 
 export default function RiskAlertPanel({ alerts }: RiskAlertPanelProps) {
   return (
-    <section className="rounded border bg-white p-4">
+    <section className="rounded border bg-card p-4">
       <h3 className="mb-3 text-lg font-semibold">Risk Alerts</h3>
       <ul className="space-y-2">
         {alerts.map((alert) => (

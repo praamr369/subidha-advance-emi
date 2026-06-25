@@ -63,9 +63,9 @@ export default function ChurnAnalysisPage() {
       <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50/80 px-4 py-3 text-sm text-sky-800">
         <strong>Drill down to source workflow:</strong> No mutation can be made from this page. Use the links below to act on churn-risk contracts.
         <div className="mt-2 flex flex-wrap gap-2">
-          <Link href={ROUTES.admin.profilesCustomers} className="inline-flex items-center rounded-md border border-sky-300 bg-white px-3 py-1 text-xs font-medium text-sky-900 transition hover:bg-sky-100">Profiles — Customers</Link>
-          <Link href={ROUTES.admin.subscriptions} className="inline-flex items-center rounded-md border border-sky-300 bg-white px-3 py-1 text-xs font-medium text-sky-900 transition hover:bg-sky-100">Sales & Contracts</Link>
-          <Link href={ROUTES.admin.financeOutstandings} className="inline-flex items-center rounded-md border border-sky-300 bg-white px-3 py-1 text-xs font-medium text-sky-900 transition hover:bg-sky-100">Finance Operations — Outstandings</Link>
+          <Link href={ROUTES.admin.profilesCustomers} className="inline-flex items-center rounded-md border border-sky-300 bg-card px-3 py-1 text-xs font-medium text-sky-900 transition hover:bg-sky-100">Profiles — Customers</Link>
+          <Link href={ROUTES.admin.subscriptions} className="inline-flex items-center rounded-md border border-sky-300 bg-card px-3 py-1 text-xs font-medium text-sky-900 transition hover:bg-sky-100">Sales & Contracts</Link>
+          <Link href={ROUTES.admin.financeOutstandings} className="inline-flex items-center rounded-md border border-sky-300 bg-card px-3 py-1 text-xs font-medium text-sky-900 transition hover:bg-sky-100">Finance Operations — Outstandings</Link>
         </div>
       </div>
 

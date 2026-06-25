@@ -1017,7 +1017,7 @@ export default function AdminSubscriptionDetailPage() {
               </div>
             </section>
             <section className="grid gap-4">
-              <div className="surface-glass rounded-[30px] p-5 shadow-[var(--surface-shadow-lg)]">
+              <div className="surface-glass rounded-[30px] p-5 shadow-lg">
                 <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
@@ -1035,7 +1035,7 @@ export default function AdminSubscriptionDetailPage() {
                     type="button"
                     onClick={() => void loadPage("refresh")}
                     disabled={refreshing || loading}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground shadow-[var(--surface-shadow)] transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <svg
                       className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
@@ -1167,7 +1167,7 @@ export default function AdminSubscriptionDetailPage() {
               </div>
 
               {winnerIntegrityIssues.length > 0 ? (
-                <div className="dashboard-posture-danger rounded-[24px] p-4 shadow-[var(--surface-shadow)]">
+                <div className="dashboard-posture-danger rounded-[24px] p-4 shadow-sm">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--semantic-danger-fg)]">
                     Winner Integrity Warning
                   </p>
@@ -1183,7 +1183,7 @@ export default function AdminSubscriptionDetailPage() {
                   </ul>
                 </div>
               ) : detailSemantics.hasWinnerHistory ? (
-                <div className="dashboard-posture-success rounded-[24px] p-4 shadow-[var(--surface-shadow)]">
+                <div className="dashboard-posture-success rounded-[24px] p-4 shadow-sm">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--semantic-success-fg)]">
                     Winner State Synced
                   </p>

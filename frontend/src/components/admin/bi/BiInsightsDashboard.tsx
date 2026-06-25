@@ -340,7 +340,7 @@ function Sections({ payload, mode }: { payload: BiInsightsPayload; mode: BiInsig
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-slate-50"
+              className="rounded-full border border-slate-200 bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-slate-50"
             >
               {link.label}
             </Link>
@@ -384,7 +384,7 @@ export default function BiInsightsDashboard({ mode = "all" }: { mode?: BiInsight
 
   if (!payload) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-slate-200 bg-card px-4 py-3 text-sm text-muted-foreground">
         Loading operational insights...
       </div>
     );

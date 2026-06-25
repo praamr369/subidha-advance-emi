@@ -8,7 +8,7 @@ export function EntityTimeline({
   points: Array<{ label: string; value: string }>;
 }) {
   return (
-    <section className="rounded-xl border border-white/80 bg-white/80 p-5">
+    <section className="rounded-xl border border-border bg-card p-5">
       <h2 className="text-base font-semibold text-foreground">{title}</h2>
       <div className="mt-4 space-y-3">
         {points.map((point, index) => (

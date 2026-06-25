@@ -52,7 +52,7 @@ export default function PublicContentCarousel({
   }
 
   const floatingControlClass =
-    "pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-white/90 text-foreground shadow-lg transition hover:bg-white";
+    "pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg transition hover:bg-card";
 
   return (
     <Carousel

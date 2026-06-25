@@ -177,7 +177,7 @@ export default function AccountingDebitNotesPage() {
               ) : (
                 <div className="space-y-3">
                   {notes.map((note) => (
-                    <div key={note.id} className="rounded-xl border border-white/75 bg-white/75 px-4 py-4">
+                    <div key={note.id} className="rounded-xl border border-border bg-card px-4 py-4">
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div>
                           <div className="font-semibold text-foreground">{note.note_no || `Draft Debit Note #${note.id}`}</div>

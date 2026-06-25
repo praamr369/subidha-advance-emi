@@ -89,7 +89,7 @@ export default function EmiJourneyTimeline({ className }: EmiJourneyTimelineProp
   return (
     <section
       className={cn(
-        "rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)]",
+        "rounded-[2rem] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)]",
         className
       )}
     >
@@ -116,7 +116,7 @@ export default function EmiJourneyTimeline({ className }: EmiJourneyTimelineProp
               )}
             >
               <span
-                className="absolute -left-[calc(1.5rem+1px)] flex h-6 w-6 items-center justify-center rounded-full border-2 border-border/60 bg-white shadow-[0_4px_10px_-4px_rgba(15,23,42,0.3)]"
+                className="absolute -left-[calc(1.5rem+1px)] flex h-6 w-6 items-center justify-center rounded-full border-2 border-border/60 bg-card shadow-[0_4px_10px_-4px_rgba(15,23,42,0.3)]"
                 aria-hidden="true"
               >
                 <step.icon className="h-3 w-3 text-primary" />

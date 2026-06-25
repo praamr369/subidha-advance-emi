@@ -8,7 +8,7 @@ type DataTableProps = {
 export default function DataTable({ headers, rows }: DataTableProps) {
   return (
     <div className="table-surface-frame">
-      <table className="min-w-full border-collapse bg-white text-sm">
+      <table className="min-w-full border-collapse bg-card text-sm">
         <thead className="border-b border-border bg-[color-mix(in_oklab,var(--surface-muted)_86%,white_14%)]">
         <tr>
           {headers.map((header) => (

@@ -487,7 +487,7 @@ export default function CustomerSelector({
             >
               {creating ? (
                 <>
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-white" />
                   Creating…
                 </>
               ) : (

@@ -39,7 +39,7 @@ export default function ProductSearch({
       />
 
       {results.length > 0 ? (
-        <div className="border rounded bg-white shadow max-h-40 overflow-auto">
+        <div className="border rounded bg-card shadow max-h-40 overflow-auto">
           {results.map((p) => (
             <div
               key={p.id}

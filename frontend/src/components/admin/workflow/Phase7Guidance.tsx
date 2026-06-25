@@ -30,7 +30,7 @@ export default function Phase7Guidance({
           <Link
             key={`${item.href}:${item.label}`}
             href={item.href}
-            className="group rounded-xl border border-border bg-white px-3 py-3 transition hover:border-amber-300 hover:bg-amber-50/70"
+            className="group rounded-xl border border-border bg-card px-3 py-3 transition hover:border-amber-300 hover:bg-amber-50/70"
           >
             <div className="flex items-start justify-between gap-3">
               <div>

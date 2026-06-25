@@ -24,7 +24,7 @@ export default function PublicMarketingBanner({
   return (
     <section
       className={cn(
-        "public-reveal relative overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(246,239,229,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(87,54,31,0.58)] dark:border-border/70 dark:bg-[linear-gradient(135deg,rgba(45,37,30,0.92),rgba(33,29,25,0.94))]",
+        "public-reveal relative overflow-hidden rounded-[2rem] border border-border bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(246,239,229,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(87,54,31,0.58)] dark:border-border/70 dark:bg-[linear-gradient(135deg,rgba(45,37,30,0.92),rgba(33,29,25,0.94))]",
         className
       )}
     >

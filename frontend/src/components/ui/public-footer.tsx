@@ -67,7 +67,7 @@ export default async function PublicFooter() {
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Trusted local retail support for furniture, electronics, and home appliances in {brandConfig.publicBranchLocation}.
           </p>
-          <div className="mt-4 rounded-xl border border-white/75 bg-white/75 p-3 text-sm dark:border-border/70 dark:bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)]">
+          <div className="mt-4 rounded-xl border border-border bg-card p-3 text-sm dark:border-border/70 dark:bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)]">
             <div className="font-semibold text-foreground">{trustTitle}</div>
             <p className="mt-1 text-muted-foreground">{trustDescription}</p>
             <p className="mt-2 text-xs text-muted-foreground dark:text-muted-foreground">Language: {PUBLIC_LANGUAGE_LABELS[locale]}</p>
@@ -86,7 +86,7 @@ export default async function PublicFooter() {
           <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Popular categories</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {productCategoryLinks.map((category) => (
-              <span key={category} className="rounded-full border border-white/80 bg-white/80 px-3 py-1 text-xs text-muted-foreground dark:border-border/70 dark:bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] dark:text-muted-foreground">
+              <span key={category} className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground dark:border-border/70 dark:bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] dark:text-muted-foreground">
                 {category}
               </span>
             ))}
@@ -101,7 +101,7 @@ export default async function PublicFooter() {
             {profile.business_hours ? <div className="public-card-sm break-words px-3 py-2">Hours: {profile.business_hours}</div> : null}
             {profile.address_text ? <div className="public-card-sm break-words px-3 py-2">Address: {profile.address_text}</div> : null}
             {profile.resolved_whatsapp_link ? (
-              <Link href={profile.resolved_whatsapp_link} className="public-card-sm inline-flex min-h-10 items-center px-3 py-2 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:hover:bg-muted/50">
+              <Link href={profile.resolved_whatsapp_link} className="public-card-sm inline-flex min-h-10 items-center px-3 py-2 transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:hover:bg-muted/50">
                 {dictionary.footer.whatsapp}
               </Link>
             ) : null}

@@ -2180,7 +2180,7 @@ export default function AdminCustomerDetailPage() {
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Link
                           href={`/admin/billing/direct-sales?customer=${customer.id}`}
-                          className="inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-950 shadow-sm transition hover:bg-amber-100/60"
+                          className="inline-flex items-center rounded-md border border-amber-300 bg-card px-3 py-2 text-sm font-medium text-amber-950 shadow-sm transition hover:bg-amber-100/60"
                         >
                           Open Direct Sales
                         </Link>
@@ -2230,7 +2230,7 @@ export default function AdminCustomerDetailPage() {
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Link
                           href={`/admin/subscriptions?customer=${customer.id}`}
-                          className="inline-flex items-center rounded-md border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/60"
+                          className="inline-flex items-center rounded-md border border-emerald-300 bg-card px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/60"
                         >
                           Open Subscriptions
                         </Link>
@@ -2243,7 +2243,7 @@ export default function AdminCustomerDetailPage() {
                         {latestSubscription ? (
                           <Link
                             href={`/admin/finance/collect?subscription=${latestSubscription.id}`}
-                            className="inline-flex items-center rounded-md border border-emerald-900 bg-white px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/60"
+                            className="inline-flex items-center rounded-md border border-emerald-900 bg-card px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/60"
                           >
                             Collect EMI
                           </Link>

@@ -211,7 +211,7 @@ export default function CollectionInlineReadinessBanner({
               </div>
               <div className="mt-3 space-y-2">
                 {blockedAccounts.slice(0, 3).map((account) => (
-                  <div key={account.id} className="rounded-lg border border-amber-200 bg-white/70 px-3 py-2">
+                  <div key={account.id} className="rounded-lg border border-amber-200 bg-card px-3 py-2">
                     <div className="font-medium text-amber-950">{account.name} · {account.kind}</div>
                     <div className="mt-1 text-xs text-amber-900">{accountBlocker(account)}</div>
                     {account.recommended_action ? (
@@ -221,7 +221,7 @@ export default function CollectionInlineReadinessBanner({
                 ))}
               </div>
               {role === "cashier" ? (
-                <div className="mt-3 rounded-lg border border-amber-300 bg-white/70 px-3 py-2 text-xs font-medium text-amber-950">
+                <div className="mt-3 rounded-lg border border-amber-300 bg-card px-3 py-2 text-xs font-medium text-amber-950">
                   Ask admin to fix accounting setup.
                 </div>
               ) : null}

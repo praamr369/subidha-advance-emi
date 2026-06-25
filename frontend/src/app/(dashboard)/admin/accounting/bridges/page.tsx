@@ -456,7 +456,7 @@ export default function AccountingBridgeReadinessPage() {
             <SummaryCard label="Setup definitions" value={totalDefinitions} tone="border-slate-200 bg-slate-50 text-foreground" />
             <SummaryCard label="Setup-ready" value={setupReadyCount} tone="border-blue-200 bg-blue-50 text-blue-900" />
             <SummaryCard label="Final-ready" value={finalReadyCount} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
-            <SummaryCard label="Reconciled evidence" value={reconciledCount} tone="border-emerald-200 bg-white text-emerald-900" />
+            <SummaryCard label="Reconciled evidence" value={reconciledCount} tone="border-emerald-200 bg-card text-emerald-900" />
             <SummaryCard label="Action required" value={activeBlockerCount} tone={activeBlockerCount ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-900"} />
             <SummaryCard label="Unsupported boundary" value={unsupportedCount} tone="border-slate-200 bg-slate-50 text-foreground" />
           </div>

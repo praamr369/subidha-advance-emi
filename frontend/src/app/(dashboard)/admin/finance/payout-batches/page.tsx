@@ -288,7 +288,7 @@ export default function AdminPayoutBatchesPage() {
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 placeholder="Batch id, status, amount"
-                className="h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                className="h-10 w-full rounded-xl border border-slate-300 bg-card px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
               />
             </div>
 
@@ -307,7 +307,7 @@ export default function AdminPayoutBatchesPage() {
                     event.target.value as "" | "DRAFT" | "FINALIZED" | "CANCELLED"
                   )
                 }
-                className="h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                className="h-10 w-full rounded-xl border border-slate-300 bg-card px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
               >
                 <option value="">All</option>
                 <option value="DRAFT">Draft</option>
@@ -327,7 +327,7 @@ export default function AdminPayoutBatchesPage() {
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-card px-4 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
               >
                 Reset
               </button>
@@ -339,7 +339,7 @@ export default function AdminPayoutBatchesPage() {
               type="button"
               onClick={() => void loadPage("refresh")}
               disabled={refreshing || loading}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-card px-4 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
@@ -452,7 +452,7 @@ export default function AdminPayoutBatchesPage() {
                             <div className="flex flex-col items-start gap-2">
                               <Link
                                 href={`/admin/finance/payout-batches/${row.id}`}
-                                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                                className="inline-flex items-center rounded-md border border-slate-300 bg-card px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                               >
                                 Open Batch
                               </Link>
@@ -488,14 +488,14 @@ export default function AdminPayoutBatchesPage() {
               <div className="flex flex-wrap gap-2">
                 <Link
                   href="/admin/finance/commissions/settled"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                 >
                   Back to Payout Queue
                 </Link>
 
                 <Link
                   href="/admin/finance/commissions"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                 >
                   Commission Register
                 </Link>

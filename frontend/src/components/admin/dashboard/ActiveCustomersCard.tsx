@@ -3,5 +3,5 @@ type ActiveCustomersCardProps = {
 };
 
 export default function ActiveCustomersCard({ value }: ActiveCustomersCardProps) {
-  return <div className="rounded border bg-white p-4">Active Customers: {value}</div>;
+  return <div className="rounded border bg-card p-4">Active Customers: {value}</div>;
 }

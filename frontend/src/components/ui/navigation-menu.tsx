@@ -36,7 +36,7 @@ export function NavigationMenuLink({ className, ...props }: ComponentProps<typeo
     <NavigationMenuPrimitive.Link
       data-slot="navigation-menu-link"
       className={cn(
-        "inline-flex rounded-full px-3 py-2 text-sm font-medium transition-colors hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 data-[active]:bg-white/80 data-[active]:text-slate-950 data-[active]:shadow-[0_12px_28px_-22px_rgba(15,23,42,0.78)]",
+        "inline-flex rounded-full px-3 py-2 text-sm font-medium transition-colors hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 data-[active]:bg-card data-[active]:text-slate-950 data-[active]:shadow-[0_12px_28px_-22px_rgba(15,23,42,0.78)]",
         className
       )}
       {...props}

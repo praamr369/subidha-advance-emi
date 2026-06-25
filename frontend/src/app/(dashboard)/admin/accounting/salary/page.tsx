@@ -597,7 +597,7 @@ export default function AccountingSalaryPage() {
                     {payrollPeriods.slice(0, 8).map((period) => (
                       <div
                         key={period.id}
-                        className="rounded-xl border border-white/80 bg-white/75 p-4"
+                        className="rounded-xl border border-border bg-card p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
@@ -649,7 +649,7 @@ export default function AccountingSalaryPage() {
                   {salarySheets.map((sheet) => (
                     <div
                       key={sheet.id}
-                      className="rounded-xl border border-white/80 bg-white/75 p-4"
+                      className="rounded-xl border border-border bg-card p-4"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -723,7 +723,7 @@ export default function AccountingSalaryPage() {
                   {salaryPayments.map((payment) => (
                     <div
                       key={payment.id}
-                      className="rounded-xl border border-white/80 bg-white/75 p-4"
+                      className="rounded-xl border border-border bg-card p-4"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -755,7 +755,7 @@ export default function AccountingSalaryPage() {
               description="Open periods are still operationally live. Closed periods are visible for audit, payroll lock, and correction planning."
             >
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border border-white/80 bg-white/75 p-4">
+                <div className="rounded-xl border border-border bg-card p-4">
                   <div className="text-sm font-semibold text-foreground">
                     Open payroll periods
                   </div>
@@ -766,7 +766,7 @@ export default function AccountingSalaryPage() {
                     Attendance, leave, claims, and draft salary work can still change inside these periods.
                   </div>
                 </div>
-                <div className="rounded-xl border border-white/80 bg-white/75 p-4">
+                <div className="rounded-xl border border-border bg-card p-4">
                   <div className="text-sm font-semibold text-foreground">
                     Closed payroll periods
                   </div>

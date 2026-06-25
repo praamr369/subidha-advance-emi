@@ -28,7 +28,7 @@ export default function WinnerSpotlight({
     return (
       <section
         className={cn(
-          "rounded-[2rem] border border-white/75 bg-white/80 p-6 shadow-[0_24px_60px_-48px_rgba(15,23,42,0.62)]",
+          "rounded-[2rem] border border-border bg-card p-6 shadow-[0_24px_60px_-48px_rgba(15,23,42,0.62)]",
           className
         )}
       >
@@ -44,13 +44,13 @@ export default function WinnerSpotlight({
         <div className="mt-5 flex flex-wrap gap-2">
           <Link
             href={ROUTES.public.winnerHistory}
-            className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
+            className="inline-flex h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
           >
             Winner history
           </Link>
           <Link
             href={ROUTES.public.howItWorks}
-            className="inline-flex h-10 items-center rounded-xl border border-white/80 bg-white/80 px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
+            className="inline-flex h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground shadow-[0_16px_34px_-26px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
           >
             How it works
           </Link>
@@ -87,7 +87,7 @@ export default function WinnerSpotlight({
         <div className="flex flex-wrap gap-2">
           <Link
             href={ROUTES.public.winnerHistory}
-            className="inline-flex h-10 items-center rounded-xl border border-white/75 bg-white/75 px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
+            className="inline-flex h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
           >
             View history
           </Link>

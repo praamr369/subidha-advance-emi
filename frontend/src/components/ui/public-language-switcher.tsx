@@ -22,7 +22,7 @@ export default function PublicLanguageSwitcher({
   const searchParams = useSearchParams();
 
   return (
-    <label className="inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white/80 px-3 py-2 text-xs font-semibold text-foreground shadow-[0_12px_28px_-22px_rgba(15,23,42,0.66)]">
+    <label className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-[0_12px_28px_-22px_rgba(15,23,42,0.66)]">
       <span>{label}</span>
       <select
         value={locale}
@@ -36,7 +36,7 @@ export default function PublicLanguageSwitcher({
           router.push(nextPath);
           router.refresh();
         }}
-        className="rounded-lg border border-slate-200/80 bg-white px-2 py-1"
+        className="rounded-lg border border-slate-200/80 bg-card px-2 py-1"
         aria-label={label}
       >
         {PUBLIC_LOCALES.map((item) => (

@@ -68,7 +68,7 @@ function issueList(title: string, items: YearEndIssue[], tone: "danger" | "warni
       {items.length === 0 ? <p className="mt-1 text-xs opacity-80">No items.</p> : (
         <div className="mt-2 space-y-2">
           {items.map((item) => (
-            <div key={`${item.code}-${item.message}`} className="rounded-lg border border-current/20 bg-white/50 px-2 py-2 text-xs">
+            <div key={`${item.code}-${item.message}`} className="rounded-lg border border-current/20 bg-card px-2 py-2 text-xs">
               <div><span className="font-semibold">{item.code}</span> · {item.message}</div>
               {item.recommended_action ? <div className="mt-1 opacity-90">{item.recommended_action}</div> : null}
               <Link href={actionHrefForIssue(item)} className="mt-2 inline-flex rounded-md border border-current/20 px-2 py-1 font-semibold">Open action</Link>

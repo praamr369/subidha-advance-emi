@@ -108,7 +108,7 @@ export default function PaymentReceiptDocument({
 
         <SignatureBlock />
 
-        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[13px] leading-5 text-muted-foreground">
+        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-card px-3.5 py-3 text-[13px] leading-5 text-muted-foreground">
           {footerNote}
         </div>
 

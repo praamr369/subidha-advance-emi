@@ -11,7 +11,7 @@ export default function BlogArticle({
   return (
     <article
       className={cn(
-        "rounded-[2rem] border border-white/75 bg-white/82 p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)] sm:p-8",
+        "rounded-[2rem] border border-border bg-card p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)] sm:p-8",
         className
       )}
     >
@@ -45,7 +45,7 @@ export default function BlogArticle({
                   {block.items.map((item) => (
                     <li
                       key={item}
-                      className="rounded-xl border border-white/75 bg-white/70 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]"
+                      className="rounded-xl border border-border bg-card px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]"
                     >
                       {item}
                     </li>

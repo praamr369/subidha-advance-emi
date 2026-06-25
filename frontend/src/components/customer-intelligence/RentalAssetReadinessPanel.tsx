@@ -85,7 +85,7 @@ export function RentalAssetReadinessPanel({ subscriptionId }: Props) {
           <button
             type="button"
             onClick={() => void load()}
-            className="inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-50"
+            className="inline-flex items-center rounded-md border border-amber-300 bg-card px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-50"
           >
             Retry
           </button>

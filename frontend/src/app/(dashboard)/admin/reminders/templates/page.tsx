@@ -361,7 +361,7 @@ export default function NotificationTemplatesPage() {
                           <span className="font-medium">Subject:</span> {preview.subject}
                         </div>
                       )}
-                      <div className="text-sm whitespace-pre-wrap bg-white rounded-lg p-2 border border-blue-100">
+                      <div className="text-sm whitespace-pre-wrap bg-card rounded-lg p-2 border border-blue-100">
                         {preview.body}
                       </div>
                       <div className="mt-2 text-xs text-blue-600">

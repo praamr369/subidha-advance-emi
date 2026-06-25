@@ -1089,7 +1089,7 @@ export default function AdminCustomersPage() {
                                   {row.email ? (
                                     <Link
                                       href={buildForgotPasswordHref(row.email)}
-                                      className="inline-flex items-center rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-900 transition hover:bg-emerald-100"
+                                      className="inline-flex items-center rounded-md border border-emerald-300 bg-card px-3 py-1.5 text-xs font-medium text-emerald-900 transition hover:bg-emerald-100"
                                     >
                                       Start OTP Reset
                                     </Link>

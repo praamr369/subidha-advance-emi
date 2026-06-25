@@ -7,7 +7,7 @@ type CustomerProfileInfoProps = {
 
 export default function CustomerProfileInfo({ name, customerCode, phone, kycStatus }: CustomerProfileInfoProps) {
   return (
-    <section className="rounded border bg-white p-4">
+    <section className="rounded border bg-card p-4">
       <h3 className="text-lg font-semibold">{name}</h3>
       <p>Customer Code: {customerCode}</p>
       <p>Phone: {phone}</p>

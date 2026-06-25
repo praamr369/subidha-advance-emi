@@ -122,7 +122,7 @@ export default function AdminSidebarNav({
             "group/navrow relative flex min-h-[2.5rem] items-center rounded-xl transition-colors",
             active
               ? "bg-[color-mix(in_oklab,var(--sidebar-primary)_16%,transparent)] ring-1 ring-inset ring-[color-mix(in_oklab,var(--sidebar-primary)_30%,transparent)]"
-              : "hover:bg-white/[0.05]"
+              : "hover:bg-card/[0.05]"
           )}
         >
           {active ? (
@@ -173,7 +173,7 @@ export default function AdminSidebarNav({
                 onToggleFavorite(item.href);
               }}
               className={cn(
-                "mr-1.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition hover:bg-white/[0.07] hover:text-[var(--sidebar-primary)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45",
+                "mr-1.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition hover:bg-card/[0.07] hover:text-[var(--sidebar-primary)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45",
                 isFav
                   ? "opacity-100 text-[var(--sidebar-primary)]"
                   : "opacity-0 group-hover/navrow:opacity-100"
@@ -204,7 +204,7 @@ export default function AdminSidebarNav({
     <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
       <div className="shrink-0 px-3 pt-3.5 pb-2">
-        <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] px-3 py-2.5 ring-1 ring-inset ring-white/[0.06]">
+        <div className="flex items-center gap-3 rounded-2xl bg-card/[0.04] px-3 py-2.5 ring-1 ring-inset ring-white/[0.06]">
           {brandSlot}
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold leading-tight tracking-tight text-[var(--sidebar-foreground)]">
@@ -217,7 +217,7 @@ export default function AdminSidebarNav({
           <button
             type="button"
             onClick={isMobile ? onClose : onToggleCollapse}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition hover:bg-white/[0.07] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition hover:bg-card/[0.07] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
             aria-label={isMobile ? "Close sidebar" : "Collapse sidebar"}
             title={isMobile ? "Close" : "Collapse"}
           >
@@ -236,9 +236,9 @@ export default function AdminSidebarNav({
             onChange={(event) => onNavQueryChange(event.target.value)}
             placeholder="Search modules"
             aria-label="Search modules"
-            className="h-10 w-full rounded-xl bg-white/[0.04] pl-9 pr-12 text-[13px] text-[var(--sidebar-foreground)] ring-1 ring-inset ring-white/[0.07] placeholder:text-[var(--sidebar-item-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-ring)]/45"
+            className="h-10 w-full rounded-xl bg-card/[0.04] pl-9 pr-12 text-[13px] text-[var(--sidebar-foreground)] ring-1 ring-inset ring-white/[0.07] placeholder:text-[var(--sidebar-item-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-ring)]/45"
           />
-          <span className="pointer-events-none absolute right-2.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--sidebar-item-muted)]">
+          <span className="pointer-events-none absolute right-2.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-card/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--sidebar-item-muted)]">
             <Command className="h-3 w-3" />K
           </span>
         </div>
@@ -270,13 +270,13 @@ export default function AdminSidebarNav({
                 key={group.title}
                 className={cn(
                   "rounded-2xl",
-                  open ? "bg-white/[0.02] ring-1 ring-inset ring-white/[0.05]" : ""
+                  open ? "bg-card/[0.02] ring-1 ring-inset ring-white/[0.05]" : ""
                 )}
               >
                 <button
                   type="button"
                   onClick={() => onToggleGroup(group.title, meta.active)}
-                  className="flex w-full items-center gap-2.5 rounded-2xl px-2.5 py-2.5 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+                  className="flex w-full items-center gap-2.5 rounded-2xl px-2.5 py-2.5 text-left transition hover:bg-card/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
                   aria-expanded={open}
                 >
                   <span
@@ -284,7 +284,7 @@ export default function AdminSidebarNav({
                       "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset transition-colors",
                       meta.active
                         ? "bg-[color-mix(in_oklab,var(--sidebar-primary)_18%,transparent)] text-[var(--sidebar-primary)] ring-[color-mix(in_oklab,var(--sidebar-primary)_30%,transparent)]"
-                        : "bg-white/[0.04] text-[var(--sidebar-item-muted)] ring-white/[0.06]"
+                        : "bg-card/[0.04] text-[var(--sidebar-item-muted)] ring-white/[0.06]"
                     )}
                   >
                     <GroupIcon className="h-[1.05rem] w-[1.05rem]" />
@@ -318,7 +318,7 @@ export default function AdminSidebarNav({
             );
           })}
           {groups.length === 0 ? (
-            <div className="rounded-xl bg-white/[0.03] px-3 py-6 text-center text-[13px] text-[var(--sidebar-item-muted)]">
+            <div className="rounded-xl bg-card/[0.03] px-3 py-6 text-center text-[13px] text-[var(--sidebar-item-muted)]">
               No modules match “{navQuery}”.
             </div>
           ) : null}

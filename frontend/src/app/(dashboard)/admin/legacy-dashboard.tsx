@@ -190,7 +190,7 @@ function toneClasses(tone: "default" | "warning" | "success" | "info" | "danger"
   if (tone === "success") return "border-emerald-200 bg-emerald-50/90 text-emerald-900";
   if (tone === "danger") return "border-red-200 bg-red-50/90 text-red-900";
   if (tone === "info") return "border-sky-200 bg-sky-50/90 text-sky-900";
-  return "border-border bg-[var(--surface-muted)] text-foreground";
+  return "border-border bg-muted/50 text-foreground";
 }
 
 function DashboardKpiCard({
@@ -216,7 +216,7 @@ function DashboardKpiCard({
       )}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="rounded-2xl border border-white/70 bg-white/75 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+        <div className="rounded-xl border border-border bg-card p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
           {icon}
         </div>
         <ArrowRight className="h-4 w-4 opacity-50 transition group-hover:translate-x-0.5 group-hover:opacity-80" />
@@ -260,7 +260,7 @@ function HorizontalBar({
         <span className="font-semibold text-foreground">{label}</span>
         <span className="text-xs font-semibold text-muted-foreground">{meta}</span>
       </div>
-      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted/50">
         <div
           className={`h-full rounded-full ${fillClass}`}
           style={{ width: `${asPercent(value, total)}%` }}
@@ -282,7 +282,7 @@ function PaymentModeSplit({
   const total = cash + bank + upi;
   return (
     <div>
-      <div className="flex h-3 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+      <div className="flex h-3 overflow-hidden rounded-full bg-muted/50">
         <div className="bg-emerald-500" style={{ width: `${asPercent(cash, total)}%` }} />
         <div className="bg-primary" style={{ width: `${asPercent(bank, total)}%` }} />
         <div className="bg-amber-500" style={{ width: `${asPercent(upi, total)}%` }} />
@@ -354,7 +354,7 @@ function AttentionRow({
   return (
     <Link
       href={href}
-      className="grid gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] md:grid-cols-[minmax(0,1fr)_auto]"
+      className="grid gap-3 rounded-xl border border-border bg-card p-4 transition hover:-translate-y-0.5 hover:border-ring hover:bg-muted/50 md:grid-cols-[minmax(0,1fr)_auto]"
     >
       <div>
         <div className="text-sm font-semibold text-foreground">{title}</div>
@@ -399,7 +399,7 @@ function ActionBucketCard({
       ? "border-emerald-200 bg-emerald-50/88"
       : tone === "info"
       ? "border-sky-200 bg-sky-50/88"
-      : "border-border bg-[var(--surface-card-elevated)]";
+      : "border-border bg-card";
 
   return (
     <article
@@ -891,7 +891,7 @@ export default function AdminDashboardPage() {
               value={selectedBranchId}
               onChange={(event) => setSelectedBranchId(event.target.value)}
               disabled={loading || refreshing}
-              className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground  outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="">All branches</option>
               {(branchOverview?.branches ?? []).map((branch) => (
@@ -1060,7 +1060,7 @@ export default function AdminDashboardPage() {
                       <PaymentModeSplit cash={cashTotal} bank={bankTotal} upi={upiTotal} />
                     </div>
 
-                    <div className="mt-6 rounded-2xl border border-white/70 bg-white/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+                    <div className="mt-6 rounded-xl border border-border bg-card p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Today (net)
                       </div>
@@ -1342,9 +1342,9 @@ export default function AdminDashboardPage() {
                     <Link
                       key={action.href}
                       href={action.href}
-                      className="flex items-center gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                      className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-ring hover:bg-muted/50"
                     >
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-[var(--surface-muted)] text-muted-foreground">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-muted/50 text-muted-foreground">
                         {action.icon}
                       </span>
                       {action.label}
@@ -1394,7 +1394,7 @@ export default function AdminDashboardPage() {
                       <Link
                         key={String(label)}
                         href={String(href)}
-                        className="rounded-2xl border border-white/75 bg-white/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:bg-white"
+                        className="rounded-xl border border-border bg-card p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:bg-card"
                       >
                         <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                           {label as ReactNode}
@@ -1447,7 +1447,7 @@ export default function AdminDashboardPage() {
                         <Link
                           key={lead.id}
                           href={`${ROUTES.admin.leads}/${lead.id}`}
-                          className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 transition hover:-translate-y-0.5 hover:bg-white"
+                          className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-card px-4 py-3 transition hover:-translate-y-0.5 hover:bg-card"
                         >
                           <div className="min-w-0">
                             <div className="truncate font-medium text-foreground">
@@ -1618,7 +1618,7 @@ export default function AdminDashboardPage() {
                 </p>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                  <div className="rounded-[1.3rem] border border-border bg-card p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Next due contract
                     </div>
@@ -1633,7 +1633,7 @@ export default function AdminDashboardPage() {
                         : "No pending EMI visible"}
                     </div>
                   </div>
-                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                  <div className="rounded-[1.3rem] border border-border bg-card p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Collections today
                     </div>
@@ -1644,7 +1644,7 @@ export default function AdminDashboardPage() {
                       {legacy.collections?.today_transaction_count ?? 0} transactions
                     </div>
                   </div>
-                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                  <div className="rounded-[1.3rem] border border-border bg-card p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Contract footprint
                     </div>
@@ -1657,7 +1657,7 @@ export default function AdminDashboardPage() {
                       {legacy.subscription_kpis?.total_customers ?? 0} customers in total
                     </div>
                   </div>
-                  <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
+                  <div className="rounded-[1.3rem] border border-border bg-card p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Next draw
                     </div>
@@ -1714,7 +1714,7 @@ export default function AdminDashboardPage() {
                       {winnerRows.map((row) => (
                         <div
                           key={row.subscription_id}
-                          className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm text-slate-700"
+                          className="rounded-[1.2rem] border border-border bg-card px-4 py-3 text-sm text-slate-700"
                         >
                           <div className="font-semibold text-slate-950">
                             {row.subscription_number}
@@ -1847,7 +1847,7 @@ export default function AdminDashboardPage() {
                     {dueRows.map((row) => (
                       <div
                         key={`${row.subscription_id ?? row.id}-${row.emi_id ?? "na"}`}
-                        className="grid gap-3 rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.35)] md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto]"
+                        className="grid gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.35)] md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto]"
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -1904,7 +1904,7 @@ export default function AdminDashboardPage() {
                         <div className="flex items-center md:justify-end">
                           <Link
                             href={buildAdminSubscriptionRoute(row.subscription_id ?? row.id)}
-                            className="inline-flex items-center gap-2 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3.5 py-2 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-ring hover:bg-muted/50"
                           >
                             Open
                             <ArrowRight className="h-4 w-4" />
@@ -1952,7 +1952,7 @@ export default function AdminDashboardPage() {
                     {paymentRows.map((row) => (
                       <div
                         key={row.payment_id}
-                        className="grid gap-3 rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.35)] md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]"
+                        className="grid gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.35)] md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]"
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -2004,7 +2004,7 @@ export default function AdminDashboardPage() {
                         <div className="flex items-center md:justify-end">
                           <Link
                             href={buildAdminPaymentRoute(row.payment_id)}
-                            className="inline-flex items-center gap-2 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3.5 py-2 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:border-ring hover:bg-muted/50"
                           >
                             View
                             <ArrowRight className="h-4 w-4" />
@@ -2032,7 +2032,7 @@ export default function AdminDashboardPage() {
                     {flaggedRows.map((row) => (
                       <div
                         key={row.subscription_id}
-                        className="rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.35)]"
+                        className="rounded-xl border border-border bg-card p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.35)]"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="min-w-0">
@@ -2096,7 +2096,7 @@ export default function AdminDashboardPage() {
               {ADMIN_ENTERPRISE_MODULES.map((item) => (
                 <article
                   key={item.key}
-                  className="rounded-[1.45rem] border border-border bg-[var(--surface-card-elevated)] px-5 py-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.42)]"
+                  className="rounded-xl border border-border bg-card px-5 py-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.42)]"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -2110,13 +2110,13 @@ export default function AdminDashboardPage() {
                         {item.description}
                       </p>
                     </div>
-                    <span className="inline-flex rounded-full border border-border bg-[var(--surface-muted)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    <span className="inline-flex rounded-full border border-border bg-muted/50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       Canonical
                     </span>
                   </div>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <div className="rounded-[1.1rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
+                    <div className="rounded-xl border border-border bg-card px-4 py-3">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Operational focus
                       </div>
@@ -2124,7 +2124,7 @@ export default function AdminDashboardPage() {
                         {item.operationalFocus}
                       </div>
                     </div>
-                    <div className="rounded-[1.1rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
+                    <div className="rounded-xl border border-border bg-card px-4 py-3">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Master-data direction
                       </div>

@@ -11,7 +11,7 @@ type SubscriptionHistoryProps = {
 
 export default function SubscriptionHistory({ subscriptions }: SubscriptionHistoryProps) {
   return (
-    <section className="rounded border bg-white p-4">
+    <section className="rounded border bg-card p-4">
       <h3 className="mb-3 text-lg font-semibold">Subscription History</h3>
       <ul className="space-y-2">
         {subscriptions.map((subscription) => (

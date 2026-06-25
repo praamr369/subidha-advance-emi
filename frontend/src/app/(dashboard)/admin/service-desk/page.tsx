@@ -201,7 +201,7 @@ export default function AdminServiceDeskOverviewPage() {
                     <label className="text-xs text-muted-foreground">
                       Search subject / ticket / phone
                       <input
-                        className="mt-1 w-full rounded-lg border border-border bg-[var(--surface-card)] px-2 py-1 text-sm"
+                        className="mt-1 w-full rounded-lg border border-border bg-card px-2 py-1 text-sm"
                         value={issueQ}
                         onChange={(e) => setIssueQ(e.target.value)}
                       />

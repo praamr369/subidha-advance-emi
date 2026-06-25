@@ -88,7 +88,7 @@ export default function SubscriptionContractDocument({
 
         <TermsBlock terms={terms} />
 
-        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[13px] leading-5 text-slate-700">
+        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-card px-3.5 py-3 text-[13px] leading-5 text-slate-700">
           {footerNote}
         </div>
 

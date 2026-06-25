@@ -4,7 +4,7 @@ type BatchPerformanceChartProps = {
 
 export default function BatchPerformanceChart({ points }: BatchPerformanceChartProps) {
   return (
-    <div className="rounded border bg-white p-4">
+    <div className="rounded border bg-card p-4">
       <h3 className="mb-2 font-semibold">Batch Performance</h3>
       <ul>
         {points.map((point) => (

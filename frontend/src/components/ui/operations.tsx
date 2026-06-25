@@ -287,7 +287,7 @@ export function ExceptionPanel({
       <div className="mt-2 space-y-2">
         {rows.map((row) => {
           const content = (
-            <div className="rounded-xl border border-red-100 bg-white px-3 py-2">
+            <div className="rounded-xl border border-red-100 bg-card px-3 py-2">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-medium text-red-900">{row.label}</p>
                 <p className="text-sm font-semibold text-red-900">{row.value}</p>

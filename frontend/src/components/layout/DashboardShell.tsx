@@ -733,7 +733,7 @@ function SidebarContent({
           ? "cursor-not-allowed text-[var(--sidebar-item-muted)] opacity-60"
           : rowActive
             ? "bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] text-[var(--sidebar-foreground)]"
-            : "text-[var(--sidebar-item-muted)] hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)]"
+            : "text-[var(--sidebar-item-muted)] hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)]"
       );
 
       const key = `${groupTitle}:${item.href}:${item.label}:${depth}`;
@@ -800,7 +800,7 @@ function SidebarContent({
           ? "cursor-not-allowed text-[var(--sidebar-item-muted)] opacity-60"
           : rowHighlight
             ? "bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] text-[var(--sidebar-foreground)]"
-            : "text-[var(--sidebar-item-muted)] hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)]"
+            : "text-[var(--sidebar-item-muted)] hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)]"
       );
 
       const rowContent = (
@@ -848,7 +848,7 @@ function SidebarContent({
                 event.stopPropagation();
                 toggleNestedItem(itemKey, defaultOpen);
               }}
-              className="inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45 md:min-h-8 md:min-w-8"
+              className="inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45 md:min-h-8 md:min-w-8"
               aria-label={itemOpen ? `Collapse ${item.label}` : `Expand ${item.label}`}
             >
               {itemOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -857,7 +857,7 @@ function SidebarContent({
             <button
               type="button"
               className={cn(
-                "inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] opacity-0 transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-primary)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45 group-hover/item:opacity-100 md:min-h-8 md:min-w-8",
+                "inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] opacity-0 transition-colors hover:bg-card/[0.06] hover:text-[var(--sidebar-primary)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45 group-hover/item:opacity-100 md:min-h-8 md:min-w-8",
                 favorites.includes(item.href) ? "opacity-100 text-[var(--sidebar-primary)]" : ""
               )}
               onClick={(event) => {
@@ -909,7 +909,7 @@ function SidebarContent({
               if (value !== "SIMPLE" && value !== "ADVANCED") return;
               persistOperatorMode(value as OperatorMode);
             }}
-            className="gap-0.5 rounded-lg border-0 bg-white/[0.04] p-0.5 shadow-none ring-1 ring-inset ring-white/[0.06]"
+            className="gap-0.5 rounded-lg border-0 bg-card/[0.04] p-0.5 shadow-none ring-1 ring-inset ring-white/[0.06]"
           >
             <ToggleGroupItem
               value="SIMPLE"
@@ -931,14 +931,14 @@ function SidebarContent({
           <Link
             href={getProfileHref(role)}
             onClick={isMobile ? onClose : undefined}
-            className="inline-flex h-9 flex-1 items-center justify-center rounded-xl bg-white/[0.05] text-[12px] font-semibold text-[var(--sidebar-foreground)] transition-colors hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+            className="inline-flex h-9 flex-1 items-center justify-center rounded-xl bg-card/[0.05] text-[12px] font-semibold text-[var(--sidebar-foreground)] transition-colors hover:bg-card/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
           >
             Profile
           </Link>
           <Link
             href={getSettingsHref(role)}
             onClick={isMobile ? onClose : undefined}
-            className="inline-flex h-9 w-10 items-center justify-center rounded-xl bg-white/[0.05] text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.09] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+            className="inline-flex h-9 w-10 items-center justify-center rounded-xl bg-card/[0.05] text-[var(--sidebar-item-muted)] transition-colors hover:bg-card/[0.09] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
             title="Settings"
             aria-label="Settings"
           >
@@ -948,7 +948,7 @@ function SidebarContent({
             type="button"
             onClick={onLogout}
             disabled={isLoggingOut}
-            className="inline-flex h-9 flex-1 items-center justify-center rounded-xl bg-white/[0.05] text-[12px] font-semibold text-red-200/95 transition-colors hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/35 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-9 flex-1 items-center justify-center rounded-xl bg-card/[0.05] text-[12px] font-semibold text-red-200/95 transition-colors hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/35 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLoggingOut ? "..." : "Logout"}
           </button>
@@ -1014,7 +1014,7 @@ function SidebarContent({
                 setFlyoutGroup(null);
                 onToggleCollapse();
               }}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
               data-testid={collapsed ? "sidebar-expand-button" : "sidebar-collapse-button"}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -1025,7 +1025,7 @@ function SidebarContent({
             <button
               type="button"
               onClick={onClose}
-              className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+              className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
               aria-label="Close sidebar"
             >
               <X className="h-4 w-4" />
@@ -1037,7 +1037,7 @@ function SidebarContent({
       {!collapsed ? (
         <div className="shrink-0 space-y-2.5 border-b border-white/[0.06] px-3 py-2.5 sm:px-3.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex max-w-[min(100%,14rem)] items-center truncate rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-[var(--sidebar-section-label)]">
+            <span className="inline-flex max-w-[min(100%,14rem)] items-center truncate rounded-full bg-card/[0.06] px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-[var(--sidebar-section-label)]">
               {formatRoleLabel(role)}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/12 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-200/95">
@@ -1053,7 +1053,7 @@ function SidebarContent({
               </div>
               <div className="space-y-0.5">
                 {favoriteLinks.map((item) => (
-                  <div key={`fav-${item.href}`} className="group/fav flex min-h-10 items-center gap-1 rounded-lg pr-1 hover:bg-white/[0.04]">
+                  <div key={`fav-${item.href}`} className="group/fav flex min-h-10 items-center gap-1 rounded-lg pr-1 hover:bg-card/[0.04]">
                     <Link
                       href={item.href}
                       onClick={isMobile ? onClose : undefined}
@@ -1065,7 +1065,7 @@ function SidebarContent({
                     {sessionId ? (
                       <button
                         type="button"
-                        className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] opacity-0 transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] group-hover/fav:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45 md:min-h-8 md:min-w-8"
+                        className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] opacity-0 transition-colors hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)] group-hover/fav:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45 md:min-h-8 md:min-w-8"
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
@@ -1099,7 +1099,7 @@ function SidebarContent({
                 value={navQuery}
                 onChange={(event) => setNavQuery(event.target.value)}
                 placeholder="Search modules"
-                className="h-9 w-full rounded-lg bg-white/[0.04] pl-9 pr-2.5 text-sm text-[var(--sidebar-foreground)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] placeholder:text-[var(--sidebar-item-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-ring)]/40"
+                className="h-9 w-full rounded-lg bg-card/[0.04] pl-9 pr-2.5 text-sm text-[var(--sidebar-foreground)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] placeholder:text-[var(--sidebar-item-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sidebar-ring)]/40"
               />
             </div>
           </div>
@@ -1127,7 +1127,7 @@ function SidebarContent({
                   value="0"
                   aria-label={`Compact: max content width ${WORKSPACE_WIDTH_CSS_VALUES[0]}`}
                   title={`Compact (${WORKSPACE_WIDTH_CSS_VALUES[0]} cap for components that respect workspace width)`}
-                  className="h-8 w-8 rounded-md border-0 bg-transparent p-0 text-[var(--sidebar-item-muted)] shadow-none hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_28%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
+                  className="h-8 w-8 rounded-md border-0 bg-transparent p-0 text-[var(--sidebar-item-muted)] shadow-none hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_28%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
                 >
                   <PanelLeft className="mx-auto h-3.5 w-3.5" />
                 </ToggleGroupItem>
@@ -1135,7 +1135,7 @@ function SidebarContent({
                   value="1"
                   aria-label={`Balanced: max content width ${WORKSPACE_WIDTH_CSS_VALUES[1]}`}
                   title={`Balanced (${WORKSPACE_WIDTH_CSS_VALUES[1]})`}
-                  className="h-8 w-8 rounded-md border-0 bg-transparent p-0 text-[var(--sidebar-item-muted)] shadow-none hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_28%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
+                  className="h-8 w-8 rounded-md border-0 bg-transparent p-0 text-[var(--sidebar-item-muted)] shadow-none hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_28%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
                 >
                   <LayoutGrid className="mx-auto h-3.5 w-3.5" />
                 </ToggleGroupItem>
@@ -1143,7 +1143,7 @@ function SidebarContent({
                   value="2"
                   aria-label={`Spacious: max content width ${WORKSPACE_WIDTH_CSS_VALUES[2]}`}
                   title={`Spacious (${WORKSPACE_WIDTH_CSS_VALUES[2]})`}
-                  className="h-8 w-8 rounded-md border-0 bg-transparent p-0 text-[var(--sidebar-item-muted)] shadow-none hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_28%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
+                  className="h-8 w-8 rounded-md border-0 bg-transparent p-0 text-[var(--sidebar-item-muted)] shadow-none hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_28%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
                 >
                   <Maximize2 className="mx-auto h-3.5 w-3.5" />
                 </ToggleGroupItem>
@@ -1163,7 +1163,7 @@ function SidebarContent({
                     if (event.target !== event.currentTarget) return;
                     persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE");
                   }}
-                  className="gap-0 rounded-md border-0 bg-white/[0.04] p-0.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]"
+                  className="gap-0 rounded-md border-0 bg-card/[0.04] p-0.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]"
                 >
                   <ToggleGroupItem
                     value="SIMPLE"
@@ -1203,7 +1203,7 @@ function SidebarContent({
                   onToggleCollapse();
                 }}
                 data-testid="sidebar-expand-button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/[0.08] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] text-[var(--sidebar-foreground)] shadow-[0_8px_22px_-16px_rgba(0,0,0,0.65)] transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/55"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/[0.08] bg-[color-mix(in_oklab,var(--sidebar-surface)_88%,black_12%)] text-[var(--sidebar-foreground)] shadow-[0_8px_22px_-16px_rgba(0,0,0,0.65)] transition hover:bg-card/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/55"
                 aria-label="Expand sidebar"
                 title="Expand sidebar"
               >
@@ -1212,7 +1212,7 @@ function SidebarContent({
             </div>
           ) : null}
           {visibleGroups.length === 0 && !collapsed ? (
-            <div className="rounded-lg bg-white/[0.03] px-3 py-2.5 text-xs text-[var(--sidebar-item-muted)]">
+            <div className="rounded-lg bg-card/[0.03] px-3 py-2.5 text-xs text-[var(--sidebar-item-muted)]">
               No navigation matches for &quot;{navQuery.trim()}&quot;.
             </div>
           ) : null}
@@ -1255,7 +1255,7 @@ function SidebarContent({
                     collapsed ? "min-h-10 min-w-10 justify-center px-0" : "",
                     groupActive
                       ? "text-[var(--sidebar-foreground)]"
-                      : "text-[var(--sidebar-section-label)] hover:bg-white/[0.04] hover:text-[var(--sidebar-foreground)]"
+                      : "text-[var(--sidebar-section-label)] hover:bg-card/[0.04] hover:text-[var(--sidebar-foreground)]"
                   )}
                   aria-expanded={collapsed ? flyoutOpen : groupOpen}
                   aria-haspopup={collapsed ? "menu" : undefined}
@@ -1320,7 +1320,7 @@ function SidebarContent({
               <Link
                 href={getSettingsHref(role)}
                 onClick={isMobile ? onClose : undefined}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
                 title="Settings"
                 aria-label="Settings"
               >
@@ -1331,7 +1331,7 @@ function SidebarContent({
               <Link
                 href={getProfileHref(role)}
                 onClick={isMobile ? onClose : undefined}
-                className="inline-flex h-10 min-h-10 flex-1 items-center justify-center rounded-lg bg-white/[0.05] text-xs font-semibold text-[var(--sidebar-foreground)] transition-colors hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+                className="inline-flex h-10 min-h-10 flex-1 items-center justify-center rounded-lg bg-card/[0.05] text-xs font-semibold text-[var(--sidebar-foreground)] transition-colors hover:bg-card/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
               >
                 Profile
               </Link>
@@ -1339,7 +1339,7 @@ function SidebarContent({
                 type="button"
                 onClick={onLogout}
                 disabled={isLoggingOut}
-                className="inline-flex h-10 min-h-10 flex-1 items-center justify-center rounded-lg bg-white/[0.05] text-xs font-semibold text-red-200/95 transition-colors hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/35 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 min-h-10 flex-1 items-center justify-center rounded-lg bg-card/[0.05] text-xs font-semibold text-red-200/95 transition-colors hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/35 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isLoggingOut ? "Logging out..." : "Logout"}
               </button>
@@ -1351,7 +1351,7 @@ function SidebarContent({
               <Link
                 href={getProfileHref(role)}
                 onClick={isMobile ? onClose : undefined}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
                 title={`Profile — ${displayName}`}
                 aria-label={`Profile — ${displayName}`}
               >
@@ -1362,7 +1362,7 @@ function SidebarContent({
             <div className="group relative">
               <Link
                 href={getSettingsHref(role)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--sidebar-item-muted)] transition-colors hover:bg-card/[0.06] hover:text-[var(--sidebar-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/45"
                 title="Settings"
                 aria-label="Settings"
               >

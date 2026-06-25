@@ -171,7 +171,7 @@ export default function AdminCountersPage() {
             setNotice(null);
             setError(null);
           }}
-          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-slate-50"
+          className="rounded-xl border border-slate-300 bg-card px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-slate-50"
         >
           Edit
         </button>
@@ -432,7 +432,7 @@ export default function AdminCountersPage() {
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50"
+                      className="rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50"
                     >
                       Reset
                     </button>
@@ -440,7 +440,7 @@ export default function AdminCountersPage() {
                       type="button"
                       onClick={() => void loadPage("refresh")}
                       disabled={refreshing}
-                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:opacity-60"
+                      className="rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:opacity-60"
                     >
                       {refreshing ? "Refreshing..." : "Refresh"}
                     </button>

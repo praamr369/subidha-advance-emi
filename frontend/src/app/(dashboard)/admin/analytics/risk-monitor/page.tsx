@@ -62,9 +62,9 @@ export default function RiskMonitorPage() {
       <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-800">
         <strong>Drill down to source workflow:</strong> Use the links below to act on overdue risk. No payment or posting can be created from this page.
         <div className="mt-2 flex flex-wrap gap-2">
-          <Link href={ROUTES.admin.financeOutstandings} className="inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100">Finance Operations — Outstandings</Link>
-          <Link href={ROUTES.admin.collections} className="inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100">Collections & Cashier</Link>
-          <Link href={ROUTES.admin.profilesCustomers} className="inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100">Profiles — Customers</Link>
+          <Link href={ROUTES.admin.financeOutstandings} className="inline-flex items-center rounded-md border border-amber-300 bg-card px-3 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100">Finance Operations — Outstandings</Link>
+          <Link href={ROUTES.admin.collections} className="inline-flex items-center rounded-md border border-amber-300 bg-card px-3 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100">Collections & Cashier</Link>
+          <Link href={ROUTES.admin.profilesCustomers} className="inline-flex items-center rounded-md border border-amber-300 bg-card px-3 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100">Profiles — Customers</Link>
         </div>
       </div>
 

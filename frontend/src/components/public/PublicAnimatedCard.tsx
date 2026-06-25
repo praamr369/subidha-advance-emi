@@ -12,7 +12,7 @@ export default function PublicAnimatedCard({
   return (
     <article
       className={cn(
-        "public-card public-card-animated relative overflow-hidden rounded-[1.5rem] border border-white/75 bg-white/82 p-5",
+        "public-card public-card-animated relative overflow-hidden rounded-[1.5rem] border border-border bg-card p-5",
         className
       )}
     >

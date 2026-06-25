@@ -11,7 +11,7 @@ type PaymentLedgerProps = {
 
 export default function PaymentLedger({ entries }: PaymentLedgerProps) {
   return (
-    <section className="rounded border bg-white p-4">
+    <section className="rounded border bg-card p-4">
       <h3 className="mb-3 text-lg font-semibold">Payment Ledger</h3>
       <div className="space-y-2">
         {entries.map((entry) => (

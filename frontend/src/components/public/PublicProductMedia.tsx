@@ -38,7 +38,7 @@ export default function PublicProductMedia({
   return (
     <div
       className={cn(
-        "relative isolate overflow-hidden rounded-[1.7rem] border border-white/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(226,232,240,0.88))] shadow-[0_30px_72px_-54px_rgba(15,23,42,0.84)] contain-paint",
+        "relative isolate overflow-hidden rounded-[1.7rem] border border-border bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(226,232,240,0.88))] shadow-[0_30px_72px_-54px_rgba(15,23,42,0.84)] contain-paint",
         className
       )}
       data-public-image={shouldRenderImage ? "product" : "fallback"}
@@ -62,7 +62,7 @@ export default function PublicProductMedia({
         />
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),rgba(226,232,240,0.96))] text-muted-foreground">
-          <div className="rounded-full border border-white/80 bg-white/80 p-3 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.76)]">
+          <div className="rounded-full border border-border bg-card p-3 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.76)]">
             <ImageOff className="h-5 w-5" />
           </div>
           <div className="text-sm font-medium">{fallbackLabel}</div>
@@ -75,7 +75,7 @@ export default function PublicProductMedia({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/14 via-slate-950/0 to-transparent" />
 
       {badge ? (
-        <div className="absolute left-4 top-4 rounded-full border border-white/80 bg-slate-950/72 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-white shadow-[0_18px_36px_-24px_rgba(15,23,42,0.88)] backdrop-blur">
+        <div className="absolute left-4 top-4 rounded-full border border-border bg-slate-950/72 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-white shadow-[0_18px_36px_-24px_rgba(15,23,42,0.88)] backdrop-blur">
           {badge}
         </div>
       ) : null}

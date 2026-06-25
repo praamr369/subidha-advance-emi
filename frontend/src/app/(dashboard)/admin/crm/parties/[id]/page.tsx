@@ -617,7 +617,7 @@ export default function AdminCrmPartyDetailPage() {
                         <Link
                           key={`${item.event_type}-${index}`}
                           href={href}
-                          className="block rounded-xl border border-border bg-muted/30 px-4 py-3 transition hover:-translate-y-0.5 hover:bg-white"
+                          className="block rounded-xl border border-border bg-muted/30 px-4 py-3 transition hover:-translate-y-0.5 hover:bg-card"
                         >
                           {content}
                         </Link>

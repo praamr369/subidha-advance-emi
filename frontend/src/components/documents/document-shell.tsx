@@ -67,7 +67,7 @@ export function DocumentPage({ children, watermark }: { children: ReactNode; wat
 
   return (
     <ThemeContext.Provider value={theme}>
-      <main className="document-screen fixed inset-0 z-[1000] min-h-screen overflow-y-auto bg-[#f4eadb] px-4 pb-8 pt-24 print:static print:z-auto print:overflow-visible print:bg-white print:p-0">
+      <main className="document-screen fixed inset-0 z-[1000] min-h-screen overflow-y-auto bg-[#f4eadb] px-4 pb-8 pt-24 print:static print:z-auto print:overflow-visible print:bg-card print:p-0">
         <style jsx global>{`
           @page { size: A4; margin: 12mm; }
           .document-screen, .document-screen * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -88,7 +88,7 @@ export function DocumentPage({ children, watermark }: { children: ReactNode; wat
             .document-watermark { color: rgba(185, 28, 28, 0.12) !important; border-color: rgba(254, 202, 202, 0.35) !important; }
           }
         `}</style>
-        <section className="print-document relative mx-auto w-full max-w-[210mm] overflow-hidden rounded-[18px] border border-[#e6d6bd] bg-[#fffaf0] text-[#2f2418] shadow-2xl print:max-w-none print:rounded-none print:border-0 print:bg-white print:shadow-none">
+        <section className="print-document relative mx-auto w-full max-w-[210mm] overflow-hidden rounded-[18px] border border-[#e6d6bd] bg-[#fffaf0] text-[#2f2418] shadow-2xl print:max-w-none print:rounded-none print:border-0 print:bg-card print:shadow-none">
           {resolvedWatermark ? (
             <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden" aria-hidden="true">
               <div className="document-watermark rotate-[-28deg] select-none border-[6px] border-red-200 px-12 py-5 text-7xl font-black uppercase tracking-[0.22em] text-red-200/40 print:text-red-200/30">{resolvedWatermark}</div>
@@ -146,7 +146,7 @@ export function DocumentHeader({ copyLabel, documentNo, documentDate }: { copyLa
 }
 
 export function DocumentTitleStrip({ title, subtitle, status }: { title: string; subtitle?: string; status?: string | null }) {
-  return <div className="document-no-break my-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#6f4e27] bg-[#6f4e27] px-5 py-4 text-white"><div><h1 className="text-xl font-black uppercase tracking-[0.16em]">{title}</h1>{subtitle ? <p className="mt-1 text-sm text-white/90">{subtitle}</p> : null}</div>{status ? <span className="rounded-full border border-white/40 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wide">{status}</span> : null}</div>;
+  return <div className="document-no-break my-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#6f4e27] bg-[#6f4e27] px-5 py-4 text-white"><div><h1 className="text-xl font-black uppercase tracking-[0.16em]">{title}</h1>{subtitle ? <p className="mt-1 text-sm text-white/90">{subtitle}</p> : null}</div>{status ? <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-bold uppercase tracking-wide">{status}</span> : null}</div>;
 }
 
 export function DocumentMetadataGrid({ items }: { items: MetadataItem[] }) {
@@ -184,5 +184,5 @@ export function DocumentSignatureBlock({ labels }: { labels: string[] }) {
 
 export function DocumentAuditFooter({ generatedAt }: { generatedAt?: string }) {
   const theme = useDocumentTheme();
-  return <footer className="document-print-footer mt-6 border-t border-[#e6d6bd] bg-white pt-3 text-center text-[10px] leading-4 text-[#7c6a56]">{theme.reportFooterNote} · {formatDocumentDateTime(generatedAt || new Date())} · Audit copy for business records</footer>;
+  return <footer className="document-print-footer mt-6 border-t border-[#e6d6bd] bg-card pt-3 text-center text-[10px] leading-4 text-[#7c6a56]">{theme.reportFooterNote} · {formatDocumentDateTime(generatedAt || new Date())} · Audit copy for business records</footer>;
 }

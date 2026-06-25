@@ -22,7 +22,7 @@ export default function WinnerHistoryProductCarousel({
   }
 
   return (
-    <section className="rounded-[2rem] border border-white/75 bg-white/70 p-4 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
+    <section className="rounded-[2rem] border border-border bg-card p-4 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.6)]">
       <PublicContentCarousel
         ariaLabel={ariaCarouselLabel}
         prevLabel={prevLabel}
@@ -31,7 +31,7 @@ export default function WinnerHistoryProductCarousel({
       >
         {slides.map((winner) => (
           <div key={winner.id} className="px-2 pb-2 pt-1">
-            <div className="rounded-[1.6rem] border border-white/80 bg-white/85 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+            <div className="rounded-[1.6rem] border border-border bg-card p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
               <AspectRatio ratio={16 / 10} className="w-full">
                 <PublicProductMedia
                   src={winner.product_image}

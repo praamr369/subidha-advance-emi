@@ -158,7 +158,7 @@ export default function AdminControlMonthEndClosePage() {
                     onClick={() => void handleExecute(false)}
                     disabled={executing || isBlocked}
                     title={isBlocked ? "Cannot execute: blocking checks failed" : "Execute month-end close"}
-                    className="rounded border border-primary/85 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[color-mix(in_oklab,var(--primary)_88%,black_12%)]"
+                    className="rounded border border-primary/85 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90"
                   >
                     {executing ? "Executing…" : "Execute Close"}
                   </button>

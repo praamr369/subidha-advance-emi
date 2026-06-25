@@ -45,12 +45,12 @@ export default function AuthLayoutShell({
   return (
     <section className={cn("auth-stage w-full", className)}>
       <div className="auth-shell grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-        <aside className="hidden border-r border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(180,130,70,0.16),transparent_36%),linear-gradient(160deg,rgba(28,18,12,0.99),rgba(38,28,22,0.98))] lg:block">
+        <aside className="hidden border-r border-border bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(180,130,70,0.16),transparent_36%),linear-gradient(160deg,rgba(28,18,12,0.99),rgba(38,28,22,0.98))] lg:block">
         <div className="flex h-full flex-col justify-between p-8 xl:p-10">
           <div>
             <AuthBrand tone="dark" />
 
-            <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-200">
+            <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-200">
               <ShieldCheck className="h-3.5 w-3.5" />
               Secure Operations Access
             </div>
@@ -63,9 +63,9 @@ export default function AuthLayoutShell({
                 return (
                   <div
                     key={point.label}
-                    className="flex items-center gap-3 rounded-xl border border-white/15 bg-white/6 px-4 py-3 text-sm text-slate-100 backdrop-blur-sm"
+                    className="flex items-center gap-3 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-100 backdrop-blur-sm"
                   >
-                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/8 text-slate-100">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-slate-100">
                       <Icon className="h-4 w-4 text-slate-100" />
                     </span>
                     <span className="font-medium">{point.label}</span>

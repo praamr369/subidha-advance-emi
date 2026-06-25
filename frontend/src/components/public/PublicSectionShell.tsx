@@ -14,7 +14,7 @@ export default function PublicSectionShell({
   return (
     <section
       className={cn(
-        "public-surface public-reveal rounded-[2rem] border border-white/75",
+        "public-surface public-reveal rounded-[2rem] border border-border",
         compact ? "p-5" : "p-6",
         className
       )}

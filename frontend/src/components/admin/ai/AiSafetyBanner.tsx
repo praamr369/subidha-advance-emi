@@ -15,7 +15,7 @@ export default function AiSafetyBanner({ disabled = false }: AiSafetyBannerProps
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="rounded-xl border border-amber-200 bg-white/80 p-2 text-amber-800">
+          <span className="rounded-xl border border-amber-200 bg-card p-2 text-amber-800">
             <AlertTriangle className="h-4 w-4" />
           </span>
           <div className="min-w-0">
@@ -33,7 +33,7 @@ export default function AiSafetyBanner({ disabled = false }: AiSafetyBannerProps
         {disabled ? (
           <Link
             href={ROUTES.admin.settingsImports}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white/80 px-3 py-2 text-xs font-semibold text-amber-950 transition hover:bg-amber-100"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-card px-3 py-2 text-xs font-semibold text-amber-950 transition hover:bg-amber-100"
           >
             <BookOpen className="h-4 w-4" />
             Documentation

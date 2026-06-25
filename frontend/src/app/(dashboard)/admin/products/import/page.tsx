@@ -229,7 +229,7 @@ export default function AdminProductImportPage() {
         },
       ]}
     >
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-card p-6 shadow-sm">
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-5">
             <div>
@@ -301,7 +301,7 @@ export default function AdminProductImportPage() {
                 type="button"
                 onClick={handlePreviewImport}
                 disabled={isPreviewing || isUploading || !file}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-card px-5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPreviewing ? "Previewing..." : "Preview Uploaded CSV"}
               </button>
@@ -325,7 +325,7 @@ export default function AdminProductImportPage() {
                 type="button"
                 onClick={handleClear}
                 disabled={isUploading || isPreviewing}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-card px-5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Clear
               </button>
@@ -381,7 +381,7 @@ export default function AdminProductImportPage() {
                 ].map((column) => (
                   <span
                     key={column}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-muted-foreground"
+                    className="rounded-full border border-slate-200 bg-card px-3 py-1 text-xs font-medium text-muted-foreground"
                   >
                     {column}
                   </span>
@@ -439,7 +439,7 @@ export default function AdminProductImportPage() {
               </div>
 
               {preview ? (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-muted-foreground">
+                <div className="mt-4 rounded-xl border border-slate-200 bg-card p-4 text-sm text-muted-foreground">
                   <div className="font-medium text-foreground">
                     Create candidates {preview.preview_rows.filter((row) => row.action === "create").length} ·
                     Update candidates {preview.preview_rows.filter((row) => row.action === "update").length}

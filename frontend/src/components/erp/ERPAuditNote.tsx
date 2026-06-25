@@ -37,9 +37,9 @@ export default function ERPAuditNote({
           className={cn(
             "mt-0.5 rounded-xl border p-2 shadow-[inset_0_1px_0_var(--hairline-shine)]",
             tone === "warning"
-              ? "border-amber-200/90 bg-white/70 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100"
+              ? "border-amber-200/90 bg-card text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100"
               : tone === "info"
-                ? "border-sky-200/90 bg-white/70 text-sky-900 dark:border-sky-500/25 dark:bg-sky-500/10 dark:text-sky-100"
+                ? "border-sky-200/90 bg-card text-sky-900 dark:border-sky-500/25 dark:bg-sky-500/10 dark:text-sky-100"
                 : "border-border bg-[var(--surface-card-elevated)] text-foreground"
           )}
         >

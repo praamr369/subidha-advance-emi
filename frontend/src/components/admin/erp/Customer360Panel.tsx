@@ -5,7 +5,7 @@ import type { CrmWorkspacePayload } from "@/services/admin-erp";
 
 export function Customer360Panel({ customers }: { customers: CrmWorkspacePayload["customer_360"] }) {
   return (
-    <section className="rounded-xl border border-white/80 bg-white/80 p-5">
+    <section className="rounded-xl border border-border bg-card p-5">
       <h2 className="text-base font-semibold text-foreground">Party 360</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Canonical customer profile with linked contracts, payments, delivery, support, and KYC status.

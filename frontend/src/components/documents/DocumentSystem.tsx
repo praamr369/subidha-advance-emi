@@ -64,7 +64,7 @@ export function DocumentShell({
   return (
     <section
       className={cn(
-        "receipt-document document-shell print-doc-shell rounded-[1.4rem] border border-slate-300 bg-white",
+        "receipt-document document-shell print-doc-shell rounded-[1.4rem] border border-slate-300 bg-card",
         className
       )}
     >
@@ -108,7 +108,7 @@ export function BrandMasthead({
       <img
         src={brandConfig.publicLogoSrc}
         alt={brandConfig.publicLogoAlt}
-        className="h-12 w-12 rounded-xl border border-slate-300 bg-white object-contain p-2"
+        className="h-12 w-12 rounded-xl border border-slate-300 bg-card object-contain p-2"
       />
       <div className="min-w-0">
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -160,7 +160,7 @@ export function DocumentMetaGrid({
   return (
     <div
       className={cn(
-        "print-doc-meta rounded-xl border border-slate-300 bg-white px-3.5 py-3",
+        "print-doc-meta rounded-xl border border-slate-300 bg-card px-3.5 py-3",
         className
       )}
     >
@@ -257,7 +257,7 @@ export function ReceiptFieldGrid({
       </h3>
       <div className={cn("receipt-document-grid grid gap-2.5", columns)}>
         {visibleFields.map((field) => (
-          <div key={field.label} className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5">
+          <div key={field.label} className="rounded-lg border border-slate-300 bg-card px-3.5 py-2.5">
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {field.label}
             </div>
@@ -319,7 +319,7 @@ export function LineItemsTable({
       <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {title}
       </h3>
-      <div className="overflow-x-auto rounded-xl border border-slate-300 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-slate-300 bg-card">
         <table className="min-w-full border-collapse text-[12px] leading-5">
           <thead className="print-doc-accent">
             <tr>
@@ -393,7 +393,7 @@ export function AmountSummary({
 
   return (
     <SummaryBlock title={title} className={className}>
-      <div className="overflow-hidden rounded-lg border border-slate-300 bg-white">
+      <div className="overflow-hidden rounded-lg border border-slate-300 bg-card">
         <table className="w-full border-collapse text-[12px] leading-5">
           <tbody>
             {visibleRows.map((row, index) => (
@@ -455,7 +455,7 @@ export function BankQrBlock({
           className="m-0"
         />
         {showQr ? (
-          <div className="rounded-xl border border-slate-300 bg-white p-3">
+          <div className="rounded-xl border border-slate-300 bg-card p-3">
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               QR / Payment Reference
             </div>
@@ -487,7 +487,7 @@ export function TermsBlock({
   return (
     <section
       className={cn(
-        "print-doc-note print-doc-section rounded-xl border border-slate-300 bg-white px-3.5 py-3",
+        "print-doc-note print-doc-section rounded-xl border border-slate-300 bg-card px-3.5 py-3",
         className
       )}
     >
@@ -518,13 +518,13 @@ export function SignatureBlock({
 }) {
   return (
     <section className={cn("print-doc-section grid gap-4 sm:grid-cols-2", className)}>
-      <div className="rounded-lg border border-slate-300 bg-white px-3.5 py-3">
+      <div className="rounded-lg border border-slate-300 bg-card px-3.5 py-3">
         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           {leftLabel}
         </div>
         <div className="mt-8 border-t border-slate-300 pt-2 text-[11px] text-muted-foreground">{leftHint}</div>
       </div>
-      <div className="rounded-lg border border-slate-300 bg-white px-3.5 py-3">
+      <div className="rounded-lg border border-slate-300 bg-card px-3.5 py-3">
         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           {rightLabel}
         </div>

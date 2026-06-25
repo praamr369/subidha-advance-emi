@@ -11,7 +11,7 @@ export default function LuckyIdGrid({ highlightSlot, className }: LuckyIdGridPro
   return (
     <section
       className={cn(
-        "rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)]",
+        "rounded-[2rem] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.62)]",
         className
       )}
     >
@@ -46,7 +46,7 @@ export default function LuckyIdGrid({ highlightSlot, className }: LuckyIdGridPro
                 "lucky-id-cell flex aspect-square items-center justify-center rounded-xl border text-[11px] font-bold tabular-nums",
                 isHighlighted
                   ? "border-primary/60 bg-[linear-gradient(145deg,color-mix(in_oklab,var(--primary)_18%,white),color-mix(in_oklab,var(--primary)_10%,white))] text-primary shadow-[0_6px_18px_-10px_color-mix(in_oklab,var(--primary)_40%,transparent)]"
-                  : "border-white/80 bg-white/80 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]"
+                  : "border-border bg-card text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]"
               )}
             >
               {id}
