@@ -91,6 +91,11 @@ export default function ReversalControlPage() {
       ]}
       actions={[{ label: "Reversal Reconciliation", href: ROUTES.admin.financeReversalReconciliation }]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Reversal Cases", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Blocked", value: loading ? "—" : rows.filter(r => (r.blocking_reasons?.length ?? 0) > 0).length, tone: !loading && rows.filter(r => (r.blocking_reasons?.length ?? 0) > 0).length > 0 ? "warning" : "success" },
+        { label: "Snapshot Total", value: loading ? "—" : `₹${rows.reduce((s, r) => s + Number(r.amount_snapshot || 0), 0).toLocaleString("en-IN")}`, tone: "default" },
+      ]}
     >
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">

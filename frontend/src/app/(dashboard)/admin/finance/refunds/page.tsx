@@ -93,6 +93,11 @@ export default function AdminFinanceRefundsPage() {
         { href: ROUTES.admin.finance, label: "Finance Operations", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Refund Cases", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Refundable Total", value: loading ? "—" : `₹${rows.reduce((s, r) => s + Number(r.refundable_amount || 0), 0).toLocaleString("en-IN")}`, tone: "default" },
+        { label: "Blocked", value: loading ? "—" : rows.filter(r => (r.blocking_reasons?.length ?? 0) > 0).length, tone: !loading && rows.filter(r => (r.blocking_reasons?.length ?? 0) > 0).length > 0 ? "warning" : "success" },
+      ]}
     >
       <div className="space-y-6">
         <section className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm">
