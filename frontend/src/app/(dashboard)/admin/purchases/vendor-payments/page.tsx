@@ -304,6 +304,12 @@ export default function AdminVendorPaymentsPage() {
         { label: "Vendor Payments" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Payments", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Draft (unposted)", value: loading ? "—" : rows.filter(r => r.status === "DRAFT").length, tone: !loading && rows.filter(r => r.status === "DRAFT").length > 0 ? "warning" : "success" },
+        { label: "Posted", value: loading ? "—" : rows.filter(r => r.status === "POSTED").length, tone: "success" },
+        { label: "Posted Value", value: loading ? "—" : `₹${rows.filter(r => r.status === "POSTED").reduce((s, r) => s + Number(r.amount || 0), 0).toLocaleString("en-IN")}`, tone: "default" },
+      ]}
     >
       <ERPSectionShell
         title="Vendor Payments"

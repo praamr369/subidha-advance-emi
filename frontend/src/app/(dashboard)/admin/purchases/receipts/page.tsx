@@ -328,6 +328,11 @@ export default function AdminPurchaseReceiptsPage() {
         { label: "Goods Receipts" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Goods Receipts", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Draft (unposted)", value: loading ? "—" : rows.filter(r => r.status === "DRAFT").length, tone: !loading && rows.filter(r => r.status === "DRAFT").length > 0 ? "warning" : "success" },
+        { label: "Received", value: loading ? "—" : rows.filter(r => r.status === "RECEIVED").length, tone: "success" },
+      ]}
     >
       <ERPSectionShell
         title="Goods Receipts"

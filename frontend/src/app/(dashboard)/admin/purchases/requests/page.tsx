@@ -341,6 +341,12 @@ export default function AdminPurchaseRequestsPage() {
         { label: "Purchase Requests" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Requests", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Draft", value: loading ? "—" : rows.filter(r => r.status === "DRAFT").length, tone: "default" },
+        { label: "Approved", value: loading ? "—" : rows.filter(r => r.status === "APPROVED").length, tone: !loading && rows.filter(r => r.status === "APPROVED").length > 0 ? "warning" : "success" },
+        { label: "Ordered", value: loading ? "—" : rows.filter(r => r.status === "ORDERED" || r.status === "PARTIALLY_ORDERED").length, tone: "success" },
+      ]}
     >
       <ERPSectionShell
         title="Purchase Requests"

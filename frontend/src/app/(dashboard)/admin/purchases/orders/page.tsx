@@ -368,6 +368,12 @@ export default function AdminPurchaseOrdersPage() {
         { label: "Purchase Orders" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Purchase Orders", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Draft", value: loading ? "—" : rows.filter(r => r.status === "DRAFT").length, tone: "default" },
+        { label: "Awaiting Receipt", value: loading ? "—" : rows.filter(r => r.status === "SENT" || r.status === "PARTIALLY_RECEIVED").length, tone: !loading && rows.filter(r => r.status === "SENT" || r.status === "PARTIALLY_RECEIVED").length > 0 ? "warning" : "success" },
+        { label: "Received / Billed", value: loading ? "—" : rows.filter(r => r.status === "RECEIVED" || r.status === "BILLED").length, tone: "success" },
+      ]}
     >
       <ERPSectionShell
         title="Purchase Orders"
