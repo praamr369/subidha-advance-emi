@@ -133,6 +133,12 @@ export default function GrowthHubPage() {
         { href: ROUTES.admin.growthRequests, label: "Growth Requests", variant: "primary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
+      stats={[
+        { label: "Open Requests", value: counts?.open_growth_requests ?? "—", tone: (counts?.open_growth_requests ?? 0) > 0 ? "warning" : "success" },
+        { label: "Active Offers", value: counts?.active_offer_packages ?? "—", tone: "info" },
+        { label: "Plan Templates", value: counts?.plan_templates ?? "—", tone: "default" },
+        { label: "Active Partners", value: counts?.active_partners ?? "—", tone: "default" },
+      ]}
     >
       {counts === null ? <ERPLoadingState label="Loading growth hub..." /> : null}
 

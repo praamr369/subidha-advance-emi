@@ -858,7 +858,12 @@ export default function AdminCollectionsPage() {
           variant: "ghost",
         },
       ]}
-      stats={[]} // We'll replace with our own KPI row
+      stats={[
+        { label: "Due Today", value: loading ? "—" : dueTodayRows.length, tone: !loading && dueTodayRows.length > 0 ? "warning" : "success" },
+        { label: "Overdue EMIs", value: loading ? "—" : overdueRows.length, tone: !loading && overdueRows.length > 0 ? "warning" : "success" },
+        { label: "Payments Today", value: loading ? "—" : recentPayments.filter((r) => !r.is_reversed).length, tone: !loading && recentPayments.filter((r) => !r.is_reversed).length > 0 ? "success" : "default" },
+        { label: "Outstanding Direct Sales", value: loading ? "—" : directSaleRows.length, tone: "default" },
+      ]}
       statusBadge={{
         label: "Daily Operations",
         tone: "info",

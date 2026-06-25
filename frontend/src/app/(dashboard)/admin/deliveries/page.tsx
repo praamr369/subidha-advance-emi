@@ -485,6 +485,12 @@ export default function AdminDeliveriesPage() {
         },
       ]}
       statusBadge={{ label: "Internal Delivery Control", tone: "info" }}
+      stats={[
+        { label: "Pending / Scheduled", value: loading ? "—" : summary.pending + summary.scheduled, tone: !loading && (summary.pending + summary.scheduled) > 0 ? "warning" : "success" },
+        { label: "In Transit", value: loading ? "—" : summary.in_transit + summary.dispatched + summary.out_for_delivery, tone: !loading && (summary.in_transit + summary.dispatched + summary.out_for_delivery) > 0 ? "info" : "default" },
+        { label: "Delivered", value: loading ? "—" : summary.delivered, tone: "success" },
+        { label: "Returns / Failed", value: loading ? "—" : summary.return_requested + summary.returned + summary.failed, tone: !loading && (summary.return_requested + summary.returned + summary.failed) > 0 ? "warning" : "success" },
+      ]}
     >
       <RegistryPageShell
         header={

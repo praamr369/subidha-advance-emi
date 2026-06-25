@@ -89,6 +89,12 @@ export default function AdminOperationsWorkspacePage() {
         { href: ROUTES.admin.operationsCommandCenter, label: "Command Center", variant: "secondary" },
       ]}
       statusBadge={{ label: "Action Mode", tone: "warning" }}
+      stats={[
+        { label: "Overdue Payments", value: loading ? "—" : (rows.find(r => r.key === "overdue_payments")?.count ?? 0), tone: !loading && (rows.find(r => r.key === "overdue_payments")?.count ?? 0) > 0 ? "warning" : "success" },
+        { label: "Blocked Deliveries", value: loading ? "—" : (rows.find(r => r.key === "delivery_blocked")?.count ?? 0), tone: !loading && (rows.find(r => r.key === "delivery_blocked")?.count ?? 0) > 0 ? "warning" : "success" },
+        { label: "KYC Pending", value: loading ? "—" : (rows.find(r => r.key === "customer_kyc_pending")?.count ?? 0), tone: !loading && (rows.find(r => r.key === "customer_kyc_pending")?.count ?? 0) > 0 ? "warning" : "success" },
+        { label: "Low Stock Alerts", value: loading ? "—" : (rows.find(r => r.key === "low_stock_alerts")?.count ?? 0), tone: !loading && (rows.find(r => r.key === "low_stock_alerts")?.count ?? 0) > 0 ? "warning" : "success" },
+      ]}
     >
       <div className="space-y-6">
         {loading ? <ERPLoadingState label="Loading operations queues..." /> : null}
