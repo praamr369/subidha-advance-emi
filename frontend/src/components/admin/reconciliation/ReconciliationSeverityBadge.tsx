@@ -10,8 +10,8 @@ export default function ReconciliationSeverityBadge({ severity }: { severity?: s
       : value === "HIGH"
         ? "border-[color-mix(in_oklab,var(--warning)_35%,var(--border)_65%)] bg-[color-mix(in_oklab,var(--warning)_16%,transparent)] text-foreground"
         : value === "MEDIUM"
-          ? "border-border bg-[var(--surface-muted)] text-foreground"
-          : "border-border bg-[var(--surface-muted)] text-muted-foreground";
+          ? "border-border bg-muted/50 text-foreground"
+          : "border-border bg-muted/50 text-muted-foreground";
 
   return (
     <span

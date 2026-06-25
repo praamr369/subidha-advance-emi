@@ -607,7 +607,7 @@ export default function AdminCrmLeadDetailPage() {
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="min-w-full text-sm">
-                  <thead className="bg-[var(--surface-muted)]">
+                  <thead className="bg-muted/50">
                     <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                       <th className="px-4 py-2.5">Due / Note</th>
                       <th className="px-4 py-2.5">Assigned</th>
@@ -666,7 +666,7 @@ export default function AdminCrmLeadDetailPage() {
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="min-w-full text-sm">
-                  <thead className="bg-[var(--surface-muted)]">
+                  <thead className="bg-muted/50">
                     <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                       <th className="px-4 py-2.5">Title</th>
                       <th className="px-4 py-2.5">Value</th>

@@ -141,7 +141,7 @@ export default function QuickActionLauncher({
       <div className="flex max-h-[calc(100dvh-1.5rem)] min-h-0 flex-col sm:max-h-[calc(100dvh-3rem)]">
         <div className="workflow-panel-header flex items-center justify-between gap-3 px-5 py-4">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-[var(--surface-strong)] text-foreground">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background text-foreground">
               <Plus className="h-5 w-5" />
             </span>
             <div>
@@ -190,9 +190,9 @@ export default function QuickActionLauncher({
                       <Link
                         href={href}
                         onClick={onClose}
-                        className="flex min-w-0 flex-1 items-start gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                        className="flex min-w-0 flex-1 items-start gap-3 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-border hover:bg-muted/50"
                       >
-                        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-strong)] text-foreground">
+                        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-foreground">
                           <Star className="h-4 w-4 fill-amber-400 text-amber-700" />
                         </span>
                         <span className="min-w-0 flex-1">
@@ -204,7 +204,7 @@ export default function QuickActionLauncher({
                       </Link>
                       <button
                         type="button"
-                        className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground opacity-100 transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] md:opacity-0 md:group-hover:opacity-100"
+                        className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground opacity-100 transition hover:border-border hover:bg-muted/50 md:opacity-0 md:group-hover:opacity-100"
                         onClick={() => handleToggleFavorite(href)}
                         aria-label="Remove from favorites"
                         title="Remove from favorites"
@@ -232,9 +232,9 @@ export default function QuickActionLauncher({
                       key={`recent-${href}`}
                       href={href}
                       onClick={onClose}
-                      className="flex items-start gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                      className="flex items-start gap-3 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-border hover:bg-muted/50"
                     >
-                      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-strong)] text-foreground">
+                      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-foreground">
                         <History className="h-4 w-4" />
                       </span>
                       <span className="min-w-0 flex-1">
@@ -258,7 +258,7 @@ export default function QuickActionLauncher({
               {workflows.map((workflow) => (
                 <div
                   key={workflow.id}
-                  className="rounded-[1.35rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]"
+                  className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]"
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-foreground">{workflow.label}</div>
@@ -285,7 +285,7 @@ export default function QuickActionLauncher({
                     <Link
                       href={workflow.canonicalHref}
                       onClick={onClose}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:border-border hover:bg-muted/50"
                     >
                       Canonical page
                     </Link>
@@ -294,7 +294,7 @@ export default function QuickActionLauncher({
               ))}
 
               {workflows.length === 0 ? (
-                <div className="rounded-[1.35rem] border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
+                <div className="rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
                   No quick workflows are configured for this role.
                 </div>
               ) : null}

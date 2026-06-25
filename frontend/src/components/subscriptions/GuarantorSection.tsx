@@ -80,7 +80,7 @@ export default function GuarantorSection({ subscriptionId }: Props) {
       </div>
 
       {showForm && (
-        <div className="mb-4 rounded-xl border border-border bg-[var(--surface-muted)] p-4 space-y-3">
+        <div className="mb-4 rounded-xl border border-border bg-muted/50 p-4 space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-semibold text-muted-foreground mb-1">Name *</label>

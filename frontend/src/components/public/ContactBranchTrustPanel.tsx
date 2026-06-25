@@ -62,7 +62,7 @@ export default function ContactBranchTrustPanel({ profile }: ContactBranchTrustP
             const Icon = row.icon;
             const content = (
               <>
-                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_12%,var(--surface-card-elevated)_88%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_12%,var(--surface-card-elevated)_88%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
                   <Icon className="h-4 w-4" />
                 </span>
                 <span className="min-w-0 flex-1">

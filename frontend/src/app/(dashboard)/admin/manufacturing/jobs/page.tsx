@@ -216,7 +216,7 @@ export default function AdminManufacturingJobsPage() {
     >
       <div className="space-y-6">
         {notice ? (
-          <div className="rounded-2xl border border-emerald-600/35 bg-emerald-600/10 px-4 py-3 text-sm text-foreground">
+          <div className="rounded-xl border border-emerald-600/35 bg-emerald-600/10 px-4 py-3 text-sm text-foreground">
             {notice}
           </div>
         ) : null}

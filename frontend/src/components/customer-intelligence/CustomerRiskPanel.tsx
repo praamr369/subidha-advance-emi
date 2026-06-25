@@ -86,7 +86,7 @@ export function CustomerRiskPanel({ customerId }: Props) {
 
   return (
     <div
-      className="rounded-2xl border border-border bg-background p-5"
+      className="rounded-xl border border-border bg-background p-5"
       data-testid="customer-risk-panel"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

@@ -114,7 +114,7 @@ function scheduleLines(preview: ProductRecontractPreviewSummary | null | undefin
 
 function CardSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="document-card my-4 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+    <section className="document-card my-4 rounded-xl border border-border bg-card p-4">
       <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">{title}</div>
       <div className="mt-3">{children}</div>
     </section>

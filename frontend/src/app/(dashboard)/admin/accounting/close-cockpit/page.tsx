@@ -212,7 +212,7 @@ export default function AccountingCloseCockpitPage() {
       {!loading && !error && cockpit && (
         <div className="space-y-6">
           {/* Overall status card */}
-          <div className="rounded-2xl border border-border bg-background p-5 shadow-sm">
+          <div className="rounded-xl border border-border bg-background p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

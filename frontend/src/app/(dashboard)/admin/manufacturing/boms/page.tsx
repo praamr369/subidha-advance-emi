@@ -273,7 +273,7 @@ export default function AdminManufacturingBomsPage() {
     >
       <div className="space-y-6">
         {notice ? (
-          <div className="rounded-2xl border border-emerald-600/35 bg-emerald-600/10 px-4 py-3 text-sm text-foreground">
+          <div className="rounded-xl border border-emerald-600/35 bg-emerald-600/10 px-4 py-3 text-sm text-foreground">
             {notice}
           </div>
         ) : null}
@@ -390,7 +390,7 @@ export default function AdminManufacturingBomsPage() {
               {form.lines.map((line, index) => (
                 <div
                   key={index}
-                  className="grid gap-3 rounded-2xl border border-border bg-background/60 p-4 md:grid-cols-4 xl:grid-cols-5"
+                  className="grid gap-3 rounded-xl border border-border bg-background/60 p-4 md:grid-cols-4 xl:grid-cols-5"
                 >
                   <div className="md:col-span-2">
                     <EntityLookupCombobox

@@ -290,7 +290,7 @@ export default function AdminInternalUserEditPage() {
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <form
           onSubmit={handleSubmit}
-          className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-sm"
+          className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-sm"
         >
           <div>
             <h2 className="text-lg font-semibold text-foreground">Identity and access</h2>
@@ -456,7 +456,7 @@ export default function AdminInternalUserEditPage() {
           />
         </form>
 
-        <aside className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <aside className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm">
           <div>
             <h2 className="text-lg font-semibold text-foreground">Current Snapshot</h2>
             <p className="mt-1 text-sm text-muted-foreground">

@@ -64,7 +64,7 @@ export default function ScheduledExportPage() {
         <p className="text-sm text-muted-foreground mt-1">Generate and email a report CSV to a recipient immediately.</p>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <div>
           <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Report Type</label>
           <select
@@ -133,7 +133,7 @@ export default function ScheduledExportPage() {
       </div>
 
       {result && (
-        <div className="rounded-2xl border border-green-200 bg-green-50 p-5 mt-4">
+        <div className="rounded-xl border border-green-200 bg-green-50 p-5 mt-4">
           <div className="text-sm font-semibold text-green-700 mb-2">{result.message}</div>
           <div className="grid grid-cols-2 gap-y-1 text-xs text-green-800">
             <span className="font-medium">Report:</span><span>{result.label}</span>
@@ -146,7 +146,7 @@ export default function ScheduledExportPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-border bg-card p-4 mt-4">
+      <div className="rounded-xl border border-border bg-card p-4 mt-4">
         <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">Available Reports</div>
         <ul className="space-y-1">
           {REPORT_TYPES.map(r => (

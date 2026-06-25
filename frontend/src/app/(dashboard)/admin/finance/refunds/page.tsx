@@ -93,30 +93,30 @@ export default function AdminFinanceRefundsPage() {
       ]}
     >
       <div className="space-y-6">
-        <section className="rounded-2xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm">
+        <section className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm">
           Refund work is intentionally routed through the audited reversal pipeline. This page is a focused operational view, not a new financial posting surface.
         </section>
 
         <section className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Refund cases</div>
             <div className="mt-2 text-2xl font-semibold text-foreground">{refundRows.length}</div>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pending</div>
             <div className="mt-2 text-2xl font-semibold text-foreground">{summary.pending}</div>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Blocked</div>
             <div className="mt-2 text-2xl font-semibold text-foreground">{summary.blocked}</div>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reconciled</div>
             <div className="mt-2 text-2xl font-semibold text-foreground">{summary.reconciled}</div>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <label className="block text-sm font-medium text-foreground">
             Search refunds
             <input
@@ -138,7 +138,7 @@ export default function AdminFinanceRefundsPage() {
         ) : null}
 
         {!loading && !error && refundRows.length > 0 ? (
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
             <table className="min-w-full divide-y divide-border text-sm">
               <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>

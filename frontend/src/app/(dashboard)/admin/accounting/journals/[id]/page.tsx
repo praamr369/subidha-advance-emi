@@ -132,7 +132,7 @@ export default function AccountingJournalDetailPage() {
       statusBadge={{ label: journal?.status || "Loading", tone: portalStatusTone(journal?.status) }}
     >
       <div className="space-y-5">
-        {notice ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div> : null}
+        {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div> : null}
         {loading ? <LoadingBlock label="Loading journal entry..." /> : null}
         {!loading && error ? <ErrorState title="Unable to load journal entry" description={error} onRetry={() => void load("initial")} /> : null}
         {!loading && !error && !journal ? <EmptyState title="Journal entry not found" description="This journal entry does not exist or is not accessible." /> : null}
@@ -140,29 +140,29 @@ export default function AccountingJournalDetailPage() {
         {!loading && !error && journal ? (
           <>
             <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Entry no</div>
                 <div className="mt-2 text-lg font-semibold">{journal.entry_no}</div>
               </div>
-              <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Date</div>
                 <div className="mt-2 text-lg font-semibold">{formatDate(journal.entry_date)}</div>
               </div>
-              <div className={`rounded-2xl border p-4 ${statusTone(journal.status)}`}>
+              <div className={`rounded-xl border p-4 ${statusTone(journal.status)}`}>
                 <div className="text-xs font-semibold uppercase opacity-75">Status</div>
                 <div className="mt-2 text-lg font-semibold">{journal.status}</div>
               </div>
-              <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">FY</div>
                 <div className="mt-2 text-lg font-semibold">{journal.financial_year_code || "Pending"}</div>
               </div>
-              <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Period</div>
                 <div className="mt-2 text-lg font-semibold">{journal.accounting_period_code || "Resolved on posting"}</div>
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-5">
+            <section className="rounded-xl border border-border bg-card p-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold">Journal evidence</h2>
@@ -188,7 +188,7 @@ export default function AccountingJournalDetailPage() {
               {journal.void_reason ? <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">Void reason: {journal.void_reason}</div> : null}
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-5">
+            <section className="rounded-xl border border-border bg-card p-5">
               <h2 className="text-lg font-semibold">Debit / credit lines</h2>
               <div className="mt-4 overflow-x-auto rounded-xl border border-border">
                 <table className="min-w-full divide-y divide-border text-sm">

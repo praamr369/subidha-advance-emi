@@ -59,7 +59,7 @@ export function FinancialSectionCard({
   const warnings = Array.isArray(section.warnings) ? section.warnings : [];
 
   return (
-    <article className="rounded-2xl border border-border bg-background p-5 shadow-sm">
+    <article className="rounded-xl border border-border bg-background p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         <FinancialStatusBadge status={section.status} deferred={section.deferred} />

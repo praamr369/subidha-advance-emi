@@ -61,7 +61,7 @@ export default function ThemeToggle({ variant = "dashboard", className }: ThemeT
           variant === "dashboard"
             ? "h-11 border-[var(--topbar-border)] bg-[var(--topbar-control)] py-0 pl-9 pr-8 text-sm"
             : "h-10 border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_90%,transparent)] py-0 pl-8 pr-7 text-xs",
-          "cursor-pointer hover:bg-[var(--surface-muted)]"
+          "cursor-pointer hover:bg-muted/50"
         )}
         aria-label="Color theme: light, dark, or system"
       >

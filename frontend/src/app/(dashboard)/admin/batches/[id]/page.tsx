@@ -585,7 +585,7 @@ export default function AdminBatchDetailPage() {
                 source ownership. Additive copy only. Lucky IDs, draw readiness,
                 and winner state are read from real backend rows below; no grid,
                 draw result, or winner state is fabricated here. */}
-            <section className="rounded-2xl border border-border bg-muted/30 p-5">
+            <section className="rounded-xl border border-border bg-muted/30 p-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Lucky Plan Control — Batch source
               </p>

@@ -27,7 +27,7 @@ export function FormSection({
   children,
 }: CommonProps & { title: string; description?: string }) {
   return (
-    <section className={cn("surface-panel rounded-2xl p-4", className)}>
+    <section className={cn("surface-panel rounded-xl p-4", className)}>
       <div className="border-b border-border/80 pb-3">
         <h3 className="enterprise-section-title">{title}</h3>
         {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
@@ -51,7 +51,7 @@ export function KpiCard({
   return (
     <article
       className={cn(
-        "rounded-2xl border border-[color-mix(in_oklab,var(--surface-border-strong)_80%,white_20%)] bg-[var(--surface-card-elevated)] p-4 shadow-[0_12px_30px_-24px_rgba(15,23,42,0.34)]",
+        "rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_80%,white_20%)] bg-[var(--surface-card-elevated)] p-4 shadow-[0_12px_30px_-24px_rgba(15,23,42,0.34)]",
         className
       )}
     >
@@ -74,7 +74,7 @@ export function WorkflowCard({
   action?: ReactNode;
 }) {
   return (
-    <div className={cn("surface-accent rounded-2xl p-4", className)}>
+    <div className={cn("surface-accent rounded-xl p-4", className)}>
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
       {action ? <div className="mt-3">{action}</div> : null}
@@ -93,7 +93,7 @@ export function DetailPanel({
   children,
 }: CommonProps & { title: string; description?: string }) {
   return (
-    <section className={cn("surface-panel rounded-2xl p-4", className)}>
+    <section className={cn("surface-panel rounded-xl p-4", className)}>
       <div className="border-b border-border/80 pb-3">
         <h3 className="enterprise-section-title">{title}</h3>
         {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
@@ -109,7 +109,7 @@ export function Timeline({
   children,
 }: CommonProps & { title?: string }) {
   return (
-    <section className={cn("surface-inset rounded-2xl p-4", className)}>
+    <section className={cn("surface-inset rounded-xl p-4", className)}>
       {title ? <h3 className="text-sm font-semibold text-foreground">{title}</h3> : null}
       <div className={cn("mt-3 grid gap-2", title ? "" : "mt-0")}>{children}</div>
     </section>
@@ -163,7 +163,7 @@ type QueueRow = {
 
 export function QueueList({ className, rows }: { className?: string; rows: QueueRow[] }) {
   return (
-    <div className={cn("rounded-2xl border border-border bg-card", className)}>
+    <div className={cn("rounded-xl border border-border bg-card", className)}>
       {rows.map((row, idx) => {
         const rowBody = (
           <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -180,7 +180,7 @@ export function QueueList({ className, rows }: { className?: string; rows: Queue
         return (
           <div key={`${row.title}-${idx}`} className={cn(idx > 0 ? "border-t border-border/70" : "")}>
             {row.route ? (
-              <Link href={row.route} className="block transition hover:bg-[var(--surface-muted)]">
+              <Link href={row.route} className="block transition hover:bg-muted/50">
                 {rowBody}
               </Link>
             ) : (
@@ -202,10 +202,10 @@ type LedgerRow = {
 
 export function LedgerSummary({ className, rows }: { className?: string; rows: LedgerRow[] }) {
   return (
-    <div className={cn("rounded-2xl border border-border bg-card p-2", className)}>
+    <div className={cn("rounded-xl border border-border bg-card p-2", className)}>
       {rows.map((row) => {
         const content = (
-          <div className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 transition hover:bg-[var(--surface-muted)]">
+          <div className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 transition hover:bg-muted/50">
             <div>
               <p className="text-sm font-medium text-foreground">{row.label}</p>
               {row.helper ? <p className="text-xs text-muted-foreground">{row.helper}</p> : null}
@@ -248,7 +248,7 @@ export function WorkflowLane({
   };
 
   return (
-    <section className={cn("rounded-2xl border border-border bg-card p-3", className)}>
+    <section className={cn("rounded-xl border border-border bg-card p-3", className)}>
       <h3 className="px-1 text-sm font-semibold text-foreground">{title}</h3>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         {steps.map((step) => (
@@ -282,7 +282,7 @@ export function ExceptionPanel({
   rows: ExceptionRow[];
 }) {
   return (
-    <section className={cn("rounded-2xl border border-red-100 bg-red-50/60 p-3", className)}>
+    <section className={cn("rounded-xl border border-red-100 bg-red-50/60 p-3", className)}>
       <h3 className="px-1 text-sm font-semibold text-red-900">{title}</h3>
       <div className="mt-2 space-y-2">
         {rows.map((row) => {
@@ -327,7 +327,7 @@ export function ActivityTimeline({
   emptyLabel?: string;
 }) {
   return (
-    <section className={cn("rounded-2xl border border-border bg-card p-3", className)}>
+    <section className={cn("rounded-xl border border-border bg-card p-3", className)}>
       <h3 className="px-1 text-sm font-semibold text-foreground">{title}</h3>
       {entries.length === 0 ? (
         <p className="mt-2 px-1 text-sm text-muted-foreground">{emptyLabel}</p>

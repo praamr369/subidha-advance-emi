@@ -64,8 +64,8 @@ export default function GeneratedMarketingVisual({
           </div>
           <div className="absolute bottom-10 left-8 h-16 w-36 rounded-[2rem_2rem_1rem_1rem] border border-border/70 bg-[color-mix(in_oklab,var(--primary)_20%,var(--surface-card-elevated)_80%)] shadow-[0_24px_54px_-38px_rgba(15,23,42,0.72)]" />
           <div className="absolute bottom-8 left-16 h-4 w-48 rounded-full bg-[color-mix(in_oklab,var(--foreground)_14%,transparent)] blur-sm" />
-          <div className="absolute bottom-16 right-10 h-28 w-24 rounded-[1.3rem] border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] shadow-[0_24px_54px_-38px_rgba(15,23,42,0.72)]" />
-          <div className="absolute bottom-24 right-24 h-16 w-28 rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--accent)_42%,var(--surface-card-elevated)_58%)] shadow-[0_24px_54px_-38px_rgba(15,23,42,0.72)]" />
+          <div className="absolute bottom-16 right-10 h-28 w-24 rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] shadow-[0_24px_54px_-38px_rgba(15,23,42,0.72)]" />
+          <div className="absolute bottom-24 right-24 h-16 w-28 rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--accent)_42%,var(--surface-card-elevated)_58%)] shadow-[0_24px_54px_-38px_rgba(15,23,42,0.72)]" />
           <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full border border-border/50 bg-[color-mix(in_oklab,var(--primary)_10%,transparent)] blur-sm" />
         </div>
       )}

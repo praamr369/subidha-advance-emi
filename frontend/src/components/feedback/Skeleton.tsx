@@ -8,7 +8,7 @@ function SkeletonBlock({ className }: BaseProps) {
   return (
     <div
       className={cn(
-        "skeleton-shimmer motion-safe:animate-skeleton-pulse rounded-lg bg-[var(--surface-muted)]",
+        "skeleton-shimmer motion-safe:animate-skeleton-pulse rounded-lg bg-muted/50",
         className
       )}
       aria-hidden="true"
@@ -18,7 +18,7 @@ function SkeletonBlock({ className }: BaseProps) {
 
 export function CardSkeleton({ className }: BaseProps) {
   return (
-    <div className={cn("surface-glass rounded-2xl p-4", className)}>
+    <div className={cn("surface-glass rounded-xl p-4", className)}>
       <SkeletonBlock className="h-3 w-24" />
       <SkeletonBlock className="mt-4 h-8 w-28" />
       <SkeletonBlock className="mt-3 h-3 w-full" />
@@ -50,7 +50,7 @@ export function TableSkeleton({ rows = 6, columns = 4, className }: BaseProps & 
 export function FormSkeleton({ fields = 5, className }: BaseProps & { fields?: number }) {
   return (
     <div
-      className={cn("surface-glass space-y-4 rounded-2xl p-5", className)}
+      className={cn("surface-glass space-y-4 rounded-xl p-5", className)}
       aria-busy="true"
       aria-label="Loading form"
     >
@@ -101,7 +101,7 @@ export function DashboardGridSkeleton({
 export function ChartSkeleton({ className }: BaseProps) {
   return (
     <div
-      className={cn("surface-glass rounded-2xl border border-border p-4", className)}
+      className={cn("surface-glass rounded-xl border border-border p-4", className)}
       aria-busy="true"
       aria-label="Loading chart"
     >

@@ -84,13 +84,13 @@ export default function AccountingGstHubPage() {
           description="Use the linked registers for draft, approve, post, and cancel flows. Cancellation remains additive through reversal journals only."
           contentClassName="grid gap-3 md:grid-cols-3"
         >
-          <Link href={ROUTES.admin.accountingTaxInvoices} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:bg-muted/40">
+          <Link href={ROUTES.admin.accountingTaxInvoices} className="rounded-xl border border-border bg-background px-4 py-4 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:bg-muted/40">
             Tax invoices and posting lifecycle
           </Link>
-          <Link href={ROUTES.admin.accountingCreditNotes} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:bg-muted/40">
+          <Link href={ROUTES.admin.accountingCreditNotes} className="rounded-xl border border-border bg-background px-4 py-4 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:bg-muted/40">
             Credit note register and reversals
           </Link>
-          <Link href={ROUTES.admin.accountingDebitNotes} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:bg-muted/40">
+          <Link href={ROUTES.admin.accountingDebitNotes} className="rounded-xl border border-border bg-background px-4 py-4 text-sm font-medium text-foreground transition hover:-translate-y-0.5 hover:bg-muted/40">
             Debit note register and reversals
           </Link>
         </WorkspaceSection>

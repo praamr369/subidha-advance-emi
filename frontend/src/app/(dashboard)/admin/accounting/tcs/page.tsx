@@ -183,7 +183,7 @@ export default function TCSPage() {
           { label: "Sale Amount", value: `₹${totals.sale}` },
           { label: "TCS Collected", value: `₹${totals.tcs}` },
         ].map(card => (
-          <div key={card.label} className="rounded-2xl border border-border bg-card p-4">
+          <div key={card.label} className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs text-muted-foreground">{card.label}</div>
             <div className="text-lg font-bold mt-1">{card.value}</div>
           </div>
@@ -198,7 +198,7 @@ export default function TCSPage() {
       )}
 
       {rows.length > 0 && (
-        <div className="rounded-2xl border border-border overflow-hidden">
+        <div className="rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
               <tr>
@@ -248,7 +248,7 @@ export default function TCSPage() {
       {/* Create Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-2xl p-6 w-full max-w-md shadow-xl">
+          <div className="bg-background rounded-xl p-6 w-full max-w-md shadow-xl">
             <div className="font-semibold mb-4">Record TCS Collection</div>
             <div className="space-y-3">
               <div>
@@ -311,7 +311,7 @@ export default function TCSPage() {
       {/* Deposit Modal */}
       {depositModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-2xl p-6 w-full max-w-sm shadow-xl">
+          <div className="bg-background rounded-xl p-6 w-full max-w-sm shadow-xl">
             <div className="font-semibold mb-1">Mark TCS Deposited</div>
             <div className="text-sm text-muted-foreground mb-4">TCS Amount: ₹{depositModal.tcs_amount}</div>
             <div className="space-y-3">

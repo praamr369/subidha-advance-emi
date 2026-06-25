@@ -81,7 +81,7 @@ export default function AdminAmendmentList({
     >
       <div className="space-y-5">
         <AmendmentSafetyNotice />
-        <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-card p-4">
+        <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-4">
           <ActionButton href="/admin/contract-amendments/new" variant="primary">
             Create amendment
           </ActionButton>
@@ -140,15 +140,15 @@ export default function AdminAmendmentList({
         {!loading && !error && rows.length === 0 ? (
           <DetailPanel title="No amendments found" description="No amendment requests match the current filters. Create an admin-side request, clear filters, or open the recontract report.">
             <div className="grid gap-3 md:grid-cols-3">
-              <Link href="/admin/contract-amendments/new" className="rounded-2xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
+              <Link href="/admin/contract-amendments/new" className="rounded-xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
                 <div className="text-sm font-semibold text-foreground">Create amendment</div>
                 <div className="mt-1 text-xs text-muted-foreground">Admin can create a request on behalf of a customer or partner when backend validation allows it.</div>
               </Link>
-              <Link href="/admin/contract-amendments" className="rounded-2xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
+              <Link href="/admin/contract-amendments" className="rounded-xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
                 <div className="text-sm font-semibold text-foreground">View all statuses</div>
                 <div className="mt-1 text-xs text-muted-foreground">Clear filters and see requested, under-review, approved, rejected, and cancelled records.</div>
               </Link>
-              <Link href="/admin/contract-amendments/recontract-report" className="rounded-2xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
+              <Link href="/admin/contract-amendments/recontract-report" className="rounded-xl border border-border bg-muted/20 p-4 transition hover:border-primary/50">
                 <div className="text-sm font-semibold text-foreground">Open Recontract Report</div>
                 <div className="mt-1 text-xs text-muted-foreground">Approved product upgrade/downgrade amendments with saved previews will appear there.</div>
               </Link>
@@ -165,7 +165,7 @@ export default function AdminAmendmentList({
                 <Link
                   key={row.id}
                   href={`/admin/contract-amendments/${row.id}`}
-                  className="rounded-2xl border border-border bg-card p-4 transition hover:border-primary/50"
+                  className="rounded-xl border border-border bg-card p-4 transition hover:border-primary/50"
                 >
                   <div className="flex flex-wrap justify-between gap-3">
                     <div>

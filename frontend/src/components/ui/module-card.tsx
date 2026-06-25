@@ -18,9 +18,9 @@ export default function ModuleCard({
   icon,
 }: ModuleCardProps) {
   return (
-    <article className="group surface-panel-elevated rounded-2xl border border-border bg-card p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <article className="group surface-panel-elevated rounded-xl border border-border bg-card p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       {icon ? (
-        <div className="mb-4 inline-flex rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-2.5 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+        <div className="mb-4 inline-flex rounded-xl border border-border bg-[var(--surface-card-elevated)] p-2.5 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
           {icon}
         </div>
       ) : null}

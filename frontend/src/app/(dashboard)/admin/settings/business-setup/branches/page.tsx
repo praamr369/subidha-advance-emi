@@ -107,9 +107,9 @@ export default function BranchesSetupPage() {
       />
       <BusinessSetupLinks />
 
-      {error ? <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
+      {error ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">Branch setup readiness</h2>
@@ -141,7 +141,7 @@ export default function BranchesSetupPage() {
 
       <section className="grid gap-4 md:grid-cols-3">
         {workflowSteps.map((step) => (
-          <article key={step.label} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <article key={step.label} className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="flex items-start justify-between gap-2">
               <h3 className="text-sm font-semibold text-foreground">{step.label}</h3>
               <span className={badgeClass(step.status === "READY" ? "green" : "amber")}>{step.status}</span>
@@ -153,7 +153,7 @@ export default function BranchesSetupPage() {
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="text-base font-semibold text-foreground">Active branch register</div>
           <p className="mt-1 text-sm text-muted-foreground">Use /admin/branches to create or edit. Exactly one active branch should be primary.</p>
           <div className="mt-4 space-y-2">
@@ -170,7 +170,7 @@ export default function BranchesSetupPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="text-base font-semibold text-foreground">What this unlocks</div>
           <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
             <li>Cashier and counter collection scope.</li>

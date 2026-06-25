@@ -39,25 +39,25 @@ export default function AiAnswerCard({ response }: AiAnswerCardProps) {
           </div>
         ) : null}
         {response.retrievalMode === "KEYWORD" ? (
-          <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-xs text-muted-foreground">
+          <div className="rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
             Keyword only retrieval is active.
           </div>
         ) : null}
-        <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4">
+        <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4">
           <p className="whitespace-pre-line text-sm leading-7 text-foreground">{response.answer}</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
-          <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-xs text-muted-foreground">
+          <div className="rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
             Permission filtered: {response.safety.permissionFiltered ? "Yes" : "No"}
           </div>
-          <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-xs text-muted-foreground">
+          <div className="rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
             Source grounded: {response.safety.sourceGrounded ? "Yes" : "No"}
           </div>
-          <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-xs text-muted-foreground">
+          <div className="rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
             Financial action request: {response.safety.actionableFinancialInstruction ? "Refused" : "No"}
           </div>
         </div>
-        <div className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs leading-5 text-sky-950">
+        <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs leading-5 text-sky-950">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
           <span>Responses are limited to retrieved excerpts and cannot execute workflows.</span>
         </div>

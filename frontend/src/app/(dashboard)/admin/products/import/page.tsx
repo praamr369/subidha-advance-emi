@@ -229,7 +229,7 @@ export default function AdminProductImportPage() {
         },
       ]}
     >
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-5">
             <div>
@@ -249,7 +249,7 @@ export default function AdminProductImportPage() {
               onDragLeave={onDragLeave}
               onDrop={onDrop}
               className={[
-                "block cursor-pointer rounded-2xl border-2 border-dashed p-6 transition",
+                "block cursor-pointer rounded-xl border-2 border-dashed p-6 transition",
                 dragActive
                   ? "border-slate-500 bg-slate-50"
                   : "border-slate-300 bg-slate-50/60 hover:border-slate-400 hover:bg-slate-50",
@@ -275,7 +275,7 @@ export default function AdminProductImportPage() {
             </label>
 
             {selectedFileMeta ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-xl border border-border bg-muted/30 p-4">
                 <div className="text-sm font-medium text-slate-900">
                   Selected file
                 </div>
@@ -332,23 +332,23 @@ export default function AdminProductImportPage() {
             </div>
 
             {successMessage ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                 {successMessage}
               </div>
             ) : null}
 
             {errorMessage ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {errorMessage}
               </div>
             ) : null}
 
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
               Uploaded CSV preview is now the governed operator path. The legacy server-default CSV shortcut remains backend-compatible for transition, but it is intentionally not exposed here for go-live use.
             </div>
 
             {result?.errors?.length ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <div className="text-sm font-medium text-amber-900">
                   Import notices
                 </div>
@@ -362,7 +362,7 @@ export default function AdminProductImportPage() {
           </div>
 
           <aside className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-border bg-muted/30 p-5">
               <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
                 Expected CSV columns
               </h3>
@@ -400,7 +400,7 @@ export default function AdminProductImportPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-border bg-muted/30 p-5">
               <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
                 Preview and result summary
               </h3>
@@ -439,7 +439,7 @@ export default function AdminProductImportPage() {
               </div>
 
               {preview ? (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
                   <div className="font-medium text-slate-900">
                     Create candidates {preview.preview_rows.filter((row) => row.action === "create").length} ·
                     Update candidates {preview.preview_rows.filter((row) => row.action === "update").length}
@@ -468,7 +468,7 @@ export default function AdminProductImportPage() {
               ) : null}
             </div>
 
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
               <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-800">
                 Operational note
               </h3>

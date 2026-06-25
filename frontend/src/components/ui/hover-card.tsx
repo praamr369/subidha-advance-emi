@@ -25,7 +25,7 @@ export function HoverCardContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "z-[200] w-72 rounded-2xl border border-border bg-popover p-4 text-popover-foreground shadow-[var(--popup-shadow-xl)] outline-none",
+          "z-[200] w-72 rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-[var(--popup-shadow-xl)] outline-none",
           className
         )}
         {...props}

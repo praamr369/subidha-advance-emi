@@ -257,7 +257,7 @@ export default function DashboardWidgetBoard({
       ) : null}
 
       {showControls ? (
-        <div className="mt-4 grid gap-2 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-3">
+        <div className="mt-4 grid gap-2 rounded-xl border border-border bg-[var(--surface-card-elevated)] p-3">
           {prefs.order.map((id) => {
             const widget = widgetMap.get(id);
             if (!widget) return null;

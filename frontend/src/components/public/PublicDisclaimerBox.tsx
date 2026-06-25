@@ -10,7 +10,7 @@ export default function PublicDisclaimerBox({
   points,
 }: PublicDisclaimerBoxProps) {
   return (
-    <section className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-5">
+    <section className="rounded-xl border border-amber-200/70 bg-amber-50/70 p-5">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-xl border border-amber-300/80 bg-amber-100 text-amber-700">
           <AlertTriangle className="h-4 w-4" />

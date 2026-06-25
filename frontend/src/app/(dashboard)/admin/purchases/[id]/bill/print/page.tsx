@@ -206,7 +206,7 @@ export default function AdminPurchaseBillPrintPage() {
         <DocumentHeader copyLabel={copyLabel} documentNo={bill.bill_no || `Vendor Bill ${bill.id}`} documentDate={formatDocumentDate(bill.bill_date)} />
         <DocumentTitleStrip title="PURCHASE BILL / VENDOR BILL" subtitle="Read-only vendor bill generated from existing purchase records." status={status} />
         {unsafeMessage ? (
-          <div className="document-card mb-4 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">
+          <div className="document-card mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">
             {unsafeMessage}
           </div>
         ) : null}
@@ -252,7 +252,7 @@ export default function AdminPurchaseBillPrintPage() {
           ]}
         />
         {Number(outstanding?.outstanding ?? 0) > 0 ? (
-          <div className="document-card mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+          <div className="document-card mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
             Vendor payable remains outstanding as reported by backend vendor ledger. This print view does not settle payment.
           </div>
         ) : null}
@@ -264,7 +264,7 @@ export default function AdminPurchaseBillPrintPage() {
           ]}
         />
         {bill.notes ? (
-          <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+          <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Notes</div>
             <div className="mt-2 whitespace-pre-line text-xs leading-5 text-[#6f5c46]">{bill.notes}</div>
           </section>

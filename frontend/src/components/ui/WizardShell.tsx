@@ -20,7 +20,7 @@ export default function WizardShell({
   className,
 }: WizardShellProps) {
   return (
-    <div className={cn("rounded-2xl border border-border bg-card p-6 shadow-sm", className)}>
+    <div className={cn("rounded-xl border border-border bg-card p-6 shadow-sm", className)}>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-foreground">{title}</h2>
         <div className="text-sm text-muted-foreground">

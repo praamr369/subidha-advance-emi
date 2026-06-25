@@ -39,19 +39,19 @@ export default function LuckyBatchPreviewPanel({ amendment }: { amendment: Amend
     <DetailPanel title="Lucky ID / Batch Change Preview" description="Read-only preview. Execution is deferred until controlled draw-safe workflow exists.">
       <div className="space-y-4">
         <div className="grid gap-3 text-sm md:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-muted/20 p-3">
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="text-xs font-semibold uppercase text-muted-foreground">Current State</div>
             <div className="mt-2 text-muted-foreground">Batch: <span className="font-medium text-foreground">{displayValue(preview.current_batch_code)}</span></div>
             <div className="mt-1 text-muted-foreground">Lucky Number: <span className="font-medium text-foreground">{displayValue(preview.current_lucky_number)}</span></div>
           </div>
-          <div className="rounded-2xl border border-border bg-muted/20 p-3">
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="text-xs font-semibold uppercase text-muted-foreground">Requested State</div>
             <div className="mt-2 text-muted-foreground">Batch: <span className="font-medium text-foreground">{displayValue(preview.requested_batch_code)}</span></div>
             <div className="mt-1 text-muted-foreground">Lucky Number: <span className="font-medium text-foreground">{displayValue(preview.requested_lucky_number)}</span></div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-muted/20 p-3 text-sm">
+        <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm">
           <div className="font-medium mb-2">Availability & Conflict Status</div>
           <dl className="grid gap-x-4 gap-y-2 md:grid-cols-2">
             <div>
@@ -78,7 +78,7 @@ export default function LuckyBatchPreviewPanel({ amendment }: { amendment: Amend
         </div>
 
         {preview.lifecycle_blocker_reason && (
-          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-3 text-sm">
+          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm">
             <div className="font-medium text-destructive mb-1">Execution Blocked</div>
             <p className="text-destructive/80">{preview.lifecycle_blocker_reason}</p>
           </div>

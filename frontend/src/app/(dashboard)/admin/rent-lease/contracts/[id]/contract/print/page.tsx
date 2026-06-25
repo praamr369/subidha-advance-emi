@@ -303,7 +303,7 @@ export default function AdminRentLeaseContractPrintPage() {
           ]}
         />
 
-        <section className="document-card my-4 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+        <section className="document-card my-4 rounded-xl border border-border bg-card p-4">
           <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">Asset / Product</div>
           <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -326,7 +326,7 @@ export default function AdminRentLeaseContractPrintPage() {
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-          <section className="document-card rounded-2xl border border-[#e6d6bd] bg-white p-4">
+          <section className="document-card rounded-xl border border-border bg-card p-4">
             <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">Commercial Terms</div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
@@ -377,7 +377,7 @@ export default function AdminRentLeaseContractPrintPage() {
           />
         </div>
 
-        <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+        <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
           <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Deposit Liability / Refund Note</div>
           <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -402,7 +402,7 @@ export default function AdminRentLeaseContractPrintPage() {
           </p>
         </section>
 
-        <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+        <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
           <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Return / Handover Condition</div>
           <div className="mt-2 grid gap-4 md:grid-cols-2">
             <div>
@@ -418,7 +418,7 @@ export default function AdminRentLeaseContractPrintPage() {
 
         <DocumentTermsBlock terms={buildContractTerms(subscription, profile)} />
 
-        <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+        <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
           <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Customer Obligations</div>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-[#6f5c46]">
             <li>Pay monthly rent/lease dues and preserve system receipts.</li>
@@ -427,7 +427,7 @@ export default function AdminRentLeaseContractPrintPage() {
           </ul>
         </section>
 
-        <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+        <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
           <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Business Obligations</div>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-[#6f5c46]">
             <li>Maintain auditable contract, billing, receipt, deposit liability, delivery, possession, and return-inspection records.</li>

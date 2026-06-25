@@ -35,7 +35,7 @@ export default function ProductCategoryDiscovery({ categories }: ProductCategory
           categories.slice(0, 8).map((category) => (
             <article key={category.name} className="public-card public-card-animated p-5">
               <div className="flex items-start justify-between gap-3">
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_13%,var(--surface-card-elevated)_87%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_13%,var(--surface-card-elevated)_87%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
                   <Boxes className="h-5 w-5" />
                 </span>
                 <span className="rounded-full border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)] px-3 py-1 text-xs font-semibold text-muted-foreground">

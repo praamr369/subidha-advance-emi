@@ -135,7 +135,7 @@ export default function AdminVendorQuotesPage() {
       ]}
     >
       {submitBanner ? (
-        <div className="rounded-2xl border border-emerald-600/35 bg-emerald-600/10 p-4 text-sm text-foreground">
+        <div className="rounded-xl border border-emerald-600/35 bg-emerald-600/10 p-4 text-sm text-foreground">
           {submitBanner}
         </div>
       ) : null}

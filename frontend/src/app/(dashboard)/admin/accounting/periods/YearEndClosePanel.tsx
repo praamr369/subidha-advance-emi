@@ -176,7 +176,7 @@ export default function YearEndClosePanel({ financialYears, activeFinancialYear,
 
   return (
     <WorkspaceSection title="Year-End Close" description="Controlled admin-only close workflow. Close is blocked until operational accounting blockers are resolved.">
-      <div className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="grid gap-3 md:grid-cols-3">
           <label className="text-sm text-muted-foreground">Selected financial year<select className={accountingFieldClassName()} value={selectedValue} onChange={(event) => setSelectedFinancialYear(event.target.value)}><option value="">Active financial year</option>{financialYears.map((year) => <option key={year.id} value={year.id}>{year.code} {year.is_active ? "(active)" : ""}</option>)}</select></label>
           {metric("Status", readiness?.financial_year?.status ?? "Not ready")}
@@ -204,7 +204,7 @@ export default function YearEndClosePanel({ financialYears, activeFinancialYear,
           <Link href={actionLinks.finance_account_setup || FINANCE_ACCOUNTS_HREF} className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground">Open finance accounts</Link>
         </div>
 
-        <details className="rounded-2xl border border-border bg-background p-3 text-sm">
+        <details className="rounded-xl border border-border bg-background p-3 text-sm">
           <summary className="cursor-pointer font-semibold text-foreground">Open remediation checklist ({steps.filter((step) => !step.ok).length} blocker group(s))</summary>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             {steps.map((step, index) => (

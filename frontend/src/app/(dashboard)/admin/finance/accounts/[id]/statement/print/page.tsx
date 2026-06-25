@@ -109,7 +109,7 @@ export default function AdminFinanceAccountStatementPrintPage() {
       <DocumentPage watermark={account.is_active ? null : "INACTIVE"}>
         <DocumentHeader copyLabel={copyLabel} documentNo={accountRef} documentDate={periodLabel(report)} />
         <DocumentTitleStrip title="FINANCE ACCOUNT STATEMENT" subtitle="Read-only finance account statement generated from existing backend account and cashbook report payloads." status={account.is_active ? "ACTIVE" : "INACTIVE"} />
-        {warn ? <div className="document-card mb-4 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">{warn}</div> : null}
+        {warn ? <div className="document-card mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">{warn}</div> : null}
         <DocumentMetadataGrid
           items={[
             { label: "Finance Account", value: safeDocumentText(account.name) },
@@ -122,7 +122,7 @@ export default function AdminFinanceAccountStatementPrintPage() {
             { label: "Reconciliation Status", value: "—" },
           ]}
         />
-        <section className="document-card my-5 overflow-hidden rounded-2xl border border-[#d9c39c] bg-white">
+        <section className="document-card my-5 overflow-hidden rounded-xl border border-border bg-card">
           <div className="border-b border-[#eadcc6] px-3 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">
             Finance Account Transactions
           </div>

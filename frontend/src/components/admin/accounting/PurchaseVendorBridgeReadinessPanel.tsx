@@ -51,7 +51,7 @@ export default function PurchaseVendorBridgeReadinessPanel({ title, description,
   }, [eventKeys, events]);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting bridge readiness</p>

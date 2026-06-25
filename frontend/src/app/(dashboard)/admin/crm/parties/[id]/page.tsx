@@ -529,7 +529,7 @@ export default function AdminCrmPartyDetailPage() {
                     payload.related.interactions.map((interaction) => (
                       <div
                         key={interaction.id}
-                        className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3"
+                        className="rounded-xl border border-border bg-muted/30 px-4 py-3"
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div>
@@ -617,7 +617,7 @@ export default function AdminCrmPartyDetailPage() {
                         <Link
                           key={`${item.event_type}-${index}`}
                           href={href}
-                          className="block rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 transition hover:-translate-y-0.5 hover:bg-white"
+                          className="block rounded-xl border border-border bg-muted/30 px-4 py-3 transition hover:-translate-y-0.5 hover:bg-white"
                         >
                           {content}
                         </Link>
@@ -627,7 +627,7 @@ export default function AdminCrmPartyDetailPage() {
                     return (
                       <div
                         key={`${item.event_type}-${index}`}
-                        className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3"
+                        className="rounded-xl border border-border bg-muted/30 px-4 py-3"
                       >
                         {content}
                       </div>

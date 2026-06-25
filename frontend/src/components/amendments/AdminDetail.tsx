@@ -87,12 +87,12 @@ function ProductChangePreview({ row }: { row: AmendmentRecord }) {
   return (
     <DetailPanel title="Product reference correction preview" description="Same-price product reference correction only. Financial product change is deferred.">
       <div className="grid gap-3 text-sm md:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-muted/20 p-3">
+        <div className="rounded-xl border border-border bg-muted/20 p-3">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Current product reference</div>
           <div className="mt-2 font-medium">{displayValue(firstValue(oldValues, ["product_name", "old_product_name", "name"]))}</div>
           <div className="mt-1 text-muted-foreground">ID: {displayValue(firstValue(oldValues, ["product_id", "old_product_id"]))}</div>
         </div>
-        <div className="rounded-2xl border border-border bg-muted/20 p-3">
+        <div className="rounded-xl border border-border bg-muted/20 p-3">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Approved corrected product reference</div>
           <div className="mt-2 font-medium">{displayValue(firstValue(nextValues, ["approved_product_name", "target_product_name", "new_product_name", "product_name"]))}</div>
           <div className="mt-1 text-muted-foreground">ID: {displayValue(firstValue(nextValues, ["approved_product_id", "target_product_id", "new_product_id", "product_id"]))}</div>

@@ -340,7 +340,7 @@ export default function AdminCrmFollowUpsPage() {
         {!loading && !error && rows.length > 0 ? (
           <div className="overflow-x-auto rounded-xl border border-border">
             <table className="min-w-full text-sm">
-              <thead className="bg-[var(--surface-muted)]">
+              <thead className="bg-muted/50">
                 <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-4 py-3">Task / Lead</th>
                   <th className="px-4 py-3">Due</th>

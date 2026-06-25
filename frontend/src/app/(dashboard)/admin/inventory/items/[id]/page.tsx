@@ -129,7 +129,7 @@ export default function InventoryItemDetailPage() {
                 Open Product Master
               </Link>
             </div>
-            <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-xs text-muted-foreground">
+            <div className="mt-4 rounded-xl border border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
               Inventory item detail is read-only here. Stock changes must flow through opening stock, adjustments, receipts, or movement workflows.
             </div>
           </ERPSectionShell>

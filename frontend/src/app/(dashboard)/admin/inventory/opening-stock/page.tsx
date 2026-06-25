@@ -884,7 +884,7 @@ export default function InventoryOpeningStockPage() {
           aria-modal
           aria-labelledby="corr-title"
         >
-          <div className="max-w-lg rounded-2xl border border-border bg-background p-6 shadow-lg w-full">
+          <div className="max-w-lg rounded-xl border border-border bg-background p-6 shadow-lg w-full">
             <h2 id="corr-title" className="text-lg font-semibold">
               Correction for opening #{correctionFor.id}
             </h2>

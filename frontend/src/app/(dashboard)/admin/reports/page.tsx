@@ -100,7 +100,7 @@ function PurposeChartCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <h3 className="text-base font-semibold text-foreground">{title}</h3>
       <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
       <div className="mt-5">{children}</div>
@@ -942,7 +942,7 @@ export default function AdminReportsPage() {
               ) : (
                 <div className="space-y-6">
                   {catalog.sections.map((section) => (
-                    <div key={section.id} className="rounded-2xl border border-border bg-card/60 p-4 shadow-sm">
+                    <div key={section.id} className="rounded-xl border border-border bg-card/60 p-4 shadow-sm">
                       <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                         {section.label}
                       </h3>

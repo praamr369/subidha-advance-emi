@@ -177,7 +177,7 @@ export default function DisputesPage() {
       )}
 
       {rows.length > 0 && (
-        <div className="rounded-2xl border border-border overflow-hidden mb-6">
+        <div className="rounded-xl border border-border overflow-hidden mb-6">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
               <tr>
@@ -223,7 +223,7 @@ export default function DisputesPage() {
       {/* Create Dispute Modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-lg shadow-xl">
+          <div className="bg-card rounded-xl border border-border p-6 w-full max-w-lg shadow-xl">
             <h2 className="text-lg font-bold mb-4">New Dispute</h2>
             {formErr && <div className="text-sm text-red-600 mb-3">{formErr}</div>}
             <div className="space-y-3">
@@ -253,7 +253,7 @@ export default function DisputesPage() {
       {/* Manage Dispute Panel */}
       {selected && (
         <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-card rounded-t-2xl sm:rounded-2xl border border-border p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-card rounded-t-2xl sm:rounded-xl border border-border p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between mb-4">
               <div>
                 <div className="text-xs text-muted-foreground font-mono">{selected.dispute_ref}</div>

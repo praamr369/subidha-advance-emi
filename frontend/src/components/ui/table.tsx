@@ -10,9 +10,9 @@ type TableProps = {
 
 export default function Table({ head, body, className }: TableProps) {
   return (
-    <div className="ops-table-scroll max-w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)]">
+    <div className="ops-table-scroll max-w-full rounded-xl border border-border bg-[var(--surface-card-elevated)]">
       <table className={cn("min-w-full border-collapse text-[0.8125rem] leading-snug sm:text-sm", className)}>
-        <thead className="border-b border-border bg-[var(--surface-muted)]">{head}</thead>
+        <thead className="border-b border-border bg-muted/50">{head}</thead>
         <tbody>{body}</tbody>
       </table>
     </div>

@@ -26,7 +26,7 @@ export default function OperatorHint({
   const iconClasses = tone === "warning" ? "text-amber-700 dark:text-amber-400" : "text-sky-700 dark:text-sky-400";
 
   return (
-    <div className={cn("rounded-2xl border px-4 py-3", toneClasses, className)}>
+    <div className={cn("rounded-xl border px-4 py-3", toneClasses, className)}>
       <div className="flex items-start gap-3">
         <Info className={cn("mt-0.5 h-4 w-4 shrink-0", iconClasses)} />
         <div className="min-w-0">

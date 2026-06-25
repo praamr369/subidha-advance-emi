@@ -120,7 +120,7 @@ export default function AdminComplianceKycPage() {
       ]}
     >
       <div className="space-y-6">
-        <section className="rounded-2xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm">
+        <section className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm">
           No paid KYC vendor API, no SMS gateway, and no live Aadhaar auth are required for the current launch path. The operating model stays
           file-based, reviewed, auditable, and reversible.
         </section>
@@ -155,7 +155,7 @@ export default function AdminComplianceKycPage() {
 
         <WorkspaceSection title="Policy surface" description="What stays open, what is gated, and where operators should work next.">
           <div className="grid gap-4 xl:grid-cols-3">
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Always allowed</h3>
               <ul className="mt-3 space-y-2 text-sm text-foreground">
                 {ALWAYS_ALLOWED_ACTIONS.map((action) => (
@@ -163,7 +163,7 @@ export default function AdminComplianceKycPage() {
                 ))}
               </ul>
             </div>
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Gated until KYC is ready</h3>
               <ul className="mt-3 space-y-2 text-sm text-foreground">
                 {GATED_ACTIONS.map((action) => (
@@ -171,7 +171,7 @@ export default function AdminComplianceKycPage() {
                 ))}
               </ul>
             </div>
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Reusable surfaces</h3>
               <div className="mt-3 space-y-2 text-sm">
                 <Link href={ROUTES.admin.crmKyc} className="block rounded-lg border border-border bg-background px-3 py-2 font-medium text-foreground hover:bg-muted">
@@ -195,7 +195,7 @@ export default function AdminComplianceKycPage() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading queue rows...</p>
           ) : queueRows.length ? (
-            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
               <table className="min-w-full divide-y divide-border text-sm">
                 <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -239,7 +239,7 @@ export default function AdminComplianceKycPage() {
               </table>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
+            <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
               No review queue rows are currently available.
             </div>
           )}

@@ -202,7 +202,7 @@ export default function BrochureQuotationsPage() {
           {loading ? <ERPLoadingState label="Loading quotations..." /> : null}
           {!loading && rows.length === 0 ? <ERPEmptyState title="No quotations found" description="Create a draft manually or from a brochure enquiry." /> : null}
           {!loading && rows.length ? (
-            <div className="overflow-x-auto rounded-2xl border border-border">
+            <div className="overflow-x-auto rounded-xl border border-border">
               <table className="min-w-[1150px] divide-y divide-border text-sm">
                 <thead className="bg-muted/60 text-left text-xs uppercase text-muted-foreground"><tr>{["Quotation", "Customer", "Phone", "Type", "Payable now", "Monthly", "Status", "Valid until", "Created", "Actions"].map((heading) => <th key={heading} className="px-3 py-3">{heading}</th>)}</tr></thead>
                 <tbody className="divide-y divide-border bg-card">

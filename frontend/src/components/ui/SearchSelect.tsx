@@ -125,7 +125,7 @@ export default function SearchSelect<T>({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="h-11 w-full rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] py-2 pl-9 pr-10 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] outline-none focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-11 w-full rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[var(--surface-card-elevated)] py-2 pl-9 pr-10 text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] outline-none focus:border-border focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60"
         />
         {value && (
           <button
@@ -155,7 +155,7 @@ export default function SearchSelect<T>({
               onMouseEnter={() => setHighlightIndex(idx)}
               className={cn(
                 "cursor-pointer px-3 py-2 text-sm transition-colors",
-                idx === highlightIndex && "bg-[var(--surface-muted)]"
+                idx === highlightIndex && "bg-muted/50"
               )}
             >
               {getOptionLabel(option)}

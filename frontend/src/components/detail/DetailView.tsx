@@ -74,7 +74,7 @@ export function DetailSection({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-2xl border border-border bg-card p-5 shadow-sm", className)}>
+    <section className={cn("rounded-xl border border-border bg-card p-5 shadow-sm", className)}>
       <div>
         <h2 className="text-base font-semibold text-foreground">{title}</h2>
         {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}

@@ -89,7 +89,7 @@ export default function AdminControlDailyClosePage() {
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-border">
                   <table className="w-full text-sm">
-                    <thead className="bg-[var(--surface-muted)] text-left text-xs uppercase text-muted-foreground">
+                    <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                       <tr>
                         <th className="px-4 py-2">Check</th>
                         <th className="px-4 py-2">Severity</th>
@@ -116,7 +116,7 @@ export default function AdminControlDailyClosePage() {
             ) : (
               <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-sm">
-                  <thead className="bg-[var(--surface-muted)] text-left text-xs uppercase text-muted-foreground">
+                  <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Branch</th>

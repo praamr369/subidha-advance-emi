@@ -217,7 +217,7 @@ export default function AccountingTaxInvoicesPage() {
               ) : (
                 <div className="space-y-3">
                   {invoices.map((invoice) => (
-                    <div key={invoice.id} className="rounded-[1.35rem] border border-white/75 bg-white/75 px-4 py-4">
+                    <div key={invoice.id} className="rounded-xl border border-white/75 bg-white/75 px-4 py-4">
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div>
                           <div className="font-semibold text-foreground">

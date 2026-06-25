@@ -84,7 +84,7 @@ export default function ChartAccountsSetupGuidePage() {
           ) : null}
         </>
       }
-      blockers={error ? <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
+      blockers={error ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
       actions={<BusinessSetupLinks />}
       checklist={
         <div className="space-y-4">

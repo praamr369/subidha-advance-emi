@@ -80,7 +80,7 @@ export default function PODArchivePage() {
       </div>
 
       {/* Year Selection & Export */}
-      <div className="rounded-2xl border border-border bg-card p-4 mb-5">
+      <div className="rounded-xl border border-border bg-card p-4 mb-5">
         <div className="flex items-center gap-3 flex-wrap">
           <div>
             <label className="text-xs text-muted-foreground">Select Year</label>
@@ -118,15 +118,15 @@ export default function PODArchivePage() {
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="text-xs text-muted-foreground">Total POD Records</div>
           <div className="text-lg font-bold mt-1">{count}</div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="text-xs text-muted-foreground">Export Format</div>
           <div className="text-sm font-semibold mt-1">ZIP (JSON + CSV + Images)</div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="text-xs text-muted-foreground">Year Covered</div>
           <div className="text-sm font-semibold mt-1">{year}</div>
         </div>
@@ -141,7 +141,7 @@ export default function PODArchivePage() {
       )}
 
       {pods.length > 0 && (
-        <div className="rounded-2xl border border-border overflow-hidden">
+        <div className="rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
               <tr>
@@ -189,7 +189,7 @@ export default function PODArchivePage() {
       {/* POD Detail Modal */}
       {selectedPOD && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-background rounded-xl p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <div className="font-semibold text-lg">POD #{selectedPOD.pod_id}</div>

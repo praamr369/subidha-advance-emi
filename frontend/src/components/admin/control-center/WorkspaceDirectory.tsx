@@ -57,10 +57,10 @@ export function WorkspaceDirectory({
                 <Link
                   key={`${group.title}:${item.href}:${item.title}`}
                   href={item.href}
-                  className="group rounded-[1.3rem] border border-[color-mix(in_oklab,var(--surface-border-strong)_80%,white_20%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_97%,var(--surface-muted)_3%),color-mix(in_oklab,var(--surface-strong)_84%,var(--surface-muted)_16%))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                  className="group rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_80%,white_20%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_97%,var(--surface-muted)_3%),color-mix(in_oklab,var(--surface-strong)_84%,var(--surface-muted)_16%))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[color-mix(in_oklab,var(--surface-border-strong)_76%,white_24%)] bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+                    <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_76%,white_24%)] bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
                       {item.icon ?? <ArrowUpRight className="h-4 w-4" />}
                     </div>
                     {item.badge ? (

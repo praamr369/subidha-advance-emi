@@ -345,7 +345,7 @@ export default function AccountingMappingAuditPage() {
         {error ? <ErrorState title="Mapping audit failed" description={error} onRetry={() => void load()} /> : null}
         {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping audit remediation</div>
@@ -376,7 +376,7 @@ export default function AccountingMappingAuditPage() {
           <div className="mt-4 rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">Active FY: {String((period.active_financial_year as { code?: string } | undefined)?.code ?? "Missing")} · Current period: {String((period.current_period as { code?: string } | undefined)?.code ?? "Missing")} · Unsupported source is not a mapping problem; implement or enable the source workflow before posting.</div>
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">{FILTERS.map((item) => <button key={item} type="button" onClick={() => setFilter(item)} className={cx("rounded-full border px-3 py-1.5 text-xs font-semibold", filter === item ? "border-foreground bg-foreground text-background" : "border-border bg-background text-foreground")}>{item}</button>)}</div>
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search event, source, profile key" className="min-h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-foreground lg:w-96" />
@@ -420,9 +420,9 @@ export default function AccountingMappingAuditPage() {
           );
         })}
 
-        <details className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <details className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <summary className="cursor-pointer text-base font-semibold text-foreground">Advanced raw mapping evidence</summary>
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-border bg-background shadow-sm">
+          <div className="mt-4 overflow-x-auto rounded-xl border border-border bg-background shadow-sm">
             <table className="min-w-full divide-y divide-border text-sm">
               <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Event</th><th className="px-4 py-3">Source</th><th className="px-4 py-3">Debit</th><th className="px-4 py-3">Credit</th><th className="px-4 py-3">Finance</th><th className="px-4 py-3">Numbering</th><th className="px-4 py-3">Period</th><th className="px-4 py-3">Status</th></tr></thead>
               <tbody className="divide-y divide-border">

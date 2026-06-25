@@ -408,7 +408,7 @@ export default function AdminSupportRequestDetailPage() {
             ) : null}
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="text-base font-semibold text-foreground">Submitted Request Context</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Customer-facing issue details captured from the self-service support flow.
@@ -464,7 +464,7 @@ export default function AdminSupportRequestDetailPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="text-base font-semibold text-foreground">Triage Workflow State</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Assign ownership and move the request through the narrow support workflow.
@@ -587,7 +587,7 @@ export default function AdminSupportRequestDetailPage() {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="text-base font-semibold text-foreground">Internal Notes</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Keep working notes inside the request. Changes are explicit and auditable.
@@ -633,7 +633,7 @@ export default function AdminSupportRequestDetailPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="text-base font-semibold text-foreground">Resolution</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Close the request with an explicit resolution summary. This records closure metadata and audit events together.
@@ -678,7 +678,7 @@ export default function AdminSupportRequestDetailPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="text-base font-semibold text-foreground">Audit Timeline</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Request creation, triage changes, and resolution history are tracked here.

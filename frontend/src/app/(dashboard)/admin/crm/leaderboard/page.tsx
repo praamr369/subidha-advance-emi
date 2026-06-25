@@ -124,7 +124,7 @@ export default function LeaderboardPage() {
         </div>
 
         {showTargetForm && (
-          <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] p-4 space-y-3 max-w-lg">
+          <div className="mt-4 rounded-xl border border-border bg-muted/50 p-4 space-y-3 max-w-lg">
             <div className="text-xs font-semibold text-foreground">Set Monthly Target</div>
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -181,7 +181,7 @@ export default function LeaderboardPage() {
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="min-w-full text-sm">
-                  <thead className="bg-[var(--surface-muted)]">
+                  <thead className="bg-muted/50">
                     <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                       <th className="px-4 py-3">Rank</th>
                       <th className="px-4 py-3">Staff</th>
@@ -230,7 +230,7 @@ export default function LeaderboardPage() {
             <ERPSectionShell title="Monthly Targets" description={`${targets.length} target(s) set for ${MONTHS[month - 1]} ${year}`}>
               <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="min-w-full text-sm">
-                  <thead className="bg-[var(--surface-muted)]">
+                  <thead className="bg-muted/50">
                     <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                       <th className="px-4 py-3">Staff</th>
                       <th className="px-4 py-3 text-right">Target Leads</th>

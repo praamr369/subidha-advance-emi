@@ -62,7 +62,7 @@ export default function AdminSettingsFinancePage() {
       ]}
       actions={[{ href: ROUTES.admin.settings, label: "Settings Home", variant: "secondary" }]}
     >
-      <div className="mb-4 rounded-2xl border border-border bg-muted/40 p-4 text-sm">
+      <div className="mb-4 rounded-xl border border-border bg-muted/40 p-4 text-sm">
         Current tax mode:{" "}
         <span className="font-medium">
           {taxMode === "GST_UNREGISTERED" ? "GST Unregistered (Commercial Invoice / Non-GST)" : taxMode}
@@ -73,7 +73,7 @@ export default function AdminSettingsFinancePage() {
           <Link
             key={item.title}
             href={item.href}
-            className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+            className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
           >
             <div className="text-base font-semibold text-card-foreground">{item.title}</div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>

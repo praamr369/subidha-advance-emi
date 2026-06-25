@@ -110,7 +110,7 @@ export default function DirectSaleInvoicePrintPage() {
   if (error || !sale) {
     return (
       <div className="p-8">
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error || "Direct sale not found."}
         </div>
       </div>
@@ -185,7 +185,7 @@ export default function DirectSaleInvoicePrintPage() {
           ]}
         />
         {Number(sale.balance_total || 0) > 0 ? (
-          <div className="document-card mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+          <div className="document-card mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
             Outstanding balance remains collectible. This print view does not settle payment or alter receivables.
           </div>
         ) : null}

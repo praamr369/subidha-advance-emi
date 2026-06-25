@@ -108,7 +108,7 @@ export function DocumentHeader({ copyLabel, documentNo, documentDate }: { copyLa
       <div className="flex items-start justify-between gap-6">
         <div className="flex items-start gap-4">
           {theme.showLogo ? (
-            <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-[#d9c39c] bg-white text-xl font-black text-[#7b4c1f]">
+            <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-border bg-card text-xl font-black text-[#7b4c1f]">
               {theme.logoPath ? (
                 <Image
                   src={theme.logoPath}
@@ -133,7 +133,7 @@ export function DocumentHeader({ copyLabel, documentNo, documentDate }: { copyLa
             </div>
           </div>
         </div>
-        <div className="min-w-[190px] rounded-2xl border border-[#d9c39c] bg-white p-4 text-right">
+        <div className="min-w-[190px] rounded-xl border border-border bg-card p-4 text-right">
           <div className="inline-flex rounded-full border border-[#c99a47] bg-[#fff2cf] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#6f4e27]">{copyLabel}</div>
           <div className="mt-3 text-xs uppercase text-[#7c6a56]">Document No.</div>
           <div className="font-bold text-[#2f2418]">{safeDocumentText(documentNo)}</div>
@@ -146,23 +146,23 @@ export function DocumentHeader({ copyLabel, documentNo, documentDate }: { copyLa
 }
 
 export function DocumentTitleStrip({ title, subtitle, status }: { title: string; subtitle?: string; status?: string | null }) {
-  return <div className="document-no-break my-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#6f4e27] bg-[#6f4e27] px-5 py-4 text-white"><div><h1 className="text-xl font-black uppercase tracking-[0.16em]">{title}</h1>{subtitle ? <p className="mt-1 text-sm text-white/90">{subtitle}</p> : null}</div>{status ? <span className="rounded-full border border-white/40 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wide">{status}</span> : null}</div>;
+  return <div className="document-no-break my-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#6f4e27] bg-[#6f4e27] px-5 py-4 text-white"><div><h1 className="text-xl font-black uppercase tracking-[0.16em]">{title}</h1>{subtitle ? <p className="mt-1 text-sm text-white/90">{subtitle}</p> : null}</div>{status ? <span className="rounded-full border border-white/40 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wide">{status}</span> : null}</div>;
 }
 
 export function DocumentMetadataGrid({ items }: { items: MetadataItem[] }) {
-  return <section className="document-card grid gap-3 rounded-2xl border border-[#e6d6bd] bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">{items.map((item) => <div key={item.label}><div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">{item.label}</div><div className="mt-1 text-sm font-semibold text-[#2f2418]">{item.value || "—"}</div></div>)}</section>;
+  return <section className="document-card grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">{items.map((item) => <div key={item.label}><div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a7255]">{item.label}</div><div className="mt-1 text-sm font-semibold text-[#2f2418]">{item.value || "—"}</div></div>)}</section>;
 }
 
 export function DocumentPartyPanel({ parties }: { parties: PartyPanel[] }) {
-  return <section className="my-4 grid gap-4 md:grid-cols-2">{parties.map((party) => <div key={party.title} className="document-card rounded-2xl border border-[#e6d6bd] bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">{party.title}</div><div className="mt-2 text-base font-bold text-[#2f2418]">{safeDocumentText(party.name)}</div><div className="mt-1 text-sm text-[#6f5c46]">{safeDocumentText(party.phone)}</div>{party.email ? <div className="text-sm text-[#6f5c46]">{party.email}</div> : null}{party.address ? <div className="mt-2 whitespace-pre-line text-sm leading-5 text-[#6f5c46]">{party.address}</div> : null}{party.gstin ? <div className="mt-2 text-xs font-semibold text-[#6f4e27]">GSTIN: {party.gstin}</div> : null}</div>)}</section>;
+  return <section className="my-4 grid gap-4 md:grid-cols-2">{parties.map((party) => <div key={party.title} className="document-card rounded-xl border border-border bg-card p-4"><div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">{party.title}</div><div className="mt-2 text-base font-bold text-[#2f2418]">{safeDocumentText(party.name)}</div><div className="mt-1 text-sm text-[#6f5c46]">{safeDocumentText(party.phone)}</div>{party.email ? <div className="text-sm text-[#6f5c46]">{party.email}</div> : null}{party.address ? <div className="mt-2 whitespace-pre-line text-sm leading-5 text-[#6f5c46]">{party.address}</div> : null}{party.gstin ? <div className="mt-2 text-xs font-semibold text-[#6f4e27]">GSTIN: {party.gstin}</div> : null}</div>)}</section>;
 }
 
 export function DocumentLineItemsTable({ items }: { items: DocumentLineItem[] }) {
-  return <section className="document-card my-4 overflow-hidden rounded-2xl border border-[#d9c39c] bg-white"><table className="w-full border-collapse text-sm"><thead><tr className="bg-[#f0dfbd] text-left text-[11px] uppercase tracking-[0.1em] text-[#5e3818]"><th className="px-3 py-3">Item</th><th className="px-3 py-3 text-right">Qty</th><th className="px-3 py-3 text-right">Rate</th><th className="px-3 py-3 text-right">Discount</th><th className="px-3 py-3 text-right">Tax</th><th className="px-3 py-3 text-right">Total</th></tr></thead><tbody>{items.map((item) => <tr key={item.key} className="border-t border-[#eadcc6] align-top"><td className="px-3 py-3"><div className="font-semibold text-[#2f2418]">{item.description}</div>{item.code ? <div className="mt-1 text-xs text-[#7c6a56]">{item.code}</div> : null}</td><td className="px-3 py-3 text-right">{item.quantity || "—"}</td><td className="px-3 py-3 text-right">{item.rate || "—"}</td><td className="px-3 py-3 text-right">{item.discount || "—"}</td><td className="px-3 py-3 text-right">{item.tax || "—"}</td><td className="px-3 py-3 text-right font-bold">{item.total || "—"}</td></tr>)}</tbody></table></section>;
+  return <section className="document-card my-4 overflow-hidden rounded-xl border border-border bg-card"><table className="w-full border-collapse text-sm"><thead><tr className="bg-[#f0dfbd] text-left text-[11px] uppercase tracking-[0.1em] text-[#5e3818]"><th className="px-3 py-3">Item</th><th className="px-3 py-3 text-right">Qty</th><th className="px-3 py-3 text-right">Rate</th><th className="px-3 py-3 text-right">Discount</th><th className="px-3 py-3 text-right">Tax</th><th className="px-3 py-3 text-right">Total</th></tr></thead><tbody>{items.map((item) => <tr key={item.key} className="border-t border-[#eadcc6] align-top"><td className="px-3 py-3"><div className="font-semibold text-[#2f2418]">{item.description}</div>{item.code ? <div className="mt-1 text-xs text-[#7c6a56]">{item.code}</div> : null}</td><td className="px-3 py-3 text-right">{item.quantity || "—"}</td><td className="px-3 py-3 text-right">{item.rate || "—"}</td><td className="px-3 py-3 text-right">{item.discount || "—"}</td><td className="px-3 py-3 text-right">{item.tax || "—"}</td><td className="px-3 py-3 text-right font-bold">{item.total || "—"}</td></tr>)}</tbody></table></section>;
 }
 
 export function DocumentAmountSummary({ rows }: { rows: AmountRow[] }) {
-  return <section className="document-amount-summary document-card ml-auto w-full max-w-sm rounded-2xl border border-[#d9c39c] bg-white p-4">{rows.map((row) => <div key={row.label} className={`flex items-center justify-between border-b border-[#eadcc6] py-2 last:border-0 ${row.strong ? "text-base font-black" : "text-sm"} ${row.danger ? "text-red-700" : "text-[#2f2418]"}`}><span>{row.label}</span><span>{row.value}</span></div>)}</section>;
+  return <section className="document-amount-summary document-card ml-auto w-full max-w-sm rounded-xl border border-border bg-card p-4">{rows.map((row) => <div key={row.label} className={`flex items-center justify-between border-b border-[#eadcc6] py-2 last:border-0 ${row.strong ? "text-base font-black" : "text-sm"} ${row.danger ? "text-red-700" : "text-[#2f2418]"}`}><span>{row.label}</span><span>{row.value}</span></div>)}</section>;
 }
 
 export function DocumentTermsBlock({ terms, termsKey }: { terms?: string[]; termsKey?: DocumentTermsKey }) {
@@ -173,7 +173,7 @@ export function DocumentTermsBlock({ terms, termsKey }: { terms?: string[]; term
     if (terms?.length) return terms;
     return theme.defaultTerms;
   }, [terms, termsKey, theme]);
-  return <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-[#fff6e4] p-4"><div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Terms & Notes</div><ol className="mt-2 list-decimal space-y-1 pl-5 text-xs leading-5 text-[#6f5c46]">{finalTerms.map((term) => <li key={term}>{term}</li>)}</ol></section>;
+  return <section className="document-card my-5 rounded-xl border border-[#e6d6bd] bg-[#fff6e4] p-4"><div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Terms & Notes</div><ol className="mt-2 list-decimal space-y-1 pl-5 text-xs leading-5 text-[#6f5c46]">{finalTerms.map((term) => <li key={term}>{term}</li>)}</ol></section>;
 }
 
 export function DocumentSignatureBlock({ labels }: { labels: string[] }) {

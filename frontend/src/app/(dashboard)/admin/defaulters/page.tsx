@@ -415,7 +415,7 @@ export default function DefaultersPage() {
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border">
             <table className="min-w-full text-sm">
-              <thead className="bg-[var(--surface-muted)]">
+              <thead className="bg-muted/50">
                 <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-4 py-3">Customer</th>
                   <th className="px-4 py-3">Contract</th>
@@ -461,7 +461,7 @@ export default function DefaultersPage() {
 
       {/* Bulk escalate panel */}
       {!loading && !error && tab === "recovery" && (
-        <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+        <div className="mb-4 rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className="text-sm font-semibold">Auto-Escalate Cases</div>
@@ -525,7 +525,7 @@ export default function DefaultersPage() {
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border">
             <table className="min-w-full text-sm">
-              <thead className="bg-[var(--surface-muted)]">
+              <thead className="bg-muted/50">
                 <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-4 py-3">Customer</th>
                   <th className="px-4 py-3">Contract</th>

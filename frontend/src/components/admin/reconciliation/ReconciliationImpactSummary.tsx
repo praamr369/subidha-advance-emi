@@ -18,7 +18,7 @@ export default function ReconciliationImpactSummary({ item }: { item: Reconcilia
   if (!hasAmount) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-3 rounded-2xl border border-border/70 bg-[var(--surface-card-elevated)] p-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 rounded-xl border border-border/70 bg-[var(--surface-card-elevated)] p-4 sm:grid-cols-3">
       <div>
         <div className="text-xs font-semibold text-muted-foreground">Expected</div>
         <div className="mt-1 text-sm font-semibold">{formatMoney(item.expected_amount)}</div>

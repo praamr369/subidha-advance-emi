@@ -95,7 +95,7 @@ export function WorkspaceNotice({
         <div className="flex min-w-0 items-start gap-3">
           <div
             className={cn(
-              "mt-0.5 rounded-2xl border p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]",
+              "mt-0.5 rounded-xl border p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]",
               styles.icon
             )}
           >
@@ -145,13 +145,13 @@ export function WorkspaceTimeline({
     <ol className={cn("space-y-4", className)}>
       {items.map((item, index) => (
         <li key={item.id} className="relative pl-8">
-          <span className="absolute left-0 top-0 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--surface-border-strong)] bg-[var(--surface-card-elevated)] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+          <span className="absolute left-0 top-0 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-[var(--surface-card-elevated)] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
             <Dot className="h-5 w-5" />
           </span>
           {index < items.length - 1 ? (
             <span className="absolute left-3 top-6 h-[calc(100%-0.25rem)] w-px bg-[color-mix(in_oklab,var(--surface-border-strong)_82%,transparent)]" />
           ) : null}
-          <div className="rounded-[1.35rem] border border-[color-mix(in_oklab,var(--surface-border-strong)_82%,white_18%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] px-4 py-4 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.32)]">
+          <div className="rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_82%,white_18%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] px-4 py-4 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.32)]">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

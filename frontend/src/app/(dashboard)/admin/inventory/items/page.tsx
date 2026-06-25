@@ -222,7 +222,7 @@ export default function InventoryItemsPage() {
           is now available as a read-only drill-down. No stock movement,
           valuation, or ledger row is created from page load — quantities are
           read from the stock-on-hand and ledger views. */}
-      <section className="rounded-2xl border border-border bg-muted/30 p-5">
+      <section className="rounded-xl border border-border bg-muted/30 p-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Inventory & Stock · Stock source workflow
         </p>
@@ -415,7 +415,7 @@ export default function InventoryItemsPage() {
             </div>
 
             <div className="grid gap-3 md:grid-cols-5">
-              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">
+              <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground">
                 <input
                   type="checkbox"
                   checked={form.stock_tracking_enabled}
@@ -430,7 +430,7 @@ export default function InventoryItemsPage() {
                 />
                 Stock tracking enabled
               </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">
+              <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground">
                 <input
                   type="checkbox"
                   checked={form.delivery_stock_bridge_enabled}
@@ -445,7 +445,7 @@ export default function InventoryItemsPage() {
                 />
                 Delivery bridge enabled
               </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">
+              <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground">
                 <input
                   type="checkbox"
                   checked={form.lot_tracking_enabled}
@@ -460,7 +460,7 @@ export default function InventoryItemsPage() {
                 />
                 Lot tracking enabled
               </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">
+              <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground">
                 <input
                   type="checkbox"
                   checked={form.expiry_tracking_enabled}
@@ -475,7 +475,7 @@ export default function InventoryItemsPage() {
                 />
                 Expiry tracking enabled
               </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">
+              <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground">
                 <input
                   type="checkbox"
                   checked={form.is_active}

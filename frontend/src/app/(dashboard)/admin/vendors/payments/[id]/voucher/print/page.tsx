@@ -211,7 +211,7 @@ export default function AdminVendorPaymentVoucherPrintPage() {
         <DocumentHeader copyLabel={copyLabel} documentNo={payment.payment_no || `Vendor Payment ${payment.id}`} documentDate={formatDocumentDate(payment.payment_date)} />
         <DocumentTitleStrip title="VENDOR PAYMENT VOUCHER" subtitle="Read-only payment voucher generated from existing vendor payment records." status={status} />
         {unsafeMessage ? (
-          <div className="document-card mb-4 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">
+          <div className="document-card mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">
             {unsafeMessage}
           </div>
         ) : null}
@@ -263,7 +263,7 @@ export default function AdminVendorPaymentVoucherPrintPage() {
           ]}
         />
         {payment.notes ? (
-          <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+          <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Notes</div>
             <div className="mt-2 whitespace-pre-line text-xs leading-5 text-[#6f5c46]">{payment.notes}</div>
           </section>

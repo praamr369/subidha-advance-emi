@@ -32,7 +32,7 @@ const getToneStyles = (tone: Tone) => {
     case "info":
       return "border-[var(--semantic-info-border)] bg-[var(--semantic-info-bg)] focus-within:border-primary focus-within:ring-[var(--ring)]/40";
     default:
-      return "border-border bg-[var(--surface-card-elevated)] focus-within:border-[var(--surface-border-strong)] focus-within:ring-[var(--ring)]/35";
+      return "border-border bg-[var(--surface-card-elevated)] focus-within:border-border focus-within:ring-[var(--ring)]/35";
   }
 };
 
@@ -85,12 +85,12 @@ export default function FormField({
         className={cn(
           "flex items-stretch rounded-xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition focus-within:ring-2",
           getToneStyles(effectiveTone),
-          (disabled || readOnly) && "bg-[var(--surface-muted)] opacity-85",
+          (disabled || readOnly) && "bg-muted/50 opacity-85",
           direction === "row" && "flex-row"
         )}
       >
         {prefix && (
-          <div className="flex items-center border-r border-border bg-[var(--surface-muted)] px-3 text-muted-foreground">
+          <div className="flex items-center border-r border-border bg-muted/50 px-3 text-muted-foreground">
             {prefix}
           </div>
         )}
@@ -98,7 +98,7 @@ export default function FormField({
           {decoratedChildren}
         </div>
         {suffix && (
-          <div className="flex items-center border-l border-border bg-[var(--surface-muted)] px-3 text-muted-foreground">
+          <div className="flex items-center border-l border-border bg-muted/50 px-3 text-muted-foreground">
             {suffix}
           </div>
         )}

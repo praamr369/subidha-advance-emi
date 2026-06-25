@@ -67,7 +67,7 @@ export default function FinanceAccountMappingPanel({
   const repairableAccounts = financeAccounts.filter(canRepairCollectionMapping);
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-foreground">Business Finance Accounts</div>

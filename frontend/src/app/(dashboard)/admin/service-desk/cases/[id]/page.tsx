@@ -314,7 +314,7 @@ export default function AdminServiceDeskCaseDetailPage() {
                   <DetailItem label="Assigned To" value={serviceCase.assigned_to_username || "Unassigned"} />
                   <DetailItem label="Created" value={formatDateTime(serviceCase.created_at)} />
                 </div>
-                <div className="mt-4 rounded-2xl border border-border bg-background p-4 text-sm text-foreground">
+                <div className="mt-4 rounded-xl border border-border bg-background p-4 text-sm text-foreground">
                   {serviceCase.issue_details || "No extended issue details recorded."}
                 </div>
               </ERPSectionShell>
@@ -431,7 +431,7 @@ export default function AdminServiceDeskCaseDetailPage() {
                   serviceCase.lines.map((line, index) => (
                     <div
                       key={line.id || index}
-                      className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3"
+                      className="rounded-xl border border-border bg-muted/30 px-4 py-3"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div>
@@ -503,7 +503,7 @@ export default function AdminServiceDeskCaseDetailPage() {
               >
                 <div className="grid gap-4">
                   {serviceCase.delivery ? (
-                    <div className="rounded-2xl border border-border bg-background p-4">
+                    <div className="rounded-xl border border-border bg-background p-4">
                       <div className="text-sm font-medium text-foreground">Delivery Return Bridge</div>
                       <label className="mt-3 grid gap-2 text-sm">
                         <span>Notes</span>
@@ -562,7 +562,7 @@ export default function AdminServiceDeskCaseDetailPage() {
                   ) : null}
 
                   {serviceCase.case_type === "EXCHANGE" ? (
-                    <div className="rounded-2xl border border-border bg-background p-4">
+                    <div className="rounded-xl border border-border bg-background p-4">
                       <div className="text-sm font-medium text-foreground">Replacement Sale Link</div>
                       <label className="mt-3 grid gap-2 text-sm">
                         <span>Replacement Direct Sale ID</span>

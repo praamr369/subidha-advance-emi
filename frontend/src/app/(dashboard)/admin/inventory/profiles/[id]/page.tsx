@@ -149,7 +149,7 @@ export default function InventoryProfileDetailPage() {
                 View Manufacturing/BOM
               </Link>
             </div>
-            <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-xs text-muted-foreground">
+            <div className="mt-4 rounded-xl border border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
               Stock quantity is not editable on this page by design. Use controlled stock flows for auditable quantity changes.
             </div>
           </ERPSectionShell>

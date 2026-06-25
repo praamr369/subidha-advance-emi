@@ -10,12 +10,12 @@ type AiSafetyBannerProps = {
 export default function AiSafetyBanner({ disabled = false }: AiSafetyBannerProps) {
   return (
     <section
-      className="rounded-[1.35rem] border border-amber-200/90 bg-amber-50/90 p-4 text-amber-950 shadow-[0_16px_36px_-30px_rgba(146,64,14,0.5)]"
+      className="rounded-xl border border-amber-200/90 bg-amber-50/90 p-4 text-amber-950 shadow-[0_16px_36px_-30px_rgba(146,64,14,0.5)]"
       aria-live={disabled ? "polite" : undefined}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="rounded-2xl border border-amber-200 bg-white/80 p-2 text-amber-800">
+          <span className="rounded-xl border border-amber-200 bg-white/80 p-2 text-amber-800">
             <AlertTriangle className="h-4 w-4" />
           </span>
           <div className="min-w-0">

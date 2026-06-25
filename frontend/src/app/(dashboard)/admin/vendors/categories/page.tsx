@@ -66,7 +66,7 @@ export default function AdminVendorCategoriesPage() {
               {rows.map((row, idx) => (
                 <div
                   key={idx}
-                  className="rounded-2xl border border-border/60 bg-[color-mix(in_oklab,var(--surface-muted)_40%,transparent)] px-3 py-2"
+                  className="rounded-xl border border-border bg-muted/40 px-3 py-2"
                 >
                   <div className="text-sm font-semibold text-foreground">
                     {String(row.code)} <span className="text-muted-foreground">·</span> {String(row.name)}

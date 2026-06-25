@@ -42,7 +42,7 @@ export default function PageHeader({
                 ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
                 : helperTone === "info"
                   ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
-                  : "border-border bg-[var(--surface-muted)] text-foreground"
+                  : "border-border bg-muted/50 text-foreground"
             )}
           >
             {helperNote}

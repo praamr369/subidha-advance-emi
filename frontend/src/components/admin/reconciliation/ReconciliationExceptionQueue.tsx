@@ -26,7 +26,7 @@ export default function ReconciliationExceptionQueue({ items }: { items: Reconci
       body={
         <>
           {items.map((row) => (
-            <tr key={row.id} className="border-b border-border/60 last:border-b-0 hover:bg-[var(--surface-muted)]">
+            <tr key={row.id} className="border-b border-border/60 last:border-b-0 hover:bg-muted/50">
               <td className="px-4 py-3">
                 <ReconciliationSeverityBadge severity={row.severity} />
               </td>

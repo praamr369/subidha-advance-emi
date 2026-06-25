@@ -68,7 +68,7 @@ function attentionConfig(
   }
   return {
     label: "Normal",
-    className: "border border-border bg-[var(--surface-muted)] text-foreground shadow-[var(--badge-inset-highlight)]",
+    className: "border border-border bg-muted/50 text-foreground shadow-[var(--badge-inset-highlight)]",
     Icon: CircleDot,
   };
 }
@@ -92,7 +92,7 @@ function IconAction({
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+        "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
       )}
     >
       {children}
@@ -136,7 +136,7 @@ export default function WidgetShell({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {icon ? (
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
                 {icon}
               </span>
             ) : null}
@@ -181,7 +181,7 @@ export default function WidgetShell({
               href={openHref}
               aria-label="Open module"
               title="Open module"
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-[var(--surface-strong)] px-3 text-xs font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50"
             >
               Open
               <ArrowUpRight className="h-3.5 w-3.5" />

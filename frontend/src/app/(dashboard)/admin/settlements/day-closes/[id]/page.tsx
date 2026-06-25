@@ -214,7 +214,7 @@ export default function AdminDayCloseDetailPage() {
 
       <ERPSectionShell title="Decision" description="Approve or reject SUBMITTED records only. Rejection requires a note.">
         {!canDecide ? (
-          <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3 text-sm text-muted-foreground">
+          <div className="rounded-xl border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
             This record is <span className="font-semibold">{record.status}</span>. Only <span className="font-semibold">SUBMITTED</span> records can be approved/rejected.
           </div>
         ) : null}

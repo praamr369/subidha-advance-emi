@@ -266,14 +266,14 @@ export default function AccountingVendorsPage() {
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-2xl border border-border bg-background p-4 shadow-sm">
+                <div className="rounded-xl border border-border bg-background p-4 shadow-sm">
                   <h3 className="text-sm font-semibold text-foreground">Recent purchase bills</h3>
                   <div className="mt-3 space-y-3">
                     {summary.purchase_bills.rows.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No purchase bills posted for this vendor yet.</p>
                     ) : (
                       summary.purchase_bills.rows.slice(0, 4).map((bill) => (
-                        <div key={bill.id} className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-3">
+                        <div key={bill.id} className="rounded-xl border border-border bg-muted/50 px-3 py-3">
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <div className="text-sm font-semibold text-foreground">{bill.bill_no}</div>
@@ -290,14 +290,14 @@ export default function AccountingVendorsPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-background p-4 shadow-sm">
+                <div className="rounded-xl border border-border bg-background p-4 shadow-sm">
                   <h3 className="text-sm font-semibold text-foreground">Recent settlements</h3>
                   <div className="mt-3 space-y-3">
                     {summary.settlements.rows.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No settlement history recorded for this vendor yet.</p>
                     ) : (
                       summary.settlements.rows.slice(0, 4).map((settlement) => (
-                        <div key={settlement.id} className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-3">
+                        <div key={settlement.id} className="rounded-xl border border-border bg-muted/50 px-3 py-3">
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <div className="text-sm font-semibold text-foreground">{settlement.settlement_no}</div>
@@ -315,14 +315,14 @@ export default function AccountingVendorsPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-border bg-background p-4 shadow-sm">
+              <div className="rounded-xl border border-border bg-background p-4 shadow-sm">
                 <h3 className="text-sm font-semibold text-foreground">Timeline</h3>
                 <div className="mt-3 space-y-3">
                   {summary.timeline.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No purchase or settlement timeline entries available yet.</p>
                   ) : (
                     summary.timeline.slice(0, 6).map((entry) => (
-                      <div key={`${entry.kind}-${entry.reference_no}-${entry.date}`} className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-3">
+                      <div key={`${entry.kind}-${entry.reference_no}-${entry.date}`} className="rounded-xl border border-border bg-muted/50 px-3 py-3">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <div className="text-sm font-semibold text-foreground">{entry.reference_no}</div>

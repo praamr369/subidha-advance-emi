@@ -12,7 +12,7 @@ import { ROUTES } from "@/lib/routes";
 const productCategoryLinks = ["Sofas", "Beds", "Wardrobes", "Dining sets", "Refrigerators", "Washing machines", "TV & electronics", "Kitchen appliances"];
 
 const footerLinkClassName =
-  "inline-flex min-h-10 items-center rounded-xl px-3 py-2 text-muted-foreground transition hover:bg-[var(--surface-muted)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2";
+  "inline-flex min-h-10 items-center rounded-xl px-3 py-2 text-muted-foreground transition hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2";
 
 export default async function PublicFooter() {
   const [profile, locale] = await Promise.all([getResolvedPublicBusinessProfile(), getPublicLocale()]);
@@ -101,7 +101,7 @@ export default async function PublicFooter() {
             {profile.business_hours ? <div className="public-card-sm break-words px-3 py-2">Hours: {profile.business_hours}</div> : null}
             {profile.address_text ? <div className="public-card-sm break-words px-3 py-2">Address: {profile.address_text}</div> : null}
             {profile.resolved_whatsapp_link ? (
-              <Link href={profile.resolved_whatsapp_link} className="public-card-sm inline-flex min-h-10 items-center px-3 py-2 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:hover:bg-[var(--surface-muted)]">
+              <Link href={profile.resolved_whatsapp_link} className="public-card-sm inline-flex min-h-10 items-center px-3 py-2 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:hover:bg-muted/50">
                 {dictionary.footer.whatsapp}
               </Link>
             ) : null}

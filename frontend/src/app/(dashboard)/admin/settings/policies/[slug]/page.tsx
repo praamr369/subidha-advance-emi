@@ -175,23 +175,23 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
         }
       />
 
-      <section className="rounded-2xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
+      <section className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
         Public policies become customer-visible only after PUBLISHED. Internal policies must use Accept internal policy and are never public.
       </section>
 
-      {message ? <section className="rounded-2xl border border-emerald-300/70 bg-emerald-50/90 p-4 text-sm text-emerald-900 shadow-sm">{message}</section> : null}
-      {error ? <section className="rounded-2xl border border-red-300/70 bg-red-50/90 p-4 text-sm text-red-900 shadow-sm">{error}</section> : null}
+      {message ? <section className="rounded-xl border border-emerald-300/70 bg-emerald-50/90 p-4 text-sm text-emerald-900 shadow-sm">{message}</section> : null}
+      {error ? <section className="rounded-xl border border-red-300/70 bg-red-50/90 p-4 text-sm text-red-900 shadow-sm">{error}</section> : null}
 
       {loading ? (
-        <section className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">Loading policy...</section>
+        <section className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">Loading policy...</section>
       ) : !policy ? (
-        <section className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
+        <section className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
           No policy found for slug <strong>{slug}</strong>.
           <div className="mt-3"><Link href={ROUTES.admin.settingsPolicies} className="text-primary underline">Back to policy list</Link></div>
         </section>
       ) : (
         <>
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span className={badgeClass(lifecycleTone(policy.status))}>Lifecycle: {policy.status}</span>
               <span className={badgeClass(visibilityTone(policy.visibility))}>Visibility: {policy.visibility || "PUBLIC"}</span>
@@ -201,7 +201,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
             </div>
 
             <div className="mt-5 grid gap-4 lg:grid-cols-3">
-              <div className="rounded-2xl border border-border bg-background p-4">
+              <div className="rounded-xl border border-border bg-background p-4">
                 <h2 className="text-sm font-semibold text-foreground">Governance metadata</h2>
                 <dl className="mt-3 space-y-2 text-xs text-muted-foreground">
                   <div><dt className="font-semibold text-foreground">Governance category</dt><dd>{policy.governance_category || policy.category}</dd></div>
@@ -212,7 +212,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
                 </dl>
               </div>
 
-              <div className="rounded-2xl border border-border bg-background p-4">
+              <div className="rounded-xl border border-border bg-background p-4">
                 <h2 className="text-sm font-semibold text-foreground">Review trail</h2>
                 <dl className="mt-3 space-y-2 text-xs text-muted-foreground">
                   <div><dt className="font-semibold text-foreground">Reviewer</dt><dd>{policy.reviewer_username || "Not assigned"}</dd></div>
@@ -223,7 +223,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
                 </dl>
               </div>
 
-              <div className="rounded-2xl border border-border bg-background p-4">
+              <div className="rounded-xl border border-border bg-background p-4">
                 <h2 className="text-sm font-semibold text-foreground">Publication / internal state</h2>
                 <dl className="mt-3 space-y-2 text-xs text-muted-foreground">
                   <div><dt className="font-semibold text-foreground">Published by</dt><dd>{policy.published_by_username || "Not published"}</dd></div>
@@ -236,7 +236,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-base font-semibold text-foreground">Policy text</h2>
             <div className="mt-4 grid gap-3">
               <input value={policy.title} onChange={(event) => setPolicy((current) => (current ? { ...current, title: event.target.value } : current))} className="rounded-xl border border-input bg-background px-3 py-2 text-sm" disabled={isContentLocked} />
@@ -246,7 +246,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
             {isContentLocked ? <p className="mt-3 text-xs text-muted-foreground">Approved, published, and archived rows are content-locked. Create a new draft version before editing legal text.</p> : null}
           </section>
 
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-base font-semibold text-foreground">Lifecycle actions</h2>
             <p className="mt-1 text-sm text-muted-foreground">Actions are enabled only when the backend lifecycle contract allows them.</p>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -260,7 +260,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
             </div>
 
             {actions?.can_reject ? (
-              <div className="mt-4 rounded-2xl border border-border bg-background p-4">
+              <div className="mt-4 rounded-xl border border-border bg-background p-4">
                 <label className="text-xs font-semibold uppercase text-muted-foreground" htmlFor="reject-reason">Reject reason</label>
                 <div className="mt-2 flex flex-col gap-2 md:flex-row">
                   <input id="reject-reason" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="Required reason before rejecting" className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm" />
@@ -270,7 +270,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
             ) : null}
 
             {actions?.can_archive ? (
-              <div className="mt-4 rounded-2xl border border-border bg-background p-4">
+              <div className="mt-4 rounded-xl border border-border bg-background p-4">
                 <label className="text-xs font-semibold uppercase text-muted-foreground" htmlFor="archive-reason">Archive reason</label>
                 <div className="mt-2 flex flex-col gap-2 md:flex-row">
                   <input id="archive-reason" value={archiveReason} onChange={(event) => setArchiveReason(event.target.value)} placeholder="Reason is stored for audit" className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm" />
@@ -280,7 +280,7 @@ export default function AdminPolicySlugEditorPage({ params }: { params: Params }
             ) : null}
           </section>
 
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-foreground">Draft preview</h3>
             <p className="mt-1 text-xs text-muted-foreground">Preview uses current draft text. Public output remains controlled by PUBLISHED + PUBLIC only.</p>
             <PolicyMarkdown content={policy.content} className="mt-3" />

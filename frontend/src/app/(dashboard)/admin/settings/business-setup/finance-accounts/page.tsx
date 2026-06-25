@@ -76,9 +76,9 @@ export default function AccountingSetupGuidePage() {
       <PageHeader title="Accounting setup" description="Configure chart accounts and finance accounts using existing Accounting masters. Finance accounts are real cash/bank/UPI settlement instruments; posting profiles remain separate." />
       <BusinessSetupLinks />
 
-      {error ? <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
+      {error ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div> : null}
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><div className="text-base font-semibold text-foreground">Live accounting readiness</div><p className="mt-2 text-sm text-muted-foreground">Settlement desks stay separate from ledger-only concepts. Use Books only for real inter-account transfers; use Bridge Reconciliation for system-generated source posting.</p></div>
           <span className={badgeClass(blockerCount > 0 ? "amber" : "green")}>{loading ? "LOADING" : setupStatus}</span>
@@ -100,13 +100,13 @@ export default function AccountingSetupGuidePage() {
       </section>
 
       <section className="grid gap-5 md:grid-cols-4">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Active chart accounts</div><div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartActiveTotal : "—"}</div><div className="mt-2 text-xs text-muted-foreground">Statement roots: {checklist ? chartRootsStmt : "—"}</div></div>
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Child / sub accounts</div><div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartChildren : "—"}</div><div className="mt-2 text-xs text-muted-foreground">Non-statement operational/control: {checklist ? nonStatement : "—"}</div></div>
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Finance accounts</div><div className="mt-2 text-3xl font-semibold text-foreground">{loading ? "—" : financeAccounts}</div><div className="mt-2 text-xs text-muted-foreground">Cash {hasCash ? "✓" : "—"} · Bank {hasBank ? "✓" : "—"} · UPI {hasUpi ? "✓" : "—"}</div></div>
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Movement eligible</div><div className="mt-2 text-3xl font-semibold text-foreground">{loading ? "—" : movementEligible}</div><div className="mt-2 text-xs text-muted-foreground">Requires real active settlement accounts mapped to posting-ready ASSET ledgers.</div></div>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Active chart accounts</div><div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartActiveTotal : "—"}</div><div className="mt-2 text-xs text-muted-foreground">Statement roots: {checklist ? chartRootsStmt : "—"}</div></div>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Child / sub accounts</div><div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? chartChildren : "—"}</div><div className="mt-2 text-xs text-muted-foreground">Non-statement operational/control: {checklist ? nonStatement : "—"}</div></div>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Finance accounts</div><div className="mt-2 text-3xl font-semibold text-foreground">{loading ? "—" : financeAccounts}</div><div className="mt-2 text-xs text-muted-foreground">Cash {hasCash ? "✓" : "—"} · Bank {hasBank ? "✓" : "—"} · UPI {hasUpi ? "✓" : "—"}</div></div>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="text-sm font-medium text-muted-foreground">Movement eligible</div><div className="mt-2 text-3xl font-semibold text-foreground">{loading ? "—" : movementEligible}</div><div className="mt-2 text-xs text-muted-foreground">Requires real active settlement accounts mapped to posting-ready ASSET ledgers.</div></div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="text-base font-semibold text-foreground">Finance account register</div>
         <p className="mt-1 text-sm text-muted-foreground">This is a setup summary. Edit/create finance accounts in Accounting Setup; use Books only for inter-account transfers.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -120,7 +120,7 @@ export default function AccountingSetupGuidePage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="text-base font-semibold text-foreground">Minimum recommended setup</div>
         <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
           <li>Create chart accounts first; finance accounts must map to active ASSET accounts.</li>

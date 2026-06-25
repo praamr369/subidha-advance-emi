@@ -75,7 +75,7 @@ export default function AdminOnlineEnquiriesPage() {
           <label className="flex w-full max-w-sm flex-col text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Status filter
             <input
-              className="mt-2 h-10 rounded-2xl border border-border bg-background px-3 text-sm font-normal tracking-normal text-foreground outline-none transition focus:border-ring"
+              className="mt-2 h-10 rounded-xl border border-border bg-background px-3 text-sm font-normal tracking-normal text-foreground outline-none transition focus:border-ring"
               placeholder="NEW, SOURCING…"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -93,9 +93,9 @@ export default function AdminOnlineEnquiriesPage() {
               description="Public submissions with procurement intent create rows automatically; operational teams can also seed RFQs from CRM leads."
             />
           ) : (
-            <div className="overflow-auto rounded-[1.25rem] border border-border bg-card">
+            <div className="overflow-auto rounded-xl border border-border bg-card">
               <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="bg-[color-mix(in_oklab,var(--surface-muted)_55%,transparent)] text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                <thead className="bg-muted/40 text-xs uppercase tracking-[0.12em] text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3">Enquiry</th>
                     <th className="px-4 py-3">Customer</th>
@@ -117,7 +117,7 @@ export default function AdminOnlineEnquiriesPage() {
                       <td className="px-4 py-3 text-xs">{row.status ?? "—"}</td>
                       <td className="px-4 py-3 text-right">
                         <Link
-                          className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-3 text-sm font-semibold transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
+                          className="inline-flex h-9 items-center rounded-xl border border-border bg-background px-3 text-sm font-semibold transition hover:border-border hover:bg-muted/30"
                           href={`${ROUTES.admin.onlineEnquiries}/${row.id}`}
                         >
                           Open

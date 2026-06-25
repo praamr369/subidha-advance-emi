@@ -259,7 +259,7 @@ function ReportCard({
   const csvKey = REPORT_CSV_KEY_MAP[report.key];
 
   return (
-    <div className="flex flex-col rounded-[1.35rem] border border-border bg-background px-5 py-4 gap-3">
+    <div className="flex flex-col rounded-xl border border-border bg-background px-5 py-4 gap-3">
       <div>
         <div className="font-semibold text-foreground">{report.title}</div>
         <div className="mt-1 text-xs text-muted-foreground">{report.description}</div>

@@ -60,7 +60,7 @@ export default function PartyKycPanel({ partyId }: { partyId: number }) {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
+      <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
         Loading party KYC…
       </div>
     );

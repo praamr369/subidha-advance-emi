@@ -45,7 +45,7 @@ export default function DrawEvidenceExplainer() {
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         {evidenceCards.map((card) => (
           <article key={card.title} className="public-card public-card-animated p-5">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_13%,var(--surface-card-elevated)_87%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_13%,var(--surface-card-elevated)_87%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
               <card.icon className="h-5 w-5" />
             </span>
             <h3 className="mt-4 text-base font-semibold text-foreground">{card.title}</h3>

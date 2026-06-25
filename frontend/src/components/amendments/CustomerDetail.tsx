@@ -95,7 +95,7 @@ function ProductRecontractExecutedSummary({ preview }: { preview?: ProductRecont
   return (
     <DetailPanel title="Product recontract executed" description="Read-only summary of the approved contract update.">
       <div className="space-y-4">
-        <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100">
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100">
           This recontract updated future contract terms after approval. Previous payments and receipts remain unchanged.
         </div>
         <div className="grid gap-3 md:grid-cols-2">

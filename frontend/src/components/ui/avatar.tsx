@@ -9,7 +9,7 @@ export function Avatar({ className, ...props }: ComponentProps<typeof AvatarPrim
     <AvatarPrimitive.Root
       data-slot="avatar"
       className={cn(
-        "relative flex size-10 shrink-0 overflow-hidden rounded-lg border border-[var(--surface-border-strong)] bg-[var(--surface-strong)] text-foreground",
+        "relative flex size-10 shrink-0 overflow-hidden rounded-lg border border-border bg-background text-foreground",
         className
       )}
       {...props}
@@ -27,7 +27,7 @@ export function AvatarFallback({ className, ...props }: ComponentProps<typeof Av
   return (
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
-      className={cn("flex size-full items-center justify-center rounded-[inherit] bg-[var(--surface-strong)] text-xs font-semibold", className)}
+      className={cn("flex size-full items-center justify-center rounded-[inherit] bg-background text-xs font-semibold", className)}
       {...props}
     />
   );

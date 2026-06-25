@@ -175,7 +175,7 @@ export default function CustomerAnalyticsReportPage() {
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-border">
                   <table className="min-w-full text-sm">
-                    <thead className="bg-[var(--surface-muted)]">
+                    <thead className="bg-muted/50">
                       <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                         <th className="px-4 py-3">Customer ID</th>
                         <th className="px-4 py-3">Severity</th>
@@ -201,7 +201,7 @@ export default function CustomerAnalyticsReportPage() {
                             <td className="px-4 py-3">
                               <div className="flex flex-wrap gap-1">
                                 {topSignals.map((st) => (
-                                  <span key={st} className="inline-block rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                  <span key={st} className="inline-block rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                                     {SIGNAL_LABELS[st] ?? st}
                                   </span>
                                 ))}
@@ -246,7 +246,7 @@ export default function CustomerAnalyticsReportPage() {
                           <span className="font-medium text-foreground">{SIGNAL_LABELS[type] ?? type}</span>
                           <span className="tabular-nums text-muted-foreground">{count} ({pct}%)</span>
                         </div>
-                        <div className="h-1.5 rounded-full bg-[var(--surface-muted)] overflow-hidden">
+                        <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
                               type.includes("OVERDUE") || type === "HIGH_RISK" ? "bg-red-400" :
@@ -263,7 +263,7 @@ export default function CustomerAnalyticsReportPage() {
                 </div>
               )}
 
-              <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-xs text-muted-foreground">
+              <div className="mt-4 rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
                 Signals are advisory only. No payment, EMI, or subscription record is created or mutated from this page. Use
                 {" "}<a href={ROUTES.admin.growthRetention} className="font-medium text-primary hover:underline">Retention Intelligence</a> to see the full retention workspace.
               </div>

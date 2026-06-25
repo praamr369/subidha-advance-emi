@@ -95,7 +95,7 @@ export default function PartialPaymentPage() {
       </div>
 
       {/* Input */}
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <h2 className="font-semibold">Lookup</h2>
         <div className="flex flex-wrap gap-3 items-end">
           <div>
@@ -121,7 +121,7 @@ export default function PartialPaymentPage() {
 
       {/* Pending EMI list */}
       {preview && (
-        <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="font-semibold">Subscription #{preview.subscription_id}</h2>
@@ -183,7 +183,7 @@ export default function PartialPaymentPage() {
 
       {/* Split result */}
       {split && (
-        <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
           <h2 className="font-semibold">Waterfall Split — ₹{split.payment_amount_input}</h2>
 
           <div className="grid grid-cols-3 gap-3">

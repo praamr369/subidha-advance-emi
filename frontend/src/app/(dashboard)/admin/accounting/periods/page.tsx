@@ -66,7 +66,7 @@ function fmtDate(value?: string | null) {
 
 function MetricCard({ label, value, detail, href, tone = "border-blue-200 bg-blue-50 text-blue-900" }: { label: string; value: number | string; detail?: string; href?: string; tone?: string }) {
   const body = (
-    <div className={`rounded-2xl border p-4 shadow-sm ${tone}`}>
+    <div className={`rounded-xl border p-4 shadow-sm ${tone}`}>
       <div className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</div>
       <div className="mt-2 text-2xl font-semibold">{value}</div>
       {detail ? <div className="mt-1 text-xs opacity-80">{detail}</div> : null}
@@ -83,7 +83,7 @@ function ReadinessPanel({ readiness }: { readiness: AccountingPeriodReadiness | 
     { label: "Posting readiness", ok: Boolean(readiness?.is_ready), detail: readiness?.is_ready ? "Ready" : "Blocked" },
   ];
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Posting setup health</h2>
       <p className="mt-1 text-sm text-muted-foreground">Current financial-year, period, and exact-date lock posture. This panel is read-only.</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -112,7 +112,7 @@ function BridgeReadinessPanel({ summary }: { summary: AccountingBridgeReconcilia
   ];
   const activeMetrics = metrics.filter((item) => item.value > 0);
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Bridge close readiness</h2>
@@ -142,7 +142,7 @@ function BridgeReadinessPanel({ summary }: { summary: AccountingBridgeReconcilia
 
 function PeriodsTable({ periods, busy, onChangeStatus }: { periods: AccountingPeriod[]; busy: string | null; onChangeStatus: (period: AccountingPeriod, status: AccountingPeriodStatus) => Promise<void> }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Accounting periods</h2>
@@ -336,7 +336,7 @@ export default function AccountingPeriodsPage() {
     }
   }
 
-  if (loading) return <main className="p-6"><div className="rounded-2xl border p-6 text-sm text-muted-foreground">Loading accounting periods…</div></main>;
+  if (loading) return <main className="p-6"><div className="rounded-xl border p-6 text-sm text-muted-foreground">Loading accounting periods…</div></main>;
 
   const openPeriodCount = periods.filter((period) => statusForPeriod(period) === "OPEN").length;
   const lockedPeriodCount = periods.filter((period) => statusForPeriod(period) === "LOCKED").length;
@@ -344,7 +344,7 @@ export default function AccountingPeriodsPage() {
 
   return (
     <main className="space-y-6 p-6">
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-sm font-medium text-muted-foreground">Admin · Accounting · Periods</p>
@@ -376,7 +376,7 @@ export default function AccountingPeriodsPage() {
       <PeriodsTable periods={periods} busy={actionBusy} onChangeStatus={changePeriodStatus} />
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground">Create Financial Year</h2>
           <p className="mt-1 text-sm text-muted-foreground">Create the FY first, activate it, then generate monthly periods.</p>
           <form onSubmit={handleCreateFinancialYear} className="mt-4 grid gap-3 md:grid-cols-2">
@@ -404,7 +404,7 @@ export default function AccountingPeriodsPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground">Posting locks</h2>
           <p className="mt-1 text-sm text-muted-foreground">Exact-date locks are additional controls. Period status remains the primary posting control.</p>
           <form onSubmit={handleCreateLock} className="mt-4 grid gap-3 md:grid-cols-[180px_1fr_auto]">

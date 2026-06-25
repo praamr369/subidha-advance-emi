@@ -110,7 +110,7 @@ export default function BatchAlertsPage() {
       </div>
 
       {/* Thresholds */}
-      <div className="rounded-2xl border border-border bg-card p-5 mb-5">
+      <div className="rounded-xl border border-border bg-card p-5 mb-5">
         <div className="text-xs font-semibold text-muted-foreground uppercase mb-3">Alert Thresholds</div>
         <div className="grid grid-cols-3 gap-4">
           {[
@@ -141,7 +141,7 @@ export default function BatchAlertsPage() {
       </div>
 
       {/* Email alert config */}
-      <div className="rounded-2xl border border-border bg-card p-5 mb-5">
+      <div className="rounded-xl border border-border bg-card p-5 mb-5">
         <div className="text-xs font-semibold text-muted-foreground uppercase mb-3">Send Email Alert</div>
         <div className="flex gap-3 items-center mb-3">
           <input
@@ -184,7 +184,7 @@ export default function BatchAlertsPage() {
               { label: "Batches with Alerts", value: checkResult.batches_with_alerts, warn: checkResult.batches_with_alerts > 0 },
               { label: "Healthy Batches", value: checkResult.batches_healthy },
             ].map(c => (
-              <div key={c.label} className={`rounded-2xl border p-4 ${c.warn ? "border-orange-200 bg-orange-50" : "border-border bg-card"}`}>
+              <div key={c.label} className={`rounded-xl border p-4 ${c.warn ? "border-orange-200 bg-orange-50" : "border-border bg-card"}`}>
                 <div className="text-xs text-muted-foreground">{c.label}</div>
                 <div className={`text-2xl font-bold mt-1 ${c.warn ? "text-orange-700" : ""}`}>{c.value}</div>
               </div>
@@ -192,7 +192,7 @@ export default function BatchAlertsPage() {
           </div>
 
           {checkResult.alerts.length > 0 && (
-            <div className="rounded-2xl border border-orange-200 overflow-hidden mb-4">
+            <div className="rounded-xl border border-orange-200 overflow-hidden mb-4">
               <div className="bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-700 uppercase">Batches with Alerts</div>
               <table className="w-full text-sm">
                 <thead className="bg-muted/40 text-xs text-muted-foreground">
@@ -235,7 +235,7 @@ export default function BatchAlertsPage() {
           )}
 
           {checkResult.healthy.length > 0 && (
-            <details className="rounded-2xl border border-green-200 overflow-hidden">
+            <details className="rounded-xl border border-green-200 overflow-hidden">
               <summary className="bg-green-50 px-4 py-2 text-xs font-semibold text-green-700 uppercase cursor-pointer">Healthy Batches ({checkResult.healthy.length})</summary>
               <table className="w-full text-sm">
                 <thead className="bg-muted/40 text-xs text-muted-foreground">

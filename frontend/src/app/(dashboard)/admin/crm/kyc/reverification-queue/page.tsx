@@ -83,7 +83,7 @@ export default function KYCReverificationQueuePage() {
           { label: "Overdue", value: docs.filter(d => d.overdue).length, cls: "text-red-600" },
           { label: "Due ≤ 14 days", value: docs.filter(d => !d.overdue && d.days_left !== null && d.days_left <= 14).length, cls: "text-orange-600" },
         ].map(card => (
-          <div key={card.label} className="rounded-2xl border border-border bg-card p-4">
+          <div key={card.label} className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs text-muted-foreground">{card.label}</div>
             <div className={`text-lg font-bold mt-1 ${card.cls ?? ""}`}>{card.value}</div>
           </div>
@@ -103,7 +103,7 @@ export default function KYCReverificationQueuePage() {
           {docs.map(doc => {
             const state = actionStates[doc.document_id];
             return (
-              <div key={doc.document_id} className={`rounded-2xl border border-border bg-card p-4 ${urgencyClass(doc)}`}>
+              <div key={doc.document_id} className={`rounded-xl border border-border bg-card p-4 ${urgencyClass(doc)}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">

@@ -116,33 +116,33 @@ export default function AdminAiSourceDetailPage() {
               </ActionButton>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
+              <div className="rounded-xl border border-border bg-muted/50 p-3">
                 <div className="text-xs text-muted-foreground">Type</div>
                 <div className="mt-1 text-sm font-semibold">{source.sourceType.replaceAll("_", " ")}</div>
               </div>
-              <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
+              <div className="rounded-xl border border-border bg-muted/50 p-3">
                 <div className="text-xs text-muted-foreground">Status</div>
                 <div className="mt-1">
                   <StatusBadge status={source.status} label={source.status.replaceAll("_", " ")} />
                 </div>
               </div>
-              <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
+              <div className="rounded-xl border border-border bg-muted/50 p-3">
                 <div className="text-xs text-muted-foreground">Visibility</div>
                 <div className="mt-1 text-sm font-semibold">{source.visibility.replaceAll("_", " ")}</div>
               </div>
-              <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
+              <div className="rounded-xl border border-border bg-muted/50 p-3">
                 <div className="text-xs text-muted-foreground">Updated</div>
                 <div className="mt-1 text-sm font-semibold">{formatDate(source.updatedAt)}</div>
               </div>
-              <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
+              <div className="rounded-xl border border-border bg-muted/50 p-3">
                 <div className="text-xs text-muted-foreground">Chunk count</div>
                 <div className="mt-1 text-sm font-semibold">{chunks.length}</div>
               </div>
-              <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
+              <div className="rounded-xl border border-border bg-muted/50 p-3">
                 <div className="text-xs text-muted-foreground">Embedding status</div>
                 <div className="mt-1 text-sm font-semibold">{source.embeddingStatus.replaceAll("_", " ")}</div>
               </div>
-              <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3">
+              <div className="rounded-xl border border-border bg-muted/50 p-3">
                 <div className="text-xs text-muted-foreground">Checksum / Version</div>
                 <div className="mt-1 text-sm font-semibold">{source.checksum || "N/A"} / {source.version}</div>
               </div>
@@ -164,7 +164,7 @@ export default function AdminAiSourceDetailPage() {
           <Card variant="bordered" title="Chunk previews">
             <div className="flex flex-col gap-3">
               {chunks.map((chunk) => (
-                <article key={chunk.id} className="rounded-2xl border border-border bg-card p-4">
+                <article key={chunk.id} className="rounded-xl border border-border bg-card p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-foreground">{chunk.heading || "Source excerpt"}</p>

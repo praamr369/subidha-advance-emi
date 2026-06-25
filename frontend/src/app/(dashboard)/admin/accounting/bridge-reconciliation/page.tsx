@@ -93,7 +93,7 @@ function StatusBadge({ value }: { value: string }) {
 
 function SummaryCard({ label, value, detail, tone = "border-blue-200 bg-blue-50 text-blue-900" }: { label: string; value: number | string; detail?: string; tone?: string }) {
   return (
-    <div className={cx("rounded-2xl border p-4 shadow-sm", tone)}>
+    <div className={cx("rounded-xl border p-4 shadow-sm", tone)}>
       <div className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</div>
       <div className="mt-2 text-2xl font-semibold">{value}</div>
       {detail ? <div className="mt-1 text-xs opacity-80">{detail}</div> : null}
@@ -233,7 +233,7 @@ function RowsTable({ title, description, rows, selected, onToggle, onPreview, on
   showSelection?: boolean;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
@@ -285,7 +285,7 @@ function RowsTable({ title, description, rows, selected, onToggle, onPreview, on
 function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconciliationPayload }) {
   const tower = payload.phase_f_control_tower;
   const inventory = tower?.source_inventory ?? [];
-  if (!tower) return <section className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">Phase F Control Tower is not available from backend payload.</section>;
+  if (!tower) return <section className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">Phase F Control Tower is not available from backend payload.</section>;
 
   const readinessState = tower.readiness?.state ?? tower.readiness?.primary_state ?? "UNKNOWN";
   const readinessCounts = tower.readiness?.counts ?? {};
@@ -294,7 +294,7 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
   const unsupported = unsupportedBoundaryCount(inventory);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">Phase F Control Tower</h2>
         <p className="text-sm text-muted-foreground">Daily operator view. Empty source definitions and validation-only references are hidden from the main workflow.</p>
@@ -343,14 +343,14 @@ function WorkflowTable({ workflows }: { workflows: ProductionAccountingValidatio
 
 function ProductionValidation({ payload }: { payload: AccountingBridgeReconciliationPayload }) {
   const validation = payload.production_accounting_validation;
-  if (!validation) return <section className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">Production Accounting Validation is not available from backend payload.</section>;
+  if (!validation) return <section className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">Production Accounting Validation is not available from backend payload.</section>;
 
   const workflows = validation.workflows ?? Object.values(validation.groups ?? {}).flat();
   const attentionWorkflows = workflows.filter(workflowNeedsOperatorAttention);
   const boundaryCount = workflows.filter((workflow) => ["VALIDATION_ONLY", "EXCLUDED", "UNSUPPORTED_BOUNDARY"].includes(workflowDisplayStatus(workflow))).length;
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">{validation.title ?? "Production Accounting Validation"}</h2>
         <p className="text-sm text-muted-foreground">Only workflows with current source rows, blockers, or exceptions are shown to operators.</p>
@@ -467,12 +467,12 @@ export default function AccountingBridgeReconciliationPage() {
     }
   }
 
-  if (loading && !payload) return <main className="p-6"><div className="rounded-2xl border p-6 text-sm text-muted-foreground">Loading accounting bridge reconciliation…</div></main>;
-  if (error && !payload) return <main className="p-6"><div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">{error}</div></main>;
+  if (loading && !payload) return <main className="p-6"><div className="rounded-xl border p-6 text-sm text-muted-foreground">Loading accounting bridge reconciliation…</div></main>;
+  if (error && !payload) return <main className="p-6"><div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">{error}</div></main>;
 
   return (
     <main className="space-y-6 p-6">
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-medium text-muted-foreground">Admin · Accounting · Bridge Reconciliation</p>
@@ -497,7 +497,7 @@ export default function AccountingBridgeReconciliationPage() {
           <ControlTowerInventory payload={payload} />
           <ProductionValidation payload={payload} />
 
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-foreground">Filters</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <select value={filters.source_model ?? ""} onChange={(event) => updateFilter("source_model", event.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm">
@@ -514,7 +514,7 @@ export default function AccountingBridgeReconciliationPage() {
 
           {showOperationalTables ? (
             <>
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="text-lg font-semibold text-foreground">Selected-row batch panel</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{selectedRows.length} selected concrete source item(s). Only concrete READY_UNPOSTED source rows with posting permission can be batch-posted.</p>
                 <textarea value={postingNote} onChange={(event) => setPostingNote(event.target.value)} placeholder="Optional posting note" className="mt-4 min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm" />
@@ -526,7 +526,7 @@ export default function AccountingBridgeReconciliationPage() {
               <RowsTable title="Unsupported / deferred boundaries" description="Unsupported and source-contract-only rows remain visible but non-postable." rows={boundaryRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} />
             </>
           ) : (
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <h2 className="text-lg font-semibold text-foreground">Operational bridge queue</h2>
               <p className="mt-1 text-sm text-muted-foreground">No concrete candidates, blocked rows, exceptions, unsupported rows, or deferred source rows are present in the backend payload.</p>
             </section>

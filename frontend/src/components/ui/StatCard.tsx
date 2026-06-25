@@ -24,7 +24,7 @@ const toneColors = {
   default: {
     shell:
       "border-[color-mix(in_oklab,var(--surface-border-strong)_55%,transparent)] bg-[var(--surface-card-elevated)]",
-    icon: "bg-[var(--surface-muted)] text-slate-600",
+    icon: "bg-muted/50 text-slate-600",
     accent: "bg-slate-400/45",
   },
   success: {
@@ -82,7 +82,7 @@ export default function StatCard({
   const card = (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-2xl border p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition motion-safe:duration-150 hover:border-[color-mix(in_oklab,var(--surface-border-strong)_80%,transparent)] hover:shadow-[0_8px_24px_-18px_rgba(15,23,42,0.32)]",
+        "group relative overflow-hidden rounded-xl border p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition motion-safe:duration-150 hover:border-[color-mix(in_oklab,var(--surface-border-strong)_80%,transparent)] hover:shadow-[0_8px_24px_-18px_rgba(15,23,42,0.32)]",
         toneStyle.shell,
         className
       )}

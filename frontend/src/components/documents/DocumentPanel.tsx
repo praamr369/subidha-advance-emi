@@ -56,15 +56,15 @@ export default function DocumentPanel({
 
       <div className="px-4 py-4 sm:px-6">
         {loading ? (
-          <div className="rounded-2xl border border-border bg-[var(--surface-muted)] px-4 py-6 text-sm text-muted-foreground">
+          <div className="rounded-xl border border-border bg-muted/50 px-4 py-6 text-sm text-muted-foreground">
             Loading documents…
           </div>
         ) : error ? (
-          <div className="rounded-2xl border border-border bg-[var(--surface-muted)] px-4 py-6 text-sm text-destructive">
+          <div className="rounded-xl border border-border bg-muted/50 px-4 py-6 text-sm text-destructive">
             {error}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-[var(--surface-muted)] px-4 py-6 text-sm text-muted-foreground">
+          <div className="rounded-xl border border-border bg-muted/50 px-4 py-6 text-sm text-muted-foreground">
             {emptyLabel}
           </div>
         ) : (
@@ -72,7 +72,7 @@ export default function DocumentPanel({
             {items.map((item) => (
               <article
                 key={item.id}
-                className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">

@@ -356,14 +356,14 @@ export default function AdminPoliciesSettingsPage() {
         description="Admin-only policy lifecycle control, public/internal separation, metadata health, coverage readiness, publishing, and archival controls. Default view shows only action-required items."
       />
 
-      <section className="rounded-2xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
+      <section className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
         Seeded templates remain DRAFT. Public launch requires PUBLISHED + PUBLIC. INTERNAL policies are never shown on public policy pages. Review dates are governance warnings, not customer-facing content.
       </section>
 
-      {message ? <section className="rounded-2xl border border-emerald-300/70 bg-emerald-50/90 p-4 text-sm text-emerald-900 shadow-sm">{message}</section> : null}
-      {error ? <section className="rounded-2xl border border-red-300/70 bg-red-50/90 p-4 text-sm text-red-900 shadow-sm">{error}</section> : null}
+      {message ? <section className="rounded-xl border border-emerald-300/70 bg-emerald-50/90 p-4 text-sm text-emerald-900 shadow-sm">{message}</section> : null}
+      {error ? <section className="rounded-xl border border-red-300/70 bg-red-50/90 p-4 text-sm text-red-900 shadow-sm">{error}</section> : null}
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">Governance cockpit</h2>
@@ -415,7 +415,7 @@ export default function AdminPoliciesSettingsPage() {
         ) : null}
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap gap-2">
             {filterOptions.map((option) => (
@@ -428,7 +428,7 @@ export default function AdminPoliciesSettingsPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-semibold text-foreground">Policy Coverage Matrix</h2>
         <p className="mt-1 text-sm text-muted-foreground">Default view shows only rows requiring action. Use All when intentionally auditing every catalog policy.</p>
 
@@ -440,7 +440,7 @@ export default function AdminPoliciesSettingsPage() {
         ) : null}
         <div className="mt-4 space-y-5">
           {visibleCoverageGroups.map((group) => (
-            <div key={group.group} className="rounded-2xl border border-border bg-background p-4">
+            <div key={group.group} className="rounded-xl border border-border bg-background p-4">
               <h3 className="text-sm font-semibold text-foreground">{group.group}</h3>
               <div className="mt-3 grid gap-3 xl:grid-cols-2">
                 {group.items.map((item) => (
@@ -476,7 +476,7 @@ export default function AdminPoliciesSettingsPage() {
         </div>
       </section>
 
-      <details className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <details className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <summary className="cursor-pointer text-base font-semibold text-foreground">Create policy draft</summary>
         <p className="mt-1 text-sm text-muted-foreground">Use only for new policy slugs. For existing policies, open the policy and create a draft version there.</p>
         <form className="mt-4 grid gap-3" onSubmit={handleCreate}>
@@ -499,7 +499,7 @@ export default function AdminPoliciesSettingsPage() {
         </form>
       </details>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-semibold text-foreground">Policy registry</h2>
         <p className="mt-1 text-sm text-muted-foreground">Registry follows the same filter/search as the coverage matrix. Open a slug to submit, approve, publish, accept internal, archive, sync metadata, or create a draft version.</p>
         {loading ? <div className="mt-4 text-sm text-muted-foreground">Loading policies...</div> : null}

@@ -68,7 +68,7 @@ export default function EnterpriseCreatePage({
 
   return (
     <PortalPage title={title} subtitle={subtitle}>
-      <section className="surface-panel-elevated mx-auto max-w-3xl rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <section className="surface-panel-elevated mx-auto max-w-3xl rounded-xl border border-border bg-card p-6 shadow-sm">
         <form className="space-y-4" onSubmit={onSubmit}>
           {fields.map((field) => (
             <div key={field.name}>
@@ -78,7 +78,7 @@ export default function EnterpriseCreatePage({
               <input
                 id={field.name}
                 type={field.type || "text"}
-                className="w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                className="w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none focus:border-border focus:ring-2 focus:ring-[var(--ring)]/35"
                 value={values[field.name] ?? ""}
                 onChange={(e) => setValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
               />

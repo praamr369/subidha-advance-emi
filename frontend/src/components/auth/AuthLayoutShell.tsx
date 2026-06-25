@@ -63,9 +63,9 @@ export default function AuthLayoutShell({
                 return (
                   <div
                     key={point.label}
-                    className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/6 px-4 py-3 text-sm text-slate-100 backdrop-blur-sm"
+                    className="flex items-center gap-3 rounded-xl border border-white/15 bg-white/6 px-4 py-3 text-sm text-slate-100 backdrop-blur-sm"
                   >
-                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/12 bg-white/8 text-slate-100">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-white/8 text-slate-100">
                       <Icon className="h-4 w-4 text-slate-100" />
                     </span>
                     <span className="font-medium">{point.label}</span>

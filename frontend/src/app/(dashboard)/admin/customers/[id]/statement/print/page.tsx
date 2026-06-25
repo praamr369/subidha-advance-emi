@@ -306,12 +306,12 @@ export default function AdminCustomerAccountStatementPrintPage() {
         />
 
         {unsafeCustomer ? (
-          <section className="document-card my-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
+          <section className="document-card my-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
             Backend customer payload exposes unsafe or inactive status: {status}. This statement does not override that state.
           </section>
         ) : null}
 
-        <section className="document-card my-4 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+        <section className="document-card my-4 rounded-xl border border-border bg-card p-4">
           <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Statement Safety Notes</div>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-[#6f5c46]">
             <li>This document does not calculate running balance.</li>
@@ -323,14 +323,14 @@ export default function AdminCustomerAccountStatementPrintPage() {
         </section>
 
         {payload.totalPaidAmountExposed ? (
-          <section className="document-card my-4 rounded-2xl border border-[#d9c39c] bg-[#fff6e4] p-4">
+          <section className="document-card my-4 rounded-xl border border-[#d9c39c] bg-[#fff6e4] p-4">
             <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">Backend-Reported Total Paid</div>
             <div className="mt-2 text-2xl font-black text-[#2f2418]">{moneyOrDash(payload.totalPaidAmount)}</div>
             <div className="mt-1 text-xs text-[#6f5c46]">Displayed only because the payments API exposed `total_paid_amount`.</div>
           </section>
         ) : null}
 
-        <section className="document-card my-4 overflow-hidden rounded-2xl border border-[#d9c39c] bg-white">
+        <section className="document-card my-4 overflow-hidden rounded-xl border border-border bg-card">
           <div className="border-b border-[#eadcc6] bg-[#f5ead8] px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">
             Subscription / Contract Section
           </div>
@@ -380,7 +380,7 @@ export default function AdminCustomerAccountStatementPrintPage() {
           const rows = displayFinancialSummary(subscription.financial_summary);
           if (rows.length === 0) return null;
           return (
-            <section key={`fs-${subscription.id}`} className="document-card my-4 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+            <section key={`fs-${subscription.id}`} className="document-card my-4 rounded-xl border border-border bg-card p-4">
               <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">
                 Backend Financial Summary · {subscriptionReference(subscription)}
               </div>
@@ -396,7 +396,7 @@ export default function AdminCustomerAccountStatementPrintPage() {
           );
         })}
 
-        <section className="document-card my-4 overflow-hidden rounded-2xl border border-[#d9c39c] bg-white">
+        <section className="document-card my-4 overflow-hidden rounded-xl border border-border bg-card">
           <div className="border-b border-[#eadcc6] bg-[#f5ead8] px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">
             Payment / Receipt Section
           </div>
@@ -434,7 +434,7 @@ export default function AdminCustomerAccountStatementPrintPage() {
           )}
         </section>
 
-        <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-[#fff6e4] p-4">
+        <section className="document-card my-5 rounded-xl border border-[#e6d6bd] bg-[#fff6e4] p-4">
           <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Deferred Until Backend Statement Ledger Exists</div>
           <div className="mt-2 grid gap-2 text-xs leading-5 text-[#6f5c46] sm:grid-cols-2">
             <div>Customer ledger rows: not exposed by current backend contract.</div>

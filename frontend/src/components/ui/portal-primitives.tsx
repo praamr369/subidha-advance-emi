@@ -59,7 +59,7 @@ export function MetricCard({
   return (
     <article
       className={cn(
-        "rounded-[1.25rem] border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] p-4 shadow-[0_18px_45px_-38px_rgba(15,23,42,0.34)]",
+        "rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] p-4 shadow-[0_18px_45px_-38px_rgba(15,23,42,0.34)]",
         className
       )}
     >
@@ -101,7 +101,7 @@ export function LoadingSkeleton({
   className?: string;
 }) {
   return (
-    <div className={cn("surface-glass rounded-2xl p-4", className)} aria-busy="true" aria-live="polite">
+    <div className={cn("surface-glass rounded-xl p-4", className)} aria-busy="true" aria-live="polite">
       <div className="flex items-center gap-3">
         <Loader2 className="h-4 w-4 animate-spin text-primary" />
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
@@ -112,7 +112,7 @@ export function LoadingSkeleton({
             <div
               key={`loading-row-${index}`}
               className={cn(
-                "animate-skeleton-pulse h-2 rounded bg-[var(--surface-muted)]",
+                "animate-skeleton-pulse h-2 rounded bg-muted/50",
                 index === rows - 1 ? "w-4/5" : index % 2 === 0 ? "w-full" : "w-11/12"
               )}
             />

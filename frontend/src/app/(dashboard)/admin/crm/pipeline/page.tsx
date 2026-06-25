@@ -61,7 +61,7 @@ function LeadCard({
     lead.next_follow_up_at && new Date(lead.next_follow_up_at) <= new Date();
 
   return (
-    <div className="rounded-2xl border border-border bg-[color-mix(in_oklab,var(--surface-muted)_44%,transparent)] p-3 text-sm">
+    <div className="rounded-xl border border-border bg-muted/40 p-3 text-sm">
       <div className="flex items-start justify-between gap-1">
         <Link
           href={`${ROUTES.admin.crmLeads}/${lead.id}`}
@@ -216,13 +216,13 @@ export default function AdminCrmPipelinePage() {
               {grouped.map((col) => (
                 <div
                   key={col.stage}
-                  className="w-52 flex-shrink-0 rounded-[1.35rem] border border-border bg-card p-3"
+                  className="w-52 flex-shrink-0 rounded-xl border border-border bg-card p-3"
                 >
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STAGE_COLORS[col.stage as LeadStage] || "bg-gray-50 border-gray-200 text-gray-600"}`}>
                       {LEAD_STAGE_LABELS[col.stage as LeadStage] || col.stage}
                     </span>
-                    <span className="rounded-full border border-border bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                    <span className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
                       {col.leads.length}
                     </span>
                   </div>
@@ -231,7 +231,7 @@ export default function AdminCrmPipelinePage() {
                       <LeadCard key={lead.id} lead={lead} onStageMove={handleStageMove} />
                     ))}
                     {col.leads.length === 0 ? (
-                      <p className="rounded-2xl border border-dashed border-border/80 bg-[color-mix(in_oklab,var(--surface-muted)_50%,transparent)] px-3 py-3 text-xs text-muted-foreground text-center">
+                      <p className="rounded-xl border border-dashed border-border/60 bg-muted/40 px-3 py-3 text-xs text-muted-foreground text-center">
                         No leads
                       </p>
                     ) : null}

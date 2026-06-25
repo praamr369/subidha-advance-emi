@@ -39,17 +39,17 @@ function getVariantClassName(variant: ActionButtonVariant) {
     case "destructive":
       return "border-destructive/90 bg-destructive text-destructive-foreground shadow-[0_16px_36px_-22px_color-mix(in_oklab,var(--destructive)_34%,transparent)] hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--destructive)_88%,black_12%)]";
     case "outline":
-      return "border-[var(--surface-border-strong)] bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] hover:-translate-y-0.5 hover:bg-[var(--surface-muted)]";
+      return "border-border bg-[var(--surface-card-elevated)] text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] hover:-translate-y-0.5 hover:bg-muted/50";
     case "ghost":
-      return "border-transparent bg-transparent text-foreground hover:border-border hover:bg-[var(--surface-muted)]";
+      return "border-transparent bg-transparent text-foreground hover:border-border hover:bg-muted/50";
     case "secondary":
     default:
-      return "border-border bg-[var(--surface-strong)] text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_78%,var(--surface-muted)_22%)]";
+      return "border-border bg-background text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] hover:-translate-y-0.5 hover:border-border hover:bg-muted/30";
   }
 }
 
 const baseClassName =
-  "inline-flex items-center justify-center gap-2 rounded-xl border font-semibold tracking-[0.01em] transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 disabled:cursor-not-allowed disabled:border-border disabled:bg-[var(--surface-muted)] disabled:text-muted-foreground disabled:shadow-none";
+  "inline-flex items-center justify-center gap-2 rounded-xl border font-semibold tracking-[0.01em] transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/40 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted/50 disabled:text-muted-foreground disabled:shadow-none";
 
 function getSizeClassName(size: NonNullable<ActionButtonProps["size"]>) {
   switch (size) {

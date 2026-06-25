@@ -55,7 +55,7 @@ function DetailItem({
   value: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3">
+    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
         {label}
       </div>
@@ -245,7 +245,7 @@ export default function AdminSubscriptionRequestDetailPage() {
             {actionError ? <ERPErrorState title="Action failed" description={actionError} /> : null}
 
             {successMessage ? (
-              <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-800 shadow-sm">
+              <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-800 shadow-sm">
                 <p className="font-semibold">{successMessage}</p>
               </section>
             ) : null}
@@ -265,7 +265,7 @@ export default function AdminSubscriptionRequestDetailPage() {
                 </div>
               </MobileSafeTable>
 
-              <div className="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4">
+              <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Review note
                 </div>
@@ -293,7 +293,7 @@ export default function AdminSubscriptionRequestDetailPage() {
               >
 
                 {!request.customer_id ? (
-                  <div className="mt-5 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4">
+                  <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -357,7 +357,7 @@ export default function AdminSubscriptionRequestDetailPage() {
                           </select>
                         </label>
 
-                        <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 text-sm text-slate-700">
+                        <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-slate-700">
                           Selected customer:{" "}
                           <span className="font-medium text-slate-900">
                             {selectedCustomer?.name || "No customer selected"}
@@ -365,7 +365,7 @@ export default function AdminSubscriptionRequestDetailPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/80 p-4 text-sm text-slate-700">
+                      <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4 text-sm text-slate-700">
                         Approving with create mode will create a new customer account using the request snapshot:{" "}
                         <span className="font-medium text-slate-900">
                           {text(request.requested_customer_name)}
@@ -376,7 +376,7 @@ export default function AdminSubscriptionRequestDetailPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4 text-sm text-slate-700">
+                  <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4 text-sm text-slate-700">
                     This request already links customer #{request.customer_id}. Approval will use that existing customer.
                   </div>
                 )}

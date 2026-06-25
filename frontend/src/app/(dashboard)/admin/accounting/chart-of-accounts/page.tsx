@@ -101,7 +101,7 @@ export default function AccountingChartOfAccountsPage() {
         {error ? <ERPErrorState title="Unable to load chart of accounts" description={error} onRetry={() => void loadPage()} /> : null}
 
         <ERPSectionShell title="Operating split" description="COA is financial classification; Finance Accounts are real settlement instruments.">
-          <div className="grid gap-3 md:grid-cols-2"><div className="rounded-2xl border bg-card p-4 text-sm"><div className="font-semibold">Chart of Accounts</div><p className="mt-1 text-muted-foreground">ASSET, LIABILITY, EQUITY, INCOME, and EXPENSE accounts used by all modules and reports.</p></div><Link href={ROUTES.admin.accountingFinanceAccounts} className="rounded-2xl border bg-card p-4 text-sm transition hover:bg-muted"><div className="font-semibold">Finance Accounts</div><p className="mt-1 text-muted-foreground">Cash, bank, UPI, and payment gateway settlement accounts mapped to active ASSET COA.</p></Link></div>
+          <div className="grid gap-3 md:grid-cols-2"><div className="rounded-xl border bg-card p-4 text-sm"><div className="font-semibold">Chart of Accounts</div><p className="mt-1 text-muted-foreground">ASSET, LIABILITY, EQUITY, INCOME, and EXPENSE accounts used by all modules and reports.</p></div><Link href={ROUTES.admin.accountingFinanceAccounts} className="rounded-xl border bg-card p-4 text-sm transition hover:bg-muted"><div className="font-semibold">Finance Accounts</div><p className="mt-1 text-muted-foreground">Cash, bank, UPI, and payment gateway settlement accounts mapped to active ASSET COA.</p></Link></div>
         </ERPSectionShell>
 
         <ERPSectionShell title="Chart account register" description="Filter by type/status, then open safe server-backed edit controls.">

@@ -115,7 +115,7 @@ export default function AdminRequestsHubPage() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="group flex flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-4 transition hover:bg-muted/30 hover:border-ring"
+                  className="group flex flex-col gap-2 rounded-xl border border-border bg-card px-4 py-4 transition hover:bg-muted/30 hover:border-ring"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <span className="font-semibold text-foreground group-hover:text-primary">
@@ -132,7 +132,7 @@ export default function AdminRequestsHubPage() {
           </ERPSectionShell>
         ))}
 
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <strong>Linked source record:</strong> Each request type links back to its source module — customers, subscriptions, partners, or deliveries. Financial, stock, and accounting workflows remain in their own controlled modules and are not triggered from this page.
         </div>
       </div>

@@ -197,7 +197,7 @@ function ImageUploadZone({
 
   if (preview) {
     return (
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-background">
+      <div className="relative overflow-hidden rounded-xl border border-border bg-background">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={preview}
@@ -222,7 +222,7 @@ function ImageUploadZone({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 transition ${
+      className={`flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition ${
         isDragging
           ? "border-primary bg-primary/5"
           : "border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50"

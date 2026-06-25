@@ -46,7 +46,7 @@ export function StockNeedsOperationalWorkspace({
 
   const leftPane =
     rows.length === 0 ? (
-      <div className="rounded-2xl border border-border bg-card p-6">
+      <div className="rounded-xl border border-border bg-card p-6">
         <EmptyState
           title="No stock needs"
           description="There are no purchase or stock needs to show in this workspace."
@@ -58,7 +58,7 @@ export function StockNeedsOperationalWorkspace({
         <p className="text-sm text-muted-foreground">
           Showing {rows.length} of {count} record(s).
         </p>
-        <div className="max-h-[min(68vh,620px)] overflow-auto rounded-2xl border border-border">
+        <div className="max-h-[min(68vh,620px)] overflow-auto rounded-xl border border-border">
           <table className="min-w-full divide-y divide-border text-sm">
             <thead className="sticky top-0 bg-muted/40 backdrop-blur-sm">
               <tr>
@@ -99,7 +99,7 @@ export function StockNeedsOperationalWorkspace({
     );
 
   const rightPane = !selected ? (
-    <div className="rounded-2xl border border-dashed border-border bg-card/60 p-6">
+    <div className="rounded-xl border border-dashed border-border bg-card/60 p-6">
       <EmptyState
         title="Select a need"
         description="Choose a stock need row to inspect every field returned by the API."
@@ -107,7 +107,7 @@ export function StockNeedsOperationalWorkspace({
       />
     </div>
   ) : (
-    <section className="rounded-2xl border border-border bg-card p-4">
+    <section className="rounded-xl border border-border bg-card p-4">
       <h2 className="text-sm font-semibold text-foreground">Need detail</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         Values shown exactly as returned — no synthesized fields.

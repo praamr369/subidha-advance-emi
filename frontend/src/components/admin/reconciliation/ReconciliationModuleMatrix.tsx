@@ -22,7 +22,7 @@ export default function ReconciliationModuleMatrix({
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {modules.map((m) => (
-        <div key={m.module} className="rounded-2xl border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+        <div key={m.module} className="rounded-xl border border-border/70 bg-[var(--surface-card-elevated)] p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">{m.module}</div>

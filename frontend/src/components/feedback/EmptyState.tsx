@@ -30,7 +30,7 @@ export default function EmptyState({
       className={cn(
         tone === "info"
           ? "border-sky-200/80 bg-sky-50/65"
-          : "border-border bg-[var(--surface-muted)]/45"
+          : "border-border bg-muted/50/45"
       )}
     />
   );

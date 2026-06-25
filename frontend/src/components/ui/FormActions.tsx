@@ -49,7 +49,7 @@ export default function FormActions({
       "inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition disabled:cursor-not-allowed disabled:opacity-60";
     const variantClasses = {
       secondary:
-        "border-border bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_86%,var(--surface-muted)_14%))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]",
+        "border-border bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_86%,var(--surface-muted)_14%))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] hover:-translate-y-0.5 hover:border-border hover:bg-muted/50",
       danger:
         "border-red-300 bg-red-50 text-red-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] hover:-translate-y-0.5 hover:border-red-400 hover:bg-red-100",
     };

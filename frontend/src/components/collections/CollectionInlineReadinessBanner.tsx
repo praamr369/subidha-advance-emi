@@ -106,7 +106,7 @@ export default function CollectionInlineReadinessBanner({
   const workflowLabel = workflowTitle(activeWorkflow);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm" aria-label="Collection readiness">
+    <section className="rounded-xl border border-border bg-card p-4 shadow-sm" aria-label="Collection readiness">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">

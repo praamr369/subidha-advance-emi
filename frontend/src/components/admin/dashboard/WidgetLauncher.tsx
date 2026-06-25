@@ -19,7 +19,7 @@ function attentionTone(attention: AdminDashboardWidgetAttention | undefined) {
   if (attention === "urgent") return "border-red-200/80 bg-red-50/90 text-red-900";
   if (attention === "warning") return "border-amber-200/80 bg-amber-50/90 text-amber-900";
   if (attention === "quiet") return "border-emerald-200/80 bg-emerald-50/90 text-emerald-900";
-  return "border-border bg-[var(--surface-muted)] text-foreground";
+  return "border-border bg-muted/50 text-foreground";
 }
 
 export default function WidgetLauncher({
@@ -52,7 +52,7 @@ export default function WidgetLauncher({
           <h2 className="text-base font-semibold text-slate-950">{title}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{subtitle}</p>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-xs font-semibold text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+        <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-xs font-semibold text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
           <Pin className="h-3.5 w-3.5" />
           Pin widgets you keep open daily
         </div>
@@ -72,10 +72,10 @@ export default function WidgetLauncher({
               onClick={() => onOpen(item.id)}
               disabled={isOpen}
               className={cn(
-                "group flex min-h-[92px] items-start gap-3 rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_12px_35px_-28px_rgba(15,23,42,0.42)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+                "group flex min-h-[92px] items-start gap-3 rounded-[1.4rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_12px_35px_-28px_rgba(15,23,42,0.42)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
               )}
             >
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-strong)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
                 {item.icon}
               </span>
 
@@ -85,7 +85,7 @@ export default function WidgetLauncher({
                     {item.title}
                   </span>
                   {isPinned ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-[var(--surface-muted)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       <Pin className="h-3 w-3" />
                       Pinned
                     </span>

@@ -34,7 +34,7 @@ export default function ValidationSummary({
   if (!visible) return null;
 
   return (
-    <div className={cn("rounded-2xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm", className)}>
+    <div className={cn("rounded-xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm", className)}>
       <div className="font-semibold text-foreground">{title}</div>
       {backendMessage ? <div className="mt-2 text-sm text-foreground/90">{backendMessage}</div> : null}
       <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">

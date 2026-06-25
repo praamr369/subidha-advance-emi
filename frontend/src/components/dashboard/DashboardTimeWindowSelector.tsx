@@ -33,7 +33,7 @@ export default function DashboardTimeWindowSelector({
   onEndDateChange,
 }: Props) {
   return (
-    <div className="workspace-filter-bar flex flex-col gap-3 rounded-[1.3rem] p-4 md:flex-row md:items-end md:justify-between">
+    <div className="workspace-filter-bar flex flex-col gap-3 rounded-xl p-4 md:flex-row md:items-end md:justify-between">
       <div>
         <p className="enterprise-eyebrow">
           {title}

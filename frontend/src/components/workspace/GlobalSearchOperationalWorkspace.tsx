@@ -37,7 +37,7 @@ export function GlobalSearchOperationalWorkspace({
   }, [results, activeKey]);
 
   const leftPane = (
-    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <h2 className="text-sm font-semibold text-foreground">Results</h2>
       <p className="mt-1 text-xs text-muted-foreground">{results.length} record(s).</p>
       <ul className="mt-4 flex max-h-[min(68vh,620px)] flex-col gap-2 overflow-y-auto pr-1">
@@ -74,7 +74,7 @@ export function GlobalSearchOperationalWorkspace({
   );
 
   const rightPane = selected ? (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {selected.type}
       </div>
@@ -91,7 +91,7 @@ export function GlobalSearchOperationalWorkspace({
       </div>
     </section>
   ) : (
-    <div className="rounded-2xl border border-dashed border-border bg-card/60 p-6">
+    <div className="rounded-xl border border-dashed border-border bg-card/60 p-6">
       <EmptyState
         title="Select a result"
         description="Choose a row in the results list to preview the record summary."

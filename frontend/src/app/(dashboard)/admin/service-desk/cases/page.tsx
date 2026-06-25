@@ -102,14 +102,14 @@ export default function AdminServiceDeskCasesPage() {
       <div className="space-y-6">
         <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
           {summaryCards.map((card) => (
-            <div key={card.label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div key={card.label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{card.label}</div>
               <div className="mt-2 text-2xl font-semibold text-foreground">{card.value}</div>
             </div>
           ))}
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="grid gap-3 md:grid-cols-3">
             <label className="block text-sm font-medium text-foreground">
               Search
@@ -167,7 +167,7 @@ export default function AdminServiceDeskCasesPage() {
         ) : null}
 
         {!loading && !error && rows.length > 0 ? (
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
             <table className="min-w-full divide-y divide-border text-sm">
               <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>

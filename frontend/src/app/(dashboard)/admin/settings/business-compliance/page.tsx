@@ -381,14 +381,14 @@ export default function AdminBusinessCompliancePage() {
         }
       />
 
-      <section className="rounded-2xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
+      <section className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
         Private compliance files are never publicly downloadable by default. GST and Udyam/MSME must remain “Not provided” unless actual verified evidence exists. Public pages expose only separately approved public-safe summaries.
       </section>
 
-      {message ? <section className="rounded-2xl border border-emerald-300/70 bg-emerald-50/90 p-4 text-sm text-emerald-900 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-900/20 dark:text-emerald-100">{message}</section> : null}
-      {error ? <section className="rounded-2xl border border-red-300/70 bg-red-50/90 p-4 text-sm text-red-900 shadow-sm dark:border-red-500/40 dark:bg-red-900/20 dark:text-red-100">{error}</section> : null}
+      {message ? <section className="rounded-xl border border-emerald-300/70 bg-emerald-50/90 p-4 text-sm text-emerald-900 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-900/20 dark:text-emerald-100">{message}</section> : null}
+      {error ? <section className="rounded-xl border border-red-300/70 bg-red-50/90 p-4 text-sm text-red-900 shadow-sm dark:border-red-500/40 dark:bg-red-900/20 dark:text-red-100">{error}</section> : null}
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">Compliance review status</h2>
@@ -439,7 +439,7 @@ export default function AdminBusinessCompliancePage() {
         ) : null}
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">Premade compliance checklist</h2>
@@ -489,7 +489,7 @@ export default function AdminBusinessCompliancePage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-semibold text-foreground">How to clear this setup blocker</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-4">
           {["Select template", "Upload real file", "View/check file", "Submit review", "Approve evidence"].map((step, index) => (
@@ -502,7 +502,7 @@ export default function AdminBusinessCompliancePage() {
         <p className="mt-3 text-sm text-muted-foreground">Do not approve GST/Udyam/MSME unless the actual certificate exists. Do not expose PAN, bank proof, rental agreement, or raw file scans publicly.</p>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-semibold text-foreground">Public summary preview</h2>
         {summary ? (
           <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
@@ -516,7 +516,7 @@ export default function AdminBusinessCompliancePage() {
         ) : <p className="mt-2 text-sm text-muted-foreground">Loading...</p>}
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-semibold text-foreground">Add compliance document row</h2>
         {selectedTemplateKey ? <p className="mt-1 text-sm text-muted-foreground">Selected template: {selectedTemplateKey}. Status defaults to pending. Upload real evidence before approval.</p> : null}
         <form className="mt-4 grid gap-3" onSubmit={handleCreate}>
@@ -540,7 +540,7 @@ export default function AdminBusinessCompliancePage() {
         </form>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-base font-semibold text-foreground">Compliance document register</h2>
         {loading ? (
           <p className="mt-3 text-sm text-muted-foreground">Loading...</p>
@@ -616,7 +616,7 @@ export default function AdminBusinessCompliancePage() {
       </section>
 
       {selectedRow ? (
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-foreground">Document review detail</h2>

@@ -131,7 +131,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
 
   return (
     <PortalPage title={title} subtitle={subtitle}>
-      <section className="surface-panel-elevated mb-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <section className="surface-panel-elevated mb-4 rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="enterprise-eyebrow">Total records</p>
@@ -154,7 +154,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
             </label>
             <button
               type="button"
-              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1 text-sm font-semibold text-foreground transition hover:border-border hover:bg-muted/50"
               disabled={rows.length === 0}
               onClick={() =>
                 downloadCsv(
@@ -178,7 +178,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
             />
             <button
               type="button"
-              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1 text-sm font-semibold text-foreground transition hover:border-border hover:bg-muted/50"
               onClick={handleProductImport}
               disabled={importing}
             >
@@ -202,7 +202,7 @@ export default function EnterpriseListPage<T extends GenericRecord>({
               />
               <button
                 type="button"
-                className="rounded-lg border border-border bg-[var(--surface-muted)] px-3 py-1 text-sm font-semibold text-muted-foreground"
+                className="rounded-lg border border-border bg-muted/50 px-3 py-1 text-sm font-semibold text-muted-foreground"
                 disabled
                 title="Customer confirm-import endpoint is not available"
               >

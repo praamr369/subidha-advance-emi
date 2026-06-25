@@ -28,7 +28,7 @@ export default function RelatedRecordPreview({
 }: RelatedRecordPreviewProps) {
   const hasRows = rows.length > 0;
   return (
-    <div className={cn("rounded-2xl border border-border/70 bg-muted/10 px-4 py-3", className)}>
+    <div className={cn("rounded-xl border border-border/70 bg-muted/10 px-4 py-3", className)}>
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-semibold text-foreground">{title}</div>
         {href ? (

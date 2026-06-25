@@ -81,7 +81,7 @@ function SummaryCard({
   hint: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </div>

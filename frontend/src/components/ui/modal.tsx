@@ -30,7 +30,7 @@ export default function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
         className={cn(
-          "relative w-full rounded-2xl border border-border bg-card shadow-xl animate-in zoom-in-95 duration-200",
+          "relative w-full rounded-xl border border-border bg-card shadow-xl animate-in zoom-in-95 duration-200",
           sizes[size]
         )}
       >

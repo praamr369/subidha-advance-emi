@@ -43,7 +43,7 @@ export default function AdminSettingsBusinessPage() {
           <Link
             key={item.title}
             href={item.href}
-            className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+            className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
           >
             <div className="text-base font-semibold text-card-foreground">{item.title}</div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>

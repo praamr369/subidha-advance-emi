@@ -6,7 +6,7 @@ import type { ReconciliationEvidence, ReconciliationResolution } from "@/types/r
 
 function EvidenceRow({ row }: { row: ReconciliationEvidence }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+    <div className="rounded-xl border border-border/70 bg-[var(--surface-card-elevated)] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-semibold">{row.label || row.evidence_type}</div>
         <div className="text-xs text-muted-foreground">{row.evidence_type}</div>
@@ -16,7 +16,7 @@ function EvidenceRow({ row }: { row: ReconciliationEvidence }) {
         {row.status ? `• Status: ${row.status}` : ""}
       </div>
       {row.metadata && Object.keys(row.metadata).length ? (
-        <pre className="mt-3 max-h-48 overflow-auto rounded-xl bg-[var(--surface-muted)] p-3 text-xs text-muted-foreground">
+        <pre className="mt-3 max-h-48 overflow-auto rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
           {JSON.stringify(row.metadata, null, 2)}
         </pre>
       ) : null}

@@ -121,7 +121,7 @@ export default function AdminVendorsLedgerPage() {
       {!loading && !error ? (
         <div className="space-y-6">
           <ERPSectionShell title="Vendor selector" description="Choose a vendor to inspect its ledger and payable posture.">
-            <div className="overflow-x-auto rounded-2xl border">
+            <div className="overflow-x-auto rounded-xl border">
               <table className="min-w-full text-sm">
                 <thead className="bg-muted/40 text-left">
                   <tr>
@@ -187,7 +187,7 @@ export default function AdminVendorsLedgerPage() {
                   ]}
                 />
 
-                <div className="mt-4 overflow-x-auto rounded-2xl border">
+                <div className="mt-4 overflow-x-auto rounded-xl border">
                   <table className="min-w-full text-sm">
                     <thead className="bg-muted/40 text-left">
                       <tr>

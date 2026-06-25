@@ -208,7 +208,7 @@ export default function BankImportDetail({ params }: { params: Promise<{ id: str
             <ERPEmptyState title="No lines found" description="This import has no parsed statement lines." />
           ) : (
             <table className="min-w-full overflow-hidden rounded-[1.2rem] border border-border bg-card">
-              <thead className="bg-[var(--surface-muted)]/60">
+              <thead className="bg-muted/50/60">
                 <tr>
                   <th className="p-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Date
@@ -417,7 +417,7 @@ export default function BankImportDetail({ params }: { params: Promise<{ id: str
             ) : null}
             {!allocationsLoading && !allocationsError && allocations.length > 0 ? (
               <table className="min-w-full overflow-hidden rounded-[1.2rem] border border-border bg-card">
-                <thead className="bg-[var(--surface-muted)]/60">
+                <thead className="bg-muted/50/60">
                   <tr>
                     <th className="p-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                       Allocation

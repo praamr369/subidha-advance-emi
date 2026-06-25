@@ -39,7 +39,7 @@ export default function TrustStrip({ className }: { className?: string }) {
           className="public-card p-5"
         >
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/80 bg-slate-950/90 text-white shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)]">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/80 bg-slate-950/90 text-white shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)]">
               <point.icon className="h-5 w-5" />
             </span>
             <div className="text-sm font-semibold text-foreground">

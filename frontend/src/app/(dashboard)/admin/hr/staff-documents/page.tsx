@@ -234,7 +234,7 @@ export default function AdminHrStaffDocumentsPage() {
 
       {reviewModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
             <h2 className="text-lg font-bold mb-1">
               {reviewModal.action === "verify" ? "Verify document" : "Reject document"}
             </h2>

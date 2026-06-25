@@ -46,7 +46,7 @@ export default function EnterpriseDetailPage({ title, subtitle, resourcePath }: 
 
   return (
     <PortalPage title={title} subtitle={subtitle}>
-      <section className="surface-panel-elevated rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <section className="surface-panel-elevated rounded-xl border border-border bg-card p-6 shadow-sm">
         {loading ? <LoadingBlock label="Loading detail..." /> : null}
         {!id ? <ErrorState title="Missing record id" description="Record identifier was not provided." /> : null}
         {error ? <ErrorState title="Failed to load detail" description={error} /> : null}

@@ -268,7 +268,7 @@ export default function ChartAccountEditDrawer({
                 <FieldLockHint reason={lockReason(detail, "system_code")} />
               </label>
 
-              <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
+              <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Structure
                 </div>
@@ -295,7 +295,7 @@ export default function ChartAccountEditDrawer({
               </label>
             </div>
 
-            <div className="grid gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4">
+            <div className="grid gap-3 rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4">
               <label className="flex items-start gap-3 text-sm text-foreground">
                 <input
                   type="checkbox"

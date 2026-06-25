@@ -41,7 +41,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     if (!this.state.hasError) return this.props.children;
 
     return (
-      <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-destructive">
+      <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-5 text-destructive">
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div className="space-y-3">

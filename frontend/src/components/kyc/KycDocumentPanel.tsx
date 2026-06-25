@@ -436,7 +436,7 @@ export default function KycDocumentPanel(props: KycDocumentPanelProps) {
   const ownerLabel = useMemo(() => owner.charAt(0).toUpperCase() + owner.slice(1), [owner]);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm" data-kyc-panel data-kyc-mode={props.mode}>
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm" data-kyc-panel data-kyc-mode={props.mode}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-foreground">{title}</h2>

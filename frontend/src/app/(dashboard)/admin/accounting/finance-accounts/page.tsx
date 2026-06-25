@@ -180,12 +180,12 @@ export default function AdminAccountingFinanceAccountsPage() {
 
         <ERPSectionShell title="Auto-sync posture" description="Uses the existing accounting setup defaults service to create/claim missing system COA and finance account defaults. This does not post money or rewrite history.">
           <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
-            <div className="rounded-2xl border bg-muted/30 p-4 text-sm text-muted-foreground">
+            <div className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
               <div className="font-semibold text-foreground">Recommended defaults</div>
               <p className="mt-1">Missing finance account defaults: <span className="font-semibold text-foreground">{recommended.length}</span>. Required settlement types are Cash, Bank, and UPI accounts mapped to active ASSET chart accounts.</p>
               {recommended.length > 0 ? <div className="mt-3 flex flex-wrap gap-2">{recommended.slice(0, 8).map((row, index) => <span key={index} className={pill("warning")}>{text(row.kind)} · {text(row.name)}</span>)}</div> : <div className="mt-3"><span className={pill("success")}>No missing recommended finance defaults</span></div>}
             </div>
-            <button type="button" disabled={saving} onClick={() => void applyDefaults()} className="inline-flex items-center justify-center gap-2 rounded-2xl border bg-background px-4 py-3 text-sm font-semibold transition hover:bg-muted disabled:opacity-50"><Wand2 className="h-4 w-4" />Apply safe defaults</button>
+            <button type="button" disabled={saving} onClick={() => void applyDefaults()} className="inline-flex items-center justify-center gap-2 rounded-xl border bg-background px-4 py-3 text-sm font-semibold transition hover:bg-muted disabled:opacity-50"><Wand2 className="h-4 w-4" />Apply safe defaults</button>
           </div>
         </ERPSectionShell>
 
@@ -277,7 +277,7 @@ export default function AdminAccountingFinanceAccountsPage() {
         </ERPSectionShell>
 
         <ERPSectionShell title="COA / FA operating rule" description="Keep these pages separate for daily operators.">
-          <div className="grid gap-3 md:grid-cols-2"><Link href={ROUTES.admin.accountingChartOfAccounts} className="rounded-2xl border bg-card p-4 text-sm transition hover:bg-muted"><div className="font-semibold">Chart of Accounts</div><p className="mt-1 text-muted-foreground">System ledger structure: ASSET, LIABILITY, EQUITY, INCOME, EXPENSE. Used by all modules.</p></Link><div className="rounded-2xl border bg-card p-4 text-sm"><div className="font-semibold">Finance Accounts</div><p className="mt-1 text-muted-foreground">Real settlement instruments: cash drawer, bank account, UPI/payment gateway. Must point to ASSET COA.</p></div></div>
+          <div className="grid gap-3 md:grid-cols-2"><Link href={ROUTES.admin.accountingChartOfAccounts} className="rounded-xl border bg-card p-4 text-sm transition hover:bg-muted"><div className="font-semibold">Chart of Accounts</div><p className="mt-1 text-muted-foreground">System ledger structure: ASSET, LIABILITY, EQUITY, INCOME, EXPENSE. Used by all modules.</p></Link><div className="rounded-xl border bg-card p-4 text-sm"><div className="font-semibold">Finance Accounts</div><p className="mt-1 text-muted-foreground">Real settlement instruments: cash drawer, bank account, UPI/payment gateway. Must point to ASSET COA.</p></div></div>
         </ERPSectionShell>
       </div>
       <FinanceAccountEditDrawer open={selectedFinanceAccountId !== null} accountId={selectedFinanceAccountId} chartAccounts={chartAccounts} onClose={() => setSelectedFinanceAccountId(null)} onSaved={async (account: FinanceAccountDetail) => { setNotice(`Finance account ${account.name} updated.`); await load("refresh"); }} />

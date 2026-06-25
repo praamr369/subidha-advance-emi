@@ -99,20 +99,20 @@ export default function PublicSiteSettingsPage() {
       />
       <BusinessSetupLinks />
 
-      <div className="rounded-2xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
+      <div className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
         Public business profile is endpoint-backed here (identity, hero copy, contact, social, and logo URL).
         Legal policy governance and compliance-document controls are managed from /admin/settings/policies and /admin/settings/business-compliance.
       </div>
 
       {message ? (
-        <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
           {message}
         </div>
       ) : null}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <section className="grid gap-5 lg:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="text-base font-semibold text-foreground">Public identity</div>
             <p className="mt-1 text-sm text-muted-foreground">
               These fields are safe to show on public pages. Avoid internal-only identifiers.
@@ -161,7 +161,7 @@ export default function PublicSiteSettingsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="text-base font-semibold text-foreground">Contact & social</div>
             <p className="mt-1 text-sm text-muted-foreground">
               Use https links only. WhatsApp phone normalizes to 10 digits for wa.me links.
@@ -244,7 +244,7 @@ export default function PublicSiteSettingsPage() {
         </section>
 
         <section className="grid gap-5 lg:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="text-base font-semibold text-foreground">Public address</div>
             <div className="mt-4 grid gap-4">
               <textarea
@@ -266,7 +266,7 @@ export default function PublicSiteSettingsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="text-base font-semibold text-foreground">Business hours</div>
             <div className="mt-4 grid gap-4">
               <textarea

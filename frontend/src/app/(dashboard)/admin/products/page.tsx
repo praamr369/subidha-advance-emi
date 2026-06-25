@@ -241,7 +241,7 @@ export default function AdminProductsPage() {
 
         {!loading && !error ? (
           <ERPSectionShell title="Product rows" description={`${rangeText}. Quick actions are available on every row and also work on mobile/tablet without hover.`}>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
               <span>{rangeText}</span>
               <div className="flex flex-wrap items-center gap-2"><button type="button" disabled={!payload.has_previous || page <= 1} onClick={() => setPage((current) => Math.max(current - 1, 1))} className="rounded-lg border border-border px-3 py-2 font-semibold text-foreground disabled:opacity-50">Previous</button><span className="px-2">Page {payload.page} of {payload.num_pages || 1}</span><button type="button" disabled={!payload.has_next} onClick={() => setPage((current) => current + 1)} className="rounded-lg border border-border px-3 py-2 font-semibold text-foreground disabled:opacity-50">Next</button></div>
             </div>

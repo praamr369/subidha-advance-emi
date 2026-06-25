@@ -41,7 +41,7 @@ function snapshotValue(source: Record<string, unknown>, key: string): string | n
 
 function MoneyRow({ label, value }: { label: string; value?: string | number | null }) {
   return (
-    <div className="rounded-2xl border border-border bg-muted/20 p-3">
+    <div className="rounded-xl border border-border bg-muted/20 p-3">
       <div className="text-xs font-semibold uppercase text-muted-foreground">{label}</div>
       <div className="mt-1 text-sm font-medium">{valueOrDash(value)}</div>
     </div>
@@ -70,7 +70,7 @@ function ExecutionSummary({ event }: { event: ContractRecontractEvent }) {
   const beforeProductId = snapshotValue(before, "product_id");
   const afterProductId = snapshotValue(after, "product_id");
   return (
-    <div className="space-y-3 rounded-2xl border border-emerald-300 bg-emerald-50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/30">
+    <div className="space-y-3 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/30">
       <div className="font-semibold text-emerald-900 dark:text-emerald-100">Execution status: {event.execution_status || "EXECUTED"}</div>
       <div className="grid gap-3 md:grid-cols-2">
         <MoneyRow label="Executed at" value={event.executed_at} />
@@ -148,7 +148,7 @@ function ExecutionPanel({
   return (
     <DetailPanel title="Product recontract execution" description="Admin-only final execution after all backend evidence exists.">
       <div className="space-y-4">
-        <p className="rounded-2xl border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100">{EXECUTION_WARNING}</p>
+        <p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100">{EXECUTION_WARNING}</p>
         <div className="grid gap-2 md:grid-cols-2">
           {checklist.map((item) => <ChecklistRow key={item.label} label={item.label} complete={item.complete} />)}
         </div>
@@ -315,7 +315,7 @@ export default function ProductRecontractPreviewPanel({ amendment }: { amendment
 
         {preview ? <PreviewGrid preview={preview} /> : null}
         {latestEvent ? (
-          <div className="space-y-3 rounded-2xl border border-border bg-muted/20 p-3">
+          <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3">
             <div className="text-xs font-semibold uppercase text-muted-foreground">Latest saved preview snapshot</div>
             <div className="text-sm font-medium">#{latestEvent.id} · {latestEvent.status} · {latestEvent.impact_type}</div>
             <div className="grid gap-3 md:grid-cols-2">
@@ -368,7 +368,7 @@ function PreviewGrid({ preview }: { preview: ProductRecontractPreview }) {
 
 function ScheduleTable({ lines }: { lines: NonNullable<ContractRecontractEvent["schedule_preview_lines"]> }) {
   return (
-    <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-3">
+    <div className="space-y-2 rounded-xl border border-border bg-muted/20 p-3">
       <div className="text-xs font-semibold uppercase text-muted-foreground">Future EMI schedule preview lines</div>
       <div className="overflow-auto">
         <table className="min-w-full text-sm">
@@ -382,7 +382,7 @@ function ScheduleTable({ lines }: { lines: NonNullable<ContractRecontractEvent["
 
 function FinancialPreviewPanel({ preview }: { preview: ContractRecontractFinancialImpactPreview }) {
   return (
-    <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-3">
+    <div className="space-y-2 rounded-xl border border-border bg-muted/20 p-3">
       <div className="text-xs font-semibold uppercase text-muted-foreground">Accounting and reconciliation impact preview</div>
       <div className="grid gap-3 md:grid-cols-2">
         <MoneyRow label="Impact type" value={preview.impact_type} />

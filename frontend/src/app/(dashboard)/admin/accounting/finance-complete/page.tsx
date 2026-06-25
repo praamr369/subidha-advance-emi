@@ -221,7 +221,7 @@ export default function FinanceCompletePage() {
       {/* LEASE ACCOUNTING */}
       {activeTab === "lease" && (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <h2 className="text-lg font-bold mb-4">IFRS-16 Lease Accounting</h2>
             <p className="text-sm text-muted-foreground mb-4">Calculate ROU asset & lease liability using PV method</p>
 
@@ -268,7 +268,7 @@ export default function FinanceCompletePage() {
           </div>
 
           {/* Lease Contract Create Form */}
-          <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">Lease Contracts</h2>
               <button onClick={() => setLeaseFormVisible(!leaseFormVisible)} className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
@@ -350,7 +350,7 @@ export default function FinanceCompletePage() {
       {/* DEPRECIATION */}
       {activeTab === "depreciation" && (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">Fixed Assets</h2>
               <button onClick={() => setAssetFormVisible(!assetFormVisible)} className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
@@ -459,7 +459,7 @@ export default function FinanceCompletePage() {
 
           {/* Depreciation schedule generator */}
           {selectedAssetId && (
-            <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="rounded-xl border border-border bg-card p-6">
               <h3 className="text-sm font-bold mb-3">Generate Depreciation Schedule — Asset #{selectedAssetId}</h3>
               <div className="flex gap-3 items-end mb-3">
                 <div>
@@ -483,7 +483,7 @@ export default function FinanceCompletePage() {
       {/* COST CENTRE P&L */}
       {activeTab === "cost-centre" && (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <div className="flex gap-3 mb-4">
               <div className="flex-1">
                 <label className="text-xs font-semibold">Period Start</label>
@@ -530,7 +530,7 @@ export default function FinanceCompletePage() {
 
       {/* CASH FLOW */}
       {activeTab === "cash-flow" && (
-        <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           {cashFlow ? (
             <div className="space-y-3">
               <h3 className="text-sm font-bold">Cash Flow Statement (Direct Method)</h3>
@@ -562,7 +562,7 @@ export default function FinanceCompletePage() {
 
       {/* FUND FLOW */}
       {activeTab === "fund-flow" && (
-        <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           {fundFlow ? (
             <div className="space-y-3">
               <h3 className="text-sm font-bold">Fund Flow Statement</h3>
@@ -603,7 +603,7 @@ export default function FinanceCompletePage() {
 
       {/* FINANCIAL RATIOS */}
       {activeTab === "ratios" && (
-        <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           {ratios ? (
             <div className="space-y-4">
               <h3 className="text-sm font-bold">Financial Ratios & Intelligence</h3>
@@ -641,7 +641,7 @@ export default function FinanceCompletePage() {
 
       {/* DEFERRED TAX */}
       {activeTab === "deferred-tax" && (
-        <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           {deferredTax ? (
             <div className="space-y-4">
               <h3 className="text-sm font-bold">Deferred Tax Tracking</h3>

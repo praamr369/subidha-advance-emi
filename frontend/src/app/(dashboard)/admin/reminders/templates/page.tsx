@@ -312,7 +312,7 @@ export default function NotificationTemplatesPage() {
                         <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${CHANNEL_BADGE[t.channel] ?? "bg-gray-50 text-gray-600 border-gray-200"}`}>
                           {t.channel}
                         </span>
-                        <span className="font-mono text-xs bg-[var(--surface-muted)] px-2 py-0.5 rounded-lg">{t.key}</span>
+                        <span className="font-mono text-xs bg-muted/50 px-2 py-0.5 rounded-lg">{t.key}</span>
                         <span className="font-medium text-sm">{t.name}</span>
                         {!t.is_active && (
                           <span className="rounded-full bg-gray-200 text-gray-500 px-2 py-0.5 text-xs">Inactive</span>

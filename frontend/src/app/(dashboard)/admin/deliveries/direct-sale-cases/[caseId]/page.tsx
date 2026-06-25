@@ -78,7 +78,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-base font-semibold text-foreground">{title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       <div className="mt-4">{children}</div>
@@ -376,7 +376,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
               type="button"
               onClick={() => void loadPage("refresh")}
               disabled={loading || refreshing}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
@@ -694,7 +694,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                     onClick={() => void runAction("SCHEDULE")}
                     disabled={Boolean(actionDisabledReason) || actionLoading === "SCHEDULE"}
                     title={actionDisabledReason || "Schedule this delivery"}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {actionLoading === "SCHEDULE" ? "Working..." : "Assign / Reschedule Delivery"}
                   </button>
@@ -705,7 +705,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                     onClick={() => void runAction("DISPATCH")}
                     disabled={Boolean(actionDisabledReason) || actionLoading === "DISPATCH"}
                     title={actionDisabledReason || "Dispatch this delivery"}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {actionLoading === "DISPATCH" ? "Working..." : "Create Delivery Action"}
                   </button>
@@ -744,7 +744,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                   type="button"
                   onClick={() => void runAction("ADD_NOTE")}
                   disabled={isHistoryOnly || actionLoading === "ADD_NOTE"}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {actionLoading === "ADD_NOTE" ? "Working..." : "Create Delivery Action Note"}
                 </button>

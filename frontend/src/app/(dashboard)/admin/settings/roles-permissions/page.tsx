@@ -108,7 +108,7 @@ export default function RolesPermissionsPage() {
 
       {matrix ? (
         <>
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-lg font-semibold">Capability matrix table</h2>
             <p className="mt-1 text-sm text-muted-foreground">Role policies remain additive and non-breaking. Toggle only explicit capability gates.</p>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -155,7 +155,7 @@ export default function RolesPermissionsPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-lg font-semibold">User override view</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <select

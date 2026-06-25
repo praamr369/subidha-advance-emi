@@ -220,7 +220,7 @@ export default function DryRunControlCenterPage() {
       />
 
       <div
-        className="rounded-2xl border border-sky-300 bg-sky-50 p-4 text-sm text-sky-950 shadow-sm"
+        className="rounded-xl border border-sky-300 bg-sky-50 p-4 text-sm text-sky-950 shadow-sm"
         role="note"
       >
         <div className="font-semibold">Safety</div>
@@ -235,12 +235,12 @@ export default function DryRunControlCenterPage() {
 
       {optionsError ? <ErrorState description={optionsError} onRetry={() => void loadOptions()} /> : null}
       {runError ? (
-        <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {runError}
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm" aria-labelledby="dry-run-options">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="dry-run-options">
         <h2 id="dry-run-options" className="text-base font-semibold text-foreground">
           Run options
         </h2>
@@ -273,13 +273,13 @@ export default function DryRunControlCenterPage() {
       </section>
 
       {loadingOptions && !checks.length ? (
-        <section className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground" aria-busy="true">
+        <section className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground" aria-busy="true">
           Loading dry run catalog…
         </section>
       ) : null}
 
       {!loadingOptions && !checks.length ? (
-        <section className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
+        <section className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
           No checks returned from the server.
         </section>
       ) : null}
@@ -301,7 +301,7 @@ export default function DryRunControlCenterPage() {
               {sectionChecks.map((c) => (
                 <label
                   key={c.key}
-                  className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-ring"
+                  className="flex cursor-pointer flex-col gap-2 rounded-xl border border-border bg-card p-4 shadow-sm transition hover:border-ring"
                 >
                   <div className="flex items-start gap-3">
                     <input
@@ -333,7 +333,7 @@ export default function DryRunControlCenterPage() {
         );
       })}
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm" aria-label="Run dry runs">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-label="Run dry runs">
         <h2 className="text-base font-semibold text-foreground">Execute</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           These actions only call validation endpoints. There is no execute / reset / import / export on this page.
@@ -382,7 +382,7 @@ export default function DryRunControlCenterPage() {
           <h2 className="text-lg font-semibold text-foreground">Latest results</h2>
           <div className="grid gap-3 sm:grid-cols-4">
             {(["pass", "warning", "blocked", "failed"] as const).map((key) => (
-              <div key={key} className="rounded-2xl border border-border bg-card p-4 text-center shadow-sm">
+              <div key={key} className="rounded-xl border border-border bg-card p-4 text-center shadow-sm">
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{key}</div>
                 <div className="mt-2 text-2xl font-semibold text-foreground" data-testid={`dry-run-summary-${key}`}>
                   {lastRun.summary[key]}
@@ -390,7 +390,7 @@ export default function DryRunControlCenterPage() {
               </div>
             ))}
           </div>
-          <div className="overflow-x-auto rounded-2xl border border-border shadow-sm">
+          <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
             <table className="min-w-full divide-y divide-border text-sm">
               <thead className="bg-muted/50">
                 <tr>
@@ -448,7 +448,7 @@ export default function DryRunControlCenterPage() {
           <p className="text-xs text-muted-foreground">Run id: {lastRun.run_id}</p>
         </section>
       ) : (
-        <section className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
+        <section className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
           No run yet. Select checks and press &quot;Run selected dry runs&quot;, or use a preset above.
         </section>
       )}

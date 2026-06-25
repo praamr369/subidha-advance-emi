@@ -120,7 +120,7 @@ export default function AdminHrWorkspacePage() {
                 <Link
                   key={label}
                   href={href}
-                  className="flex items-center gap-2.5 rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted hover:border-[var(--surface-border-strong)]"
+                  className="flex items-center gap-2.5 rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted hover:border-border"
                 >
                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   {label}

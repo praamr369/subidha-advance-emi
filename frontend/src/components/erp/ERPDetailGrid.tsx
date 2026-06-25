@@ -41,7 +41,7 @@ export default function ERPDetailGrid({ items, columns = 2, className }: ERPDeta
         <div
           key={`detail-${index}`}
           className={cn(
-            "rounded-2xl border border-border/60 bg-[color-mix(in_oklab,var(--surface-muted)_40%,transparent)] p-3",
+            "rounded-xl border border-border bg-muted/40 p-3",
             item.className
           )}
         >

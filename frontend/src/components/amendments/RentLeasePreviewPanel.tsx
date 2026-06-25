@@ -67,13 +67,13 @@ export default function RentLeasePreviewPanel({ amendment }: { amendment: Amendm
   return (
     <DetailPanel title="Rent / Lease Amendment Preview" description="Preview-only mode. Execution is deferred until rent/lease accounting and reconciliation workflow exists.">
       <div className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-muted/20 p-3">
+        <div className="rounded-xl border border-border bg-muted/20 p-3">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Contract Details</div>
           <div className="mt-2 text-muted-foreground">Ref: <span className="font-medium text-foreground">{preview.current_contract_reference || "—"}</span></div>
           <div className="mt-1 text-muted-foreground">Customer: <span className="font-medium text-foreground">{preview.customer_name || "—"}</span></div>
         </div>
         
-        <div className="rounded-2xl border border-border bg-muted/20 p-3">
+        <div className="rounded-xl border border-border bg-muted/20 p-3">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Asset & Tenure</div>
           <div className="mt-2 text-muted-foreground">Asset: <span className="font-medium text-foreground">{preview.current_product || "—"}</span></div>
           {preview.requested_product_id && (
@@ -85,7 +85,7 @@ export default function RentLeasePreviewPanel({ amendment }: { amendment: Amendm
           )}
         </div>
 
-        <div className="rounded-2xl border border-border bg-muted/20 p-3">
+        <div className="rounded-xl border border-border bg-muted/20 p-3">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Financials</div>
           <div className="mt-2 text-muted-foreground">Monthly: <span className="font-medium text-foreground">{preview.current_monthly_amount || "—"}</span></div>
           {preview.requested_monthly_amount && (
@@ -97,7 +97,7 @@ export default function RentLeasePreviewPanel({ amendment }: { amendment: Amendm
           )}
         </div>
 
-        <div className="rounded-2xl border border-orange-200 bg-orange-50/50 dark:border-orange-900/50 dark:bg-orange-900/10 p-3 md:col-span-2 lg:col-span-3">
+        <div className="rounded-xl border border-orange-200 bg-orange-50/50 dark:border-orange-900/50 dark:bg-orange-900/10 p-3 md:col-span-2 lg:col-span-3">
           <div className="text-xs font-semibold uppercase text-orange-800 dark:text-orange-200">Impact Analysis & Risk</div>
           <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <div><dt className="text-muted-foreground">Demand Schedule</dt><dd className="font-medium text-foreground">{preview.demand_schedule_impact_summary || "—"}</dd></div>

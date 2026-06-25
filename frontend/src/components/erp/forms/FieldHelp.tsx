@@ -13,7 +13,7 @@ type FieldHelpProps = {
 
 export default function FieldHelp({ meaning, requiredWhy, examples, className }: FieldHelpProps) {
   return (
-    <div className={cn("rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-sm", className)}>
+    <div className={cn("rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-sm", className)}>
       <div className="font-semibold text-foreground">Field help</div>
       <div className="mt-2 space-y-2 text-muted-foreground">
         <div>

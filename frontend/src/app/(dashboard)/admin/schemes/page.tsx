@@ -94,7 +94,7 @@ function SchemeForm({
   );
 
   return (
-    <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-5 space-y-4">
+    <div className="rounded-xl border border-border bg-muted/50 p-5 space-y-4">
       <div className="font-semibold text-sm">{initial ? "Edit Scheme" : "New Scheme"}</div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {field("Scheme Name *", "name", "text", "e.g. Diwali 2025")}
@@ -264,7 +264,7 @@ export default function SchemesPage() {
         {!loading && !error && schemes.length > 0 ? (
           <div className="overflow-x-auto rounded-xl border border-border">
             <table className="min-w-full text-sm">
-              <thead className="bg-[var(--surface-muted)]">
+              <thead className="bg-muted/50">
                 <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-4 py-3">Name / Code</th>
                   <th className="px-4 py-3">Plan</th>

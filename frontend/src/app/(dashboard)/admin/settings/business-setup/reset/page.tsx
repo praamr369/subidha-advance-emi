@@ -149,7 +149,7 @@ export default function BusinessSetupResetPage() {
       <PageHeader title="Modular Reset + Backup / Restore" description="Admin-only governance for safe reset and package-based restore." />
       <BusinessSetupLinks />
 
-      <section className="rounded-2xl border border-border bg-card p-4">
+      <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Reset Scope Selector</h2>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           {scopes.map((scope) => (
@@ -170,7 +170,7 @@ export default function BusinessSetupResetPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-4">
+      <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Reset Preview Panel</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <input
@@ -185,7 +185,7 @@ export default function BusinessSetupResetPage() {
             onChange={(e) => setConfirmation(e.target.value)}
             placeholder={PHRASE}
           />
-          <button className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground" onClick={() => void runPreview()}>
+          <button type="button" className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground" onClick={() => void runPreview()}>
             Run preview
           </button>
         </div>
@@ -193,19 +193,19 @@ export default function BusinessSetupResetPage() {
         {preview ? <pre className="mt-3 overflow-x-auto rounded bg-muted p-3 text-xs">{JSON.stringify(preview, null, 2)}</pre> : null}
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-4">
+      <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Backup Before Reset Panel</h2>
         <div className="mt-3 flex gap-2">
-          <button className="rounded border border-border px-3 py-2 text-sm" onClick={() => void runBackup("SELECTED_SCOPES_EXPORT")}>Create selected-scope export</button>
-          <button className="rounded border border-border px-3 py-2 text-sm" onClick={() => void runBackup("FULL_DATABASE_LOGICAL")}>Create full logical backup metadata</button>
-          <button className="rounded bg-destructive px-3 py-2 text-sm text-destructive-foreground" disabled={hasBlockers} onClick={() => void runReset()}>
+          <button type="button" className="rounded border border-border px-3 py-2 text-sm" onClick={() => void runBackup("SELECTED_SCOPES_EXPORT")}>Create selected-scope export</button>
+          <button type="button" className="rounded border border-border px-3 py-2 text-sm" onClick={() => void runBackup("FULL_DATABASE_LOGICAL")}>Create full logical backup metadata</button>
+          <button type="button" className="rounded bg-destructive px-3 py-2 text-sm text-destructive-foreground" disabled={hasBlockers} onClick={() => void runReset()}>
             Execute reset
           </button>
         </div>
         <pre className="mt-3 overflow-x-auto rounded bg-muted p-3 text-xs">{JSON.stringify(backupJobs, null, 2)}</pre>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-4">
+      <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Restore / Import Panel</h2>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           <label className="text-sm">
@@ -251,15 +251,15 @@ export default function BusinessSetupResetPage() {
               placeholder="Paste setup snapshot JSON package"
             />
             <div className="text-xs text-muted-foreground">
-              Not for full production database rollback. See runbook: <a className="underline" href="/docs/operations/setup-snapshot-runbook.md">Setup Snapshot Runbook</a>
+              Not for full production database rollback. Use the Dry Runs page for read-only validation before any restore.
             </div>
           </div>
         ) : null}
         <div className="mt-3 flex gap-2">
-          <button className="rounded border border-border px-3 py-2 text-sm" onClick={() => void runRestorePreview()} disabled={restoreType !== "SETUP_SNAPSHOT_RESTORE_PREVIEW" && !selectedBackupId}>
+          <button type="button" className="rounded border border-border px-3 py-2 text-sm" onClick={() => void runRestorePreview()} disabled={restoreType !== "SETUP_SNAPSHOT_RESTORE_PREVIEW" && !selectedBackupId}>
             Preview restore
           </button>
-          <button className="rounded border border-border px-3 py-2 text-sm" onClick={() => void runRestoreExecute()} disabled={!restorePreview}>
+          <button type="button" className="rounded border border-border px-3 py-2 text-sm" onClick={() => void runRestoreExecute()} disabled={!restorePreview}>
             Execute restore
           </button>
         </div>

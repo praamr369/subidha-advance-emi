@@ -107,11 +107,11 @@ export default function HomeLandingHero({ title, subtitle, companyName, tagline,
             sizes="(max-width: 1024px) 100vw, 46vw"
             className="min-h-[22rem] lg:min-h-[31rem]"
           />
-          <div className="pointer-events-none absolute -left-4 top-8 hidden rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
+          <div className="pointer-events-none absolute -left-4 top-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Lucky Plan</div>
             <div className="mt-1 text-sm font-semibold text-foreground">Future EMI waiver only</div>
           </div>
-          <div className="pointer-events-none absolute -right-2 bottom-8 hidden rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
+          <div className="pointer-events-none absolute -right-2 bottom-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Rent / Lease</div>
             <div className="mt-1 text-sm font-semibold text-foreground">Monthly invoice workflow</div>
           </div>

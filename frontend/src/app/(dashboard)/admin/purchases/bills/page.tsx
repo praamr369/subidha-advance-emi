@@ -359,7 +359,7 @@ export default function AdminPurchaseBillsPage() {
         {!loading && error ? <ERPErrorState title="Load error" description={error} onRetry={() => void load()} /> : null}
 
         {showCreate ? (
-          <div className="mb-6 rounded-2xl border border-border bg-card p-5">
+          <div className="mb-6 rounded-xl border border-border bg-card p-5">
             <h3 className="mb-4 text-sm font-semibold text-foreground">New Vendor Bill</h3>
             <CreateBillForm vendors={vendors} receipts={receipts} items={items} onSaved={handleSaved} onCancel={() => setShowCreate(false)} />
           </div>
@@ -372,7 +372,7 @@ export default function AdminPurchaseBillsPage() {
         {!loading && !error && rows.length > 0 ? (
           <div className="overflow-x-auto rounded-xl border border-border">
             <table className="min-w-full text-sm">
-              <thead className="bg-[var(--surface-muted)]">
+              <thead className="bg-muted/50">
                 <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-4 py-3">Bill No</th>
                   <th className="px-4 py-3">Date</th>

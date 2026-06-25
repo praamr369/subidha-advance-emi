@@ -41,7 +41,7 @@ export default function WinnerHistoryProductCarousel({
                       : `Prize product · batch ${winner.batch_code}`
                   }
                   sizes="100vw"
-                  className="absolute inset-0 size-full rounded-[1.25rem]"
+                  className="absolute inset-0 size-full rounded-xl"
                   fallbackLabel="Media unavailable"
                 />
               </AspectRatio>

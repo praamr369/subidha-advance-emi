@@ -110,7 +110,7 @@ export default function DirectSaleDeliveryChallanPrintPage() {
   if (error || !delivery) {
     return (
       <div className="p-8">
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error || "Delivery case not found."}
         </div>
       </div>
@@ -178,12 +178,12 @@ export default function DirectSaleDeliveryChallanPrintPage() {
           ]}
         />
         {hasOutstanding ? (
-          <div className="document-card mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+          <div className="document-card mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
             Outstanding balance remains collectible: {delivery.balance_total}. This delivery challan does not settle payment or alter receivables.
           </div>
         ) : null}
         {releasedWithOutstanding ? (
-          <div className="document-card mt-4 rounded-2xl border border-sky-300 bg-sky-50 p-4 text-sm text-sky-900">
+          <div className="document-card mt-4 rounded-xl border border-sky-300 bg-sky-50 p-4 text-sm text-sky-900">
             <div className="font-semibold">Delivery was operationally released with outstanding balance recorded.</div>
             <div className="mt-1">
               Approved by {delivery.payment_exception_approved_by_username || "—"} at {formatDocumentDateTime(delivery.payment_exception_approved_at)}.
@@ -193,7 +193,7 @@ export default function DirectSaleDeliveryChallanPrintPage() {
           </div>
         ) : null}
         {delivery.operational_notes || delivery.notes || delivery.failure_or_cancellation_reason ? (
-          <div className="document-card mt-4 rounded-2xl border border-[#e6d6bd] bg-white p-4 text-sm text-[#6f5c46]">
+          <div className="document-card mt-4 rounded-xl border border-border bg-card p-4 text-sm text-[#6f5c46]">
             <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Remarks / Notes</div>
             <div className="mt-2 whitespace-pre-line">
               {delivery.operational_notes || delivery.notes || delivery.failure_or_cancellation_reason}

@@ -54,7 +54,7 @@ export function ErpCardsOperationalWorkspace({
       minLeftPercent={22}
       minRightPercent={36}
       left={
-        <section className="flex h-full min-h-[260px] flex-col rounded-2xl border border-white/80 bg-[#fffaf5] p-4 shadow-[0_14px_26px_-24px_rgba(120,53,15,0.25)]">
+        <section className="flex h-full min-h-[260px] flex-col rounded-xl border border-white/80 bg-[#fffaf5] p-4 shadow-[0_14px_26px_-24px_rgba(120,53,15,0.25)]">
           <h2 className="text-base font-semibold text-foreground">{boardTitle}</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Pick a lane to open the full operational card preview.
@@ -89,7 +89,7 @@ export function ErpCardsOperationalWorkspace({
         </section>
       }
       right={
-        <section className="min-h-[260px] rounded-2xl border border-white/80 bg-[#fffaf5] p-2 shadow-[0_14px_26px_-24px_rgba(120,53,15,0.25)]">
+        <section className="min-h-[260px] rounded-xl border border-white/80 bg-[#fffaf5] p-2 shadow-[0_14px_26px_-24px_rgba(120,53,15,0.25)]">
           {selected ? (
             <QueueCard card={selected} />
           ) : (

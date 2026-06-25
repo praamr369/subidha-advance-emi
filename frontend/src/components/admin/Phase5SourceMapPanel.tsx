@@ -14,7 +14,7 @@ export default function Phase5SourceMapPanel({
 }) {
   if (!rows.length) return null;
   return (
-    <section className="rounded-2xl border border-border bg-card p-4">
+    <section className="rounded-xl border border-border bg-card p-4">
       <h3 className="text-sm font-semibold text-foreground">Data source map</h3>
       <div className="mt-3 space-y-3">
         {rows.map((row) => (

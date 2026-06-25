@@ -102,7 +102,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div>
         <h2 className="text-base font-semibold text-foreground">{title}</h2>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
@@ -355,7 +355,7 @@ export default function AdminDeliveryDetailPage() {
               type="button"
               onClick={() => void loadPage("refresh")}
               disabled={loading || refreshing}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
@@ -525,7 +525,7 @@ export default function AdminDeliveryDetailPage() {
                       type="button"
                       onClick={() => void handleTransition(action)}
                       disabled={actionLoading === action}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {actionLoading === action
                         ? "Working..."
@@ -558,7 +558,7 @@ export default function AdminDeliveryDetailPage() {
                   {timeline.map((entry) => (
                     <div
                       key={entry.id}
-                      className="rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3"
+                      className="rounded-xl border border-border bg-muted/50 px-4 py-3"
                     >
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {entry.action_type}

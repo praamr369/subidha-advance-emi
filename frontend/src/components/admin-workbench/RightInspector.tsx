@@ -7,7 +7,7 @@ type RightInspectorProps = {
 
 export default function RightInspector({ title, children }: RightInspectorProps) {
   return (
-    <aside className="surface-panel-elevated h-fit rounded-2xl border border-border p-4 xl:sticky xl:top-4">
+    <aside className="surface-panel-elevated h-fit rounded-xl border border-border p-4 xl:sticky xl:top-4">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         Inspector
       </p>

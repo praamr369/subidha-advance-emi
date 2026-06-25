@@ -112,7 +112,7 @@ export default function AdminOperationsWorkspacePage() {
               return (
                 <article
                   key={`op-focus-${row.key}`}
-                  className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+                  className="rounded-xl border border-border bg-card p-4 shadow-sm"
                 >
                   <div className="text-sm font-semibold text-foreground">{row.key.replaceAll("_", " ")}</div>
                   <div className="mt-2 text-2xl font-semibold text-foreground">{row.count}</div>

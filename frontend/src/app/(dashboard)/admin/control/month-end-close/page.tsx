@@ -150,7 +150,7 @@ export default function AdminControlMonthEndClosePage() {
                   <button
                     onClick={() => void handleExecute(true)}
                     disabled={executing}
-                    className="rounded border border-border bg-[var(--surface-strong)] px-4 py-2 text-sm font-medium disabled:opacity-50 hover:bg-muted/30"
+                    className="rounded border border-border bg-background px-4 py-2 text-sm font-medium disabled:opacity-50 hover:bg-muted/30"
                   >
                     {executing ? "Running…" : "Dry Run"}
                   </button>
@@ -183,7 +183,7 @@ export default function AdminControlMonthEndClosePage() {
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-border">
                   <table className="w-full text-sm">
-                    <thead className="bg-[var(--surface-muted)] text-left text-xs uppercase text-muted-foreground">
+                    <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                       <tr>
                         <th className="px-4 py-2">Check</th>
                         <th className="px-4 py-2">Severity</th>
@@ -211,7 +211,7 @@ export default function AdminControlMonthEndClosePage() {
             ) : (
               <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-sm">
-                  <thead className="bg-[var(--surface-muted)] text-left text-xs uppercase text-muted-foreground">
+                  <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3">Period</th>
                       <th className="px-4 py-3">Branch</th>

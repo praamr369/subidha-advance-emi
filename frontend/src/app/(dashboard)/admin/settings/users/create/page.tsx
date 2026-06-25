@@ -181,7 +181,7 @@ export default function AdminInternalUserCreatePage() {
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <form
           onSubmit={handleSubmit}
-          className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-sm"
+          className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-sm"
         >
           <div>
             <h2 className="text-lg font-semibold text-foreground">Identity and access</h2>
@@ -388,7 +388,7 @@ export default function AdminInternalUserCreatePage() {
         </form>
 
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Live preview
             </h3>
@@ -408,7 +408,7 @@ export default function AdminInternalUserCreatePage() {
             </dl>
           </div>
 
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
             <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-800">
               Control note
             </h3>

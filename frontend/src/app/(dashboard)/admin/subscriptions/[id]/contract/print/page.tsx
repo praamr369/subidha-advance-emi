@@ -277,7 +277,7 @@ export default function AdminSubscriptionContractPrintPage() {
           ]}
         />
 
-        <section className="document-card my-4 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+        <section className="document-card my-4 rounded-xl border border-border bg-card p-4">
           <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">Product / Contract Item</div>
           <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -300,7 +300,7 @@ export default function AdminSubscriptionContractPrintPage() {
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-          <section className="document-card rounded-2xl border border-[#e6d6bd] bg-white p-4">
+          <section className="document-card rounded-xl border border-border bg-card p-4">
             <div className="text-[11px] font-black uppercase tracking-[0.12em] text-[#8a5a22]">Payment Posture</div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
@@ -345,7 +345,7 @@ export default function AdminSubscriptionContractPrintPage() {
 
         <DocumentTermsBlock terms={buildTerms(subscription)} />
 
-        <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+        <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
           <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Customer Obligations</div>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-[#6f5c46]">
             <li>Pay monthly EMI dues as per the backend contract record and preserve system receipts.</li>
@@ -354,7 +354,7 @@ export default function AdminSubscriptionContractPrintPage() {
           </ul>
         </section>
 
-        <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+        <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
           <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Business Obligations</div>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-[#6f5c46]">
             <li>Maintain posted EMI, payment, waiver, delivery, and audit records in SUBIDHA CORE.</li>

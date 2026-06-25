@@ -140,7 +140,7 @@ export default function AMLScreeningPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* List */}
-        <div className="lg:col-span-3 rounded-2xl border border-border overflow-hidden">
+        <div className="lg:col-span-3 rounded-xl border border-border overflow-hidden">
           {loading && <div className="text-sm text-muted-foreground py-10 text-center">Loading…</div>}
           {!loading && screenings.length === 0 && (
             <div className="text-sm text-muted-foreground text-center py-12">No screening records found.</div>
@@ -190,7 +190,7 @@ export default function AMLScreeningPage() {
         </div>
 
         {/* Profile panel */}
-        <div className="lg:col-span-2 rounded-2xl border border-border p-4">
+        <div className="lg:col-span-2 rounded-xl border border-border p-4">
           {!selectedProfile && !profileLoading && (
             <div className="text-sm text-muted-foreground text-center py-10">Select a customer to view their AML profile.</div>
           )}
@@ -261,7 +261,7 @@ export default function AMLScreeningPage() {
       {/* New Screening Modal */}
       {showScreeningForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-2xl p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-background rounded-xl p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="font-semibold mb-4">New AML Screening</div>
             <div className="space-y-3">
               <div>

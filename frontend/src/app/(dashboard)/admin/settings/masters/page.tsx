@@ -17,7 +17,7 @@ export default function AdminSettingsMastersPage() {
       actions={[{ href: ROUTES.admin.settings, label: "Settings Home", variant: "secondary" }]}
     >
       <div className="space-y-6">
-        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm leading-6 text-sky-950">
+        <div className="rounded-xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm leading-6 text-sky-950">
           Shared master-data direction for the ERP transition is explicit: product category, subcategory, SKU, and unit belong to the canonical product master; inventory extends that master through stock profiles and locations; billing mirrors contract and delivery state; accounting owns books and finance masters separately from EMI payment truth.
         </div>
 
@@ -26,7 +26,7 @@ export default function AdminSettingsMastersPage() {
             <Link
               key={item.title}
               href={item.href}
-              className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+              className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
             >
               <div className="text-base font-semibold text-card-foreground">{item.title}</div>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -39,7 +39,7 @@ export default function AdminSettingsMastersPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <Link
             href={ROUTES.admin.settingsImports}
-            className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+            className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
           >
             <div className="text-base font-semibold text-card-foreground">Import Hub</div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -48,7 +48,7 @@ export default function AdminSettingsMastersPage() {
           </Link>
           <Link
             href={ROUTES.admin.accountingPurchaseBills}
-            className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+            className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
           >
             <div className="text-base font-semibold text-card-foreground">Vendor and purchase operations</div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">

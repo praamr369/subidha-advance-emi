@@ -34,7 +34,7 @@ export default function AiFeedbackButtons({ queryLogId }: AiFeedbackButtonsProps
   if (!queryLogId) return null;
 
   return (
-    <section className="rounded-[1.35rem] border border-border bg-card p-4">
+    <section className="rounded-xl border border-border bg-card p-4">
       <div className="flex flex-col gap-3">
         <div>
           <p className="text-sm font-semibold text-foreground">Feedback</p>

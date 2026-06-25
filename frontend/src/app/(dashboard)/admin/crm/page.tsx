@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { WorkspaceShell } from "@/components/admin/erp/WorkspaceShell";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPAuditNote from "@/components/erp/ERPAuditNote";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import {
@@ -33,7 +33,7 @@ function FunnelBar({ stage, count, pct, isLost }: { stage: string; count: number
     <div className="flex items-center gap-3">
       <div className="w-28 flex-shrink-0 text-right text-xs font-medium text-muted-foreground">{label}</div>
       <div className="flex-1 min-w-0">
-        <div className="h-5 rounded-full bg-[var(--surface-muted)] overflow-hidden">
+        <div className="h-5 rounded-full bg-muted overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ${barColor}`}
             style={{ width: `${Math.max(pct, 1)}%` }}
@@ -55,7 +55,7 @@ function SourceBreakdown({ rows }: { rows: CrmFunnelResponse["source_breakdown"]
       <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Lead Source Conversion</div>
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="min-w-full text-sm">
-          <thead className="bg-[var(--surface-muted)]">
+          <thead className="bg-muted/50">
             <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-2.5">Source</th>
               <th className="px-4 py-2.5 text-right">Leads</th>
@@ -190,9 +190,20 @@ export default function AdminCrmOverviewPage() {
   }, [customerCount, overview, workspace, funnel]);
 
   return (
-    <WorkspaceShell
+    <ERPPageShell
+      eyebrow="CRM"
       title="CRM Workspace"
       subtitle="Operational CRM hub with explicit separation between registered customers and CRM party records."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "CRM" },
+      ]}
+      actions={[
+        { href: ROUTES.admin.crmLeads, label: "Leads", variant: "secondary" },
+        { href: ROUTES.admin.crmParties, label: "Parties", variant: "secondary" },
+        { href: ROUTES.admin.crmPipeline, label: "Pipeline", variant: "primary" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" }}
     >
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
@@ -282,6 +293,6 @@ export default function AdminCrmOverviewPage() {
           </div>
         </ERPSectionShell>
       ) : null}
-    </WorkspaceShell>
+    </ERPPageShell>
   );
 }

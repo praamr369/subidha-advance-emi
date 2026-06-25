@@ -969,7 +969,7 @@ export default function AdminSubscriptionDetailPage() {
                 ownership. Additive copy only. EMI schedule, winner, and waiver
                 semantics are unchanged; money, delivery, and accounting truth
                 stay in their owning modules. */}
-            <section className="rounded-2xl border border-border bg-muted/30 p-5">
+            <section className="rounded-xl border border-border bg-muted/30 p-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Sales & Contracts · Contract source workflow
               </p>
@@ -995,7 +995,7 @@ export default function AdminSubscriptionDetailPage() {
               </ul>
             </section>
 
-            <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+            <section className="rounded-xl border border-amber-200 bg-amber-50/80 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-900">Process Flow</p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                 {[
@@ -1175,7 +1175,7 @@ export default function AdminSubscriptionDetailPage() {
                     {winnerIntegrityIssues.map((warning) => (
                       <li
                         key={warning}
-                        className="rounded-2xl border border-border/80 bg-card/80 px-4 py-3 text-card-foreground"
+                        className="rounded-xl border border-border/80 bg-card/80 px-4 py-3 text-card-foreground"
                       >
                         {warning}
                       </li>

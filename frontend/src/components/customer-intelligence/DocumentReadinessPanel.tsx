@@ -160,7 +160,7 @@ export function DocumentReadinessPanel({ subscriptionId }: Props) {
 
   return (
     <div
-      className={`rounded-2xl border p-5 ${isReady ? "border-emerald-200 bg-emerald-50/60" : "border-red-200 bg-red-50/50"}`}
+      className={`rounded-xl border p-5 ${isReady ? "border-emerald-200 bg-emerald-50/60" : "border-red-200 bg-red-50/50"}`}
       data-testid="document-readiness-panel"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

@@ -29,7 +29,7 @@ export default function ReconciliationRunTable({ runs }: { runs: ReconciliationR
       body={
         <>
           {runs.map((run) => (
-            <tr key={run.id} className={cn("border-b border-border/60 last:border-b-0 hover:bg-[var(--surface-muted)]")}>
+            <tr key={run.id} className={cn("border-b border-border/60 last:border-b-0 hover:bg-muted/50")}>
               <td className="px-4 py-3">
                 <Link href={`/admin/reconciliation/runs/${run.id}`} className="font-semibold hover:underline">
                   #{run.run_no}

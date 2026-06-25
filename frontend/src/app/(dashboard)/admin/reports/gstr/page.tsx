@@ -339,7 +339,7 @@ export default function GstrReportPage() {
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-border">
                   <table className="min-w-full text-sm">
-                    <thead className="bg-[var(--surface-muted)]">
+                    <thead className="bg-muted/50">
                       <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                         <th className="px-3 py-2.5">Invoice No</th>
                         <th className="px-3 py-2.5">Date</th>
@@ -375,7 +375,7 @@ export default function GstrReportPage() {
             {tab === "b2cs" ? (
               <div className="rounded-xl border border-border overflow-hidden max-w-lg">
                 <table className="min-w-full text-sm">
-                  <thead className="bg-[var(--surface-muted)]">
+                  <thead className="bg-muted/50">
                     <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                       <th className="px-4 py-2.5">Field</th>
                       <th className="px-4 py-2.5 text-right">Amount</th>
@@ -405,7 +405,7 @@ export default function GstrReportPage() {
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-border">
                   <table className="min-w-full text-sm">
-                    <thead className="bg-[var(--surface-muted)]">
+                    <thead className="bg-muted/50">
                       <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                         <th className="px-4 py-2.5">HSN/SAC</th>
                         <th className="px-4 py-2.5 text-right">GST %</th>

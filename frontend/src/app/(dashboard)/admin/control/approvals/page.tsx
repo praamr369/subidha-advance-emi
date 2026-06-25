@@ -61,7 +61,7 @@ export default function AdminControlApprovalsPage() {
       {!loading && !error && rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm">
-            <thead className="bg-[var(--surface-muted)] text-left text-xs uppercase text-muted-foreground">
+            <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">ID</th>
                 <th className="px-4 py-3">Title</th>

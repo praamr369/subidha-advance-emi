@@ -23,7 +23,7 @@ export default function FormImpactPanel({
       : "border-sky-600/30 bg-sky-600/10";
 
   return (
-    <div className={cn("rounded-2xl border px-4 py-3 text-sm", toneClasses, className)}>
+    <div className={cn("rounded-xl border px-4 py-3 text-sm", toneClasses, className)}>
       <div className="font-semibold text-foreground">{title}</div>
       <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
         {items.map((item, idx) => (

@@ -104,7 +104,7 @@ export default function BusinessSetupChecklistPage() {
       />
       <BusinessSetupLinks />
 
-      <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
+      <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
         Validate routing, API contracts, and finance safety without changing data in the{" "}
         <Link href={ROUTES.admin.settingsBusinessSetupDryRuns} className="font-semibold text-primary hover:underline">
           Dry Run Control Center
@@ -114,7 +114,7 @@ export default function BusinessSetupChecklistPage() {
 
       {checklistQuery.error ? (
         <div
-          className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+          className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
           role="alert"
         >
           <div className="font-medium">Checklist could not be loaded.</div>
@@ -130,7 +130,7 @@ export default function BusinessSetupChecklistPage() {
       ) : null}
 
       {previewError ? (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
           <div className="font-medium">Reset preview failed.</div>
           <p className="mt-1">{previewError}</p>
           <button
@@ -145,7 +145,7 @@ export default function BusinessSetupChecklistPage() {
 
       {checklistQuery.isPending && !data ? (
         <section
-          className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm"
+          className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm"
           aria-busy="true"
           aria-label="Loading business setup checklist"
         >
@@ -155,7 +155,7 @@ export default function BusinessSetupChecklistPage() {
 
       {data ? (
         <>
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-muted-foreground">Document Numbering</div>
@@ -193,15 +193,15 @@ export default function BusinessSetupChecklistPage() {
           </section>
 
           <section className="grid gap-5 md:grid-cols-3">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <div className="text-sm font-medium text-muted-foreground">Completion</div>
               <div className="mt-2 text-3xl font-semibold text-foreground">{data.percent_complete}%</div>
             </div>
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <div className="text-sm font-medium text-muted-foreground">Checklist items</div>
               <div className="mt-2 text-3xl font-semibold text-foreground">{data.items.length}</div>
             </div>
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <div className="text-sm font-medium text-muted-foreground">Status</div>
               <div className="mt-2 text-lg font-semibold text-foreground">
                 {data.is_ready_for_go_live ? "Ready for go-live" : "Not ready yet"}
@@ -209,7 +209,7 @@ export default function BusinessSetupChecklistPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-card shadow-sm">
+          <section className="rounded-xl border border-border bg-card shadow-sm">
             <div className="border-b border-border px-5 py-4 text-sm font-medium text-muted-foreground">
               Itemized checklist
             </div>
@@ -273,8 +273,8 @@ export default function BusinessSetupChecklistPage() {
             </Accordion>
           </section>
 
-          <Collapsible defaultOpen={false} className="rounded-2xl border border-border bg-card shadow-sm">
-            <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 rounded-2xl px-5 py-4 text-left text-sm font-medium text-muted-foreground transition hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180">
+          <Collapsible defaultOpen={false} className="rounded-xl border border-border bg-card shadow-sm">
+            <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 rounded-xl px-5 py-4 text-left text-sm font-medium text-muted-foreground transition hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180">
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-foreground">Go-live reset (controlled)</span>
                 <span className="text-xs font-normal text-muted-foreground">

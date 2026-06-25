@@ -30,7 +30,7 @@ function Note({ text, tone }: { text: string; tone: "default" | "warning" | "inf
           ? "chip-tone-warning"
           : tone === "info"
             ? "chip-tone-info"
-            : "border border-border bg-[var(--surface-muted)] text-foreground shadow-[var(--badge-inset-highlight)]"
+            : "border border-border bg-muted/50 text-foreground shadow-[var(--badge-inset-highlight)]"
       )}
     >
       {text}
@@ -57,7 +57,7 @@ export function WorkspaceSection({
       ? (
           <Link
             href={actionHref}
-            className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-border bg-[var(--surface-strong)] px-3.5 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+            className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50"
           >
             {actionLabel}
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -103,7 +103,7 @@ export function DetailItem({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.28)]",
+        "rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.28)]",
         className
       )}
     >

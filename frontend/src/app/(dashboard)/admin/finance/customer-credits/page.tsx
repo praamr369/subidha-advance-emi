@@ -160,7 +160,7 @@ export default function AdminCustomerCreditsPage() {
         </ERPSectionShell>
 
         <ERPSectionShell title="Credit register" description="Select a source record to preview or execute posting.">
-          <div className="overflow-x-auto rounded-2xl border">
+          <div className="overflow-x-auto rounded-xl border">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40 text-left">
                 <tr>
@@ -231,7 +231,7 @@ export default function AdminCustomerCreditsPage() {
                 {preview.blocked_reason}
               </div>
             ) : null}
-            <div className="mt-3 overflow-x-auto rounded-2xl border">
+            <div className="mt-3 overflow-x-auto rounded-xl border">
               <table className="min-w-full text-sm">
                 <thead className="bg-muted/40 text-left">
                   <tr>

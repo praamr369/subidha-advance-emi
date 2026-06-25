@@ -49,7 +49,7 @@ export default function ERPPageHeader({
                 ? "border-amber-200/90 bg-amber-50/85 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100"
                 : helperTone === "info"
                   ? "border-sky-200/90 bg-sky-50/85 text-sky-900 dark:border-sky-500/25 dark:bg-sky-500/10 dark:text-sky-100"
-                  : "border-border bg-[var(--surface-muted)] text-foreground"
+                  : "border-border bg-muted/50 text-foreground"
             )}
           >
             {helperNote}

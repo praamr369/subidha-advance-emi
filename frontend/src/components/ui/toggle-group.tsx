@@ -8,7 +8,7 @@ export function ToggleGroup({ className, ...props }: ComponentProps<typeof Toggl
   return (
     <ToggleGroupPrimitive.Root
       data-slot="toggle-group"
-      className={cn("flex flex-wrap items-center gap-1 rounded-xl border border-border bg-[var(--surface-muted)]/60 p-1", className)}
+      className={cn("flex flex-wrap items-center gap-1 rounded-xl border border-border bg-muted/50/60 p-1", className)}
       {...props}
     />
   );

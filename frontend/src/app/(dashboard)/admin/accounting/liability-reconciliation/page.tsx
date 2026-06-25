@@ -98,7 +98,7 @@ export default function LiabilityReconciliationPage() {
       {!loading && !error && !data ? <ERPEmptyState title="No reconciliation payload" /> : null}
       {!loading && !error && data ? (
         <div className="space-y-6">
-          <div className="rounded-2xl border border-border bg-background p-5 shadow-sm">
+          <div className="rounded-xl border border-border bg-background p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">{data.period.year}-{String(data.period.month).padStart(2, "0")} · As of {data.as_of}</p>

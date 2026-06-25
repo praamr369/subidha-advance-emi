@@ -31,7 +31,7 @@ export default function DuplicateCheckPanel({
             : "Idle";
 
   return (
-    <div className={cn("rounded-2xl border border-border/70 bg-muted/20 px-4 py-3", className)}>
+    <div className={cn("rounded-xl border border-border/70 bg-muted/20 px-4 py-3", className)}>
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-semibold text-foreground">{title}</div>
         <div className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">

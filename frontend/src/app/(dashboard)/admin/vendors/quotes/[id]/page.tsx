@@ -80,7 +80,7 @@ export default function AdminVendorQuoteDetailPage() {
     >
       {error ? <ERPErrorState title="Unable to load quote request" description={error} /> : null}
       {actionNote ? (
-        <div className="rounded-2xl border border-emerald-600/35 bg-emerald-600/10 p-4 text-sm text-foreground">
+        <div className="rounded-xl border border-emerald-600/35 bg-emerald-600/10 p-4 text-sm text-foreground">
           {actionNote}
         </div>
       ) : null}
@@ -108,7 +108,7 @@ export default function AdminVendorQuoteDetailPage() {
           </ERPSectionShell>
 
           <ERPSectionShell title="Quote lines" description="Only QUOTED rows can be accepted/rejected.">
-            <div className="overflow-auto rounded-2xl border border-border bg-card">
+            <div className="overflow-auto rounded-xl border border-border bg-card">
               <table className="w-full min-w-[860px] text-left text-sm">
                 <thead className="bg-muted/50">
                   <tr>

@@ -420,7 +420,7 @@ export default function InventoryAdjustmentsPage() {
             {form.lines.map((line, index) => (
               <div
                 key={`line-${index}`}
-                className="grid gap-3 rounded-2xl border border-border bg-muted/30 p-4 xl:grid-cols-[minmax(0,1.3fr)_140px_140px_minmax(0,1fr)_auto]"
+                className="grid gap-3 rounded-xl border border-border bg-muted/30 p-4 xl:grid-cols-[minmax(0,1.3fr)_140px_140px_minmax(0,1fr)_auto]"
               >
                 <select
                   aria-label="Inventory item"

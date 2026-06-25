@@ -349,7 +349,7 @@ export default function BrochureProductSettingsPage() {
           {!loading && rows.length === 0 ? <ERPEmptyState title="No products found" description="Change the filters or add products to the product master." /> : null}
           {!loading && rows.length > 0 ? (
             <>
-              <div className="overflow-x-auto rounded-2xl border border-border">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="min-w-[1500px] divide-y divide-border text-sm">
                   <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-3">Select</th><th className="px-3 py-3">Product</th><th className="px-3 py-3">Code</th><th className="px-3 py-3">Category</th><th className="px-3 py-3">Public</th><th className="px-3 py-3">Rent</th><th className="px-3 py-3">Lease</th><th className="px-3 py-3">Lucky EMI</th><th className="px-3 py-3">Sale</th><th className="px-3 py-3">Monthly rent</th><th className="px-3 py-3">Lease monthly</th><th className="px-3 py-3">Deposit</th><th className="px-3 py-3">Featured</th><th className="px-3 py-3">Sort</th><th className="px-3 py-3">Description</th><th className="px-3 py-3">Actions</th></tr></thead>
                   <tbody className="divide-y divide-border bg-card">

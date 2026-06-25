@@ -20,7 +20,7 @@ export default function Phase7Guidance({
   if (items.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-amber-200/80 bg-[#fffaf5] p-4 shadow-[0_18px_34px_-30px_rgba(120,53,15,0.35)]">
+    <section className="rounded-xl border border-amber-200/80 bg-[#fffaf5] p-4 shadow-[0_18px_34px_-30px_rgba(120,53,15,0.35)]">
       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <CheckCircle2 className="h-4 w-4 text-emerald-700" />
         {title}

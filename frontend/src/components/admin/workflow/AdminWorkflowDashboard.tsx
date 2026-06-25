@@ -67,7 +67,7 @@ function QueueCard({
   emptyText: string;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card shadow-sm">
+    <section className="rounded-xl border border-border bg-card shadow-sm">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="rounded-xl border border-border bg-muted p-2">{icon}</div>
@@ -174,7 +174,7 @@ export default function AdminWorkflowDashboard() {
             {state.data.metrics.map((metric) => (
               <article
                 key={metric.label}
-                className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+                className="rounded-xl border border-border bg-card p-5 shadow-sm"
               >
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   {metric.label}
@@ -195,7 +195,7 @@ export default function AdminWorkflowDashboard() {
           </section>
 
           <section className="grid gap-5 xl:grid-cols-[1.3fr_0.9fr]">
-            <div className="rounded-2xl border border-border bg-card shadow-sm">
+            <div className="rounded-xl border border-border bg-card shadow-sm">
               <div className="border-b border-border px-5 py-4">
                 <h2 className="text-lg font-semibold text-card-foreground">Workflow modules</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -207,7 +207,7 @@ export default function AdminWorkflowDashboard() {
                 {state.data.modules.map((module) => (
                   <article
                     key={module.id}
-                    className="rounded-2xl border border-border bg-background p-4"
+                    className="rounded-xl border border-border bg-background p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -266,7 +266,7 @@ export default function AdminWorkflowDashboard() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card shadow-sm">
+            <div className="rounded-xl border border-border bg-card shadow-sm">
               <div className="border-b border-border px-5 py-4">
                 <h2 className="text-lg font-semibold text-card-foreground">Priority actions</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -279,7 +279,7 @@ export default function AdminWorkflowDashboard() {
                   <Link
                     href={task.href}
                     key={task.id}
-                    className="block rounded-2xl border border-border bg-background p-4 transition hover:border-ring hover:bg-accent/40"
+                    className="block rounded-xl border border-border bg-background p-4 transition hover:border-ring hover:bg-accent/40"
                   >
                     <div className="flex items-start gap-4">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-sm font-semibold">
@@ -343,7 +343,7 @@ export default function AdminWorkflowDashboard() {
           <section className="grid gap-4 md:grid-cols-3">
             <Link
               href="/admin/settings"
-              className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+              className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
             >
               <BadgeCheck className="h-5 w-5" />
               <div className="mt-4 text-base font-semibold text-card-foreground">
@@ -355,7 +355,7 @@ export default function AdminWorkflowDashboard() {
             </Link>
             <Link
               href="/admin/reports"
-              className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+              className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
             >
               <ClipboardList className="h-5 w-5" />
               <div className="mt-4 text-base font-semibold text-card-foreground">
@@ -367,7 +367,7 @@ export default function AdminWorkflowDashboard() {
             </Link>
             <Link
               href="/admin/audit-logs"
-              className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+              className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
             >
               <ShieldAlert className="h-5 w-5" />
               <div className="mt-4 text-base font-semibold text-card-foreground">

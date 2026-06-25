@@ -17,7 +17,7 @@ export default function ERPDataToolbar({ left, right, className }: ERPDataToolba
   return (
     <DataToolbar
       className={cn(
-        "rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,var(--surface-muted)_12%)] shadow-[inset_0_1px_0_var(--hairline-shine)]",
+        "rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,var(--surface-muted)_12%)] shadow-[inset_0_1px_0_var(--hairline-shine)]",
         className
       )}
     >

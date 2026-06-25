@@ -12,7 +12,7 @@ export default function AdminVendorPurchasesPage() {
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor purchases" }]}
     >
       <ERPSectionShell title="Procurement workspace handoff" description="Use the existing purchase order, receipt/GRN, and bill modules for full procurement documents.">
-        <div className="rounded-2xl border border-border bg-card p-4 text-sm">
+        <div className="rounded-xl border border-border bg-card p-4 text-sm">
           Use purchase order, receipt, and bill modules for detailed procurement documents.
         </div>
       </ERPSectionShell>

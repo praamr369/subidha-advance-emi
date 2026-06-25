@@ -129,7 +129,7 @@ export default function LuckyPlanWinnersPage() {
           <>
             <div className="overflow-x-auto rounded-xl border border-border">
               <table className="min-w-full text-sm">
-                <thead className="bg-[var(--surface-muted)]">
+                <thead className="bg-muted/50">
                   <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="px-4 py-3">Batch</th>
                     <th className="px-4 py-3 text-right">Draw Month</th>
@@ -147,7 +147,7 @@ export default function LuckyPlanWinnersPage() {
                   {winners.map((w) => (
                     <tr key={w.id} className="border-t border-border/60 hover:bg-muted/30/50">
                       <td className="px-4 py-3">
-                        <span className="font-mono text-xs bg-[var(--surface-muted)] px-2 py-0.5 rounded-lg">
+                        <span className="font-mono text-xs bg-muted/50 px-2 py-0.5 rounded-lg">
                           {w.batch_code ?? `#${w.batch}`}
                         </span>
                       </td>

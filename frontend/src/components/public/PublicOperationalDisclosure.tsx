@@ -28,7 +28,7 @@ export default function PublicOperationalDisclosure() {
         <div className="grid gap-4 md:grid-cols-3">
           {disclosures.map((item) => (
             <div key={item.title} className="flex gap-3">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_12%,var(--surface-card-elevated)_88%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_12%,var(--surface-card-elevated)_88%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]">
                 <item.icon className="h-4 w-4" />
               </span>
               <div>

@@ -1040,7 +1040,7 @@ export default function AdminOperationsDashboard() {
               value={selectedBranchId}
               onChange={(event) => setSelectedBranchId(event.target.value)}
               disabled={refreshingCore}
-              className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] outline-none transition focus:border-border focus:ring-2 focus:ring-[var(--ring)]/35 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="">All branches</option>
               {(branchOverview?.branches ?? []).map((branch) => (
@@ -1387,7 +1387,7 @@ export default function AdminOperationsDashboard() {
           openHref={ROUTES.admin.finance}
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-[1.3rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
+            <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
               <div className="enterprise-eyebrow">Posture</div>
               <div className="mt-2 text-sm font-semibold text-foreground">
                 {settlementPosture?.title ?? "—"}
@@ -1396,7 +1396,7 @@ export default function AdminOperationsDashboard() {
                 {settlementPosture?.description ?? "Settlement posture summary"}
               </div>
             </div>
-            <div className="rounded-[1.3rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
+            <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
               <div className="enterprise-eyebrow">Next due</div>
               <div className="mt-2 text-sm font-semibold text-foreground">
                 {summary?.next_due_subscription_number ?? "—"}
@@ -1407,7 +1407,7 @@ export default function AdminOperationsDashboard() {
                   : "No next due row visible"}
               </div>
             </div>
-            <div className="rounded-[1.3rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
+            <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
               <div className="enterprise-eyebrow">Collections today</div>
               <div className="mt-2 text-sm font-semibold text-foreground">
                 {money(todayNetCollections)}
@@ -1416,7 +1416,7 @@ export default function AdminOperationsDashboard() {
                 Cash {cashToday.toFixed(2)} · Bank {bankToday.toFixed(2)} · UPI {upiToday.toFixed(2)}
               </div>
             </div>
-            <div className="rounded-[1.3rem] border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
+            <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
               <div className="enterprise-eyebrow">Lucky draw</div>
               <div className="mt-2 text-sm font-semibold text-foreground">
                 {legacy?.batches?.next_draw_batch?.batch_code ?? "—"}
@@ -1505,7 +1505,7 @@ export default function AdminOperationsDashboard() {
                             {dueRows.map((row) => (
                               <div
                                 key={String(row.id)}
-                                className="flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                                className="flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50"
                               >
                                 <Link
                                   href={
@@ -1596,7 +1596,7 @@ export default function AdminOperationsDashboard() {
                                   subscription: row.subscription_id,
                                   flagged: true,
                                 })}
-                                className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                                className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50"
                               >
                                 <div className="flex flex-wrap items-start justify-between gap-2">
                                   <div className="font-semibold text-slate-950">
@@ -1904,7 +1904,7 @@ export default function AdminOperationsDashboard() {
                                   <Link
                                     key={req.id}
                                     href={`${ROUTES.admin.subscriptionRequests}/${req.id}`}
-                                    className="rounded-[1.1rem] border border-border bg-[var(--surface-strong)] px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:bg-[var(--surface-muted)]"
+                                    className="rounded-[1.1rem] border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:bg-muted/50"
                                   >
                                     #{req.id} · {req.requested_customer_name || req.customer_name || "Customer"} ·{" "}
                                     {req.batch_code || "Batch"}
@@ -1919,7 +1919,7 @@ export default function AdminOperationsDashboard() {
                                   <Link
                                     key={lead.id}
                                     href={`${ROUTES.admin.leads}/${lead.id}`}
-                                    className="rounded-[1.1rem] border border-border bg-[var(--surface-strong)] px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:bg-[var(--surface-muted)]"
+                                    className="rounded-[1.1rem] border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:bg-muted/50"
                                   >
                                     #{lead.id} · {lead.name} · {lead.status}
                                     <div className="mt-1 text-xs text-muted-foreground">
@@ -1975,7 +1975,7 @@ export default function AdminOperationsDashboard() {
                               <Link
                                 key={row.id}
                                 href={`${ROUTES.admin.supportRequests}/${row.id}`}
-                                className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                                className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50"
                               >
                                 <div className="font-semibold text-slate-950">
                                   #{row.id} · {row.category}
@@ -2011,7 +2011,7 @@ export default function AdminOperationsDashboard() {
                               <Link
                                 key={row.payment_id}
                                 href={buildAdminPaymentRoute(row.payment_id)}
-                                className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                                className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50"
                               >
                                 <div className="flex flex-wrap items-start justify-between gap-2">
                                   <div className="font-semibold text-slate-950">
@@ -2070,7 +2070,7 @@ export default function AdminOperationsDashboard() {
                                 href={buildAdminCollectionsRoute({
                                   subscription: String(row.subscription_id),
                                 })}
-                                className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                                className="rounded-[1.2rem] border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50"
                               >
                                 <div className="font-semibold text-slate-950">
                                   {row.subscription_number}

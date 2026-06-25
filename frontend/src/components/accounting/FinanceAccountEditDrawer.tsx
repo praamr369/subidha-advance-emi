@@ -269,7 +269,7 @@ export default function FinanceAccountEditDrawer({
             </div>
 
             {!detail.collection_ready ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
                 <div className="font-semibold">Collection selector warning</div>
                 <p className="mt-1">{detail.collection_blocker_reason || "This finance account is not ready for cashier/admin collection selectors."}</p>
                 <p className="mt-1 text-xs text-amber-900">
@@ -367,7 +367,7 @@ export default function FinanceAccountEditDrawer({
                 />
               </label>
 
-              <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
+              <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   <Landmark className="h-3.5 w-3.5" />
                   Usage posture
@@ -390,7 +390,7 @@ export default function FinanceAccountEditDrawer({
               </label>
             </div>
 
-            <div className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4">
+            <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4">
               <label className="flex items-start gap-3 text-sm text-foreground">
                 <input
                   type="checkbox"

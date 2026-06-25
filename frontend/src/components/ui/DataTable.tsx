@@ -161,7 +161,7 @@ export default function DataTable<T extends { id?: number | string }>({
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+      <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
         {error}
       </div>
     );
@@ -284,7 +284,7 @@ export default function DataTable<T extends { id?: number | string }>({
                     }}
                     tabIndex={onRowClick ? 0 : undefined}
                     className={cn(
-                      "border-b border-border/80 transition-colors-smooth hover:bg-[color-mix(in_oklab,var(--surface-muted)_72%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--surface-muted)_68%,transparent)]",
+                      "border-b border-border/80 transition-colors-smooth hover:bg-muted/40 focus-within:bg-muted/40",
                       onRowClick && "cursor-pointer"
                     )}
                   >
@@ -340,14 +340,14 @@ export default function DataTable<T extends { id?: number | string }>({
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={clampedPage === 1}
-              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-[var(--surface-card-elevated)]"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-[var(--surface-card-elevated)]"
             >
               Previous
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={clampedPage === totalPages}
-              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-[var(--surface-card-elevated)]"
+              className="rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 py-1.5 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:-translate-y-0.5 hover:border-border hover:bg-muted/50 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-[var(--surface-card-elevated)]"
             >
               Next
             </button>

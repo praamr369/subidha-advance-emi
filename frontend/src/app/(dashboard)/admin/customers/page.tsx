@@ -832,7 +832,7 @@ export default function AdminCustomersPage() {
           description="Preview and confirm the existing backend customer import flow from the admin workspace. Confirm import is intentionally gated behind a clean preview."
         >
           <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
+            <div className="space-y-4 rounded-xl border border-border bg-card p-5">
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-foreground">
                   Import controls
@@ -920,7 +920,7 @@ export default function AdminCustomersPage() {
               ) : null}
             </div>
 
-            <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
+            <div className="space-y-4 rounded-xl border border-border bg-card p-5">
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-foreground">
                   Preview and result

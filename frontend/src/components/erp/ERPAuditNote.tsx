@@ -28,14 +28,14 @@ export default function ERPAuditNote({
           ? "border-amber-200/90 bg-amber-50/75 text-amber-950 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100"
           : tone === "info"
             ? "border-sky-200/90 bg-sky-50/75 text-sky-950 dark:border-sky-500/25 dark:bg-sky-500/10 dark:text-sky-100"
-            : "border-border/80 bg-[color-mix(in_oklab,var(--surface-muted)_62%,transparent)] text-foreground",
+            : "border-border/80 bg-muted/40 text-foreground",
         className
       )}
     >
       <div className="flex items-start gap-3">
         <div
           className={cn(
-            "mt-0.5 rounded-2xl border p-2 shadow-[inset_0_1px_0_var(--hairline-shine)]",
+            "mt-0.5 rounded-xl border p-2 shadow-[inset_0_1px_0_var(--hairline-shine)]",
             tone === "warning"
               ? "border-amber-200/90 bg-white/70 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100"
               : tone === "info"

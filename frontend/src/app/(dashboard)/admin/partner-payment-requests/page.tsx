@@ -117,7 +117,7 @@ export default function AdminPartnerPaymentRequestsPage() {
       {error ? <ErrorState title="Queue unavailable" description={error} /> : null}
 
       {!loading && !error ? (
-        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+        <div className="overflow-x-auto rounded-xl border border-border bg-card">
           <table className="min-w-full text-left text-xs">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
@@ -180,7 +180,7 @@ export default function AdminPartnerPaymentRequestsPage() {
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
             <h2 className="text-base font-semibold text-foreground">
               {modal.action === "approve" ? "Approve" : "Reject"} Payment Request
             </h2>

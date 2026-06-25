@@ -301,7 +301,7 @@ export default function AdminCustomerEditPage() {
       <div className="space-y-6">
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border bg-card px-5 py-4 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-sm">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Customer account</h2>
                 <p className="mt-1 text-sm text-muted-foreground">

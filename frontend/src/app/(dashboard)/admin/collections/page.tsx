@@ -1063,7 +1063,7 @@ export default function AdminCollectionsPage() {
                   {directSalePreview.map((sale) => (
                     <div
                       key={sale.id}
-                      className="rounded-2xl border border-border bg-background p-4 shadow-sm"
+                      className="rounded-xl border border-border bg-background p-4 shadow-sm"
                     >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>

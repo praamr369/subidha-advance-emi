@@ -52,7 +52,7 @@ export default function InventoryProfilesPage() {
         title="Guidance"
         description="Stock quantity is read-only here. Use Opening Stock, Goods Receipt, Stock Adjustment, Sale/Delivery, Return, or Manufacturing Receipt workflows to change real stock."
       >
-        <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
           Profiles control only stock-facing fields like default location, reorder controls, and delivery bridge participation. Catalog identity stays on Product.
         </div>
       </ERPSectionShell>

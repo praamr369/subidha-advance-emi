@@ -171,7 +171,7 @@ export default function AdminServiceDeskOverviewPage() {
                           "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition",
                           active
                             ? "border-primary/60 bg-primary text-primary-foreground"
-                            : "border-border bg-[var(--surface-strong)] text-foreground hover:bg-muted/30 hover:border-ring",
+                            : "border-border bg-background text-foreground hover:bg-muted/30 hover:border-ring",
                         ].join(" ")}
                         title={lane.helper}
                       >
@@ -222,7 +222,7 @@ export default function AdminServiceDeskOverviewPage() {
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-border">
                   <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="bg-[var(--surface-muted)] text-xs uppercase text-muted-foreground">
+                    <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                       <tr>
                         <th className="px-3 py-2">Ticket</th>
                         <th className="px-3 py-2">Subject</th>
@@ -392,7 +392,7 @@ export default function AdminServiceDeskOverviewPage() {
                 actions={
                   <Link
                     href={ROUTES.admin.serviceDeskReturns}
-                    className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
+                    className="inline-flex h-9 items-center rounded-xl border border-border bg-background px-4 text-sm font-semibold transition hover:border-border hover:bg-muted/30"
                   >
                     Open Return Register
                   </Link>
@@ -409,7 +409,7 @@ export default function AdminServiceDeskOverviewPage() {
                       <Link
                         key={item.id}
                         href={buildAdminServiceDeskCaseRoute(item.id)}
-                        className="block rounded-2xl border border-border bg-card px-4 py-3 transition hover:bg-muted/30 hover:border-ring"
+                        className="block rounded-xl border border-border bg-card px-4 py-3 transition hover:bg-muted/30 hover:border-ring"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>
@@ -439,7 +439,7 @@ export default function AdminServiceDeskOverviewPage() {
                 actions={
                   <Link
                     href={ROUTES.admin.serviceDeskComplaints}
-                    className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
+                    className="inline-flex h-9 items-center rounded-xl border border-border bg-background px-4 text-sm font-semibold transition hover:border-border hover:bg-muted/30"
                   >
                     Open Complaint Register
                   </Link>
@@ -460,7 +460,7 @@ export default function AdminServiceDeskOverviewPage() {
                             ? buildAdminServiceDeskCaseRoute(item.linked_service_case_id)
                             : ROUTES.admin.supportRequests
                         }
-                        className="block rounded-2xl border border-border bg-card px-4 py-3 transition hover:bg-muted/30 hover:border-ring"
+                        className="block rounded-xl border border-border bg-card px-4 py-3 transition hover:bg-muted/30 hover:border-ring"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>

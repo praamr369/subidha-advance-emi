@@ -267,7 +267,7 @@ export default function AdminServiceDeskReturnsPage() {
           </>
         }
         detailPane={
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <label className="grid gap-2 text-sm">
               <span>Case Type</span>

@@ -530,7 +530,7 @@ export default function AdminHrStaffProfilePage() {
         />
       </QuickActionGrid>
 
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-card p-2">
+      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-2">
         {DETAIL_TABS.map((tab) => (
           <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-xl px-3 py-2 text-sm font-semibold ${activeTab === tab ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"}`}>
             {tab}
@@ -699,7 +699,7 @@ export default function AdminHrStaffProfilePage() {
 
       {reviewModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
             <h2 className="text-lg font-bold">
               {reviewModal.action === "verify" ? "Verify document" : "Reject document"}
             </h2>

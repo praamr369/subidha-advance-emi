@@ -186,7 +186,7 @@ export default function AiBiExplanationPanel() {
                 <Link
                   key={`${row.label}-${idx}`}
                   href={row.href}
-                  className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-[var(--surface-muted)]"
+                  className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted/50"
                 >
                   {row.label}
                 </Link>

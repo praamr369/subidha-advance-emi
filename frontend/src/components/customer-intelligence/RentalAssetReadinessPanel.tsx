@@ -111,7 +111,7 @@ export function RentalAssetReadinessPanel({ subscriptionId }: Props) {
 
   return (
     <div
-      className={`rounded-2xl border p-5 ${canHandover ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60"}`}
+      className={`rounded-xl border p-5 ${canHandover ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60"}`}
       data-testid="rental-asset-readiness-panel"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

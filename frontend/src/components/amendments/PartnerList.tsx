@@ -63,7 +63,7 @@ export default function PartnerAmendmentList() {
                 <Link
                   key={row.id}
                   href={`/partner/contract-amendments/${row.id}`}
-                  className="rounded-2xl border border-border bg-card p-4 transition hover:border-primary/50"
+                  className="rounded-xl border border-border bg-card p-4 transition hover:border-primary/50"
                 >
                   <div className="flex flex-wrap justify-between gap-3">
                     <div>

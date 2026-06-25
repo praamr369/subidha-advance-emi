@@ -38,9 +38,9 @@ const primaryActions = [
   { label: "Open Checklist", href: ROUTES.admin.settingsBusinessSetupChecklist },
   { label: "Open Dry-runs", href: ROUTES.admin.settingsBusinessSetupDryRuns },
   { label: "Open Reset / Restore", href: ROUTES.admin.settingsBusinessSetupReset },
-  { label: "Open Branch Setup", href: "/admin/settings/business-setup/branches" },
-  { label: "Open Cash Counter Setup", href: "/admin/settings/business-setup/cash-desks" },
-  { label: "Open Finance Accounts", href: "/admin/settings/business-setup/finance-accounts" },
+  { label: "Open Branch Setup", href: ROUTES.admin.settingsBusinessSetupBranches },
+  { label: "Open Cash Counter Setup", href: ROUTES.admin.settingsBusinessSetupCashDesks },
+  { label: "Open Finance Accounts", href: ROUTES.admin.settingsBusinessSetupFinanceAccounts },
   { label: "Open Accounting Setup", href: ROUTES.admin.accountingSetup },
   { label: "Open Accounting Bridges", href: ROUTES.admin.accountingBridges },
   { label: "Open Bridge Reconciliation", href: ROUTES.admin.accountingBridgeReconciliation },
@@ -57,7 +57,7 @@ const primaryActions = [
   { label: "Open CRM", href: ROUTES.admin.crm },
   { label: "Open CRM Parties", href: ROUTES.admin.crmParties },
   { label: "Open Document Numbering", href: ROUTES.admin.settingsBusinessSetupDocumentNumbering },
-  { label: "Open Print Branding", href: "/admin/settings/business-setup/print-branding" },
+  { label: "Open Print Branding", href: ROUTES.admin.settingsBusinessSetupPrintBranding },
 ];
 
 function statusClass(status: string) {
@@ -83,7 +83,7 @@ function SectionCard({ section }: { section: SetupReadinessSection }) {
   const crm = section.category === "CRM_REQUIRED";
   const finance = section.category === "FINANCE_ACCOUNTING_REQUIRED";
   return (
-    <article className={`rounded-2xl border p-4 shadow-sm ${statusClass(section.status)}`}>
+    <article className={`rounded-xl border p-4 shadow-sm ${statusClass(section.status)}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide opacity-80">{section.category_label ?? section.category}</div>
@@ -111,7 +111,7 @@ function SectionCard({ section }: { section: SetupReadinessSection }) {
 function FreshStartResult({ result }: { result: EnsureFreshStartSetupResult | null }) {
   if (!result) return null;
   return (
-    <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 shadow-sm">
+    <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 shadow-sm">
       <div className="font-semibold">Fresh-start action result: {result.mode}</div>
       <p className="mt-1">{result.safety_contract ?? "Setup action completed with the safe setup contract."}</p>
       <div className="mt-3 grid gap-2 md:grid-cols-4">
@@ -127,7 +127,7 @@ function FreshStartResult({ result }: { result: EnsureFreshStartSetupResult | nu
 
 function SetupChart({ sections }: { sections: SetupReadinessSection[] }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <h2 className="text-base font-semibold text-foreground">Production setup chart</h2>
       <p className="mt-1 text-sm text-muted-foreground">Every action link is a real route. Statuses are backend readiness states, not fake completion.</p>
       <div className="mt-4 overflow-x-auto">
@@ -215,12 +215,12 @@ export default function BusinessSetupOverviewPage() {
       <PageHeader title="Business Setup" description="Fresh-start readiness, finance setup, branch/counter setup, documents, inventory onboarding." />
       <BusinessSetupLinks />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</div> : null}
-      {loading ? <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">Loading production business setup…</div> : null}
+      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</div> : null}
+      {loading ? <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">Loading production business setup…</div> : null}
 
       {payload ? (
         <>
-          <section className={`rounded-2xl border p-5 shadow-sm ${statusClass(payload.summary.overall_status)}`}>
+          <section className={`rounded-xl border p-5 shadow-sm ${statusClass(payload.summary.overall_status)}`}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="text-sm font-semibold uppercase tracking-wide opacity-80">Start from Zero Business Setup</div>
@@ -246,13 +246,13 @@ export default function BusinessSetupOverviewPage() {
 
           <FreshStartResult result={actionResult} />
 
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-base font-semibold text-foreground">Primary admin actions</h2>
             <p className="mt-1 text-sm text-muted-foreground">Only real setup routes are shown. No fake buttons and no href placeholders.</p>
             <div className="mt-4 grid gap-2 md:grid-cols-3 xl:grid-cols-5">{primaryActions.map((action) => <Link key={action.href} href={action.href} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground">{action.label}</Link>)}</div>
           </section>
 
-          <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 text-blue-950 shadow-sm">
+          <section className="rounded-xl border border-blue-200 bg-blue-50 p-5 text-blue-950 shadow-sm">
             <h2 className="text-base font-semibold">Inventory onboarding</h2>
             <div className="mt-2 grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4"><div>CSV stock upload is a required admin workflow</div><div>Opening stock is a required admin workflow</div><div>Current stock entry may still be pending</div><div>Stock is not marked ready unless real records exist</div></div>
           </section>
@@ -266,7 +266,7 @@ export default function BusinessSetupOverviewPage() {
             </section>
           ))}
 
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="text-base font-semibold text-foreground">Launch checklist</h2>
             <p className="mt-1 text-sm text-muted-foreground">Inventory opening stock pending is visible and required as an admin workflow, but stock quantity is never faked.</p>
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{payload.launch_checklist.map((item) => <div key={item.key} className="rounded-xl border border-border bg-background px-3 py-3"><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold text-foreground">{item.label}</span><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.ready ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{item.ready ? "READY" : "BLOCKED"}</span></div><div className="mt-1 text-xs text-muted-foreground">Source: {item.source_section.replaceAll("_", " ")}</div></div>)}</div>

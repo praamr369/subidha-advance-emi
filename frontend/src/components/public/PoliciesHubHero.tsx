@@ -71,11 +71,11 @@ export default function PoliciesHubHero() {
             sizes="(max-width: 1024px) 100vw, 44vw"
             className="min-h-[22rem] lg:min-h-[30rem]"
           />
-          <div className="pointer-events-none absolute -left-3 top-8 hidden rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
+          <div className="pointer-events-none absolute -left-3 top-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Policy hub</div>
             <div className="mt-1 text-sm font-semibold text-foreground">Read before pay</div>
           </div>
-          <div className="pointer-events-none absolute -right-3 bottom-8 hidden rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
+          <div className="pointer-events-none absolute -right-3 bottom-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Audit boundary</div>
             <div className="mt-1 text-sm font-semibold text-foreground">Records protected</div>
           </div>

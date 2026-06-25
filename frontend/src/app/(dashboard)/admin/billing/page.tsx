@@ -367,7 +367,7 @@ export default function BillingOverviewPage() {
                 }))}
               />
             ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
                 Post a billing invoice to preview the branded print layout here.
               </div>
             )}

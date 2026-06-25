@@ -45,22 +45,22 @@ export default function CountersSetupPage() {
       <BusinessSetupLinks />
 
       {error ? (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
       <section className="grid gap-5 md:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="text-sm font-medium text-muted-foreground">Active counters</div>
           <div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? countersActive : "—"}</div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="text-sm font-medium text-muted-foreground">Finance accounts</div>
           <div className="mt-2 text-3xl font-semibold text-foreground">{checklist ? financeAccounts : "—"}</div>
           <div className="mt-2 text-xs text-muted-foreground">Counters require an active finance account.</div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="text-sm font-medium text-muted-foreground">Next action</div>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link href="/admin/counters" className="rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
@@ -73,7 +73,7 @@ export default function CountersSetupPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="text-base font-semibold text-foreground">Operational notes</div>
         <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
           <li>Use one default counter per branch for day-to-day receipts.</li>

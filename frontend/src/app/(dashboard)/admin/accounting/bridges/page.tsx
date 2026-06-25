@@ -333,7 +333,7 @@ function GroupedRows({ groupedEvents }: { groupedEvents: Array<[string, Accounti
       {groupedEvents.map(([group, events]) => {
         const stats = groupStats(events);
         return (
-          <section key={group} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <section key={group} className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-foreground">{group}</h3>
@@ -432,7 +432,7 @@ export default function AccountingBridgeReadinessPage() {
       <div className="space-y-6">
         {error ? <ErrorState title="Unable to load bridge readiness" description={error} onRetry={() => void load()} /> : null}
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting Bridge Readiness</div>

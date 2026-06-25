@@ -26,7 +26,7 @@ export function MenubarTrigger({ className, ...props }: ComponentProps<typeof Me
     <MenubarPrimitive.Trigger
       data-slot="menubar-trigger"
       className={cn(
-        "flex cursor-pointer items-center rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground outline-none transition hover:bg-[var(--surface-muted)] hover:text-foreground data-[state=open]:bg-[var(--surface-muted)] data-[state=open]:text-foreground",
+        "flex cursor-pointer items-center rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground outline-none transition hover:bg-muted/50 hover:text-foreground data-[state=open]:bg-muted/50 data-[state=open]:text-foreground",
         className
       )}
       {...props}
@@ -63,7 +63,7 @@ export function MenubarItem({ className, ...props }: ComponentProps<typeof Menub
     <MenubarPrimitive.Item
       data-slot="menubar-item"
       className={cn(
-        "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2 text-sm outline-none focus:bg-[var(--surface-muted)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2 text-sm outline-none focus:bg-muted/50 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className
       )}
       {...props}

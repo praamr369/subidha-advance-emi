@@ -52,7 +52,7 @@ export default function FormSection({
             <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
           )}
           {note ? (
-            <div className="mt-2 inline-flex max-w-2xl rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-xs font-medium leading-6 text-foreground">
+            <div className="mt-2 inline-flex max-w-2xl rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs font-medium leading-6 text-foreground">
               {note}
             </div>
           ) : null}
@@ -63,7 +63,7 @@ export default function FormSection({
             <button
               type="button"
               onClick={() => setOpen(!open)}
-              className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-2 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] hover:text-foreground"
+              className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-2 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-border hover:bg-muted/50 hover:text-foreground"
             >
               {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>

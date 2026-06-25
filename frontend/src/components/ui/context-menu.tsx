@@ -35,7 +35,7 @@ export function ContextMenuItem({ className, ...props }: ComponentProps<typeof C
     <ContextMenuPrimitive.Item
       data-slot="context-menu-item"
       className={cn(
-        "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2 text-sm outline-none focus:bg-[var(--surface-muted)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2 text-sm outline-none focus:bg-muted/50 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className
       )}
       {...props}

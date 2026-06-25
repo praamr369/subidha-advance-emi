@@ -303,7 +303,7 @@ export default function AdminFinanceDepositsPage() {
           ["Deducted amount", formatRupee(kpis.deducted)],
           ["Pending refund count", kpis.pendingRefunds],
         ].map(([label, value]) => (
-          <div key={String(label)} className="rounded-2xl border bg-card p-4 shadow-sm">
+          <div key={String(label)} className="rounded-xl border bg-card p-4 shadow-sm">
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
             <div className="mt-2 text-xl font-semibold">{value}</div>
           </div>
@@ -380,7 +380,7 @@ export default function AdminFinanceDepositsPage() {
       <WorkspaceSection title="Selected Deposit Action Panel" description="Select a register row first. No manual subscription ID entry is required.">
         {selected ? (
           <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
-            <div className="rounded-2xl border bg-card p-4">
+            <div className="rounded-xl border bg-card p-4">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected contract</div>
               <div className="mt-2 text-lg font-semibold">{selected.subscription_number || `SUB-${selected.subscription_id}`}</div>
               <div className="mt-1 text-sm text-muted-foreground">{selected.customer_name} · {selected.plan_type}</div>
@@ -395,7 +395,7 @@ export default function AdminFinanceDepositsPage() {
                 <div><dt className="text-muted-foreground">Finance account</dt><dd className="font-semibold">{selected.latest_transaction?.finance_account_name || selected.latest_transaction?.finance_account_id || "-"}</dd></div>
               </dl>
             </div>
-            <div className="rounded-2xl border bg-card p-4">
+            <div className="rounded-xl border bg-card p-4">
               <div className="rounded-xl border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{HISTORY_NOTE}</div>
               {selected.disabled_reason ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">{selected.disabled_reason}</div> : null}
               <div className="mt-4 grid gap-3 md:grid-cols-2">

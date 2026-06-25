@@ -52,7 +52,7 @@ export default function AiSourceTable({ sources, ingestingId = null, onIngest }:
                 <div className="flex flex-wrap justify-end gap-2">
                   <Link
                     href={`/admin/ai/sources/${source.id}`}
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 text-xs font-semibold text-foreground transition hover:bg-[var(--surface-muted)]"
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 text-xs font-semibold text-foreground transition hover:bg-muted/50"
                   >
                     <Eye className="h-4 w-4" />
                     View chunks

@@ -96,7 +96,7 @@ export default function PODCapturePage() {
         </p>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         {/* Delivery Info */}
         <div className="grid grid-cols-2 gap-3">
           <div>

@@ -174,7 +174,7 @@ export default function AccountingBooksPage() {
       <RegistryPageShell
         header={
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {notice ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div> : <div />}
+            {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div> : <div />}
             <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing || loading} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-60">
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>

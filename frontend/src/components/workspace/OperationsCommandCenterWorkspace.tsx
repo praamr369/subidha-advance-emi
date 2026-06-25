@@ -173,7 +173,7 @@ export function OperationsCommandCenterWorkspace() {
 
   const leftPane =
     flatItems.length === 0 ? (
-      <div className="rounded-2xl border border-border bg-card p-4">
+      <div className="rounded-xl border border-border bg-card p-4">
         <EmptyState
           title="No queue rows"
           description="There are no operational queue summaries to display right now."
@@ -181,7 +181,7 @@ export function OperationsCommandCenterWorkspace() {
         />
       </div>
     ) : (
-      <section className="rounded-2xl border border-border bg-card p-4">
+      <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold text-foreground">Queues</h2>
         <p className="mt-1 text-xs text-muted-foreground">
           Select a lane to preview counts and routing actions.
@@ -219,7 +219,7 @@ export function OperationsCommandCenterWorkspace() {
     );
 
   const rightPane = !selectedEntry ? (
-    <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6">
+    <div className="rounded-xl border border-dashed border-border bg-card/50 p-6">
       <EmptyState
         title="No row selected"
         description="Pick a queue lane from the list to open the operational preview."
@@ -227,7 +227,7 @@ export function OperationsCommandCenterWorkspace() {
       />
     </div>
   ) : (
-    <section className="rounded-2xl border border-border bg-card p-4">
+    <section className="rounded-xl border border-border bg-card p-4">
       <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {selectedEntry.sectionTitle}
       </div>
@@ -280,7 +280,7 @@ export function OperationsCommandCenterWorkspace() {
         left={leftPane}
         right={rightPane}
       />
-      <div className="rounded-2xl border border-border bg-card p-4">
+      <div className="rounded-xl border border-border bg-card p-4">
         <div className="text-xs text-muted-foreground">
           Partner request visibility:{" "}
           <Link

@@ -322,7 +322,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
     const RowIcon = item.kind === "workflow" ? CommandIcon : Search;
     const rowContent = (
       <>
-        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-strong)] text-foreground">
+        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-foreground">
           <RowIcon className="h-4 w-4" />
         </span>
         <span className="min-w-0 flex-1">
@@ -350,7 +350,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
     );
 
     const rowActionClassName = cn(
-      "group flex min-w-0 flex-1 items-start gap-3 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+      "group flex min-w-0 flex-1 items-start gap-3 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition hover:border-border hover:bg-muted/50"
     );
 
     if (item.kind === "workflow") {
@@ -380,7 +380,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
               type="button"
               onClick={() => handleToggleFavorite(item.href)}
               className={cn(
-                "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]",
+                "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-border hover:bg-muted/50",
                 isFavorite ? "text-amber-700" : ""
               )}
               aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
@@ -417,7 +417,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
             type="button"
             onClick={() => handleToggleFavorite(item.href)}
             className={cn(
-              "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]",
+              "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-border hover:bg-muted/50",
               isFavorite ? "text-amber-700" : ""
             )}
             aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
@@ -436,7 +436,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
     <ModalShell open={open} onClose={onClose} title="Command palette" align="center" panelClassName="max-w-3xl">
       <div className="flex max-h-[calc(100dvh-1.5rem)] min-h-0 flex-col sm:max-h-[calc(100dvh-3rem)]">
         <div className="workflow-panel-header flex items-center gap-3 px-5 py-4">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-[var(--surface-strong)]">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background">
             <CommandIcon className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -463,7 +463,7 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search operations, registers, workflows…"
                 aria-describedby="command-palette-search-hint"
-                className="h-11 w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] pl-10 pr-[7.25rem] text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] outline-none transition focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                className="h-11 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] pl-10 pr-[7.25rem] text-sm font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] outline-none transition focus:border-border focus:ring-2 focus:ring-[var(--ring)]/35"
               />
               <span
                 id="command-palette-search-hint"
@@ -515,12 +515,12 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
               Results
             </div>
             {canSearchGlobal && globalLoading ? (
-              <div className="mb-2 rounded-2xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
+              <div className="mb-2 rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
                 Searching customers, subscriptions, invoices, receipts, products, partners, and payments…
               </div>
             ) : null}
             {displayedMatches.length === 0 ? (
-              <div className="rounded-2xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
+              <div className="rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
                 No matches for &quot;{query.trim()}&quot;.
               </div>
             ) : (

@@ -268,7 +268,7 @@ export default function InventoryLocationsPage() {
                 ))}
               </select>
             </label>
-            <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground">
+            <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground">
               <input
                 type="checkbox"
                 checked={form.is_active}

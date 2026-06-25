@@ -183,7 +183,7 @@ export default function AdminCashierDayClosePrintPage() {
         <DocumentHeader copyLabel={copyLabel} documentNo={record.close_no || `Day Close ${record.id}`} documentDate={formatDocumentDate(record.business_date)} />
         <DocumentTitleStrip title="CASHIER DAY CLOSE REPORT" subtitle="Read-only cashier settlement evidence generated from backend day-close records." status={displayStatus(record.status)} />
         {warning ? (
-          <div className="document-card mb-4 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">
+          <div className="document-card mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">
             {warning}
           </div>
         ) : null}
@@ -231,7 +231,7 @@ export default function AdminCashierDayClosePrintPage() {
           </section>
         ) : null}
         {record.notes ? (
-          <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+          <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Remarks / Notes</div>
             <div className="mt-2 whitespace-pre-line text-xs leading-5 text-[#6f5c46]">{record.notes}</div>
           </section>

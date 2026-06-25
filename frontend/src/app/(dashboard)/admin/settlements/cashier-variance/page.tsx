@@ -111,7 +111,7 @@ export default function CashierVariancePage() {
       </div>
 
       {/* Filters */}
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <h2 className="font-semibold">Filter</h2>
         <div className="flex flex-wrap gap-3 items-end">
           <div>
@@ -155,7 +155,7 @@ export default function CashierVariancePage() {
 
       {/* Escalation config (shown once data is loaded) */}
       {data && (
-        <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        <div className="rounded-xl border border-border bg-card p-5 space-y-3">
           <h2 className="font-semibold">Escalation Settings</h2>
           <p className="text-xs text-muted-foreground">These apply to all escalation emails sent from this page.</p>
           <div className="flex flex-wrap gap-3 items-end">
@@ -185,7 +185,7 @@ export default function CashierVariancePage() {
 
       {/* Results */}
       {data && (
-        <div className="rounded-2xl border border-border bg-card">
+        <div className="rounded-xl border border-border bg-card">
           {/* Summary header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div>

@@ -152,7 +152,7 @@ export default function BillingContractsPage() {
         />
 
         {notice ? (
-          <div className="receipt-print-hide rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="receipt-print-hide rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             {notice}
           </div>
         ) : null}
@@ -175,12 +175,12 @@ export default function BillingContractsPage() {
             >
               <div className="grid gap-3">
                 {profiles.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
                     No billing contract mirrors matched the current filter.
                   </div>
                 ) : (
                   profiles.map((profile) => (
-                    <div key={profile.id} className="rounded-[1.35rem] border border-border bg-background px-4 py-4 shadow-sm">
+                    <div key={profile.id} className="rounded-xl border border-border bg-background px-4 py-4 shadow-sm">
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                         <div className="space-y-2">
                           <div className="text-base font-semibold text-foreground">
@@ -240,12 +240,12 @@ export default function BillingContractsPage() {
             >
               <div className="grid gap-3">
                 {events.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
                     No billing sync events recorded yet.
                   </div>
                 ) : (
                   events.map((event) => (
-                    <div key={event.id} className="rounded-[1.25rem] border border-border bg-background px-4 py-3 text-sm shadow-sm">
+                    <div key={event.id} className="rounded-xl border border-border bg-background px-4 py-3 text-sm shadow-sm">
                       <div className="font-medium text-foreground">
                         {event.event_type} • {event.source_model} #{event.source_id}
                       </div>
@@ -371,7 +371,7 @@ export default function BillingContractsPage() {
                   ]}
                 />
               ) : (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
                   No contract mirror is available in this filter scope for print preview.
                 </div>
               )}

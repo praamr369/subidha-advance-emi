@@ -90,7 +90,7 @@ export default function PublicNavClient({
             <button
               type="button"
               onClick={() => setMobileOpen((prev) => !prev)}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_90%,transparent)] text-foreground shadow-[0_12px_26px_-18px_rgba(15,23,42,0.65)] transition hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.45)]"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_90%,transparent)] text-foreground shadow-[0_12px_26px_-18px_rgba(15,23,42,0.65)] transition hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_12px_26px_-18px_rgba(0,0,0,0.45)]"
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileOpen}
               aria-controls={MOBILE_MENU_ID}
@@ -128,7 +128,7 @@ export default function PublicNavClient({
             {showWhatsApp ? (
               <Link
                 href={whatsappLink as string}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] px-4 text-sm font-semibold text-foreground shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition hover:-translate-y-0.5 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]"
               >
                 <MessageCircle className="h-4 w-4" />
                 {dictionary.whatsapp}
@@ -143,7 +143,7 @@ export default function PublicNavClient({
                   "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold shadow-[0_16px_32px_-26px_rgba(15,23,42,0.72)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2 dark:shadow-[0_16px_32px_-26px_rgba(0,0,0,0.5)]",
                   action.variant === "primary"
                     ? "border-primary/25 bg-primary text-primary-foreground hover:-translate-y-0.5"
-                    : "border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] text-foreground hover:-translate-y-0.5 hover:bg-[var(--surface-muted)]"
+                    : "border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] text-foreground hover:-translate-y-0.5 hover:bg-muted/50"
                 )}
               >
                 {action.label}
@@ -168,7 +168,7 @@ export default function PublicNavClient({
             <ThemeToggle variant="public" className="mt-2" />
             <div className="mt-2 text-xs font-semibold text-muted-foreground">{trustBadge}</div>
           </div>
-          <div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
+          <div className="rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {dictionary.navigate}
             </div>
@@ -185,7 +185,7 @@ export default function PublicNavClient({
                       "min-h-11 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2",
                       active
                         ? "bg-primary text-primary-foreground shadow-[0_10px_26px_-20px_rgba(15,23,42,0.8)] dark:shadow-[0_10px_26px_-20px_rgba(0,0,0,0.55)]"
-                        : "text-foreground hover:bg-[var(--surface-muted)]"
+                        : "text-foreground hover:bg-muted/50"
                     )}
                   >
                     {link.label}
@@ -195,7 +195,7 @@ export default function PublicNavClient({
             </div>
           </div>
 
-          <div className="grid gap-2 rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
+          <div className="grid gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_88%,transparent)] p-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {dictionary.quickActions}
             </div>

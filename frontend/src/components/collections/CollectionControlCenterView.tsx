@@ -63,7 +63,7 @@ function FinanceReadinessBanner({ payload }: { payload: CollectionControlPayload
   return (
     <section
       className={[
-        "rounded-2xl border p-5 shadow-sm",
+        "rounded-xl border p-5 shadow-sm",
         blocked ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-950",
       ].join(" ")}
     >
@@ -214,7 +214,7 @@ function RecentCollections({ rows }: { rows: CollectionControlRecentPayment[] })
       ) : (
         <div className="space-y-3">
           {rows.map((row) => (
-            <div key={row.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div key={row.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="text-sm font-semibold text-foreground">Payment #{row.id} · {money(row.amount)}</div>
@@ -300,7 +300,7 @@ export default function CollectionControlCenterView({ role }: { role: Collection
                 {lanes.map((lane) => {
                   const deferred = isDeferredLane(lane);
                   return (
-                    <div key={lane.key} className={deferred ? "rounded-2xl border border-dashed border-amber-300 bg-amber-50/70 p-1" : ""}>
+                    <div key={lane.key} className={deferred ? "rounded-xl border border-dashed border-amber-300 bg-amber-50/70 p-1" : ""}>
                       <WorkflowCard
                         title={laneTitle(lane)}
                         description={deferred && lane.key === "rent_lease" ? "Collection action deferred until the backend endpoint is enabled." : lane.description || ""}
@@ -324,12 +324,12 @@ export default function CollectionControlCenterView({ role }: { role: Collection
 
             <FormSection title="Receipt and reconciliation posture" description="Only backend-exposed fields are shown; unknown values are not invented.">
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-border bg-card p-4">
+                <div className="rounded-xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pending receipts</div>
                   <div className="mt-2 text-2xl font-semibold text-foreground">{metric(summary.pending_receipt_count)}</div>
                   <p className="mt-1 text-sm text-muted-foreground">Shown only when receipt status is available from backend.</p>
                 </div>
-                <div className="rounded-2xl border border-border bg-card p-4">
+                <div className="rounded-xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unreconciled collections</div>
                   <div className="mt-2 text-2xl font-semibold text-foreground">{metric(summary.unreconciled_collection_count)}</div>
                   <p className="mt-1 text-sm text-muted-foreground">Shown only when reconciliation status is available from backend.</p>

@@ -91,23 +91,23 @@ export default function AdminCustomerProfilePage({ params }: { params: Promise<{
 
             <ERPSectionShell title="Workspace signals" description="Counts below reflect the current payload sections returned by the CRM profile service.">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <div className="rounded-[1.35rem] border border-border bg-card p-4">
+                <div className="rounded-xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Contracts</div>
                   <div className="mt-1 text-2xl font-semibold text-foreground">{payload.contracts.length}</div>
                 </div>
-                <div className="rounded-[1.35rem] border border-border bg-card p-4">
+                <div className="rounded-xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Payments</div>
                   <div className="mt-1 text-2xl font-semibold text-foreground">{payload.payments.length}</div>
                 </div>
-                <div className="rounded-[1.35rem] border border-border bg-card p-4">
+                <div className="rounded-xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Follow-ups</div>
                   <div className="mt-1 text-2xl font-semibold text-foreground">{payload.follow_ups.length}</div>
                 </div>
-                <div className="rounded-[1.35rem] border border-border bg-card p-4">
+                <div className="rounded-xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Risk flags</div>
                   <div className="mt-1 text-2xl font-semibold text-foreground">{payload.risk_flags.length}</div>
                 </div>
-                <div className="rounded-[1.35rem] border border-border bg-card p-4">
+                <div className="rounded-xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Audit timeline</div>
                   <div className="mt-1 text-2xl font-semibold text-foreground">{payload.audit_timeline.length}</div>
                 </div>

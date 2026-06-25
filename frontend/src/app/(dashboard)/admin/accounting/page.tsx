@@ -504,7 +504,7 @@ export default function AdminAccountingPage() {
                       { label: "Finance Accounts", Icon: Landmark, href: ROUTES.admin.accountingFinanceAccounts },
                     ] as { label: string; Icon: LucideIcon; href: string }[]).map(({ label, Icon, href }) => (
                       <Link key={label} href={href}
-                        className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-muted">
+                        className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:border-border hover:bg-muted">
                         <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
                         {label}
                       </Link>

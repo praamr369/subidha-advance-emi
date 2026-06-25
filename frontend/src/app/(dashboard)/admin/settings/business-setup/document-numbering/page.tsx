@@ -228,12 +228,12 @@ export default function BusinessSetupDocumentNumberingPage() {
       />
       <BusinessSetupLinks />
 
-      <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+      <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
         Changing numbering affects future documents only. Existing documents are never renumbered.
       </section>
 
       {data?.setup_blockers?.length ? (
-        <section className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">
+        <section className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">
           <div className="font-semibold">Readiness blockers</div>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {data.setup_blockers.map((item) => <li key={item}>{item}</li>)}
@@ -241,10 +241,10 @@ export default function BusinessSetupDocumentNumberingPage() {
         </section>
       ) : null}
 
-      {notice ? <section className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</section> : null}
-      {error ? <section className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</section> : null}
+      {notice ? <section className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</section> : null}
+      {error ? <section className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</section> : null}
 
-      <section className="rounded-2xl border border-border bg-card shadow-sm">
+      <section className="rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border px-5 py-4">
           <div className="text-sm font-semibold text-foreground">Sequence summary</div>
           <p className="mt-1 text-sm text-muted-foreground">Preview the next future number and verify where each sequence is used before editing details below.</p>
@@ -275,7 +275,7 @@ export default function BusinessSetupDocumentNumberingPage() {
       </section>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Financial year</div>
           <div className="mt-2 text-2xl font-semibold text-foreground">{data?.active_financial_year_code || data?.financial_year || "…"}</div>
           <div className="mt-1 text-xs text-muted-foreground">
@@ -284,31 +284,31 @@ export default function BusinessSetupDocumentNumberingPage() {
               : "No active FY configured"}
           </div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Ready</div>
           <div className="mt-2 text-2xl font-semibold text-foreground">{Number(summary.ready_count || 0)}</div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Needs setup</div>
           <div className="mt-2 text-2xl font-semibold text-foreground">{Number(summary.needs_setup_count || missingRows.length)}</div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Blocked</div>
           <div className="mt-2 text-2xl font-semibold text-foreground">{Number(summary.blocked_count || blockingRows.length)}</div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Current period</div>
           <div className="mt-2 text-2xl font-semibold text-foreground">{data?.current_period?.status || "…"}</div>
           <div className="mt-1 text-xs text-muted-foreground">{data?.current_period?.name || "No period for today"}</div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Issued docs</div>
           <div className="mt-2 text-2xl font-semibold text-foreground">{Number(summary.issued_document_count || 0)}</div>
         </div>
       </section>
 
       {data?.operator_rules?.length ? (
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="text-sm font-semibold text-foreground">Operator rules</div>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             {data.operator_rules.map((rule) => (
@@ -320,7 +320,7 @@ export default function BusinessSetupDocumentNumberingPage() {
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-border bg-card shadow-sm">
+      <section className="rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border px-5 py-4">
           <div className="text-sm font-semibold text-foreground">Numbering register</div>
           <p className="mt-1 text-sm text-muted-foreground">Required rows affect go-live. Future rent/lease rows may be prepared now without enabling collection execution.</p>

@@ -85,7 +85,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div>
         <h2 className="text-base font-semibold text-foreground">{title}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
@@ -702,7 +702,7 @@ export default function AdminDeliveriesPage() {
 
             {createPortfolio === "DIRECT_SALE" ? (
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
                   <div className="text-sm font-semibold text-foreground">Search direct-sale sources</div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Finds delivery-required retail sales by sale number, invoice document no., customer phone/name, or id.
@@ -743,7 +743,7 @@ export default function AdminDeliveriesPage() {
                             type="button"
                             key={item.id}
                             onClick={() => void prefillFromDirectSaleId(item.id)}
-                            className="w-full rounded-2xl border border-border bg-card p-4 text-left transition hover:bg-muted/30 hover:border-ring"
+                            className="w-full rounded-xl border border-border bg-card p-4 text-left transition hover:bg-muted/30 hover:border-ring"
                           >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0">
@@ -775,25 +775,25 @@ export default function AdminDeliveriesPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-muted-foreground">
+                    <div className="mt-4 rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                       Results appear after search.
                     </div>
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
                   <div className="text-sm font-semibold text-foreground">Preview & sync desk row</div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Runs the bridge sync so Operations sees one consolidated DIRECT_SALE_DELIVERY case without duplicating rows.
                   </p>
 
                   {dsPrefillLoading ? (
-                    <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-muted-foreground">
+                    <div className="mt-4 rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                       Loading direct-sale preview…
                     </div>
                   ) : selectedDsSource ? (
                     <div className="mt-4 space-y-3">
-                      <div className="rounded-2xl border border-border bg-[var(--surface-muted)] p-4">
+                      <div className="rounded-xl border border-border bg-muted/50 p-4">
                         <div className="text-sm font-semibold text-foreground">
                           {selectedDsSource.sale_no || `Sale ${selectedDsSource.id}`}
                         </div>
@@ -861,7 +861,7 @@ export default function AdminDeliveriesPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-muted-foreground">
+                    <div className="mt-4 rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                       Pick a sale from the search results to preview readiness before syncing.
                     </div>
                   )}
@@ -869,7 +869,7 @@ export default function AdminDeliveriesPage() {
               </div>
             ) : (
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
                   <div className="text-sm font-semibold text-foreground">Select subscription source</div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Search by subscription id, customer phone/name, product, batch, or contract reference. Selecting a
@@ -915,7 +915,7 @@ export default function AdminDeliveriesPage() {
                             type="button"
                             key={item.id}
                             onClick={() => void prefillFromSubscriptionId(item.id)}
-                            className="w-full rounded-2xl border border-border bg-card p-4 text-left transition hover:bg-muted/30 hover:border-ring"
+                            className="w-full rounded-xl border border-border bg-card p-4 text-left transition hover:bg-muted/30 hover:border-ring"
                           >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0">
@@ -949,13 +949,13 @@ export default function AdminDeliveriesPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-muted-foreground">
+                    <div className="mt-4 rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                       Search results show up here.
                     </div>
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
                   <div className="text-sm font-semibold text-foreground">Source preview & autofill</div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Review the source and adjust receiver/address fields before creating the delivery record.
@@ -979,12 +979,12 @@ export default function AdminDeliveriesPage() {
                   </div>
 
                   {sourcePrefillLoading ? (
-                    <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-muted-foreground">
+                    <div className="mt-4 rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                       Loading subscription prefill…
                     </div>
                   ) : selectedSource ? (
                     <div className="mt-4 space-y-3">
-                      <div className="rounded-2xl border border-border bg-[var(--surface-muted)] p-4">
+                      <div className="rounded-xl border border-border bg-muted/50 p-4">
                         <div className="text-sm font-semibold text-foreground">
                           {selectedSource.subscription_number || `SUB-${selectedSource.id}`}
                         </div>
@@ -1061,7 +1061,7 @@ export default function AdminDeliveriesPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2 text-sm text-muted-foreground">
+                    <div className="mt-4 rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                       Select a subscription from the search results to see a preview and autofill defaults.
                     </div>
                   )}

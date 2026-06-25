@@ -172,7 +172,7 @@ export default function NotificationCenterPanel({
         <EmptyState title="No notifications" description="You are caught up. New system alerts will appear here." />
       )}
       {!loading && !error && data && data.results.length > 0 && (
-        <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
+        <ul className="divide-y divide-border rounded-xl border border-border bg-card">
           {data.results.map((row) => (
             <li key={row.id} className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1 space-y-1">

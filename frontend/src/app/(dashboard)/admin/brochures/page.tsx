@@ -209,7 +209,7 @@ export default function AdminBrochuresPage() {
 
         {generated ? (
           <ERPSectionShell title="Generated brochure" description="Download the PDF or copy a customer-safe public link and WhatsApp message.">
-            <div className="grid gap-4 rounded-2xl border border-border bg-card p-5 md:grid-cols-[1fr_auto]">
+            <div className="grid gap-4 rounded-xl border border-border bg-card p-5 md:grid-cols-[1fr_auto]">
               <div className="space-y-2">
                 <div className="text-lg font-semibold text-foreground">{generated.title}</div>
                 <div className="text-sm text-muted-foreground">{generated.brochure_no} · {generated.product_count} products</div>
@@ -228,7 +228,7 @@ export default function AdminBrochuresPage() {
           {loadingProducts ? <ERPLoadingState label="Loading brochure-safe products..." /> : null}
           {!loadingProducts && products.length === 0 ? <ERPEmptyState title="No eligible products" description="Add brochure pricing/settings or change the catalog type or category filter." /> : null}
           {!loadingProducts && products.length > 0 ? (
-            <div className="overflow-x-auto rounded-2xl border border-border">
+            <div className="overflow-x-auto rounded-xl border border-border">
               <table className="min-w-full divide-y divide-border text-sm">
                 <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>{brochureType === "CUSTOM" ? <th className="px-4 py-3">Select</th> : null}<th className="px-4 py-3">Product</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Visible price</th><th className="px-4 py-3">Availability</th></tr>
@@ -255,7 +255,7 @@ export default function AdminBrochuresPage() {
           {!loadingRecent && recent.length > 0 ? (
             <div className="grid gap-3">
               {recent.map((document) => (
-                <div key={document.id} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 md:flex-row md:items-center md:justify-between">
+                <div key={document.id} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 md:flex-row md:items-center md:justify-between">
                   <div><div className="font-semibold text-foreground">{document.title}</div><div className="text-xs text-muted-foreground">{document.brochure_no} · {document.product_count} products · {formatDate(document.created_at)}</div></div>
                   <div className="flex flex-wrap gap-2">
                     <a href={document.pdf_url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold"><Download className="h-4 w-4" /> PDF</a>

@@ -817,7 +817,7 @@ function ContractReferenceList({
         return (
           <div
             key={key}
-            className="rounded-2xl border border-border bg-background p-4 shadow-sm"
+            className="rounded-xl border border-border bg-background p-4 shadow-sm"
           >
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
@@ -839,7 +839,7 @@ function ContractReferenceList({
               </div>
 
               <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[360px]">
-                <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
+                <div className="rounded-xl border border-border bg-muted/50 px-3 py-2">
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Due
                   </div>
@@ -855,7 +855,7 @@ function ContractReferenceList({
                     {formatRupee(row.overdue_amount)}
                   </div>
                 </div>
-                <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
+                <div className="rounded-xl border border-border bg-muted/50 px-3 py-2">
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Next Due
                   </div>
@@ -1781,7 +1781,7 @@ export default function AdminCustomerDetailPage() {
                 Additive copy only. This page is the identity source; money,
                 collection, contract, and accounting truth stay in their owning
                 modules and are reached by navigation, never posted from here. */}
-            <section className="rounded-2xl border border-border bg-muted/30 p-5">
+            <section className="rounded-xl border border-border bg-muted/30 p-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Profiles & Parties · Customer profile source
               </p>
@@ -2153,7 +2153,7 @@ export default function AdminCustomerDetailPage() {
                   description="Keep retail direct-sale operations and subscription-sale operations visible together while preserving separate posting, collection, and reconciliation paths."
                 >
                   <div className="grid gap-4 lg:grid-cols-2">
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5">
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-5">
                       <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
                         Direct Sale
                       </div>
@@ -2206,7 +2206,7 @@ export default function AdminCustomerDetailPage() {
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-5">
                       <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                         Subscription Sale
                       </div>
@@ -2479,7 +2479,7 @@ export default function AdminCustomerDetailPage() {
                       {operationalProfile.direct_sales.rows.map((row) => (
                         <div
                           key={row.id}
-                          className="rounded-2xl border border-border bg-background p-4 shadow-sm"
+                          className="rounded-xl border border-border bg-background p-4 shadow-sm"
                         >
                           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                             <div>
@@ -2494,11 +2494,11 @@ export default function AdminCustomerDetailPage() {
                               </div>
                             </div>
                             <div className="grid gap-2 sm:grid-cols-3">
-                              <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
+                              <div className="rounded-xl border border-border bg-muted/50 px-3 py-2">
                                 <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Grand Total</div>
                                 <div className="mt-1 text-sm font-semibold text-foreground">{formatRupee(row.grand_total)}</div>
                               </div>
-                              <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-3 py-2">
+                              <div className="rounded-xl border border-border bg-muted/50 px-3 py-2">
                                 <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Collected</div>
                                 <div className="mt-1 text-sm font-semibold text-foreground">{formatRupee(row.received_total)}</div>
                               </div>

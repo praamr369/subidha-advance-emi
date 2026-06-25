@@ -277,12 +277,12 @@ export default function AdminManufacturingJobDetailPage() {
         {job ? (
           <>
             {error ? (
-              <div className="rounded-2xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div className="rounded-xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {error}
               </div>
             ) : null}
             {notice ? (
-              <div className="rounded-2xl border border-emerald-600/35 bg-emerald-600/10 px-4 py-3 text-sm text-foreground">
+              <div className="rounded-xl border border-emerald-600/35 bg-emerald-600/10 px-4 py-3 text-sm text-foreground">
                 {notice}
               </div>
             ) : null}
@@ -580,7 +580,7 @@ export default function AdminManufacturingJobDetailPage() {
                     <ERPEmptyState title="No material lines" description="Release the job or post a material batch to create material movement lines." />
                   ) : (
                     job.material_issue_lines.map((line) => (
-                      <div key={line.id} className="rounded-2xl border border-border bg-background/70 p-3 text-sm">
+                      <div key={line.id} className="rounded-xl border border-border bg-background/70 p-3 text-sm">
                         <div className="font-medium text-foreground">
                           {line.entry_kind} · {line.inventory_item_product_name || line.inventory_item_sku || `Item ${line.inventory_item}`}
                         </div>
@@ -602,7 +602,7 @@ export default function AdminManufacturingJobDetailPage() {
                     <ERPEmptyState title="No receipt lines" description="Post an output batch to receive finished goods." />
                   ) : (
                     job.receipt_lines.map((line) => (
-                      <div key={line.id} className="rounded-2xl border border-border bg-background/70 p-3 text-sm">
+                      <div key={line.id} className="rounded-xl border border-border bg-background/70 p-3 text-sm">
                         <div className="font-medium text-foreground">
                           {line.inventory_item_product_name || line.inventory_item_sku || `Item ${line.inventory_item}`}
                         </div>
@@ -624,7 +624,7 @@ export default function AdminManufacturingJobDetailPage() {
                     <ERPEmptyState title="No scrap lines" description="Record wastage only when it belongs to this job." />
                   ) : (
                     job.scrap_lines.map((line) => (
-                      <div key={line.id} className="rounded-2xl border border-border bg-background/70 p-3 text-sm">
+                      <div key={line.id} className="rounded-xl border border-border bg-background/70 p-3 text-sm">
                         <div className="font-medium text-foreground">{line.reason}</div>
                         <div className="text-muted-foreground">
                           Qty {line.quantity} · Cost {formatRupee(line.line_total_cost)} · {line.is_posted ? "Posted" : "Draft"}

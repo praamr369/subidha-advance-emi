@@ -17,7 +17,7 @@ export default function EmiSchedule({ schedule }: EmiScheduleProps) {
         {schedule.map((installment) => (
           <li
             key={installment.installmentNumber}
-            className="rounded-lg border border-border bg-[var(--surface-muted)] p-3"
+            className="rounded-lg border border-border bg-muted/50 p-3"
           >
             <p>Installment #{installment.installmentNumber}</p>
             <p>Due Date: {installment.dueDate}</p>

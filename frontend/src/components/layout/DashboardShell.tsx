@@ -457,7 +457,7 @@ function UserDropdown({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_14px_34px_-30px_rgba(15,23,42,0.5)] transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/35"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_14px_34px_-30px_rgba(15,23,42,0.5)] transition hover:border-border hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/35"
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label={`Open account menu for ${displayName}, ${formatRoleLabel(role)}`}
@@ -472,7 +472,7 @@ function UserDropdown({
 
       {isOpen ? (
         <div
-          className="surface-glass absolute right-0 z-50 mt-2 w-56 animate-in fade-in-0 zoom-in-95 rounded-2xl p-2 duration-100"
+          className="surface-glass absolute right-0 z-50 mt-2 w-56 animate-in fade-in-0 zoom-in-95 rounded-xl p-2 duration-100"
           role="menu"
           aria-label="Account menu"
         >
@@ -485,7 +485,7 @@ function UserDropdown({
           </div>
           <Link
             href={profileHref}
-            className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-[var(--surface-muted)]"
+            className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-muted/50"
             onClick={() => setIsOpen(false)}
           >
             <UserCircle2 className="h-4 w-4" />
@@ -493,7 +493,7 @@ function UserDropdown({
           </Link>
           <Link
             href={settingsHref}
-            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-[var(--surface-muted)]"
+            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-muted/50"
             onClick={() => setIsOpen(false)}
           >
             <Settings className="h-4 w-4" />
@@ -1436,7 +1436,7 @@ function Topbar({
             <button
               type="button"
               onClick={onOpenSidebar}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground transition hover:bg-[var(--surface-muted)] md:hidden"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground transition hover:bg-muted/50 md:hidden"
               aria-label="Open menu"
               aria-expanded={mobileOpen}
               aria-controls="mobile-sidebar-nav"
@@ -1470,7 +1470,7 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="hidden h-9 shrink-0 items-center gap-2 rounded-lg border border-[var(--topbar-border)] bg-[color-mix(in_oklab,var(--topbar-control)_80%,var(--surface-muted)_20%)] px-3 text-xs text-muted-foreground transition hover:bg-[var(--surface-muted)] hover:text-foreground lg:flex"
+            className="hidden h-9 shrink-0 items-center gap-2 rounded-lg border border-[var(--topbar-border)] bg-[color-mix(in_oklab,var(--topbar-control)_80%,var(--surface-muted)_20%)] px-3 text-xs text-muted-foreground transition hover:bg-muted/50 hover:text-foreground lg:flex"
             style={{ width: "260px" }}
             aria-label="Open command palette (Ctrl+K)"
             title="Command palette (Ctrl+K)"
@@ -1489,7 +1489,7 @@ function Topbar({
             <button
               type="button"
               onClick={onOpenCommandPalette}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground transition hover:bg-[var(--surface-muted)] lg:hidden"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground transition hover:bg-muted/50 lg:hidden"
               aria-label="Open command palette"
               data-testid="command-palette-trigger"
             >
@@ -1502,7 +1502,7 @@ function Topbar({
                 <Link
                   key={action.key}
                   href={action.href}
-                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2 text-xs font-medium text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2 text-xs font-medium text-foreground transition hover:border-border hover:bg-muted/50"
                   title={action.title}
                 >
                   <Plus className="h-3 w-3 shrink-0" />
@@ -1540,7 +1540,7 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenSidebar}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] md:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-muted/50 md:hidden"
             aria-label="Open menu"
             aria-expanded={mobileOpen}
             aria-controls="mobile-sidebar-nav"
@@ -1558,7 +1558,7 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] sm:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-muted/50 sm:hidden"
             aria-label="Open command palette"
             data-testid="command-palette-trigger"
           >
@@ -1567,7 +1567,7 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="hidden h-10 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-[var(--surface-muted)] sm:inline-flex"
+            className="hidden h-10 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-3 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:bg-muted/50 sm:inline-flex"
             aria-label="Open command palette (Ctrl+K)"
             data-testid="command-palette-trigger"
           >

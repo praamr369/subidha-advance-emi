@@ -49,7 +49,7 @@ function UploadPanel({
   const readyToPost = Boolean(file && preview && preview.invalid_count === 0);
 
   return (
-    <div className="rounded-[1.35rem] border border-border bg-background p-5 shadow-sm">
+    <div className="rounded-xl border border-border bg-background p-5 shadow-sm">
       <div className="text-base font-semibold text-foreground">{title}</div>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
       <div className="mt-4 space-y-3">
@@ -75,17 +75,17 @@ function UploadPanel({
           </ActionButton>
         </div>
         {!preview ? (
-          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
             Preview is required before posting this import.
           </div>
         ) : null}
         {preview ? (
-          <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
             Valid {preview.valid_count} • Invalid {preview.invalid_count}
           </div>
         ) : null}
         {preview?.errors.length ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <div className="font-medium">Preview errors</div>
             <ul className="mt-2 space-y-1">
               {preview.errors.slice(0, 5).map((row, index) => (
@@ -97,7 +97,7 @@ function UploadPanel({
           </div>
         ) : null}
         {result ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             Created {result.created} • Updated {result.updated} • Skipped {result.skipped}
           </div>
         ) : null}
@@ -218,7 +218,7 @@ export default function AdminSettingsImportsPage() {
       <div className="space-y-6">
         {error ? <ErrorState title="Import action failed" description={error} /> : null}
 
-        <div className="rounded-[1.35rem] border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
+        <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
           Before wide exports or selective resets, run validation in the{" "}
           <Link href={ROUTES.admin.settingsBusinessSetupDryRuns} className="font-semibold text-primary hover:underline">
             Dry Run Control Center
@@ -233,7 +233,7 @@ export default function AdminSettingsImportsPage() {
         >
           <Link
             href="/admin/customers"
-            className="rounded-[1.35rem] border border-border bg-background p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+            className="rounded-xl border border-border bg-background p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
           >
             <div className="text-base font-semibold text-foreground">Customer import</div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -242,7 +242,7 @@ export default function AdminSettingsImportsPage() {
           </Link>
           <Link
             href="/admin/products/import"
-            className="rounded-[1.35rem] border border-border bg-background p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+            className="rounded-xl border border-border bg-background p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
           >
             <div className="text-base font-semibold text-foreground">Product catalog import</div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -251,7 +251,7 @@ export default function AdminSettingsImportsPage() {
           </Link>
           <Link
             href={ROUTES.admin.inventoryOpeningStock}
-            className="rounded-[1.35rem] border border-border bg-background p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
+            className="rounded-xl border border-border bg-background p-5 shadow-sm transition hover:border-ring hover:bg-accent/40"
           >
             <div className="text-base font-semibold text-foreground">Opening stock import</div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -332,7 +332,7 @@ export default function AdminSettingsImportsPage() {
           />
         </WorkspaceSection>
 
-        <div className="rounded-[1.35rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
           Subscription bulk import remains intentionally unavailable here. Opening-balance bulk import is also deferred. Those flows would risk bypassing EMI, reconciliation, posting, or audit controls if they were reduced to unchecked CSV writes.
         </div>
       </div>

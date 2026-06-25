@@ -61,10 +61,10 @@ function getActionClassName(variant: PortalAction["variant"] = "secondary") {
     case "danger":
       return "border-destructive/70 bg-destructive text-destructive-foreground shadow-[0_18px_40px_-28px_rgba(127,29,29,0.75)]";
     case "ghost":
-      return "border-border bg-[var(--surface-card-elevated)] text-foreground hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]";
+      return "border-border bg-[var(--surface-card-elevated)] text-foreground hover:border-border hover:bg-muted/50";
     case "secondary":
     default:
-      return "border-border bg-[var(--surface-strong)] text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]";
+      return "border-border bg-background text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] hover:border-border hover:bg-muted/30";
   }
 }
 
@@ -234,7 +234,7 @@ export default function PortalPage({
                           ? "chip-tone-warning"
                           : helperTone === "info"
                             ? "chip-tone-info"
-                            : "border border-border bg-[var(--surface-muted)] text-foreground"
+                            : "border border-border bg-muted/50 text-foreground"
                       )}
                     >
                       {helperNote}
@@ -379,7 +379,7 @@ export default function PortalPage({
                             ? "border-amber-200/90 bg-amber-50/85 text-amber-900"
                             : helperTone === "info"
                               ? "border-sky-200/90 bg-sky-50/85 text-sky-900"
-                              : "border-border bg-[var(--surface-muted)] text-foreground"
+                              : "border-border bg-muted/50 text-foreground"
                         )}
                       >
                         {helperNote}

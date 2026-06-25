@@ -203,7 +203,7 @@ export default function AdminProductEditPage() {
             <div className="space-y-6">
               {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div> : null}
               {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div> : null}
-              <div className="sticky top-0 z-10 flex flex-wrap justify-end gap-2 rounded-2xl border border-border bg-background/95 p-3 shadow-sm backdrop-blur">
+              <div className="sticky top-0 z-10 flex flex-wrap justify-end gap-2 rounded-xl border border-border bg-background/95 p-3 shadow-sm backdrop-blur">
                 <Link href={`/admin/products/${product.id}`} className="inline-flex h-10 items-center justify-center rounded-xl border border-border px-4 text-sm font-medium">Cancel</Link>
                 <button type="submit" disabled={saving} className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60">{saving ? "Saving..." : "Save Product"}</button>
               </div>
@@ -239,7 +239,7 @@ export default function AdminProductEditPage() {
               <ERPSectionShell title="Image" description="Single image used for catalog completeness and daily product lookup." id="image">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-3"><input type="file" accept="image/*" onChange={onImageChange} className={fieldClass()} /><label className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">Remove existing image<input type="checkbox" checked={clearImage} onChange={(event) => { setClearImage(event.target.checked); if (event.target.checked) setImageFile(null); }} /></label></div>
-                  <div className="relative h-56 overflow-hidden rounded-2xl border border-border bg-muted/30">{imagePreview || (product.image && !clearImage) ? <Image src={imagePreview || product.image || ""} alt={name} fill sizes="(min-width: 1280px) 360px, (min-width: 768px) 50vw, 100vw" className="object-cover" unoptimized={Boolean(imagePreview) || shouldBypassNextImageOptimization(product.image)} /> : <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">No image selected</div>}</div>
+                  <div className="relative h-56 overflow-hidden rounded-xl border border-border bg-muted/30">{imagePreview || (product.image && !clearImage) ? <Image src={imagePreview || product.image || ""} alt={name} fill sizes="(min-width: 1280px) 360px, (min-width: 768px) 50vw, 100vw" className="object-cover" unoptimized={Boolean(imagePreview) || shouldBypassNextImageOptimization(product.image)} /> : <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">No image selected</div>}</div>
                 </div>
               </ERPSectionShell>
             </div>

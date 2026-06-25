@@ -78,7 +78,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
   const hasActiveFilter = Boolean(globalFilterInput.trim());
 
   return (
-    <section className="surface-panel-elevated overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+    <section className="surface-panel-elevated overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div className="border-b border-border px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
@@ -94,7 +94,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
             <div className="relative min-w-0 sm:w-72">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
-                className="h-10 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] pl-10 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] focus:border-[var(--surface-border-strong)] focus:ring-2 focus:ring-[var(--ring)]/35"
+                className="h-10 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] pl-10 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.74)] focus:border-border focus:ring-2 focus:ring-[var(--ring)]/35"
                 value={globalFilterInput}
                 onChange={(e) => {
                   setGlobalFilterInput(e.target.value);
@@ -141,7 +141,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
         <>
           <div className="ops-table-scroll max-w-full">
             <table className="min-w-[max(100%,720px)] border-collapse text-sm">
-              <thead className="sticky top-0 z-10 bg-[color-mix(in_oklab,var(--surface-muted)_95%,transparent)] backdrop-blur">
+              <thead className="sticky top-0 z-10 bg-muted/40 backdrop-blur">
                 <tr className="border-b border-border">
                   {columns.map((column) => (
                     <th
@@ -169,8 +169,8 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
                       className={[
                         "border-b border-border/80 align-top motion-safe:transition-colors motion-safe:duration-150",
                         clickableRows
-                          ? "cursor-pointer hover:bg-[color-mix(in_oklab,var(--surface-muted)_78%,transparent)]"
-                          : "hover:bg-[color-mix(in_oklab,var(--surface-muted)_58%,transparent)]",
+                          ? "cursor-pointer hover:bg-muted/40"
+                          : "hover:bg-muted/40",
                       ].join(" ")}
                     >
                       {columns.map((column) => (
@@ -201,7 +201,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
 
             <div className="flex items-center gap-2">
               <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 text-sm font-semibold text-foreground transition hover:border-border hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
                 disabled={safePageIndex <= 0}
                 type="button"
@@ -211,7 +211,7 @@ export default function EnterpriseDataTable<T extends GenericRecord>({
               </button>
 
               <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-[var(--surface-card-elevated)] px-3 text-sm font-semibold text-foreground transition hover:border-border hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => setPageIndex((prev) => Math.min(pageCount - 1, prev + 1))}
                 disabled={safePageIndex >= pageCount - 1}
                 type="button"

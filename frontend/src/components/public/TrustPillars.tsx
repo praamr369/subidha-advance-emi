@@ -81,7 +81,7 @@ export default function TrustPillars({ className }: TrustPillarsProps) {
           >
             <div className="flex items-start gap-3">
               <span
-                className="trust-pillar-icon inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_13%,var(--surface-card-elevated)_87%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                className="trust-pillar-icon inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--primary)_13%,var(--surface-card-elevated)_87%)] text-primary shadow-[inset_0_1px_0_var(--hairline-shine)]"
                 aria-hidden="true"
               >
                 <pillar.icon className="h-5 w-5" />

@@ -369,7 +369,7 @@ export default function AdminPartnersPage() {
             </div>
           </section>
 
-          <section className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <section className="mb-4 rounded-xl border border-border bg-card p-4 shadow-sm">
             <h2 className="mb-3 text-base font-semibold text-card-foreground">
               Filters
             </h2>
@@ -539,7 +539,7 @@ export default function AdminPartnersPage() {
           )}
 
           {!loading && !error && filteredPartners.length > 0 ? (
-            <section className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <section className="mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
               <h2 className="mb-3 text-base font-semibold text-card-foreground">
                 Quick Partner Actions
               </h2>

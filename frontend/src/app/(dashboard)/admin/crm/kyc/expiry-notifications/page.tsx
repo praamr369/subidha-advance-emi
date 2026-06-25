@@ -88,7 +88,7 @@ export default function KycExpiryNotificationsPage() {
       </div>
 
       {/* Controls */}
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
         <h2 className="font-semibold">Configuration</h2>
         <div className="flex flex-wrap gap-4 items-end">
           <div>
@@ -115,7 +115,7 @@ export default function KycExpiryNotificationsPage() {
 
       {/* Preview Summary */}
       {previewData && (
-        <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">Preview — {previewData.total} document(s) expiring within {previewData.window_days} days</h2>
           </div>
@@ -196,7 +196,7 @@ export default function KycExpiryNotificationsPage() {
 
       {/* Notify Result */}
       {notifyResult && (
-        <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        <div className="rounded-xl border border-border bg-card p-5 space-y-3">
           <h2 className="font-semibold">
             {notifyResult.dry_run ? "Simulation Result" : "Notification Result"}
           </h2>

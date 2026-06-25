@@ -82,7 +82,7 @@ export default function AdminJournalEntryPrintPage() {
       <DocumentPage watermark={documentStatusWatermark(entry.status)}>
         <DocumentHeader copyLabel={copyLabel} documentNo={entry.entry_no} documentDate={formatDocumentDate(entry.entry_date)} />
         <DocumentTitleStrip title="JOURNAL ENTRY VOUCHER" subtitle="Read-only accounting voucher generated from existing journal-entry records." status={statusLabel(entry.status)} />
-        {warn ? <div className="document-card mb-4 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">{warn}</div> : null}
+        {warn ? <div className="document-card mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">{warn}</div> : null}
         <DocumentMetadataGrid
           items={[
             { label: "Journal Reference", value: safeDocumentText(entry.entry_no, `#${entry.id}`) },
@@ -100,12 +100,12 @@ export default function AdminJournalEntryPrintPage() {
           ]}
         />
         {entry.memo || entry.void_reason ? (
-          <section className="document-card my-5 rounded-2xl border border-[#e6d6bd] bg-white p-4">
+          <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Narration / Description</div>
             <div className="mt-2 whitespace-pre-line text-xs leading-5 text-[#6f5c46]">{entry.memo || entry.void_reason}</div>
           </section>
         ) : null}
-        <section className="document-card my-5 overflow-hidden rounded-2xl border border-[#d9c39c] bg-white">
+        <section className="document-card my-5 overflow-hidden rounded-xl border border-border bg-card">
           <div className="border-b border-[#eadcc6] px-3 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">
             Debit / Credit Lines
           </div>

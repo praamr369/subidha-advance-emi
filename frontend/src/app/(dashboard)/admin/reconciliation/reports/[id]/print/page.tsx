@@ -142,7 +142,7 @@ export default function AdminReconciliationReportPrintPage() {
       <DocumentPage watermark={watermark(run)}>
         <DocumentHeader copyLabel={copyLabel} documentNo={reportRef} documentDate={period(run)} />
         <DocumentTitleStrip title="RECONCILIATION REPORT" subtitle="Read-only report generated from backend reconciliation run records." status={statusLabel(run.status)} />
-        {warn ? <div className="document-card mb-4 rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">{warn}</div> : null}
+        {warn ? <div className="document-card mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">{warn}</div> : null}
         <DocumentMetadataGrid
           items={[
             { label: "Report Reference", value: reportRef },

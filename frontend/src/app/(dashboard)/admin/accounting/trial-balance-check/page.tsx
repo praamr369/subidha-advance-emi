@@ -71,7 +71,7 @@ export default function TrialBalanceCheckPage() {
       {!loading && !error && !data ? <ERPEmptyState title="No trial balance payload" /> : null}
       {!loading && !error && data ? (
         <div className="space-y-6">
-          <div className="rounded-2xl border border-border bg-background p-5 shadow-sm">
+          <div className="rounded-xl border border-border bg-background p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">{data.period_start} to {data.period_end} · As of {data.as_of}</p>
