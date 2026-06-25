@@ -104,6 +104,42 @@ POSTING_PROFILE_SPECS: tuple[PostingProfileSpec, ...] = (
         debit_keys=("EMI_COLLECTION_CLEARING", "CUSTOMER_RECEIVABLE"),
         credit_keys=("EMI_COLLECTION_CLEARING", "CUSTOMER_RECEIVABLE"),
     ),
+    PostingProfileSpec(
+        key="payment_gateway_collection",
+        label="Payment Gateway Collection",
+        debit_keys=(FinanceAccountMappingPurpose.PAYMENT_GATEWAY_COLLECTION,),
+        credit_keys=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
+    ),
+    PostingProfileSpec(
+        key="delivery_charges",
+        label="Delivery Charges",
+        debit_keys=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
+        credit_keys=(FinanceAccountMappingPurpose.DELIVERY_CHARGES_INCOME,),
+    ),
+    PostingProfileSpec(
+        key="waiver_expense",
+        label="EMI Waiver Expense",
+        debit_keys=(FinanceAccountMappingPurpose.WAIVER_LOSS,),
+        credit_keys=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
+    ),
+    PostingProfileSpec(
+        key="damage_recovery",
+        label="Damage Recovery",
+        debit_keys=(FinanceAccountMappingPurpose.CUSTOMER_RECEIVABLE,),
+        credit_keys=(FinanceAccountMappingPurpose.DAMAGE_RECOVERY,),
+    ),
+    PostingProfileSpec(
+        key="delivery_expense",
+        label="Delivery Expense",
+        debit_keys=(FinanceAccountMappingPurpose.DELIVERY_EXPENSE,),
+        credit_keys=("ACCOUNTS_PAYABLE",),
+    ),
+    PostingProfileSpec(
+        key="salary_payroll",
+        label="Salary / Payroll",
+        debit_keys=(FinanceAccountMappingPurpose.SALARY_EXPENSE,),
+        credit_keys=("ACCOUNTS_PAYABLE",),
+    ),
 )
 
 

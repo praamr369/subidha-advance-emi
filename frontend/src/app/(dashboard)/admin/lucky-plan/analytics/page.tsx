@@ -1,5 +1,5 @@
 "use client";
-import { RefreshCw, TrendingUp, Users, Award } from "lucide-react";
+import { Award, RefreshCw, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -11,6 +11,7 @@ import {
   ERPSectionShell,
 } from "@/components/erp";
 import ActionButton from "@/components/ui/ActionButton";
+import { ROUTES } from "@/lib/routes";
 import { listLuckyDraws, getBatchDrawSummary } from "@/services/draws";
 
 function formatRupee(value: string | number | null | undefined): string {
@@ -87,9 +88,25 @@ export default function LuckyPlanAnalyticsPage() {
     loadData();
   }, [loadData]);
 
+  const shellProps = {
+    eyebrow: "Lucky Plan",
+    title: "Lucky Plan Analytics",
+    subtitle: "Draw performance, winner metrics, and EMI waiver business impact.",
+    breadcrumbs: [
+      { label: "Admin", href: ROUTES.admin.dashboard },
+      { label: "Lucky Plan", href: ROUTES.admin.luckyPlanControl },
+      { label: "Analytics" },
+    ],
+    actions: [
+      { href: ROUTES.admin.luckyPlanWinners, label: "Winners", variant: "secondary" as const },
+      { href: ROUTES.admin.luckyPlanDraws, label: "Draws", variant: "primary" as const },
+    ],
+    statusBadge: { label: "Admin Only", tone: "info" as const },
+  };
+
   if (loading) {
     return (
-      <ERPPageShell title="Lucky Plan Analytics">
+      <ERPPageShell {...shellProps}>
         <ERPLoadingState label="Loading analytics..." />
       </ERPPageShell>
     );
@@ -97,7 +114,7 @@ export default function LuckyPlanAnalyticsPage() {
 
   if (error) {
     return (
-      <ERPPageShell title="Lucky Plan Analytics">
+      <ERPPageShell {...shellProps}>
         <ERPErrorState
           title="Unable to load analytics"
           message={error}
@@ -108,7 +125,7 @@ export default function LuckyPlanAnalyticsPage() {
   }
 
   return (
-    <ERPPageShell title="Lucky Plan Analytics">
+    <ERPPageShell {...shellProps}>
       <div className="space-y-6">
         {/* Key Metrics */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -116,7 +133,7 @@ export default function LuckyPlanAnalyticsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Total Draws</p>
-                <TrendingUp className="h-5 w-5 text-blue-600" />
+                <TrendingUp className="h-5 w-5 text-primary" />
               </div>
               <p className="text-3xl font-semibold">{analytics.totalDraws}</p>
               <p className="text-xs text-muted-foreground">Completed draws</p>
@@ -127,7 +144,7 @@ export default function LuckyPlanAnalyticsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Total Winners</p>
-                <Award className="h-5 w-5 text-yellow-600" />
+                <Award className="h-5 w-5 text-amber-500" />
               </div>
               <p className="text-3xl font-semibold">{analytics.totalWinners}</p>
               <p className="text-xs text-muted-foreground">Verified winners</p>
@@ -138,7 +155,7 @@ export default function LuckyPlanAnalyticsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Total Waived</p>
-                <Users className="h-5 w-5 text-green-600" />
+                <Users className="h-5 w-5 text-emerald-600" />
               </div>
               <p className="text-2xl font-semibold">
                 {formatRupee(analytics.totalWaivers)}
@@ -180,9 +197,9 @@ export default function LuckyPlanAnalyticsPage() {
                     {analytics.totalDraws}/{analytics.totalDraws}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-muted rounded-full h-2">
                   <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    className="bg-primary h-2 rounded-full transition-all"
                     style={{ width: "100%" }}
                   ></div>
                 </div>
@@ -195,9 +212,9 @@ export default function LuckyPlanAnalyticsPage() {
                     {analytics.totalWinners}/{analytics.totalDraws}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-muted rounded-full h-2">
                   <div
-                    className="bg-green-600 h-2 rounded-full transition-all"
+                    className="bg-emerald-500 h-2 rounded-full transition-all"
                     style={{
                       width: `${analytics.totalDraws > 0 ? (analytics.totalWinners / analytics.totalDraws) * 100 : 0}%`,
                     }}

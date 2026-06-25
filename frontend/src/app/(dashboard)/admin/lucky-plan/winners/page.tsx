@@ -27,15 +27,15 @@ function fmtMoney(v?: string | null): string {
 }
 
 const DELIVERY_LABELS: Record<string, { label: string; color: string }> = {
-  NOT_SCHEDULED: { label: "Not Scheduled", color: "bg-gray-100 text-muted-foreground" },
-  PENDING: { label: "Pending", color: "bg-yellow-100 text-yellow-800" },
-  SCHEDULED: { label: "Scheduled", color: "bg-blue-100 text-blue-800" },
-  DISPATCHED: { label: "Dispatched", color: "bg-indigo-100 text-indigo-800" },
-  OUT_FOR_DELIVERY: { label: "Out for Delivery", color: "bg-purple-100 text-purple-800" },
-  DELIVERED: { label: "Delivered", color: "bg-green-100 text-green-800" },
-  FAILED: { label: "Failed", color: "bg-red-100 text-red-800" },
-  CANCELLED: { label: "Cancelled", color: "bg-gray-200 text-muted-foreground" },
-  RETURNED: { label: "Returned", color: "bg-orange-100 text-orange-800" },
+  NOT_SCHEDULED: { label: "Not Scheduled", color: "bg-muted text-muted-foreground" },
+  PENDING: { label: "Pending", color: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" },
+  SCHEDULED: { label: "Scheduled", color: "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+  DISPATCHED: { label: "Dispatched", color: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300" },
+  OUT_FOR_DELIVERY: { label: "Out for Delivery", color: "bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300" },
+  DELIVERED: { label: "Delivered", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" },
+  FAILED: { label: "Failed", color: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300" },
+  CANCELLED: { label: "Cancelled", color: "bg-muted text-muted-foreground" },
+  RETURNED: { label: "Returned", color: "bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
 };
 
 function DeliveryBadge({ status }: { status?: string | null }) {
