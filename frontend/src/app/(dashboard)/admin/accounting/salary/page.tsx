@@ -19,16 +19,16 @@ import { WorkspaceSection } from "@/components/ui/workspace";
 import { buildAdminSalarySheetRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
-  approveSalarySheet,
-  closePayrollPeriod,
+  approveSalarySheetSafe as approveSalarySheet,
+  closePayrollPeriodSafe as closePayrollPeriod,
   createSalaryPayment,
-  createSalarySheet,
+  createSalarySheetSafe as createSalarySheet,
   listEmployees,
   listFinanceAccounts,
-  listPayrollPeriods,
+  listPayrollPeriodsSafe as listPayrollPeriods,
   listSalaryPayments,
-  listSalarySheets,
-  postSalarySheet,
+  listSalarySheetsSafe as listSalarySheets,
+  postSalarySheetSafe as postSalarySheet,
   type EmployeeProfile,
   type FinanceAccount,
   type PayrollPeriod,

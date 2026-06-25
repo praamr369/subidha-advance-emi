@@ -1349,9 +1349,27 @@ export function listPayrollPeriods(params: Record<string, string | number | unde
   );
 }
 
+/** Payroll periods moved to /admin/hr/payroll-periods/ — use this for module pages. */
+export function listPayrollPeriodsSafe(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<PayrollPeriod>>(
+    `/admin/hr/payroll-periods/${buildQuery(params)}`
+  );
+}
+
 export function closePayrollPeriod(id: number, close_reason = "") {
   return apiFetch<AccountingActionResponse<{ payroll_period: PayrollPeriod }>>(
     `/accounting/payroll-periods/${id}/close/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ close_reason }),
+    }
+  );
+}
+
+/** Payroll periods moved to /admin/hr/payroll-periods/ — use this for module pages. */
+export function closePayrollPeriodSafe(id: number, close_reason = "") {
+  return apiFetch<AccountingActionResponse<{ payroll_period: PayrollPeriod }>>(
+    `/admin/hr/payroll-periods/${id}/close/`,
     {
       method: "POST",
       body: JSON.stringify({ close_reason }),
@@ -1463,8 +1481,21 @@ export function createSalarySheet(payload: Partial<SalarySheet>) {
   });
 }
 
+/** Salary sheets moved to /admin/hr/payroll/ — use this for the module-level salary page. */
+export function createSalarySheetSafe(payload: Partial<SalarySheet>) {
+  return apiFetch<SalarySheet>("/admin/hr/payroll/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getSalarySheet(id: number) {
   return apiFetch<SalarySheet>(`/accounting/salary-sheets/${id}/`);
+}
+
+/** Salary sheets moved to /admin/hr/payroll/ — use this for the module-level salary page. */
+export function getSalarySheetSafe(id: number) {
+  return apiFetch<SalarySheet>(`/admin/hr/payroll/${id}/`);
 }
 
 export function approveSalarySheet(id: number) {
@@ -1477,9 +1508,31 @@ export function approveSalarySheet(id: number) {
   );
 }
 
+/** Salary sheets moved to /admin/hr/payroll/ — use this for the module-level salary page. */
+export function approveSalarySheetSafe(id: number) {
+  return apiFetch<AccountingActionResponse<{ salary_sheet: SalarySheet }>>(
+    `/admin/hr/payroll/${id}/approve/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
 export function postSalarySheet(id: number) {
   return apiFetch<AccountingActionResponse<{ salary_sheet: SalarySheet }>>(
     `/accounting/salary-sheets/${id}/post/`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+/** Salary sheets moved to /admin/hr/payroll/ — use this for the module-level salary page. */
+export function postSalarySheetSafe(id: number) {
+  return apiFetch<AccountingActionResponse<{ salary_sheet: SalarySheet }>>(
+    `/admin/hr/payroll/${id}/post/`,
     {
       method: "POST",
       body: JSON.stringify({}),

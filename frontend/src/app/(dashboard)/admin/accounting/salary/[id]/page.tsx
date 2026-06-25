@@ -16,10 +16,10 @@ import PortalPage from "@/components/ui/PortalPage";
 import { DetailItem, WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
-  approveSalarySheet,
-  getSalarySheet,
+  approveSalarySheetSafe as approveSalarySheet,
+  getSalarySheetSafe as getSalarySheet,
   listSalaryPayments,
-  postSalarySheet,
+  postSalarySheetSafe as postSalarySheet,
   type SalaryPayment,
   type SalarySheet,
 } from "@/services/accounting";

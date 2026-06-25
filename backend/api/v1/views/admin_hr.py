@@ -753,6 +753,12 @@ class AdminHrPayrollView(_AdminBase):
         sheets = sheets_qs[:50]
         return Response({"current_period": None if period is None else {"id": period.id, "code": period.code, "status": period.status}, "salary_sheets": SalarySheetSerializer(sheets, many=True, context={"request": request}).data})
 
+    def post(self, request):
+        serializer = SalarySheetSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        sheet = serializer.save()
+        return Response(SalarySheetSerializer(sheet, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
 
 class AdminHrSalaryPaymentsListCreateView(_AdminBase):
     def get(self, request):
