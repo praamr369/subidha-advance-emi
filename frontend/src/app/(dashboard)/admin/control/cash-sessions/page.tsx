@@ -41,6 +41,11 @@ export default function AdminControlCashSessionsPage() {
         { label: "Cash Sessions" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Sessions", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Open", value: loading ? "—" : rows.filter(r => r.status === "OPEN").length, tone: !loading && rows.filter(r => r.status === "OPEN").length > 0 ? "warning" : "success" },
+        { label: "Closed", value: loading ? "—" : rows.filter(r => r.status !== "OPEN").length, tone: "default" },
+      ]}
     >
       {loading && <LoadingBlock />}
       {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}

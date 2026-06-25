@@ -55,6 +55,10 @@ export default function AdminControlApprovalsPage() {
         { label: "Approvals" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Total", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Pending", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "PENDING").length, tone: !loading && rows.filter(r => String(r.status).toUpperCase() === "PENDING").length > 0 ? "warning" : "success" },
+      ]}
     >
       {loading && <LoadingBlock />}
       {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}

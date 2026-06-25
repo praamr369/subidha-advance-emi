@@ -55,6 +55,11 @@ export default function AdminControlExceptionsPage() {
         { label: "Exceptions" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Total", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Open", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "OPEN").length, tone: !loading && rows.filter(r => String(r.status).toUpperCase() === "OPEN").length > 0 ? "danger" : "success" },
+        { label: "Acknowledged", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "ACKNOWLEDGED").length, tone: !loading && rows.filter(r => String(r.status).toUpperCase() === "ACKNOWLEDGED").length > 0 ? "warning" : "success" },
+      ]}
     >
       {loading && <LoadingBlock />}
       {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}

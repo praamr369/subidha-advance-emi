@@ -41,6 +41,11 @@ export default function AdminControlPoliciesPage() {
         { label: "Policies" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Policies", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Enabled", value: loading ? "—" : rows.filter(r => r.is_enabled).length, tone: "success" },
+        { label: "Disabled", value: loading ? "—" : rows.filter(r => !r.is_enabled).length, tone: "default" },
+      ]}
     >
       {loading && <LoadingBlock />}
       {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}
