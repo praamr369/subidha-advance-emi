@@ -101,6 +101,7 @@ export default function AdminControlMonthEndClosePage() {
         { href: ROUTES.admin.controlRoot, label: "Control Desk" },
         { label: "Month-End Close" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {/* Period selector */}
       <div className="mb-6 flex flex-wrap items-end gap-4">

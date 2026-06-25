@@ -62,6 +62,7 @@ export default function AdminSettingsFinancePage() {
         { label: "Finance" },
       ]}
       actions={[{ href: ROUTES.admin.settings, label: "Settings Home", variant: "secondary" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="mb-4 rounded-xl border border-border bg-muted/40 p-4 text-sm">
         Current tax mode:{" "}

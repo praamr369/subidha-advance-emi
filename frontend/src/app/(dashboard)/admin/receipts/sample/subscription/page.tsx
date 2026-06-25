@@ -18,6 +18,7 @@ export default function SampleSubscriptionDocumentsPage() {
         { label: "Receipt Samples", href: "/admin/receipts/sample" },
         { label: "Subscription Documents" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <PrintActionBanner
         className="mb-4"

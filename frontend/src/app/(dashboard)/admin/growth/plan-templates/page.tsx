@@ -43,6 +43,12 @@ export default function PlanTemplatesPage() {
       title="Plan Templates"
       subtitle="Reusable EMI, RENT, and LEASE plan configuration blueprints."
       actions={[{ href: ROUTES.admin.growth, label: "Growth Hub", variant: "secondary" }]}
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Growth & Offers", href: ROUTES.admin.growth },
+        { label: "Plan Templates" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {templates.length === 0 ? (
         <ERPEmptyState title="No plan templates" description="No plan templates configured yet." />

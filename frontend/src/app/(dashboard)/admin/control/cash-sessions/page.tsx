@@ -40,6 +40,7 @@ export default function AdminControlCashSessionsPage() {
         { href: ROUTES.admin.controlRoot, label: "Control Desk" },
         { label: "Cash Sessions" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {loading && <LoadingBlock />}
       {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}

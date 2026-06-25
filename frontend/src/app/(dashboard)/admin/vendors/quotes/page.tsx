@@ -134,6 +134,7 @@ export default function AdminVendorQuotesPage() {
         { href: ROUTES.admin.vendorsSourcing, label: "Sourcing hints", variant: "secondary" },
         { href: ROUTES.admin.purchaseOrders, label: "Purchase orders", variant: "primary" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {submitBanner ? (
         <div className="rounded-xl border border-emerald-600/35 bg-emerald-600/10 p-4 text-sm text-foreground">

@@ -90,6 +90,7 @@ export default function ReversalControlPage() {
         { label: "Reversal & Return Control" },
       ]}
       actions={[{ label: "Reversal Reconciliation", href: ROUTES.admin.financeReversalReconciliation }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">

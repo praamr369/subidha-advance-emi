@@ -38,6 +38,7 @@ export default function AdminSettingsBusinessPage() {
         { label: "Business" },
       ]}
       actions={[{ href: ROUTES.admin.settings, label: "Settings Home", variant: "secondary" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="grid gap-4 md:grid-cols-2">
         {items.map((item) => (

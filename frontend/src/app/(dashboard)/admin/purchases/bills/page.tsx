@@ -350,6 +350,7 @@ export default function AdminPurchaseBillsPage() {
         { label: "Purchases", href: ROUTES.admin.purchases },
         { label: "Vendor Bills" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Vendor Bills"

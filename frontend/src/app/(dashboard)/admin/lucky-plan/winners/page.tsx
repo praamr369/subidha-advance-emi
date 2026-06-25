@@ -86,6 +86,7 @@ export default function LuckyPlanWinnersPage() {
         { href: ROUTES.admin.luckyPlanControl, label: "Lucky Plan" },
         { label: "Winners" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Filters"

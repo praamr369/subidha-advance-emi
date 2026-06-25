@@ -11,6 +11,7 @@ export default function AdminVendorPurchaseReturnsPage() {
       title="Vendor purchase returns"
       subtitle="Vendor-side purchase return visibility."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor purchase returns" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell title="Audit-safe note" description="Purchase return posting remains controlled by existing reversal services.">
         <div className="rounded-xl border border-border bg-card p-4 text-sm">

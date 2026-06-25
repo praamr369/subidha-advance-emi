@@ -64,6 +64,7 @@ export default function ReversalReconciliationPage() {
         { label: "Finance", href: ROUTES.admin.finance },
         { label: "Reversal Reconciliation" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ApprovalQueuePageShell
         queueSummary={

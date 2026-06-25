@@ -69,6 +69,7 @@ export default function AdminDataQualityPage() {
       subtitle="11 read-only integrity checks across customers, products, contracts, payments, and accounting. No records are mutated."
       breadcrumbs={[{ href: ROUTES.admin.dashboard, label: "Admin" }, { label: "Data Quality" }]}
       stats={stats}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {loading && <LoadingBlock />}
       {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}

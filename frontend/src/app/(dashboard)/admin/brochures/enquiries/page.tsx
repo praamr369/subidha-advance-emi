@@ -105,6 +105,7 @@ export default function BrochureEnquiriesPage() {
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Brochures", href: "/admin/brochures" }, { label: "Enquiries" }]}
       actions={[{ href: "/admin/brochures", label: "Brochure Generator", variant: "secondary" }, { href: "/admin/brochures/settings", label: "Product Settings", variant: "secondary" }, { href: "/admin/brochures/quotations", label: "Quotations", variant: "secondary" }]}
       stats={[{ label: "Visible enquiries", value: rows.length }, { label: "New", value: rows.filter((row) => row.status === "NEW").length }, { label: "High priority", value: rows.filter((row) => row.priority === "HIGH").length }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         <ERPSectionShell title="Filters">

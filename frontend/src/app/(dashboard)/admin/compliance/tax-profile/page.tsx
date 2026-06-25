@@ -49,6 +49,7 @@ export default function AdminComplianceTaxProfilePage() {
         { label: "Compliance" },
         { label: "Tax Profile" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceSection title="Current Tax Mode" description={`Active mode: ${activeMode}`}>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

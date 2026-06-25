@@ -11,6 +11,7 @@ export default function AdminVendorPurchasesPage() {
       title="Vendor purchases"
       subtitle="Purchase orders and purchase bills visibility for vendors."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor purchases" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell title="Procurement workspace handoff" description="Use the existing purchase order, receipt/GRN, and bill modules for full procurement documents.">
         <div className="rounded-xl border border-border bg-card p-4 text-sm">

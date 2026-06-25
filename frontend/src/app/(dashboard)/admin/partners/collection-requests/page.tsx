@@ -230,6 +230,7 @@ export default function AdminPartnerCollectionRequestsPage() {
         { label: "Approved", value: approvedCount },
         { label: "Rejected", value: rejectedCount },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="mb-4 flex flex-wrap gap-3">
         <select

@@ -82,6 +82,7 @@ export default function FinanceControlPage() {
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Finance Control" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

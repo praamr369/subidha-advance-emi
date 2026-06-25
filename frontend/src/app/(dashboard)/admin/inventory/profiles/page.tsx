@@ -48,6 +48,7 @@ export default function InventoryProfilesPage() {
         { label: "Inventory", href: ROUTES.admin.inventory },
         { label: "Profiles" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Guidance"

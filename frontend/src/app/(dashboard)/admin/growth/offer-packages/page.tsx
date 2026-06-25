@@ -49,6 +49,12 @@ export default function OfferPackagesPage() {
         { href: ROUTES.admin.growthPlanTemplates, label: "Plan Templates", variant: "secondary" },
         { href: ROUTES.admin.growth, label: "Growth Hub", variant: "secondary" },
       ]}
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Growth & Offers", href: ROUTES.admin.growth },
+        { label: "Offer Packages" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {packages.length === 0 ? (
         <ERPEmptyState title="No offer packages" description="No offer packages configured yet." />

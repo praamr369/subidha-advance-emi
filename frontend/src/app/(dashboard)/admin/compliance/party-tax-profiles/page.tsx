@@ -56,6 +56,7 @@ export default function AdminCompliancePartyTaxProfilesPage() {
         { label: "Compliance" },
         { label: "Party Tax Profiles" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceSection title="Profiles" description="Tax identity readiness without changing current non-GST postings.">
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

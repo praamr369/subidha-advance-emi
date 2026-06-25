@@ -54,6 +54,7 @@ export default function AdminControlApprovalsPage() {
         { href: ROUTES.admin.controlRoot, label: "Control Desk" },
         { label: "Approvals" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {loading && <LoadingBlock />}
       {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}

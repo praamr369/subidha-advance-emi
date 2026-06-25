@@ -107,6 +107,7 @@ export default function InventoryLedgerPage() {
         { label: "Inventory", href: ROUTES.admin.inventory },
         { label: "Ledger" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceDirectory
         title="Inventory route map"

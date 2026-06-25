@@ -123,6 +123,7 @@ export default function AdminBrandDataPage() {
         { label: "Brand Data" },
       ]}
       actions={[{ label: "Load Provider Status", href: ROUTES.admin.brandData }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         <section className="rounded border p-4">

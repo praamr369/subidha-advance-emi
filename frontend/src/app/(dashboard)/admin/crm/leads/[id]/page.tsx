@@ -373,6 +373,7 @@ export default function AdminCrmLeadDetailPage() {
         { label: "Leads", href: ROUTES.admin.crmLeads },
         { label: lead?.name || `Lead #${id}` },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {loading ? <ERPLoadingState label="Loading lead…" /> : null}
       {!loading && error ? <ERPErrorState title="Unable to load lead" description={error} /> : null}

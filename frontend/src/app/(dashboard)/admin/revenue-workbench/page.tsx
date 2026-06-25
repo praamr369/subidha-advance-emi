@@ -68,6 +68,7 @@ export default function RevenueWorkbenchPage() {
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Revenue Workbench" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

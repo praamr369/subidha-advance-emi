@@ -97,6 +97,7 @@ export default function BillingCreditNotesPage() {
         { label: "Billing", href: ROUTES.admin.billing },
         { label: "Credit Notes" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceDirectory
         className="receipt-print-hide"

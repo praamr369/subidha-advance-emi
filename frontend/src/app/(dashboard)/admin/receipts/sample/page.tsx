@@ -42,6 +42,7 @@ export default function AdminReceiptSampleIndexPage() {
         { label: "Admin", href: "/admin" },
         { label: "Receipt Samples" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <section className="grid gap-3 md:grid-cols-2">
         {SAMPLE_LINKS.map((item) => (

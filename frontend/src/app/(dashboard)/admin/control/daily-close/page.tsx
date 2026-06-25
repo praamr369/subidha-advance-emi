@@ -71,6 +71,7 @@ export default function AdminControlDailyClosePage() {
         { href: ROUTES.admin.controlRoot, label: "Control Desk" },
         { label: "Daily Close" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {loading && <LoadingBlock />}
       {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}

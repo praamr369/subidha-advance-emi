@@ -106,6 +106,7 @@ export default function InventoryMovementsPage() {
         { href: ROUTES.admin.billingRegister, label: "Billing Register", variant: "secondary" },
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceDirectory
         title="Inventory route map"

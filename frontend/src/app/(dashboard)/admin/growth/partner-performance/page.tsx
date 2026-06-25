@@ -61,6 +61,12 @@ export default function PartnerPerformancePage() {
       title="Partner Performance"
       subtitle="Read-only partner activity: referrals, collections, overdue, commissions, risk flags. No payout or commission mutation."
       actions={[{ href: ROUTES.admin.growth, label: "Growth Hub", variant: "secondary" }]}
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Growth & Offers", href: ROUTES.admin.growth },
+        { label: "Partner Performance" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {partners.length === 0 ? (
         <ERPEmptyState title="No partners" description="No active partners found." />

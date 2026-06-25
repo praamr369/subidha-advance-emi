@@ -207,6 +207,7 @@ export default function AdminCrmLeadRegisterPage() {
         { label: "Converted", value: String(stageCounts["CONVERTED"] || 0), tone: "success" },
         { label: "Lost", value: String(stageCounts["LOST"] || 0), tone: "warning" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {/* Tab bar */}
       <div className="flex gap-0 rounded-xl border border-border overflow-hidden w-fit mb-6">

@@ -248,6 +248,7 @@ export default function AdminPartnersPage() {
         { label: "Subscriptions", value: kpis.totalLinkedSubscriptions },
         { label: "Monthly Book", value: formatCurrency(kpis.totalMonthlyBook) },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="mb-4 flex flex-wrap gap-2.5">
         <button

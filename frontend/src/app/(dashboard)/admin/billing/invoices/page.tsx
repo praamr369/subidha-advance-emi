@@ -171,6 +171,7 @@ export default function BillingInvoicesPage() {
         { href: ROUTES.admin.billingRegister, label: "Document Register", variant: "secondary" },
         { href: ROUTES.admin.billingDirectSales, label: "Direct Sales", variant: "secondary" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceDirectory
         className="receipt-print-hide"

@@ -76,6 +76,7 @@ export default function AdminVendorsPage() {
         { href: ROUTES.admin.accountingVendors, label: "Accounting Vendor Control", variant: "secondary" },
       ]}
       stats={[{ label: "Vendors", value: String(vendors.length), tone: "info" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Vendor register"

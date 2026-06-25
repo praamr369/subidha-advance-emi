@@ -51,6 +51,7 @@ export default function ReversalCaseDetailPage() {
         { label: "Reversal & Return Control", href: ROUTES.admin.financeReversalControl },
         { label: String(row?.case_no || id) },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {loading ? <LoadingBlock label="Loading reversal case..." /> : null}
       {!loading && error ? <ErrorState title="Unable to load reversal case" description={error} /> : null}

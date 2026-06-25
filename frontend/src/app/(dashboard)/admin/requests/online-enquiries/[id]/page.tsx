@@ -195,6 +195,7 @@ export default function AdminOnlineEnquiryDetailPage() {
         { href: ROUTES.admin.vendorsQuotes, label: "Quote registry", variant: "secondary" },
         { href: ROUTES.admin.purchaseOrders, label: "Purchase orders", variant: "secondary" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {banner ? <div className="mb-3 rounded border border-emerald-600/40 bg-emerald-600/10 p-3 text-sm">{banner}</div> : null}
       {error ? <ERPErrorState title="Action failed" description={error} /> : null}

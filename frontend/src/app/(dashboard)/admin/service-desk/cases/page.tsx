@@ -99,6 +99,7 @@ export default function AdminServiceDeskCasesPage() {
         { href: ROUTES.admin.serviceDeskReturns, label: "Returns", variant: "secondary" },
         { href: ROUTES.admin.serviceDeskTickets, label: "Service Tickets", variant: "secondary" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">

@@ -81,6 +81,12 @@ export default function RetentionIntelligencePage() {
       title="Retention Intelligence"
       subtitle={`Advisory signals only. No Payment, EMI, or Subscription records are mutated. ${total} customer${total === 1 ? "" : "s"} with active signals.`}
       actions={[{ href: ROUTES.admin.growth, label: "Growth Hub", variant: "secondary" }]}
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Growth & Offers", href: ROUTES.admin.growth },
+        { label: "Retention Intelligence" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {profiles.length === 0 ? (
         <ERPEmptyState

@@ -298,6 +298,7 @@ export default function AdminCustomerEditPage() {
         { label: customer.name, href: `/admin/customers/${customer.id}` },
         { label: "Edit" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">

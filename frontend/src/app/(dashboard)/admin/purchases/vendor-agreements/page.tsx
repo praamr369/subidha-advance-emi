@@ -242,6 +242,7 @@ export default function AdminVendorAgreementsPage() {
         { label: "Purchases", href: ROUTES.admin.purchases },
         { label: "Vendor Agreements" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Vendor Agreements"

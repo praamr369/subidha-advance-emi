@@ -184,6 +184,7 @@ export default function BrochureQuotationsPage() {
         { label: "Draft", value: rows.filter((row) => row.status === "DRAFT").length },
         { label: "Sent", value: rows.filter((row) => row.status === "SENT").length },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         <ERPSectionShell title="Filters" actions={<button type="button" onClick={() => setCreateOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> New quotation</button>}>

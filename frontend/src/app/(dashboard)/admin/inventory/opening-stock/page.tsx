@@ -383,6 +383,7 @@ export default function InventoryOpeningStockPage() {
         { href: ROUTES.admin.inventoryLedger, label: "Stock Ledger", variant: "secondary" },
       ]}
       stats={stats}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         <WorkspaceDirectory

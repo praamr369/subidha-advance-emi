@@ -56,6 +56,7 @@ export default function AdminInventoryDemandPlanningPage() {
         { label: "Inventory", href: ROUTES.admin.inventory },
         { label: "Demand Planning" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Demand by Product"

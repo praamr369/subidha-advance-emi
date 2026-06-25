@@ -459,6 +459,7 @@ export default function AdminAccountingSetupPage() {
       subtitle="Separate money destinations, ledger posting rules, bridge approval, and close readiness so operators cannot confuse system profiles with collection accounts."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Setup" }]}
       actions={[{ href: ROUTES.admin.accountingChartOfAccounts, label: "Chart of Accounts", variant: "secondary" }, { href: ROUTES.admin.collectionControlCenter, label: "Collection Control", variant: "secondary" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <RepairDialog open={repairDialogOpen} targets={repairTargets} preview={repairPreview} repairing={repairing} onClose={() => { if (repairing) return; setRepairDialogOpen(false); setRepairTargets([]); }} onConfirm={() => void confirmRepair()} />
 

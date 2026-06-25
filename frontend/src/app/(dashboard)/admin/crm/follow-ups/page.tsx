@@ -292,6 +292,7 @@ export default function AdminCrmFollowUpsPage() {
         { label: "Done", value: String(doneCount), tone: "default" },
         { label: "Total", value: String(totalCount), tone: "default" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Follow-up queue"

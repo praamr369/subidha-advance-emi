@@ -250,6 +250,7 @@ export default function BillingDocumentRegisterPage() {
         { href: buildAdminBillingReceiptsRoute(filters), label: "Receipts", variant: "secondary" },
         { href: buildAdminBillingInvoicesRoute(filters), label: "Invoice Register", variant: "secondary" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceDirectory
         className="receipt-print-hide"

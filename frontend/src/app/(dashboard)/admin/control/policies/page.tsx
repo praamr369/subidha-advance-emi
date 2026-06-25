@@ -40,6 +40,7 @@ export default function AdminControlPoliciesPage() {
         { href: ROUTES.admin.controlRoot, label: "Control Desk" },
         { label: "Policies" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {loading && <LoadingBlock />}
       {!loading && error && <ErrorState message={error} onRetry={() => void load()} />}

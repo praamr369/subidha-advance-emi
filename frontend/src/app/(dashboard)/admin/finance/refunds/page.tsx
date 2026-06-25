@@ -92,6 +92,7 @@ export default function AdminFinanceRefundsPage() {
         { href: ROUTES.admin.financeReversalReconciliation, label: "Reconciliation Queue", variant: "secondary" },
         { href: ROUTES.admin.finance, label: "Finance Operations", variant: "secondary" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         <section className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm">

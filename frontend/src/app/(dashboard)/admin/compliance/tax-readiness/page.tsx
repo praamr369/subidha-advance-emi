@@ -43,6 +43,7 @@ export default function AdminComplianceTaxReadinessPage() {
         { label: "Compliance" },
         { label: "Tax Readiness" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceSection title="Readiness" description="Product and party tax master completeness for future GST activation.">
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

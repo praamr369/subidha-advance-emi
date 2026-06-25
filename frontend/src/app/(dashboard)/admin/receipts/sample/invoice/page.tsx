@@ -38,6 +38,7 @@ export default function SampleInvoicePage() {
         { label: "Receipt Samples", href: "/admin/receipts/sample" },
         { label: "Invoice / Bill" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <PrintActionBanner
         className="mb-4"

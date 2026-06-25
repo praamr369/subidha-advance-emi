@@ -221,6 +221,7 @@ export default function AdminVendorSourcingPage() {
         },
         { label: "Selected invites", value: String(Object.values(picked).filter(Boolean).length), tone: "info" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {banner ? <div className="mb-3 rounded border border-emerald-600/40 bg-emerald-600/10 p-3 text-sm">{banner}</div> : null}
       {error ? <div className="mb-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}

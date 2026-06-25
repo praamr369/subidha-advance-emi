@@ -17,6 +17,7 @@ export default function SampleWaiverReceiptPage() {
         { label: "Receipt Samples", href: "/admin/receipts/sample" },
         { label: "Waiver Benefit Receipt" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <PrintActionBanner
         className="mb-4"

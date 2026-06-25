@@ -190,6 +190,7 @@ export default function AdminLegalControlsPage() {
         { label: "Settings", href: ROUTES.admin.settings },
         { label: "Legal & GST Controls" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {loading ? <p className="text-sm text-muted-foreground">Loading controls...</p> : null}
       {error ? <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}

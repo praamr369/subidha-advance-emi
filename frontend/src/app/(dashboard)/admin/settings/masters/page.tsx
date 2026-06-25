@@ -16,6 +16,7 @@ export default function AdminSettingsMastersPage() {
         { label: "Masters" },
       ]}
       actions={[{ href: ROUTES.admin.settings, label: "Settings Home", variant: "secondary" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         <div className="rounded-xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm leading-6 text-sky-950">

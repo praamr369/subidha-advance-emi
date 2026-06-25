@@ -97,6 +97,7 @@ export default function BillingDebitNotesPage() {
         { label: "Billing", href: ROUTES.admin.billing },
         { label: "Debit Notes" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceDirectory
         className="receipt-print-hide"

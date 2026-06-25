@@ -17,6 +17,7 @@ export default function SampleAcknowledgementPage() {
         { label: "Receipt Samples", href: "/admin/receipts/sample" },
         { label: "Acknowledgement Slip" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <PrintActionBanner
         className="mb-4"

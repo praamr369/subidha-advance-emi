@@ -108,6 +108,7 @@ export default function AdminCustomerAdvancesPage() {
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Customer Advances" }]}
       actions={[{ href: ROUTES.admin.accountingChartOfAccounts, label: "Chart of Accounts", variant: "secondary" }, { href: ROUTES.admin.financeDeposits, label: "Deposits", variant: "secondary" }]}
       stats={[{ label: "Records", value: String(rows.length), tone: "info" }, { label: "Total source amount", value: formatRupee(total), tone: "success" }, { label: "Selected", value: selected ? `#${text(selected.id)}` : "None", tone: selected ? "info" : "warning" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         {loading ? <ERPLoadingState label="Loading customer advances..." /> : null}

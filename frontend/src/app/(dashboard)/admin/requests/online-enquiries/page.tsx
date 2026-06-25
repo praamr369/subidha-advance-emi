@@ -67,6 +67,7 @@ export default function AdminOnlineEnquiriesPage() {
         { label: "Loaded rows", value: String(rows.length), tone: loading ? "info" : rows.length === 0 ? "warning" : "info" },
         { label: "Filter", value: statusFilter.trim() || "all", tone: "info" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Enquiry register"

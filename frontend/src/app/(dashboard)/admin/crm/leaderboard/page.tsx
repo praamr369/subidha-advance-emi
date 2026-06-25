@@ -6,6 +6,7 @@ import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import {
   getLeaderboard,
@@ -90,6 +91,12 @@ export default function LeaderboardPage() {
       eyebrow="CRM"
       title="Staff Leaderboard"
       subtitle="Monthly sales performance, lead conversion, and targets per staff member"
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "CRM", href: ROUTES.admin.crm },
+        { label: "Staff Leaderboard" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {/* Period selector */}
       <ERPSectionShell title="Period">

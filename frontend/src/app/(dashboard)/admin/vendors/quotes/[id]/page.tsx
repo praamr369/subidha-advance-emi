@@ -78,6 +78,7 @@ export default function AdminVendorQuoteDetailPage() {
         { label: String(detail?.request_no || rfqId) },
       ]}
       actions={[{ href: ROUTES.admin.purchaseOrders, label: "Purchase orders workspace", variant: "primary" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {error ? <ERPErrorState title="Unable to load quote request" description={error} /> : null}
       {actionNote ? (

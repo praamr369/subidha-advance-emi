@@ -136,6 +136,7 @@ export default function AdminCustomerCreditsPage() {
         { label: "Total source amount", value: formatRupee(total), tone: "success" },
         { label: "Selected", value: selected ? `#${text(selected.id)}` : "None", tone: selected ? "info" : "warning" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         {loading ? <ERPLoadingState label="Loading customer credits..." /> : null}

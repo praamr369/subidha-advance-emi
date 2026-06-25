@@ -50,6 +50,7 @@ export default function AdminInventoryPurchaseNeedsPage() {
         { label: "Purchase Needs" },
       ]}
       stats={[{ label: "Open Alerts", value: String(alerts), tone: alerts > 0 ? "warning" : "success" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPDataToolbar
         left={<div className="text-sm text-muted-foreground">Operational feed (read-only).</div>}

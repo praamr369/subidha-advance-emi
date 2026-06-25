@@ -80,6 +80,7 @@ export default function AdminVendorProductsHubPage() {
       subtitle="Pick a supplier to review their SKU lines. Maintain lines from each vendor detail page."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor products", href: ROUTES.admin.vendorsProducts }]}
       actions={[{ href: ROUTES.admin.vendors, label: "Vendor register", variant: "secondary" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {error ? <ERPErrorState title="Unable to load vendor catalog" description={error} /> : null}
 

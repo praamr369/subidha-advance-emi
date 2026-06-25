@@ -168,6 +168,7 @@ export default function AdminCrmPipelinePage() {
         { label: "Converted", value: String(rows.filter((r) => r.stage === "CONVERTED").length), tone: "success" },
         { label: "Lost", value: String(rows.filter((r) => r.stage === "LOST").length), tone: "warning" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Pipeline board"

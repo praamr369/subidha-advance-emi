@@ -140,6 +140,7 @@ export default function AdminVendorDetailPage() {
         { href: ROUTES.admin.vendorsQuotes, label: "Vendor quotes", variant: "secondary" },
         { href: ROUTES.admin.purchaseOrders, label: "Purchase orders", variant: "primary" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPDataToolbar
         left={

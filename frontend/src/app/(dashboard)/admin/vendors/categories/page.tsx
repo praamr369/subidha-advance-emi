@@ -49,6 +49,7 @@ export default function AdminVendorCategoriesPage() {
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Vendor Categories" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Category Register"

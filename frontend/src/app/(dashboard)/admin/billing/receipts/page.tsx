@@ -116,6 +116,7 @@ export default function BillingReceiptsPage() {
         { href: ROUTES.admin.billingRegister, label: "Document Register", variant: "secondary" },
         { href: ROUTES.admin.billingInvoices, label: "Invoices", variant: "secondary" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPSectionShell
         title="Billing control directory"

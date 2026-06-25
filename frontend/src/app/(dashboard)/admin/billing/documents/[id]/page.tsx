@@ -235,6 +235,7 @@ export default function BillingDocumentDetailPage() {
             ]
           : []),
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceDirectory
         className="receipt-print-hide"

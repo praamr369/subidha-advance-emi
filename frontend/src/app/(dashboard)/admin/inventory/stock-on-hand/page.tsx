@@ -101,6 +101,7 @@ export default function InventoryStockOnHandPage() {
         { label: "Inventory", href: ROUTES.admin.inventory },
         { label: "Stock On Hand" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceDirectory
         title="Inventory route map"

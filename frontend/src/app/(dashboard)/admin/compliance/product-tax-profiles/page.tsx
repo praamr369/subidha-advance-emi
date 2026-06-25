@@ -53,6 +53,7 @@ export default function AdminComplianceProductTaxProfilesPage() {
         { label: "Compliance" },
         { label: "Product Tax Profiles" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <WorkspaceSection title="Profiles" description="Readiness data only while GST Unregistered.">
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

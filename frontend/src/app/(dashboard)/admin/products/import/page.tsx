@@ -229,6 +229,7 @@ export default function AdminProductImportPage() {
           tone: (preview?.invalid_count ?? 0) > 0 ? "warning" : "default",
         },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">

@@ -117,6 +117,7 @@ export default function AdminReportCenterDetailPage() {
           variant: "secondary",
         },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPDataToolbar
         left={

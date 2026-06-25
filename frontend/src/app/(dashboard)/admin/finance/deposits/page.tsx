@@ -290,6 +290,7 @@ export default function AdminFinanceDepositsPage() {
       title="Rent/Lease Deposit Operations"
       subtitle={SOURCE_NOTE}
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Finance", href: "/admin/finance" }, { label: "Deposits" }]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {loading ? <LoadingBlock label="Loading deposit operations..." /> : null}
       {error ? <ErrorState title="Unable to load deposit workspace" message={error} onRetry={() => void load()} /> : null}

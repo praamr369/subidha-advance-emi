@@ -171,6 +171,7 @@ export default function NotificationTemplatesPage() {
         { href: ROUTES.admin.reminders, label: "Reminders" },
         { label: "Templates" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
         {notice && (

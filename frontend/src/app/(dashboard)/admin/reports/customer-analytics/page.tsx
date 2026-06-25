@@ -120,6 +120,7 @@ export default function CustomerAnalyticsReportPage() {
         { href: ROUTES.admin.reportsOverdue, label: "Overdue Report", variant: "secondary" },
       ]}
       headerMode="erp"
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       {loading ? <ERPLoadingState label="Analysing customer signals…" /> : null}
       {!loading && error ? <ERPErrorState title="Failed to load" description={error} /> : null}

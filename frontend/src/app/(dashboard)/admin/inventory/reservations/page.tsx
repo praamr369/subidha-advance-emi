@@ -69,6 +69,7 @@ export default function AdminInventoryReservationsPage() {
         { label: "Inventory", href: ROUTES.admin.inventory },
         { label: "Reservations" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <ERPAuditNote title="Read-only" tone="info">
         Stock reservations are system-managed. To release a reservation, use the relevant

@@ -17,6 +17,7 @@ export default function SamplePaymentReceiptPage() {
         { label: "Receipt Samples", href: "/admin/receipts/sample" },
         { label: "EMI Payment Receipt" },
       ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <PrintActionBanner
         className="mb-4"
