@@ -79,6 +79,7 @@ export default function LuckyPlanWinnersPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title="Winners Register"
       subtitle="Complete Lucky Draw winner register — EMI waivers, delivery tracking, and audit trail"
       breadcrumbs={[

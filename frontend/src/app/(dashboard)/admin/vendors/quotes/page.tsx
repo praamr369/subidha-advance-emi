@@ -126,6 +126,7 @@ export default function AdminVendorQuotesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendor quote requests"
       subtitle="Request quotes without posting procurement, payable, or billing documents."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor quotes", href: ROUTES.admin.vendorsQuotes }]}

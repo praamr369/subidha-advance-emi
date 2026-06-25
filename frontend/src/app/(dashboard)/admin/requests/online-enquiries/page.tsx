@@ -55,6 +55,7 @@ export default function AdminOnlineEnquiriesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Sales"
       title="Online purchase enquiries"
       subtitle="Customer intents for fulfilment sourcing — no automatic procurement or payments."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Online enquiries", href: ROUTES.admin.onlineEnquiries }]}

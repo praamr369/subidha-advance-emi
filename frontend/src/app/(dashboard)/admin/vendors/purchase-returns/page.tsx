@@ -7,6 +7,7 @@ import { ROUTES } from "@/lib/routes";
 export default function AdminVendorPurchaseReturnsPage() {
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendor purchase returns"
       subtitle="Vendor-side purchase return visibility."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor purchase returns" }]}

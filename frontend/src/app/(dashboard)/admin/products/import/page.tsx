@@ -187,6 +187,7 @@ export default function AdminProductImportPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title="Import Products"
       subtitle="Bulk import product master data with category, sub-category, SKU, unit, description, and pricing while keeping product master as the shared catalog truth for subscriptions and future inventory."
       breadcrumbs={[

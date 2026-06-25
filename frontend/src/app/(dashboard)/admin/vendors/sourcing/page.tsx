@@ -205,6 +205,7 @@ export default function AdminVendorSourcingPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendor sourcing workspace"
       subtitle="Ranked supplier recommendations — read-only until procurement records RFQs manually. Orders are never auto-placed."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor sourcing", href: ROUTES.admin.vendorsSourcing }]}

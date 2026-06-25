@@ -515,6 +515,7 @@ export default function AdminPaymentsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="Payments Register"
       subtitle="Operational payment register for admin review, verification, reversal visibility, and reconciliation handoff."
       breadcrumbs={[

@@ -41,6 +41,7 @@ export default function AdminInventoryPurchaseNeedsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title="Inventory Purchase Needs"
       subtitle="Required products and inventory needs generated from direct sale and other demand sources."
       breadcrumbs={[

@@ -170,6 +170,7 @@ export default function BrochureQuotationsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Marketing"
       title="Brochure Quotations"
       subtitle="Create and share non-financial quotation drafts. Acceptance records agreement in principle only; it creates no invoice, payment, contract, order, delivery, EMI, or stock reservation."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Brochures", href: "/admin/brochures" }, { label: "Quotations" }]}

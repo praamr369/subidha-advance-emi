@@ -10,6 +10,7 @@ export default function SampleSubscriptionDocumentsPage() {
   return (
     <ERPPageShell
       className="receipt-print-page"
+      eyebrow="Billing"
       title="Sample Subscription Booking + Plan Summary"
       subtitle="Customer-facing enrollment receipt and contract-style plan summary preview."
       breadcrumbs={[

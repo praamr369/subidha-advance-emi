@@ -84,6 +84,7 @@ export default function AccountingItrPackPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="ITR Export Pack"
       subtitle="Generate an additive accounting handoff pack containing trial balance, profit and loss, and balance sheet JSON extracts for tax and finance workflows."
       breadcrumbs={[

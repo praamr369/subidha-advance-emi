@@ -60,6 +60,7 @@ export default function AdminInventoryReservationsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title="Stock Reservations"
       subtitle="Active stock reservations by item and purpose. Read-only visibility."
       headerMode="erp"

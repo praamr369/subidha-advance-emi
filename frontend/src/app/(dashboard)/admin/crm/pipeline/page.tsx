@@ -154,6 +154,7 @@ export default function AdminCrmPipelinePage() {
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title="CRM Pipeline"
       subtitle="Lead stage board. Use the stage buttons on each card to advance leads through the pipeline."
       breadcrumbs={[

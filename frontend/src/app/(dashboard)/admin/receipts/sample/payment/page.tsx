@@ -9,6 +9,7 @@ export default function SamplePaymentReceiptPage() {
   return (
     <ERPPageShell
       className="receipt-print-page"
+      eyebrow="Billing"
       title="Sample EMI Payment Receipt"
       subtitle="Customer-ready EMI receipt preview with clean payment and subscription context."
       breadcrumbs={[

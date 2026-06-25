@@ -42,6 +42,7 @@ export default function ReversalCaseDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title={`Reversal Case ${String(row?.case_no || "")}`}
       subtitle="Operational reversal case detail, checklist, and controlled actions."
       breadcrumbs={[

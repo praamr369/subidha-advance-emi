@@ -163,6 +163,7 @@ export default function NotificationTemplatesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title="Notification Templates"
       subtitle="Manage reusable message templates for email, WhatsApp, and other reminder channels"
       breadcrumbs={[

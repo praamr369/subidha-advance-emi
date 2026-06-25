@@ -20,6 +20,7 @@ const CHAIN_STEPS = [
 export default function AdminPurchasesPage() {
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Purchases — Purchase Source Workflow"
       subtitle="Procurement chain from vendor to stock to payable. Each step is a separate auditable record. No step auto-creates the next."
       helperNote="Purchase source workflow: vendor profile → request → order → receipt → stock → bill → payable → payment → accounting bridge → reconciliation. Accounting bridge status and reconciliation evidence are confirmed in Accounting & Reconciliation, not here."

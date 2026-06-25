@@ -87,6 +87,7 @@ export default function RevenueReportPage() {
 
   return (
     <ERPPageShell
+      eyebrow="BI & Reports"
       title="Revenue Report"
       subtitle="Operational revenue view sourced from the admin payment register so collection totals and reversal visibility stay aligned."
       headerMode="erp"

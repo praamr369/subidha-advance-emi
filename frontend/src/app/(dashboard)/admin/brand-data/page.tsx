@@ -115,6 +115,7 @@ export default function AdminBrandDataPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Settings"
       title="Brand & Business Data Center"
       subtitle="Manage Subidha Furniture profile, public content, social links, media, and verified business details."
       breadcrumbs={[

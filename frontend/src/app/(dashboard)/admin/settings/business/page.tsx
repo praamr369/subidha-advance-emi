@@ -29,6 +29,7 @@ const items = [
 export default function AdminSettingsBusinessPage() {
   return (
     <ERPPageShell
+      eyebrow="Settings & Governance"
       title="Business Settings"
       subtitle="Operational control surfaces that affect day-to-day shop execution without changing Lucky Plan financial truth."
       breadcrumbs={[

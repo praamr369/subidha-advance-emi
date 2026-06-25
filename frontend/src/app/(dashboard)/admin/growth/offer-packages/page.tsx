@@ -42,6 +42,7 @@ export default function OfferPackagesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Growth & Offers"
       title="Offer Packages"
       subtitle="Time-bounded offers built on plan templates. No subscription is created automatically."
       actions={[

@@ -135,6 +135,7 @@ export default function AccountingCreditNotesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Credit Notes"
       subtitle="Controlled GST credit notes linked back to the original tax invoice. Posting remains explicit and admin-only."
       breadcrumbs={[

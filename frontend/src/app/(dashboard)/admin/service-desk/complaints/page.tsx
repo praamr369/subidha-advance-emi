@@ -121,6 +121,7 @@ export default function AdminServiceDeskComplaintsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Service Desk"
       title="Complaint Register"
       subtitle="Customer complaint intake stays anchored in support requests while linked service-desk cases capture the operational return, exchange, or after-sales work that follows."
       breadcrumbs={[

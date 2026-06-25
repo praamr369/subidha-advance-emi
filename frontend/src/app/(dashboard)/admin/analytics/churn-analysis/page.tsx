@@ -43,6 +43,7 @@ export default function ChurnAnalysisPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Analytics"
       title="Churn Analysis"
       subtitle="Read-only churn-risk watchlist based on defaulted or high-outstanding subscriptions. Source-linked report — drill down to Profiles / Customers for action."
       headerMode="erp"

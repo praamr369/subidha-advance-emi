@@ -193,6 +193,7 @@ export default function AdminCrmLeadRegisterPage() {
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title="CRM Leads"
       subtitle="Internal lead pipeline and online enquiry inbox."
       breadcrumbs={[

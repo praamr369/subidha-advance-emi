@@ -175,7 +175,8 @@ export default function AdminOnlineEnquiryDetailPage() {
 
   if (!Number.isFinite(id) || id < 1) {
     return (
-      <ERPPageShell title="Invalid enquiry" breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }]}>
+      <ERPPageShell eyebrow="Sales"
+      title="Invalid enquiry" breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }]}>
         <div className="text-sm text-destructive">Missing enquiry id.</div>
       </ERPPageShell>
     );

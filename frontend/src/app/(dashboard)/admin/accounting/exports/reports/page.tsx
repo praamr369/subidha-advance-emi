@@ -137,6 +137,7 @@ export default function AccountingExportReportsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Accounting Exports"
       subtitle="Read-only structured exports for manual review or import preparation. JSON and CSV available."
       helperNote="No external accounting sync or export jobs run here. Reports are fetched directly from the read-only P4E endpoints."

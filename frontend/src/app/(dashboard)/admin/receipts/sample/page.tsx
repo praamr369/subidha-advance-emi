@@ -35,6 +35,7 @@ export default function AdminReceiptSampleIndexPage() {
   return (
     <ERPPageShell
       className="receipt-print-page"
+      eyebrow="Billing"
       title="Document Sample Previews"
       subtitle="Review the branded receipt/document family before or alongside route-level backend wiring."
       breadcrumbs={[

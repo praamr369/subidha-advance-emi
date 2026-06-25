@@ -75,6 +75,7 @@ export default function FinancialIntelligencePage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Financial Intelligence"
       subtitle="Read-only finance posture across collections, billing, accounting bridges, reconciliation, liabilities, close controls, inventory, and trial balance."
       helperNote="Diagnostic only. This page does not post journals or mutate financial records."

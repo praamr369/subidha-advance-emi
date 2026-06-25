@@ -530,6 +530,7 @@ export default function AdminLuckyDrawRevealPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title={draw ? `Reveal Draw #${draw.id}` : `Reveal Lucky Draw #${drawId ?? "—"}`}
       subtitle="Dedicated confirmation page for the final Lucky Draw reveal action."
       breadcrumbs={[

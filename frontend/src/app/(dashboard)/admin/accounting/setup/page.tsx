@@ -446,7 +446,8 @@ export default function AdminAccountingSetupPage() {
 
   if (loading) {
     return (
-      <ERPPageShell title="Accounting Setup" subtitle="Operator-proof setup for finance accounts, posting profiles, and Chart of Accounts health.">
+      <ERPPageShell eyebrow="Accounting"
+      title="Accounting Setup" subtitle="Operator-proof setup for finance accounts, posting profiles, and Chart of Accounts health.">
         <LoadingBlock label="Loading accounting setup..." />
       </ERPPageShell>
     );

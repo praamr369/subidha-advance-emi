@@ -135,6 +135,7 @@ export default function AccountingDebitNotesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Debit Notes"
       subtitle="Controlled GST debit notes for upward adjustments against an original invoice, posted through the accounting subsystem only."
       breadcrumbs={[

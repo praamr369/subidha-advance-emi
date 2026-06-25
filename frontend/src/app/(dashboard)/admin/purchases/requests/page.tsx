@@ -332,6 +332,7 @@ export default function AdminPurchaseRequestsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Purchase Requests"
       subtitle="Internal demand-to-order intake. Approve and convert to PO once the backend exposes those actions."
       breadcrumbs={[

@@ -574,6 +574,7 @@ export default function AdminPaymentDetailRoutePage() {
   return (
     <ERPPageShell
       className="receipt-print-page"
+      eyebrow="Finance"
       title={`Payment #${paymentId ?? "—"}`}
       subtitle="Inspect payment facts, linked contract context, reversal state, and the full ledger/audit timeline."
       breadcrumbs={[

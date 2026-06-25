@@ -79,6 +79,7 @@ export default function AdminFinanceRefundsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="Refunds"
       subtitle="Customer refunds stay source-driven inside reversal control so finance can reconcile, block, or approve them with a full audit trail."
       breadcrumbs={[

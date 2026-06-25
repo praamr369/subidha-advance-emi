@@ -532,6 +532,7 @@ export default function AdminProductCreatePage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title="Create Product"
       subtitle="Create product master data for contract pricing, product lookup, and downstream subscription creation."
       breadcrumbs={[

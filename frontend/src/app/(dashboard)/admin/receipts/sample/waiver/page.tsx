@@ -9,6 +9,7 @@ export default function SampleWaiverReceiptPage() {
   return (
     <ERPPageShell
       className="receipt-print-page"
+      eyebrow="Billing"
       title="Sample Waiver / Lucky Draw Benefit Receipt"
       subtitle="Future-EMI-only waiver confirmation document for winner communication."
       breadcrumbs={[

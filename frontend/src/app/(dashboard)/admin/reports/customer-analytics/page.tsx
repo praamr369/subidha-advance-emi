@@ -106,6 +106,7 @@ export default function CustomerAnalyticsReportPage() {
 
   return (
     <ERPPageShell
+      eyebrow="BI & Reports"
       title="Customer Analytics"
       subtitle="Retention signals, risk segments, and lifecycle status across all active customers."
       breadcrumbs={[

@@ -342,6 +342,7 @@ export default function AdminPurchaseBillsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendor Bills"
       subtitle="Post vendor bills to accounting. Creates a payable journal entry via account mappings."
       breadcrumbs={[

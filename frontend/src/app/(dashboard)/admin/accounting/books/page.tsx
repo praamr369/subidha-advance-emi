@@ -158,6 +158,7 @@ export default function AccountingBooksPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Books"
       subtitle="Track finance accounts and explicit inter-account transfers inside accounting. This is not the EMI collection register and does not auto-post bridge rows."
       breadcrumbs={[

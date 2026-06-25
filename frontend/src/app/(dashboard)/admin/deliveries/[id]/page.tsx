@@ -293,6 +293,7 @@ export default function AdminDeliveryDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Delivery"
       title={delivery ? delivery.delivery_reference : "Delivery Detail"}
       subtitle="Inspect delivery facts, update operational metadata, and perform explicit lifecycle transitions with audit history."
       breadcrumbs={[

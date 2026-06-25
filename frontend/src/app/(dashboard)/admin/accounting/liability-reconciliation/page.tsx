@@ -78,6 +78,7 @@ export default function LiabilityReconciliationPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Liability Reconciliation"
       subtitle="Diagnostic comparison of customer-advance and security-deposit source liabilities, bridge coverage, and deferred GL comparison."
       helperNote="Read-only. No advance application, deposit refund, deduction, or accounting posting can be performed from this page."

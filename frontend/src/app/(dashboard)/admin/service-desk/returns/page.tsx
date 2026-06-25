@@ -179,6 +179,7 @@ export default function AdminServiceDeskReturnsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Service Desk"
       title="Return Register"
       subtitle="Sales returns, delivery returns, and exchanges are captured as explicit service-desk cases. Stock and finance effects only happen through the linked delivery or billing-note actions on the case detail."
       breadcrumbs={[

@@ -280,6 +280,7 @@ export default function AdminBatchControlCenterPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title={state?.batch_code || `Batch #${batchId ?? "—"} Control Center`}
       subtitle="Lock, commit, and execute draw actions using real backend guardrails and reasons only."
       breadcrumbs={[

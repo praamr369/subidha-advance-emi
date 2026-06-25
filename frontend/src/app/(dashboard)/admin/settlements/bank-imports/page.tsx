@@ -82,6 +82,7 @@ export default function BankImportsList() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="Bank Statement Imports"
       subtitle="Admin-only evidence imports. Upload, review parsed lines, then apply manual allocations to existing targets."
       helperNote="Imports only store evidence. They do not match payments, post accounting, or close reconciliation items."

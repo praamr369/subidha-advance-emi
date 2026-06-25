@@ -223,6 +223,7 @@ export default function AdminPartnersPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Partners"
       title="Partner Management"
       subtitle="Monitor partner productivity, customer acquisition, active subscriptions, collections workflow visibility, and commercial contribution."
       breadcrumbs={[

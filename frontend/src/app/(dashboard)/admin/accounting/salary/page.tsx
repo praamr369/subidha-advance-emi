@@ -236,6 +236,7 @@ export default function AccountingSalaryPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Salary Register"
       subtitle="Payroll remains a separate operational workflow: period-aware salary sheets, payslip-ready line breakdowns, explicit posting, and controlled salary disbursement into the selected finance book."
       breadcrumbs={[

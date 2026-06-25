@@ -150,6 +150,7 @@ export default function BankImportDetail({ params }: { params: Promise<{ id: str
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title={`Bank import ${importData.import_no}`}
       subtitle="Review parsed statement lines and apply manual allocations to existing targets."
       helperNote="Manual allocation only. No payment record is edited. No accounting entry is created. No reconciliation exception is closed automatically."

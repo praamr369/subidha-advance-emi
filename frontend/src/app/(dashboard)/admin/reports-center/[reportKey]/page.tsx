@@ -101,6 +101,7 @@ export default function AdminReportCenterDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="BI & Reports"
       title={payload?.title || reportKey || "Report"}
       subtitle="Read-only dataset. Exports require the reports.export capability."
       headerMode="erp"

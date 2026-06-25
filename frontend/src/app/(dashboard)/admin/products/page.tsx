@@ -201,6 +201,7 @@ export default function AdminProductsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title="Product Register"
       subtitle="Enterprise product operations register with server-side pagination, full-catalog search, quick edits, and inventory preparation. Product edits affect future onboarding only."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Products" }]}

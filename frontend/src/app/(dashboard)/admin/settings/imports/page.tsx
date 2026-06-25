@@ -198,6 +198,7 @@ export default function AdminSettingsImportsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Settings & Governance"
       title="Import Hub"
       subtitle="Use preview and post flows for master-data imports. Live Lucky Plan finance history remains unchanged by these imports."
       breadcrumbs={[

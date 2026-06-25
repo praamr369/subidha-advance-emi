@@ -45,6 +45,7 @@ export default function AdminComplianceProductTaxProfilesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Compliance"
       title="Product Tax Readiness"
       subtitle="HSN and GST rate readiness master for future GST registration."
       breadcrumbs={[

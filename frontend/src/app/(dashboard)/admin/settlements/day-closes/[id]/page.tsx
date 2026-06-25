@@ -98,7 +98,8 @@ export default function AdminDayCloseDetailPage() {
   if (loading) {
     return (
       <ERPPageShell
-        title="Day-close review"
+        eyebrow="Finance"
+      title="Day-close review"
         breadcrumbs={[
           { label: "Admin", href: ROUTES.admin.dashboard },
           { label: "Settlements", href: ROUTES.admin.settlements },

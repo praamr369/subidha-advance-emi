@@ -56,6 +56,7 @@ export default function AccountingGstHubPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting · GST"
       title="GST Documents"
       subtitle="GST-ready invoice and note lifecycle controls with consecutive numbering, controlled posting, and additive cancellation through reversal journals."
       breadcrumbs={[

@@ -418,6 +418,7 @@ export default function AdminPayoutBatchDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title={`Payout Batch #${batchId ?? "—"}`}
       subtitle="Inspect payout batch composition, review included commission rows, and execute controlled finalize or cancel actions."
       breadcrumbs={[

@@ -508,6 +508,7 @@ export default function AdminLuckyIdEditPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title={
         luckyId
           ? `Edit Lucky ID ${formatLuckyNumber(luckyId.lucky_number)}`

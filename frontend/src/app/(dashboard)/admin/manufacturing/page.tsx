@@ -43,6 +43,7 @@ export default function AdminManufacturingOverviewPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Manufacturing"
       title="Manufacturing"
       subtitle="Run BOM governance, raw-material issue, WIP tracking, finished-goods receipt, and scrap capture through explicit production jobs that link back to inventory and accounting without becoming a second stock or finance truth."
       breadcrumbs={[

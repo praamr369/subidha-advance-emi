@@ -90,6 +90,7 @@ export default function AdminPartnerPaymentRequestsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Partners"
       title="Partner Payment Requests"
       subtitle="SUBMITTED collection requests from partners awaiting admin approval. Approving a request posts the payment and EMI record — this action cannot be undone."
       helperNote="Approving a request posts a real payment and EMI record. Rejecting returns it to the partner for correction. No financial changes happen from reject."

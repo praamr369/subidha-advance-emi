@@ -459,6 +459,7 @@ export default function AdminDeliveriesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Delivery"
       title="Deliveries"
       subtitle="Create, track, and transition subscription-linked delivery records while keeping fulfillment summary and audit history consistent."
       breadcrumbs={[

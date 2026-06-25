@@ -150,6 +150,7 @@ export default function UpiImportDetail({ params }: { params: Promise<{ id: stri
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title={`UPI import ${importData.import_no}`}
       subtitle="Review parsed settlement lines and apply manual allocations to existing targets."
       helperNote="Manual allocation only. No payment record is edited. No accounting entry is created. No reconciliation exception is closed automatically."

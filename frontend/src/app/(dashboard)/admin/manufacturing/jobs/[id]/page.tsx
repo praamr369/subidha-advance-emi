@@ -244,6 +244,7 @@ export default function AdminManufacturingJobDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Manufacturing"
       title={job?.job_no || "Production Job"}
       subtitle="This job detail keeps BOM reference, raw issue, WIP, finished-goods receipt, scrap, and costing posture in one operational view while inventory and accounting remain separate posted truths."
       breadcrumbs={[

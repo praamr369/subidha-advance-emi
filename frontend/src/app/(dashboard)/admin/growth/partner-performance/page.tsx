@@ -57,6 +57,7 @@ export default function PartnerPerformancePage() {
 
   return (
     <ERPPageShell
+      eyebrow="Growth & Offers"
       title="Partner Performance"
       subtitle="Read-only partner activity: referrals, collections, overdue, commissions, risk flags. No payout or commission mutation."
       actions={[{ href: ROUTES.admin.growth, label: "Growth Hub", variant: "secondary" }]}

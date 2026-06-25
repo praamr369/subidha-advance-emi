@@ -308,6 +308,7 @@ export default function AdminSupportRequestDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Sales"
       title={supportRequest ? `Support Request #${supportRequest.id}` : "Support Request Detail"}
       subtitle="Review the customer-submitted issue, update triage ownership and status, and follow the linked records without leaving the support workflow."
       breadcrumbs={[

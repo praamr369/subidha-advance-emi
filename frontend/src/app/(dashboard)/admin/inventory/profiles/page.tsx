@@ -40,6 +40,7 @@ export default function InventoryProfilesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title="Inventory Profiles"
       subtitle="Product catalog entries become stock-trackable only after profile preparation."
       breadcrumbs={[

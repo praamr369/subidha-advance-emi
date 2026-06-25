@@ -319,6 +319,7 @@ export default function AdminPurchaseReceiptsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Goods Receipts"
       subtitle="Receive goods against a PO. Posting creates stock ledger IN entries."
       breadcrumbs={[

@@ -101,6 +101,7 @@ export default function AdminLegalControlsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Settings & Governance"
       title="Legal & GST Controls"
       subtitle="DB-backed launch gates for Product Instalment Sale classification, GST mode, waiver readiness, refund SLA, partner receipts, KYC masking, deposit inspection, and late payment charge controls."
       breadcrumbs={[

@@ -58,7 +58,8 @@ export default function AdminReconciliationRunDetailPage() {
   }, [load]);
 
   return (
-    <ERPPageShell title={run ? `Reconciliation Run #${run.run_no}` : "Reconciliation Run"}>
+    <ERPPageShell eyebrow="Finance"
+      title={run ? `Reconciliation Run #${run.run_no}` : "Reconciliation Run"}>
       <div className="space-y-6">
         <ERPSectionShell
           title="Run Summary"

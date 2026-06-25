@@ -278,6 +278,7 @@ export default function AdminCrmFollowUpsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title="CRM Follow-ups"
       subtitle="Follow-up task queue. Mark tasks done after each call or outreach attempt."
       breadcrumbs={[

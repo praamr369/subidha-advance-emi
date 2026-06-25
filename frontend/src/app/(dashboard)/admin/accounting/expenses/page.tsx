@@ -194,6 +194,7 @@ export default function AccountingExpensesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Expenses"
       subtitle="Vendor-side expense vouchers move from draft to approved to posted through the new accounting books, without mutating EMI payment history."
       breadcrumbs={[

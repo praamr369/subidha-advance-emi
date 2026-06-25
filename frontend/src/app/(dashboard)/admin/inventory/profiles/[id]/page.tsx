@@ -52,6 +52,7 @@ export default function InventoryProfileDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title={profile ? `${profile.product_name} Inventory Profile` : "Inventory Profile"}
       subtitle="Profile controls stock behavior and costing metadata; quantity changes must use stock workflows."
       breadcrumbs={[

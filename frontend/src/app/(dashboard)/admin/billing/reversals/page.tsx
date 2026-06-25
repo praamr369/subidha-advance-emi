@@ -196,6 +196,7 @@ export default function AdminBillingReversalsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Billing"
       title="Returns, Voids & Reversal Center"
       subtitle="Admin-only control center for direct sale cancellation, returns, receipt voids, customer refunds, and purchase returns."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.root }, { label: "Billing", href: ROUTES.admin.billing }, { label: "Reversals" }]}

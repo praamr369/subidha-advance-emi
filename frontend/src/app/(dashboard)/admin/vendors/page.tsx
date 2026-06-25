@@ -67,6 +67,7 @@ export default function AdminVendorsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendors"
       subtitle="Internal supplier master for purchase and payable workflows."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendors" }]}

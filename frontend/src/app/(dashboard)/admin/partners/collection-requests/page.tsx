@@ -214,6 +214,7 @@ export default function AdminPartnerCollectionRequestsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Partners"
       title="Partner Collection Requests"
       subtitle="Controlled approval queue for partner-submitted field collection reports. Approve or reject request status only."
       helperNote="This is a controlled approval queue. Approving or rejecting a request updates the request status through the existing backend workflow. No direct payment, commission, or payout record is created from this page."

@@ -192,6 +192,7 @@ export default function AdminSubscriptionRequestDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Sales"
       title={request ? `Request #${request.id}` : "Subscription Request Review"}
       subtitle="Approve or reject customer and partner subscription intake without bypassing the canonical EMI subscription creation path."
       breadcrumbs={[

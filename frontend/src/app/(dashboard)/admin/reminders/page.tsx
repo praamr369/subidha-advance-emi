@@ -263,6 +263,7 @@ export default function AdminRemindersPage() {
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title="Reminder Queue"
       subtitle="Manual and scheduled reminders for retail dues and Lucky Plan EMI collections, with explicit status tracking and audit events."
       breadcrumbs={[

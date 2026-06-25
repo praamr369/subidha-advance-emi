@@ -7,6 +7,7 @@ import { ROUTES } from "@/lib/routes";
 export default function AdminSettingsMastersPage() {
   return (
     <ERPPageShell
+      eyebrow="Settings & Governance"
       title="Master Data"
       subtitle="Reference data that operational modules reuse instead of duplicating product, inventory, or accounting truth."
       breadcrumbs={[

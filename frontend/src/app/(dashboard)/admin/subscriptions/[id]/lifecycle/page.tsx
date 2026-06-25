@@ -350,6 +350,7 @@ export default function ContractLifecyclePage() {
 
   return (
     <ERPPageShell
+      eyebrow="Sales"
       title={`Contract Lifecycle — #${subscriptionId}`}
       subtitle="Manage contract approval, activation, amendments, possession, and return inspection."
       breadcrumbs={[

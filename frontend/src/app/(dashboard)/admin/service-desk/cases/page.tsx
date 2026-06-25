@@ -85,6 +85,7 @@ export default function AdminServiceDeskCasesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Service Desk"
       title="Service Desk Cases"
       subtitle="Canonical case register for returns, complaints, exchanges, and after-sales service."
       breadcrumbs={[

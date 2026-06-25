@@ -9,6 +9,7 @@ export default function SampleAcknowledgementPage() {
   return (
     <ERPPageShell
       className="receipt-print-page"
+      eyebrow="Billing"
       title="Sample Payment Acknowledgement Slip"
       subtitle="Compact acknowledgement format for quick customer handover."
       breadcrumbs={[

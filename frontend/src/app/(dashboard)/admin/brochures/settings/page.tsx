@@ -295,6 +295,7 @@ export default function BrochureProductSettingsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Marketing"
       title="Brochure Product Settings"
       subtitle="Products require brochure settings before they can appear in generated brochures."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Brochures", href: "/admin/brochures" }, { label: "Product Settings" }]}

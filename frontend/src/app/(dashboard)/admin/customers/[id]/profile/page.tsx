@@ -60,6 +60,7 @@ export default function AdminCustomerProfilePage({ params }: { params: Promise<{
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title="Party 360 Profile"
       subtitle="Identity, contracts, dues, payments, delivery, notes, follow-ups, risk flags, and audit timeline."
     >

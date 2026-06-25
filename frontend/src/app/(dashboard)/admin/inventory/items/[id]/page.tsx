@@ -38,6 +38,7 @@ export default function InventoryItemDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title={item ? `${item.product_name} Inventory Item` : "Inventory Item"}
       subtitle="Per-item stock controls, reorder posture, and delivery bridge status. Quantity mutations still flow through controlled stock workflows."
       breadcrumbs={[

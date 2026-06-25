@@ -105,6 +105,7 @@ export default function AdminComplianceKycPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Compliance"
       title="KYC compliance"
       subtitle="Free-only KYC governance across Lucky Plan EMI, rent, lease, delivery, refund, and winner settlement workflows."
       breadcrumbs={[

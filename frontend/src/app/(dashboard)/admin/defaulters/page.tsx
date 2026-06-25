@@ -363,6 +363,7 @@ export default function DefaultersPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Collections"
       title="Defaulter Recovery"
       subtitle="Subscriptions with overdue EMIs, aging buckets, and recovery case management"
     >

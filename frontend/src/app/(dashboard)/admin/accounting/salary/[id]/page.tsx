@@ -100,6 +100,7 @@ export default function AdminSalarySheetDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title={salarySheet ? `${salarySheet.employee_code} Payroll` : "Salary Sheet"}
       subtitle="This detail view keeps payslip-ready earnings and deduction lines, approval posture, journal linkage, and payment settlement visible in one place while accounting remains the posted truth."
       breadcrumbs={[

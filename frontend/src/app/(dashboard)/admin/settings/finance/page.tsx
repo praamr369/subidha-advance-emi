@@ -53,6 +53,7 @@ export default function AdminSettingsFinancePage() {
 
   return (
     <ERPPageShell
+      eyebrow="Settings & Governance"
       title="Finance Configuration"
       subtitle="Accounting controls and reconciliation-adjacent configuration without overloading the live EMI/payment operational core."
       breadcrumbs={[

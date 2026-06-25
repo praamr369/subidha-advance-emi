@@ -77,6 +77,7 @@ export default function RetentionIntelligencePage() {
 
   return (
     <ERPPageShell
+      eyebrow="Growth & Offers"
       title="Retention Intelligence"
       subtitle={`Advisory signals only. No Payment, EMI, or Subscription records are mutated. ${total} customer${total === 1 ? "" : "s"} with active signals.`}
       actions={[{ href: ROUTES.admin.growth, label: "Growth Hub", variant: "secondary" }]}

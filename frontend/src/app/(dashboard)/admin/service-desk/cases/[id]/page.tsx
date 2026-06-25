@@ -191,6 +191,7 @@ export default function AdminServiceDeskCaseDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Service Desk"
       title={serviceCase?.case_no || "Service Desk Case"}
       subtitle="This case detail is the explicit operational control surface for returns, exchanges, complaints, and after-sales service. Inventory, billing, delivery, and accounting remain linked but separate truths."
       breadcrumbs={[

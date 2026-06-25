@@ -408,7 +408,8 @@ export default function AccountingBridgeReadinessPage() {
   }, [allEvents]);
 
   if (loading) {
-    return <ERPPageShell title="Accounting Bridge Readiness" subtitle="Validating bridge mappings and canonical postability."><LoadingBlock label="Loading accounting bridge readiness..." /></ERPPageShell>;
+    return <ERPPageShell eyebrow="Accounting"
+      title="Accounting Bridge Readiness" subtitle="Validating bridge mappings and canonical postability."><LoadingBlock label="Loading accounting bridge readiness..." /></ERPPageShell>;
   }
 
   const summary: Partial<AccountingBridgeReadinessPayload["summary"]> = payload?.summary ?? { source_count: allEvents.length };

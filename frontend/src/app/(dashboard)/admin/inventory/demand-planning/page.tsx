@@ -48,6 +48,7 @@ export default function AdminInventoryDemandPlanningPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title="Inventory Demand Planning"
       subtitle="Read-only demand projection from active subscriptions, locked batches, winners, direct sales, and rent/lease commitments."
       breadcrumbs={[

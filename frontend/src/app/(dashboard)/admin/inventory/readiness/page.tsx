@@ -99,7 +99,8 @@ export default function InventoryReadinessPage() {
   const StatusIcon = statusCopy.icon;
 
   return (
-    <ERPPageShell title="Inventory readiness" subtitle="Read-only operational cockpit for stock, delivery, returns, finance mapping, and reconciliation readiness." breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Inventory", href: ROUTES.admin.inventory }, { label: "Readiness" }]} actions={[{ label: "Inventory", href: ROUTES.admin.inventory, variant: "secondary" }, { label: "Stock needs", href: ROUTES.admin.inventoryStockNeeds, variant: "secondary" }, { label: "Opening stock", href: ROUTES.admin.inventoryOpeningStock, variant: "secondary" }]} statusBadge={{ label: "Read-only", tone: "info" }}>
+    <ERPPageShell eyebrow="Inventory"
+      title="Inventory readiness" subtitle="Read-only operational cockpit for stock, delivery, returns, finance mapping, and reconciliation readiness." breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Inventory", href: ROUTES.admin.inventory }, { label: "Readiness" }]} actions={[{ label: "Inventory", href: ROUTES.admin.inventory, variant: "secondary" }, { label: "Stock needs", href: ROUTES.admin.inventoryStockNeeds, variant: "secondary" }, { label: "Opening stock", href: ROUTES.admin.inventoryOpeningStock, variant: "secondary" }]} statusBadge={{ label: "Read-only", tone: "info" }}>
       <div className="space-y-6">
         {loading ? <ERPLoadingState label="Loading inventory readiness..." /> : null}
         {!loading && error ? <ERPErrorState title="Unable to load inventory readiness" description={`${error} Check API connectivity and retry this read-only page.`} /> : null}

@@ -314,6 +314,7 @@ export default function AdminAuditLogsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Audit"
       title="Audit Logs"
       subtitle="Operational and financial system audit trail with searchable event visibility for admin review."
       breadcrumbs={[

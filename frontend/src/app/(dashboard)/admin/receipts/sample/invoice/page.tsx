@@ -30,6 +30,7 @@ export default function SampleInvoicePage() {
   return (
     <ERPPageShell
       className="receipt-print-page"
+      eyebrow="Billing"
       title="Sample Invoice / Bill"
       subtitle="Branded customer-safe invoice preview for print and PDF output."
       breadcrumbs={[

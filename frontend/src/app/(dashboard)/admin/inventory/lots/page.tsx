@@ -124,6 +124,7 @@ export default function InventoryLotsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title="Barcode & Lot Tracking"
       subtitle="Operational lot, QR, barcode, and expiry visibility for inventory."
       breadcrumbs={[

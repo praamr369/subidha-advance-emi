@@ -75,6 +75,7 @@ export default function AdminVendorProductsHubPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendor catalog hub"
       subtitle="Pick a supplier to review their SKU lines. Maintain lines from each vendor detail page."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor products", href: ROUTES.admin.vendorsProducts }]}

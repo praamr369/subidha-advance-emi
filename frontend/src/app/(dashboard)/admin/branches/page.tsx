@@ -195,6 +195,7 @@ export default function AdminBranchesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Settings"
       title="Branch Master"
       subtitle="Govern branch ownership centrally so subscriptions, collections, billing, inventory, accounting, and workforce records can carry explicit branch context without collapsing those modules into one table."
       breadcrumbs={[

@@ -40,6 +40,7 @@ export default function StockNeedsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title="Purchase need workspace"
       subtitle="Operational purchase/stock needs (PurchaseNeed). Mutations require admin privileges."
       breadcrumbs={[

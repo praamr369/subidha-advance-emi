@@ -114,6 +114,7 @@ export default function AdminProductDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title={product?.name || `Product #${productId ?? "—"}`}
       subtitle="Product operational cockpit for catalog, inventory profile, capabilities, and downstream usage. Product edits affect future onboarding only."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Products", href: "/admin/products" }, { label: product?.name || `Product #${productId ?? "—"}` }]}

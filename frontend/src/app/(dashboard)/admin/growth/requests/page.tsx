@@ -107,6 +107,7 @@ export default function GrowthRequestsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Growth & Offers"
       title="Growth Requests"
       subtitle="Customer renewal, upgrade, exchange, and plan conversion requests. Approve or reject submitted requests."
       actions={[{ href: ROUTES.admin.growth, label: "Growth Hub", variant: "secondary" }]}

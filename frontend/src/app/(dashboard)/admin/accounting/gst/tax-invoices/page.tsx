@@ -168,6 +168,7 @@ export default function AccountingTaxInvoicesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Tax Invoices"
       subtitle="GST-ready invoice skeletons with controlled numbering and accounting posting. This is additive document handling only, not a tax engine."
       breadcrumbs={[

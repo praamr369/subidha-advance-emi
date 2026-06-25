@@ -228,6 +228,7 @@ export default function AdminBatchCreatePage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title="Create Batch"
       subtitle="Create a Lucky Plan batch with controlled slots, tenure, draw scheduling, and safe initial lifecycle state."
       breadcrumbs={[

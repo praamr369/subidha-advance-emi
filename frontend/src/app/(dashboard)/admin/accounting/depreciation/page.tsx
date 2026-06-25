@@ -137,6 +137,7 @@ export default function AccountingDepreciationPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Depreciation Runs"
       subtitle="Calculate and post depreciation from the asset register using explicit, admin-controlled run and post steps."
       breadcrumbs={[

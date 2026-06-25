@@ -295,6 +295,7 @@ export default function AdminVendorPaymentsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendor Payments"
       subtitle="Record and post vendor payments. Posting creates an accounting journal entry reducing vendor payable."
       breadcrumbs={[

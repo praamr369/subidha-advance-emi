@@ -41,6 +41,7 @@ export default function AdminComplianceTaxProfilePage() {
 
   return (
     <ERPPageShell
+      eyebrow="Compliance"
       title="Compliance Tax Profile"
       subtitle="Current stage should remain GST Unregistered while keeping GST activation controls ready."
       breadcrumbs={[

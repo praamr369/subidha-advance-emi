@@ -214,6 +214,7 @@ export default function SchemesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Growth & Offers"
       title="Discount & Scheme Manager"
       subtitle="Festival and promotional EMI schemes — define discount rules, validity periods, and usage limits"
     >

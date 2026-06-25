@@ -461,6 +461,7 @@ export default function AdminLuckyDrawCreatePage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title="Create Draw Commitment"
       subtitle="Create a Lucky Draw commitment from a selected batch using the existing backend commit workflow."
       breadcrumbs={[

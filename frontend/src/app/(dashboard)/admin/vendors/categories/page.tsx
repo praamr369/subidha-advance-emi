@@ -42,6 +42,7 @@ export default function AdminVendorCategoriesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendor Categories"
       subtitle="Supplier category master."
       breadcrumbs={[

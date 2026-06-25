@@ -252,6 +252,7 @@ export default function AdminCommissionPayoutQueuePage() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="Commission Payout Queue"
       subtitle="Build draft payout batches from live eligible commission rows. Pending rows settle on batch finalization, while legacy-settled rows remain batchable for backward compatibility."
       breadcrumbs={[

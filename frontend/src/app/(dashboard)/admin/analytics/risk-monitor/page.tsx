@@ -42,6 +42,7 @@ export default function RiskMonitorPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Analytics"
       title="Risk Monitor"
       subtitle="Read-only overdue EMI risk watchlist for collection escalation. Source-linked report — drill down to Finance Operations / Outstandings to take action."
       headerMode="erp"

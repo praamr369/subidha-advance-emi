@@ -100,6 +100,7 @@ export default function AdminVendorsLedgerPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendor Ledger"
       subtitle="Vendor-by-vendor payable ledger drill-down with live outstanding snapshot."
       breadcrumbs={[

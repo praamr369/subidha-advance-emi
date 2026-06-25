@@ -226,6 +226,7 @@ export default function AdminCountersPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="Counter & Cash Desk Master"
       subtitle="Map each collection desk to one branch and one finance account so cashier scope, cash discipline, and branch-linked collection reporting stay explicit."
       breadcrumbs={[

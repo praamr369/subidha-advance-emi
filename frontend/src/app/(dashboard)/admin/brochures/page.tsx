@@ -162,6 +162,7 @@ export default function AdminBrochuresPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Marketing"
       title="Product Brochure Generator"
       subtitle="Generate customer-facing catalogs from brochure-safe product and price fields. This workflow never reserves stock or creates billing, contracts, payments, or accounting entries."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Products", href: "/admin/products" }, { label: "Brochures" }]}

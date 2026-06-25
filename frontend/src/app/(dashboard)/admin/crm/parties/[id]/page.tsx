@@ -225,6 +225,7 @@ export default function AdminCrmPartyDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title={payload ? `${payload.party.display_name} · Party 360` : "Party 360 Profile"}
       subtitle="Cross-module Party 360 profile for customers, partners, vendors, and staff. This view supports additive party-profile edits and interaction follow-ups while preserving source-system ownership."
       breadcrumbs={[

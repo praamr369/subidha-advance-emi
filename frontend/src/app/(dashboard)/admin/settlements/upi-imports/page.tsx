@@ -77,6 +77,7 @@ export default function UpiImportsList() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="UPI Settlement Imports"
       subtitle="Admin-only evidence imports. Upload, review parsed lines, then apply manual allocations to existing targets."
       helperNote="Imports only store evidence. They do not match payments, post accounting, or close reconciliation items."

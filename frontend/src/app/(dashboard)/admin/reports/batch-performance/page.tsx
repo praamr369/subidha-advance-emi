@@ -114,6 +114,7 @@ export default function BatchPerformanceReportPage() {
 
   return (
     <ERPPageShell
+      eyebrow="BI & Reports"
       title="Batch Performance"
       subtitle="Operational draw, enrollment, and Lucky ID progression by batch using live per-batch summary endpoints."
       headerMode="erp"

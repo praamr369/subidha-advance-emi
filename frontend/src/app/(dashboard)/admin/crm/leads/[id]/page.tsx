@@ -364,6 +364,7 @@ export default function AdminCrmLeadDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title={lead ? lead.name : "Lead Detail"}
       subtitle={lead ? `${lead.phone} · ${lead.source ? (LEAD_SOURCE_LABELS[lead.source] || lead.source) : ""}` : ""}
       breadcrumbs={[

@@ -328,7 +328,8 @@ export default function AccountingMappingAuditPage() {
     return Array.from(map.entries()).sort(([a], [b]) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
   }, [visibleRows]);
 
-  if (loading) return <ERPPageShell title="Accounting Mapping Audit" subtitle="Full setup verification for accounting mappings."><LoadingBlock label="Loading mapping audit..." /></ERPPageShell>;
+  if (loading) return <ERPPageShell eyebrow="Accounting"
+      title="Accounting Mapping Audit" subtitle="Full setup verification for accounting mappings."><LoadingBlock label="Loading mapping audit..." /></ERPPageShell>;
 
   const summary = payload?.summary ?? { total_events: 0, ready: 0, missing_mapping: 0, conflicts: 0, unsupported: 0, blocked_by_period: 0, blocked_by_numbering: 0 };
   const period = payload?.period_readiness ?? {};

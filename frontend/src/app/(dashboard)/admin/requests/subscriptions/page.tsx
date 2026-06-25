@@ -138,6 +138,7 @@ export default function AdminSubscriptionRequestsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Sales"
       title="Subscription Requests"
       subtitle="Admin review queue for customer and partner EMI subscription intake, with approval creating the real subscription through the canonical service path."
       breadcrumbs={[

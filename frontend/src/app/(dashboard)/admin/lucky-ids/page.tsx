@@ -408,6 +408,7 @@ export default function AdminLuckyIdsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title="Lucky ID Register"
       subtitle="Operational register for Lucky ID visibility, batch allocation, assignment integrity, and contract linkage."
       breadcrumbs={[

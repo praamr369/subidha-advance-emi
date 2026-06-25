@@ -541,6 +541,7 @@ export default function AdminLuckyDrawDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title={draw ? `Draw #${draw.id}` : `Lucky Draw #${drawId ?? "—"}`}
       subtitle="Detailed Lucky Draw audit view for commitment, reveal state, winner visibility, and seed-custody status."
       breadcrumbs={[

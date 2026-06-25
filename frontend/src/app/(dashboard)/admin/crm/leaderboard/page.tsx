@@ -87,6 +87,7 @@ export default function LeaderboardPage() {
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title="Staff Leaderboard"
       subtitle="Monthly sales performance, lead conversion, and targets per staff member"
     >

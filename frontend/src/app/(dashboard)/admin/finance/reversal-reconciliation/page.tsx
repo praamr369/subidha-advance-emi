@@ -56,6 +56,7 @@ export default function ReversalReconciliationPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="Reversal Reconciliation"
       subtitle="Approval-style queue for unresolved reversal/refund/return links that must be reconciled with explicit evidence."
       breadcrumbs={[

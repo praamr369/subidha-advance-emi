@@ -95,6 +95,7 @@ export default function AccountingStaffLedgerPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting · HR"
       title="Staff Ledger"
       subtitle="The staff ledger gives a single payable-receivable view across salary accruals, salary payments, reimbursement accruals, and reimbursement payments while leaving payroll and accounting source records intact."
       breadcrumbs={[

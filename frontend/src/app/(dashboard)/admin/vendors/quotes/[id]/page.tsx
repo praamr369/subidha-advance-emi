@@ -69,6 +69,7 @@ export default function AdminVendorQuoteDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title={String(detail?.request_no || rfqId)}
       subtitle="Compare QUOTED lines; acceptance records the decision without posting ERP documents."
       breadcrumbs={[

@@ -488,6 +488,7 @@ export default function AdminLuckyDrawsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title="Lucky Draw Register"
       subtitle="Operational register for Lucky Draw commitments, reveal state, winner visibility, and audit navigation."
       breadcrumbs={[

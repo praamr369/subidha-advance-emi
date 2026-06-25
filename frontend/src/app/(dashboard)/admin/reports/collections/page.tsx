@@ -79,6 +79,7 @@ export default function CollectionsReportPage() {
 
   return (
     <ERPPageShell
+      eyebrow="BI & Reports"
       title="Collections Report"
       subtitle="Source-linked collection analytics for the current month — trend, payment method mix, and overdue exposure posture."
       headerMode="erp"

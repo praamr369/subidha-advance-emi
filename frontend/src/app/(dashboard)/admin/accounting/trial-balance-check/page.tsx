@@ -51,6 +51,7 @@ export default function TrialBalanceCheckPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Trial Balance Check"
       subtitle="Read-only automation check over posted journal lines. Draft and void journals remain excluded from totals."
       helperNote="Opening-balance automation is deferred. Opening columns display backend-provided zero values and must not be treated as historical opening truth."

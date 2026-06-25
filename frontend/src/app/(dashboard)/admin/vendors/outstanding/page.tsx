@@ -83,6 +83,7 @@ export default function AdminVendorsOutstandingPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendor Outstanding"
       subtitle="Vendor payable summary with direct drill-down to the selected vendor ledger and detail page."
       breadcrumbs={[

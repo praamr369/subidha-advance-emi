@@ -289,6 +289,7 @@ export default function AdminCustomerEditPage() {
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title={`Edit Customer: ${customer.name}`}
       subtitle="Update customer profile, access details, and account state from the admin workflow."
       breadcrumbs={[

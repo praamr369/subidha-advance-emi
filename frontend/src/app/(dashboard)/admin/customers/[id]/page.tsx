@@ -1697,6 +1697,7 @@ export default function AdminCustomerDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="CRM"
       title={customer?.name || `Customer #${customerId ?? "—"}`}
       subtitle="Inspect KYC state, direct-sale exposure, subscription contracts, collections, receipts, and partner linkage from one operational customer workspace."
       breadcrumbs={[

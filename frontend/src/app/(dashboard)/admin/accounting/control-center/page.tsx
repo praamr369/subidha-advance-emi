@@ -88,6 +88,7 @@ export default function AdminAccountingControlCenterPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Accounting Control Center"
       subtitle="Admin-only accounting command surface for reconciliation blockers, mappings, journals, and period posture (no posting changes here)."
       breadcrumbs={[

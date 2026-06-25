@@ -79,6 +79,7 @@ export default function AdminPartnerDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Partners"
       title={partner ? `Partner #${partner.id}` : "Partner Detail"}
       subtitle="Admin access handoff for partner login identity."
       breadcrumbs={[

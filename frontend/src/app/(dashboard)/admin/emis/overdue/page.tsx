@@ -261,6 +261,7 @@ export default function OverdueEmiPage() {
 
   return (
     <ERPPageShell
+      eyebrow="EMI"
       title="Overdue EMIs"
       subtitle="Operational follow-up workspace for overdue pending installments. Use this page to review exposure, open linked subscriptions, and route to collection workflow."
       breadcrumbs={[

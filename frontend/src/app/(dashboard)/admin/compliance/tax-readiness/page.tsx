@@ -35,6 +35,7 @@ export default function AdminComplianceTaxReadinessPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Compliance"
       title="Tax Readiness"
       subtitle="Non-GST operations today with GST transition readiness tracking."
       breadcrumbs={[

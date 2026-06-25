@@ -39,6 +39,7 @@ export default function PlanTemplatesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Growth & Offers"
       title="Plan Templates"
       subtitle="Reusable EMI, RENT, and LEASE plan configuration blueprints."
       actions={[{ href: ROUTES.admin.growth, label: "Growth Hub", variant: "secondary" }]}

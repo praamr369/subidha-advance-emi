@@ -99,6 +99,7 @@ export default function BrochureEnquiriesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Marketing"
       title="Brochure Enquiries"
       subtitle="Follow up customer interest captured from public brochure links. Enquiries do not create orders, contracts, invoices, payments, EMI schedules, or stock reservations."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Brochures", href: "/admin/brochures" }, { label: "Enquiries" }]}

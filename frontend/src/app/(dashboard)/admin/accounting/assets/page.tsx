@@ -174,6 +174,7 @@ export default function AccountingAssetsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Asset Register"
       subtitle="Asset categories and fixed assets for depreciation-ready accounting, kept separate from operational EMI and payment truth."
       breadcrumbs={[

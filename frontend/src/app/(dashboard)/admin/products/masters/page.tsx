@@ -156,6 +156,7 @@ export default function AdminProductMastersPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title="Product Masters"
       subtitle="Govern shared catalog masters for category, subcategory, and unit of measure from the product workspace. SKU and product code remain product-level identifiers."
       breadcrumbs={[

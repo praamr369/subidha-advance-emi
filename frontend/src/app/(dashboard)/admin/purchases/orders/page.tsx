@@ -359,6 +359,7 @@ export default function AdminPurchaseOrdersPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Purchase Orders"
       subtitle="Create and manage purchase orders. Cancel is only available in Draft state."
       breadcrumbs={[

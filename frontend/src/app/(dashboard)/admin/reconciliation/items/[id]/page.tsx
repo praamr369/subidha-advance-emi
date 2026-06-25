@@ -48,7 +48,8 @@ export default function AdminReconciliationItemDetailPage({ params }: { params: 
   }, [item]);
 
   return (
-    <ERPPageShell title={title}>
+    <ERPPageShell eyebrow="Finance"
+      title={title}>
       <div className="space-y-6">
         <ERPSectionShell
           title="Exception Detail"

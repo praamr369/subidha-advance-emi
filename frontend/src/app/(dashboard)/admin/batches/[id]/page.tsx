@@ -496,6 +496,7 @@ export default function AdminBatchDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title={batch?.batch_code || `Batch #${batchId ?? "—"}`}
       subtitle="Operational batch detail workspace for slot readiness, Lucky IDs, subscriptions, and lifecycle visibility."
       breadcrumbs={[

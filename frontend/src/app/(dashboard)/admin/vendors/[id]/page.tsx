@@ -132,6 +132,7 @@ export default function AdminVendorDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title={String(vendor?.display_name || vendor?.name || "Vendor")}
       subtitle="Vendor profile, sourcing visibility, ledger, procurement links, and product catalog."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendors", href: ROUTES.admin.vendors }, { label: String(vendor?.name || id) }]}

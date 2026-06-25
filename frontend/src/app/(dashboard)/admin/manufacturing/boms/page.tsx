@@ -252,6 +252,7 @@ export default function AdminManufacturingBomsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Manufacturing"
       title="BOM Register"
       subtitle="Maintain additive furniture BOM revisions against the shared finished-good and raw-material inventory master. Activation is explicit so production jobs only release against controlled BOM revisions."
       breadcrumbs={[

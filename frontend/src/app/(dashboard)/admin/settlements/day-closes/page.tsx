@@ -130,6 +130,7 @@ export default function AdminDayClosesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="Day-closes"
       subtitle="Admin review for cashier day-close evidence only."
       helperNote="Approval/rejection reviews evidence only. No accounting entry is created and no payment record is modified."

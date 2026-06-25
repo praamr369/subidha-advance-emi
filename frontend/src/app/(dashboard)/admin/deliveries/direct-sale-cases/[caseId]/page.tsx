@@ -318,6 +318,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Delivery"
       title={delivery?.sale_number || delivery?.sale_no || "Direct-Sale Delivery"}
       subtitle="Operational delivery workspace for direct-sale service cases."
       breadcrumbs={[

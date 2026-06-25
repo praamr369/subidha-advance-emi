@@ -195,6 +195,7 @@ export default function AdminManufacturingJobsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Manufacturing"
       title="Production Jobs"
       subtitle="Release furniture jobs only when BOM and material planning are ready. Raw issue, output receipt, scrap capture, and job completion stay explicit and auditable."
       breadcrumbs={[

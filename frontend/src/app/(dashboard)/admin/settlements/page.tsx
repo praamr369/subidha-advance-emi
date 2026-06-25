@@ -11,6 +11,7 @@ import { ROUTES } from "@/lib/routes";
 export default function SettlementsOverview() {
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="Settlements"
       subtitle="Admin-only bank statement and UPI settlement import evidence with manual allocation tooling."
       helperNote="Imports only store evidence. They do not match payments, post accounting, or close reconciliation items."

@@ -187,6 +187,7 @@ export default function AdminProductEditPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Inventory"
       title={product ? `Edit ${product.name}` : `Edit Product #${productId ?? "—"}`}
       subtitle="Safe product master editing for future catalog, subscription, rent/lease, direct-sale, and inventory onboarding."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Products", href: "/admin/products" }, { label: product?.name || `#${productId}`, href: productId ? `/admin/products/${productId}` : "/admin/products" }, { label: "Edit" }]}

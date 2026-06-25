@@ -234,6 +234,7 @@ export default function AdminVendorAgreementsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Purchases & Vendors"
       title="Vendor Agreements"
       subtitle="Commercial agreement register. Agreement terms are auditable before PO issuance."
       breadcrumbs={[

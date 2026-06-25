@@ -375,6 +375,7 @@ export default function AdminBatchEditPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Lucky Plan"
       title={
         batch?.batch_code
           ? `Edit ${batch.batch_code}`

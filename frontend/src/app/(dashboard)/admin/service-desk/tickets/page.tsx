@@ -188,6 +188,7 @@ export default function AdminServiceDeskTicketsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Service Desk"
       title="Service Tickets"
       subtitle="After-sales service stays inside explicit tickets. Warranty posture, optional charge notes, and optional stock issues are visible on the case without turning billing or accounting into the operational owner of the workflow."
       breadcrumbs={[

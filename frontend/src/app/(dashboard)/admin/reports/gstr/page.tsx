@@ -245,6 +245,7 @@ export default function GstrReportPage() {
 
   return (
     <ERPPageShell
+      eyebrow="BI & Reports"
       title="GSTR Report"
       subtitle="GSTR-1 / GSTR-3B summary — B2B invoices, B2CS, and HSN breakdown"
     >

@@ -48,6 +48,7 @@ export default function AdminCompliancePartyTaxProfilesPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Compliance"
       title="Party Tax Readiness"
       subtitle="Customer/supplier/partner/vendor tax master readiness for future GST transition."
       breadcrumbs={[

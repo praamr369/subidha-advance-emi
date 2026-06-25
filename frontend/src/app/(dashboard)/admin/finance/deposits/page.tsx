@@ -286,6 +286,7 @@ export default function AdminFinanceDepositsPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="Rent/Lease Deposit Operations"
       subtitle={SOURCE_NOTE}
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Finance", href: "/admin/finance" }, { label: "Deposits" }]}

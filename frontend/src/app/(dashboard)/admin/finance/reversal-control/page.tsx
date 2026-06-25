@@ -81,6 +81,7 @@ export default function ReversalControlPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Finance"
       title="Reversal & Return Control"
       subtitle="Admin-only audited control center for cancellation, reversal, refund, and reconciliation decisions."
       breadcrumbs={[
