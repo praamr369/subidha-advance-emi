@@ -152,6 +152,11 @@ export default function AccountingExportReportsPage() {
         { href: ROUTES.admin.accountingCloseCockpit, label: "Close Cockpit", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only — Read Only", tone: "info" }}
+      stats={[
+        { label: "Available Reports", value: loading ? "—" : reports.length, tone: "info" },
+        { label: "Period", value: `${year}-${String(month).padStart(2, "0")}`, tone: "default" },
+        { label: "As Of", value: asOf, tone: "default" },
+      ]}
     >
       <ERPSectionShell
         title="Period Selector"

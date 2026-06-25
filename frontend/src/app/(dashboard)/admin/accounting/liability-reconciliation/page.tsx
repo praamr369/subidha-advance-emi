@@ -90,6 +90,12 @@ export default function LiabilityReconciliationPage() {
       ]}
       actions={[{ href: ROUTES.admin.accountingFinancialIntelligence, label: "Financial Intelligence", variant: "secondary" }]}
       statusBadge={{ label: "Admin Only — Read Only", tone: "info" }}
+      stats={[
+        { label: "Overall Status", value: loading || !data ? "—" : data.overall_status, tone: "info" },
+        { label: "Advance Liability", value: loading || !data ? "—" : accountingMoney(data.customer_advance.expected_liability), tone: "default" },
+        { label: "Deposit Liability", value: loading || !data ? "—" : accountingMoney(data.security_deposit.expected_deposit_liability), tone: "default" },
+        { label: "Advance Bridge Gaps", value: loading || !data ? "—" : (data.customer_advance.bridge_gap_count ?? 0), tone: !loading && data && (data.customer_advance.bridge_gap_count ?? 0) > 0 ? "warning" : "success" },
+      ]}
     >
       <ERPSectionShell title="Reporting period">
         <PeriodSelector year={year} month={month} asOf={asOf} onYearChange={setYear} onMonthChange={setMonth} onAsOfChange={setAsOf} />

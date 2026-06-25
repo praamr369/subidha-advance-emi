@@ -446,8 +446,13 @@ export default function AdminAccountingSetupPage() {
 
   if (loading) {
     return (
-      <ERPPageShell eyebrow="Accounting"
-      title="Accounting Setup" subtitle="Operator-proof setup for finance accounts, posting profiles, and Chart of Accounts health.">
+      <ERPPageShell
+        eyebrow="Accounting"
+        title="Accounting Setup"
+        subtitle="Separate money destinations, ledger posting rules, bridge approval, and close readiness so operators cannot confuse system profiles with collection accounts."
+        breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Setup" }]}
+        statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      >
         <LoadingBlock label="Loading accounting setup..." />
       </ERPPageShell>
     );
@@ -455,6 +460,7 @@ export default function AdminAccountingSetupPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Accounting Setup"
       subtitle="Separate money destinations, ledger posting rules, bridge approval, and close readiness so operators cannot confuse system profiles with collection accounts."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Setup" }]}

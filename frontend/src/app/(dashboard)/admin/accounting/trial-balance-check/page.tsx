@@ -63,6 +63,12 @@ export default function TrialBalanceCheckPage() {
       ]}
       actions={[{ href: ROUTES.admin.accountingFinancialIntelligence, label: "Financial Intelligence", variant: "secondary" }]}
       statusBadge={{ label: "Admin Only — Read Only", tone: "info" }}
+      stats={[
+        { label: "Balanced", value: loading || !data ? "—" : data.is_balanced ? "Yes" : "No", tone: !loading && data ? (data.is_balanced ? "success" : "danger") : "default" },
+        { label: "Total Debit", value: loading || !data ? "—" : accountingMoney(data.total_debit), tone: "info" },
+        { label: "Total Credit", value: loading || !data ? "—" : accountingMoney(data.total_credit), tone: "info" },
+        { label: "Difference", value: loading || !data ? "—" : accountingMoney(data.difference), tone: !loading && data && Number(data.difference) !== 0 ? "warning" : "success" },
+      ]}
     >
       <ERPSectionShell title="Reporting period">
         <PeriodSelector year={year} month={month} asOf={asOf} onYearChange={setYear} onMonthChange={setMonth} onAsOfChange={setAsOf} />

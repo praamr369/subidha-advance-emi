@@ -408,8 +408,13 @@ export default function AccountingBridgeReadinessPage() {
   }, [allEvents]);
 
   if (loading) {
-    return <ERPPageShell eyebrow="Accounting"
-      title="Accounting Bridge Readiness" subtitle="Validating bridge mappings and canonical postability."><LoadingBlock label="Loading accounting bridge readiness..." /></ERPPageShell>;
+    return <ERPPageShell
+      eyebrow="Accounting"
+      title="Accounting Bridge Readiness"
+      subtitle="Read-only readiness matrix for setup definitions. Real source posting remains inside controlled bridge reconciliation."
+      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Readiness" }]}
+      statusBadge={{ label: "Admin Only — Read Only", tone: "info" as const }}
+    ><LoadingBlock label="Loading accounting bridge readiness..." /></ERPPageShell>;
   }
 
   const summary: Partial<AccountingBridgeReadinessPayload["summary"]> = payload?.summary ?? { source_count: allEvents.length };
@@ -424,6 +429,7 @@ export default function AccountingBridgeReadinessPage() {
 
   return (
     <ERPPageShell
+      eyebrow="Accounting"
       title="Accounting Bridge Readiness"
       subtitle="Read-only readiness matrix for setup definitions. Real source posting remains inside controlled bridge reconciliation."
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Readiness" }]}
