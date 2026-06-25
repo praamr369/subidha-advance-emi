@@ -1304,7 +1304,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                           />
                         </div>
                         {customerQuery.trim().length >= 2 && !selectedCustomer ? (
-                          <div className="absolute z-[85] mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-[var(--surface-card-elevated)] p-1 shadow-2xl">
+                          <div className="absolute z-[85] mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-card p-1 shadow-2xl">
                             {customerLoading ? (
                               <div className="px-3 py-2 text-sm text-muted-foreground">Searching customers...</div>
                             ) : customerResults.length ? (
@@ -1747,7 +1747,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                 />
                               </div>
                               {line.product_search.trim().length >= 2 && !line.selected_product ? (
-                                <div className="absolute z-[85] mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-[var(--surface-card-elevated)] p-1 shadow-2xl">
+                                <div className="absolute z-[85] mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-card p-1 shadow-2xl">
                                   {line.product_loading ? (
                                     <div className="px-3 py-2 text-sm text-muted-foreground">Searching products...</div>
                                   ) : line.product_error ? (

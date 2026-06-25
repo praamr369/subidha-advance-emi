@@ -36,19 +36,19 @@ export default function SettlementsOverview() {
             <div className="flex flex-wrap gap-2">
               <Link
                 href={ROUTES.admin.settlementsBankImports}
-                className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground hover:bg-[var(--surface-muted)]"
+                className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted/30"
               >
                 Bank imports
               </Link>
               <Link
                 href={ROUTES.admin.settlementsUpiImports}
-                className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground hover:bg-[var(--surface-muted)]"
+                className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted/30"
               >
                 UPI imports
               </Link>
               <Link
                 href={ROUTES.admin.settlementsDayCloses}
-                className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm font-semibold text-foreground hover:bg-[var(--surface-muted)]"
+                className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted/30"
               >
                 Day-closes
               </Link>
@@ -57,7 +57,7 @@ export default function SettlementsOverview() {
         />
 
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine)]">
+          <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Bank statement evidence
             </div>
@@ -72,7 +72,7 @@ export default function SettlementsOverview() {
             </div>
           </div>
 
-          <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine)]">
+          <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               UPI settlement evidence
             </div>
@@ -88,7 +88,7 @@ export default function SettlementsOverview() {
           </div>
         </div>
 
-        <div className="mt-3 rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine)]">
+        <div className="mt-3 rounded-xl border border-border bg-card p-4">
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Cashier day-close evidence
           </div>

@@ -284,7 +284,7 @@ export default function AdminCrmLeadRegisterPage() {
 
           {/* Add Lead Form */}
           {showAddForm ? (
-            <div className="mb-5 rounded-xl border border-border bg-[var(--surface-card-elevated)] p-5">
+            <div className="mb-5 rounded-xl border border-border bg-card p-5">
               <div className="mb-3 text-sm font-semibold text-foreground">New Lead</div>
               {addError ? <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{addError}</div> : null}
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -353,7 +353,7 @@ export default function AdminCrmLeadRegisterPage() {
                       return (
                         <tr
                           key={row.id}
-                          className="border-t border-border/60 hover:bg-[var(--surface-muted)] cursor-pointer"
+                          className="border-t border-border/60 hover:bg-muted/30 cursor-pointer"
                           onClick={() => (window.location.href = `${ROUTES.admin.crmLeads}/${row.id}`)}
                         >
                           <td className="px-4 py-3">

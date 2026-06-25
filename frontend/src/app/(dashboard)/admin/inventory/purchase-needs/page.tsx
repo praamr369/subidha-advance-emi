@@ -56,7 +56,7 @@ export default function AdminInventoryPurchaseNeedsPage() {
           <button
             type="button"
             onClick={() => void loadNeeds()}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={loading}
           >
             {loading ? "Refreshing..." : "Refresh Needs"}

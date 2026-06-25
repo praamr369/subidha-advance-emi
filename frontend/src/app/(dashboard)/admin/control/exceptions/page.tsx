@@ -76,7 +76,7 @@ export default function AdminControlExceptionsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {rows.map((row) => (
-                <tr key={row.id} className="hover:bg-[var(--surface-muted)]">
+                <tr key={row.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{row.id}</td>
                   <td className="px-4 py-3 font-medium">{row.title}</td>
                   <td className="px-4 py-3 font-mono text-xs">{row.exception_key}</td>

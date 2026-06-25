@@ -79,35 +79,35 @@ export default function InventoryItemDetailPage() {
             actions={<ERPStatusBadge status={item.stock_tracking_enabled ? "ACTIVE" : "INACTIVE"} label={item.stock_tracking_enabled ? "Stock tracked" : "Stock not tracked"} />}
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Stock item type</div>
                 <div className="mt-1 text-sm font-semibold">{item.stock_item_type.replaceAll("_", " ")}</div>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Delivery bridge</div>
                 <div className="mt-1 text-sm font-semibold">{item.delivery_stock_bridge_enabled ? "Enabled" : "Disabled"}</div>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Opening stock</div>
                 <div className="mt-1 text-sm font-semibold">{item.opening_stock_qty}</div>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Reorder level</div>
                 <div className="mt-1 text-sm font-semibold">{item.reorder_level_qty}</div>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Valuation method</div>
                 <div className="mt-1 text-sm font-semibold">{item.valuation_method}</div>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Standard cost</div>
                 <div className="mt-1 text-sm font-semibold">{item.standard_unit_cost || "—"}</div>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Default location</div>
                 <div className="mt-1 text-sm font-semibold">{item.default_stock_location_name || "Unassigned"}</div>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background px-4 py-3">
+              <div className="rounded-xl border border-border bg-background px-4 py-3">
                 <div className="text-xs font-semibold uppercase text-muted-foreground">Active</div>
                 <div className="mt-1 text-sm font-semibold">{item.is_active ? "Yes" : "No"}</div>
               </div>
@@ -129,7 +129,7 @@ export default function InventoryItemDetailPage() {
                 Open Product Master
               </Link>
             </div>
-            <div className="mt-4 rounded-[1.3rem] border border-border/70 bg-[var(--surface-muted)] px-4 py-3 text-xs text-muted-foreground">
+            <div className="mt-4 rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-xs text-muted-foreground">
               Inventory item detail is read-only here. Stock changes must flow through opening stock, adjustments, receipts, or movement workflows.
             </div>
           </ERPSectionShell>

@@ -743,7 +743,7 @@ export default function AdminDeliveriesPage() {
                             type="button"
                             key={item.id}
                             onClick={() => void prefillFromDirectSaleId(item.id)}
-                            className="w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 text-left transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                            className="w-full rounded-2xl border border-border bg-card p-4 text-left transition hover:bg-muted/30 hover:border-ring"
                           >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0">
@@ -915,7 +915,7 @@ export default function AdminDeliveriesPage() {
                             type="button"
                             key={item.id}
                             onClick={() => void prefillFromSubscriptionId(item.id)}
-                            className="w-full rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4 text-left transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                            className="w-full rounded-2xl border border-border bg-card p-4 text-left transition hover:bg-muted/30 hover:border-ring"
                           >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0">

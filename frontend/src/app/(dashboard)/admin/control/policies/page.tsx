@@ -58,7 +58,7 @@ export default function AdminControlPoliciesPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {rows.map((row) => (
-                <tr key={row.id} className="hover:bg-[var(--surface-muted)]">
+                <tr key={row.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-mono text-xs">{row.policy_key}</td>
                   <td className="px-4 py-3">{row.description}</td>
                   <td className="px-4 py-3">

@@ -115,7 +115,7 @@ export default function AdminRequestsHubPage() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="group flex flex-col gap-2 rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                  className="group flex flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-4 transition hover:bg-muted/30 hover:border-ring"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <span className="font-semibold text-foreground group-hover:text-primary">

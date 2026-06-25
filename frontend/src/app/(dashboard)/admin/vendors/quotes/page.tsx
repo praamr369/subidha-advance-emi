@@ -226,7 +226,7 @@ export default function AdminVendorQuotesPage() {
             {rows.map((row) => (
               <div
                 key={String(row.id)}
-                className="flex flex-wrap items-start justify-between gap-3 rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-card p-4"
               >
                 <div>
                   <Link className="font-semibold text-primary underline" href={`${ROUTES.admin.vendorsQuotes}/${row.id}`}>

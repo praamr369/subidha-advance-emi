@@ -61,7 +61,7 @@ function LeadCard({
     lead.next_follow_up_at && new Date(lead.next_follow_up_at) <= new Date();
 
   return (
-    <div className="rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-muted)_44%,transparent)] p-3 text-sm">
+    <div className="rounded-2xl border border-border bg-[color-mix(in_oklab,var(--surface-muted)_44%,transparent)] p-3 text-sm">
       <div className="flex items-start justify-between gap-1">
         <Link
           href={`${ROUTES.admin.crmLeads}/${lead.id}`}
@@ -216,7 +216,7 @@ export default function AdminCrmPipelinePage() {
               {grouped.map((col) => (
                 <div
                   key={col.stage}
-                  className="w-52 flex-shrink-0 rounded-[1.35rem] border border-border/70 bg-[var(--surface-card-elevated)] p-3 shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                  className="w-52 flex-shrink-0 rounded-[1.35rem] border border-border bg-card p-3"
                 >
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STAGE_COLORS[col.stage as LeadStage] || "bg-gray-50 border-gray-200 text-gray-600"}`}>

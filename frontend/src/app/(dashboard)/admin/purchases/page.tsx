@@ -81,7 +81,7 @@ export default function AdminPurchasesPage() {
         title="Vendor payable source"
         description="Vendor payable is created from entered purchase bills — not from purchase receipts or purchase orders. A receipt alone does not create a payable."
       >
-        <div className="rounded-[1.2rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 text-sm text-muted-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]">
+        <div className="rounded-[1.2rem] border border-border bg-card p-4 text-sm text-muted-foreground">
           Navigate to <strong>Purchase Bills</strong> to see entered bills, then <strong>Vendor Payables</strong> to see the derived payable register. Vendor payable source records are distinct from stock ledger source records.
         </div>
       </ERPSectionShell>
@@ -90,7 +90,7 @@ export default function AdminPurchasesPage() {
         title="Accounting bridge status"
         description="Accounting bridge posting and reconciliation evidence are confirmed in Accounting & Reconciliation. This page does not auto-post accounting entries."
       >
-        <div className="rounded-[1.2rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 text-sm text-muted-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]">
+        <div className="rounded-[1.2rem] border border-border bg-card p-4 text-sm text-muted-foreground">
           Check bridge status and reconciliation evidence at{" "}
           <a href={ROUTES.admin.accountingBridgeReconciliation} className="font-medium text-primary underline-offset-4 hover:underline">
             Accounting &gt; Bridge Reconciliation

@@ -212,7 +212,7 @@ export default function AdminVendorDetailPage() {
               {ledger.map((row, idx) => (
                 <div
                   key={idx}
-                  className="rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-muted)_40%,transparent)] px-3 py-2"
+                  className="rounded-xl border border-border bg-[color-mix(in_oklab,var(--surface-muted)_40%,transparent)] px-3 py-2"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-medium">{String(row.entry_type)}</div>
@@ -308,7 +308,7 @@ export default function AdminVendorDetailPage() {
                 {products.map((row) => (
                   <div
                     key={String(row.id)}
-                    className="flex flex-wrap justify-between gap-3 rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-muted)_40%,transparent)] px-3 py-2"
+                    className="flex flex-wrap justify-between gap-3 rounded-xl border border-border bg-[color-mix(in_oklab,var(--surface-muted)_40%,transparent)] px-3 py-2"
                   >
                     <div>
                       <div className="font-semibold">{String(row.product_name || "—")}</div>

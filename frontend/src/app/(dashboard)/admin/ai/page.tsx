@@ -31,7 +31,7 @@ export default function AdminAiAssistantPage() {
         </p>
         <Link
           href={`${ROUTES.admin.bi}#ai-explanation`}
-          className="mt-3 inline-flex rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-[var(--surface-muted)]"
+          className="mt-3 inline-flex rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-muted/30"
         >
           Open BI Explanation
         </Link>

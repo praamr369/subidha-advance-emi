@@ -108,7 +108,7 @@ export default function AdminVendorQuoteDetailPage() {
           </ERPSectionShell>
 
           <ERPSectionShell title="Quote lines" description="Only QUOTED rows can be accepted/rejected.">
-            <div className="overflow-auto rounded-2xl border border-border/70 bg-[var(--surface-card-elevated)] shadow-[inset_0_1px_0_var(--hairline-shine)]">
+            <div className="overflow-auto rounded-2xl border border-border bg-card">
               <table className="w-full min-w-[860px] text-left text-sm">
                 <thead className="bg-muted/50">
                   <tr>

@@ -153,7 +153,7 @@ export default function AdminDayClosesPage() {
               <label className="block">
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Status</div>
                 <select
-                  className="mt-1 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm"
+                  className="mt-1 rounded-xl border border-border bg-card px-3 py-2 text-sm"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
@@ -168,7 +168,7 @@ export default function AdminDayClosesPage() {
               <label className="block">
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Business date</div>
                 <input
-                  className="mt-1 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm"
+                  className="mt-1 rounded-xl border border-border bg-card px-3 py-2 text-sm"
                   type="date"
                   value={businessDateFilter}
                   onChange={(e) => setBusinessDateFilter(e.target.value)}

@@ -649,7 +649,7 @@ export default function AccountingSalaryPage() {
                   {salarySheets.map((sheet) => (
                     <div
                       key={sheet.id}
-                      className="rounded-[1.4rem] border border-white/80 bg-white/75 p-4"
+                      className="rounded-xl border border-white/80 bg-white/75 p-4"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>

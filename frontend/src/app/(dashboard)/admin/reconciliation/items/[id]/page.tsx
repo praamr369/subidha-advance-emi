@@ -100,14 +100,14 @@ export default function AdminReconciliationItemDetailPage({ params }: { params: 
               />
 
               {item.exception_message ? (
-                <div className="rounded-2xl border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+                <div className="rounded-2xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold text-muted-foreground">Message</div>
                   <div className="mt-2 text-sm">{item.exception_message}</div>
                 </div>
               ) : null}
 
               {item.recommended_action ? (
-                <div className="rounded-2xl border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+                <div className="rounded-2xl border border-border bg-card p-4">
                   <div className="text-xs font-semibold text-muted-foreground">Recommended Action</div>
                   <div className="mt-2 text-sm">{item.recommended_action}</div>
                 </div>

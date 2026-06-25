@@ -126,7 +126,7 @@ export default function AccountingStaffLedgerPage() {
             <label className="max-w-sm text-sm text-muted-foreground">
               Staff filter
               <select
-                className="mt-1 w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-sm text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
                 value={selectedEmployeeId}
                 onChange={(event) => setSelectedEmployeeId(event.target.value)}
               >
@@ -182,7 +182,7 @@ export default function AccountingStaffLedgerPage() {
               {report.employees.map((employee) => (
                 <div
                   key={employee.employee_id}
-                  className="surface-panel-elevated rounded-[1.35rem] border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_92%,white_8%)] p-4 shadow-[0_18px_40px_-46px_rgba(15,23,42,0.38)]"
+                  className="rounded-xl border border-border bg-card p-4"
                 >
                   <div className="text-sm font-semibold text-foreground">
                     {employee.employee_code} · {employee.employee_name}

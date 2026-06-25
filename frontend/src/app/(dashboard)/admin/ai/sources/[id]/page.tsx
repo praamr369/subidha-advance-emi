@@ -147,7 +147,7 @@ export default function AdminAiSourceDetailPage() {
                 <div className="mt-1 text-sm font-semibold">{source.checksum || "N/A"} / {source.version}</div>
               </div>
             </div>
-            <div className="mt-3 rounded-xl border border-border bg-[var(--surface-card-elevated)] p-3">
+            <div className="mt-3 rounded-xl border border-border bg-card p-3">
               <div className="text-xs text-muted-foreground">Last ingestion metadata</div>
               <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-foreground">
                 {JSON.stringify(source.metadata || {}, null, 2)}
@@ -164,7 +164,7 @@ export default function AdminAiSourceDetailPage() {
           <Card variant="bordered" title="Chunk previews">
             <div className="flex flex-col gap-3">
               {chunks.map((chunk) => (
-                <article key={chunk.id} className="rounded-2xl border border-border bg-[var(--surface-card-elevated)] p-4">
+                <article key={chunk.id} className="rounded-2xl border border-border bg-card p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-foreground">{chunk.heading || "Source excerpt"}</p>

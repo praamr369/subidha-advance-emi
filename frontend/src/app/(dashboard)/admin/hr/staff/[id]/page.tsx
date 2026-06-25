@@ -144,7 +144,7 @@ function mask(value?: string | null) {
 
 function Detail({ label, value }: { label: string; value?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-3">
+    <div className="rounded-xl border border-border bg-card p-3">
       <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-1 text-sm font-medium text-foreground">{value || "Unavailable"}</div>
     </div>

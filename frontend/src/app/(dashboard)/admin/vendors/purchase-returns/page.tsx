@@ -12,7 +12,7 @@ export default function AdminVendorPurchaseReturnsPage() {
       breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Vendor purchase returns" }]}
     >
       <ERPSectionShell title="Audit-safe note" description="Purchase return posting remains controlled by existing reversal services.">
-        <div className="rounded-2xl border border-border/70 bg-[var(--surface-card-elevated)] p-4 text-sm shadow-[inset_0_1px_0_var(--hairline-shine)]">
+        <div className="rounded-2xl border border-border bg-card p-4 text-sm">
           Purchase returns stay controlled by existing reversal posting services and remain audit-safe.
         </div>
       </ERPSectionShell>

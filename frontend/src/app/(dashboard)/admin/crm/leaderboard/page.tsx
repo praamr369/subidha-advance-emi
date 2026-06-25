@@ -196,7 +196,7 @@ export default function LeaderboardPage() {
                     {board.map((row) => (
                       <tr
                         key={row.staff_id}
-                        className={`border-t border-border/60 ${row.rank <= 3 ? "bg-[var(--surface-card-elevated)]" : ""}`}
+                        className={`border-t border-border/60 ${row.rank <= 3 ? "bg-card" : ""}`}
                       >
                         <td className="px-4 py-3 font-bold text-lg">{rankEmoji(row.rank)}</td>
                         <td className="px-4 py-3 font-medium text-foreground">{row.staff_name}</td>

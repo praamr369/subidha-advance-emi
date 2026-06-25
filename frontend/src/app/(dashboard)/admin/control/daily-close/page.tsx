@@ -23,7 +23,7 @@ const SEVERITY_CLASS: Record<string, string> = {
 
 function CheckRow({ check }: { check: CloseCheckResult }) {
   return (
-    <tr className="hover:bg-[var(--surface-muted)]">
+    <tr className="hover:bg-muted/30">
       <td className="px-4 py-2 font-mono text-xs">{check.check_key}</td>
       <td className={`px-4 py-2 text-xs ${SEVERITY_CLASS[check.severity] ?? ""}`}>{check.severity}</td>
       <td className="px-4 py-2">
@@ -128,7 +128,7 @@ export default function AdminControlDailyClosePage() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {history.map((run) => (
-                      <tr key={run.id} className="hover:bg-[var(--surface-muted)]">
+                      <tr key={run.id} className="hover:bg-muted/30">
                         <td className="px-4 py-3 font-mono text-xs">{run.close_date}</td>
                         <td className="px-4 py-3">{run.branch_name ?? "All"}</td>
                         <td className="px-4 py-3">{run.run_by_username}</td>

@@ -17,7 +17,7 @@ const SEVERITY_CLASS: Record<string, string> = {
 
 function DQCheckRow({ check }: { check: DQCheck }) {
   return (
-    <tr className="hover:bg-[var(--surface-muted)]">
+    <tr className="hover:bg-muted/30">
       <td className="px-4 py-3 font-mono text-xs">{check.check_key}</td>
       <td className={`px-4 py-3 text-xs ${SEVERITY_CLASS[check.severity] ?? ""}`}>{check.severity}</td>
       <td className="px-4 py-3">

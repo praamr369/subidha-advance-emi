@@ -191,7 +191,7 @@ export default function NotificationTemplatesPage() {
           </div>
 
           {formMode !== "closed" && (
-            <div className="mb-6 rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 space-y-3">
+            <div className="mb-6 rounded-xl border border-border bg-card p-4 space-y-3">
               <div className="font-semibold text-sm">
                 {formMode === "create" ? "New Template" : "Edit Template"}
               </div>
@@ -383,23 +383,23 @@ export default function NotificationTemplatesPage() {
 
         <ERPSectionShell title="Placeholder reference" description="Available placeholders for template messages">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-            <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2">
+            <div className="rounded-xl border border-border bg-card px-3 py-2">
               <code className="text-xs font-mono">{"{name}"}</code>
               <div className="text-xs text-muted-foreground mt-0.5">Customer name</div>
             </div>
-            <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2">
+            <div className="rounded-xl border border-border bg-card px-3 py-2">
               <code className="text-xs font-mono">{"{amount}"}</code>
               <div className="text-xs text-muted-foreground mt-0.5">Due amount</div>
             </div>
-            <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2">
+            <div className="rounded-xl border border-border bg-card px-3 py-2">
               <code className="text-xs font-mono">{"{due_date}"}</code>
               <div className="text-xs text-muted-foreground mt-0.5">Payment due date</div>
             </div>
-            <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2">
+            <div className="rounded-xl border border-border bg-card px-3 py-2">
               <code className="text-xs font-mono">{"{ref}"}</code>
               <div className="text-xs text-muted-foreground mt-0.5">Subscription/contract ref</div>
             </div>
-            <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2">
+            <div className="rounded-xl border border-border bg-card px-3 py-2">
               <code className="text-xs font-mono">{"{company}"}</code>
               <div className="text-xs text-muted-foreground mt-0.5">Company name</div>
             </div>

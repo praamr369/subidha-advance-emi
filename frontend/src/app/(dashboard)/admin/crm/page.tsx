@@ -242,15 +242,15 @@ export default function AdminCrmOverviewPage() {
               </div>
 
               <div className="mt-5 flex gap-4 flex-wrap">
-                <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-center">
+                <div className="rounded-xl border border-border bg-card px-4 py-3 text-center">
                   <div className="text-xl font-bold text-green-700">{funnel.summary.converted}</div>
                   <div className="text-xs text-muted-foreground">Converted</div>
                 </div>
-                <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-center">
+                <div className="rounded-xl border border-border bg-card px-4 py-3 text-center">
                   <div className="text-xl font-bold text-foreground">{funnel.summary.active}</div>
                   <div className="text-xs text-muted-foreground">Active</div>
                 </div>
-                <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 text-center">
+                <div className="rounded-xl border border-border bg-card px-4 py-3 text-center">
                   <div className="text-xl font-bold text-gray-500">{funnel.summary.lost}</div>
                   <div className="text-xs text-muted-foreground">Lost</div>
                 </div>

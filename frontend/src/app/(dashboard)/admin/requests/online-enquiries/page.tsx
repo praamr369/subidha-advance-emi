@@ -75,7 +75,7 @@ export default function AdminOnlineEnquiriesPage() {
           <label className="flex w-full max-w-sm flex-col text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Status filter
             <input
-              className="mt-2 h-10 rounded-2xl border border-border/70 bg-background px-3 text-sm font-normal tracking-normal text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)] outline-none transition focus:border-ring"
+              className="mt-2 h-10 rounded-2xl border border-border bg-background px-3 text-sm font-normal tracking-normal text-foreground outline-none transition focus:border-ring"
               placeholder="NEW, SOURCING…"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -93,7 +93,7 @@ export default function AdminOnlineEnquiriesPage() {
               description="Public submissions with procurement intent create rows automatically; operational teams can also seed RFQs from CRM leads."
             />
           ) : (
-            <div className="overflow-auto rounded-[1.25rem] border border-border/70 bg-[var(--surface-card-elevated)] shadow-[inset_0_1px_0_var(--hairline-shine)]">
+            <div className="overflow-auto rounded-[1.25rem] border border-border bg-card">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="bg-[color-mix(in_oklab,var(--surface-muted)_55%,transparent)] text-xs uppercase tracking-[0.12em] text-muted-foreground">
                   <tr>
@@ -107,7 +107,7 @@ export default function AdminOnlineEnquiriesPage() {
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id} className="border-t border-border/70">
+                    <tr key={row.id} className="border-t border-border">
                       <td className="px-4 py-3 font-medium text-foreground">{row.enquiry_no ?? `#${row.id}`}</td>
                       <td className="px-4 py-3">{row.customer_name ?? "—"}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
@@ -117,7 +117,7 @@ export default function AdminOnlineEnquiriesPage() {
                       <td className="px-4 py-3 text-xs">{row.status ?? "—"}</td>
                       <td className="px-4 py-3 text-right">
                         <Link
-                          className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-3 text-sm font-semibold shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
+                          className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-3 text-sm font-semibold transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
                           href={`${ROUTES.admin.onlineEnquiries}/${row.id}`}
                         >
                           Open

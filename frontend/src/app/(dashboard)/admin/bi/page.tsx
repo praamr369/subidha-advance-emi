@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import AiBiExplanationPanel from "@/components/admin/ai/AiBiExplanationPanel";
 import Phase5ChartBlock from "@/components/admin/Phase5ChartBlock";
-import PortalPage from "@/components/ui/PortalPage";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { getAdminBiSummary, type BiSummary } from "@/services/admin-bi";
 import { BiChartCard } from "@/components/admin/bi/BiChartCard";
@@ -33,7 +33,7 @@ export default function AdminBiControlCenterPage() {
   }, []);
 
   return (
-    <PortalPage
+    <ERPPageShell
       eyebrow="BI Control Center"
       title="Business Intelligence"
       subtitle="Read-only trends and posture. Use Reports for exports and drill-down tables."
@@ -73,20 +73,20 @@ export default function AdminBiControlCenterPage() {
           <AiBiExplanationPanel />
           <BiInsightsDashboard />
 
-          <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-5">
+          <section className="rounded-xl border border-border bg-card p-5">
             <h2 className="text-base font-semibold text-foreground">HR Snapshot</h2>
             <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-xl border border-white/80 bg-white/80 p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="text-xs text-muted-foreground">Active staff</div>
                 <div className="mt-1 text-2xl font-semibold">{payload.hr.active_staff}</div>
               </div>
-              <div className="rounded-xl border border-white/80 bg-white/80 p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="text-xs text-muted-foreground">Today present / absent</div>
                 <div className="mt-1 text-2xl font-semibold">
                   {payload.hr.today_present} / {payload.hr.today_absent}
                 </div>
               </div>
-              <div className="rounded-xl border border-white/80 bg-white/80 p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="text-xs text-muted-foreground">Pending leave / expenses</div>
                 <div className="mt-1 text-2xl font-semibold">
                   {payload.hr.pending_leave_requests} / {payload.hr.pending_expense_claims}
@@ -137,23 +137,23 @@ export default function AdminBiControlCenterPage() {
             </BiChartCard>
           </div>
 
-          <section className="rounded-2xl border border-white/80 bg-white/80 p-5">
+          <section className="rounded-xl border border-border bg-card p-5">
             <h2 className="text-base font-semibold text-foreground">Finance exposure snapshot</h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="text-xs text-muted-foreground">Waived EMI count</div>
                 <div className="mt-1 text-2xl font-semibold">{payload.finance.waiver_loss_exposure.waived_count}</div>
                 <div className="mt-1 text-xs text-muted-foreground">Waived amount: {payload.finance.waiver_loss_exposure.waived_amount}</div>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="text-xs text-muted-foreground">Deposit liability held</div>
                 <div className="mt-1 text-2xl font-semibold">{payload.finance.deposit_liability.held_total}</div>
                 <div className="mt-1 text-xs text-muted-foreground">Source: Subscription deposits</div>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="text-xs text-muted-foreground">Revenue breakdown (cards)</div>
                 <div className="mt-1 text-xs text-muted-foreground">Source: Accounting Control Center</div>
-                <div className="mt-2 rounded-lg bg-[#fffaf5] p-3 text-xs text-foreground">
+                <div className="mt-2 rounded-lg bg-muted/50 p-3 text-xs text-foreground">
                   <pre className="whitespace-pre-wrap break-words">{JSON.stringify(payload.finance.revenue_breakdown, null, 2)}</pre>
                 </div>
               </div>
@@ -165,6 +165,6 @@ export default function AdminBiControlCenterPage() {
           )}
         </div>
       )}
-    </PortalPage>
+    </ERPPageShell>
   );
 }

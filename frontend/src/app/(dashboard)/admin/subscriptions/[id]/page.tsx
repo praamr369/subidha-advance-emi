@@ -1367,7 +1367,7 @@ export default function AdminSubscriptionDetailPage() {
                       </div>
 
                       {contractPdfDocument?.file_url ? (
-                        <div className="mt-5 rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
+                        <div className="mt-5 rounded-xl border border-border bg-card px-4 py-3">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                             Generated contract PDF
                           </div>

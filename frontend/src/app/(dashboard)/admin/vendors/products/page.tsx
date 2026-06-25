@@ -139,7 +139,7 @@ export default function AdminVendorProductsHubPage() {
         ) : null}
 
         {selectedVendorId != null && !loadingProducts && visibleRows.length > 0 ? (
-          <div className="overflow-auto rounded-2xl border border-border/70 bg-[var(--surface-card-elevated)] text-sm shadow-[inset_0_1px_0_var(--hairline-shine)]">
+          <div className="overflow-auto rounded-2xl border border-border bg-card text-sm">
             <table className="w-full min-w-[560px] text-left">
               <thead className="bg-muted/60">
                 <tr>

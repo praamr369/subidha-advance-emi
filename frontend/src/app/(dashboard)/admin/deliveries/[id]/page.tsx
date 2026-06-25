@@ -355,7 +355,7 @@ export default function AdminDeliveryDetailPage() {
               type="button"
               onClick={() => void loadPage("refresh")}
               disabled={loading || refreshing}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
@@ -525,7 +525,7 @@ export default function AdminDeliveryDetailPage() {
                       type="button"
                       onClick={() => void handleTransition(action)}
                       disabled={actionLoading === action}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold text-foreground transition hover:bg-muted/30 hover:border-ring disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {actionLoading === action
                         ? "Working..."

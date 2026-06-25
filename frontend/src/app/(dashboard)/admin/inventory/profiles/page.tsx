@@ -52,7 +52,7 @@ export default function InventoryProfilesPage() {
         title="Guidance"
         description="Stock quantity is read-only here. Use Opening Stock, Goods Receipt, Stock Adjustment, Sale/Delivery, Return, or Manufacturing Receipt workflows to change real stock."
       >
-        <div className="rounded-[1.3rem] border border-border/70 bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm text-muted-foreground">
           Profiles control only stock-facing fields like default location, reorder controls, and delivery bridge participation. Catalog identity stays on Product.
         </div>
       </ERPSectionShell>
@@ -70,7 +70,7 @@ export default function InventoryProfilesPage() {
               <Link
                 key={row.id}
                 href={`${ROUTES.admin.inventoryProfiles}/${row.id}`}
-                className="group rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] px-4 py-4 shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                className="group rounded-xl border border-border bg-card px-4 py-4 transition hover:bg-muted/30 hover:border-ring"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">

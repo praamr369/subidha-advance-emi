@@ -92,7 +92,7 @@ export default function AdminReconciliationRunDetailPage() {
                 {run ? (
                   <Link
                     href={buildAdminReconciliationReportPrintRoute(run.id)}
-                    className="inline-flex h-10 items-center rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 text-sm font-semibold text-foreground hover:bg-[var(--surface-muted)]"
+                    className="inline-flex h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground hover:bg-muted/30"
                   >
                     Reconciliation Report PDF / Print
                   </Link>

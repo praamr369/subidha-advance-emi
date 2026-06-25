@@ -24,7 +24,7 @@ const SEVERITY_CLASS: Record<string, string> = {
 
 function CheckRow({ check }: { check: CloseCheckResult }) {
   return (
-    <tr className="hover:bg-[var(--surface-muted)]">
+    <tr className="hover:bg-muted/30">
       <td className="px-4 py-2 font-mono text-xs">{check.check_key}</td>
       <td className={`px-4 py-2 text-xs ${SEVERITY_CLASS[check.severity] ?? ""}`}>{check.severity}</td>
       <td className="px-4 py-2">
@@ -150,7 +150,7 @@ export default function AdminControlMonthEndClosePage() {
                   <button
                     onClick={() => void handleExecute(true)}
                     disabled={executing}
-                    className="rounded border border-border bg-[var(--surface-strong)] px-4 py-2 text-sm font-medium disabled:opacity-50 hover:bg-[var(--surface-muted)]"
+                    className="rounded border border-border bg-[var(--surface-strong)] px-4 py-2 text-sm font-medium disabled:opacity-50 hover:bg-muted/30"
                   >
                     {executing ? "Running…" : "Dry Run"}
                   </button>
@@ -223,7 +223,7 @@ export default function AdminControlMonthEndClosePage() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {history.map((run) => (
-                      <tr key={run.id} className="hover:bg-[var(--surface-muted)]">
+                      <tr key={run.id} className="hover:bg-muted/30">
                         <td className="px-4 py-3 font-mono text-xs">
                           {MONTHS[run.period_month - 1]} {run.period_year}
                         </td>

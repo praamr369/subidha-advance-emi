@@ -129,7 +129,7 @@ export default function AdminManufacturingOverviewPage() {
                         <Link
                           key={job.id}
                           href={buildAdminManufacturingJobRoute(job.id)}
-                          className="block rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                          className="block rounded-xl border border-border bg-card px-4 py-3 transition hover:bg-muted/30 hover:border-ring"
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div>
@@ -170,7 +170,7 @@ export default function AdminManufacturingOverviewPage() {
                     payload.recent_boms.map((bom) => (
                       <div
                         key={bom.id}
-                        className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] px-4 py-3 shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                        className="rounded-xl border border-border bg-card px-4 py-3"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>

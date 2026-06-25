@@ -306,7 +306,7 @@ export default function AdminManufacturingJobDetailPage() {
                     { label: "Posting notes", value: job.posting_notes || "—" },
                   ]}
                 />
-                <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 text-sm text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]">
+                <div className="rounded-xl border border-border bg-card p-4 text-sm text-foreground">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Job notes
                   </div>

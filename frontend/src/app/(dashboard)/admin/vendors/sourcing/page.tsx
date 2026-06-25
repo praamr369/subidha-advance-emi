@@ -294,7 +294,7 @@ export default function AdminVendorSourcingPage() {
             return (
               <div
                 key={row.vendor_id}
-                className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
+                className="rounded-xl border border-border bg-card p-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex items-start gap-3">

@@ -188,7 +188,7 @@ export default function CustomerAnalyticsReportPage() {
                       {filtered.slice(0, 100).map((p) => {
                         const topSignals = [...new Set(p.signals.map((s) => s.signal_type))].slice(0, 3);
                         return (
-                          <tr key={p.customer_id} className="border-t border-border/60 hover:bg-[var(--surface-muted)]/40">
+                          <tr key={p.customer_id} className="border-t border-border/60 hover:bg-muted/30/40">
                             <td className="px-4 py-3 font-mono text-xs font-semibold">
                               #{p.customer_id}
                             </td>

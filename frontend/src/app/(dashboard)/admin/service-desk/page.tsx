@@ -171,7 +171,7 @@ export default function AdminServiceDeskOverviewPage() {
                           "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition",
                           active
                             ? "border-primary/60 bg-primary text-primary-foreground"
-                            : "border-border bg-[var(--surface-strong)] text-foreground hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]",
+                            : "border-border bg-[var(--surface-strong)] text-foreground hover:bg-muted/30 hover:border-ring",
                         ].join(" ")}
                         title={lane.helper}
                       >
@@ -392,7 +392,7 @@ export default function AdminServiceDeskOverviewPage() {
                 actions={
                   <Link
                     href={ROUTES.admin.serviceDeskReturns}
-                    className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
+                    className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
                   >
                     Open Return Register
                   </Link>
@@ -409,7 +409,7 @@ export default function AdminServiceDeskOverviewPage() {
                       <Link
                         key={item.id}
                         href={buildAdminServiceDeskCaseRoute(item.id)}
-                        className="block rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                        className="block rounded-2xl border border-border bg-card px-4 py-3 transition hover:bg-muted/30 hover:border-ring"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>
@@ -439,7 +439,7 @@ export default function AdminServiceDeskOverviewPage() {
                 actions={
                   <Link
                     href={ROUTES.admin.serviceDeskComplaints}
-                    className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold shadow-[inset_0_1px_0_var(--hairline-shine)] transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
+                    className="inline-flex h-9 items-center rounded-xl border border-border bg-[var(--surface-strong)] px-4 text-sm font-semibold transition hover:border-[var(--surface-border-strong)] hover:bg-[color-mix(in_oklab,var(--surface-strong)_76%,var(--surface-muted)_24%)]"
                   >
                     Open Complaint Register
                   </Link>
@@ -460,7 +460,7 @@ export default function AdminServiceDeskOverviewPage() {
                             ? buildAdminServiceDeskCaseRoute(item.linked_service_case_id)
                             : ROUTES.admin.supportRequests
                         }
-                        className="block rounded-2xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3 transition hover:-translate-y-0.5 hover:border-[var(--surface-border-strong)] hover:bg-[var(--surface-muted)]"
+                        className="block rounded-2xl border border-border bg-card px-4 py-3 transition hover:bg-muted/30 hover:border-ring"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>

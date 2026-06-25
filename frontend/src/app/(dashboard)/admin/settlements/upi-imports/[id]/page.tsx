@@ -207,7 +207,7 @@ export default function UpiImportDetail({ params }: { params: Promise<{ id: stri
           {lines.length === 0 ? (
             <ERPEmptyState title="No lines found" description="This import has no parsed settlement lines." />
           ) : (
-            <table className="min-w-full overflow-hidden rounded-[1.2rem] border border-border/70 bg-[var(--surface-card-elevated)]">
+            <table className="min-w-full overflow-hidden rounded-[1.2rem] border border-border bg-card">
               <thead className="bg-[var(--surface-muted)]/60">
                 <tr>
                   <th className="p-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -268,7 +268,7 @@ export default function UpiImportDetail({ params }: { params: Promise<{ id: stri
           />
 
           <form
-            className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
+            className="rounded-xl border border-border bg-card p-4"
             onSubmit={handleAllocate}
           >
             <div className="grid gap-3 md:grid-cols-2">
@@ -367,7 +367,7 @@ export default function UpiImportDetail({ params }: { params: Promise<{ id: stri
                 />
               ) : null}
               {!targetType ? (
-                <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 text-sm text-muted-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]">
+                <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
                   Select a target type to search for an existing Payment, ReceiptDocument, or MoneyMovement.
                 </div>
               ) : null}
@@ -420,7 +420,7 @@ export default function UpiImportDetail({ params }: { params: Promise<{ id: stri
               />
             ) : null}
             {!allocationsLoading && !allocationsError && allocations.length > 0 ? (
-              <table className="min-w-full overflow-hidden rounded-[1.2rem] border border-border/70 bg-[var(--surface-card-elevated)]">
+              <table className="min-w-full overflow-hidden rounded-[1.2rem] border border-border bg-card">
                 <thead className="bg-[var(--surface-muted)]/60">
                   <tr>
                     <th className="p-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">

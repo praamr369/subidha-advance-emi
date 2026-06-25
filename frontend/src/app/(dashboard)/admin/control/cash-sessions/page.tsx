@@ -65,7 +65,7 @@ export default function AdminControlCashSessionsPage() {
               {rows.map((row) => {
                 const variance = row.variance ? parseFloat(row.variance) : null;
                 return (
-                  <tr key={row.id} className="hover:bg-[var(--surface-muted)]">
+                  <tr key={row.id} className="hover:bg-muted/30">
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{row.id}</td>
                     <td className="px-4 py-3">{row.counter_name}</td>
                     <td className="px-4 py-3">{row.opened_by_username}</td>

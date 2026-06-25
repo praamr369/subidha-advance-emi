@@ -131,19 +131,19 @@ function RecoveryDrawer({
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-5 text-sm">
-          <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2">
+          <div className="rounded-xl border border-border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">Overdue Amount</div>
             <div className="font-bold text-red-700">{fmt(rc.overdue_amount)}</div>
           </div>
-          <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2">
+          <div className="rounded-xl border border-border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">Overdue EMIs</div>
             <div className="font-bold">{rc.overdue_emis}</div>
           </div>
-          <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2">
+          <div className="rounded-xl border border-border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">First Overdue</div>
             <div className="font-semibold">{rc.first_overdue_date ?? "—"}</div>
           </div>
-          <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2">
+          <div className="rounded-xl border border-border bg-card px-3 py-2">
             <div className="text-xs text-muted-foreground">Aging</div>
             <div className="font-bold text-orange-700">{rc.aging_bucket} days</div>
           </div>

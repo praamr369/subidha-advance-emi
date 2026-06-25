@@ -172,7 +172,7 @@ export default function AdminDayCloseDetailPage() {
         ) : null}
 
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cashier</div>
             <div className="mt-2 text-sm font-semibold text-foreground">{record.cashier_username || `User #${record.cashier}`}</div>
             <div className="mt-1 text-xs text-muted-foreground">
@@ -182,7 +182,7 @@ export default function AdminDayCloseDetailPage() {
               Finance account {record.finance_account_name || "—"}
             </div>
           </div>
-          <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Business date</div>
             <div className="mt-2 text-sm font-semibold text-foreground">{record.business_date}</div>
             <div className="mt-2 text-xs text-muted-foreground">
@@ -192,21 +192,21 @@ export default function AdminDayCloseDetailPage() {
         </div>
 
         <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">System cash total</div>
             <div className="mt-2 text-sm font-semibold text-foreground">{formatRupee(record.system_cash_total)}</div>
           </div>
-          <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Counted cash</div>
             <div className="mt-2 text-sm font-semibold text-foreground">{formatRupee(record.counted_cash)}</div>
           </div>
-          <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Variance</div>
             <div className="mt-2 text-sm font-semibold text-foreground">{formatRupee(record.variance)}</div>
           </div>
         </div>
 
-        <div className="mt-3 rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4">
+        <div className="mt-3 rounded-xl border border-border bg-card p-4">
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Notes</div>
           <div className="mt-2 text-sm text-foreground whitespace-pre-wrap">{record.notes?.trim() ? record.notes : "—"}</div>
         </div>
@@ -214,7 +214,7 @@ export default function AdminDayCloseDetailPage() {
 
       <ERPSectionShell title="Decision" description="Approve or reject SUBMITTED records only. Rejection requires a note.">
         {!canDecide ? (
-          <div className="rounded-xl border border-border/70 bg-[var(--surface-muted)] p-3 text-sm text-muted-foreground">
+          <div className="rounded-xl border border-border bg-[var(--surface-muted)] p-3 text-sm text-muted-foreground">
             This record is <span className="font-semibold">{record.status}</span>. Only <span className="font-semibold">SUBMITTED</span> records can be approved/rejected.
           </div>
         ) : null}
@@ -222,7 +222,7 @@ export default function AdminDayCloseDetailPage() {
         <label className="block">
           <div className="text-sm font-semibold text-foreground">Decision note</div>
           <textarea
-            className="mt-1 w-full rounded-xl border border-border bg-[var(--surface-card-elevated)] px-3 py-2 text-sm text-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]"
+            className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
             rows={4}
             value={decisionNote}
             onChange={(e) => setDecisionNote(e.target.value)}
@@ -250,7 +250,7 @@ export default function AdminDayCloseDetailPage() {
           </button>
           <Link
             href={ROUTES.admin.settlementsDayCloses}
-            className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-2 text-sm font-semibold text-foreground hover:bg-[var(--surface-muted)]"
+            className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted/30"
           >
             Back to list
           </Link>

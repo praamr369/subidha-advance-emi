@@ -61,7 +61,7 @@ export default function AdminVendorCategoriesPage() {
           <ERPEmptyState title="No vendor categories" description="No vendor categories are configured yet." />
         ) : null}
         {!loading && !error && rows.length > 0 ? (
-          <div className="rounded-[1.4rem] border border-border/70 bg-[var(--surface-card-elevated)] p-4 text-sm shadow-[inset_0_1px_0_var(--hairline-shine)]">
+          <div className="rounded-xl border border-border bg-card p-4 text-sm">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {rows.map((row, idx) => (
                 <div

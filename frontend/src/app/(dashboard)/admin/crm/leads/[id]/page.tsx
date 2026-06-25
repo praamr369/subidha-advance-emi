@@ -394,7 +394,7 @@ export default function AdminCrmLeadDetailPage() {
                 </div>
 
                 {showEditForm ? (
-                  <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 space-y-3">
+                  <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                     <div className="text-sm font-semibold text-foreground">Edit Lead</div>
                     {editError ? <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{editError}</div> : null}
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -496,7 +496,7 @@ export default function AdminCrmLeadDetailPage() {
 
                 {/* Gap 5: Assign form */}
                 {showAssignForm && !showEditForm ? (
-                  <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4">
+                  <div className="rounded-xl border border-border bg-card p-4">
                     <div className="text-sm font-semibold mb-2">Assign Lead</div>
                     {assignError ? <div className="mb-2 text-xs text-red-600">{assignError}</div> : null}
                     {staffLoading ? <div className="text-xs text-muted-foreground">Loading staff…</div> : (
@@ -582,7 +582,7 @@ export default function AdminCrmLeadDetailPage() {
             </div>
 
             {showTaskForm ? (
-              <div className="mb-4 rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4">
+              <div className="mb-4 rounded-xl border border-border bg-card p-4">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium mb-1">Due date & time *</label>
@@ -637,7 +637,7 @@ export default function AdminCrmLeadDetailPage() {
             </div>
 
             {showOppForm ? (
-              <div className="mb-4 rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4">
+              <div className="mb-4 rounded-xl border border-border bg-card p-4">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-medium mb-1">Title *</label>

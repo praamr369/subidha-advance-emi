@@ -70,7 +70,7 @@ export default function ProfilesHubPage() {
           <Link
             key={mod.href}
             href={mod.href}
-            className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-ring hover:shadow-md"
+            className="group flex flex-col gap-3 rounded-xl border border-border bg-card p-5 transition hover:border-ring hover:shadow-sm"
           >
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground transition group-hover:bg-primary group-hover:text-primary-foreground">

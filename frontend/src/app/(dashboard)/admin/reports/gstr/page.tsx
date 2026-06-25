@@ -49,7 +49,7 @@ function Gstr2bReconcileTab({
 }) {
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4">
+      <div className="rounded-xl border border-border bg-card p-4">
         <p className="text-sm font-medium text-foreground">Paste GSTR-2B JSON</p>
         <p className="mt-1 text-xs text-muted-foreground">
           Paste the JSON downloaded from the GSTN portal (standard B2B format) or a simplified list.
@@ -82,7 +82,7 @@ function Gstr2bReconcileTab({
               { label: "Not in books", value: result.summary.not_in_books, accent: "red" },
               { label: "Not in 2B", value: result.summary.not_in_2b, accent: "blue" },
             ].map((c) => (
-              <div key={c.label} className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">
+              <div key={c.label} className="rounded-xl border border-border bg-card px-4 py-3">
                 <div className={`text-xl font-bold ${c.accent === "green" ? "text-green-700" : c.accent === "amber" ? "text-amber-700" : c.accent === "red" ? "text-red-700" : c.accent === "blue" ? "text-blue-700" : "text-foreground"}`}>
                   {c.value}
                 </div>
@@ -310,7 +310,7 @@ export default function GstrReportPage() {
               ].map((c) => (
                 <div
                   key={c.label}
-                  className={`rounded-xl border px-4 py-3 ${c.accent ? "border-primary/30 bg-primary/5" : "border-border bg-[var(--surface-card-elevated)]"}`}
+                  className={`rounded-xl border px-4 py-3 ${c.accent ? "border-primary/30 bg-primary/5" : "border-border bg-card"}`}
                 >
                   <div className={`text-lg font-bold ${c.accent ? "text-primary" : "text-foreground"}`}>{c.value}</div>
                   <div className="text-xs text-muted-foreground">{c.label}</div>
