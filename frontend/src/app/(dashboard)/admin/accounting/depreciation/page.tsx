@@ -176,7 +176,7 @@ export default function AccountingDepreciationPage() {
               Period end
               <input type="date" className={accountingFieldClassName()} value={form.period_end} onChange={(event) => setForm((current) => ({ ...current, period_end: event.target.value }))} required />
             </label>
-            <button type="submit" className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white md:col-span-2">
+            <button type="submit" className="rounded-xl border border-primary bg-foreground px-4 py-2 text-sm font-medium text-background md:col-span-2">
               Create Depreciation Run
             </button>
           </form>

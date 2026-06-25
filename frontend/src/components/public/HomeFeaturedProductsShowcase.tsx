@@ -59,7 +59,7 @@ export default function HomeFeaturedProductsShowcase({
           </Link>
           <Link
             href={buildApplyHref(product)}
-            className="inline-flex h-10 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+            className="inline-flex h-10 items-center rounded-xl border border-foreground/15 bg-foreground px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
           >
             Apply
           </Link>

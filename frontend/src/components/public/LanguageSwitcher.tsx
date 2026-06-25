@@ -36,7 +36,7 @@ export default function LanguageSwitcher({ value, className }: LanguageSwitcherP
             className={cn(
               "rounded-lg px-2.5 py-1.5 text-xs font-semibold",
               language === value
-                ? "bg-slate-950 text-white"
+                ? "bg-foreground text-background"
                 : "text-muted-foreground hover:bg-card"
             )}
             aria-label={`Switch language to ${PUBLIC_LANGUAGE_LABELS[language]}`}

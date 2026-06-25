@@ -106,7 +106,7 @@ export default function PublicLatestWinnerWidget() {
           </Link>
           <Link
             href={ROUTES.public.apply}
-            className="inline-flex h-10 items-center rounded-xl border border-slate-900/10 bg-slate-900 px-4 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5"
+            className="inline-flex h-10 items-center rounded-xl border border-foreground/15 bg-foreground px-4 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5"
           >
             Apply Now
           </Link>

@@ -251,7 +251,7 @@ function HorizontalBar({
       : tone === "danger"
       ? "bg-red-500"
       : tone === "default"
-      ? "bg-slate-500"
+      ? "bg-muted-foreground"
       : "bg-primary";
 
   return (
@@ -1041,7 +1041,7 @@ export default function AdminDashboardPage() {
                 actionLabel="Open branch report"
               >
                 <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="rounded-2xl border border-border bg-muted/40 p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Payment mode split (window net)
                     </div>
@@ -1151,7 +1151,7 @@ export default function AdminDashboardPage() {
                     tone="success"
                   />
 
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="rounded-2xl border border-border bg-muted/40 p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Direct sales (window)
                     </div>
@@ -1361,7 +1361,7 @@ export default function AdminDashboardPage() {
               actionLabel="Open CRM"
             >
               <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                <div className="rounded-2xl border border-border bg-muted/40 p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Pipeline snapshot
                   </div>
@@ -1447,7 +1447,7 @@ export default function AdminDashboardPage() {
                         <Link
                           key={lead.id}
                           href={`${ROUTES.admin.leads}/${lead.id}`}
-                          className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-card px-4 py-3 transition hover:-translate-y-0.5 hover:bg-card"
+                          className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-card px-4 py-3 transition hover:-translate-y-0.5 hover:bg-card"
                         >
                           <div className="min-w-0">
                             <div className="truncate font-medium text-foreground">
@@ -1864,7 +1864,7 @@ export default function AdminDashboardPage() {
                               className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
                                 row.is_overdue
                                   ? "border-amber-200 bg-amber-50 text-amber-700"
-                                  : "border-slate-200 bg-slate-50 text-slate-600"
+                                  : "border-border bg-muted/50 text-slate-600"
                               }`}
                             >
                               {row.is_overdue

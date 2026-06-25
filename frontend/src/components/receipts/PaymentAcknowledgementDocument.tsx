@@ -50,7 +50,7 @@ export default function PaymentAcknowledgementDocument({
 
         <AmountSummary title="Receipt Amount Summary" rows={amountFields} />
 
-        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-card px-3.5 py-3 text-[13px] leading-5 text-muted-foreground">
+        <div className="print-doc-note print-doc-section rounded-xl border border-border bg-card px-3.5 py-3 text-[13px] leading-5 text-muted-foreground">
           {note}
         </div>
 

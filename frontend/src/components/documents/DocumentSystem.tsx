@@ -32,7 +32,7 @@ function toneClassName(tone: Tone): string {
       return "border-sky-200 bg-sky-50 text-sky-800";
     case "default":
     default:
-      return "border-slate-300 bg-slate-100 text-foreground";
+      return "border-border bg-muted text-foreground";
   }
 }
 
@@ -64,7 +64,7 @@ export function DocumentShell({
   return (
     <section
       className={cn(
-        "receipt-document document-shell print-doc-shell rounded-[1.4rem] border border-slate-300 bg-card",
+        "receipt-document document-shell print-doc-shell rounded-[1.4rem] border border-border bg-card",
         className
       )}
     >
@@ -108,7 +108,7 @@ export function BrandMasthead({
       <img
         src={brandConfig.publicLogoSrc}
         alt={brandConfig.publicLogoAlt}
-        className="h-12 w-12 rounded-xl border border-slate-300 bg-card object-contain p-2"
+        className="h-12 w-12 rounded-xl border border-border bg-card object-contain p-2"
       />
       <div className="min-w-0">
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -160,7 +160,7 @@ export function DocumentMetaGrid({
   return (
     <div
       className={cn(
-        "print-doc-meta rounded-xl border border-slate-300 bg-card px-3.5 py-3",
+        "print-doc-meta rounded-xl border border-border bg-card px-3.5 py-3",
         className
       )}
     >
@@ -191,7 +191,7 @@ export function DocumentHeader({
   return (
     <header
       className={cn(
-        "print-doc-section grid gap-4 border-b border-slate-300 pb-4",
+        "print-doc-section grid gap-4 border-b border-border pb-4",
         className
       )}
     >
@@ -257,7 +257,7 @@ export function ReceiptFieldGrid({
       </h3>
       <div className={cn("receipt-document-grid grid gap-2.5", columns)}>
         {visibleFields.map((field) => (
-          <div key={field.label} className="rounded-lg border border-slate-300 bg-card px-3.5 py-2.5">
+          <div key={field.label} className="rounded-lg border border-border bg-card px-3.5 py-2.5">
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {field.label}
             </div>
@@ -319,7 +319,7 @@ export function LineItemsTable({
       <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {title}
       </h3>
-      <div className="overflow-x-auto rounded-xl border border-slate-300 bg-card">
+      <div className="overflow-x-auto rounded-xl border border-border bg-card">
         <table className="min-w-full border-collapse text-[12px] leading-5">
           <thead className="print-doc-accent">
             <tr>
@@ -339,7 +339,7 @@ export function LineItemsTable({
           </thead>
           <tbody>
             {visibleItems.map((item, index) => (
-              <tr key={`${index}-${String(item.description)}`} className="border-t border-slate-200">
+              <tr key={`${index}-${String(item.description)}`} className="border-t border-border">
                 <td className="px-3 py-2 text-foreground">
                   <div className="font-medium">{item.description}</div>
                   {item.note && !isDisplayEmpty(item.note) ? (
@@ -393,11 +393,11 @@ export function AmountSummary({
 
   return (
     <SummaryBlock title={title} className={className}>
-      <div className="overflow-hidden rounded-lg border border-slate-300 bg-card">
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
         <table className="w-full border-collapse text-[12px] leading-5">
           <tbody>
             {visibleRows.map((row, index) => (
-              <tr key={`${row.label}-${index}`} className="border-t border-slate-200 first:border-t-0">
+              <tr key={`${row.label}-${index}`} className="border-t border-border first:border-t-0">
                 <td className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   {row.label}
                 </td>
@@ -455,11 +455,11 @@ export function BankQrBlock({
           className="m-0"
         />
         {showQr ? (
-          <div className="rounded-xl border border-slate-300 bg-card p-3">
+          <div className="rounded-xl border border-border bg-card p-3">
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               QR / Payment Reference
             </div>
-            <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-[12px] text-muted-foreground">
+            <div className="mt-2 rounded-lg border border-dashed border-border bg-muted/50 px-3 py-6 text-center text-[12px] text-muted-foreground">
               <div className="font-semibold text-foreground">{qrLabel}</div>
               {!isDisplayEmpty(qrReference) ? (
                 <div className="mt-1 text-[11px] text-muted-foreground">{qrReference}</div>
@@ -487,7 +487,7 @@ export function TermsBlock({
   return (
     <section
       className={cn(
-        "print-doc-note print-doc-section rounded-xl border border-slate-300 bg-card px-3.5 py-3",
+        "print-doc-note print-doc-section rounded-xl border border-border bg-card px-3.5 py-3",
         className
       )}
     >
@@ -518,17 +518,17 @@ export function SignatureBlock({
 }) {
   return (
     <section className={cn("print-doc-section grid gap-4 sm:grid-cols-2", className)}>
-      <div className="rounded-lg border border-slate-300 bg-card px-3.5 py-3">
+      <div className="rounded-lg border border-border bg-card px-3.5 py-3">
         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           {leftLabel}
         </div>
-        <div className="mt-8 border-t border-slate-300 pt-2 text-[11px] text-muted-foreground">{leftHint}</div>
+        <div className="mt-8 border-t border-border pt-2 text-[11px] text-muted-foreground">{leftHint}</div>
       </div>
-      <div className="rounded-lg border border-slate-300 bg-card px-3.5 py-3">
+      <div className="rounded-lg border border-border bg-card px-3.5 py-3">
         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           {rightLabel}
         </div>
-        <div className="mt-8 border-t border-slate-300 pt-2 text-[11px] text-muted-foreground">{rightHint}</div>
+        <div className="mt-8 border-t border-border pt-2 text-[11px] text-muted-foreground">{rightHint}</div>
       </div>
     </section>
   );
@@ -546,7 +546,7 @@ export function DocumentFooter({
   return (
     <footer
       className={cn(
-        "print-doc-section flex items-end justify-between gap-3 border-t border-slate-300 pt-3 text-[11px] text-muted-foreground",
+        "print-doc-section flex items-end justify-between gap-3 border-t border-border pt-3 text-[11px] text-muted-foreground",
         className
       )}
     >

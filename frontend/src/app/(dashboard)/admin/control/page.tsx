@@ -40,8 +40,8 @@ const MODULES: ModuleDef[] = [
     description:
       "Toggle enterprise control policies — e.g. cash variance approval requirement.",
     Icon: Settings2,
-    iconCls: "bg-slate-50 text-muted-foreground dark:bg-slate-800/50 dark:text-slate-300",
-    dotCls: "bg-slate-400",
+    iconCls: "bg-muted/50 text-muted-foreground",
+    dotCls: "bg-muted-foreground/60",
   },
   {
     href: ROUTES.admin.controlExceptions,

@@ -267,7 +267,7 @@ export default function AccountingDebitNotesPage() {
                   Tax adjustment
                   <input value={form.tax_adjustment} onChange={(event) => setForm((current) => ({ ...current, tax_adjustment: event.target.value }))} className={accountingFieldClassName()} />
                 </label>
-                <button type="submit" className="rounded-xl border border-slate-900/10 bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+                <button type="submit" className="rounded-xl border border-primary/10 bg-foreground px-4 py-2 text-sm font-medium text-background">
                   Create Draft Debit Note
                 </button>
               </form>

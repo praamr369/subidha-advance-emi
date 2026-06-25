@@ -271,7 +271,7 @@ function ReportCard({
           type="button"
           onClick={onFetch}
           disabled={isLoading}
-          className="rounded-xl border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+          className="rounded-xl border border-foreground bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-60"
         >
           {isLoading ? "Loading…" : "View JSON"}
         </button>

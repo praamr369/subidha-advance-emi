@@ -139,6 +139,8 @@ export const ROUTES = {
     settingsBusinessCompliance: "/admin/settings/business-compliance",
     settingsLegalControls: "/admin/settings/legal-controls",
     complianceKyc: "/admin/compliance/kyc",
+    revenueWorkbench: "/admin/revenue-workbench",
+    financeControl: "/admin/finance-control",
     settingsFinance: "/admin/settings/finance",
     settingsImports: "/admin/settings/imports",
     settingsMasters: "/admin/settings/masters",

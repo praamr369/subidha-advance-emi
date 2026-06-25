@@ -35,7 +35,7 @@ export default function RegisterPrintDocument({
             { label: "Rows", value: String(rows.length) },
           ]}
         />
-        <div className="print-doc-section overflow-x-auto rounded-xl border border-slate-300 bg-card">
+        <div className="print-doc-section overflow-x-auto rounded-xl border border-border bg-card">
           <table className="min-w-full border-collapse text-[11px] leading-[1.45]">
             <thead className="print-doc-accent">
               <tr>
@@ -51,7 +51,7 @@ export default function RegisterPrintDocument({
             </thead>
             <tbody>
               {rows.map((row, index) => (
-                <tr key={index} className="border-t border-slate-200 even:bg-slate-50/40">
+                <tr key={index} className="border-t border-border even:bg-slate-50/40">
                   {row.map((cell, cellIndex) => (
                     <td
                       key={`${index}-${cellIndex}`}
@@ -66,7 +66,7 @@ export default function RegisterPrintDocument({
           </table>
         </div>
 
-        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-card px-3.5 py-3 text-[13px] leading-5 text-slate-700">
+        <div className="print-doc-note print-doc-section rounded-xl border border-border bg-card px-3.5 py-3 text-[13px] leading-5 text-slate-700">
           {footerNote}
         </div>
         <DocumentFooter leftText="Prepared from posted register rows" />

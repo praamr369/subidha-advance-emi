@@ -53,7 +53,7 @@ function activationStatusTone(status: string | undefined): string {
   if (normalized === "CANCELLED") {
     return "border-red-200 bg-red-50 text-red-700";
   }
-  return "border-slate-300 bg-slate-100 text-foreground";
+  return "border-border bg-muted text-foreground";
 }
 
 export default function BillingContractsPage() {
@@ -175,7 +175,7 @@ export default function BillingContractsPage() {
             >
               <div className="grid gap-3">
                 {profiles.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-muted-foreground">
+                  <div className="rounded-xl border border-dashed border-border bg-muted/50 px-4 py-5 text-sm text-muted-foreground">
                     No billing contract mirrors matched the current filter.
                   </div>
                 ) : (
@@ -240,7 +240,7 @@ export default function BillingContractsPage() {
             >
               <div className="grid gap-3">
                 {events.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-muted-foreground">
+                  <div className="rounded-xl border border-dashed border-border bg-muted/50 px-4 py-5 text-sm text-muted-foreground">
                     No billing sync events recorded yet.
                   </div>
                 ) : (
@@ -371,7 +371,7 @@ export default function BillingContractsPage() {
                   ]}
                 />
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-muted-foreground">
+                <div className="rounded-xl border border-dashed border-border bg-muted/50 px-4 py-5 text-sm text-muted-foreground">
                   No contract mirror is available in this filter scope for print preview.
                 </div>
               )}

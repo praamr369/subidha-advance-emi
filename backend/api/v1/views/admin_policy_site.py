@@ -45,6 +45,10 @@ from subscriptions.services.business_compliance_review_actions import (
     revoke_public_summary,
     update_document_metadata,
 )
+from subscriptions.services.waiver_classification_service import (
+    WAIVER_CLASSIFICATION_MATRIX,
+    classify_waiver_from_dict,
+)
 from subscriptions.services.business_rule_policy_service import (
     business_rule_policy_payload,
     update_active_business_rule_policy,
@@ -108,6 +112,18 @@ class AdminBusinessRulePolicyView(_AdminPolicyBase):
         except Exception as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         return Response(business_rule_policy_payload(policy))
+
+
+class AdminWaiverClassificationMatrixView(_AdminPolicyBase):
+    """Returns the static waiver classification matrix and optionally classifies a specific case."""
+
+    def get(self, request):
+        return Response({"matrix": WAIVER_CLASSIFICATION_MATRIX})
+
+    def post(self, request):
+        data = request.data or {}
+        result = classify_waiver_from_dict(data)
+        return Response(result)
 
 
 class AdminPolicyPageListCreateView(_AdminPolicyBase):

@@ -21,7 +21,7 @@ function formatDateTime(value?: string | null): string {
 function toneClass(value: string): string {
   if (["OPEN", "UNDER_REVIEW", "AUTHORIZED", "IN_SERVICE"].includes(value)) return "border-amber-200 bg-amber-50 text-amber-900";
   if (["RESOLVED", "CLOSED"].includes(value)) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (["REJECTED", "CANCELLED"].includes(value)) return "border-slate-200 bg-slate-50 text-muted-foreground";
+  if (["REJECTED", "CANCELLED"].includes(value)) return "border-border bg-muted/50 text-muted-foreground";
   return "border-blue-200 bg-blue-50 text-blue-800";
 }
 

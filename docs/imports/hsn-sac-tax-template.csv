@@ -1,0 +1,2 @@
+item_type,sku_or_category,hsn_sac,description,sale_gst_rate,rent_lease_gst_rate,effective_from,ca_review_status,notes
+PRODUCT,SKU-001,__FILL_HSN__,__FILL__,__FILL_FUTURE_GST_RATE__,__FILL_FUTURE_GST_RATE__,__YYYY-MM-DD__,PENDING,Before GST registration do not charge GST

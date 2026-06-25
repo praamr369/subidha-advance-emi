@@ -140,7 +140,7 @@ export default function AccountingItrPackPage() {
                   End date
                   <input type="date" value={form.end_date} onChange={(event) => setForm((current) => ({ ...current, end_date: event.target.value }))} className={accountingFieldClassName()} />
                 </label>
-                <button type="submit" className="rounded-xl border border-slate-900/10 bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+                <button type="submit" className="rounded-xl border border-primary/10 bg-foreground px-4 py-2 text-sm font-medium text-background">
                   Generate ITR Pack
                 </button>
               </form>

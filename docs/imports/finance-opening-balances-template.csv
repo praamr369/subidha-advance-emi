@@ -1,0 +1,2 @@
+account_name,opening_balance,balance_type,as_of_date,proof_reference,notes
+Cash,__AMOUNT__,DEBIT,__YYYY-MM-DD__,__PROOF__,

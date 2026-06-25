@@ -45,7 +45,7 @@ export default function AdminReceiptSampleIndexPage() {
     >
       <section className="grid gap-3 md:grid-cols-2">
         {SAMPLE_LINKS.map((item) => (
-          <div key={item.href} className="rounded-xl border border-slate-300 bg-card p-4 shadow-sm">
+          <div key={item.href} className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <h2 className="text-base font-semibold text-foreground">{item.label}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
             <div className="mt-3">

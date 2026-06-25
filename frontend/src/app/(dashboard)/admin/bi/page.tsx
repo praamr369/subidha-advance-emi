@@ -55,7 +55,7 @@ export default function AdminBiControlCenterPage() {
 
       {!payload ? (
         <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-card px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
             {error ? "BI summary is temporarily unavailable." : "Loading BI control center..."}
           </div>
           <BiChartCard

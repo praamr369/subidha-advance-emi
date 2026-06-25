@@ -26,7 +26,7 @@ function money(value: string | number | null | undefined): string {
 function toneClass(label: string): string {
   if (label === "READY" || label === "RECONCILED") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (label === "BLOCKED" || label === "PENDING") return "border-amber-200 bg-amber-50 text-amber-900";
-  if (label === "CANCELLED" || label === "ARCHIVED") return "border-slate-200 bg-slate-50 text-muted-foreground";
+  if (label === "CANCELLED" || label === "ARCHIVED") return "border-border bg-muted/50 text-muted-foreground";
   return "border-blue-200 bg-blue-50 text-blue-800";
 }
 

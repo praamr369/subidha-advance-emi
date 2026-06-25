@@ -50,7 +50,7 @@ function badgeClass(tone: "green" | "amber" | "red" | "blue" | "slate") {
     amber: "border-amber-200 bg-amber-50 text-amber-900",
     red: "border-red-200 bg-red-50 text-red-800",
     blue: "border-blue-200 bg-blue-50 text-blue-800",
-    slate: "border-slate-200 bg-slate-50 text-muted-foreground",
+    slate: "border-border bg-muted/50 text-muted-foreground",
   };
   return `inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${map[tone]}`;
 }
@@ -267,7 +267,7 @@ export default function AccountingBooksPage() {
                     <label className="text-sm text-muted-foreground md:col-span-2">Notes<textarea className={fieldClassName()} value={movementForm.notes} onChange={(event) => setMovementForm((current) => ({ ...current, notes: event.target.value }))} rows={3} /></label>
                     {selectedFrom && selectedTo ? <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 md:col-span-2">Preview: Dr {selectedTo.chart_account_code || selectedTo.name} / Cr {selectedFrom.chart_account_code || selectedFrom.name}. Journal is created only after explicit Post.</div> : null}
                     {formBlocker ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 md:col-span-2">{formBlocker}</div> : null}
-                    <div className="md:col-span-2"><button type="submit" disabled={!canCreateMovement || hasReadinessBlocker} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50">Create draft movement</button></div>
+                    <div className="md:col-span-2"><button type="submit" disabled={!canCreateMovement || hasReadinessBlocker} className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-foreground/90 disabled:opacity-50">Create draft movement</button></div>
                   </form>
                 </WorkspaceSection>
 

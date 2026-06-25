@@ -55,7 +55,7 @@ function statusClass(status: string): string {
   if (value === "READY_UNPOSTED") return "border-blue-200 bg-blue-50 text-blue-900";
   if (value.includes("UNSUPPORTED") || value.includes("CONFLICT") || value.includes("ERROR")) return "border-red-200 bg-red-50 text-red-900";
   if (value.includes("WARNING") || value.includes("BLOCKED") || value.includes("MISSING") || value.includes("INACTIVE")) return "border-amber-200 bg-amber-50 text-amber-950";
-  return "border-slate-200 bg-slate-50 text-foreground";
+  return "border-border bg-muted/50 text-foreground";
 }
 
 function MappingStatus({ value }: { value: string }) {
@@ -360,7 +360,7 @@ export default function AccountingMappingAuditPage() {
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
-            <SummaryCard label="Total events" value={summary.total_events} tone="border-slate-200 bg-slate-50 text-foreground" />
+            <SummaryCard label="Total events" value={summary.total_events} tone="border-border bg-muted/50 text-foreground" />
             <SummaryCard label="Ready" value={summary.ready} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
             <SummaryCard label="Missing" value={summary.missing_mapping} tone="border-amber-200 bg-amber-50 text-amber-950" />
             <SummaryCard label="Conflicts" value={summary.conflicts} tone="border-red-200 bg-red-50 text-red-900" />

@@ -308,7 +308,7 @@ export default function AccountingExpensesPage() {
                   <div className="md:col-span-2">
                     <button
                       type="submit"
-                      className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                      className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-foreground/90"
                     >
                       Create vendor
                     </button>
@@ -508,7 +508,7 @@ export default function AccountingExpensesPage() {
                   <div className="md:col-span-2">
                     <button
                       type="submit"
-                      className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                      className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-foreground/90"
                     >
                       Create expense voucher
                     </button>

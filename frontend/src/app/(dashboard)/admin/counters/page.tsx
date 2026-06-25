@@ -171,7 +171,7 @@ export default function AdminCountersPage() {
             setNotice(null);
             setError(null);
           }}
-          className="rounded-xl border border-slate-300 bg-card px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-slate-50"
+          className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-muted/50"
         >
           Edit
         </button>
@@ -308,7 +308,7 @@ export default function AdminCountersPage() {
                       <input
                         value={form.code}
                         onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border px-3 py-2.5"
                         placeholder="CTR-01"
                         required
                       />
@@ -318,7 +318,7 @@ export default function AdminCountersPage() {
                       <input
                         value={form.name}
                         onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border px-3 py-2.5"
                         placeholder="Main Cash Desk"
                         required
                       />
@@ -334,7 +334,7 @@ export default function AdminCountersPage() {
                             finance_account: "",
                           }))
                         }
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border px-3 py-2.5"
                         required
                       >
                         <option value="">Select branch</option>
@@ -350,7 +350,7 @@ export default function AdminCountersPage() {
                       <select
                         value={form.finance_account}
                         onChange={(event) => setForm((current) => ({ ...current, finance_account: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border px-3 py-2.5"
                         disabled={!form.branch || eligibleLoading}
                         required
                       >
@@ -378,7 +378,7 @@ export default function AdminCountersPage() {
                       <select
                         value={form.assigned_user}
                         onChange={(event) => setForm((current) => ({ ...current, assigned_user: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border px-3 py-2.5"
                       >
                         <option value="">Unassigned</option>
                         {cashiers.map((cashier) => (
@@ -394,18 +394,18 @@ export default function AdminCountersPage() {
                         rows={3}
                         value={form.notes}
                         onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                        className="w-full rounded-xl border border-border px-3 py-2.5"
                         placeholder="Counter remarks, handover instructions, or cash-desk scope."
                       />
                     </label>
                   </div>
 
-                  <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-muted-foreground">
+                  <label className="flex items-center gap-3 rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
                     <input
                       type="checkbox"
                       checked={form.is_active}
                       onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))}
-                      className="h-4 w-4 rounded border-slate-300"
+                      className="h-4 w-4 rounded border-border"
                     />
                     Keep this counter active for branch collection and cashier assignment.
                   </label>
@@ -426,14 +426,14 @@ export default function AdminCountersPage() {
                     <button
                       type="submit"
                       disabled={saving}
-                      className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+                      className="rounded-xl bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:bg-foreground/90 disabled:opacity-60"
                     >
                       {saving ? "Saving..." : selectedCounter ? "Update Counter" : "Create Counter"}
                     </button>
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50"
+                      className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-muted/50"
                     >
                       Reset
                     </button>
@@ -441,7 +441,7 @@ export default function AdminCountersPage() {
                       type="button"
                       onClick={() => void loadPage("refresh")}
                       disabled={refreshing}
-                      className="rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:opacity-60"
+                      className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-muted/50 disabled:opacity-60"
                     >
                       {refreshing ? "Refreshing..." : "Refresh"}
                     </button>

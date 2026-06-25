@@ -216,7 +216,7 @@ function batchToneClass(status: BatchStatus): string {
       return "border-blue-200 bg-blue-50 text-blue-700";
     case "CLOSED":
     case "COMPLETED":
-      return "border-slate-200 bg-slate-100 text-muted-foreground";
+      return "border-border bg-muted/50 text-muted-foreground";
     default:
       return "border-border bg-muted text-foreground";
   }

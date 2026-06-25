@@ -235,7 +235,7 @@ export default function AdminDayCloseDetailPage() {
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            className="rounded-xl border border-border bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+            className="rounded-xl border border-border bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/90 disabled:opacity-60"
             disabled={!canDecide || working}
             onClick={() => void handleApprove()}
           >

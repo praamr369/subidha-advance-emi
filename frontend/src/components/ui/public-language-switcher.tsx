@@ -36,7 +36,7 @@ export default function PublicLanguageSwitcher({
           router.push(nextPath);
           router.refresh();
         }}
-        className="rounded-lg border border-slate-200/80 bg-card px-2 py-1"
+        className="rounded-lg border border-border/80 bg-card px-2 py-1"
         aria-label={label}
       >
         {PUBLIC_LOCALES.map((item) => (

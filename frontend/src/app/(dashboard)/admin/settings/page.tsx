@@ -76,8 +76,8 @@ const CONTROLS: SettingsDef[] = [
     description: "Immutable traceability for payment, draw, batch, and access changes.",
     href: ROUTES.admin.auditLogs,
     Icon: ScrollText,
-    iconCls: "bg-slate-50 text-muted-foreground dark:bg-slate-800/50 dark:text-slate-300",
-    dotCls: "bg-slate-400",
+    iconCls: "bg-muted/50 text-muted-foreground",
+    dotCls: "bg-muted-foreground/60",
   },
   {
     title: "Session Policy",

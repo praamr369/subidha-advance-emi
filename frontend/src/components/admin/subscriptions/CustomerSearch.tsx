@@ -45,7 +45,7 @@ export default function CustomerSearch({
           {results.map((c) => (
             <div
               key={c.id}
-              className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+              className="px-3 py-2 hover:bg-muted cursor-pointer text-sm"
               onClick={() => {
                 onSelect(c.id);
                 setQuery(c.user?.name || c.name || "");

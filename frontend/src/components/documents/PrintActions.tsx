@@ -46,7 +46,7 @@ export function PrintActions({
   return (
     <section
       className={cn(
-        "receipt-print-hide flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-300 bg-card px-4 py-3 shadow-sm",
+        "receipt-print-hide flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm",
         className
       )}
     >

@@ -108,7 +108,7 @@ export default function BankImportsList() {
           right={
             <button
               type="button"
-              className="rounded-xl border border-border bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.6)] hover:bg-slate-800"
+              className="rounded-xl border border-border bg-foreground px-4 py-2 text-sm font-semibold text-background shadow-[0_18px_40px_-28px_rgba(15,23,42,0.6)] hover:bg-foreground/90"
               onClick={() => setShowUpload((value) => !value)}
             >
               {showUpload ? "Cancel" : "Upload bank statement"}

@@ -388,7 +388,7 @@ export default function AdminPartnersPage() {
                   placeholder="Username, phone, email, partner id..."
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
               </div>
 
@@ -403,7 +403,7 @@ export default function AdminPartnersPage() {
                   id="partner-active-filter"
                   value={activeFilter}
                   onChange={(event) => setActiveFilter(event.target.value)}
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                 >
                   <option value="">All</option>
                   <option value="active">Active only</option>
@@ -430,7 +430,7 @@ export default function AdminPartnersPage() {
                         | "subscriptions"
                     )
                   }
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                 >
                   <option value="monthly_book">Monthly Book</option>
                   <option value="contract_value">Contract Value</option>

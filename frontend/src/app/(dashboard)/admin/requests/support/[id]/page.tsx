@@ -75,7 +75,7 @@ function statusTone(status?: string | null): string {
     case "UNDER_REVIEW":
       return "border-sky-200 bg-sky-50 text-sky-700";
     case "CLOSED":
-      return "border-slate-200 bg-slate-100 text-muted-foreground";
+      return "border-border bg-muted/50 text-muted-foreground";
     default:
       return "border-border bg-muted text-foreground";
   }

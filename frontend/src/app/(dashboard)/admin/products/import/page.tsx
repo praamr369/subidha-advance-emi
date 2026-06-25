@@ -230,7 +230,7 @@ export default function AdminProductImportPage() {
         },
       ]}
     >
-      <section className="rounded-xl border border-slate-200 bg-card p-6 shadow-sm">
+      <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-5">
             <div>
@@ -252,8 +252,8 @@ export default function AdminProductImportPage() {
               className={[
                 "block cursor-pointer rounded-xl border-2 border-dashed p-6 transition",
                 dragActive
-                  ? "border-slate-500 bg-slate-50"
-                  : "border-slate-300 bg-slate-50/60 hover:border-slate-400 hover:bg-slate-50",
+                  ? "border-ring bg-muted/50"
+                  : "border-border bg-slate-50/60 hover:border-ring hover:bg-muted/50",
               ].join(" ")}
             >
               <input
@@ -302,7 +302,7 @@ export default function AdminProductImportPage() {
                 type="button"
                 onClick={handlePreviewImport}
                 disabled={isPreviewing || isUploading || !file}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-card px-5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center rounded-xl border border-border bg-card px-5 text-sm font-medium text-muted-foreground transition hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPreviewing ? "Previewing..." : "Preview Uploaded CSV"}
               </button>
@@ -317,7 +317,7 @@ export default function AdminProductImportPage() {
                   !preview ||
                   preview.invalid_count > 0
                 }
-                className="inline-flex h-11 items-center rounded-xl bg-slate-900 px-5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center rounded-xl bg-foreground px-5 text-sm font-medium text-background transition hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isUploading ? "Importing..." : "Import Uploaded CSV"}
               </button>
@@ -326,7 +326,7 @@ export default function AdminProductImportPage() {
                 type="button"
                 onClick={handleClear}
                 disabled={isUploading || isPreviewing}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-card px-5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center rounded-xl border border-border bg-card px-5 text-sm font-medium text-muted-foreground transition hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Clear
               </button>
@@ -382,7 +382,7 @@ export default function AdminProductImportPage() {
                 ].map((column) => (
                   <span
                     key={column}
-                    className="rounded-full border border-slate-200 bg-card px-3 py-1 text-xs font-medium text-muted-foreground"
+                    className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground"
                   >
                     {column}
                   </span>
@@ -440,7 +440,7 @@ export default function AdminProductImportPage() {
               </div>
 
               {preview ? (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-card p-4 text-sm text-muted-foreground">
+                <div className="mt-4 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
                   <div className="font-medium text-foreground">
                     Create candidates {preview.preview_rows.filter((row) => row.action === "create").length} ·
                     Update candidates {preview.preview_rows.filter((row) => row.action === "update").length}
@@ -488,9 +488,9 @@ export default function AdminProductImportPage() {
         description="Reference row shape for operator CSV authoring. Uses the same columns as the governed import path."
       >
         <DataTableShell>
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-border">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-muted-foreground">
+              <thead className="bg-muted/50 text-left text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">product_code</th>
                   <th className="px-4 py-3">name</th>
@@ -504,7 +504,7 @@ export default function AdminProductImportPage() {
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-t border-slate-200">
+                <tr className="border-t border-border">
                   <td className="px-4 py-3">BED-001</td>
                   <td className="px-4 py-3">Wooden King Bed</td>
                   <td className="px-4 py-3">Bed</td>
@@ -517,7 +517,7 @@ export default function AdminProductImportPage() {
                   <td className="px-4 py-3">35000</td>
                   <td className="px-4 py-3">wooden-king-bed.jpg</td>
                 </tr>
-                <tr className="border-t border-slate-200">
+                <tr className="border-t border-border">
                   <td className="px-4 py-3">ALM-002</td>
                   <td className="px-4 py-3">Steel Almirah</td>
                   <td className="px-4 py-3">Almirah</td>

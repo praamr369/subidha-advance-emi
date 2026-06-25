@@ -42,8 +42,8 @@ function statusTone(status: string): string {
   if (["DRAFT", "REQUESTED", "PENDING_APPROVAL"].includes(s))
     return "bg-amber-100 text-amber-800 border-amber-200";
   if (["RETURNED", "CLOSED"].includes(s))
-    return "bg-slate-100 text-slate-700 border-slate-200";
-  return "bg-slate-100 text-slate-700 border-slate-200";
+    return "bg-muted text-muted-foreground border-slate-200";
+  return "bg-muted text-muted-foreground border-slate-200";
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -65,7 +65,7 @@ function PlanTypeBadge({ planType }: { planType: string }) {
         ? "bg-sky-100 text-sky-800 border-sky-200"
         : pt === "LEASE"
           ? "bg-indigo-100 text-indigo-800 border-indigo-200"
-          : "bg-slate-100 text-slate-700 border-slate-200";
+          : "bg-muted text-muted-foreground border-slate-200";
   const label =
     pt === "EMI" ? "Advance EMI" : pt === "RENT" ? "Rent" : pt === "LEASE" ? "Lease" : pt;
   return (

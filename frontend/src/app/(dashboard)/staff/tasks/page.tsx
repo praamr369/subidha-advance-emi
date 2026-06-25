@@ -22,14 +22,14 @@ function formatDate(value: string | null): string {
 const PRIORITY_STYLE: Record<string, string> = {
   HIGH: "bg-red-100 text-red-700",
   MEDIUM: "bg-amber-100 text-amber-700",
-  LOW: "bg-slate-100 text-slate-700",
+  LOW: "bg-muted text-muted-foreground",
 };
 
 const STATUS_STYLE: Record<string, string> = {
   OPEN: "bg-blue-100 text-blue-700",
   IN_PROGRESS: "bg-amber-100 text-amber-700",
   DONE: "bg-green-100 text-green-700",
-  CANCELLED: "bg-slate-100 text-slate-700",
+  CANCELLED: "bg-muted text-muted-foreground",
 };
 
 export default function StaffTasksPage() {

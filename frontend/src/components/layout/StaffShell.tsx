@@ -39,7 +39,7 @@ export default function StaffShell({ children }: { children: ReactNode }) {
                   href={item.href}
                   className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
                     isActive(pathname, item.href)
-                      ? "border-slate-900 bg-slate-900 text-white"
+                      ? "border-foreground bg-foreground text-background"
                       : "border-border bg-background text-foreground hover:bg-muted"
                   }`}
                 >

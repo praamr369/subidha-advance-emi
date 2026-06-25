@@ -1,0 +1,2 @@
+sku,product_name,rent_enabled,lease_enabled,monthly_rent,monthly_lease,security_deposit_amount_or_percent,return_inspection_required,normal_wear_deductible,damage_deduction_allowed
+SKU-001,__FILL_PRODUCT__,YES,YES,__FILL__,__FILL__,__FILL__,YES,NO,YES_WITH_EVIDENCE

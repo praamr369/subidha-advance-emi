@@ -354,7 +354,7 @@ export default function AccountingPeriodsPage() {
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={refreshing} onClick={() => loadPage("refresh")} className="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">{refreshing ? "Refreshing…" : "Refresh"}</button>
             <button type="button" disabled={actionBusy === "period"} onClick={handleGenerateCurrentPeriod} className="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">Generate current period</button>
-            <button type="button" disabled={actionBusy === "seed"} onClick={handleSeedMappings} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50">Seed supported mappings</button>
+            <button type="button" disabled={actionBusy === "seed"} onClick={handleSeedMappings} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/90 disabled:opacity-50">Seed supported mappings</button>
           </div>
         </div>
         {notice ? <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</div> : null}
@@ -385,7 +385,7 @@ export default function AccountingPeriodsPage() {
             <input type="date" value={fyForm.start_date} onChange={(event) => setFyForm((current) => ({ ...current, start_date: event.target.value }))} className="rounded-lg border bg-background px-3 py-2 text-sm" required />
             <input type="date" value={fyForm.end_date} onChange={(event) => setFyForm((current) => ({ ...current, end_date: event.target.value }))} className="rounded-lg border bg-background px-3 py-2 text-sm" required />
             <input value={fyForm.notes} onChange={(event) => setFyForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Notes" className="rounded-lg border bg-background px-3 py-2 text-sm md:col-span-2" />
-            <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Create FY</button>
+            <button type="submit" className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/90">Create FY</button>
           </form>
           <div className="mt-5 overflow-x-auto rounded-xl border border-border">
             <table className="min-w-full divide-y divide-border text-sm">
@@ -396,7 +396,7 @@ export default function AccountingPeriodsPage() {
                     <td className="px-4 py-3"><div className="font-semibold">{year.code}</div><div className="text-xs text-muted-foreground">{year.name}</div></td>
                     <td className="px-4 py-3 text-muted-foreground">{fmtDate(year.start_date)} – {fmtDate(year.end_date)}</td>
                     <td className="px-4 py-3">{year.is_active ? "Active" : "Inactive"}</td>
-                    <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button type="button" disabled={actionBusy === `fy-${year.id}`} onClick={() => handleGeneratePeriods(year)} className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-muted disabled:opacity-50">Generate periods</button>{!year.is_active ? <button type="button" disabled={actionBusy === `fy-${year.id}`} onClick={() => handleActivateYear(year)} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-50">Activate</button> : null}</div></td>
+                    <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button type="button" disabled={actionBusy === `fy-${year.id}`} onClick={() => handleGeneratePeriods(year)} className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-muted disabled:opacity-50">Generate periods</button>{!year.is_active ? <button type="button" disabled={actionBusy === `fy-${year.id}`} onClick={() => handleActivateYear(year)} className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background hover:bg-foreground/90 disabled:opacity-50">Activate</button> : null}</div></td>
                   </tr>
                 ))}
               </tbody>
@@ -410,7 +410,7 @@ export default function AccountingPeriodsPage() {
           <form onSubmit={handleCreateLock} className="mt-4 grid gap-3 md:grid-cols-[180px_1fr_auto]">
             <input type="date" value={lockForm.lock_date} onChange={(event) => setLockForm((current) => ({ ...current, lock_date: event.target.value }))} className="rounded-lg border bg-background px-3 py-2 text-sm" required />
             <input value={lockForm.reason} onChange={(event) => setLockForm((current) => ({ ...current, reason: event.target.value }))} placeholder="Why this date is locked" className="rounded-lg border bg-background px-3 py-2 text-sm" />
-            <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Create lock</button>
+            <button type="submit" className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/90">Create lock</button>
           </form>
           <div className="mt-5 space-y-2">
             {locks.length === 0 ? <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No posting locks. Use locks only when an exact date must be blocked independently of the period status.</div> : locks.map((lock) => (

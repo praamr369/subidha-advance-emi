@@ -1,0 +1,2 @@
+batch_code,plan_name,batch_size,lucky_id_start,lucky_id_end,tenure_months,monthly_due_day,waiver_selection_day,eligibility_cutoff_time,refund_sla_working_days,status
+BATCH-001,__FILL_PLAN_NAME__,100,00,99,__TENURE__,__DUE_DAY__,__SELECTION_DAY__,__HH_MM__,7,DRAFT

@@ -54,7 +54,7 @@ export default function SampleSubscriptionDocumentsPage() {
         ]}
       />
 
-      <div className="my-3 border-t border-dashed border-slate-300" />
+      <div className="my-3 border-t border-dashed border-border" />
 
       <SubscriptionContractDocument
         audienceLabel="Plan summary print view for customer understanding and branch filing."

@@ -513,7 +513,7 @@ export default function AdminFinancePage() {
             type="button"
             onClick={() => void loadPage("refresh")}
             disabled={refreshing || loading}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-card px-4 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
             {refreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -712,7 +712,7 @@ export default function AdminFinancePage() {
                     operationalRows.slice(0, 6).map((row) => (
                       <div
                         key={row.finance_account_id}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                        className="rounded-xl border border-border bg-muted/50 px-4 py-3"
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                           <div>
@@ -728,10 +728,10 @@ export default function AdminFinancePage() {
                               status={row.reconciliation_status || "UNKNOWN"}
                               label={row.reconciliation_status || "—"}
                             />
-                            <span className="rounded-full border border-slate-200 bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
+                            <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
                               Pending {formatRupee(row.pending_settlement_amount)}
                             </span>
-                            <span className="rounded-full border border-slate-200 bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
+                            <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
                               Unapplied {formatRupee(row.unapplied_advance_total)}
                             </span>
                           </div>
@@ -867,13 +867,13 @@ export default function AdminFinancePage() {
                     <button
                       type="submit"
                       disabled={transferSubmitting}
-                      className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center justify-center rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {transferSubmitting ? "Posting transfer..." : "Post Transfer"}
                     </button>
                     <Link
                       href={ROUTES.admin.accountingBooks}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                     >
                       Open Books
                     </Link>
@@ -884,7 +884,7 @@ export default function AdminFinancePage() {
                   {(financeTransfers?.results ?? []).slice(0, 5).map((transfer) => (
                     <div
                       key={transfer.id}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                      className="rounded-xl border border-border bg-muted/50 px-4 py-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -914,28 +914,28 @@ export default function AdminFinancePage() {
                 description="Customer dues stay split by rail, but the posting surface remains controlled through existing collection, receipt, and finance-account workflows."
               >
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm">
                     <span className="font-medium text-muted-foreground">Subscription overdue</span>
                     <span className="font-semibold text-foreground">{formatRupee(overdueAmount)}</span>
                   </div>
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm">
                     <span className="font-medium text-muted-foreground">Direct-sale unpaid</span>
                     <span className="font-semibold text-foreground">{formatRupee(directSalesOutstandingTotal)}</span>
                   </div>
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm">
                     <span className="font-medium text-muted-foreground">Recent net collection</span>
                     <span className="font-semibold text-emerald-700">{formatRupee(windowNet)}</span>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Link
                       href={ROUTES.admin.collections}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                     >
                       Collections Workspace
                     </Link>
                     <Link
                       href={ROUTES.admin.payments}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                     >
                       Payment Register
                     </Link>
@@ -948,28 +948,28 @@ export default function AdminFinancePage() {
                 description="Vendor settlements, purchase bills, and finance accounts remain aligned through the current accounting posting paths."
               >
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm">
                     <span className="font-medium text-muted-foreground">Purchase bill queue</span>
                     <span className="font-semibold text-foreground">{purchaseQueueCount}</span>
                   </div>
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm">
                     <span className="font-medium text-muted-foreground">Chart of accounts</span>
                     <span className="font-semibold text-foreground">{chartAccountCount}</span>
                   </div>
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm">
                     <span className="font-medium text-muted-foreground">Finance accounts</span>
                     <span className="font-semibold text-foreground">{financeAccountCount}</span>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Link
                       href={ROUTES.admin.accountingPurchaseBills}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                     >
                       Purchase Bills
                     </Link>
                     <Link
                       href={ROUTES.admin.accountingVendors}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                     >
                       Vendor Ledger View
                     </Link>
@@ -1019,7 +1019,7 @@ export default function AdminFinancePage() {
                     {directSales.map((sale) => (
                       <div
                         key={sale.id}
-                        className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                        className="rounded-xl border border-border bg-muted/50 p-4"
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                           <div>
@@ -1039,13 +1039,13 @@ export default function AdminFinancePage() {
                             </div>
                             <Link
                               href={`${ROUTES.admin.financeCollect}?workflow=direct-sale&sale_id=${sale.id}`}
-                              className="inline-flex items-center rounded-xl border border-slate-300 bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                              className="inline-flex items-center rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                             >
                               Collect Direct Sale
                             </Link>
                             <Link
                               href={`${ROUTES.admin.billingDirectSales}?focus_sale=${sale.id}`}
-                              className="inline-flex items-center rounded-xl border border-slate-300 bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                              className="inline-flex items-center rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                             >
                               Open Sale
                             </Link>
@@ -1071,7 +1071,7 @@ export default function AdminFinancePage() {
                     {recentCollections.map((row) => (
                       <div
                         key={row.id}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                        className="rounded-xl border border-border bg-muted/50 px-4 py-3"
                       >
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                           <div>
@@ -1097,7 +1097,7 @@ export default function AdminFinancePage() {
                             )}
                             <Link
                               href={ROUTES.admin.payments}
-                              className="inline-flex items-center rounded-xl border border-slate-300 bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                              className="inline-flex items-center rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                             >
                               Register
                             </Link>
@@ -1149,7 +1149,7 @@ export default function AdminFinancePage() {
                     {vendorSummaries.map((vendor) => (
                       <div
                         key={vendor.vendor.id}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                        className="rounded-xl border border-border bg-muted/50 px-4 py-3"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div>
@@ -1164,7 +1164,7 @@ export default function AdminFinancePage() {
                             </div>
                             <Link
                               href={`${ROUTES.admin.accountingVendors}?vendor=${vendor.vendor.id}`}
-                              className="mt-1 inline-flex items-center rounded-xl border border-slate-300 bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                              className="mt-1 inline-flex items-center rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-ring hover:bg-muted"
                             >
                               Open Vendor
                             </Link>
@@ -1181,11 +1181,11 @@ export default function AdminFinancePage() {
                 description="Finance exceptions, commission exposure, and payout batches stay visible without bypassing the current audit-safe workflows."
               >
                 <div className="space-y-3">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="rounded-xl border border-border bg-muted/50 px-4 py-3">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Reconciliation flags</div>
                     <div className="mt-1 text-lg font-semibold text-foreground">{reconciliationFlags}</div>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="rounded-xl border border-border bg-muted/50 px-4 py-3">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Pending commission exposure</div>
                     <div className="mt-1 text-lg font-semibold text-foreground">
                       {formatRupee(summary?.summary?.pending_commission)}
@@ -1201,7 +1201,7 @@ export default function AdminFinancePage() {
                       {recentBatches.map((row) => (
                         <div
                           key={row.id}
-                          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                          className="rounded-xl border border-border bg-muted/50 px-4 py-3"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div>
@@ -1222,19 +1222,19 @@ export default function AdminFinancePage() {
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Link
                       href={buildAdminReconciliationRoute({ flagged: true })}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                     >
                       Flagged Queue
                     </Link>
                     <Link
                       href={ROUTES.admin.financePayoutBatches}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                     >
                       Payout Batches
                     </Link>
                     <Link
                       href={ROUTES.admin.financeRefunds}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                     >
                       Refunds
                     </Link>
@@ -1249,24 +1249,24 @@ export default function AdminFinancePage() {
                 description="Finance review keeps both sales rails visible without collapsing them into a single posting model."
               >
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="rounded-xl border border-border bg-muted/50 p-4">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Direct Sale</div>
                     <div className="mt-2 text-xl font-semibold text-foreground">{formatRupee(directSalesGross)}</div>
                     <div className="mt-1 text-sm text-muted-foreground">{directSalesCount} direct-sale documents in selected window</div>
                     <Link
                       href={ROUTES.admin.billingDirectSales}
-                      className="mt-3 inline-flex items-center rounded-xl border border-slate-300 bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                      className="mt-3 inline-flex items-center rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                     >
                       Open Direct Sale
                     </Link>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="rounded-xl border border-border bg-muted/50 p-4">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Subscription Sale</div>
                     <div className="mt-2 text-xl font-semibold text-foreground">{formatRupee(outstandingReceivables)}</div>
                     <div className="mt-1 text-sm text-muted-foreground">{formatRupee(overdueAmount)} overdue from EMI side</div>
                     <Link
                       href={ROUTES.admin.subscriptions}
-                      className="mt-3 inline-flex items-center rounded-xl border border-slate-300 bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                      className="mt-3 inline-flex items-center rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                     >
                       Open Subscriptions
                     </Link>
@@ -1281,25 +1281,25 @@ export default function AdminFinancePage() {
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Link
                     href={ROUTES.admin.accountingBooksCash}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                    className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                   >
                     Cash Book
                   </Link>
                   <Link
                     href={ROUTES.admin.accountingBooksBank}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                    className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                   >
                     Bank Book
                   </Link>
                   <Link
                     href={ROUTES.admin.accountingBooksUpi}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                    className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                   >
                     UPI Book
                   </Link>
                   <Link
                     href={ROUTES.admin.accountingChartOfAccounts}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
+                    className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted"
                   >
                     Chart of Accounts
                   </Link>

@@ -230,7 +230,7 @@ export default function AccountingAssetsPage() {
                 Default salvage
                 <input className={accountingFieldClassName()} value={categoryForm.default_salvage} onChange={(event) => setCategoryForm((current) => ({ ...current, default_salvage: event.target.value }))} required />
               </label>
-              <button type="submit" className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+              <button type="submit" className="rounded-xl border border-primary bg-foreground px-4 py-2 text-sm font-medium text-background">
                 Create Category
               </button>
             </form>
@@ -291,7 +291,7 @@ export default function AccountingAssetsPage() {
                   ))}
                 </select>
               </label>
-              <button type="submit" className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+              <button type="submit" className="rounded-xl border border-primary bg-foreground px-4 py-2 text-sm font-medium text-background">
                 Create Asset
               </button>
             </form>

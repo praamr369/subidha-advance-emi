@@ -607,7 +607,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                     type="button"
                     onClick={() => void handleApprovePaymentException()}
                     disabled={actionLoading === "PAYMENT_EXCEPTION"}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-foreground px-4 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {actionLoading === "PAYMENT_EXCEPTION" ? "Saving…" : "Record admin delivery release"}
                   </button>
@@ -667,7 +667,7 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                     type="button"
                     onClick={() => void handleSaveMetadata()}
                     disabled={isHistoryOnly || actionLoading === "metadata"}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-foreground px-4 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isHistoryOnly ? "History only" : actionLoading === "metadata" ? "Saving..." : "Save Metadata"}
                   </button>

@@ -1,0 +1,2 @@
+partner_code,partner_name,phone,email,address,role_type,commission_rule,can_create_receipt_request,can_create_final_receipt,status,notes
+PTR-001,__FILL_PARTNER_NAME__,__PHONE__,,__ADDRESS__,LEAD_GENERATOR,__FILL__,YES,NO,ACTIVE,

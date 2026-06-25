@@ -107,7 +107,7 @@ export default function ChartAccountCreateDrawer({
             type="submit"
             form="chart-account-create-form"
             disabled={submitting || !name.trim()}
-            className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
           >
             {submitting ? "Creating…" : "Create account"}
           </button>

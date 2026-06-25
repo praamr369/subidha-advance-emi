@@ -84,7 +84,7 @@ function statusClass(status: string): string {
   if (["EXCEPTION", "UNSUPPORTED", "UNSUPPORTED_SOURCE", "UNSUPPORTED_BOUNDARY", "DEFERRED", "SOURCE_CONTRACT_ONLY", "SKIPPED_NOT_APPLICABLE", "BOUNDARY_VIOLATION"].includes(value)) {
     return "border-red-200 bg-red-50 text-red-900";
   }
-  return "border-slate-200 bg-slate-50 text-foreground";
+  return "border-border bg-muted/50 text-foreground";
 }
 
 function StatusBadge({ value }: { value: string }) {
@@ -267,7 +267,7 @@ function RowsTable({ title, description, rows, selected, onToggle, onPreview, on
                         <p className="max-w-xs text-xs text-muted-foreground">{actionCopy(row)}</p>
                         <div className="flex flex-wrap gap-2">
                           {id && rowCanPreview(row) ? <button type="button" onClick={() => onPreview(row)} className="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-muted">Preview</button> : null}
-                          {id && rowCanPost(row) ? <button type="button" onClick={() => onPost(row)} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700">Post</button> : null}
+                          {id && rowCanPost(row) ? <button type="button" onClick={() => onPost(row)} className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90">Post</button> : null}
                         </div>
                       </div>
                     </td>
@@ -304,7 +304,7 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
         <SummaryCard label="Active source rows" value={activeCount} detail="Rows needing review" />
         <SummaryCard label="Ready" value={readinessCounts.ready_unposted ?? 0} detail="Unposted candidates" />
         <SummaryCard label="Posted unverified" value={readinessCounts.posted_unverified ?? 0} detail="Needs reconciliation" />
-        <SummaryCard label="Boundaries" value={sourceContract + unsupported} detail={`${sourceContract} source-contract · ${unsupported} unsupported`} tone="border-slate-200 bg-slate-50 text-foreground" />
+        <SummaryCard label="Boundaries" value={sourceContract + unsupported} detail={`${sourceContract} source-contract · ${unsupported} unsupported`} tone="border-border bg-muted/50 text-foreground" />
       </div>
       <div className="mt-4 rounded-xl border border-border bg-background p-4 text-sm text-muted-foreground">
         <div className="font-semibold text-foreground">F24/F25 guardrails</div>
@@ -508,7 +508,7 @@ export default function AccountingBridgeReconciliationPage() {
               </select>
               <input value={filters.event_key ?? ""} onChange={(event) => updateFilter("event_key", event.target.value)} placeholder="Event key" className="rounded-lg border bg-background px-3 py-2 text-sm" />
               <input value={filters.vendor ?? ""} onChange={(event) => updateFilter("vendor", event.target.value)} placeholder="Reference / vendor" className="rounded-lg border bg-background px-3 py-2 text-sm" />
-              <div className="flex gap-2"><button type="button" onClick={() => load(filters)} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Apply</button><button type="button" onClick={() => { setFilters({}); void load({}); }} className="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-muted">Clear</button></div>
+              <div className="flex gap-2"><button type="button" onClick={() => load(filters)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/90">Apply</button><button type="button" onClick={() => { setFilters({}); void load({}); }} className="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-muted">Clear</button></div>
             </div>
           </section>
 
@@ -518,7 +518,7 @@ export default function AccountingBridgeReconciliationPage() {
                 <h2 className="text-lg font-semibold text-foreground">Selected-row batch panel</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{selectedRows.length} selected concrete source item(s). Only concrete READY_UNPOSTED source rows with posting permission can be batch-posted.</p>
                 <textarea value={postingNote} onChange={(event) => setPostingNote(event.target.value)} placeholder="Optional posting note" className="mt-4 min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm" />
-                <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={!selectedRows.length} onClick={handleBatchPreview} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Preview selected</button><button type="button" disabled={!selectedCanPost} onClick={handleBatchPost} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Post selected</button></div>
+                <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={!selectedRows.length} onClick={handleBatchPreview} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Preview selected</button><button type="button" disabled={!selectedCanPost} onClick={handleBatchPost} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Post selected</button></div>
                 {operationMessage ? <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">{operationMessage}</div> : null}
               </section>
               <RowsTable title="Concrete source candidates" description="Real bridge candidate rows from the backend payload. Preview/post remains explicit and row controlled." rows={concreteRows} selected={selected} onToggle={toggleSelected} onPreview={handlePreview} onPost={handlePost} showSelection />

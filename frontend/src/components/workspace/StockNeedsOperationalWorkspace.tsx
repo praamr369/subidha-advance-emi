@@ -138,7 +138,7 @@ export function StockNeedsOperationalWorkspace({
               setRechecking(false);
             }
           }}
-          className="inline-flex h-9 items-center justify-center rounded-lg bg-slate-800 px-3 text-xs font-semibold text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-9 items-center justify-center rounded-lg bg-foreground px-3 text-xs font-semibold text-background transition hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {rechecking ? "Rechecking…" : "Recheck stock availability"}
         </button>

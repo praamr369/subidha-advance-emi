@@ -55,8 +55,8 @@ function statusClass(status: string): string {
   if (normalized === "BLOCKED_BY_APPROVAL") return "border-purple-200 bg-purple-50 text-purple-900";
   if (normalized.includes("WARNING") || normalized === "SKIPPED" || normalized === "BOUNDARY") return "border-amber-200 bg-amber-50 text-amber-950";
   if (normalized.startsWith("BLOCKED") || normalized === "LOCKED") return "border-red-200 bg-red-50 text-red-900";
-  if (normalized === "UNSUPPORTED_SOURCE" || normalized.includes("UNSUPPORTED")) return "border-slate-200 bg-slate-50 text-foreground";
-  return "border-slate-200 bg-slate-50 text-foreground";
+  if (normalized === "UNSUPPORTED_SOURCE" || normalized.includes("UNSUPPORTED")) return "border-border bg-muted/50 text-foreground";
+  return "border-border bg-muted/50 text-foreground";
 }
 
 function groupName(event: AccountingBridgeReadinessEvent): string {
@@ -454,12 +454,12 @@ export default function AccountingBridgeReadinessPage() {
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-            <SummaryCard label="Setup definitions" value={totalDefinitions} tone="border-slate-200 bg-slate-50 text-foreground" />
+            <SummaryCard label="Setup definitions" value={totalDefinitions} tone="border-border bg-muted/50 text-foreground" />
             <SummaryCard label="Setup-ready" value={setupReadyCount} tone="border-blue-200 bg-blue-50 text-blue-900" />
             <SummaryCard label="Final-ready" value={finalReadyCount} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
             <SummaryCard label="Reconciled evidence" value={reconciledCount} tone="border-emerald-200 bg-card text-emerald-900" />
             <SummaryCard label="Action required" value={activeBlockerCount} tone={activeBlockerCount ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-900"} />
-            <SummaryCard label="Unsupported boundary" value={unsupportedCount} tone="border-slate-200 bg-slate-50 text-foreground" />
+            <SummaryCard label="Unsupported boundary" value={unsupportedCount} tone="border-border bg-muted/50 text-foreground" />
           </div>
         </section>
 
@@ -495,7 +495,7 @@ export default function AccountingBridgeReadinessPage() {
           <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               {FILTERS.map((item) => (
-                <button key={item} type="button" onClick={() => setFilter(item)} className={cx("rounded-full border px-3 py-1.5 text-xs font-semibold", filter === item ? "border-slate-900 bg-slate-900 text-white" : "border-border bg-background text-foreground hover:bg-muted")}>{item}</button>
+                <button key={item} type="button" onClick={() => setFilter(item)} className={cx("rounded-full border px-3 py-1.5 text-xs font-semibold", filter === item ? "border-foreground bg-foreground text-background" : "border-border bg-background text-foreground hover:bg-muted")}>{item}</button>
               ))}
             </div>
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search event, source, status, profile key, account" className="min-w-[18rem] rounded-xl border border-border bg-background px-3 py-2 text-sm" />

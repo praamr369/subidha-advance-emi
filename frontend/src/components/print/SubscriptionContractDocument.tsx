@@ -68,7 +68,7 @@ export default function SubscriptionContractDocument({
           ]}
         />
 
-        <div className="print-doc-section flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 px-3.5 py-2.5 print-doc-accent">
+        <div className="print-doc-section flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-3.5 py-2.5 print-doc-accent">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge label={statusLabel} tone={statusTone} />
             <span className="text-[11px] text-slate-600">
@@ -88,7 +88,7 @@ export default function SubscriptionContractDocument({
 
         <TermsBlock terms={terms} />
 
-        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-card px-3.5 py-3 text-[13px] leading-5 text-slate-700">
+        <div className="print-doc-note print-doc-section rounded-xl border border-border bg-card px-3.5 py-3 text-[13px] leading-5 text-slate-700">
           {footerNote}
         </div>
 
