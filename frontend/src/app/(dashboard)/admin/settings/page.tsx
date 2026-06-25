@@ -5,6 +5,7 @@ import {
   Database,
   FileText,
   LockKeyhole,
+  Scale,
   ScrollText,
   ShieldCheck,
   UserPlus,
@@ -94,6 +95,15 @@ const CONTROLS: SettingsDef[] = [
     Icon: FileText,
     iconCls: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
     dotCls: "bg-indigo-400",
+  },
+  {
+    title: "Legal & GST Controls",
+    description:
+      "Set waiver launch status, refund SLA, partner receipt approval, KYC masking, deposit inspection, and GST document gates.",
+    href: ROUTES.admin.settingsLegalControls,
+    Icon: Scale,
+    iconCls: "bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300",
+    dotCls: "bg-cyan-400",
   },
   {
     title: "Business Compliance",

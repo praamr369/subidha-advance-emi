@@ -1,6 +1,8 @@
 import { apiFetch } from "@/lib/api";
 import type {
   BusinessTaxProfile,
+  BusinessRulePolicyPayload,
+  BusinessRulePolicyReadiness,
   ComplianceAlert,
   ComplianceTaxProfilePayload,
   ComplianceTaxReadiness,
@@ -9,6 +11,17 @@ import type {
   TaxProfileSnapshot,
   TurnoverSummary,
 } from "@/types/compliance";
+
+export async function getBusinessRulePolicy() {
+  return apiFetch<BusinessRulePolicyReadiness>("/admin/settings/legal-controls/");
+}
+
+export async function updateBusinessRulePolicy(payload: BusinessRulePolicyPayload) {
+  return apiFetch<BusinessRulePolicyReadiness>("/admin/settings/legal-controls/", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
 
 export async function getComplianceTaxProfile() {
   return apiFetch<{

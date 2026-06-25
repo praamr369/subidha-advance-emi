@@ -18,6 +18,7 @@ from accounting.models import (
     TaxDocumentStatus,
     TaxInvoice,
 )
+from accounting.services.tax_guard_service import assert_gst_invoice_allowed
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.document_sequence_service import (
     DOCUMENT_TYPE_BY_SERIES_CODE,
@@ -159,6 +160,7 @@ def _tax_total(document) -> Decimal:
 
 @transaction.atomic
 def approve_tax_invoice(*, tax_invoice_id: int, approved_by) -> tuple[TaxInvoice, bool]:
+    assert_gst_invoice_allowed(operation="GST tax invoice approval")
     invoice = TaxInvoice.objects.select_for_update().select_related("doc_series").get(
         pk=tax_invoice_id
     )
@@ -193,6 +195,7 @@ def approve_tax_invoice(*, tax_invoice_id: int, approved_by) -> tuple[TaxInvoice
 
 @transaction.atomic
 def post_tax_invoice(*, tax_invoice_id: int, posted_by) -> tuple[TaxInvoice, bool]:
+    assert_gst_invoice_allowed(operation="GST tax invoice posting")
     invoice = TaxInvoice.objects.select_for_update().select_related(
         "doc_series",
         "posted_journal_entry",
@@ -285,6 +288,7 @@ def _approve_note(note, *, approved_by, event_name: str):
 
 @transaction.atomic
 def approve_credit_note(*, credit_note_id: int, approved_by) -> tuple[CreditNote, bool]:
+    assert_gst_invoice_allowed(operation="GST credit note approval")
     note = CreditNote.objects.select_for_update().select_related("doc_series").get(
         pk=credit_note_id
     )
@@ -297,6 +301,7 @@ def approve_credit_note(*, credit_note_id: int, approved_by) -> tuple[CreditNote
 
 @transaction.atomic
 def approve_debit_note(*, debit_note_id: int, approved_by) -> tuple[DebitNote, bool]:
+    assert_gst_invoice_allowed(operation="GST debit note approval")
     note = DebitNote.objects.select_for_update().select_related("doc_series").get(
         pk=debit_note_id
     )
@@ -309,6 +314,7 @@ def approve_debit_note(*, debit_note_id: int, approved_by) -> tuple[DebitNote, b
 
 @transaction.atomic
 def post_credit_note(*, credit_note_id: int, posted_by) -> tuple[CreditNote, bool]:
+    assert_gst_invoice_allowed(operation="GST credit note posting")
     note = CreditNote.objects.select_for_update().select_related(
         "posted_journal_entry"
     ).get(pk=credit_note_id)
@@ -366,6 +372,7 @@ def post_credit_note(*, credit_note_id: int, posted_by) -> tuple[CreditNote, boo
 
 @transaction.atomic
 def post_debit_note(*, debit_note_id: int, posted_by) -> tuple[DebitNote, bool]:
+    assert_gst_invoice_allowed(operation="GST debit note posting")
     note = DebitNote.objects.select_for_update().select_related(
         "posted_journal_entry"
     ).get(pk=debit_note_id)

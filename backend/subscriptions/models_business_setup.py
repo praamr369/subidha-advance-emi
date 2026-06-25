@@ -139,6 +139,156 @@ class BusinessProfile(BusinessSetupTimeStampedModel):
         return self.trade_name or self.legal_name
 
 
+class PlanLegalClassification(models.TextChoices):
+    PRODUCT_INSTALLMENT = "PRODUCT_INSTALLMENT", "Product Instalment"
+    DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+    RENTAL = "RENTAL", "Rental"
+    LEASE = "LEASE", "Lease"
+
+
+class BenefitType(models.TextChoices):
+    NONE = "NONE", "None"
+    CONTRACTUAL_WAIVER = "CONTRACTUAL_WAIVER", "Contractual Waiver"
+    TRADE_DISCOUNT = "TRADE_DISCOUNT", "Trade Discount"
+    PROMOTIONAL_CREDIT = "PROMOTIONAL_CREDIT", "Promotional Credit"
+
+
+class SelectionMethod(models.TextChoices):
+    NONE = "NONE", "None"
+    HASH_FAIRNESS = "HASH_FAIRNESS", "Hash Fairness"
+    ADMIN_APPROVED = "ADMIN_APPROVED", "Admin Approved"
+    PERFORMANCE_BASED = "PERFORMANCE_BASED", "Performance Based"
+
+
+class BenefitFundingSource(models.TextChoices):
+    COMPANY_MARGIN = "COMPANY_MARGIN", "Company Margin"
+    CUSTOMER_POOL_BLOCKED = "CUSTOMER_POOL_BLOCKED", "Customer Pool Blocked"
+
+
+class LegalRiskStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    CA_REVIEW_REQUIRED = "CA_REVIEW_REQUIRED", "CA Review Required"
+    ADVOCATE_REVIEW_REQUIRED = "ADVOCATE_REVIEW_REQUIRED", "Advocate Review Required"
+    APPROVED_FOR_INTERNAL_TEST = "APPROVED_FOR_INTERNAL_TEST", "Approved For Internal Test"
+    APPROVED_FOR_PUBLIC_LAUNCH = "APPROVED_FOR_PUBLIC_LAUNCH", "Approved For Public Launch"
+    BLOCKED = "BLOCKED", "Blocked"
+
+
+def default_non_gst_document_labels() -> list[str]:
+    return [
+        "Retail Bill",
+        "Sale Bill",
+        "Money Receipt",
+        "Plan Receipt",
+        "Security Deposit Receipt",
+        "Commercial Waiver Note",
+        "Commercial Credit Note",
+        "Refund Record",
+    ]
+
+
+class BusinessRulePolicy(BusinessSetupTimeStampedModel):
+    """
+    DB-backed legal/CA/business-rule settings for launch gates.
+
+    This table records operating policy only. It must not post money, create
+    receipts, generate invoices, or mutate EMI/payment history.
+    """
+
+    name = models.CharField(max_length=120, default="Default legal controls")
+    is_active = models.BooleanField(default=True, db_index=True)
+    plan_type = models.CharField(
+        max_length=40,
+        choices=PlanLegalClassification.choices,
+        default=PlanLegalClassification.PRODUCT_INSTALLMENT,
+        db_index=True,
+    )
+    benefit_type = models.CharField(
+        max_length=40,
+        choices=BenefitType.choices,
+        default=BenefitType.CONTRACTUAL_WAIVER,
+    )
+    selection_method = models.CharField(
+        max_length=40,
+        choices=SelectionMethod.choices,
+        default=SelectionMethod.HASH_FAIRNESS,
+    )
+    funding_source = models.CharField(
+        max_length=40,
+        choices=BenefitFundingSource.choices,
+        default=BenefitFundingSource.COMPANY_MARGIN,
+    )
+    risk_status = models.CharField(
+        max_length=40,
+        choices=LegalRiskStatus.choices,
+        default=LegalRiskStatus.ADVOCATE_REVIEW_REQUIRED,
+        db_index=True,
+    )
+    refund_sla_working_days = models.PositiveSmallIntegerField(default=7)
+    late_payment_charge_enabled = models.BooleanField(default=False)
+    late_payment_charge_configured = models.BooleanField(default=False)
+    late_payment_charge_label = models.CharField(max_length=80, default="Late Payment Charge")
+    partner_receipt_admin_approval_required = models.BooleanField(default=True)
+    kyc_masking_required = models.BooleanField(default=True)
+    deposit_refund_requires_inspection = models.BooleanField(default=True)
+    gst_documents_require_hsn_sac = models.BooleanField(default=True)
+    non_gst_document_labels = models.JSONField(default=default_non_gst_document_labels, blank=True)
+    notes = models.TextField(blank=True, default="")
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="updated_business_rule_policies",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "business_rule_policies"
+        ordering = ["-is_active", "-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_active"],
+                condition=models.Q(is_active=True),
+                name="unique_active_business_rule_policy",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(refund_sla_working_days__gte=1),
+                name="chk_business_rule_refund_sla_positive",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["risk_status", "is_active"], name="business_ru_risk_st_440138_idx"),
+            models.Index(fields=["plan_type", "risk_status"], name="business_ru_plan_ty_1b933e_idx"),
+        ]
+
+    def clean(self):
+        errors = {}
+        self.name = (self.name or "").strip() or "Default legal controls"
+        self.late_payment_charge_label = (self.late_payment_charge_label or "").strip()
+        self.notes = (self.notes or "").strip()
+        if self.is_active and BusinessRulePolicy.objects.filter(is_active=True).exclude(pk=self.pk).exists():
+            errors["is_active"] = "Only one active business rule policy is allowed."
+        if self.funding_source == BenefitFundingSource.CUSTOMER_POOL_BLOCKED:
+            errors["funding_source"] = "Customer pool funding is blocked for Lucky Plan classification."
+        forbidden_label_terms = {"penalty", "punishment", "fine"}
+        if any(term in self.late_payment_charge_label.lower() for term in forbidden_label_terms):
+            errors["late_payment_charge_label"] = "Use 'Late Payment Charge' wording; penalty/punishment/fine wording is not allowed."
+        if self.late_payment_charge_enabled and not self.late_payment_charge_configured:
+            errors["late_payment_charge_configured"] = "Late payment charge must be configured before it can be enabled."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip() or "Default legal controls"
+        self.notes = (self.notes or "").strip()
+        self.late_payment_charge_label = (self.late_payment_charge_label or "").strip() or "Late Payment Charge"
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} [{self.risk_status}]"
+
+
 class PublicBusinessProfile(BusinessSetupTimeStampedModel):
     """
     Public-facing business identity and contact settings.

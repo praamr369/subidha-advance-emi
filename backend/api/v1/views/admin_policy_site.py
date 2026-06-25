@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -17,7 +18,15 @@ from api.v1.serializers.policy_site import (
     PolicyReasonActionSerializer,
     PolicySeedActionSerializer,
 )
-from subscriptions.models_business_setup import BusinessComplianceDocument, PolicyPage
+from subscriptions.models_business_setup import (
+    BenefitFundingSource,
+    BenefitType,
+    BusinessComplianceDocument,
+    LegalRiskStatus,
+    PlanLegalClassification,
+    PolicyPage,
+    SelectionMethod,
+)
 from subscriptions.services.business_compliance_governance_service import (
     build_business_compliance_readiness,
     list_business_compliance_templates,
@@ -35,6 +44,10 @@ from subscriptions.services.business_compliance_review_actions import (
     reject_document,
     revoke_public_summary,
     update_document_metadata,
+)
+from subscriptions.services.business_rule_policy_service import (
+    business_rule_policy_payload,
+    update_active_business_rule_policy,
 )
 from subscriptions.services.policy_governance_service import (
     accept_internal_policy,
@@ -55,6 +68,46 @@ from subscriptions.services.policy_governance_service import (
 
 class _AdminPolicyBase(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+
+class BusinessRulePolicyUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    plan_type = serializers.ChoiceField(required=False, choices=PlanLegalClassification.choices)
+    benefit_type = serializers.ChoiceField(required=False, choices=BenefitType.choices)
+    selection_method = serializers.ChoiceField(required=False, choices=SelectionMethod.choices)
+    funding_source = serializers.ChoiceField(required=False, choices=BenefitFundingSource.choices)
+    risk_status = serializers.ChoiceField(required=False, choices=LegalRiskStatus.choices)
+    refund_sla_working_days = serializers.IntegerField(required=False, min_value=1, max_value=60)
+    late_payment_charge_enabled = serializers.BooleanField(required=False)
+    late_payment_charge_configured = serializers.BooleanField(required=False)
+    late_payment_charge_label = serializers.CharField(required=False, allow_blank=True, max_length=80)
+    partner_receipt_admin_approval_required = serializers.BooleanField(required=False)
+    kyc_masking_required = serializers.BooleanField(required=False)
+    deposit_refund_requires_inspection = serializers.BooleanField(required=False)
+    gst_documents_require_hsn_sac = serializers.BooleanField(required=False)
+    non_gst_document_labels = serializers.ListField(
+        required=False,
+        child=serializers.CharField(max_length=80, allow_blank=False),
+        allow_empty=False,
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class AdminBusinessRulePolicyView(_AdminPolicyBase):
+    def get(self, request):
+        return Response(business_rule_policy_payload())
+
+    def patch(self, request):
+        serializer = BusinessRulePolicyUpdateSerializer(data=request.data or {}, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            policy = update_active_business_rule_policy(
+                payload=serializer.validated_data,
+                performed_by=request.user,
+            )
+        except Exception as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(business_rule_policy_payload(policy))
 
 
 class AdminPolicyPageListCreateView(_AdminPolicyBase):

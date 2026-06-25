@@ -385,6 +385,7 @@ export const ADMIN_ROUTE_TREE: AdminRouteRegistryItem[] = [
   item("Settings & Governance", "Business Setup", ROUTES.admin.settingsBusinessSetup, "Fresh-start readiness, finance setup, branch/counter setup, documents, inventory onboarding."),
   item("Settings & Governance", "Business Setup Checklist", ROUTES.admin.settingsBusinessSetupChecklist, "Setup readiness checklist."),
   item("Settings & Governance", "Business Compliance", ROUTES.admin.settingsBusinessCompliance, "Contract templates, e-sign evidence, seller-of-record, GST, stamp-duty, grievance, and direct-selling readiness controls."),
+  item("Settings & Governance", "Legal & GST Controls", ROUTES.admin.settingsLegalControls, "DB-backed GST mode, waiver launch status, refund SLA, partner receipt approval, KYC masking, deposit inspection, and late-charge controls."),
   item("Settings & Governance", "Counters / Cash Desks", ROUTES.admin.counters, "Cash counter and desk configuration."),
   item("Settings & Governance", "Finance Setup", ROUTES.admin.settingsFinance, "Finance setup."),
   item("Settings & Governance", "Document Numbering", ROUTES.admin.settingsBusinessSetupDocumentNumbering, "Invoice and receipt sequence readiness and configuration."),

@@ -2,6 +2,7 @@ from django.urls import path
 
 from api.v1.views.admin_policy_review_dates import AdminPolicyBulkReviewDateView
 from api.v1.views.admin_policy_site import (
+    AdminBusinessRulePolicyView,
     AdminPolicyCoverageView,
     AdminPolicyPageAcceptInternalView,
     AdminPolicyPageApproveView,
@@ -11,6 +12,7 @@ from api.v1.views.admin_policy_site import (
 )
 
 urlpatterns = [
+    path("settings/legal-controls/", AdminBusinessRulePolicyView.as_view()),
     path("settings/policies/coverage/", AdminPolicyCoverageView.as_view()),
     path("settings/policies/bulk-review-dates/", AdminPolicyBulkReviewDateView.as_view()),
     path("public-site/policies/<int:pk>/submit-review/", AdminPolicyPageSubmitReviewView.as_view()),

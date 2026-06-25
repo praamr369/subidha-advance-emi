@@ -108,4 +108,12 @@ test("Settings & Governance sidebar includes business compliance route", () => {
     settingsBlock.includes("Contract templates, e-sign evidence"),
     "Business Compliance sidebar description must expose contract/e-sign governance scope"
   );
+  assert.ok(
+    settingsBlock.includes("ROUTES.admin.settingsLegalControls"),
+    "Settings & Governance sidebar must expose Legal & GST Controls"
+  );
+  assert.ok(
+    settingsBlock.includes("DB-backed GST mode"),
+    "Legal & GST Controls sidebar description must expose DB-backed settings scope"
+  );
 });
