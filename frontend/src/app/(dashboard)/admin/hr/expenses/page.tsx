@@ -53,6 +53,12 @@ export default function AdminHrExpenseClaimsPage() {
         { label: "Expenses" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
+      stats={[
+        { label: "Claims", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Pending", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "PENDING").length, tone: !loading && rows.filter(r => String(r.status).toUpperCase() === "PENDING").length > 0 ? "warning" : "success" },
+        { label: "Approved", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "APPROVED").length, tone: "success" },
+        { label: "Pending Value", value: loading ? "—" : `₹${rows.filter(r => String(r.status).toUpperCase() === "PENDING").reduce((s, r) => s + Number(r.amount || 0), 0).toLocaleString("en-IN")}`, tone: "default" },
+      ]}
     >
       {loading ? <ERPLoadingState label="Loading expense claims..." /> : null}
       {!loading && error ? <ERPErrorState title="Expense claims unavailable" description={error} onRetry={() => void load()} /> : null}

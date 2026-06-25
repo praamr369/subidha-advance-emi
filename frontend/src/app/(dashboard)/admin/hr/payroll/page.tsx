@@ -59,6 +59,12 @@ export default function AdminHrPayrollPage() {
         { href: ROUTES.admin.hrStaffDocuments, label: "Staff Documents", variant: "ghost" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
+      stats={[
+        { label: "Staff", value: loading ? "—" : staff.length, tone: "info" },
+        { label: "Current Period", value: loading || !payload?.current_period ? "—" : payload.current_period.code, tone: "default" },
+        { label: "Period Status", value: loading || !payload?.current_period ? "—" : payload.current_period.status, tone: payload?.current_period?.status === "OPEN" ? "warning" : "success" },
+        { label: "Salary Sheets", value: loading || !payload ? "—" : payload.salary_sheets.length, tone: "default" },
+      ]}
     >
       {loading ? <ERPLoadingState label="Loading payroll..." /> : null}
       {!loading && error ? <ERPErrorState title="Payroll unavailable" description={error} onRetry={() => void load()} /> : null}

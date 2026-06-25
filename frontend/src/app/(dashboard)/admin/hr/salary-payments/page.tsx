@@ -49,6 +49,18 @@ export default function AdminHrSalaryPaymentsPage() {
         { href: ROUTES.admin.accountingBridgeReconciliation, label: "Reconciliation evidence", variant: "ghost" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
+      stats={[
+        { label: "Payments Recorded", value: loading ? "—" : rows.length, tone: "info" },
+        {
+          label: "Total Amount",
+          value: loading
+            ? "—"
+            : `₹${rows
+                .reduce<number>((sum, row) => sum + Number((row as { amount?: unknown }).amount ?? 0), 0)
+                .toLocaleString("en-IN")}`,
+          tone: "default",
+        },
+      ]}
     >
       {loading ? <ERPLoadingState label="Loading salary payments..." /> : null}
       {!loading && error ? <ERPErrorState title="Unable to load salary payments" description={error} onRetry={() => void load()} /> : null}

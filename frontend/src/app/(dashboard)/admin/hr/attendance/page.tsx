@@ -70,6 +70,12 @@ export default function AdminHrAttendancePage() {
         { href: ROUTES.admin.hrPayroll, label: "Payroll", variant: "secondary" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
+      stats={[
+        { label: "Staff", value: loading ? "—" : staff.length, tone: "info" },
+        { label: "Records", value: loading ? "—" : rows.length, tone: "default" },
+        { label: "Present", value: loading ? "—" : rows.filter(r => String((r as { status?: unknown }).status ?? "").toUpperCase() === "PRESENT").length, tone: "success" },
+        { label: "Absent", value: loading ? "—" : rows.filter(r => String((r as { status?: unknown }).status ?? "").toUpperCase() === "ABSENT").length, tone: !loading && rows.filter(r => String((r as { status?: unknown }).status ?? "").toUpperCase() === "ABSENT").length > 0 ? "warning" : "success" },
+      ]}
     >
       <ERPSectionShell title="Mark attendance" description="Writes only through the existing attendance mutation endpoint; no local state becomes authoritative.">
         <div className="grid gap-3 md:grid-cols-4">

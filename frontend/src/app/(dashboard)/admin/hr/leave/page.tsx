@@ -53,6 +53,12 @@ export default function AdminHrLeaveRequestsPage() {
         { label: "Leave" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" }}
+      stats={[
+        { label: "Requests", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Pending", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "PENDING").length, tone: !loading && rows.filter(r => String(r.status).toUpperCase() === "PENDING").length > 0 ? "warning" : "success" },
+        { label: "Approved", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "APPROVED").length, tone: "success" },
+        { label: "Rejected", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "REJECTED").length, tone: "default" },
+      ]}
     >
       {loading ? <ERPLoadingState label="Loading leave requests..." /> : null}
       {!loading && error ? <ERPErrorState title="Leave requests unavailable" description={error} onRetry={() => void load()} /> : null}
