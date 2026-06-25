@@ -526,58 +526,50 @@ export default function AccountingExpensesPage() {
                   description="Create the first vendor voucher above to start the expense register."
                 />
               ) : (
-                <div className="grid gap-3">
-                  {expenses.map((expense) => (
-                    <div
-                      key={expense.id}
-                      className="rounded-[1.4rem] border border-white/80 bg-white/75 p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-foreground">
-                            {expense.voucher_no}
+                <div className="grid gap-2">
+                  {expenses.map((expense) => {
+                    const statusCls =
+                      expense.status === "POSTED"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : expense.status === "APPROVED"
+                          ? "border-sky-200 bg-sky-50 text-sky-800"
+                          : "border-amber-200 bg-amber-50 text-amber-800";
+                    return (
+                      <div key={expense.id} className="rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition hover:shadow-[0_3px_10px_rgba(0,0,0,0.07)]">
+                        <div className="flex flex-wrap items-start justify-between gap-3 p-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-foreground">{expense.voucher_no}</span>
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusCls}`}>{expense.status}</span>
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {expense.vendor_name || "No vendor"} · {expense.expense_account_code} · {expense.payment_mode} · {formatDate(expense.expense_date)}
+                            </div>
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {expense.vendor_name || "No vendor"} • {expense.expense_account_code} • {expense.payment_mode}
+                          <div className="text-right">
+                            <div className="text-sm font-semibold tabular-nums text-foreground">{formatRupee(expense.net_amount)}</div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-sm font-semibold text-foreground">
-                            {formatRupee(expense.net_amount)}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {expense.status} • {formatDate(expense.expense_date)}
-                          </div>
+                        <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2.5">
+                          {expense.status === "DRAFT" ? (
+                            <button type="button" onClick={() => void handleApproveExpense(expense.id)}
+                              className="inline-flex h-8 items-center rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:bg-muted">
+                              Approve
+                            </button>
+                          ) : null}
+                          {expense.status === "APPROVED" ? (
+                            <button type="button" onClick={() => void handlePostExpense(expense.id)}
+                              className="inline-flex h-8 items-center rounded-lg bg-foreground px-3 text-xs font-semibold text-background transition hover:opacity-90">
+                              Post
+                            </button>
+                          ) : null}
+                          {expense.posted_journal_entry_no ? (
+                            <span className="text-xs font-medium text-emerald-700">Journal {expense.posted_journal_entry_no}</span>
+                          ) : null}
                         </div>
                       </div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {expense.status === "DRAFT" ? (
-                          <button
-                            type="button"
-                            onClick={() => void handleApproveExpense(expense.id)}
-                            className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-                          >
-                            Approve
-                          </button>
-                        ) : null}
-                        {expense.status === "APPROVED" ? (
-                          <button
-                            type="button"
-                            onClick={() => void handlePostExpense(expense.id)}
-                            className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-                          >
-                            Post
-                          </button>
-                        ) : null}
-                        {expense.posted_journal_entry_no ? (
-                          <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                            Journal {expense.posted_journal_entry_no}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </WorkspaceSection>

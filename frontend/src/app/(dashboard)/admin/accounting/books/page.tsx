@@ -215,19 +215,42 @@ export default function AccountingBooksPage() {
                 {moneyMovements.length === 0 ? (
                   <EmptyState title="No money movements yet" description="Create a draft transfer only for real cash/bank/UPI movement between finance accounts." />
                 ) : (
-                  <div className="grid gap-3">
-                    {moneyMovements.map((movement) => (
-                      <div key={movement.id} className="rounded-[1.4rem] border border-border bg-card p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div><div className="text-sm font-semibold text-foreground">{movement.movement_no}</div><div className="mt-1 text-xs text-muted-foreground">{movement.from_finance_account_name} → {movement.to_finance_account_name} • {formatDate(movement.movement_date)}</div></div>
-                          <div className="text-right"><div className="text-sm font-semibold text-foreground">{formatRupee(movement.amount)}</div><div className="mt-1 text-xs text-muted-foreground">{movement.status}</div></div>
+                  <div className="grid gap-2">
+                    {moneyMovements.map((movement) => {
+                      const isDraft = movement.status === "DRAFT";
+                      const statusCls = isDraft
+                        ? "border-amber-200 bg-amber-50 text-amber-800"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-800";
+                      return (
+                        <div key={movement.id} className="rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition hover:shadow-[0_3px_10px_rgba(0,0,0,0.07)]">
+                          <div className="flex flex-wrap items-start justify-between gap-3 p-4">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-foreground">{movement.movement_no}</span>
+                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusCls}`}>{movement.status}</span>
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {movement.from_finance_account_name} → {movement.to_finance_account_name} · {formatDate(movement.movement_date)}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold tabular-nums text-foreground">{formatRupee(movement.amount)}</div>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2.5">
+                            {isDraft ? (
+                              <button type="button" onClick={() => void handlePostMovement(movement.id)}
+                                className="inline-flex h-8 items-center rounded-lg bg-foreground px-3 text-xs font-semibold text-background transition hover:opacity-90">
+                                Post
+                              </button>
+                            ) : null}
+                            {movement.posted_journal_entry_no ? (
+                              <span className="text-xs font-medium text-emerald-700">Journal {movement.posted_journal_entry_no}</span>
+                            ) : null}
+                          </div>
                         </div>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {movement.status === "DRAFT" ? <button type="button" onClick={() => void handlePostMovement(movement.id)} className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800">Post</button> : null}
-                          {movement.posted_journal_entry_no ? <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Journal {movement.posted_journal_entry_no}</span> : null}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </WorkspaceSection>
@@ -249,13 +272,26 @@ export default function AccountingBooksPage() {
 
                 <WorkspaceSection title="Finance accounts" description="Operational finance accounts mapped to ASSET chart accounts. These are source/destination controls for movement posting.">
                   {financeAccounts.length === 0 ? <EmptyState title="No finance accounts yet" description="Create finance accounts in chart setup before recording money movements." /> : (
-                    <div className="grid gap-3">
+                    <div className="grid gap-2">
                       {financeAccounts.map((account: AccountingBooksReadinessAccount) => (
-                        <div key={account.id} className="rounded-[1.3rem] border border-border bg-card px-4 py-4">
-                          <div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold text-foreground">{account.name}</div><div className="mt-1 text-xs text-muted-foreground">{account.kind} • {account.chart_account_code || "No chart code"} • {account.chart_account_name || "No linked chart account"}</div></div><div className="text-sm font-semibold text-foreground">{formatRupee(account.opening_balance)}</div></div>
-                          <div className="mt-3 flex flex-wrap gap-2"><span className={badgeClass(account.movement_eligible ? "green" : "amber")}>{account.movement_eligible ? "Movement eligible" : "Not movement eligible"}</span><span className={badgeClass(account.collection_ready ? "green" : "amber")}>{account.collection_ready ? "Collection ready" : "Collection review"}</span>{account.branch_code ? <span className={badgeClass("blue")}>{account.branch_code}</span> : null}</div>
-                          {account.collection_blocker_reason ? <div className="mt-2 text-xs text-amber-900">{account.collection_blocker_reason}</div> : null}
-                          <div className="mt-3 flex flex-wrap gap-2"><Link href={buildAdminFinanceAccountStatementPrintRoute(account.id)} className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted">Finance Statement PDF / Print</Link>{account.chart_account_id ? <Link href={buildAdminLedgerStatementPrintRoute(account.chart_account_id)} className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted">Ledger Statement PDF / Print</Link> : null}</div>
+                        <div key={account.id} className="rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                          <div className="flex items-start justify-between gap-3 p-4">
+                            <div>
+                              <div className="text-sm font-semibold text-foreground">{account.name}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">{account.kind} · {account.chart_account_code || "No chart code"} · {account.chart_account_name || "No linked chart account"}</div>
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                <span className={badgeClass(account.movement_eligible ? "green" : "amber")}>{account.movement_eligible ? "Movement eligible" : "Not eligible"}</span>
+                                <span className={badgeClass(account.collection_ready ? "green" : "amber")}>{account.collection_ready ? "Collection ready" : "Review"}</span>
+                                {account.branch_code ? <span className={badgeClass("blue")}>{account.branch_code}</span> : null}
+                              </div>
+                              {account.collection_blocker_reason ? <div className="mt-1.5 text-xs text-amber-900">{account.collection_blocker_reason}</div> : null}
+                            </div>
+                            <div className="shrink-0 text-sm font-semibold tabular-nums text-foreground">{formatRupee(account.opening_balance)}</div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 border-t border-border/60 px-4 py-2.5">
+                            <Link href={buildAdminFinanceAccountStatementPrintRoute(account.id)} className="inline-flex h-8 items-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted">Finance Statement</Link>
+                            {account.chart_account_id ? <Link href={buildAdminLedgerStatementPrintRoute(account.chart_account_id)} className="inline-flex h-8 items-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted">Ledger Statement</Link> : null}
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -7,6 +7,7 @@ import {
   Banknote,
   BookOpenText,
   Building2,
+  Calendar,
   ClipboardCheck,
   FileBarChart,
   FileText,
@@ -27,6 +28,8 @@ import {
   WalletCards,
   type LucideIcon,
 } from "lucide-react";
+
+import { cn } from "@/lib/utils";
 
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
@@ -306,6 +309,29 @@ function moduleActionLabel(module: AccountingModuleDefinition, status: ModuleSta
   return module.key === "rent_lease_dues" ? "Open rent/lease workspace" : "Open";
 }
 
+type MetricTone = "count-bad" | "count-good" | "status" | "neutral";
+
+function metricToneCls(value: string | number | null | undefined, tone: MetricTone): string {
+  const v = String(value ?? "");
+  if (tone === "status") {
+    if (v === "READY") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+    if (v === "BLOCKED" || v === "Blocked") return "border-red-200 bg-red-50 text-red-900";
+    if (v && v !== "Not exposed" && v !== "—") return "border-amber-200 bg-amber-50 text-amber-900";
+    return "border-border bg-card text-foreground";
+  }
+  if (tone === "count-bad") {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return "border-amber-200 bg-amber-50 text-amber-900";
+    return "border-border bg-card text-foreground";
+  }
+  if (tone === "count-good") {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return "border-emerald-200 bg-emerald-50 text-emerald-900";
+    return "border-border bg-card text-foreground";
+  }
+  return "border-border bg-card text-foreground";
+}
+
 function ModuleCard({ module, setupBlocked, setupBlockers, readiness }: { module: AccountingModuleDefinition; setupBlocked: boolean; setupBlockers: string[]; readiness: AccountingReadiness | null }) {
   const status = statusForModule(module, setupBlocked, readiness);
   const Icon = module.icon;
@@ -313,23 +339,57 @@ function ModuleCard({ module, setupBlocked, setupBlockers, readiness }: { module
   const actionHref = status === "BLOCKED" && module.setupGate ? ROUTES.admin.accountingChartOfAccounts : module.route;
   const blockers = status === "BLOCKED" ? (readiness?.blockers?.length ? readiness.blockers : setupBlockers) : [];
 
+  const iconCls = {
+    READY: "border-emerald-100 bg-emerald-50 text-emerald-700",
+    BLOCKED: "border-red-100 bg-red-50 text-red-600",
+    PARTIAL: "border-amber-100 bg-amber-50 text-amber-700",
+    DEFERRED: "border-border bg-muted text-muted-foreground",
+  }[status];
+  const dotCls = {
+    READY: "bg-emerald-400",
+    BLOCKED: "bg-red-500",
+    PARTIAL: "bg-amber-400",
+    DEFERRED: "bg-slate-300",
+  }[status];
+
   return (
-    <article className="flex min-h-[15rem] flex-col rounded-[1.5rem] border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-muted text-foreground"><Icon className="h-5 w-5" aria-hidden="true" /></div>
-        <div className="flex flex-wrap justify-end gap-2">
-          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${STATUS_STYLES[status]}`}>{status}</span>
-          {module.readOnly ? <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-800">Read-only</span> : null}
+    <article className="group flex min-h-[11rem] flex-col rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(0,0,0,0.08)]">
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", iconCls)}>
+            <Icon className="h-4 w-4" aria-hidden />
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className={cn("inline-block h-1.5 w-1.5 rounded-full", dotCls)} />
+              {status}
+            </span>
+            {module.readOnly ? <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">Read-only</span> : null}
+          </div>
+        </div>
+        <div className="mt-3 flex-1">
+          <h3 className="text-sm font-semibold leading-snug text-foreground">{module.title}</h3>
+          <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">{module.description}</p>
+          {blockers.length > 0 ? (
+            <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-900">
+              <span className="font-semibold">{blockers.length} blocker{blockers.length === 1 ? "" : "s"}:</span>
+              <span className="ml-1 line-clamp-1">{blockers[0]}</span>
+            </div>
+          ) : null}
+          {module.deferredReason ? (
+            <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700">{module.deferredReason}</p>
+          ) : null}
         </div>
       </div>
-      <div className="mt-4 flex-1 space-y-2">
-        <h3 className="text-base font-semibold text-foreground">{module.title}</h3>
-        <p className="text-sm leading-6 text-muted-foreground">{module.description}</p>
-        {blockers.length > 0 ? <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900"><div className="font-semibold">{blockers.length} setup blocker{blockers.length === 1 ? "" : "s"}</div><p className="mt-1 line-clamp-2">{blockers[0]}</p></div> : null}
-        {module.deferredReason ? <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">{module.deferredReason}</p> : null}
-      </div>
-      <div className="mt-4 border-t border-border pt-3">
-        {isDeferred || !actionHref ? <button type="button" disabled className="inline-flex w-full items-center justify-center rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">Deferred</button> : <Link href={actionHref} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted">{moduleActionLabel(module, status)}<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>}
+      <div className="border-t border-border px-4 py-2.5">
+        {isDeferred || !actionHref ? (
+          <span className="text-xs font-medium text-muted-foreground">Deferred</span>
+        ) : (
+          <Link href={actionHref} className="group/link flex items-center gap-1.5 text-xs font-semibold text-primary transition hover:text-primary/80">
+            {moduleActionLabel(module, status)}
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover/link:translate-x-0.5" aria-hidden />
+          </Link>
+        )}
       </div>
     </article>
   );
@@ -394,51 +454,84 @@ export default function AdminAccountingPage() {
       statusBadge={{ label: data?.accountingReadiness?.status === "READY" ? "Bridge ready" : setupBlocked ? "Setup blocked" : "Read-only cockpit", tone: data?.accountingReadiness?.status === "READY" ? "success" : setupBlocked ? "warning" : "info" }}
     >
       <div className="space-y-6">
-        <div className="flex justify-end"><button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing || loading} className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"><RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" />{refreshing ? "Refreshing..." : "Refresh"}</button></div>
         {loading ? <ERPLoadingState label="Loading accounting and finance cockpit..." /> : null}
         {!loading && error ? <ERPErrorState title="Unable to load accounting cockpit" description={error} onRetry={() => void loadPage("initial")} /> : null}
         {!loading && !error && data ? (
           <>
-            <ERPSectionShell title="Accounting Control Center" description="Start here: active blockers, primary actions, and daily finance workflows. This control center is read-only.">
-              <div className="grid gap-3 lg:grid-cols-[1.1fr_1fr]">
-                <div className="rounded-2xl border border-border bg-card p-4">
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    {[
-                      ["Readiness", displayMetric(bridgeStatusValue)],
-                      ["Chart accounts", displayMetric(data.chartAccountsCount)],
-                      ["Finance accounts", displayMetric(data.financeAccountsCount)],
-                      ["Mapping blockers", displayMetric(mappingBlockerCount)],
-                      ["Collection-ready", displayMetric(collectionReadyAccountsCount)],
-                      ["Current open period", displayMetric(currentOpenPeriod)],
-                      ["Period close", displayMetric(periodCloseStatus)],
-                      ["Recon exceptions", displayMetric(reconciliationExceptionCount)],
-                      ["Ready unposted", displayMetric(readyUnpostedCount)],
-                      ["Bridge blockers", displayMetric(bridgeBlockerCount)],
-                    ].map(([label, value]) => <div key={label} className="rounded-xl border border-border bg-background px-3 py-2"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div><div className="mt-1 text-lg font-semibold text-foreground">{value}</div></div>)}
+            <ERPSectionShell
+              title="Accounting Control Center"
+              description="Active blockers, primary actions, and daily finance workflows."
+              actions={
+                <button type="button" onClick={() => void loadPage("refresh")} disabled={refreshing}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60">
+                  <RefreshCw className={cn("h-3.5 w-3.5", refreshing ? "animate-spin" : "")} aria-hidden />
+                  {refreshing ? "Refreshing…" : "Refresh"}
+                </button>
+              }
+            >
+              <div className="grid gap-3 lg:grid-cols-[3fr_2fr]">
+                {/* Left: live counters + quick links */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Live counters</p>
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5">
+                    {([
+                      { label: "Readiness", value: displayMetric(bridgeStatusValue), tone: "status" },
+                      { label: "Chart accounts", value: displayMetric(data.chartAccountsCount), tone: "neutral" },
+                      { label: "Finance accounts", value: displayMetric(data.financeAccountsCount), tone: "neutral" },
+                      { label: "Mapping blockers", value: displayMetric(mappingBlockerCount), tone: "count-bad" },
+                      { label: "Collection-ready", value: displayMetric(collectionReadyAccountsCount), tone: "count-good" },
+                      { label: "Open period", value: displayMetric(currentOpenPeriod), tone: "neutral" },
+                      { label: "Period status", value: displayMetric(periodCloseStatus), tone: "status" },
+                      { label: "Recon exceptions", value: displayMetric(reconciliationExceptionCount), tone: "count-bad" },
+                      { label: "Ready unposted", value: displayMetric(readyUnpostedCount), tone: "count-bad" },
+                      { label: "Bridge blockers", value: displayMetric(bridgeBlockerCount), tone: "count-bad" },
+                    ] as { label: string; value: string; tone: MetricTone }[]).map(({ label, value, tone }) => (
+                      <div key={label} className={cn("rounded-lg border px-2.5 py-2", metricToneCls(value, tone))}>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide opacity-60">{label}</div>
+                        <div className="mt-0.5 text-sm font-bold">{value}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                    {[
-                      ["Open Setup", ROUTES.admin.accountingSetup],
-                      ["Open Bridge Readiness", ROUTES.admin.accountingBridges],
-                      ["Open Mapping Audit", "/admin/accounting/setup/mapping-audit"],
-                      ["Open Reconciliation", ROUTES.admin.accountingBridgeReconciliation],
-                      ["Open Periods", ROUTES.admin.accountingPeriods],
-                      ["Open Document Numbering", ROUTES.admin.settingsBusinessSetupDocumentNumbering],
-                      ["Open Finance Accounts", ROUTES.admin.accountingFinanceAccounts],
-                    ].map(([label, href]) => <Link key={label} href={href} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted">{label}</Link>)}
+                  <p className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Quick navigation</p>
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-4">
+                    {([
+                      { label: "Setup", Icon: Settings2, href: ROUTES.admin.accountingSetup },
+                      { label: "Bridge Readiness", Icon: Scale, href: ROUTES.admin.accountingBridges },
+                      { label: "Mapping Audit", Icon: ShieldCheck, href: "/admin/accounting/setup/mapping-audit" },
+                      { label: "Reconciliation", Icon: Repeat2, href: ROUTES.admin.accountingBridgeReconciliation },
+                      { label: "Periods", Icon: Calendar, href: ROUTES.admin.accountingPeriods },
+                      { label: "Numbering", Icon: FileText, href: ROUTES.admin.settingsBusinessSetupDocumentNumbering },
+                      { label: "Finance Accounts", Icon: Landmark, href: ROUTES.admin.accountingFinanceAccounts },
+                    ] as { label: string; Icon: LucideIcon; href: string }[]).map(({ label, Icon, href }) => (
+                      <Link key={label} href={href}
+                        className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:border-[var(--surface-border-strong)] hover:bg-muted">
+                        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                        {label}
+                      </Link>
+                    ))}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-border bg-card p-4">
-                  <h2 className="text-sm font-semibold text-foreground">Fix first</h2>
+                {/* Right: fix-first blockers */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Fix first</p>
                   {fixFirst.length === 0 ? (
-                    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">No active accounting setup, bridge, numbering, or reconciliation blocker is exposed by backend readiness.</div>
+                    <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+                      <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                      <span>No active blocker — accounting setup, bridge, numbering, and reconciliation are all clear.</span>
+                    </div>
                   ) : (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-3 space-y-1.5">
                       {fixFirst.map((item, index) => (
-                        <div key={item.label} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                        <div key={item.label} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                           <div className="flex items-start justify-between gap-3">
-                            <div><div className="font-semibold text-foreground">{index + 1}. {item.label}</div><div className="mt-1 text-xs">{item.detail}</div></div>
-                            <Link href={item.href} className="shrink-0 text-xs font-semibold text-primary underline underline-offset-4">Open</Link>
+                            <div className="flex items-start gap-2">
+                              <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold text-white">{index + 1}</span>
+                              <div>
+                                <div className="text-xs font-semibold text-amber-950">{item.label}</div>
+                                <div className="mt-0.5 text-[11px] leading-4 text-amber-800">{item.detail}</div>
+                              </div>
+                            </div>
+                            <Link href={item.href} className="shrink-0 text-[11px] font-semibold text-primary underline underline-offset-4 transition hover:opacity-75">Fix →</Link>
                           </div>
                         </div>
                       ))}
@@ -447,8 +540,15 @@ export default function AdminAccountingPage() {
                 </div>
               </div>
             </ERPSectionShell>
-            <ERPSectionShell title="Readiness posture" description="Operational counts are read from backend APIs. Unsupported/deferred readiness boundaries are not treated as active blockers."><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">{[["Chart accounts", displayMetric(data.chartAccountsCount)], ["Finance accounts", displayMetric(data.financeAccountsCount)], ["Draft journals", displayMetric(data.draftJournalsCount)], ["Bridge status", displayMetric(bridgeStatusValue)], ["Active FY", displayMetric(data.accountingReadiness?.financial_year_readiness?.active_financial_year?.code)], ["Period", displayMetric(data.accountingReadiness?.accounting_period_readiness?.current_period?.code)], ["Period status", displayMetric(data.accountingReadiness?.accounting_period_readiness?.current_period?.status)], ["Setup blockers", displayMetric(setupBlockerCount)], ["Bridge blockers", displayMetric(bridgeBlockerCount)], ["Ready unposted", displayMetric(readyUnpostedCount)]].map(([label, value]) => <div key={label} className="rounded-2xl border border-border bg-card px-4 py-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-2 text-lg font-semibold text-foreground">{value}</p></div>)}</div></ERPSectionShell>
-            {MODULE_GROUPS.map((group) => <ERPSectionShell key={group.title} title={group.title} description={group.description}><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{group.modules.map((module) => <ModuleCard key={module.key} module={module} setupBlocked={setupBlocked} readiness={data.accountingReadiness} setupBlockers={setupBlockers.length > 0 ? setupBlockers : ["Accounting setup readiness is blocked."]} />)}</div></ERPSectionShell>)}
+            {MODULE_GROUPS.map((group) => (
+              <ERPSectionShell key={group.title} title={group.title} description={group.description}>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {group.modules.map((module) => (
+                    <ModuleCard key={module.key} module={module} setupBlocked={setupBlocked} readiness={data.accountingReadiness} setupBlockers={setupBlockers.length > 0 ? setupBlockers : ["Accounting setup readiness is blocked."]} />
+                  ))}
+                </div>
+              </ERPSectionShell>
+            ))}
           </>
         ) : null}
       </div>

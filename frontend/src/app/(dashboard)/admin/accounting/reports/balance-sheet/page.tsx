@@ -132,21 +132,21 @@ export default function AccountingBalanceSheetPage() {
                       description={`Posted ${section.title.toLowerCase()} will appear here once journals exist.`}
                     />
                   ) : (
-                    <div className="space-y-3">
-                      {section.rows.map((row) => (
-                        <div
-                          key={`${section.title}-${row.account_code}-${row.account_name}`}
-                          className="rounded-2xl border border-border/70 bg-background px-4 py-4 shadow-[inset_0_1px_0_var(--hairline-shine)]"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="font-medium text-foreground">{row.account_code}</div>
-                              <div className="text-xs text-muted-foreground">{row.account_name}</div>
+                    <div className="overflow-hidden rounded-xl border border-border">
+                      <div className="divide-y divide-border/70">
+                        {section.rows.map((row) => (
+                          <div
+                            key={`${section.title}-${row.account_code}-${row.account_name}`}
+                            className="flex items-center justify-between gap-3 bg-card px-4 py-2.5 transition hover:bg-muted/30"
+                          >
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold text-muted-foreground">{row.account_code}</div>
+                              <div className="truncate text-sm text-foreground">{row.account_name}</div>
                             </div>
-                            <div className="font-semibold text-foreground">{accountingMoney(row.balance)}</div>
+                            <div className="shrink-0 text-sm font-semibold tabular-nums text-foreground">{accountingMoney(row.balance)}</div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </ERPSectionShell>
