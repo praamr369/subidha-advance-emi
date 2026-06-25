@@ -27,7 +27,7 @@ from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from accounts.models import User, UserRole
 from accounts.capabilities import require_capability
 from accounting.services.finance_account_readiness import FinanceAccountPostingReadinessError
-from api.v1.pagination import AdminOptInPagination
+from api.v1.pagination import AdminListPagination, AdminOptInPagination
 from api.v1.permissions import IsAdmin
 from api.v1.throttles.auth_password_reset import PaymentMutationThrottle
 from api.v1.serializers.admin_resources import (
@@ -3013,6 +3013,7 @@ class SubscriptionAdminViewSet(AdminOnlyModelViewSet):
         .order_by("-created_at", "-id")
     )
     serializer_class = SubscriptionAdminSerializer
+    pagination_class = AdminListPagination
 
     def get_serializer_class(self):
         if self.action == "cancel_subscription":

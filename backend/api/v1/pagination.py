@@ -78,6 +78,19 @@ class AdminAccountingPagination(PageNumberPagination):
     max_page_size = 500
 
 
+class AdminListPagination(PageNumberPagination):
+    """Always-on pagination for admin registers that honors ``?page_size``.
+
+    Returns the standard DRF envelope ``{count, next, previous, results}``.
+    Unlike the project default paginator, this honors the client page_size so
+    server and client agree on page boundaries (page-count math stays exact).
+    """
+
+    page_size = 25
+    page_size_query_param = "page_size"
+    max_page_size = 200
+
+
 class AdminOptInPagination(PageNumberPagination):
     """Backward-compatible, opt-in pagination for admin list endpoints.
 

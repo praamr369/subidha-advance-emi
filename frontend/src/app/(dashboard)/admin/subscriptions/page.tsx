@@ -192,18 +192,42 @@ function normalizeSubscriptionRow(raw: Record<string, unknown>): SubscriptionRow
   };
 }
 
-function normalizeSubscriptionListPayload(payload: unknown): SubscriptionListPayload {
-  const root = (payload ?? {}) as Record<string, unknown>;
+function normalizeSubscriptionListPayload(
+  payload: unknown,
+  requestedPage = 1,
+): SubscriptionListPayload {
+  // Accepts both response shapes:
+  //  - DRF PageNumberPagination: { count, next, previous, results }
+  //  - build_paginated_payload:  { count, page, num_pages, has_next, has_previous, results }
+  //  - bare array (legacy / unpaginated fallback)
+  const root = Array.isArray(payload)
+    ? ({ results: payload, count: payload.length } as Record<string, unknown>)
+    : ((payload ?? {}) as Record<string, unknown>);
+
+  const results = Array.isArray(root.results)
+    ? (root.results as Record<string, unknown>[]).map(normalizeSubscriptionRow)
+    : [];
+  const count = toNumber(root.count) || results.length;
+  const pageSize = Math.max(toNumber(root.page_size) || PAGE_SIZE, 1);
+  const page = Math.max(toNumber(root.page) || requestedPage || 1, 1);
+  const numPages =
+    Math.max(toNumber(root.num_pages), 0) ||
+    (count > 0 ? Math.ceil(count / pageSize) : 0);
+  // Prefer explicit booleans; otherwise derive from DRF next/previous URLs,
+  // and finally fall back to page arithmetic.
+  const hasNext =
+    root.has_next === true || Boolean(root.next) || page < numPages;
+  const hasPrevious =
+    root.has_previous === true || Boolean(root.previous) || page > 1;
+
   return {
-    count: toNumber(root.count),
-    results: Array.isArray(root.results)
-      ? (root.results as Record<string, unknown>[]).map(normalizeSubscriptionRow)
-      : [],
-    page: Math.max(toNumber(root.page) || 1, 1),
-    page_size: Math.max(toNumber(root.page_size) || PAGE_SIZE, 1),
-    num_pages: Math.max(toNumber(root.num_pages), 0),
-    has_next: root.has_next === true,
-    has_previous: root.has_previous === true,
+    count,
+    results,
+    page,
+    page_size: pageSize,
+    num_pages: numPages,
+    has_next: hasNext,
+    has_previous: hasPrevious,
   };
 }
 
@@ -420,7 +444,7 @@ export default function AdminSubscriptionsPage() {
 
     try {
       const payload = await apiFetch<unknown>(`/admin/subscriptions/?${listQueryString}`);
-      const normalized = normalizeSubscriptionListPayload(payload);
+      const normalized = normalizeSubscriptionListPayload(payload, currentPage);
 
       setRows(normalized.results);
       setCount(normalized.count);
