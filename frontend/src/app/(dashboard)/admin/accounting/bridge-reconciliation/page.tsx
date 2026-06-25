@@ -470,8 +470,9 @@ export default function AccountingBridgeReconciliationPage() {
     }
   }
 
-  if (loading && !payload) return <ERPPageShell eyebrow="Accounting" title="Bridge Reconciliation" subtitle="" breadcrumbs={[{ label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Reconciliation" }]}><div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading accounting bridge reconciliation…</div></ERPPageShell>;
-  if (error && !payload) return <ERPPageShell eyebrow="Accounting" title="Bridge Reconciliation" subtitle="" breadcrumbs={[{ label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Reconciliation" }]}><div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">{error}</div></ERPPageShell>;
+  const BRIDGE_RECON_SUBTITLE = "Post unposted bridge candidates to accounting journals. All posting is explicit — no auto-post or auto-reconcile.";
+  if (loading && !payload) return <ERPPageShell eyebrow="Accounting" title="Bridge Reconciliation" subtitle={BRIDGE_RECON_SUBTITLE} breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Reconciliation" }]} statusBadge={{ label: "Admin Only", tone: "info" as const }}><div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Loading accounting bridge reconciliation…</div></ERPPageShell>;
+  if (error && !payload) return <ERPPageShell eyebrow="Accounting" title="Bridge Reconciliation" subtitle={BRIDGE_RECON_SUBTITLE} breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Accounting", href: ROUTES.admin.accounting }, { label: "Bridge Reconciliation" }]} statusBadge={{ label: "Admin Only", tone: "info" as const }}><div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-900">{error}</div></ERPPageShell>;
 
   return (
     <ERPPageShell
