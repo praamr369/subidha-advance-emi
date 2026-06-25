@@ -7,7 +7,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PageHeader from "@/components/ui/PageHeader";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import StatCard from "@/components/ui/StatCard";
 import {
   activateInternalUser,
@@ -204,50 +205,55 @@ export default function AdminInternalUserDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={user ? `Managed User: ${user.full_name || user.username}` : "Managed User Detail"}
-        description="Review identity, role posture, account status, and audit history for managed admin, cashier, and partner accounts."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/admin/settings/users"
-              className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              Back to List
-            </Link>
+    <ERPPageShell
+      eyebrow="Settings · Users"
+      title={user ? `Managed User: ${user.full_name || user.username}` : "Managed User Detail"}
+      subtitle="Review identity, role posture, account status, and audit history for managed admin, cashier, and partner accounts."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Settings", href: ROUTES.admin.settings },
+        { label: "Managed Users", href: ROUTES.admin.settingsUsers },
+        { label: user ? (user.full_name || user.username) : "Detail" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={ROUTES.admin.settingsUsers}
+          className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+        >
+          Back to List
+        </Link>
 
-            {user ? (
-              <Link
-                href={`/admin/settings/users/${user.id}/edit`}
-                className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-              >
-                Edit
-              </Link>
-            ) : null}
+        {user ? (
+          <Link
+            href={`${ROUTES.admin.settingsUsers}/${user.id}/edit`}
+            className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+          >
+            Edit
+          </Link>
+        ) : null}
 
-            {user?.is_active ? (
-              <button
-                type="button"
-                onClick={() => void handleDeactivate()}
-                disabled={actionLoading !== null}
-                className="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-60"
-              >
-                {actionLoading === "deactivate" ? "Working..." : "Deactivate"}
-              </button>
-            ) : user ? (
-              <button
-                type="button"
-                onClick={() => void handleActivate()}
-                disabled={actionLoading !== null}
-                className="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
-              >
-                {actionLoading === "activate" ? "Working..." : "Activate"}
-              </button>
-            ) : null}
-          </div>
-        }
-      />
+        {user?.is_active ? (
+          <button
+            type="button"
+            onClick={() => void handleDeactivate()}
+            disabled={actionLoading !== null}
+            className="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-60"
+          >
+            {actionLoading === "deactivate" ? "Working..." : "Deactivate"}
+          </button>
+        ) : user ? (
+          <button
+            type="button"
+            onClick={() => void handleActivate()}
+            disabled={actionLoading !== null}
+            className="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+          >
+            {actionLoading === "activate" ? "Working..." : "Activate"}
+          </button>
+        ) : null}
+      </div>
 
       {message ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
@@ -398,6 +404,6 @@ export default function AdminInternalUserDetailPage() {
           </section>
         </>
       ) : null}
-    </div>
+    </ERPPageShell>
   );
 }

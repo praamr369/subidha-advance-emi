@@ -7,7 +7,8 @@ import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import ConfirmActionButton from "@/components/ui/ConfirmActionButton";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
-import PageHeader from "@/components/ui/PageHeader";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import StatusBadge from "@/components/ui/status-badge";
 import TableToolbar from "@/components/ui/TableToolbar";
 import { DataTableShell, MobileSafeTable } from "@/components/ui/operations";
@@ -206,27 +207,31 @@ async function handleDeactivate(user: InternalUserRecord) {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Managed Users"
-        description="Control ADMIN, CASHIER, and PARTNER accounts from one internal workspace with activation, deactivation, audit visibility, and role-safe lifecycle management."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/admin/settings"
-              className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              Back to Settings
-            </Link>
-            <Link
-              href="/admin/settings/users/create"
-              className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-95"
-            >
-              Create Managed User
-            </Link>
-          </div>
-        }
-      />
+    <ERPPageShell
+      eyebrow="Settings · Users"
+      title="Managed Users"
+      subtitle="Control ADMIN, CASHIER, and PARTNER accounts with activation, deactivation, audit visibility, and role-safe lifecycle management."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Settings", href: ROUTES.admin.settings },
+        { label: "Managed Users" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={ROUTES.admin.settings}
+          className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+        >
+          Back to Settings
+        </Link>
+        <Link
+          href={ROUTES.admin.settingsUsers + "/create"}
+          className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-95"
+        >
+          Create Managed User
+        </Link>
+      </div>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <SummaryCard
@@ -490,6 +495,6 @@ async function handleDeactivate(user: InternalUserRecord) {
           </MobileSafeTable>
         </DataTableShell>
       ) : null}
-    </div>
+    </ERPPageShell>
   );
 }

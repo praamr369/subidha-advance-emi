@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
-import PageHeader from "@/components/ui/PageHeader";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import { createInternalUser, type InternalUserRole } from "@/services/internal-users";
 
 function toMessage(error: unknown): string {
@@ -156,27 +157,32 @@ export default function AdminInternalUserCreatePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Create Managed User"
-        description="Create internal ADMIN, CASHIER, and PARTNER accounts from a single controlled admin workflow."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/admin/settings/users"
-              className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              Managed User List
-            </Link>
-            <Link
-              href="/admin/settings"
-              className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              Back to Settings
-            </Link>
-          </div>
-        }
-      />
+    <ERPPageShell
+      eyebrow="Settings · Users"
+      title="Create Managed User"
+      subtitle="Create internal ADMIN, CASHIER, and PARTNER accounts from a single controlled admin workflow."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Settings", href: ROUTES.admin.settings },
+        { label: "Managed Users", href: ROUTES.admin.settingsUsers },
+        { label: "Create" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={ROUTES.admin.settingsUsers}
+          className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+        >
+          Managed User List
+        </Link>
+        <Link
+          href={ROUTES.admin.settings}
+          className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+        >
+          Back to Settings
+        </Link>
+      </div>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <form
@@ -418,6 +424,6 @@ export default function AdminInternalUserCreatePage() {
           </div>
         </aside>
       </section>
-    </div>
+    </ERPPageShell>
   );
 }

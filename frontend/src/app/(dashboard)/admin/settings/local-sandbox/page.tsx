@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import PageHeader from "@/components/ui/PageHeader";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import {
   exportSetupSnapshot,
   getSetupReadiness,
@@ -63,12 +64,25 @@ export default function LocalSandboxPage() {
   }
 
   if (disabledMsg && !readiness) {
-    return <div className="space-y-4"><PageHeader title="Local Sandbox" description="Local-only testing controls" /><div className="rounded-xl border p-4 text-sm">{disabledMsg}. Sandbox tools are disabled in production-like environments.</div></div>;
+    return (
+      <ERPPageShell eyebrow="Settings · Dev" title="Local Sandbox" subtitle="Local-only testing controls." breadcrumbs={[{ label: "Admin", href: ROUTES.admin.dashboard }, { label: "Settings", href: ROUTES.admin.settings }, { label: "Local Sandbox" }]} statusBadge={{ label: "Admin Only", tone: "info" as const }}>
+        <div className="rounded-xl border p-4 text-sm">{disabledMsg}. Sandbox tools are disabled in production-like environments.</div>
+      </ERPPageShell>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Local Sandbox" description="Safe local setup snapshot + demo seed + selective reset." />
+    <ERPPageShell
+      eyebrow="Settings · Dev"
+      title="Local Sandbox"
+      subtitle="Safe local setup snapshot + demo seed + selective reset."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Settings", href: ROUTES.admin.settings },
+        { label: "Local Sandbox" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
       {readiness ? <pre className="rounded-xl bg-muted p-3 text-xs">{JSON.stringify(readiness, null, 2)}</pre> : null}
 
       <section className="rounded-xl border p-4 space-y-2">
@@ -102,6 +116,6 @@ export default function LocalSandboxPage() {
       </section>
 
       {result ? <pre className="rounded-xl bg-muted p-3 text-xs">{JSON.stringify(result, null, 2)}</pre> : null}
-    </div>
+    </ERPPageShell>
   );
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import PageHeader from "@/components/ui/PageHeader";
+import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ApiError } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import { fetchComplianceDocumentEvidence } from "@/services/business-compliance-evidence";
@@ -362,24 +362,28 @@ export default function AdminBusinessCompliancePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Business compliance governance"
-        description="Actual shop identity, registration, certificates, bank proof, premises proof, private evidence files, and approved public-safe summaries. Separate from Policy Governance."
-        actions={
-          <>
-            <Link href={ROUTES.admin.setupReadiness} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">
-              Setup readiness
-            </Link>
-            <Link href={ROUTES.admin.complianceKyc} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">
-              KYC compliance
-            </Link>
-            <Link href={ROUTES.admin.settingsPolicies} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">
-              Policy governance
-            </Link>
-          </>
-        }
-      />
+    <ERPPageShell
+      eyebrow="Settings · Compliance"
+      title="Business Compliance Governance"
+      subtitle="Shop identity, registration, certificates, bank proof, premises proof, private evidence files, and approved public-safe summaries."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Settings", href: ROUTES.admin.settings },
+        { label: "Business Compliance" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link href={ROUTES.admin.setupReadiness} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">
+          Setup readiness
+        </Link>
+        <Link href={ROUTES.admin.complianceKyc} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">
+          KYC compliance
+        </Link>
+        <Link href={ROUTES.admin.settingsPolicies} className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-accent">
+          Policy governance
+        </Link>
+      </div>
 
       <section className="rounded-xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
         Private compliance files are never publicly downloadable by default. GST and Udyam/MSME must remain “Not provided” unless actual verified evidence exists. Public pages expose only separately approved public-safe summaries.
@@ -643,6 +647,6 @@ export default function AdminBusinessCompliancePage() {
           </div>
         </section>
       ) : null}
-    </div>
+    </ERPPageShell>
   );
 }

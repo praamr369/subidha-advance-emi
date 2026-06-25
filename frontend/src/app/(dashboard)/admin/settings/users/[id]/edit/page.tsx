@@ -7,7 +7,8 @@ import { useParams } from "next/navigation";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import FormActions from "@/components/ui/FormActions";
-import PageHeader from "@/components/ui/PageHeader";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import StatusBadge from "@/components/ui/status-badge";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
 import {
@@ -249,27 +250,33 @@ export default function AdminInternalUserEditPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Edit Managed User: ${user.full_name || user.username}`}
-        description="Update managed user identity, role posture, activation state, and partner commission settings without leaving the admin access workflow."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/admin/settings/users/${user.id}`}
-              className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              View Detail
-            </Link>
-            <Link
-              href="/admin/settings/users"
-              className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-            >
-              Managed User List
-            </Link>
-          </div>
-        }
-      />
+    <ERPPageShell
+      eyebrow="Settings · Users"
+      title={`Edit: ${user.full_name || user.username}`}
+      subtitle="Update managed user identity, role posture, activation state, and partner commission settings."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Settings", href: ROUTES.admin.settings },
+        { label: "Managed Users", href: ROUTES.admin.settingsUsers },
+        { label: user.full_name || user.username, href: `${ROUTES.admin.settingsUsers}/${user.id}` },
+        { label: "Edit" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={`${ROUTES.admin.settingsUsers}/${user.id}`}
+          className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+        >
+          View Detail
+        </Link>
+        <Link
+          href={ROUTES.admin.settingsUsers}
+          className="inline-flex items-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+        >
+          Managed User List
+        </Link>
+      </div>
 
       {success ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
@@ -484,6 +491,6 @@ export default function AdminInternalUserEditPage() {
           </dl>
         </aside>
       </section>
-    </div>
+    </ERPPageShell>
   );
 }

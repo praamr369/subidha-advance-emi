@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import PageHeader from "@/components/ui/PageHeader";
+import ERPPageShell from "@/components/erp/ERPPageShell";
+import { ROUTES } from "@/lib/routes";
 import {
   getRolePermissionMatrix,
   listUserCapabilityOverrides,
@@ -96,11 +97,17 @@ export default function RolesPermissionsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Roles & capabilities"
-        description="Additive capability matrix layered on top of existing role-based guards for stricter finance-critical access control."
-      />
+    <ERPPageShell
+      eyebrow="Settings · Governance"
+      title="Roles & Capabilities"
+      subtitle="Additive capability matrix layered on top of existing role-based guards for stricter finance-critical access control."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Settings", href: ROUTES.admin.settings },
+        { label: "Roles & Capabilities" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
 
       {loading ? <div className="rounded-xl border border-border bg-card p-4 text-sm">Loading matrix...</div> : null}
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
@@ -208,6 +215,6 @@ export default function RolesPermissionsPage() {
           </section>
         </>
       ) : null}
-    </div>
+    </ERPPageShell>
   );
 }
