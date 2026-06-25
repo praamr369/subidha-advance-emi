@@ -2,6 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  Banknote,
+  CalendarCheck,
+  CalendarX,
+  FileText,
+  Receipt,
+  UserCheck,
+  WalletCards,
+} from "lucide-react";
+import type { ComponentType } from "react";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -95,21 +105,24 @@ export default function AdminHrWorkspacePage() {
           </ERPSectionShell>
 
           <ERPSectionShell title="Quick routes" description="Open HR source workflow workspaces. Staff creation, attendance, payroll setup, and salary payments do not create journals, accounting bridge postings, or reconciliation records.">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {[
-                ["Staff Register", ROUTES.admin.hrStaff],
-                ["Attendance", ROUTES.admin.hrAttendance],
-                ["Payroll", ROUTES.admin.hrPayroll],
-                ["Salary Payments", ROUTES.admin.hrSalaryPayments],
-                ["Leave Requests", ROUTES.admin.hrLeave],
-                ["Expense Claims", ROUTES.admin.hrExpenses],
-                ["Staff Documents", ROUTES.admin.hrStaffDocuments],
-              ].map(([label, href]) => (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {(
+                [
+                  { label: "Staff Register", href: ROUTES.admin.hrStaff, Icon: UserCheck },
+                  { label: "Attendance", href: ROUTES.admin.hrAttendance, Icon: CalendarCheck },
+                  { label: "Payroll", href: ROUTES.admin.hrPayroll, Icon: WalletCards },
+                  { label: "Salary Payments", href: ROUTES.admin.hrSalaryPayments, Icon: Banknote },
+                  { label: "Leave Requests", href: ROUTES.admin.hrLeave, Icon: CalendarX },
+                  { label: "Expense Claims", href: ROUTES.admin.hrExpenses, Icon: Receipt },
+                  { label: "Staff Documents", href: ROUTES.admin.hrStaffDocuments, Icon: FileText },
+                ] as { label: string; href: string; Icon: ComponentType<{ className?: string }> }[]
+              ).map(({ label, href, Icon }) => (
                 <Link
-                  key={String(label)}
-                  href={String(href)}
-                  className="rounded-xl border border-border bg-[var(--surface-muted)] px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-[var(--surface-strong)]"
+                  key={label}
+                  href={href}
+                  className="flex items-center gap-2.5 rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-muted hover:border-[var(--surface-border-strong)]"
                 >
+                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   {label}
                 </Link>
               ))}
