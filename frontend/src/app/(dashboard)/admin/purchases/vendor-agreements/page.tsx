@@ -22,7 +22,7 @@ function statusBadge(s: VendorAgreement["status"]) {
   const map: Record<VendorAgreement["status"], string> = {
     DRAFT: "bg-blue-50 text-blue-700",
     ACTIVE: "bg-green-50 text-green-700",
-    EXPIRED: "bg-gray-100 text-gray-500",
+    EXPIRED: "bg-gray-100 text-muted-foreground",
     TERMINATED: "bg-red-50 text-red-700",
   };
   return <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${map[s] ?? ""}`}>{s}</span>;

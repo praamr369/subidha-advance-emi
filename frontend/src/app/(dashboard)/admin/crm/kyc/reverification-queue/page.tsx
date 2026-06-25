@@ -51,7 +51,7 @@ export default function KYCReverificationQueuePage() {
 
   const daysLabel = (doc: KYCReverificationDoc) => {
     if (doc.overdue) return <span className="text-red-600 font-semibold text-xs">OVERDUE</span>;
-    if (doc.days_left === null) return <span className="text-gray-500 text-xs">No expiry</span>;
+    if (doc.days_left === null) return <span className="text-muted-foreground text-xs">No expiry</span>;
     return <span className={`text-xs font-medium ${doc.days_left <= 14 ? "text-orange-600" : "text-yellow-700"}`}>{doc.days_left}d left</span>;
   };
 

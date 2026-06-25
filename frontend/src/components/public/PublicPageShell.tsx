@@ -91,7 +91,7 @@ export default function PublicPageShell({
                     {crumb.label}
                   </span>
                 )}
-                {!isLast ? <ChevronRight className="h-4 w-4 text-slate-400" /> : null}
+                {!isLast ? <ChevronRight className="h-4 w-4 text-muted-foreground/70" /> : null}
               </div>
             );
           })}

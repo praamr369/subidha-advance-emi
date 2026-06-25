@@ -84,7 +84,7 @@ function statusClass(status: string): string {
   if (["EXCEPTION", "UNSUPPORTED", "UNSUPPORTED_SOURCE", "UNSUPPORTED_BOUNDARY", "DEFERRED", "SOURCE_CONTRACT_ONLY", "SKIPPED_NOT_APPLICABLE", "BOUNDARY_VIOLATION"].includes(value)) {
     return "border-red-200 bg-red-50 text-red-900";
   }
-  return "border-slate-200 bg-slate-50 text-slate-900";
+  return "border-slate-200 bg-slate-50 text-foreground";
 }
 
 function StatusBadge({ value }: { value: string }) {
@@ -216,7 +216,7 @@ function SourceDetails({ row }: { row: AccountingBridgeReconciliationRow }) {
   return (
     <div className="mt-2 grid gap-1 text-xs text-muted-foreground md:grid-cols-2">
       {details.map(([label, value]) => (
-        <div key={String(label)}><span className="font-medium text-slate-600">{label}:</span> {String(value)}</div>
+        <div key={String(label)}><span className="font-medium text-muted-foreground">{label}:</span> {String(value)}</div>
       ))}
     </div>
   );
@@ -304,7 +304,7 @@ function ControlTowerInventory({ payload }: { payload: AccountingBridgeReconcili
         <SummaryCard label="Active source rows" value={activeCount} detail="Rows needing review" />
         <SummaryCard label="Ready" value={readinessCounts.ready_unposted ?? 0} detail="Unposted candidates" />
         <SummaryCard label="Posted unverified" value={readinessCounts.posted_unverified ?? 0} detail="Needs reconciliation" />
-        <SummaryCard label="Boundaries" value={sourceContract + unsupported} detail={`${sourceContract} source-contract · ${unsupported} unsupported`} tone="border-slate-200 bg-slate-50 text-slate-900" />
+        <SummaryCard label="Boundaries" value={sourceContract + unsupported} detail={`${sourceContract} source-contract · ${unsupported} unsupported`} tone="border-slate-200 bg-slate-50 text-foreground" />
       </div>
       <div className="mt-4 rounded-xl border border-border bg-background p-4 text-sm text-muted-foreground">
         <div className="font-semibold text-foreground">F24/F25 guardrails</div>

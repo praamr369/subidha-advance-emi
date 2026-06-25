@@ -47,7 +47,7 @@ export default function BlogCard({
         {post.tags.slice(0, 3).map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center rounded-full border border-white/80 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]"
+            className="inline-flex items-center rounded-full border border-white/80 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]"
           >
             {tag}
           </span>

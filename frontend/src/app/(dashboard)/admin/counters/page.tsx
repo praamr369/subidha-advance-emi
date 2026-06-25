@@ -171,7 +171,7 @@ export default function AdminCountersPage() {
             setNotice(null);
             setError(null);
           }}
-          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-slate-50"
         >
           Edit
         </button>
@@ -297,12 +297,12 @@ export default function AdminCountersPage() {
                 description="Each counter must stay inside one branch and map to one active cash-desk finance account for the same branch. Bank and UPI posting still use their own payment accounts from collection screens."
               >
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-muted-foreground">
                     Counters use cash-desk finance accounts only. Bank and UPI receipts are still posted to their own
                     payment accounts through collection forms.
                   </p>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <label className="text-sm text-slate-700">
+                    <label className="text-sm text-muted-foreground">
                       <span className="mb-2 block font-medium">Code</span>
                       <input
                         value={form.code}
@@ -312,7 +312,7 @@ export default function AdminCountersPage() {
                         required
                       />
                     </label>
-                    <label className="text-sm text-slate-700">
+                    <label className="text-sm text-muted-foreground">
                       <span className="mb-2 block font-medium">Name</span>
                       <input
                         value={form.name}
@@ -322,7 +322,7 @@ export default function AdminCountersPage() {
                         required
                       />
                     </label>
-                    <label className="text-sm text-slate-700">
+                    <label className="text-sm text-muted-foreground">
                       <span className="mb-2 block font-medium">Branch</span>
                       <select
                         value={form.branch}
@@ -344,7 +344,7 @@ export default function AdminCountersPage() {
                         ))}
                       </select>
                     </label>
-                    <label className="text-sm text-slate-700">
+                    <label className="text-sm text-muted-foreground">
                       <span className="mb-2 block font-medium">Collection Book</span>
                       <select
                         value={form.finance_account}
@@ -372,7 +372,7 @@ export default function AdminCountersPage() {
                         </p>
                       ) : null}
                     </label>
-                    <label className="text-sm text-slate-700 md:col-span-2">
+                    <label className="text-sm text-muted-foreground md:col-span-2">
                       <span className="mb-2 block font-medium">Assigned Cashier</span>
                       <select
                         value={form.assigned_user}
@@ -387,7 +387,7 @@ export default function AdminCountersPage() {
                         ))}
                       </select>
                     </label>
-                    <label className="text-sm text-slate-700 md:col-span-2">
+                    <label className="text-sm text-muted-foreground md:col-span-2">
                       <span className="mb-2 block font-medium">Notes</span>
                       <textarea
                         rows={3}
@@ -399,7 +399,7 @@ export default function AdminCountersPage() {
                     </label>
                   </div>
 
-                  <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-muted-foreground">
                     <input
                       type="checkbox"
                       checked={form.is_active}
@@ -432,7 +432,7 @@ export default function AdminCountersPage() {
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50"
                     >
                       Reset
                     </button>
@@ -440,7 +440,7 @@ export default function AdminCountersPage() {
                       type="button"
                       onClick={() => void loadPage("refresh")}
                       disabled={refreshing}
-                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:opacity-60"
                     >
                       {refreshing ? "Refreshing..." : "Refresh"}
                     </button>

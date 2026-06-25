@@ -302,7 +302,7 @@ export default function BillingOverviewPage() {
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                     : latestPosted.status === "APPROVED"
                     ? "border-amber-200 bg-amber-50 text-amber-700"
-                    : "border-slate-300 bg-slate-100 text-slate-800"
+                    : "border-slate-300 bg-slate-100 text-foreground"
                 }
                 partyFields={[
                   {
@@ -367,7 +367,7 @@ export default function BillingOverviewPage() {
                 }))}
               />
             ) : (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-muted-foreground">
                 Post a billing invoice to preview the branded print layout here.
               </div>
             )}

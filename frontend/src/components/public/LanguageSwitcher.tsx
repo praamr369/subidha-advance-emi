@@ -24,7 +24,7 @@ export default function LanguageSwitcher({ value, className }: LanguageSwitcherP
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/80 bg-white/80 text-slate-700">
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/80 bg-white/80 text-muted-foreground">
         <Globe className="h-4 w-4" />
       </span>
       <div className="flex items-center gap-1 rounded-xl border border-white/75 bg-white/82 p-1">
@@ -37,7 +37,7 @@ export default function LanguageSwitcher({ value, className }: LanguageSwitcherP
               "rounded-lg px-2.5 py-1.5 text-xs font-semibold",
               language === value
                 ? "bg-slate-950 text-white"
-                : "text-slate-700 hover:bg-white"
+                : "text-muted-foreground hover:bg-white"
             )}
             aria-label={`Switch language to ${PUBLIC_LANGUAGE_LABELS[language]}`}
           >

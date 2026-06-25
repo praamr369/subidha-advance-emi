@@ -22,7 +22,7 @@ import {
 type Bucket = "" | "0-30" | "31-60" | "61-90" | "91-120" | "120+";
 
 const BUCKETS: { label: string; value: Bucket; color: string }[] = [
-  { label: "All", value: "", color: "bg-gray-100 text-gray-700" },
+  { label: "All", value: "", color: "bg-gray-100 text-muted-foreground" },
   { label: "0–30 days", value: "0-30", color: "bg-green-100 text-green-700" },
   { label: "31–60 days", value: "31-60", color: "bg-yellow-100 text-yellow-700" },
   { label: "61–90 days", value: "61-90", color: "bg-orange-100 text-orange-700" },
@@ -45,7 +45,7 @@ const STAGE_COLORS: Record<string, string> = {
   FIELD_VISIT: "bg-orange-100 text-orange-700",
   LEGAL: "bg-red-100 text-red-700",
   SETTLED: "bg-green-100 text-green-700",
-  WRITTEN_OFF: "bg-gray-100 text-gray-500",
+  WRITTEN_OFF: "bg-gray-100 text-muted-foreground",
 };
 
 function fmt(v: string | undefined): string {
@@ -545,7 +545,7 @@ export default function DefaultersPage() {
                     </td>
                     <td className="px-4 py-3 text-xs font-mono">{rc.contract_ref}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STAGE_COLORS[rc.stage] ?? "bg-gray-100 text-gray-600"}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STAGE_COLORS[rc.stage] ?? "bg-gray-100 text-muted-foreground"}`}>
                         {STAGE_LABELS[rc.stage] ?? rc.stage}
                       </span>
                     </td>

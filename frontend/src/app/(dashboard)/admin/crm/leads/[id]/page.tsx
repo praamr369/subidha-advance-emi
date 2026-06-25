@@ -51,10 +51,10 @@ function StageBadge({ stage }: { stage: LeadStage }) {
     KYC_PENDING: "bg-orange-100 text-orange-800",
     READY_TO_CONVERT: "bg-teal-100 text-teal-800",
     CONVERTED: "bg-green-100 text-green-800",
-    LOST: "bg-gray-100 text-gray-500",
+    LOST: "bg-gray-100 text-muted-foreground",
   };
   return (
-    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ${colors[stage] || "bg-gray-100 text-gray-600"}`}>
+    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ${colors[stage] || "bg-gray-100 text-muted-foreground"}`}>
       {LEAD_STAGE_LABELS[stage] || stage}
     </span>
   );
@@ -81,7 +81,7 @@ function TaskRow({ task, onComplete, onCancel }: {
       <td className="px-4 py-3 text-sm">
         <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
           task.status === "DONE" ? "bg-green-100 text-green-700" :
-          task.status === "CANCELLED" ? "bg-gray-100 text-gray-500" :
+          task.status === "CANCELLED" ? "bg-gray-100 text-muted-foreground" :
           overdue ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
         }`}>{task.status}</span>
       </td>
@@ -98,7 +98,7 @@ function TaskRow({ task, onComplete, onCancel }: {
             <button
               disabled={busy}
               onClick={async () => { setBusy(true); try { await onCancel(task.id); } finally { setBusy(false); } }}
-              className="rounded-lg border border-gray-300 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              className="rounded-lg border border-gray-300 bg-gray-50 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-gray-100 disabled:opacity-50"
             >
               {busy ? "…" : "Cancel"}
             </button>
@@ -124,7 +124,7 @@ function OppRow({ opp, onStageChange }: {
       <td className="px-4 py-3 text-sm">
         <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
           opp.stage === "WON" ? "bg-green-100 text-green-700" :
-          opp.stage === "LOST" ? "bg-gray-100 text-gray-500" : "bg-blue-100 text-blue-700"
+          opp.stage === "LOST" ? "bg-gray-100 text-muted-foreground" : "bg-blue-100 text-blue-700"
         }`}>{opp.stage}</span>
       </td>
       <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(opp.expected_close_date)}</td>
@@ -138,7 +138,7 @@ function OppRow({ opp, onStageChange }: {
                 onClick={async () => { setBusy(true); try { await onStageChange(opp.id, s); } finally { setBusy(false); } }}
                 className={`rounded-lg border px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
                   s === "WON" ? "border-green-300 bg-green-50 text-green-700 hover:bg-green-100" :
-                  "border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100"
+                  "border-gray-300 bg-gray-50 text-muted-foreground hover:bg-gray-100"
                 }`}
               >
                 {busy ? "…" : s}

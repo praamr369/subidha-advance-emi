@@ -226,8 +226,8 @@ function SectionCard({
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div>
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
       <div className="mt-4">{children}</div>
     </section>
@@ -243,7 +243,7 @@ function DetailValue({
 }) {
   return (
     <div>
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
       <div className="mt-1 text-sm text-foreground">{value}</div>
@@ -483,7 +483,7 @@ export default function AdminPayoutBatchDetailPage() {
             type="button"
             onClick={() => void loadPage("refresh")}
             disabled={refreshing || loading}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {refreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -586,7 +586,7 @@ export default function AdminPayoutBatchDetailPage() {
 
                 {batch.note ? (
                   <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Batch Note
                     </div>
                     <div className="mt-2 text-sm text-foreground">{batch.note}</div>
@@ -629,7 +629,7 @@ export default function AdminPayoutBatchDetailPage() {
                         onChange={(event) => setActionNote(event.target.value)}
                         rows={4}
                         placeholder="Optional finance note for finalize or cancel actions."
-                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                         disabled={acting}
                       />
                     </div>
@@ -646,7 +646,7 @@ export default function AdminPayoutBatchDetailPage() {
                           id="batch-finance-account"
                           value={selectedFinanceAccount}
                           onChange={(event) => setSelectedFinanceAccount(event.target.value)}
-                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                           disabled={acting}
                         >
                           <option value="">Leave unassigned</option>
@@ -672,7 +672,7 @@ export default function AdminPayoutBatchDetailPage() {
                           value={referenceNo}
                           onChange={(event) => setReferenceNo(event.target.value)}
                           placeholder="Transfer, bank, or UPI reference"
-                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-foreground outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                           disabled={acting}
                         />
                       </div>
@@ -713,7 +713,7 @@ export default function AdminPayoutBatchDetailPage() {
                     This batch is cancelled and remains visible for auditability only.
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-muted-foreground">
                     No lifecycle action is available for this batch state.
                   </div>
                 )}
@@ -734,22 +734,22 @@ export default function AdminPayoutBatchDetailPage() {
                   <table className="min-w-full border-separate border-spacing-0">
                     <thead>
                       <tr className="text-left">
-                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Row
                         </th>
-                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Partner / Customer
                         </th>
-                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Contract
                         </th>
-                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Amount
                         </th>
-                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Timing
                         </th>
-                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        <th className="border-b border-slate-200 bg-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Actions
                         </th>
                       </tr>
@@ -761,7 +761,7 @@ export default function AdminPayoutBatchDetailPage() {
                           <td className="border-b border-slate-200 px-4 py-3 text-sm text-foreground">
                             <div className="font-medium">#{row.id}</div>
                             {row.note ? (
-                              <div className="mt-1 text-xs text-slate-600">
+                              <div className="mt-1 text-xs text-muted-foreground">
                                 {row.note}
                               </div>
                             ) : null}
@@ -771,7 +771,7 @@ export default function AdminPayoutBatchDetailPage() {
                             <div className="font-medium">
                               {row.partner_name || "Unknown partner"}
                             </div>
-                            <div className="mt-1 text-xs text-slate-600">
+                            <div className="mt-1 text-xs text-muted-foreground">
                               {row.customer_name || "No customer linked"}
                             </div>
                           </td>
@@ -780,7 +780,7 @@ export default function AdminPayoutBatchDetailPage() {
                             <div className="font-medium">
                               {row.subscription_number || "—"}
                             </div>
-                            <div className="mt-1 text-xs text-slate-600">
+                            <div className="mt-1 text-xs text-muted-foreground">
                               {row.batch_code || "No batch"}
                               {typeof row.lucky_number === "number"
                                 ? ` · Lucky #${row.lucky_number}`
@@ -793,10 +793,10 @@ export default function AdminPayoutBatchDetailPage() {
                           </td>
 
                           <td className="border-b border-slate-200 px-4 py-3 text-sm text-foreground">
-                            <div className="text-xs text-slate-600">
+                            <div className="text-xs text-muted-foreground">
                               Settled {formatDateTime(row.settled_at)}
                             </div>
-                            <div className="mt-1 text-xs text-slate-600">
+                            <div className="mt-1 text-xs text-muted-foreground">
                               Created {formatDateTime(row.created_at)}
                             </div>
                           </td>
@@ -806,7 +806,7 @@ export default function AdminPayoutBatchDetailPage() {
                               {typeof row.subscription_id === "number" ? (
                                 <Link
                                   href={`/admin/subscriptions/${row.subscription_id}`}
-                                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                                 >
                                   Subscription
                                 </Link>
@@ -814,7 +814,7 @@ export default function AdminPayoutBatchDetailPage() {
 
                               <Link
                                 href="/admin/finance/commissions"
-                                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
                               >
                                 Commission Register
                               </Link>

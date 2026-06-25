@@ -25,7 +25,7 @@ const rows: ComparisonRow[] = [
 
 function Cell({ value }: { value: string | boolean }) {
   if (value === true) return <Check className="mx-auto h-4 w-4 text-emerald-600" aria-label="Yes" />;
-  if (value === false) return <X className="mx-auto h-4 w-4 text-slate-400" aria-label="No" />;
+  if (value === false) return <X className="mx-auto h-4 w-4 text-muted-foreground/70" aria-label="No" />;
   return <span className="text-xs text-muted-foreground">{value}</span>;
 }
 

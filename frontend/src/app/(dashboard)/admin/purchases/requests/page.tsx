@@ -28,7 +28,7 @@ function statusBadge(s: PurchaseRequest["status"]) {
     APPROVED: "bg-green-50 text-green-700",
     PARTIALLY_ORDERED: "bg-amber-50 text-amber-700",
     ORDERED: "bg-purple-50 text-purple-700",
-    CANCELLED: "bg-gray-100 text-gray-500",
+    CANCELLED: "bg-gray-100 text-muted-foreground",
   };
   return <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${map[s] ?? ""}`}>{s.replace(/_/g, " ")}</span>;
 }

@@ -169,7 +169,7 @@ export default function AMLScreeningPage() {
                     <td className="px-4 py-3">
                       <button
                         onClick={e => { e.stopPropagation(); void handleTogglePEP(s.customer_id, false); }}
-                        className="text-xs px-2 py-0.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50"
+                        className="text-xs px-2 py-0.5 rounded-full border border-gray-200 text-muted-foreground hover:bg-gray-50"
                       >
                         Not PEP
                       </button>
@@ -199,7 +199,7 @@ export default function AMLScreeningPage() {
             <div>
               <div className="font-semibold text-base mb-1">{selectedProfile.customer_name}</div>
               <div className="flex gap-2 mb-4 flex-wrap">
-                <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${selectedProfile.is_pep ? "bg-orange-50 text-orange-700 border-orange-200" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${selectedProfile.is_pep ? "bg-orange-50 text-orange-700 border-orange-200" : "bg-gray-50 text-muted-foreground border-gray-200"}`}>
                   {selectedProfile.is_pep ? "PEP" : "Not PEP"}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${selectedProfile.aml_cleared ? "bg-green-50 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"}`}>

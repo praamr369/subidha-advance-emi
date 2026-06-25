@@ -55,8 +55,8 @@ function statusClass(status: string): string {
   if (normalized === "BLOCKED_BY_APPROVAL") return "border-purple-200 bg-purple-50 text-purple-900";
   if (normalized.includes("WARNING") || normalized === "SKIPPED" || normalized === "BOUNDARY") return "border-amber-200 bg-amber-50 text-amber-950";
   if (normalized.startsWith("BLOCKED") || normalized === "LOCKED") return "border-red-200 bg-red-50 text-red-900";
-  if (normalized === "UNSUPPORTED_SOURCE" || normalized.includes("UNSUPPORTED")) return "border-slate-200 bg-slate-50 text-slate-900";
-  return "border-slate-200 bg-slate-50 text-slate-900";
+  if (normalized === "UNSUPPORTED_SOURCE" || normalized.includes("UNSUPPORTED")) return "border-slate-200 bg-slate-50 text-foreground";
+  return "border-slate-200 bg-slate-50 text-foreground";
 }
 
 function groupName(event: AccountingBridgeReadinessEvent): string {
@@ -453,12 +453,12 @@ export default function AccountingBridgeReadinessPage() {
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-            <SummaryCard label="Setup definitions" value={totalDefinitions} tone="border-slate-200 bg-slate-50 text-slate-900" />
+            <SummaryCard label="Setup definitions" value={totalDefinitions} tone="border-slate-200 bg-slate-50 text-foreground" />
             <SummaryCard label="Setup-ready" value={setupReadyCount} tone="border-blue-200 bg-blue-50 text-blue-900" />
             <SummaryCard label="Final-ready" value={finalReadyCount} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
             <SummaryCard label="Reconciled evidence" value={reconciledCount} tone="border-emerald-200 bg-white text-emerald-900" />
             <SummaryCard label="Action required" value={activeBlockerCount} tone={activeBlockerCount ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-900"} />
-            <SummaryCard label="Unsupported boundary" value={unsupportedCount} tone="border-slate-200 bg-slate-50 text-slate-900" />
+            <SummaryCard label="Unsupported boundary" value={unsupportedCount} tone="border-slate-200 bg-slate-50 text-foreground" />
           </div>
         </section>
 

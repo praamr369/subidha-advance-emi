@@ -63,14 +63,14 @@ export default async function PublicFooter() {
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.2fr_0.8fr_0.9fr] lg:px-8">
         <div className="public-card min-w-0 max-w-xl p-4 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.5)]">
           <BrandLockup logoSrc={profile.resolved_logo_src} companyName={profile.resolved_display_name} subtitle={profile.resolved_tagline} />
-          <p className="mt-2 text-xs font-medium text-slate-600 dark:text-muted-foreground">Advance EMI • Rent • Lease • Direct Sale</p>
+          <p className="mt-2 text-xs font-medium text-muted-foreground dark:text-muted-foreground">Advance EMI • Rent • Lease • Direct Sale</p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Trusted local retail support for furniture, electronics, and home appliances in {brandConfig.publicBranchLocation}.
           </p>
           <div className="mt-4 rounded-xl border border-white/75 bg-white/75 p-3 text-sm dark:border-border/70 dark:bg-[color-mix(in_oklab,var(--surface-card-elevated)_82%,transparent)]">
             <div className="font-semibold text-foreground">{trustTitle}</div>
             <p className="mt-1 text-muted-foreground">{trustDescription}</p>
-            <p className="mt-2 text-xs text-slate-500 dark:text-muted-foreground">Language: {PUBLIC_LANGUAGE_LABELS[locale]}</p>
+            <p className="mt-2 text-xs text-muted-foreground dark:text-muted-foreground">Language: {PUBLIC_LANGUAGE_LABELS[locale]}</p>
           </div>
         </div>
 
@@ -86,7 +86,7 @@ export default async function PublicFooter() {
           <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Popular categories</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {productCategoryLinks.map((category) => (
-              <span key={category} className="rounded-full border border-white/80 bg-white/80 px-3 py-1 text-xs text-slate-600 dark:border-border/70 dark:bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] dark:text-muted-foreground">
+              <span key={category} className="rounded-full border border-white/80 bg-white/80 px-3 py-1 text-xs text-muted-foreground dark:border-border/70 dark:bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] dark:text-muted-foreground">
                 {category}
               </span>
             ))}

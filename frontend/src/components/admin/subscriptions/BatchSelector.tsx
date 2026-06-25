@@ -62,7 +62,7 @@ export default function BatchSelector({ productId, value = null, disabled, onSel
           </option>
         ))}
       </select>
-      {!loading && options.length === 0 && !error ? <span className="text-xs text-slate-500">No batch available for this product.</span> : null}
+      {!loading && options.length === 0 && !error ? <span className="text-xs text-muted-foreground">No batch available for this product.</span> : null}
       {error ? <span className="text-xs text-red-600">{error}</span> : null}
     </div>
   );

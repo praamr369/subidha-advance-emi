@@ -33,7 +33,7 @@ const workflowCards: CockpitCard[] = [
   { title: "Delivery Documents", purpose: "Review delivery and handover documents generated from real delivery cases.", href: ROUTES.admin.deliveries, icon: PackageCheck, status: "Read-only" },
 ];
 
-const STATUS_CLASS: Record<CockpitCard["status"], string> = { Active: "border-emerald-200 bg-emerald-50 text-emerald-800", "Read-only": "border-blue-200 bg-blue-50 text-blue-800", "Setup required": "border-amber-200 bg-amber-50 text-amber-900", Deferred: "border-slate-200 bg-slate-100 text-slate-700" };
+const STATUS_CLASS: Record<CockpitCard["status"], string> = { Active: "border-emerald-200 bg-emerald-50 text-emerald-800", "Read-only": "border-blue-200 bg-blue-50 text-blue-800", "Setup required": "border-amber-200 bg-amber-50 text-amber-900", Deferred: "border-slate-200 bg-slate-100 text-muted-foreground" };
 
 function CockpitWorkflowCard({ card }: { card: CockpitCard }) {
   const Icon = card.icon;

@@ -41,7 +41,7 @@ const STAGE_BADGE: Record<string, string> = {
   KYC_PENDING: "bg-orange-100 text-orange-800",
   READY_TO_CONVERT: "bg-teal-100 text-teal-800",
   CONVERTED: "bg-green-100 text-green-800",
-  LOST: "bg-gray-100 text-gray-500",
+  LOST: "bg-gray-100 text-muted-foreground",
 };
 
 const SOURCES = Object.entries(LEAD_SOURCE_LABELS).map(([value, label]) => ({ value, label }));
@@ -367,7 +367,7 @@ export default function AdminCrmLeadRegisterPage() {
                           <td className="px-4 py-3 text-xs text-muted-foreground">{LEAD_SOURCE_LABELS[row.source] || row.source || "—"}</td>
                           <td className="px-4 py-3 text-xs text-muted-foreground">{row.interested_plan_type?.replace("_", " ") || "—"}</td>
                           <td className="px-4 py-3">
-                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${STAGE_BADGE[row.stage] || "bg-gray-100 text-gray-600"}`}>
+                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${STAGE_BADGE[row.stage] || "bg-gray-100 text-muted-foreground"}`}>
                               {LEAD_STAGE_LABELS[row.stage] || row.stage}
                             </span>
                           </td>

@@ -71,7 +71,7 @@ export default function AccountingBridgeReadinessIndicator({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${error || !events.length ? "border-slate-200 bg-slate-50 text-slate-900" : readinessTone(events)}`}>
+          <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${error || !events.length ? "border-slate-200 bg-slate-50 text-foreground" : readinessTone(events)}`}>
             {statusLabel}
           </span>
           <Link href={ROUTES.admin.accountingBridges} className="text-xs font-semibold text-primary hover:underline">

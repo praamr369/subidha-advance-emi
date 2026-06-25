@@ -51,8 +51,8 @@ export function PrintActions({
       )}
     >
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        <p className="text-xs text-slate-600">{description}</p>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <p className="text-xs text-muted-foreground">{description}</p>
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">

@@ -25,7 +25,7 @@ const STAGE_COLORS: Record<LeadStage, string> = {
   KYC_PENDING: "bg-orange-50 border-orange-200 text-orange-800",
   READY_TO_CONVERT: "bg-teal-50 border-teal-200 text-teal-800",
   CONVERTED: "bg-green-50 border-green-200 text-green-800",
-  LOST: "bg-gray-50 border-gray-200 text-gray-500",
+  LOST: "bg-gray-50 border-gray-200 text-muted-foreground",
 };
 
 const NEXT_STAGES: Record<LeadStage, LeadStage[]> = {
@@ -219,7 +219,7 @@ export default function AdminCrmPipelinePage() {
                   className="w-52 flex-shrink-0 rounded-xl border border-border bg-card p-3"
                 >
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STAGE_COLORS[col.stage as LeadStage] || "bg-gray-50 border-gray-200 text-gray-600"}`}>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STAGE_COLORS[col.stage as LeadStage] || "bg-gray-50 border-gray-200 text-muted-foreground"}`}>
                       {LEAD_STAGE_LABELS[col.stage as LeadStage] || col.stage}
                     </span>
                     <span className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-xs font-semibold text-muted-foreground">

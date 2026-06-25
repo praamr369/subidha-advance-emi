@@ -30,7 +30,7 @@ function toneForStatus(status: string): string {
   if (status === "READY" || status === "APPROVED" || status === "VERIFIED") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (status === "SUBMITTED" || status === "PENDING" || status === "EXPIRING_SOON") return "border-amber-200 bg-amber-50 text-amber-900";
   if (status === "REJECTED" || status === "EXPIRED" || status === "BLOCKED") return "border-red-200 bg-red-50 text-red-800";
-  return "border-slate-200 bg-slate-50 text-slate-700";
+  return "border-slate-200 bg-slate-50 text-muted-foreground";
 }
 
 function formatDate(value?: string | null): string {

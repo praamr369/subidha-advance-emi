@@ -27,7 +27,7 @@ function statusBadge(s: VendorPayment["status"]) {
   const map: Record<VendorPayment["status"], string> = {
     DRAFT: "bg-blue-50 text-blue-700",
     POSTED: "bg-green-50 text-green-700",
-    CANCELLED: "bg-gray-100 text-gray-500",
+    CANCELLED: "bg-gray-100 text-muted-foreground",
   };
   return <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${map[s] ?? ""}`}>{s}</span>;
 }

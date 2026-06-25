@@ -63,8 +63,8 @@ export default function LuckyIdSelector({ batchId, value = null, disabled, onSel
         })}
       </div>
 
-      {loading ? <span className="text-xs text-slate-500">Loading lucky IDs...</span> : null}
-      {!loading && visibleSlots.length === 0 && !error ? <span className="text-xs text-slate-500">No available lucky IDs in this batch.</span> : null}
+      {loading ? <span className="text-xs text-muted-foreground">Loading lucky IDs...</span> : null}
+      {!loading && visibleSlots.length === 0 && !error ? <span className="text-xs text-muted-foreground">No available lucky IDs in this batch.</span> : null}
       {error ? <span className="text-xs text-red-600">{error}</span> : null}
     </div>
   );

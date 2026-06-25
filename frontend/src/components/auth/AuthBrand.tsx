@@ -44,13 +44,13 @@ export default function AuthBrand({
         <div className="min-w-0">
           <div
             className={cn(
-              "truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600",
+              "truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground",
               dark && "text-slate-300"
             )}
           >
             {AUTH_BRAND.wordmark}
           </div>
-          <div className={cn("truncate text-sm font-medium text-slate-900", dark && "text-white")}>
+          <div className={cn("truncate text-sm font-medium text-foreground", dark && "text-white")}>
             {AUTH_BRAND.productLine}
           </div>
         </div>
@@ -59,7 +59,7 @@ export default function AuthBrand({
       {!compact ? (
         <div
           className={cn(
-            "mt-4 inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-700",
+            "mt-4 inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-[11px] font-medium text-muted-foreground",
             dark && "border-white/20 bg-white/10 text-slate-200"
           )}
         >

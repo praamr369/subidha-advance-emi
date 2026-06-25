@@ -71,15 +71,15 @@ export default function PaymentReceiptDocument({
         <div className="print-doc-section flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 px-3.5 py-2.5 print-doc-accent">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge label={statusLabel} tone={statusTone} />
-            <span className="text-[11px] text-slate-600">
+            <span className="text-[11px] text-muted-foreground">
               Receipt generated from posted payment records. Keep for your records.
             </span>
           </div>
           <div className="text-right">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Receipt Reference
             </div>
-            <div className="print-doc-amount text-[13px] font-semibold text-slate-900">
+            <div className="print-doc-amount text-[13px] font-semibold text-foreground">
               {receiptReference}
             </div>
           </div>
@@ -108,7 +108,7 @@ export default function PaymentReceiptDocument({
 
         <SignatureBlock />
 
-        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[13px] leading-5 text-slate-700">
+        <div className="print-doc-note print-doc-section rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[13px] leading-5 text-muted-foreground">
           {footerNote}
         </div>
 

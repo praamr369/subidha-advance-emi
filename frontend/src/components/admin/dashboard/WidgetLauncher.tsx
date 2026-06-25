@@ -112,7 +112,7 @@ export default function WidgetLauncher({
                 </span>
               </span>
 
-              <span className="mt-1 inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-slate-700 transition group-hover:text-sky-700">
+              <span className="mt-1 inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-muted-foreground transition group-hover:text-sky-700">
                 {isOpen ? (
                   <>
                     <CheckCircle2 className="h-4 w-4" />

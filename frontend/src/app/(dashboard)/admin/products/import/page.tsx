@@ -233,8 +233,8 @@ export default function AdminProductImportPage() {
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-5">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Upload CSV</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
+              <h2 className="text-lg font-semibold text-foreground">Upload CSV</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
                 Import products using CSV. This page is structured for the real
                 product catalog fields used in daily operations: name, category,
                 sub-category, SKU, unit of measure, description, and base price.
@@ -265,10 +265,10 @@ export default function AdminProductImportPage() {
               />
 
               <div className="space-y-2 text-center">
-                <div className="text-sm font-medium text-slate-900">
+                <div className="text-sm font-medium text-foreground">
                   Drag and drop a CSV here
                 </div>
-                <div className="text-sm text-slate-500">
+                <div className="text-sm text-muted-foreground">
                   or click to browse for a file
                 </div>
               </div>
@@ -276,20 +276,20 @@ export default function AdminProductImportPage() {
 
             {selectedFileMeta ? (
               <div className="rounded-xl border border-border bg-muted/30 p-4">
-                <div className="text-sm font-medium text-slate-900">
+                <div className="text-sm font-medium text-foreground">
                   Selected file
                 </div>
-                <div className="mt-2 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
+                <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
                   <div>
-                    <span className="font-medium text-slate-700">Name:</span>{" "}
+                    <span className="font-medium text-muted-foreground">Name:</span>{" "}
                     {selectedFileMeta.name}
                   </div>
                   <div>
-                    <span className="font-medium text-slate-700">Size:</span>{" "}
+                    <span className="font-medium text-muted-foreground">Size:</span>{" "}
                     {selectedFileMeta.size}
                   </div>
                   <div>
-                    <span className="font-medium text-slate-700">Type:</span>{" "}
+                    <span className="font-medium text-muted-foreground">Type:</span>{" "}
                     {selectedFileMeta.type}
                   </div>
                 </div>
@@ -301,7 +301,7 @@ export default function AdminProductImportPage() {
                 type="button"
                 onClick={handlePreviewImport}
                 disabled={isPreviewing || isUploading || !file}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPreviewing ? "Previewing..." : "Preview Uploaded CSV"}
               </button>
@@ -325,7 +325,7 @@ export default function AdminProductImportPage() {
                 type="button"
                 onClick={handleClear}
                 disabled={isUploading || isPreviewing}
-                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-muted-foreground transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Clear
               </button>
@@ -363,7 +363,7 @@ export default function AdminProductImportPage() {
 
           <aside className="space-y-4">
             <div className="rounded-xl border border-border bg-muted/30 p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Expected CSV columns
               </h3>
 
@@ -381,27 +381,27 @@ export default function AdminProductImportPage() {
                 ].map((column) => (
                   <span
                     key={column}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700"
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-muted-foreground"
                   >
                     {column}
                   </span>
                 ))}
               </div>
 
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
                 Category and sub-category should be included in the CSV so product
                 master data remains structured for filtering, inventory, billing,
                 and future rental or leasing expansion. Base price remains the total
                 contract price.
               </p>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
                 Safe rollout rule: preview first, then import. The import will not
                 post if preview still shows invalid rows.
               </p>
             </div>
 
             <div className="rounded-xl border border-border bg-muted/30 p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Preview and result summary
               </h3>
 
@@ -439,8 +439,8 @@ export default function AdminProductImportPage() {
               </div>
 
               {preview ? (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-                  <div className="font-medium text-slate-900">
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-muted-foreground">
+                  <div className="font-medium text-foreground">
                     Create candidates {preview.preview_rows.filter((row) => row.action === "create").length} ·
                     Update candidates {preview.preview_rows.filter((row) => row.action === "update").length}
                   </div>
@@ -451,20 +451,20 @@ export default function AdminProductImportPage() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-2 text-slate-600">No blocking preview errors detected.</p>
+                    <p className="mt-2 text-muted-foreground">No blocking preview errors detected.</p>
                   )}
                 </div>
               ) : null}
 
               {result?.source ? (
-                <p className="mt-4 text-sm text-slate-600">
+                <p className="mt-4 text-sm text-muted-foreground">
                   Source:{" "}
-                  <span className="font-medium text-slate-900">{result.source}</span>
+                  <span className="font-medium text-foreground">{result.source}</span>
                 </p>
               ) : null}
 
               {result?.message ? (
-                <p className="mt-2 text-sm text-slate-600">{result.message}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{result.message}</p>
               ) : null}
             </div>
 
@@ -489,7 +489,7 @@ export default function AdminProductImportPage() {
         <DataTableShell>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-slate-600">
+              <thead className="bg-slate-50 text-left text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">product_code</th>
                   <th className="px-4 py-3">name</th>
@@ -534,7 +534,7 @@ export default function AdminProductImportPage() {
           </div>
         </DataTableShell>
 
-        <div className="mt-4 text-sm text-slate-600">
+        <div className="mt-4 text-sm text-muted-foreground">
           After import, review the result in{" "}
           <Link
             href="/admin/products"

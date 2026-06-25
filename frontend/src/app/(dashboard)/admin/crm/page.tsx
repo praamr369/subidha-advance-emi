@@ -72,7 +72,7 @@ function SourceBreakdown({ rows }: { rows: CrmFunnelResponse["source_breakdown"]
                 <td className="px-4 py-2.5 text-right text-muted-foreground">{row.total}</td>
                 <td className="px-4 py-2.5 text-right text-muted-foreground">{row.converted}</td>
                 <td className="px-4 py-2.5 text-right">
-                  <span className={`font-semibold ${row.conversion_rate >= 30 ? "text-green-700" : row.conversion_rate >= 10 ? "text-yellow-700" : "text-gray-500"}`}>
+                  <span className={`font-semibold ${row.conversion_rate >= 30 ? "text-green-700" : row.conversion_rate >= 10 ? "text-yellow-700" : "text-muted-foreground"}`}>
                     {row.conversion_rate}%
                   </span>
                 </td>
@@ -262,7 +262,7 @@ export default function AdminCrmOverviewPage() {
                   <div className="text-xs text-muted-foreground">Active</div>
                 </div>
                 <div className="rounded-xl border border-border bg-card px-4 py-3 text-center">
-                  <div className="text-xl font-bold text-gray-500">{funnel.summary.lost}</div>
+                  <div className="text-xl font-bold text-muted-foreground">{funnel.summary.lost}</div>
                   <div className="text-xs text-muted-foreground">Lost</div>
                 </div>
                 <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-center">

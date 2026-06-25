@@ -7,7 +7,6 @@ from api.v1.routes import admin_hr_complete
 from api.v1.views.admin_business_setup import (
     AdminLocalSandboxResetView,
     AdminLocalSandboxSeedView,
-    AdminSetupReadinessView,
     AdminSetupSnapshotExportView,
     AdminSetupSnapshotImportView,
     AdminBusinessProfileView,
@@ -718,7 +717,6 @@ urlpatterns = [
     path("business-setup/restore/", BusinessSetupRestoreExecuteView.as_view()),
     path("business-setup/restore-jobs/", BusinessSetupRestoreJobsView.as_view()),
     path("business-setup/restore-jobs/<int:pk>/", BusinessSetupRestoreJobDetailView.as_view()),
-    path("setup-readiness/", AdminSetupReadinessView.as_view()),
     path("setup-snapshot/export/", AdminSetupSnapshotExportView.as_view()),
     path("setup-snapshot/import/", AdminSetupSnapshotImportView.as_view()),
     path("local-sandbox/seed/", AdminLocalSandboxSeedView.as_view()),

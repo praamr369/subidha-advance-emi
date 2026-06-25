@@ -35,7 +35,7 @@ function badgeClass(tone: "green" | "amber" | "red" | "blue" | "slate" | "purple
     red: "border-red-200 bg-red-50 text-red-800",
     blue: "border-blue-200 bg-blue-50 text-blue-800",
     purple: "border-purple-200 bg-purple-50 text-purple-800",
-    slate: "border-slate-200 bg-slate-50 text-slate-700",
+    slate: "border-slate-200 bg-slate-50 text-muted-foreground",
   };
   return `inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${map[tone]}`;
 }

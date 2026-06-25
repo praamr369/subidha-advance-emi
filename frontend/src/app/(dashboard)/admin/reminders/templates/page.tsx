@@ -31,7 +31,7 @@ const CHANNEL_BADGE: Record<string, string> = {
   WHATSAPP: "bg-green-50 text-green-700 border-green-200",
   SMS: "bg-orange-50 text-orange-700 border-orange-200",
   CALL: "bg-purple-50 text-purple-700 border-purple-200",
-  INTERNAL: "bg-gray-50 text-gray-600 border-gray-200",
+  INTERNAL: "bg-gray-50 text-muted-foreground border-gray-200",
 };
 
 type FormState = {
@@ -309,13 +309,13 @@ export default function NotificationTemplatesPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${CHANNEL_BADGE[t.channel] ?? "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${CHANNEL_BADGE[t.channel] ?? "bg-gray-50 text-muted-foreground border-gray-200"}`}>
                           {t.channel}
                         </span>
                         <span className="font-mono text-xs bg-muted/50 px-2 py-0.5 rounded-lg">{t.key}</span>
                         <span className="font-medium text-sm">{t.name}</span>
                         {!t.is_active && (
-                          <span className="rounded-full bg-gray-200 text-gray-500 px-2 py-0.5 text-xs">Inactive</span>
+                          <span className="rounded-full bg-gray-200 text-muted-foreground px-2 py-0.5 text-xs">Inactive</span>
                         )}
                       </div>
                       {t.subject && (

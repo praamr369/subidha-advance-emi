@@ -24,7 +24,7 @@ const toneColors = {
   default: {
     shell:
       "border-[color-mix(in_oklab,var(--surface-border-strong)_55%,transparent)] bg-[var(--surface-card-elevated)]",
-    icon: "bg-muted/50 text-slate-600",
+    icon: "bg-muted/50 text-muted-foreground",
     accent: "bg-slate-400/45",
   },
   success: {

@@ -56,10 +56,10 @@ function DetailItem({
 }) {
   return (
     <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </div>
-      <div className="mt-2 text-sm text-slate-900">{value}</div>
+      <div className="mt-2 text-sm text-foreground">{value}</div>
     </div>
   );
 }
@@ -266,10 +266,10 @@ export default function AdminSubscriptionRequestDetailPage() {
               </MobileSafeTable>
 
               <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Review note
                 </div>
-                <div className="mt-2 text-sm text-slate-900">
+                <div className="mt-2 text-sm text-foreground">
                   {text(request.review_note, "No review note recorded yet.")}
                 </div>
               </div>
@@ -357,17 +357,17 @@ export default function AdminSubscriptionRequestDetailPage() {
                           </select>
                         </label>
 
-                        <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-slate-700">
+                        <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
                           Selected customer:{" "}
-                          <span className="font-medium text-slate-900">
+                          <span className="font-medium text-foreground">
                             {selectedCustomer?.name || "No customer selected"}
                           </span>
                         </div>
                       </div>
                     ) : (
-                      <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4 text-sm text-slate-700">
+                      <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
                         Approving with create mode will create a new customer account using the request snapshot:{" "}
-                        <span className="font-medium text-slate-900">
+                        <span className="font-medium text-foreground">
                           {text(request.requested_customer_name)}
                         </span>
                         , {text(request.requested_customer_phone)},{" "}
@@ -376,7 +376,7 @@ export default function AdminSubscriptionRequestDetailPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4 text-sm text-slate-700">
+                  <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
                     This request already links customer #{request.customer_id}. Approval will use that existing customer.
                   </div>
                 )}

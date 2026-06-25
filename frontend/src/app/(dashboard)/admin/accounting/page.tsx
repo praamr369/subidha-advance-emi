@@ -160,7 +160,7 @@ const STATUS_STYLES: Record<ModuleStatus, string> = {
   READY: "border-emerald-200 bg-emerald-50 text-emerald-800",
   BLOCKED: "border-red-200 bg-red-50 text-red-800",
   PARTIAL: "border-amber-200 bg-amber-50 text-amber-900",
-  DEFERRED: "border-slate-200 bg-slate-100 text-slate-700",
+  DEFERRED: "border-slate-200 bg-slate-100 text-muted-foreground",
 };
 
 function toErrorMessage(error: unknown): string {
@@ -377,7 +377,7 @@ function ModuleCard({ module, setupBlocked, setupBlockers, readiness }: { module
             </div>
           ) : null}
           {module.deferredReason ? (
-            <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700">{module.deferredReason}</p>
+            <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-muted-foreground">{module.deferredReason}</p>
           ) : null}
         </div>
       </div>

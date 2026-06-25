@@ -104,13 +104,13 @@ export default function AuthLayoutShell({
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Secure Entry
               </div>
-              <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-900 sm:text-[1.9rem]">
+              <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground sm:text-[1.9rem]">
                 {formTitle}
               </h1>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{formSubtitle}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{formSubtitle}</p>
               <div className="mt-6">{children}</div>
 
-              <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border/80 pt-5 text-xs text-slate-500">
+              <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border/80 pt-5 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Session-safe routing

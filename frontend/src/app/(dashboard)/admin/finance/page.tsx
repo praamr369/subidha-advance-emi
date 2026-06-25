@@ -513,7 +513,7 @@ export default function AdminFinancePage() {
             type="button"
             onClick={() => void loadPage("refresh")}
             disabled={refreshing || loading}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {refreshing ? "Refreshing..." : "Refresh"}
           </button>
@@ -716,10 +716,10 @@ export default function AdminFinancePage() {
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                           <div>
-                            <div className="text-sm font-semibold text-slate-900">
+                            <div className="text-sm font-semibold text-foreground">
                               {row.finance_account_name} · {row.kind}
                             </div>
-                            <div className="mt-1 text-xs text-slate-600">
+                            <div className="mt-1 text-xs text-muted-foreground">
                               Chart {row.chart_account_code} · Branch {row.branch_name || "Shared"} · Payments {formatRupee(row.payment_total)} · Advances {formatRupee(row.advance_total)}
                             </div>
                           </div>
@@ -728,10 +728,10 @@ export default function AdminFinancePage() {
                               status={row.reconciliation_status || "UNKNOWN"}
                               label={row.reconciliation_status || "—"}
                             />
-                            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-muted-foreground">
                               Pending {formatRupee(row.pending_settlement_amount)}
                             </span>
-                            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-muted-foreground">
                               Unapplied {formatRupee(row.unapplied_advance_total)}
                             </span>
                           </div>
@@ -873,7 +873,7 @@ export default function AdminFinancePage() {
                     </button>
                     <Link
                       href={ROUTES.admin.accountingBooks}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       Open Books
                     </Link>
@@ -888,18 +888,18 @@ export default function AdminFinancePage() {
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <div className="text-sm font-semibold text-slate-900">
+                          <div className="text-sm font-semibold text-foreground">
                             {transfer.movement_no}
                           </div>
-                          <div className="mt-1 text-xs text-slate-600">
+                          <div className="mt-1 text-xs text-muted-foreground">
                             {transfer.from_finance_account_name} → {transfer.to_finance_account_name} · {formatDate(transfer.movement_date)}
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm font-semibold text-slate-900">
+                          <div className="text-sm font-semibold text-foreground">
                             {formatRupee(transfer.amount)}
                           </div>
-                          <div className="mt-1 text-xs text-slate-600">{transfer.status}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">{transfer.status}</div>
                         </div>
                       </div>
                     </div>
@@ -915,27 +915,27 @@ export default function AdminFinancePage() {
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                    <span className="font-medium text-slate-700">Subscription overdue</span>
-                    <span className="font-semibold text-slate-900">{formatRupee(overdueAmount)}</span>
+                    <span className="font-medium text-muted-foreground">Subscription overdue</span>
+                    <span className="font-semibold text-foreground">{formatRupee(overdueAmount)}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                    <span className="font-medium text-slate-700">Direct-sale unpaid</span>
-                    <span className="font-semibold text-slate-900">{formatRupee(directSalesOutstandingTotal)}</span>
+                    <span className="font-medium text-muted-foreground">Direct-sale unpaid</span>
+                    <span className="font-semibold text-foreground">{formatRupee(directSalesOutstandingTotal)}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                    <span className="font-medium text-slate-700">Recent net collection</span>
+                    <span className="font-medium text-muted-foreground">Recent net collection</span>
                     <span className="font-semibold text-emerald-700">{formatRupee(windowNet)}</span>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Link
                       href={ROUTES.admin.collections}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       Collections Workspace
                     </Link>
                     <Link
                       href={ROUTES.admin.payments}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       Payment Register
                     </Link>
@@ -949,27 +949,27 @@ export default function AdminFinancePage() {
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                    <span className="font-medium text-slate-700">Purchase bill queue</span>
-                    <span className="font-semibold text-slate-900">{purchaseQueueCount}</span>
+                    <span className="font-medium text-muted-foreground">Purchase bill queue</span>
+                    <span className="font-semibold text-foreground">{purchaseQueueCount}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                    <span className="font-medium text-slate-700">Chart of accounts</span>
-                    <span className="font-semibold text-slate-900">{chartAccountCount}</span>
+                    <span className="font-medium text-muted-foreground">Chart of accounts</span>
+                    <span className="font-semibold text-foreground">{chartAccountCount}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                    <span className="font-medium text-slate-700">Finance accounts</span>
-                    <span className="font-semibold text-slate-900">{financeAccountCount}</span>
+                    <span className="font-medium text-muted-foreground">Finance accounts</span>
+                    <span className="font-semibold text-foreground">{financeAccountCount}</span>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Link
                       href={ROUTES.admin.accountingPurchaseBills}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       Purchase Bills
                     </Link>
                     <Link
                       href={ROUTES.admin.accountingVendors}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       Vendor Ledger View
                     </Link>
@@ -1023,13 +1023,13 @@ export default function AdminFinancePage() {
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                           <div>
-                            <div className="text-sm font-semibold text-slate-900">
+                            <div className="text-sm font-semibold text-foreground">
                               {sale.sale_no || `SALE-${sale.id}`} · {sale.customer_name || sale.customer_name_snapshot || "Walk-in customer"}
                             </div>
-                            <div className="mt-1 text-sm text-slate-600">
+                            <div className="mt-1 text-sm text-muted-foreground">
                               Invoice {sale.billing_invoice_no || "—"} · {formatDate(sale.sale_date)} · Collected {formatRupee(sale.received_total)}
                             </div>
-                            <div className="mt-1 text-xs text-slate-600">
+                            <div className="mt-1 text-xs text-muted-foreground">
                               Finance account {sale.finance_account_name || "Not tagged"} · Branch {sale.branch_name || sale.branch_code || "Primary branch"}
                             </div>
                           </div>
@@ -1039,13 +1039,13 @@ export default function AdminFinancePage() {
                             </div>
                             <Link
                               href={`${ROUTES.admin.financeCollect}?workflow=direct-sale&sale_id=${sale.id}`}
-                              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                             >
                               Collect Direct Sale
                             </Link>
                             <Link
                               href={`${ROUTES.admin.billingDirectSales}?focus_sale=${sale.id}`}
-                              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                             >
                               Open Sale
                             </Link>
@@ -1075,13 +1075,13 @@ export default function AdminFinancePage() {
                       >
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                           <div>
-                            <div className="text-sm font-semibold text-slate-900">
+                            <div className="text-sm font-semibold text-foreground">
                               {row.customer_name || "Unassigned customer"} · {formatRupee(row.amount)}
                             </div>
-                            <div className="mt-1 text-sm text-slate-600">
+                            <div className="mt-1 text-sm text-muted-foreground">
                               {row.method || "Unknown method"} · {formatDate(row.payment_date)} · Collected by {row.collected_by_username || "System"}
                             </div>
-                            <div className="mt-1 text-xs text-slate-600">
+                            <div className="mt-1 text-xs text-muted-foreground">
                               Subscription {row.subscription_number || row.subscription || "—"} · Branch {row.branch_name || row.branch_code || "—"}
                             </div>
                           </div>
@@ -1097,7 +1097,7 @@ export default function AdminFinancePage() {
                             )}
                             <Link
                               href={ROUTES.admin.payments}
-                              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                              className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                             >
                               Register
                             </Link>
@@ -1153,8 +1153,8 @@ export default function AdminFinancePage() {
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-sm font-semibold text-slate-900">{vendor.vendor.name}</div>
-                            <div className="mt-1 text-xs text-slate-600">
+                            <div className="text-sm font-semibold text-foreground">{vendor.vendor.name}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">
                               {vendor.summary.posted_purchase_bill_count} posted purchase bills · {vendor.summary.posted_settlement_count} posted settlements
                             </div>
                           </div>
@@ -1164,7 +1164,7 @@ export default function AdminFinancePage() {
                             </div>
                             <Link
                               href={`${ROUTES.admin.accountingVendors}?vendor=${vendor.vendor.id}`}
-                              className="mt-1 inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                              className="mt-1 inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                             >
                               Open Vendor
                             </Link>
@@ -1182,12 +1182,12 @@ export default function AdminFinancePage() {
               >
                 <div className="space-y-3">
                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Reconciliation flags</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">{reconciliationFlags}</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Reconciliation flags</div>
+                    <div className="mt-1 text-lg font-semibold text-foreground">{reconciliationFlags}</div>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Pending commission exposure</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Pending commission exposure</div>
+                    <div className="mt-1 text-lg font-semibold text-foreground">
                       {formatRupee(summary?.summary?.pending_commission)}
                     </div>
                   </div>
@@ -1205,13 +1205,13 @@ export default function AdminFinancePage() {
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <div className="text-sm font-semibold text-slate-900">Batch #{row.id}</div>
-                              <div className="mt-1 text-xs text-slate-600">
+                              <div className="text-sm font-semibold text-foreground">Batch #{row.id}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">
                                 {row.status} · {row.commission_count} commission rows
                               </div>
                             </div>
-                            <div className="text-right text-xs text-slate-600">
-                              <div className="font-semibold text-slate-900">{formatRupee(row.total_amount)}</div>
+                            <div className="text-right text-xs text-muted-foreground">
+                              <div className="font-semibold text-foreground">{formatRupee(row.total_amount)}</div>
                               <div>{formatDateTime(row.created_at)}</div>
                             </div>
                           </div>
@@ -1222,19 +1222,19 @@ export default function AdminFinancePage() {
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Link
                       href={buildAdminReconciliationRoute({ flagged: true })}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       Flagged Queue
                     </Link>
                     <Link
                       href={ROUTES.admin.financePayoutBatches}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       Payout Batches
                     </Link>
                     <Link
                       href={ROUTES.admin.financeRefunds}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       Refunds
                     </Link>
@@ -1250,23 +1250,23 @@ export default function AdminFinancePage() {
               >
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Direct Sale</div>
-                    <div className="mt-2 text-xl font-semibold text-slate-900">{formatRupee(directSalesGross)}</div>
-                    <div className="mt-1 text-sm text-slate-600">{directSalesCount} direct-sale documents in selected window</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Direct Sale</div>
+                    <div className="mt-2 text-xl font-semibold text-foreground">{formatRupee(directSalesGross)}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">{directSalesCount} direct-sale documents in selected window</div>
                     <Link
                       href={ROUTES.admin.billingDirectSales}
-                      className="mt-3 inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="mt-3 inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       Open Direct Sale
                     </Link>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Subscription Sale</div>
-                    <div className="mt-2 text-xl font-semibold text-slate-900">{formatRupee(outstandingReceivables)}</div>
-                    <div className="mt-1 text-sm text-slate-600">{formatRupee(overdueAmount)} overdue from EMI side</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Subscription Sale</div>
+                    <div className="mt-2 text-xl font-semibold text-foreground">{formatRupee(outstandingReceivables)}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">{formatRupee(overdueAmount)} overdue from EMI side</div>
                     <Link
                       href={ROUTES.admin.subscriptions}
-                      className="mt-3 inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="mt-3 inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       Open Subscriptions
                     </Link>
@@ -1281,25 +1281,25 @@ export default function AdminFinancePage() {
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Link
                     href={ROUTES.admin.accountingBooksCash}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                   >
                     Cash Book
                   </Link>
                   <Link
                     href={ROUTES.admin.accountingBooksBank}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                   >
                     Bank Book
                   </Link>
                   <Link
                     href={ROUTES.admin.accountingBooksUpi}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                   >
                     UPI Book
                   </Link>
                   <Link
                     href={ROUTES.admin.accountingChartOfAccounts}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:border-slate-400 hover:bg-slate-100"
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-foreground transition hover:border-slate-400 hover:bg-slate-100"
                   >
                     Chart of Accounts
                   </Link>

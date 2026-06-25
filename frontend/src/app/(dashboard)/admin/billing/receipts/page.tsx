@@ -162,7 +162,7 @@ export default function BillingReceiptsPage() {
             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
             : latestReceipt?.status === "VOID"
             ? "border-red-200 bg-red-50 text-red-700"
-            : "border-slate-300 bg-slate-100 text-slate-800"
+            : "border-slate-300 bg-slate-100 text-foreground"
         }
         partyFields={[
           {

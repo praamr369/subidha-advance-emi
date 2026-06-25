@@ -167,7 +167,7 @@ export default function PODArchivePage() {
                   <td className="px-4 py-3 text-center text-xs font-semibold">{p.photos}</td>
                   <td className="px-4 py-3 text-center">{p.signature ? "✓" : "—"}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.status === "CAPTURED" ? "bg-blue-50 text-blue-700 border border-blue-200" : p.status === "VERIFIED" ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-50 text-gray-600 border border-gray-200"}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.status === "CAPTURED" ? "bg-blue-50 text-blue-700 border border-blue-200" : p.status === "VERIFIED" ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-50 text-muted-foreground border border-gray-200"}`}>
                       {p.status}
                     </span>
                   </td>

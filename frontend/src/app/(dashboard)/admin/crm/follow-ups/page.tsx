@@ -74,7 +74,7 @@ function TaskRow({
     task.status === "DONE"
       ? "bg-green-100 text-green-700"
       : task.status === "CANCELLED"
-      ? "bg-gray-100 text-gray-500"
+      ? "bg-gray-100 text-muted-foreground"
       : task.is_overdue
       ? "bg-orange-100 text-orange-700"
       : "bg-blue-100 text-blue-700";

@@ -8,7 +8,7 @@ function OtpDigitSlot(props: SlotProps) {
   return (
     <div
       className={cn(
-        "relative flex h-12 w-10 items-center justify-center border-y border-r border-slate-300 bg-white text-base font-semibold tabular-nums text-slate-900 transition-all first:rounded-l-xl first:border-l last:rounded-r-xl",
+        "relative flex h-12 w-10 items-center justify-center border-y border-r border-slate-300 bg-white text-base font-semibold tabular-nums text-foreground transition-all first:rounded-l-xl first:border-l last:rounded-r-xl",
         props.isActive &&
           "z-10 ring-2 ring-slate-500/40 ring-offset-2 ring-offset-white"
       )}

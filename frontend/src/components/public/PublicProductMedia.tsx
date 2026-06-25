@@ -61,12 +61,12 @@ export default function PublicProductMedia({
           onError={() => setFailedSrc(resolvedSrc)}
         />
       ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),rgba(226,232,240,0.96))] text-slate-600">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),rgba(226,232,240,0.96))] text-muted-foreground">
           <div className="rounded-full border border-white/80 bg-white/80 p-3 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.76)]">
             <ImageOff className="h-5 w-5" />
           </div>
           <div className="text-sm font-medium">{fallbackLabel}</div>
-          <div className="max-w-[14rem] text-center text-xs text-slate-500">
+          <div className="max-w-[14rem] text-center text-xs text-muted-foreground">
             Uploaded product media will appear here once the catalog image is available.
           </div>
         </div>

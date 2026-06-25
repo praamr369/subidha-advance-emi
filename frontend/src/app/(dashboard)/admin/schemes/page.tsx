@@ -207,7 +207,7 @@ export default function SchemesPage() {
       ? "bg-green-100 text-green-700"
       : s.is_active
       ? "bg-yellow-100 text-yellow-700"
-      : "bg-gray-100 text-gray-500";
+      : "bg-gray-100 text-muted-foreground";
 
   const statusLabel = (s: EMIScheme) =>
     s.is_currently_active ? "Active" : s.is_active ? "Scheduled / Expired" : "Inactive";

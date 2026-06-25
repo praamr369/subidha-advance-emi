@@ -12,12 +12,12 @@ import {
 } from "@/services/billing";
 
 const STATUS_TONE: Record<InvoiceDeliveryStatus, string> = {
-  NOT_REQUIRED: "border-slate-200 bg-slate-50 text-slate-600",
+  NOT_REQUIRED: "border-slate-200 bg-slate-50 text-muted-foreground",
   PENDING_DELIVERY: "border-amber-200 bg-amber-50 text-amber-700",
   PARTIALLY_DELIVERED: "border-sky-200 bg-sky-50 text-sky-700",
   DELIVERED: "border-emerald-200 bg-emerald-50 text-emerald-700",
   RETURNED: "border-indigo-200 bg-indigo-50 text-indigo-700",
-  CANCELLED: "border-slate-300 bg-slate-100 text-slate-700",
+  CANCELLED: "border-slate-300 bg-slate-100 text-muted-foreground",
   BLOCKED: "border-rose-200 bg-rose-50 text-rose-700",
 };
 

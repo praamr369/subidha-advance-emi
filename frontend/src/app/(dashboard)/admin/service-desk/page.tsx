@@ -416,13 +416,13 @@ export default function AdminServiceDeskOverviewPage() {
                             <div className="font-medium text-foreground">
                               {item.case_no} · {item.issue_summary}
                             </div>
-                            <div className="text-sm text-slate-600">
+                            <div className="text-sm text-muted-foreground">
                               {item.case_type} · {item.status}
                               {item.billing_invoice_no ? ` · ${item.billing_invoice_no}` : ""}
                               {item.delivery_reference ? ` · ${item.delivery_reference}` : ""}
                             </div>
                           </div>
-                          <div className="text-right text-xs text-slate-600">
+                          <div className="text-right text-xs text-muted-foreground">
                             <div>{item.finance_status}</div>
                             <div>{formatDateTime(item.created_at)}</div>
                           </div>
@@ -467,14 +467,14 @@ export default function AdminServiceDeskOverviewPage() {
                             <div className="font-medium text-foreground">
                               Complaint #{item.id} · {item.customer_name || "Customer"}
                             </div>
-                            <div className="text-sm text-slate-600">
+                            <div className="text-sm text-muted-foreground">
                               {item.category} · {item.status}
                               {item.linked_service_case_no
                                 ? ` · ${item.linked_service_case_no}`
                                 : " · No case linked yet"}
                             </div>
                           </div>
-                          <div className="text-right text-xs text-slate-600">
+                          <div className="text-right text-xs text-muted-foreground">
                             <div>{item.linked_service_case_status || "Support only"}</div>
                             <div>{formatDateTime(item.created_at)}</div>
                           </div>

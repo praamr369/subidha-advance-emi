@@ -72,7 +72,7 @@ function statusTone(status?: string): string {
     case "REJECTED":
       return "border-red-200 bg-red-50 text-red-700";
     case "CANCELLED":
-      return "border-slate-200 bg-slate-100 text-slate-700";
+      return "border-slate-200 bg-slate-100 text-muted-foreground";
     default:
       return "border-border bg-muted text-foreground";
   }

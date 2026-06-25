@@ -40,7 +40,7 @@ const MODULES: ModuleDef[] = [
     description:
       "Toggle enterprise control policies — e.g. cash variance approval requirement.",
     Icon: Settings2,
-    iconCls: "bg-slate-50 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300",
+    iconCls: "bg-slate-50 text-muted-foreground dark:bg-slate-800/50 dark:text-slate-300",
     dotCls: "bg-slate-400",
   },
   {

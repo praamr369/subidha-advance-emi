@@ -32,7 +32,7 @@ function toneClassName(tone: Tone): string {
       return "border-sky-200 bg-sky-50 text-sky-800";
     case "default":
     default:
-      return "border-slate-300 bg-slate-100 text-slate-800";
+      return "border-slate-300 bg-slate-100 text-foreground";
   }
 }
 
@@ -111,13 +111,13 @@ export function BrandMasthead({
         className="h-12 w-12 rounded-xl border border-slate-300 bg-white object-contain p-2"
       />
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           {brandConfig.companyName}
         </div>
-        <div className="text-[12px] font-medium text-slate-900">
+        <div className="text-[12px] font-medium text-foreground">
           {brandConfig.publicProgramName}
         </div>
-        <div className="text-[11px] text-slate-600">
+        <div className="text-[11px] text-muted-foreground">
           {branchLabel || brandConfig.publicBranchLocation}
         </div>
       </div>
@@ -142,7 +142,7 @@ export function DocumentTitleBar({
         </h2>
         {status ? <div>{status}</div> : null}
       </div>
-      {subtitle ? <p className="mt-1.5 text-[13px] leading-5 text-slate-700">{subtitle}</p> : null}
+      {subtitle ? <p className="mt-1.5 text-[13px] leading-5 text-muted-foreground">{subtitle}</p> : null}
     </div>
   );
 }
@@ -220,12 +220,12 @@ export function SafeValueRow({
 
   return (
     <div className={cn("flex items-start justify-between gap-3", className)}>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </span>
       <span
         className={cn(
-          "text-right text-slate-900",
+          "text-right text-foreground",
           compact ? "text-[12px]" : "text-[13px]",
           emphasize ? "print-doc-amount font-semibold" : "font-medium"
         )}
@@ -252,18 +252,18 @@ export function ReceiptFieldGrid({
 
   return (
     <section className={cn("print-doc-section space-y-2.5", className)}>
-      <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+      <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {title}
       </h3>
       <div className={cn("receipt-document-grid grid gap-2.5", columns)}>
         {visibleFields.map((field) => (
           <div key={field.label} className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {field.label}
             </div>
             <div
               className={cn(
-                "mt-1 text-[13px] leading-5 text-slate-900",
+                "mt-1 text-[13px] leading-5 text-foreground",
                 field.emphasize ? "print-doc-amount font-semibold" : "font-medium"
               )}
             >
@@ -316,23 +316,23 @@ export function LineItemsTable({
 
   return (
     <section className={cn("print-doc-section space-y-2.5", className)}>
-      <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+      <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {title}
       </h3>
       <div className="overflow-x-auto rounded-xl border border-slate-300 bg-white">
         <table className="min-w-full border-collapse text-[12px] leading-5">
           <thead className="print-doc-accent">
             <tr>
-              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Description
               </th>
-              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Qty
               </th>
-              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Rate
               </th>
-              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+              <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {amountColumnLabel}
               </th>
             </tr>
@@ -340,15 +340,15 @@ export function LineItemsTable({
           <tbody>
             {visibleItems.map((item, index) => (
               <tr key={`${index}-${String(item.description)}`} className="border-t border-slate-200">
-                <td className="px-3 py-2 text-slate-900">
+                <td className="px-3 py-2 text-foreground">
                   <div className="font-medium">{item.description}</div>
                   {item.note && !isDisplayEmpty(item.note) ? (
-                    <div className="mt-0.5 text-[11px] text-slate-600">{item.note}</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">{item.note}</div>
                   ) : null}
                 </td>
-                <td className="px-3 py-2 text-right text-slate-700">{item.quantity ?? "—"}</td>
-                <td className="px-3 py-2 text-right text-slate-700">{item.rate ?? "—"}</td>
-                <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                <td className="px-3 py-2 text-right text-muted-foreground">{item.quantity ?? "—"}</td>
+                <td className="px-3 py-2 text-right text-muted-foreground">{item.rate ?? "—"}</td>
+                <td className="px-3 py-2 text-right font-semibold text-foreground">
                   {item.amount ?? "—"}
                 </td>
               </tr>
@@ -371,7 +371,7 @@ export function SummaryBlock({
 }) {
   return (
     <section className={cn("print-doc-section space-y-2.5", className)}>
-      <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+      <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {title}
       </h3>
       {children}
@@ -398,12 +398,12 @@ export function AmountSummary({
           <tbody>
             {visibleRows.map((row, index) => (
               <tr key={`${row.label}-${index}`} className="border-t border-slate-200 first:border-t-0">
-                <td className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                <td className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   {row.label}
                 </td>
                 <td
                   className={cn(
-                    "px-3 py-2 text-right text-slate-900",
+                    "px-3 py-2 text-right text-foreground",
                     row.emphasize ? "print-doc-amount text-[13px] font-semibold" : "font-medium"
                   )}
                 >
@@ -456,13 +456,13 @@ export function BankQrBlock({
         />
         {showQr ? (
           <div className="rounded-xl border border-slate-300 bg-white p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               QR / Payment Reference
             </div>
-            <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-[12px] text-slate-700">
-              <div className="font-semibold text-slate-900">{qrLabel}</div>
+            <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-[12px] text-muted-foreground">
+              <div className="font-semibold text-foreground">{qrLabel}</div>
               {!isDisplayEmpty(qrReference) ? (
-                <div className="mt-1 text-[11px] text-slate-600">{qrReference}</div>
+                <div className="mt-1 text-[11px] text-muted-foreground">{qrReference}</div>
               ) : null}
             </div>
           </div>
@@ -491,10 +491,10 @@ export function TermsBlock({
         className
       )}
     >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         {title}
       </div>
-      <ul className="mt-2 list-disc space-y-1.5 pl-4 text-[12px] leading-5 text-slate-700">
+      <ul className="mt-2 list-disc space-y-1.5 pl-4 text-[12px] leading-5 text-muted-foreground">
         {visibleTerms.map((term, index) => (
           <li key={`term-${index}`}>{term}</li>
         ))}
@@ -519,16 +519,16 @@ export function SignatureBlock({
   return (
     <section className={cn("print-doc-section grid gap-4 sm:grid-cols-2", className)}>
       <div className="rounded-lg border border-slate-300 bg-white px-3.5 py-3">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           {leftLabel}
         </div>
-        <div className="mt-8 border-t border-slate-300 pt-2 text-[11px] text-slate-600">{leftHint}</div>
+        <div className="mt-8 border-t border-slate-300 pt-2 text-[11px] text-muted-foreground">{leftHint}</div>
       </div>
       <div className="rounded-lg border border-slate-300 bg-white px-3.5 py-3">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           {rightLabel}
         </div>
-        <div className="mt-8 border-t border-slate-300 pt-2 text-[11px] text-slate-600">{rightHint}</div>
+        <div className="mt-8 border-t border-slate-300 pt-2 text-[11px] text-muted-foreground">{rightHint}</div>
       </div>
     </section>
   );
@@ -546,7 +546,7 @@ export function DocumentFooter({
   return (
     <footer
       className={cn(
-        "print-doc-section flex items-end justify-between gap-3 border-t border-slate-300 pt-3 text-[11px] text-slate-600",
+        "print-doc-section flex items-end justify-between gap-3 border-t border-slate-300 pt-3 text-[11px] text-muted-foreground",
         className
       )}
     >
