@@ -153,6 +153,12 @@ export default function DisputesPage() {
         { label: "Customer Disputes" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Total Disputes", value: loading ? "—" : count, tone: "info" },
+        { label: "Open", value: loading ? "—" : rows.filter(r => String(r.stage).toUpperCase() === "OPEN").length, tone: !loading && rows.filter(r => String(r.stage).toUpperCase() === "OPEN").length > 0 ? "warning" : "success" },
+        { label: "Escalated", value: loading ? "—" : rows.filter(r => String(r.stage).toUpperCase() === "ESCALATED").length, tone: !loading && rows.filter(r => String(r.stage).toUpperCase() === "ESCALATED").length > 0 ? "danger" : "success" },
+        { label: "Resolved", value: loading ? "—" : rows.filter(r => String(r.stage).toUpperCase() === "RESOLVED").length, tone: "success" },
+      ]}
     >
       <div className="flex flex-wrap gap-2">
         <button

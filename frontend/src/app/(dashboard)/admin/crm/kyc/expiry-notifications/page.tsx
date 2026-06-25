@@ -95,6 +95,12 @@ export default function KycExpiryNotificationsPage() {
         { label: "Expiry Notifications" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Expiring (window)", value: previewData ? previewData.total : "—", tone: "info" },
+        { label: "Overdue", value: previewData ? previewData.overdue_count : "—", tone: previewData && previewData.overdue_count > 0 ? "danger" : "success" },
+        { label: "Within 14 days", value: previewData ? previewData.expiring_14d_count : "—", tone: previewData && previewData.expiring_14d_count > 0 ? "warning" : "success" },
+        { label: "Within 30 days", value: previewData ? previewData.expiring_30d_count : "—", tone: "default" },
+      ]}
     >
 
       {/* Controls */}

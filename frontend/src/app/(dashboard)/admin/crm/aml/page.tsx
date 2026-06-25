@@ -128,6 +128,12 @@ export default function AMLScreeningPage() {
         { label: "AML Screening" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Screenings", value: loading ? "—" : count, tone: "info" },
+        { label: "Watchlist Hits", value: loading ? "—" : screenings.filter(s => s.result === "WATCHLIST_HIT").length, tone: !loading && screenings.filter(s => s.result === "WATCHLIST_HIT").length > 0 ? "warning" : "success" },
+        { label: "Sanctioned / PEP", value: loading ? "—" : screenings.filter(s => s.result === "SANCTIONED" || s.result === "PEP_CONFIRMED").length, tone: !loading && screenings.filter(s => s.result === "SANCTIONED" || s.result === "PEP_CONFIRMED").length > 0 ? "danger" : "success" },
+        { label: "Pending", value: loading ? "—" : screenings.filter(s => s.result === "PENDING").length, tone: !loading && screenings.filter(s => s.result === "PENDING").length > 0 ? "warning" : "success" },
+      ]}
     >
       <div className="flex flex-wrap gap-2">
         <button

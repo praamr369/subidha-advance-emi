@@ -97,6 +97,12 @@ export default function LeaderboardPage() {
         { label: "Staff Leaderboard" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Staff Ranked", value: loading ? "—" : board.length, tone: "info" },
+        { label: "Leads Assigned", value: loading ? "—" : board.reduce((sum, r) => sum + Number(r.leads_assigned || 0), 0), tone: "default" },
+        { label: "Conversions", value: loading ? "—" : board.reduce((sum, r) => sum + Number(r.leads_converted || 0), 0), tone: "success" },
+        { label: "Targets Set", value: loading ? "—" : targets.length, tone: "default" },
+      ]}
     >
       {/* Period selector */}
       <ERPSectionShell title="Period">

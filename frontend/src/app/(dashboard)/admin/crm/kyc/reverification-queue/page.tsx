@@ -72,6 +72,11 @@ export default function KYCReverificationQueuePage() {
         { label: "Re-verification Queue" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Total Docs", value: loading ? "—" : count, tone: "info" },
+        { label: "Overdue", value: loading ? "—" : docs.filter(d => d.overdue).length, tone: !loading && docs.filter(d => d.overdue).length > 0 ? "danger" : "success" },
+        { label: "Due ≤ 14 days", value: loading ? "—" : docs.filter(d => !d.overdue && d.days_left !== null && d.days_left <= 14).length, tone: !loading && docs.filter(d => !d.overdue && d.days_left !== null && d.days_left <= 14).length > 0 ? "warning" : "success" },
+      ]}
     >
       <div className="flex flex-wrap gap-2">
         <select
@@ -82,20 +87,6 @@ export default function KYCReverificationQueuePage() {
           {WINDOW_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <button onClick={() => void load()} className="h-9 px-4 rounded-xl border border-border bg-card text-sm">Refresh</button>
-      </div>
-
-      {/* Summary bar */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        {[
-          { label: "Total Docs", value: count },
-          { label: "Overdue", value: docs.filter(d => d.overdue).length, cls: "text-red-600" },
-          { label: "Due ≤ 14 days", value: docs.filter(d => !d.overdue && d.days_left !== null && d.days_left <= 14).length, cls: "text-orange-600" },
-        ].map(card => (
-          <div key={card.label} className="rounded-xl border border-border bg-card p-4">
-            <div className="text-xs text-muted-foreground">{card.label}</div>
-            <div className={`text-lg font-bold mt-1 ${card.cls ?? ""}`}>{card.value}</div>
-          </div>
-        ))}
       </div>
 
       {loading && <div className="text-sm text-muted-foreground py-10 text-center">Loading…</div>}
