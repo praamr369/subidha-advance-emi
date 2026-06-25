@@ -76,3 +76,27 @@ class AdminAccountingPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
     max_page_size = 500
+
+
+class AdminOptInPagination(PageNumberPagination):
+    """Backward-compatible, opt-in pagination for admin list endpoints.
+
+    Pagination only activates when the request explicitly asks for it via
+    ``?page=`` or ``?page_size=``. Without those params the viewset returns the
+    full result array exactly as before, so existing frontend callers that
+    expect raw arrays (or that fetch a complete filtered set to compute counts)
+    keep working unchanged. Migrated tables opt in by sending ``?page=``.
+    """
+
+    page_size = 50
+    page_size_query_param = "page_size"
+    max_page_size = 500
+
+    def paginate_queryset(self, queryset, request, view=None):
+        wants_pagination = (
+            request.query_params.get(self.page_query_param) is not None
+            or request.query_params.get(self.page_size_query_param) is not None
+        )
+        if not wants_pagination:
+            return None
+        return super().paginate_queryset(queryset, request, view=view)

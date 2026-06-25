@@ -17,28 +17,45 @@ function money(value: string | undefined): string {
   return `₹${Number(value || 0).toFixed(2)}`;
 }
 
+const PAGE_SIZE = 50;
+
 export default function AdminEmiLedgerPage() {
   const [status, setStatus] = useState("");
   const [overdueOnly, setOverdueOnly] = useState(false);
+  const [page, setPage] = useState(1);
   const [rows, setRows] = useState<EmiRecord[]>([]);
+  const [count, setCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loadedKey, setLoadedKey] = useState("");
+  const [exporting, setExporting] = useState(false);
 
-  const requestKey = `${status}|${overdueOnly}`;
+  const requestKey = `${status}|${overdueOnly}|${page}`;
+
+  // Reset to first page whenever a filter changes.
+  function applyStatus(next: string) {
+    setStatus(next);
+    setPage(1);
+  }
+  function applyOverdueOnly(next: boolean) {
+    setOverdueOnly(next);
+    setPage(1);
+  }
 
   useEffect(() => {
     let cancelled = false;
 
-    listEmis({ status: status || undefined, overdue_only: overdueOnly })
+    listEmis({ status: status || undefined, overdue_only: overdueOnly, page, page_size: PAGE_SIZE })
       .then((payload) => {
         if (cancelled) return;
         setRows(payload.results || []);
+        setCount(payload.count ?? payload.results?.length ?? 0);
         setError(null);
         setLoadedKey(requestKey);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         setRows([]);
+        setCount(0);
         setError(err instanceof Error ? err.message : "Failed to load advance EMI ledger");
         setLoadedKey(requestKey);
       });
@@ -46,13 +63,44 @@ export default function AdminEmiLedgerPage() {
     return () => {
       cancelled = true;
     };
-  }, [overdueOnly, requestKey, status]);
+  }, [overdueOnly, page, requestKey, status]);
 
   const loading = loadedKey !== requestKey;
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const overdueCount = useMemo(
     () => rows.filter((row) => row.status === "OVERDUE" || Number(row.overdue_days ?? 0) > 0).length,
     [rows]
   );
+
+  // Export the full filtered set on demand (no page param -> backend returns all
+  // matching rows), so CSV export stays complete even though the table is paged.
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const payload = await listEmis({ status: status || undefined, overdue_only: overdueOnly });
+      downloadCsv(
+        "emi-ledger.csv",
+        [
+          { key: "month_no", header: "month_no" },
+          { key: "subscription", header: "subscription" },
+          { key: "due_date", header: "due_date" },
+          { key: "amount", header: "amount" },
+          { key: "total_paid", header: "paid", format: (row) => row.total_paid || row.paid_amount || "" },
+          { key: "waived_amount", header: "waived_amount" },
+          {
+            key: "balance_amount",
+            header: "outstanding",
+            format: (row) => row.balance_amount || row.outstanding_amount || "",
+          },
+          { key: "status", header: "status" },
+          { key: "lucky_number", header: "lucky_number" },
+        ],
+        payload.results || []
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <ERPPageShell
@@ -68,8 +116,9 @@ export default function AdminEmiLedgerPage() {
       ]}
       statusBadge={{ label: "EMI Operations", tone: "info" }}
       stats={[
-        { label: "Visible Rows", value: String(rows.length) },
-        { label: "Overdue Rows", value: String(overdueCount), tone: overdueCount > 0 ? "warning" : undefined },
+        { label: "Total Rows", value: loading ? "—" : String(count) },
+        { label: "Page", value: `${page} / ${totalPages}` },
+        { label: "Overdue (page)", value: String(overdueCount), tone: overdueCount > 0 ? "warning" : undefined },
         { label: "Filter", value: status || "ALL" },
       ]}
     >
@@ -84,7 +133,7 @@ export default function AdminEmiLedgerPage() {
                 <span className="font-medium">Status</span>
                 <select
                   value={status}
-                  onChange={(event) => setStatus(event.target.value)}
+                  onChange={(event) => applyStatus(event.target.value)}
                   className="h-11 rounded-xl border border-border bg-background px-3"
                 >
                   <option value="">All status</option>
@@ -98,38 +147,18 @@ export default function AdminEmiLedgerPage() {
                 <input
                   type="checkbox"
                   checked={overdueOnly}
-                  onChange={(event) => setOverdueOnly(event.target.checked)}
+                  onChange={(event) => applyOverdueOnly(event.target.checked)}
                 />
                 Overdue only
               </label>
             </div>
             <button
               type="button"
-              disabled={rows.length === 0}
-              onClick={() =>
-                downloadCsv(
-                  "emi-ledger.csv",
-                  [
-                    { key: "month_no", header: "month_no" },
-                    { key: "subscription", header: "subscription" },
-                    { key: "due_date", header: "due_date" },
-                    { key: "amount", header: "amount" },
-                    { key: "total_paid", header: "paid", format: (row) => row.total_paid || row.paid_amount || "" },
-                    { key: "waived_amount", header: "waived_amount" },
-                    {
-                      key: "balance_amount",
-                      header: "outstanding",
-                      format: (row) => row.balance_amount || row.outstanding_amount || "",
-                    },
-                    { key: "status", header: "status" },
-                    { key: "lucky_number", header: "lucky_number" },
-                  ],
-                  rows
-                )
-              }
+              disabled={count === 0 || exporting}
+              onClick={() => void handleExport()}
               className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Export Current View
+              {exporting ? "Exporting…" : "Export All (filtered)"}
             </button>
           </div>
         </TableToolbar>
@@ -212,6 +241,33 @@ export default function AdminEmiLedgerPage() {
                 />
               </MobileSafeTable>
             </DataTableShell>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground">
+                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, count)} of {count}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  className="h-9 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  className="h-9 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </FormSection>
         ) : null}
       </div>

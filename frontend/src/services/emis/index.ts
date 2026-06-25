@@ -29,6 +29,7 @@ export type EmiQuery = {
   overdue_only?: boolean;
   subscription?: string | number;
   page?: number;
+  page_size?: number;
 };
 
 function buildQuery(params: EmiQuery = {}): string {
@@ -39,6 +40,7 @@ function buildQuery(params: EmiQuery = {}): string {
     search.set("subscription", String(params.subscription));
   }
   if (params.page) search.set("page", String(params.page));
+  if (params.page_size) search.set("page_size", String(params.page_size));
   const query = search.toString();
   return query ? `?${query}` : "";
 }

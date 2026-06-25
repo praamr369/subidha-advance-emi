@@ -27,6 +27,7 @@ from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from accounts.models import User, UserRole
 from accounts.capabilities import require_capability
 from accounting.services.finance_account_readiness import FinanceAccountPostingReadinessError
+from api.v1.pagination import AdminOptInPagination
 from api.v1.permissions import IsAdmin
 from api.v1.throttles.auth_password_reset import PaymentMutationThrottle
 from api.v1.serializers.admin_resources import (
@@ -1277,6 +1278,7 @@ class EmiAdminViewSet(AdminOnlyModelViewSet):
         .order_by("due_date", "id")
     )
     serializer_class = EmiAdminSerializer
+    pagination_class = AdminOptInPagination
 
     def get_queryset(self):
         queryset = super().get_queryset()
