@@ -70,6 +70,11 @@ export default function AdminInventoryReservationsPage() {
         { label: "Reservations" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Reservations", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Reserved Qty", value: loading ? "—" : rows.reduce((s, r) => s + Number(r.reserved_qty || 0), 0), tone: "default" },
+        { label: "Fulfilled Qty", value: loading ? "—" : rows.reduce((s, r) => s + Number(r.fulfilled_qty || 0), 0), tone: "success" },
+      ]}
     >
       <ERPAuditNote title="Read-only" tone="info">
         Stock reservations are system-managed. To release a reservation, use the relevant

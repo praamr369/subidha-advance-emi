@@ -108,6 +108,11 @@ export default function InventoryLedgerPage() {
         { label: "Ledger" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Ledger Entries", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Total In", value: loading ? "—" : rows.reduce((s, r) => s + Number(r.quantity_in || 0), 0), tone: "success" },
+        { label: "Total Out", value: loading ? "—" : rows.reduce((s, r) => s + Number(r.quantity_out || 0), 0), tone: "default" },
+      ]}
     >
       <WorkspaceDirectory
         title="Inventory route map"

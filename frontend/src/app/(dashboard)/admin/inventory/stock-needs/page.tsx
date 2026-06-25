@@ -53,6 +53,9 @@ export default function StockNeedsPage() {
         { label: "Readiness", href: ROUTES.admin.inventoryReadiness, variant: "secondary" },
         { label: "Purchase needs (legacy workspace)", href: ROUTES.admin.inventoryPurchaseNeeds, variant: "secondary" },
       ]}
+      stats={[
+        { label: "Need Signals", value: loading ? "—" : count, tone: !loading && count > 0 ? "warning" : "success" },
+      ]}
     >
       <div className="space-y-6">
         <div className="flex flex-wrap gap-2 text-sm">

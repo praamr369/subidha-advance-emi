@@ -57,6 +57,9 @@ export default function AdminInventoryDemandPlanningPage() {
         { label: "Demand Planning" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Demand Lines", value: loading ? "—" : rows.length, tone: "info" },
+      ]}
     >
       <ERPSectionShell
         title="Demand by Product"

@@ -49,6 +49,10 @@ export default function InventoryProfilesPage() {
         { label: "Profiles" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "Profiles", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Tracking Active", value: loading ? "—" : rows.filter(r => String(r.stock_tracking_status || "").toUpperCase() === "ACTIVE").length, tone: "success" },
+      ]}
     >
       <ERPSectionShell
         title="Guidance"

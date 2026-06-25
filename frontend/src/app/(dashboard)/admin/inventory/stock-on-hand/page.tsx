@@ -102,6 +102,12 @@ export default function InventoryStockOnHandPage() {
         { label: "Stock On Hand" },
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
+      stats={[
+        { label: "SKUs Tracked", value: loading ? "—" : rows.length, tone: "info" },
+        { label: "Out of Stock", value: loading ? "—" : rows.filter(r => parseFloat(r.on_hand_qty || "0") <= 0).length, tone: !loading && rows.filter(r => parseFloat(r.on_hand_qty || "0") <= 0).length > 0 ? "danger" : "success" },
+        { label: "Low Stock", value: loading ? "—" : rows.filter(r => { const oh = parseFloat(r.on_hand_qty || "0"); const ro = parseFloat(r.reorder_level_qty || "0"); return oh > 0 && ro > 0 && oh <= ro; }).length, tone: !loading && rows.filter(r => { const oh = parseFloat(r.on_hand_qty || "0"); const ro = parseFloat(r.reorder_level_qty || "0"); return oh > 0 && ro > 0 && oh <= ro; }).length > 0 ? "warning" : "success" },
+        { label: "In Stock", value: loading ? "—" : rows.filter(r => parseFloat(r.on_hand_qty || "0") > 0).length, tone: "success" },
+      ]}
     >
       <WorkspaceDirectory
         title="Inventory route map"
