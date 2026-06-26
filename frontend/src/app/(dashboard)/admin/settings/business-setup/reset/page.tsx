@@ -15,6 +15,7 @@ import {
   listRestoreJobs,
   type ResetScope,
 } from "@/services/business-setup";
+import { exportSetupSnapshot, importSetupSnapshot } from "@/services/local-sandbox";
 
 const PHRASE = "RESET_SUBIDHA_CORE";
 
@@ -43,6 +44,89 @@ export default function BusinessSetupResetPage() {
   >("FULL_BACKUP_RESTORE_PREVIEW");
   const [snapshotPayloadText, setSnapshotPayloadText] = useState("");
   const [restoreConfirm, setRestoreConfirm] = useState("");
+
+  // Settings snapshot (portable setup/config export+import)
+  const [snapBusy, setSnapBusy] = useState<"export" | "preview" | "apply" | null>(null);
+  const [snapMessage, setSnapMessage] = useState<string | null>(null);
+  const [snapError, setSnapError] = useState<string | null>(null);
+  const [snapImportFile, setSnapImportFile] = useState<File | null>(null);
+  const [snapImportPreview, setSnapImportPreview] = useState<Record<string, unknown> | null>(null);
+
+  async function handleSnapshotExport() {
+    setSnapBusy("export");
+    setSnapError(null);
+    setSnapMessage(null);
+    try {
+      const payload = await exportSetupSnapshot();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `subidha-settings-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+      const counts = (payload as { counts?: Record<string, number> }).counts ?? {};
+      const total = Object.values(counts).reduce((sum, n) => sum + Number(n || 0), 0);
+      setSnapMessage(`Exported ${total} setup/config rows across ${Object.keys(counts).length} sections.`);
+    } catch (e) {
+      setSnapError(err(e));
+    } finally {
+      setSnapBusy(null);
+    }
+  }
+
+  async function readImportPayload(): Promise<Record<string, unknown>> {
+    if (!snapImportFile) throw new Error("Choose a snapshot JSON file first.");
+    const text = await snapImportFile.text();
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    if (!parsed || parsed.kind !== "setup_snapshot") {
+      throw new Error("File is not a valid setup snapshot (kind must be 'setup_snapshot').");
+    }
+    return parsed;
+  }
+
+  async function handleSnapshotImportPreview() {
+    setSnapBusy("preview");
+    setSnapError(null);
+    setSnapMessage(null);
+    setSnapImportPreview(null);
+    try {
+      const payload = await readImportPayload();
+      const result = await importSetupSnapshot(payload, true, false);
+      setSnapImportPreview(result);
+    } catch (e) {
+      setSnapError(err(e));
+    } finally {
+      setSnapBusy(null);
+    }
+  }
+
+  async function handleSnapshotImportApply() {
+    setSnapBusy("apply");
+    setSnapError(null);
+    setSnapMessage(null);
+    try {
+      const payload = await readImportPayload();
+      const result = await importSetupSnapshot(payload, false, true);
+      const applied = (result as { applied_row_counts?: Record<string, number> }).applied_row_counts ?? {};
+      const total = Object.values(applied).reduce((sum, n) => sum + Number(n || 0), 0);
+      setSnapMessage(`Import applied: ${total} rows upserted across ${Object.keys(applied).length} sections.`);
+      setSnapImportPreview(null);
+    } catch (e) {
+      setSnapError(err(e));
+    } finally {
+      setSnapBusy(null);
+    }
+  }
+
+  const snapImportAllowedHere = snapImportPreview
+    ? snapImportPreview.import_allowed_here !== false
+    : true;
+  const snapValidationErrors = Array.isArray(snapImportPreview?.validation_errors)
+    ? (snapImportPreview?.validation_errors as string[])
+    : [];
 
   useEffect(() => {
     void (async () => {
@@ -148,6 +232,90 @@ export default function BusinessSetupResetPage() {
     <div className="space-y-6">
       <PageHeader title="Modular Reset + Backup / Restore" description="Admin-only governance for safe reset and package-based restore." />
       <BusinessSetupLinks />
+
+      <section className="rounded-xl border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold">Settings Snapshot — Export / Import</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Portable setup/config/master data only (business profile, branches, counters, document sequences,
+          chart of accounts, finance accounts, accounting mappings, tax setup, product taxonomy, reminder
+          templates). Never includes customers, payments, invoices, ledgers, draw results, KYC files, or secrets.
+          Use this to carry settings across redeploys.
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleSnapshotExport()}
+            disabled={snapBusy !== null}
+            className="rounded bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50"
+          >
+            {snapBusy === "export" ? "Exporting…" : "Export settings (download JSON)"}
+          </button>
+          <span className="text-xs text-muted-foreground">Export works in all environments (read-only).</span>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-border p-3">
+          <div className="text-sm font-semibold">Import settings snapshot</div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Import is permitted in development/staging only and is blocked in production. It validates the
+            package and upserts setup rows by stable code/key inside a single transaction.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              type="file"
+              accept=".json,application/json"
+              onChange={(e) => {
+                setSnapImportFile(e.target.files?.[0] ?? null);
+                setSnapImportPreview(null);
+                setSnapError(null);
+                setSnapMessage(null);
+              }}
+              className="text-xs"
+            />
+            <button
+              type="button"
+              onClick={() => void handleSnapshotImportPreview()}
+              disabled={snapBusy !== null || !snapImportFile}
+              className="rounded border border-border px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {snapBusy === "preview" ? "Validating…" : "Preview / validate"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSnapshotImportApply()}
+              disabled={
+                snapBusy !== null ||
+                !snapImportFile ||
+                !snapImportPreview ||
+                !snapImportAllowedHere ||
+                snapValidationErrors.length > 0
+              }
+              className="rounded bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50"
+            >
+              {snapBusy === "apply" ? "Importing…" : "Apply import"}
+            </button>
+          </div>
+
+          {snapImportPreview ? (
+            <div className="mt-2 text-xs">
+              {!snapImportAllowedHere ? (
+                <div className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-amber-900">
+                  Import is disabled in this environment (production). Preview only.
+                </div>
+              ) : null}
+              {snapValidationErrors.length > 0 ? (
+                <div className="mt-1 rounded border border-rose-300 bg-rose-50 px-2 py-1 text-rose-900">
+                  {snapValidationErrors.join("; ")}
+                </div>
+              ) : null}
+              <pre className="mt-2 overflow-x-auto rounded bg-muted p-2">{JSON.stringify(snapImportPreview.row_counts ?? {}, null, 2)}</pre>
+            </div>
+          ) : null}
+        </div>
+
+        {snapMessage ? <div className="mt-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{snapMessage}</div> : null}
+        {snapError ? <div className="mt-3 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-900">{snapError}</div> : null}
+      </section>
 
       <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Reset Scope Selector</h2>

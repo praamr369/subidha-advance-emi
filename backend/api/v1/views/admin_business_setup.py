@@ -51,7 +51,12 @@ from subscriptions.services.business_reset_governance_service import (
     list_reset_scopes,
 )
 from subscriptions.services.setup_readiness_service import get_setup_readiness
-from subscriptions.services.setup_snapshot_service import export_setup_snapshot, import_setup_snapshot
+from subscriptions.services.setup_snapshot_service import (
+    SetupSnapshotImportError,
+    export_setup_snapshot,
+    import_setup_snapshot,
+    is_setup_import_allowed,
+)
 from subscriptions.services.local_sandbox_seed_service import seed_local_sandbox
 from subscriptions.services.selective_reset_service import execute_selective_reset
 from subscriptions.services.setup_checklist_service import compute_setup_checklist
@@ -479,27 +484,51 @@ class AdminSetupReadinessView(APIView):
 
 
 class AdminSetupSnapshotExportView(APIView):
+    """Export setup/config/master data as a portable snapshot (download JSON).
+
+    Read-only. Allowed for admins in ALL environments (including production) so
+    operators can save settings before a redeploy. Never includes transactional
+    records, auth users, or secrets.
+    """
+
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def post(self, request):
-        if not _sandbox_enabled():
-            return Response({"detail": "Local sandbox tools are disabled in this environment."}, status=status.HTTP_403_FORBIDDEN)
-        payload = export_setup_snapshot().payload
+        payload = export_setup_snapshot(
+            exported_by=getattr(request.user, "username", None)
+        ).payload
         return Response(payload, status=status.HTTP_200_OK)
 
 
 class AdminSetupSnapshotImportView(APIView):
+    """Import a setup snapshot (write). Permitted only in dev/staging/test.
+
+    Production import is fail-closed (blocked) — production settings must be
+    changed through their own controlled screens, not bulk import.
+    """
+
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def post(self, request):
-        if not _sandbox_enabled():
-            return Response({"detail": "Local sandbox tools are disabled in this environment."}, status=status.HTTP_403_FORBIDDEN)
         serializer = SetupSnapshotImportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        if not data.get("dry_run") and not data.get("confirm"):
+        dry_run = bool(data.get("dry_run", True))
+
+        # Environment guard applies to writes only; dry-run preview is allowed
+        # everywhere so operators can inspect a package.
+        if not dry_run and not is_setup_import_allowed():
+            return Response(
+                {"detail": "Setup snapshot import is disabled in this environment (production)."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not dry_run and not data.get("confirm"):
             return Response({"detail": "Set confirm=true to apply import."}, status=status.HTTP_400_BAD_REQUEST)
-        result = import_setup_snapshot(payload=data["payload"], dry_run=bool(data.get("dry_run", True)))
+
+        try:
+            result = import_setup_snapshot(payload=data["payload"], dry_run=dry_run)
+        except SetupSnapshotImportError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(result, status=status.HTTP_200_OK)
 
 

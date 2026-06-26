@@ -12,6 +12,8 @@ from django.db import transaction
 from django.utils import timezone
 
 
+SCHEMA_VERSION = 2
+
 SETUP_MODEL_LABELS: tuple[str, ...] = (
     "subscriptions.BusinessProfile",
     "accounting.BusinessTaxProfile",
@@ -28,6 +30,36 @@ SETUP_MODEL_LABELS: tuple[str, ...] = (
     "subscriptions.ProductSubcategoryMaster",
     "subscriptions.ProductUnitOfMeasureMaster",
     "accounting.ProductTaxProfile",
+    "reminders.NotificationTemplate",
+)
+
+# Stable natural keys for idempotent upsert (import). Models not listed here
+# fall back to pk-based upsert (singletons / composite-config rows). Import runs
+# only in dev/staging, never production.
+NATURAL_KEYS: dict[str, tuple[str, ...]] = {
+    "accounting.ChartOfAccount": ("code",),
+    "accounting.AccountingPostingProfile": ("key",),
+    "branch_control.Branch": ("code",),
+    "branch_control.CashCounter": ("code",),
+    "inventory.Warehouse": ("code",),
+    "inventory.StockLocation": ("code",),
+    "subscriptions.ProductCategoryMaster": ("name",),
+    "subscriptions.ProductUnitOfMeasureMaster": ("code",),
+    "reminders.NotificationTemplate": ("key",),
+}
+
+# Sections that must never appear in a setup snapshot import package.
+FORBIDDEN_IMPORT_PREFIXES: tuple[str, ...] = (
+    "accounts.User",
+    "auth.",
+    "authtoken.",
+    "sessions.",
+)
+
+# Environments where setup-snapshot IMPORT (write) is permitted. Production is
+# intentionally excluded — it is fail-closed (only known-safe envs allow import).
+SETUP_IMPORT_ALLOWED_ENVS: frozenset[str] = frozenset(
+    {"development", "dev", "local", "test", "staging"}
 )
 
 EXCLUDED_TRANSACTIONAL_MODEL_PREFIXES: tuple[str, ...] = (
@@ -59,7 +91,7 @@ def _records_for_model(model) -> list[dict[str, Any]]:
     return json.loads(serialize("json", model.objects.all()))
 
 
-def export_setup_snapshot() -> SnapshotExportResult:
+def export_setup_snapshot(*, exported_by: str | None = None) -> SnapshotExportResult:
     sections: dict[str, Any] = {}
     counts: dict[str, int] = {}
     for label in SETUP_MODEL_LABELS:
@@ -73,13 +105,54 @@ def export_setup_snapshot() -> SnapshotExportResult:
 
     return SnapshotExportResult(
         payload={
+            # `version` retained for backward compatibility with v1 readers.
             "version": 1,
+            "schema_version": SCHEMA_VERSION,
             "kind": "setup_snapshot",
+            "exported_at": timezone.now().isoformat(),
+            "exported_by": exported_by,
+            "source_environment": (getattr(settings, "ENVIRONMENT_NAME", "") or "").lower() or None,
             "sections": sections,
             "counts": counts,
             "excluded_transactional_prefixes": list(EXCLUDED_TRANSACTIONAL_MODEL_PREFIXES),
         }
     )
+
+
+def is_setup_import_allowed() -> bool:
+    """Setup-snapshot import is permitted only in known-safe environments.
+
+    Production is fail-closed: import is blocked unless the environment is one of
+    the explicitly-allowed dev/staging/test envs (or DEBUG is on).
+    """
+    env = (getattr(settings, "ENVIRONMENT_NAME", "") or "").lower()
+    return bool(settings.DEBUG or env in SETUP_IMPORT_ALLOWED_ENVS)
+
+
+class SetupSnapshotImportError(Exception):
+    """Raised when a setup-snapshot import is invalid or not permitted."""
+
+
+def validate_setup_snapshot_payload(payload: dict[str, Any]) -> list[str]:
+    """Return a list of blocking validation errors for an import payload."""
+    errors: list[str] = []
+    if not isinstance(payload, dict):
+        return ["Snapshot payload must be a JSON object."]
+    if payload.get("kind") != "setup_snapshot":
+        errors.append("Payload kind must be 'setup_snapshot'.")
+    schema_version = payload.get("schema_version", payload.get("version"))
+    if schema_version not in (1, SCHEMA_VERSION):
+        errors.append(f"Unsupported snapshot schema_version: {schema_version!r}.")
+    sections = payload.get("sections")
+    if not isinstance(sections, dict) or not sections:
+        errors.append("Snapshot has no setup sections to import.")
+        return errors
+    for label in sections.keys():
+        if any(label == prefix or label.startswith(prefix) for prefix in FORBIDDEN_IMPORT_PREFIXES):
+            errors.append(f"Forbidden section in import package: {label}.")
+        if any(label.startswith(prefix) for prefix in EXCLUDED_TRANSACTIONAL_MODEL_PREFIXES):
+            errors.append(f"Transactional section not allowed in setup import: {label}.")
+    return errors
 
 
 def preview_import_setup_snapshot(*, payload: dict[str, Any]) -> dict[str, Any]:
@@ -182,19 +255,34 @@ def build_setup_snapshot_restore_preview(*, payload: dict[str, Any], preserve_ad
 
 def import_setup_snapshot(*, payload: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
     preview = preview_import_setup_snapshot(payload=payload)
+
+    # Validate before applying (also surfaced in dry-run for operator review).
+    validation_errors = validate_setup_snapshot_payload(payload)
     if dry_run:
-        return preview
+        return {**preview, "validation_errors": validation_errors, "import_allowed_here": is_setup_import_allowed()}
+
+    # Environment guard: import (write) is blocked in production.
+    if not is_setup_import_allowed():
+        raise SetupSnapshotImportError(
+            "Setup snapshot import is disabled in this environment (production). "
+            "Import is only permitted in development/staging/test."
+        )
+    if validation_errors:
+        raise SetupSnapshotImportError("; ".join(validation_errors))
 
     sections = payload.get("sections") or {}
     applied: dict[str, int] = {}
+    # Single transaction: validate-then-apply is all-or-nothing.
     with transaction.atomic():
         for label, rows in sections.items():
+            # Only allowlisted setup/config/master models are ever written.
             if label not in SETUP_MODEL_LABELS:
                 continue
             try:
                 model = _get_model(label)
             except Exception:
                 continue
+            natural_key = NATURAL_KEYS.get(label)
             created = 0
             for row in rows or []:
                 fields = row.get("fields") or {}
@@ -210,8 +298,20 @@ def import_setup_snapshot(*, payload: dict[str, Any], dry_run: bool = True) -> d
                         normalized[f"{key}_id"] = value
                     else:
                         normalized[key] = value
-                model.objects.update_or_create(id=pk, defaults=normalized)
+
+                if natural_key and all(fields.get(part) not in (None, "") for part in natural_key):
+                    # Idempotent upsert by stable code/key.
+                    lookup = {part: fields.get(part) for part in natural_key}
+                    defaults = {
+                        key: value
+                        for key, value in normalized.items()
+                        if key not in natural_key
+                    }
+                    model.objects.update_or_create(**lookup, defaults=defaults)
+                else:
+                    # Fallback: pk-based upsert (singletons / composite-config rows).
+                    model.objects.update_or_create(id=pk, defaults=normalized)
                 created += 1
             applied[label] = created
 
-    return {**preview, "mode": "applied", "applied_row_counts": applied}
+    return {**preview, "mode": "applied", "applied_row_counts": applied, "schema_version": SCHEMA_VERSION}
