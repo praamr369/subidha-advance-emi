@@ -1656,6 +1656,7 @@ class LuckyIdAdminViewSet(AdminOnlyModelViewSet):
         .order_by("batch_id", "lucky_number")
     )
     serializer_class = LuckyIdAdminSerializer
+    pagination_class = AdminListPagination
 
     def get_queryset(self):
         queryset = super().get_queryset()

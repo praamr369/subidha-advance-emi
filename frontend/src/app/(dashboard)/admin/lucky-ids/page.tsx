@@ -285,7 +285,9 @@ export default function AdminLuckyIdsPage() {
 
     try {
       const [luckyRows, batchRows] = await Promise.all([
-        fetchAllPagedRows("/admin/lucky-ids/"),
+        // Request a large page so the full (per-grid, client-filtered) set loads
+        // in one round-trip; fetchAllPagedRows still follows next as a safety net.
+        fetchAllPagedRows("/admin/lucky-ids/?page_size=200"),
         fetchAllPagedRows("/admin/batches/"),
       ]);
 
