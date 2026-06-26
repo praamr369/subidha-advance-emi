@@ -24,6 +24,7 @@ import {
 } from "@/components/erp";
 import AccountingBridgeReadinessIndicator from "@/components/admin/accounting/AccountingBridgeReadinessIndicator";
 import { DataTableShell } from "@/components/ui/operations";
+import PaginationControls from "@/components/ui/PaginationControls";
 import { RegistryPageShell } from "@/components/layout/page-shells";
 import { downloadCsv } from "@/lib/export/csv";
 import {
@@ -317,6 +318,8 @@ function PaymentsTable({ rows }: { rows: PaymentRegisterRow[] }) {
   );
 }
 
+const PAYMENTS_PAGE_SIZE = 25;
+
 export default function AdminPaymentsPage() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -336,6 +339,11 @@ export default function AdminPaymentsPage() {
 
   const [rows, setRows] = useState<PaymentRegisterRow[]>([]);
   const [summary, setSummary] = useState<PaymentRegisterSummary>(EMPTY_SUMMARY);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [numPages, setNumPages] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrevious, setHasPrevious] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -377,16 +385,26 @@ export default function AdminPaymentsPage() {
           batch: batchFilter || undefined,
           partner: partnerFilter || undefined,
           emi: emiFilter || undefined,
+          page,
+          page_size: PAYMENTS_PAGE_SIZE,
         });
 
         setRows(payload.results);
         setSummary(payload.summary);
+        setCount(payload.count);
+        setNumPages(payload.num_pages);
+        setHasNext(payload.has_next);
+        setHasPrevious(payload.has_previous);
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
         if (mode === "initial") {
           setRows([]);
           setSummary(EMPTY_SUMMARY);
+          setCount(0);
+          setNumPages(0);
+          setHasNext(false);
+          setHasPrevious(false);
         }
       } finally {
         if (mode === "initial") {
@@ -396,7 +414,7 @@ export default function AdminPaymentsPage() {
         }
       }
     },
-    [query, method, reversalState, dateFrom, dateTo, subscriptionFilter, customerFilter, batchFilter, partnerFilter, emiFilter]
+    [query, method, reversalState, dateFrom, dateTo, subscriptionFilter, customerFilter, batchFilter, partnerFilter, emiFilter, page]
   );
 
   useEffect(() => {
@@ -427,6 +445,7 @@ export default function AdminPaymentsPage() {
     setBatchFilter(parseIdFilter(params.get("batch")));
     setPartnerFilter(parseIdFilter(params.get("partner")));
     setEmiFilter(parseIdFilter(params.get("emi")));
+    setPage(1);
   }, [searchParamKey]);
 
   function replaceFiltersInUrl(params: URLSearchParams) {
@@ -791,6 +810,19 @@ export default function AdminPaymentsPage() {
             description="Review payments, confirm reversal visibility, and hand off to payment detail, subscription detail, or payment-level reconciliation."
           >
             <PaymentsTable rows={rows} />
+            {count > 0 ? (
+              <PaginationControls
+                count={count}
+                page={page}
+                pageSize={PAYMENTS_PAGE_SIZE}
+                numPages={numPages || Math.max(Math.ceil(count / PAYMENTS_PAGE_SIZE), 1)}
+                hasNext={hasNext}
+                hasPrevious={hasPrevious}
+                disabled={loading || refreshing}
+                onPrevious={() => setPage((value) => Math.max(1, value - 1))}
+                onNext={() => setPage((value) => value + 1)}
+              />
+            ) : null}
           </ERPSectionShell>
         )}
           </>

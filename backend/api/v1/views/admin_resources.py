@@ -27,7 +27,7 @@ from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from accounts.models import User, UserRole
 from accounts.capabilities import require_capability
 from accounting.services.finance_account_readiness import FinanceAccountPostingReadinessError
-from api.v1.pagination import AdminListPagination, AdminOptInPagination
+from api.v1.pagination import AdminListPagination, AdminOptInPagination, get_page_params
 from api.v1.permissions import IsAdmin
 from api.v1.throttles.auth_password_reset import PaymentMutationThrottle
 from api.v1.serializers.admin_resources import (
@@ -1992,13 +1992,44 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(queryset, many=True)
+        count = queryset.count()
+        # Summary is always computed over the FULL filtered set so callers that
+        # rely on it (e.g. collections desk net-collected/today counts) stay
+        # correct regardless of paging.
+        summary = self._payment_summary(queryset)
 
+        # Opt-in pagination: only page the rows when the client asks via
+        # ?page / ?page_size. Without them, return the full filtered set
+        # (backward compatible with existing unpaginated callers).
+        wants_page = (
+            request.query_params.get("page") is not None
+            or request.query_params.get("page_size") is not None
+        )
+        if wants_page:
+            page, page_size = get_page_params(request, default_page_size=25)
+            start = (page - 1) * page_size
+            rows = list(queryset[start : start + page_size]) if start < count else []
+            serializer = self.get_serializer(rows, many=True)
+            num_pages = (count + page_size - 1) // page_size if count else 0
+            return Response(
+                {
+                    "count": count,
+                    "results": serializer.data,
+                    "summary": summary,
+                    "page": page,
+                    "page_size": page_size,
+                    "num_pages": num_pages,
+                    "has_next": page < num_pages,
+                    "has_previous": page > 1 and num_pages > 0,
+                }
+            )
+
+        serializer = self.get_serializer(queryset, many=True)
         return Response(
             {
-                "count": queryset.count(),
+                "count": count,
                 "results": serializer.data,
-                "summary": self._payment_summary(queryset),
+                "summary": summary,
             }
         )
 

@@ -136,6 +136,11 @@ export type PaymentRegisterSummary = {
 export type PaymentRegisterListResponse = {
   results: PaymentRegisterRow[];
   summary: PaymentRegisterSummary;
+  count: number;
+  page: number;
+  num_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
 };
 
 export type PaymentRecord = {
@@ -249,6 +254,12 @@ type RawPaymentRegisterRow = Record<string, unknown>;
 type RawPaymentRegisterResponse = {
   results?: RawPaymentRegisterRow[];
   summary?: Partial<PaymentRegisterSummary>;
+  count?: number;
+  page?: number;
+  page_size?: number;
+  num_pages?: number;
+  has_next?: boolean;
+  has_previous?: boolean;
 };
 
 export function buildPaymentCollectionIdempotencyKey(): string {
@@ -478,6 +489,7 @@ function buildPaymentRegisterQuery(params: {
   partner?: number | string;
   emi?: number | string;
   page?: number;
+  page_size?: number;
 }) {
   const search = new URLSearchParams();
 
@@ -492,6 +504,7 @@ function buildPaymentRegisterQuery(params: {
   if (params.partner) search.set("partner", String(params.partner));
   if (params.emi) search.set("emi", String(params.emi));
   if (params.page) search.set("page", String(params.page));
+  if (params.page_size) search.set("page_size", String(params.page_size));
 
   const query = search.toString();
   return query ? `?${query}` : "";
@@ -633,6 +646,8 @@ export async function getAdminPaymentRegister(params?: {
   batch?: number | string;
   partner?: number | string;
   emi?: number | string;
+  page?: number;
+  page_size?: number;
 }): Promise<PaymentRegisterListResponse> {
   const payload = await request<RawPaymentRegisterResponse>(
     `/admin/payments/${buildPaymentRegisterQuery(params ?? {})}`,
@@ -642,8 +657,20 @@ export async function getAdminPaymentRegister(params?: {
   );
 
   const rows = Array.isArray(payload?.results) ? payload.results : [];
+  const count = typeof payload?.count === "number" ? payload.count : rows.length;
+  const pageSize = payload?.page_size && payload.page_size > 0 ? payload.page_size : rows.length || 1;
   return {
     results: rows.map(normalizePaymentRegisterRow),
     summary: normalizePaymentRegisterSummary(payload?.summary),
+    count,
+    page: typeof payload?.page === "number" ? payload.page : 1,
+    num_pages:
+      typeof payload?.num_pages === "number"
+        ? payload.num_pages
+        : count > 0
+          ? Math.ceil(count / pageSize)
+          : 0,
+    has_next: payload?.has_next === true,
+    has_previous: payload?.has_previous === true,
   };
 }
