@@ -49,6 +49,8 @@ const primaryActions = [
   { label: "Open Subscription EMI", href: ROUTES.admin.subscriptions },
   { label: "Open Inventory Readiness", href: ROUTES.admin.inventoryReadiness },
   { label: "Open Opening Stock", href: ROUTES.admin.inventoryOpeningStock },
+  { label: "Open Products", href: ROUTES.admin.products },
+  { label: "Open Product Import", href: ROUTES.admin.productsImport },
   { label: "Open Inventory Items", href: ROUTES.admin.inventoryItems },
   { label: "Open Stock Ledger", href: ROUTES.admin.inventoryLedger },
   { label: "Open Staff Setup", href: ROUTES.admin.hrStaff },

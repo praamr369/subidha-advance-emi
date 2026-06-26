@@ -13,6 +13,7 @@ const links = [
   { href: ROUTES.admin.settingsBusinessSetupFinanceAccounts, label: "Finance Accounts" },
   { href: ROUTES.admin.settingsBusinessSetupCashDesks, label: "Cash Desks" },
   { href: ROUTES.admin.settingsBusinessSetupStaff, label: "Staff & Roles" },
+  { href: ROUTES.admin.products, label: "Products" },
   { href: ROUTES.admin.settingsBusinessSetupChartAccounts, label: "Chart Accounts" },
   { href: ROUTES.admin.inventoryReadiness, label: "Inventory readiness" },
   { href: ROUTES.admin.inventoryOpeningStock, label: "Opening stock" },
