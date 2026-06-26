@@ -34,7 +34,9 @@ import {
 } from "@/domains/customers/api";
 import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
 import { buildForgotPasswordHref } from "@/lib/auth/password-reset";
-import { apiFetch, toArray } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
+import { toPaginated } from "@/services/api/list";
+import PaginationControls from "@/components/ui/PaginationControls";
 import { downloadCsv } from "@/lib/export/csv";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
@@ -192,6 +194,8 @@ function normalizeCustomerRow(raw: Record<string, unknown>): CustomerRow {
   };
 }
 
+const CUSTOMERS_PAGE_SIZE = 25;
+
 export default function AdminCustomersPage() {
   const { openWorkflow } = useWorkflowLauncher();
   const customerImportFileRef = useRef<HTMLInputElement | null>(null);
@@ -207,6 +211,8 @@ export default function AdminCustomersPage() {
     "") as "" | CustomerStatus;
 
   const [rows, setRows] = useState<CustomerRow[]>([]);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -243,21 +249,26 @@ export default function AdminCustomersPage() {
         if (query) params.set("q", query);
         if (kycFilter) params.set("kyc_status", kycFilter);
         if (statusFilter) params.set("status", statusFilter);
+        params.set("page", String(page));
+        params.set("page_size", String(CUSTOMERS_PAGE_SIZE));
 
-        const payload = await apiFetch<unknown>(
-          `/admin/customers/${params.toString() ? `?${params.toString()}` : ""}`
-        );
-        setRows(toArray<Record<string, unknown>>(payload).map(normalizeCustomerRow));
+        const payload = await apiFetch<unknown>(`/admin/customers/?${params.toString()}`);
+        const normalized = toPaginated<Record<string, unknown>>(payload);
+        setRows((normalized.results ?? []).map(normalizeCustomerRow));
+        setCount(normalized.count ?? 0);
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
-        if (mode === "initial") setRows([]);
+        if (mode === "initial") {
+          setRows([]);
+          setCount(0);
+        }
       } finally {
         if (mode === "initial") setLoading(false);
         else setRefreshing(false);
       }
     },
-    [kycFilter, query, statusFilter]
+    [kycFilter, page, query, statusFilter]
   );
 
   useEffect(() => {
@@ -278,6 +289,7 @@ export default function AdminCustomersPage() {
     setQuery(nextQuery);
     setKycFilter(nextKyc);
     setStatusFilter(nextStatus);
+    setPage(1);
   }, [searchParamKey]);
 
   function replaceFilters(params: URLSearchParams) {
@@ -565,20 +577,19 @@ export default function AdminCustomersPage() {
       ]}
       statusBadge={{ label: "Customer Profile Source", tone: "info" }}
       stats={[
-        { label: "Total Customers", value: loading ? "—" : rows.length, tone: "info" },
-        { label: "Active", value: loading ? "—" : activeCustomers, tone: "success" },
-        { label: "KYC Pending", value: loading ? "—" : pendingKyc, tone: !loading && pendingKyc > 0 ? "warning" : "success" },
-        { label: "Active Subscriptions", value: loading ? "—" : activeSubscriptions, tone: "default" },
+        { label: "Total Customers", value: loading ? "—" : count, tone: "info" },
+        { label: "Active (page)", value: loading ? "—" : activeCustomers, tone: "success" },
+        { label: "KYC Pending (page)", value: loading ? "—" : pendingKyc, tone: !loading && pendingKyc > 0 ? "warning" : "success" },
+        { label: "Active Subs (page)", value: loading ? "—" : activeSubscriptions, tone: "default" },
       ]}
     >
       <RegistryPageShell
         summary={
           !loading && !error ? (
             <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
-              <span className="font-semibold text-foreground">Current register</span>
+              <span className="font-semibold text-foreground">Register</span>
               {": "}
-              {rows.length} visible · {activeCustomers} active · {pendingKyc} pending KYC · {activeSubscriptions} active
-              contract rows (sum on this page)
+              {count} total · page {page} of {Math.max(Math.ceil(count / CUSTOMERS_PAGE_SIZE), 1)} · {rows.length} on this page · {activeCustomers} active · {pendingKyc} pending KYC
             </div>
           ) : null
         }
@@ -750,7 +761,7 @@ export default function AdminCustomersPage() {
                 <DataTable<CustomerRow>
                   rows={rows}
                   columns={columns}
-                  pageSize={12}
+                  pageSize={CUSTOMERS_PAGE_SIZE}
                   rowActions={(row) => (
                     <div className="flex flex-col items-end gap-2">
                       <Link
@@ -782,6 +793,19 @@ export default function AdminCustomersPage() {
                 />
               </DataTableShell>
             )}
+            {count > 0 ? (
+              <PaginationControls
+                count={count}
+                page={page}
+                pageSize={CUSTOMERS_PAGE_SIZE}
+                numPages={Math.max(Math.ceil(count / CUSTOMERS_PAGE_SIZE), 1)}
+                hasNext={page < Math.ceil(count / CUSTOMERS_PAGE_SIZE)}
+                hasPrevious={page > 1}
+                disabled={loading || refreshing}
+                onPrevious={() => setPage((value) => Math.max(1, value - 1))}
+                onNext={() => setPage((value) => value + 1)}
+              />
+            ) : null}
           </DetailPanel>
 
 

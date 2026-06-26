@@ -599,6 +599,7 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
         .order_by("-created_at")
     )
     serializer_class = CustomerAdminSerializer
+    pagination_class = AdminListPagination
 
     def get_queryset(self):
         zero_money = Value(
