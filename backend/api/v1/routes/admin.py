@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 # HR Routes (Session 4 Consolidation - 2026-06-24)
 from api.v1.routes import admin_hr_complete
 
+from api.v1.views.admin_money_in_out import AdminMoneyInOutView
 from api.v1.views.admin_business_setup import (
     AdminLocalSandboxResetView,
     AdminLocalSandboxSeedView,
@@ -878,6 +879,7 @@ urlpatterns = [
     path("reports/batch-performance/", AdminBatchPerformanceSummaryView.as_view()),
     path("reports/reconciliation-attention/", AdminReconciliationAttentionAggregateView.as_view()),
     path("reports/analytics-summary/", AdminAnalyticsSummaryView.as_view()),
+    path("reports/money-in-out/", AdminMoneyInOutView.as_view()),
     # Phase 5: accounting control center
     path("accounting/control-center/", AdminAccountingControlCenterView.as_view()),
     path("accounting/chart-summary/", AdminAccountingChartSummaryView.as_view()),

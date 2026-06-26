@@ -183,6 +183,7 @@ export const ROUTES = {
     reportsBatchPerformance: "/admin/reports/batch-performance",
     reportsPartners: "/admin/reports/partners",
     reportsWaiverLoss: "/admin/reports/waiver-loss",
+    reportsMoneyInOut: "/admin/reports/money-in-out",
     leads: "/admin/crm/leads", // was /admin/leads — now redirected
     supportRequests: "/admin/requests/support", // was /admin/support-requests — now canonical is requests/support
     customers: "/admin/customers",

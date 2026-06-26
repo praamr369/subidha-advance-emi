@@ -631,3 +631,22 @@ export async function getAdminAnalyticsSummary(
     `/admin/reports/analytics-summary/${buildQuery(params)}`
   );
 }
+
+export type MoneyInOutBucket = {
+  method: string;
+  money_in: string;
+  money_out: string;
+  net: string;
+};
+
+export type MoneyInOutResponse = {
+  date_from: string | null;
+  date_to: string | null;
+  buckets: MoneyInOutBucket[];
+  totals: { money_in: string; money_out: string; net: string };
+  sources: { money_in: string[]; money_out: string[]; note?: string };
+};
+
+export async function getMoneyInOut(params: { date_from?: string; date_to?: string } = {}): Promise<MoneyInOutResponse> {
+  return request<MoneyInOutResponse>(`/admin/reports/money-in-out/${buildQuery(params)}`);
+}

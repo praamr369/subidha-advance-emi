@@ -339,6 +339,12 @@ export default function AdminReportsPage() {
       badge: "CUSTOMER",
     },
     {
+      title: "Money In vs Out",
+      description: "Consolidated cash flow by method (Cash/UPI/Bank/Card): collected vs spent, with net.",
+      href: ROUTES.admin.reportsMoneyInOut,
+      badge: "FINANCE",
+    },
+    {
       title: "Collections Workspace",
       description: "Route to collection execution and row-level payment follow-up.",
       href: ROUTES.admin.collections,
