@@ -4651,3 +4651,31 @@ class BridgePostingApproval(AccountingTimeStampedModel):
     def __str__(self):
         state = "approved" if self.is_approved else "not approved"
         return f"{self.event_key} ({state})"
+
+
+class CustomerOpeningOutstanding(AccountingTimeStampedModel):
+    """Opening receivable balance migrated from a previous system (e.g. BillBook)."""
+
+    customer_name = models.CharField(max_length=150, db_index=True)
+    phone = models.CharField(max_length=20, blank=True, default="")
+    outstanding_amount = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    entry_date = models.DateField(db_index=True)
+    notes = models.TextField(blank=True, default="")
+    is_settled = models.BooleanField(default=False, db_index=True)
+    settled_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="customer_opening_outstandings",
+    )
+
+    class Meta:
+        db_table = "accounting_customer_opening_outstandings"
+        ordering = ["-entry_date", "customer_name"]
+
+    def __str__(self):
+        return f"{self.customer_name} — ₹{self.outstanding_amount}"

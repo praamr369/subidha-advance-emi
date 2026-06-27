@@ -136,6 +136,7 @@ export const ROUTES = {
     settingsBusinessSetupPublicSite: "/admin/settings/business-setup/public-site",
     settingsBusinessSetupDryRuns: "/admin/settings/business-setup/dry-runs",
     settingsBusinessSetupReset: "/admin/settings/business-setup/reset",
+    settingsBusinessSetupOpeningBalances: "/admin/settings/business-setup/opening-balances",
     settingsBusinessCompliance: "/admin/settings/business-compliance",
     settingsLegalControls: "/admin/settings/legal-controls",
     complianceKyc: "/admin/compliance/kyc",

@@ -22,6 +22,7 @@ const links = [
   { href: ROUTES.admin.accountingBridgeReconciliation, label: "Bridge reconciliation" },
   { href: ROUTES.admin.settingsBusinessSetupDocumentNumbering, label: "Document Numbering" },
   { href: ROUTES.admin.brandData, label: "Brand Data Center" },
+  { href: ROUTES.admin.settingsBusinessSetupOpeningBalances, label: "Opening Balances" },
   { href: ROUTES.admin.settingsBusinessSetupReset, label: "Dry Runs & Reset" },
 ];
 

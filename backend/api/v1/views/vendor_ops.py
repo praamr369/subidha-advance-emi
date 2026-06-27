@@ -5,7 +5,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounting.models import Vendor, VendorLedgerEntry, VendorProduct, VendorQuote, VendorQuoteRequest
+from accounting.models import CustomerOpeningOutstanding, Vendor, VendorLedgerEntry, VendorProduct, VendorQuote, VendorQuoteRequest
 from accounts.models import User
 from accounting.services.vendor_ledger_service import (
     get_vendor_ledger,
@@ -97,6 +97,47 @@ class AdminVendorLedgerView(APIView):
         )
         rows = VendorLedgerEntry.objects.filter(id__in=[row["id"] for row in payload["results"]]).order_by("-posted_at", "-id")
         return Response({"count": payload["count"], "results": VendorLedgerEntrySerializer(rows, many=True).data})
+
+    def post(self, request, pk: int):
+        """Create an OPENING_BALANCE ledger entry for a vendor. Idempotent: replaces existing opening entry."""
+        from django.utils import timezone as tz
+        from decimal import Decimal, InvalidOperation
+        vendor = get_object_or_404(Vendor, pk=pk)
+        amount_raw = (request.data.get("amount") or "0").strip() if isinstance(request.data.get("amount"), str) else str(request.data.get("amount") or 0)
+        try:
+            amount = Decimal(amount_raw)
+        except InvalidOperation:
+            return Response({"error": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
+        if amount < Decimal("0"):
+            return Response({"error": "Amount must be zero or positive."}, status=status.HTTP_400_BAD_REQUEST)
+        notes = (request.data.get("notes") or "").strip()
+        posted_at_raw = request.data.get("posted_at")
+        try:
+            posted_at = tz.datetime.fromisoformat(str(posted_at_raw)) if posted_at_raw else tz.now()
+        except (ValueError, TypeError):
+            posted_at = tz.now()
+        # Replace any existing opening balance entry (only one allowed per vendor)
+        VendorLedgerEntry.objects.filter(vendor=vendor, entry_type="OPENING_BALANCE").delete()
+        entry = None
+        if amount > Decimal("0"):
+            entry = VendorLedgerEntry.objects.create(
+                vendor=vendor,
+                entry_type="OPENING_BALANCE",
+                debit=amount,
+                credit=Decimal("0.00"),
+                balance_after=amount,
+                posted_at=posted_at,
+                created_by=request.user,
+                notes=notes or "Opening balance from previous system (BillBook migration).",
+            )
+        from accounting.services.vendor_ledger_service import get_vendor_outstanding
+        return Response({
+            "vendor_id": vendor.id,
+            "vendor_name": vendor.name,
+            "entry_id": entry.id if entry else None,
+            "opening_balance": str(amount),
+            "outstanding": get_vendor_outstanding(vendor),
+        }, status=status.HTTP_200_OK)
 
 
 class AdminVendorOutstandingView(APIView):
@@ -493,3 +534,77 @@ class VendorSelfPurchaseReturnsView(APIView):
         if vendor is None:
             return Response({"count": 0, "results": []})
         return Response(get_vendor_return_summary(vendor))
+
+
+class AdminCustomerOpeningOutstandingView(APIView):
+    """List and create customer opening outstanding balances (BillBook migration)."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from decimal import Decimal
+        qs = CustomerOpeningOutstanding.objects.all().order_by("-entry_date", "customer_name")
+        settled = request.query_params.get("settled")
+        if settled == "true":
+            qs = qs.filter(is_settled=True)
+        elif settled == "false":
+            qs = qs.filter(is_settled=False)
+        rows = list(qs.values("id", "customer_name", "phone", "outstanding_amount", "entry_date", "notes", "is_settled", "settled_at", "created_at"))
+        total = sum((r["outstanding_amount"] for r in rows if not r["is_settled"]), Decimal("0.00"))
+        return Response({"count": len(rows), "total_outstanding": str(total), "results": rows})
+
+    def post(self, request):
+        from decimal import Decimal, InvalidOperation
+        from django.utils import timezone as tz
+        data = request.data
+        customer_name = (data.get("customer_name") or "").strip()
+        if not customer_name:
+            return Response({"error": "customer_name is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            amount = Decimal(str(data.get("outstanding_amount") or "0"))
+        except InvalidOperation:
+            return Response({"error": "Invalid outstanding_amount."}, status=status.HTTP_400_BAD_REQUEST)
+        if amount <= Decimal("0"):
+            return Response({"error": "outstanding_amount must be positive."}, status=status.HTTP_400_BAD_REQUEST)
+        entry_date_raw = data.get("entry_date")
+        try:
+            from datetime import date
+            entry_date = date.fromisoformat(str(entry_date_raw)) if entry_date_raw else tz.now().date()
+        except (ValueError, TypeError):
+            entry_date = tz.now().date()
+        obj = CustomerOpeningOutstanding.objects.create(
+            customer_name=customer_name,
+            phone=(data.get("phone") or "").strip(),
+            outstanding_amount=amount,
+            entry_date=entry_date,
+            notes=(data.get("notes") or "").strip(),
+            created_by=request.user,
+        )
+        return Response({
+            "id": obj.id,
+            "customer_name": obj.customer_name,
+            "phone": obj.phone,
+            "outstanding_amount": str(obj.outstanding_amount),
+            "entry_date": str(obj.entry_date),
+            "notes": obj.notes,
+        }, status=status.HTTP_201_CREATED)
+
+
+class AdminCustomerOpeningOutstandingDetailView(APIView):
+    """Mark a customer opening outstanding as settled or delete it."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def patch(self, request, pk: int):
+        from django.utils import timezone as tz
+        obj = get_object_or_404(CustomerOpeningOutstanding, pk=pk)
+        if "is_settled" in request.data:
+            obj.is_settled = bool(request.data["is_settled"])
+            obj.settled_at = tz.now() if obj.is_settled else None
+        if "notes" in request.data:
+            obj.notes = (request.data["notes"] or "").strip()
+        obj.save()
+        return Response({"id": obj.id, "customer_name": obj.customer_name, "is_settled": obj.is_settled, "settled_at": obj.settled_at and obj.settled_at.isoformat()})
+
+    def delete(self, request, pk: int):
+        obj = get_object_or_404(CustomerOpeningOutstanding, pk=pk)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
