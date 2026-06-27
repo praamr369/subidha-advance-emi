@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import { buildPortalMetadata } from "@/lib/portal-metadata";
+
+export const metadata: Metadata = buildPortalMetadata(
+  "Secure sign in",
+  "Secure access to SUBIDHA CORE role-based workspaces."
+);
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (

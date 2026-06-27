@@ -44,6 +44,8 @@ export type ApiFetchOptions = Omit<RequestInit, "body" | "headers"> & {
   body?: ApiFetchBody;
 };
 
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
+
 function normalizeHeaders(headers?: HeadersInit): Record<string, string> {
   if (!headers) return {};
 
@@ -390,7 +392,42 @@ export async function apiFetch<T = unknown>(
   options: ApiFetchOptions = {},
   token?: string | null
 ): Promise<T> {
-  return apiFetchInternal<T>(path, options, token, false);
+  const method = (options.method || "GET").toUpperCase();
+  const canDedupe =
+    typeof window !== "undefined" &&
+    method === "GET" &&
+    options.body == null &&
+    options.signal == null;
+
+  if (!canDedupe) {
+    return apiFetchInternal<T>(path, options, token, false);
+  }
+
+  const accessToken =
+    token ?? getAccessToken() ?? getStoredSession()?.accessToken ?? null;
+  const headers = Object.entries(normalizeHeaders(options.headers))
+    .map(([key, value]) => [key.toLowerCase(), value] as const)
+    .sort(([left], [right]) => left.localeCompare(right));
+  const requestKey = JSON.stringify([
+    path,
+    accessToken,
+    options.credentials ?? null,
+    options.cache ?? null,
+    headers,
+  ]);
+  const existingRequest = inFlightGetRequests.get(requestKey);
+
+  if (existingRequest) {
+    return existingRequest as Promise<T>;
+  }
+
+  const request = apiFetchInternal<T>(path, options, accessToken, false).finally(
+    () => {
+      inFlightGetRequests.delete(requestKey);
+    }
+  );
+  inFlightGetRequests.set(requestKey, request);
+  return request;
 }
 
 async function apiFetchInternal<T>(

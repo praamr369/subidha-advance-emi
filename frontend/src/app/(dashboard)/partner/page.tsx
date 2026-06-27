@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowRight,
@@ -72,22 +73,7 @@ function toErrorMessage(error: unknown): string {
 
 export default function PartnerDashboardPage() {
   const { logout, isLoggingOut } = useLogout();
-  const [legacy, setLegacy] = useState<LegacyDashboardPayload | null>(null);
-  const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
-  const [upcoming, setUpcoming] = useState<DashboardDuePayload | null>(null);
-  const [overdue, setOverdue] = useState<DashboardDuePayload | null>(null);
-  const [recentPayments, setRecentPayments] =
-    useState<DashboardPaymentsPayload | null>(null);
-  const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
-    null
-  );
-  const [notificationSummary, setNotificationSummary] =
-    useState<NotificationSummaryResponse | null>(null);
-  const [products, setProducts] = useState<PublicProduct[]>([]);
   const [productCategory, setProductCategory] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [windowPreset, setWindowPreset] =
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
@@ -109,14 +95,10 @@ export default function PartnerDashboardPage() {
     [endDate, startDate, windowPreset]
   );
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        // Promise.allSettled — secondary failures don't block the entire dashboard
-        const [
+  const dashboardDataQuery = useQuery({
+    queryKey: ["partner", "dashboard", dashboardQuery],
+    queryFn: async () => {
+      const [
           legacyResult,
           canonicalResult,
           overdueResult,
@@ -124,7 +106,7 @@ export default function PartnerDashboardPage() {
           recentPaymentsResult,
           winnersResult,
           notificationResult,
-        ] = await Promise.allSettled([
+      ] = await Promise.allSettled([
           getPartnerDashboard(),
           getDashboardSummaryV2(dashboardQuery),
           listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
@@ -132,40 +114,49 @@ export default function PartnerDashboardPage() {
           listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
           listDashboardWinners({ ...dashboardQuery, limit: 4 }),
           getPartnerNotificationSummary(),
-        ]);
+      ]);
 
-        if (legacyResult.status === "rejected") throw legacyResult.reason;
-        setLegacy(legacyResult.value);
-        setCanonical(canonicalResult.status === "fulfilled" ? canonicalResult.value : null);
-        setOverdue(overdueResult.status === "fulfilled" ? overdueResult.value : null);
-        setUpcoming(upcomingResult.status === "fulfilled" ? upcomingResult.value : null);
-        setRecentPayments(recentPaymentsResult.status === "fulfilled" ? recentPaymentsResult.value : null);
-        setWinnerItems(winnersResult.status === "fulfilled" ? winnersResult.value : null);
-        setNotificationSummary(notificationResult.status === "fulfilled" ? notificationResult.value : null);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        setLegacy(null);
-        setCanonical(null);
-        setNotificationSummary(null);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+      if (legacyResult.status === "rejected") throw legacyResult.reason;
+      return {
+        legacy: legacyResult.value,
+        canonical:
+          canonicalResult.status === "fulfilled" ? canonicalResult.value : null,
+        overdue: overdueResult.status === "fulfilled" ? overdueResult.value : null,
+        upcoming: upcomingResult.status === "fulfilled" ? upcomingResult.value : null,
+        recentPayments:
+          recentPaymentsResult.status === "fulfilled"
+            ? recentPaymentsResult.value
+            : null,
+        winnerItems:
+          winnersResult.status === "fulfilled" ? winnersResult.value : null,
+        notificationSummary:
+          notificationResult.status === "fulfilled" ? notificationResult.value : null,
+      };
     },
-    [dashboardQuery]
-  );
+  });
+  const productsQuery = useQuery({
+    queryKey: ["public", "products", "partner-dashboard"],
+    queryFn: listPublicProducts,
+  });
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
-
-  // Load products independently — does not affect main dashboard loading
-  useEffect(() => {
-    listPublicProducts()
-      .then(r => setProducts(r.products))
-      .catch(() => null);
-  }, []);
+  const legacy: LegacyDashboardPayload | null =
+    dashboardDataQuery.data?.legacy ?? null;
+  const canonical: CanonicalDashboardPayload | null =
+    dashboardDataQuery.data?.canonical ?? null;
+  const overdue: DashboardDuePayload | null = dashboardDataQuery.data?.overdue ?? null;
+  const upcoming: DashboardDuePayload | null = dashboardDataQuery.data?.upcoming ?? null;
+  const recentPayments: DashboardPaymentsPayload | null =
+    dashboardDataQuery.data?.recentPayments ?? null;
+  const winnerItems: DashboardWinnersPayload | null =
+    dashboardDataQuery.data?.winnerItems ?? null;
+  const notificationSummary: NotificationSummaryResponse | null =
+    dashboardDataQuery.data?.notificationSummary ?? null;
+  const products: PublicProduct[] = productsQuery.data?.products ?? [];
+  const loading = dashboardDataQuery.isPending;
+  const refreshing = dashboardDataQuery.isFetching && !dashboardDataQuery.isPending;
+  const error = dashboardDataQuery.error
+    ? toErrorMessage(dashboardDataQuery.error)
+    : null;
 
   const summary =
     canonical?.summary ??
@@ -323,7 +314,7 @@ export default function PartnerDashboardPage() {
         <div className="flex justify-end">
           <ActionButton
             variant="outline"
-            onClick={() => void loadPage("refresh")}
+            onClick={() => void dashboardDataQuery.refetch()}
             disabled={refreshing || loading}
             leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
@@ -507,7 +498,7 @@ export default function PartnerDashboardPage() {
           <ERPErrorState
             title="Unable to load partner dashboard"
             description={error}
-            onRetry={() => void loadPage("initial")}
+            onRetry={() => void dashboardDataQuery.refetch()}
           />
         ) : null}
 

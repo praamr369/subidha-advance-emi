@@ -3,7 +3,8 @@
 import Link from "next/link";
 import type { NotificationSummaryResponse } from "@/services/notifications";
 import { getCustomerNotificationSummary } from "@/services/notifications";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import {
   ArrowRight,
@@ -111,28 +112,7 @@ function QuickLinkCard({ title, description, href }: QuickLink) {
 }
 
 export default function CustomerDashboardPage() {
-  const [legacy, setLegacy] = useState<LegacyDashboardResponse | null>(null);
-  const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
-  const [upcoming, setUpcoming] = useState<DashboardDuePayload | null>(null);
-  const [overdue, setOverdue] = useState<DashboardDuePayload | null>(null);
-  const [recentPayments, setRecentPayments] =
-    useState<DashboardPaymentsPayload | null>(null);
-  const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
-    null
-  );
-  const [directSaleSummary, setDirectSaleSummary] = useState<DirectSaleSummaryPayload | null>(null);
-  const [latestDirectSales, setLatestDirectSales] = useState<CustomerDirectSaleListItem[]>([]);
-  const [notificationSummary, setNotificationSummary] =
-    useState<NotificationSummaryResponse | null>(null);
-  const [deliverySummary, setDeliverySummary] = useState<DeliveryReportSummary | null>(
-    null
-  );
-  const [supportOpenCount, setSupportOpenCount] = useState<number | null>(null);
-  const [publicProducts, setPublicProducts] = useState<PublicProduct[]>([]);
   const [productCategoryFilter, setProductCategoryFilter] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [windowPreset, setWindowPreset] =
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
@@ -149,13 +129,10 @@ export default function CustomerDashboardPage() {
     [endDate, startDate, windowPreset]
   );
 
-  const loadPage = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
-
-      try {
-        const [
+  const dashboardDataQuery = useQuery({
+    queryKey: ["customer", "dashboard", dashboardQuery],
+    queryFn: async () => {
+      const [
           legacyResult,
           canonicalResult,
           overdueResult,
@@ -167,7 +144,7 @@ export default function CustomerDashboardPage() {
           notificationSummaryResult,
           deliveriesResult,
           supportOpenResult,
-        ] = await Promise.allSettled([
+      ] = await Promise.allSettled([
           getCustomerDashboard(),
           getDashboardSummaryV2(dashboardQuery),
           listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
@@ -179,71 +156,68 @@ export default function CustomerDashboardPage() {
           getCustomerNotificationSummary(),
           listCustomerDeliveries(),
           listCustomerSupportTickets("open"),
-        ]);
+      ]);
 
-        if (legacyResult.status !== "fulfilled") {
-          throw legacyResult.reason;
-        }
-
-        setLegacy(legacyResult.value);
-        setCanonical(
-          canonicalResult.status === "fulfilled" ? canonicalResult.value : null
-        );
-        setOverdue(overdueResult.status === "fulfilled" ? overdueResult.value : null);
-        setUpcoming(
-          upcomingResult.status === "fulfilled" ? upcomingResult.value : null
-        );
-        setRecentPayments(
+      if (legacyResult.status !== "fulfilled") throw legacyResult.reason;
+      return {
+        legacy: legacyResult.value,
+        canonical:
+          canonicalResult.status === "fulfilled" ? canonicalResult.value : null,
+        overdue: overdueResult.status === "fulfilled" ? overdueResult.value : null,
+        upcoming: upcomingResult.status === "fulfilled" ? upcomingResult.value : null,
+        recentPayments:
           recentPaymentsResult.status === "fulfilled"
             ? recentPaymentsResult.value
-            : null
-        );
-        setWinnerItems(winnersResult.status === "fulfilled" ? winnersResult.value : null);
-        setDirectSaleSummary(
-          directSaleSummaryResult.status === "fulfilled" ? directSaleSummaryResult.value : null
-        );
-        setLatestDirectSales(
-          directSalesListResult.status === "fulfilled" ? directSalesListResult.value.results : []
-        );
-        setNotificationSummary(
-          notificationSummaryResult.status === "fulfilled" ? notificationSummaryResult.value : null
-        );
-        setDeliverySummary(
-          deliveriesResult.status === "fulfilled" ? deliveriesResult.value.summary : null
-        );
-        setSupportOpenCount(
-          supportOpenResult.status === "fulfilled" ? supportOpenResult.value.count : null
-        );
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        setLegacy(null);
-        setCanonical(null);
-        setOverdue(null);
-        setUpcoming(null);
-        setRecentPayments(null);
-        setWinnerItems(null);
-        setDirectSaleSummary(null);
-        setLatestDirectSales([]);
-        setNotificationSummary(null);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+            : null,
+        winnerItems:
+          winnersResult.status === "fulfilled" ? winnersResult.value : null,
+        directSaleSummary:
+          directSaleSummaryResult.status === "fulfilled"
+            ? directSaleSummaryResult.value
+            : null,
+        latestDirectSales:
+          directSalesListResult.status === "fulfilled"
+            ? directSalesListResult.value.results
+            : [],
+        notificationSummary:
+          notificationSummaryResult.status === "fulfilled"
+            ? notificationSummaryResult.value
+            : null,
+        deliverySummary:
+          deliveriesResult.status === "fulfilled" ? deliveriesResult.value.summary : null,
+        supportOpenCount:
+          supportOpenResult.status === "fulfilled" ? supportOpenResult.value.count : null,
+      };
     },
-    [dashboardQuery]
-  );
+  });
+  const productsQuery = useQuery({
+    queryKey: ["public", "products", "customer-dashboard"],
+    queryFn: listPublicProducts,
+  });
 
-  useEffect(() => {
-    void loadPage("initial");
-  }, [loadPage]);
-
-  // Load product catalog independently — shows even if main dashboard is slow
-  useEffect(() => {
-    listPublicProducts()
-      .then(r => setPublicProducts(r.products))
-      .catch(() => null);
-  }, []);
+  const legacy: LegacyDashboardResponse | null = dashboardDataQuery.data?.legacy ?? null;
+  const canonical: CanonicalDashboardPayload | null = dashboardDataQuery.data?.canonical ?? null;
+  const overdue: DashboardDuePayload | null = dashboardDataQuery.data?.overdue ?? null;
+  const upcoming: DashboardDuePayload | null = dashboardDataQuery.data?.upcoming ?? null;
+  const recentPayments: DashboardPaymentsPayload | null =
+    dashboardDataQuery.data?.recentPayments ?? null;
+  const winnerItems: DashboardWinnersPayload | null =
+    dashboardDataQuery.data?.winnerItems ?? null;
+  const directSaleSummary: DirectSaleSummaryPayload | null =
+    dashboardDataQuery.data?.directSaleSummary ?? null;
+  const latestDirectSales: CustomerDirectSaleListItem[] =
+    dashboardDataQuery.data?.latestDirectSales ?? [];
+  const notificationSummary: NotificationSummaryResponse | null =
+    dashboardDataQuery.data?.notificationSummary ?? null;
+  const deliverySummary: DeliveryReportSummary | null =
+    dashboardDataQuery.data?.deliverySummary ?? null;
+  const supportOpenCount: number | null = dashboardDataQuery.data?.supportOpenCount ?? null;
+  const publicProducts: PublicProduct[] = productsQuery.data?.products ?? [];
+  const loading = dashboardDataQuery.isPending;
+  const refreshing = dashboardDataQuery.isFetching && !dashboardDataQuery.isPending;
+  const error = dashboardDataQuery.error
+    ? toErrorMessage(dashboardDataQuery.error)
+    : null;
 
   const summary =
     canonical?.summary ??
@@ -427,7 +401,7 @@ export default function CustomerDashboardPage() {
             actions={
               <ActionButton
                 variant="outline"
-                onClick={() => void loadPage("refresh")}
+                onClick={() => void dashboardDataQuery.refetch()}
                 leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
               >
                 {refreshing ? "Refreshing..." : "Refresh"}
@@ -534,7 +508,7 @@ export default function CustomerDashboardPage() {
         <ERPErrorState
           title="Unable to load customer workspace"
           description={error}
-          onRetry={() => void loadPage("initial")}
+          onRetry={() => void dashboardDataQuery.refetch()}
         />
       ) : null}
 

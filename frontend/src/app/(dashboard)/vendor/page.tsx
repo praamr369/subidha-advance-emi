@@ -2,12 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  AlertCircle,
   ArrowRight,
   Bell,
-  Box,
   CheckCircle2,
   ChevronRight,
   ClipboardList,
@@ -20,9 +19,7 @@ import {
   RotateCcw,
   ShoppingCart,
   Tag,
-  TrendingDown,
   Wallet,
-  Warehouse,
 } from "lucide-react";
 
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -85,6 +82,9 @@ type VendorOutstanding = {
   total_paid?: string | number;
   pending_bills?: string | number;
 };
+
+const EMPTY_VENDOR_PRODUCTS: VendorProduct[] = [];
+const EMPTY_VENDOR_PURCHASE_ORDERS: VendorPO[] = [];
 
 function fmt(v: string | number | null | undefined): string {
   if (v == null) return "—";
@@ -222,57 +222,66 @@ function ProductCard({ product }: { product: VendorProduct }) {
 }
 
 export default function VendorDashboardPage() {
-  const [dashboard, setDashboard] = useState<VendorDashboard | null>(null);
-  const [products, setProducts] = useState<VendorProduct[]>([]);
-  const [purchaseOrders, setPurchaseOrders] = useState<VendorPO[]>([]);
-  const [outstanding, setOutstanding] = useState<VendorOutstanding | null>(null);
-  const [notifSummary, setNotifSummary] = useState<NotificationSummaryResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Product filter state
   const [categoryFilter, setCategoryFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [dash, prods, pos, outs, notifs] = await Promise.allSettled([
+  const dashboardQuery = useQuery({
+    queryKey: ["vendor", "dashboard"],
+    queryFn: async () => {
+      const [dashboardResult, productsResult, ordersResult, outstandingResult, notificationsResult] =
+        await Promise.allSettled([
         listVendorDashboard(),
         listVendorProducts(),
         listVendorPurchaseOrders(),
         getVendorOutstanding(),
         getVendorNotificationSummary(),
       ]);
-      if (dash.status === "fulfilled") {
-        const d = dash.value as VendorDashboard;
-        setDashboard(d);
-      } else {
-        throw dash.reason;
-      }
-      if (prods.status === "fulfilled") {
-        const payload = prods.value as { results?: VendorProduct[] } | VendorProduct[];
-        setProducts(Array.isArray(payload) ? payload : (payload?.results ?? []));
-      }
-      if (pos.status === "fulfilled") {
-        const payload = pos.value as { results?: VendorPO[] } | VendorPO[];
-        setPurchaseOrders(Array.isArray(payload) ? payload : (payload?.results ?? []));
-      }
-      if (outs.status === "fulfilled") {
-        setOutstanding(outs.value as VendorOutstanding);
-      }
-      if (notifs.status === "fulfilled") {
-        setNotifSummary(notifs.value);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load vendor dashboard.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      if (dashboardResult.status === "rejected") throw dashboardResult.reason;
 
-  useEffect(() => { void load(); }, [load]);
+      const productsPayload =
+        productsResult.status === "fulfilled"
+          ? (productsResult.value as { results?: VendorProduct[] } | VendorProduct[])
+          : [];
+      const ordersPayload =
+        ordersResult.status === "fulfilled"
+          ? (ordersResult.value as { results?: VendorPO[] } | VendorPO[])
+          : [];
+
+      return {
+        dashboard: dashboardResult.value as VendorDashboard,
+        products: Array.isArray(productsPayload)
+          ? productsPayload
+          : (productsPayload.results ?? []),
+        purchaseOrders: Array.isArray(ordersPayload)
+          ? ordersPayload
+          : (ordersPayload.results ?? []),
+        outstanding:
+          outstandingResult.status === "fulfilled"
+            ? (outstandingResult.value as VendorOutstanding)
+            : null,
+        notificationSummary:
+          notificationsResult.status === "fulfilled"
+            ? notificationsResult.value
+            : null,
+      };
+    },
+  });
+
+  const dashboard = dashboardQuery.data?.dashboard ?? null;
+  const products = dashboardQuery.data?.products ?? EMPTY_VENDOR_PRODUCTS;
+  const purchaseOrders =
+    dashboardQuery.data?.purchaseOrders ?? EMPTY_VENDOR_PURCHASE_ORDERS;
+  const outstanding = dashboardQuery.data?.outstanding ?? null;
+  const notifSummary: NotificationSummaryResponse | null =
+    dashboardQuery.data?.notificationSummary ?? null;
+  const loading = dashboardQuery.isPending;
+  const refreshing = dashboardQuery.isFetching && !dashboardQuery.isPending;
+  const error = dashboardQuery.error
+    ? dashboardQuery.error instanceof Error
+      ? dashboardQuery.error.message
+      : "Unable to load vendor dashboard."
+    : null;
 
   // Derived filter lists
   const categories = useMemo(() => {
@@ -311,11 +320,11 @@ export default function VendorDashboardPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => void load()}
-              disabled={loading}
+              onClick={() => void dashboardQuery.refetch()}
+              disabled={loading || refreshing}
               className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+              <RefreshCw className={`h-3.5 w-3.5 ${loading || refreshing ? "animate-spin" : ""}`} /> Refresh
             </button>
             <Link href={ROUTES.vendor.notifications} className="relative flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-card hover:bg-muted">
               <Bell className="h-4 w-4" />
@@ -333,7 +342,7 @@ export default function VendorDashboardPage() {
         {loading ? (
           <ERPLoadingState label="Loading vendor dashboard…" />
         ) : error ? (
-          <ERPErrorState title="Dashboard unavailable" description={error} onRetry={() => void load()} />
+          <ERPErrorState title="Dashboard unavailable" description={error} onRetry={() => void dashboardQuery.refetch()} />
         ) : (
           <>
             {/* ── KPI band ── */}

@@ -1,4 +1,14 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
+
+import { buildPublicMetadata } from "@/lib/public-seo";
+
+export const metadata: Metadata = buildPublicMetadata({
+  title: "Home",
+  description:
+    "Subidha Furniture Lucky Plan Advance EMI — buy furniture on easy monthly installments with full transparency, fair draw, and winner tracking.",
+  path: "/",
+});
 
 import PublicOperationalDisclosure from "@/components/public/PublicOperationalDisclosure";
 import PublicStructuredData from "@/components/public/PublicStructuredData";

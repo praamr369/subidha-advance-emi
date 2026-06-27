@@ -102,9 +102,15 @@ const ADMIN_PERMANENT_REDIRECTS: Array<{ source: string; destination: string }> 
   { source: "/admin/setup/readiness", destination: "/admin/settings/business-setup" },
 ];
 
+const ONE_HOUR = 60 * 60;
+
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1"],
+  compress: true,
+  poweredByHeader: false,
   experimental: {
     webpackBuildWorker: false,
+    optimizePackageImports: ["lucide-react"],
   },
   typescript: {
     ignoreBuildErrors: true,
@@ -113,6 +119,43 @@ const nextConfig: NextConfig = {
     dangerouslyAllowLocalIP: true,
     qualities: [75, 78, 80],
     remotePatterns: buildRemotePatterns(),
+    minimumCacheTTL: ONE_HOUR,
+  },
+  async headers() {
+    return [
+      // Public uploaded/media assets
+      {
+        source: "/brand/:path*",
+        headers: [
+          { key: "Cache-Control", value: `public, max-age=${ONE_HOUR}, stale-while-revalidate=86400` },
+        ],
+      },
+      // Public pages - short cache so content updates are visible quickly
+      {
+        source: "/(products|about|contact|faq|how-it-works|lucky-plan|partners|customers|winners|winner-history|apply|blog|policies|terms|privacy|rent|lease|direct-sale|lucky-plan-policy|refund-cancellation|warranty|vision-trust|rulebook|udyam-msme|contracts|grievance|payment-policy|service-policy|rental-lease-policy|delivery-policy|direct-sale-policy|lucky-plan-policy|business-compliance|data-requests)(.*)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=300, stale-while-revalidate=600" },
+          { key: "X-Robots-Tag", value: "index, follow" },
+        ],
+      },
+      // Auth/dashboard pages: no public caching, no indexing
+      {
+        source: "/(login|admin|cashier|customer|partner|vendor|unauthorized)(.*)",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+      // Security headers for all pages
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+    ];
   },
   async redirects() {
     return ADMIN_PERMANENT_REDIRECTS.map(({ source, destination }) => ({

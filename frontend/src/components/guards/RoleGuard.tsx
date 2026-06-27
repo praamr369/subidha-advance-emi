@@ -15,8 +15,9 @@ function normalizeRole(value: string | null | undefined): string {
   return (value || "").trim().toUpperCase();
 }
 
-function subscribeToHydration(): () => void {
-  return () => {};
+function subscribeToHydration(onStoreChange: () => void): () => void {
+  const timeoutId = window.setTimeout(onStoreChange, 0);
+  return () => window.clearTimeout(timeoutId);
 }
 
 function useHydrated(): boolean {
@@ -35,7 +36,7 @@ export default function RoleGuard({
   const pathname = usePathname();
   const hydrated = useHydrated();
 
-  const { role, isAuthenticated, isLoading } = useAuth();
+  const { role, isAuthenticated } = useAuth();
 
   const normalizedAllowedRoles = useMemo(
     () => allowedRoles.map((item) => normalizeRole(item)),
@@ -61,11 +62,10 @@ export default function RoleGuard({
     );
   }, [isAuthenticated, storedSession]);
 
-  const isReady = useMemo(() => {
-    if (!hydrated) return false;
-    if (isLoading && !storedSession && !isAuthenticated) return false;
-    return true;
-  }, [hydrated, isLoading, storedSession, isAuthenticated]);
+  // Once this guard has hydrated it can trust the persisted session it reads
+  // directly. Waiting for a second provider effect can leave protected routes
+  // on the loading fallback when the provider hydration is delayed.
+  const isReady = hydrated;
 
   useEffect(() => {
     if (!isReady) return;

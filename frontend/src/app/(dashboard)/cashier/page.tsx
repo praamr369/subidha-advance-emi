@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowRight,
@@ -158,18 +159,6 @@ function toErrorMessage(error: unknown): string {
 }
 
 export default function CashierDashboardPage() {
-  const [legacy, setLegacy] = useState<LegacyDashboardPayload | null>(null);
-  const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
-  const [upcoming, setUpcoming] = useState<DashboardDuePayload | null>(null);
-  const [overdue, setOverdue] = useState<DashboardDuePayload | null>(null);
-  const [recentPayments, setRecentPayments] =
-    useState<DashboardPaymentsPayload | null>(null);
-  const [winnerItems, setWinnerItems] = useState<DashboardWinnersPayload | null>(
-    null
-  );
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [windowPreset, setWindowPreset] =
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
@@ -188,54 +177,59 @@ export default function CashierDashboardPage() {
     [endDate, startDate, windowPreset]
   );
 
-  const loadDashboard = useCallback(
-    async (mode: "initial" | "refresh" = "initial") => {
-      if (mode === "initial") setLoading(true);
-      else setRefreshing(true);
+  const dashboardDataQuery = useQuery({
+    queryKey: ["cashier", "dashboard", dashboardQuery],
+    queryFn: async () => {
+      const [
+        legacyResult,
+        canonicalResult,
+        overdueResult,
+        upcomingResult,
+        recentPaymentsResult,
+        winnersResult,
+      ] = await Promise.allSettled([
+        getCashierDashboard(),
+        getDashboardSummaryV2(dashboardQuery),
+        listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+        listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+        listDashboardRecentPayments({ ...dashboardQuery, limit: 12 }),
+        listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+      ]);
 
-      try {
-        // Promise.allSettled — any failed secondary call doesn't block the whole page
-        const [
-          legacyResult,
-          canonicalResult,
-          overdueResult,
-          upcomingResult,
-          recentPaymentsResult,
-          winnersResult,
-        ] = await Promise.allSettled([
-          getCashierDashboard(),
-          getDashboardSummaryV2(dashboardQuery),
-          listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
-          listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
-          listDashboardRecentPayments({ ...dashboardQuery, limit: 12 }),
-          listDashboardWinners({ ...dashboardQuery, limit: 4 }),
-        ]);
-
-        if (legacyResult.status === "rejected") throw legacyResult.reason;
-        setLegacy(legacyResult.value);
-        setCanonical(canonicalResult.status === "fulfilled" ? canonicalResult.value : null);
-        setOverdue(overdueResult.status === "fulfilled" ? overdueResult.value : null);
-        setUpcoming(upcomingResult.status === "fulfilled" ? upcomingResult.value : null);
-        setRecentPayments(recentPaymentsResult.status === "fulfilled" ? recentPaymentsResult.value : null);
-        setWinnerItems(winnersResult.status === "fulfilled" ? winnersResult.value : null);
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setLegacy(null);
-          setCanonical(null);
-        }
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else setRefreshing(false);
-      }
+      if (legacyResult.status === "rejected") throw legacyResult.reason;
+      return {
+        legacy: legacyResult.value,
+        canonical:
+          canonicalResult.status === "fulfilled" ? canonicalResult.value : null,
+        overdue: overdueResult.status === "fulfilled" ? overdueResult.value : null,
+        upcoming: upcomingResult.status === "fulfilled" ? upcomingResult.value : null,
+        recentPayments:
+          recentPaymentsResult.status === "fulfilled"
+            ? recentPaymentsResult.value
+            : null,
+        winnerItems:
+          winnersResult.status === "fulfilled" ? winnersResult.value : null,
+      };
     },
-    [dashboardQuery]
-  );
+  });
 
-  useEffect(() => {
-    void loadDashboard("initial");
-  }, [loadDashboard]);
+  const legacy: LegacyDashboardPayload | null =
+    dashboardDataQuery.data?.legacy ?? null;
+  const canonical: CanonicalDashboardPayload | null =
+    dashboardDataQuery.data?.canonical ?? null;
+  const overdue: DashboardDuePayload | null =
+    dashboardDataQuery.data?.overdue ?? null;
+  const upcoming: DashboardDuePayload | null =
+    dashboardDataQuery.data?.upcoming ?? null;
+  const recentPayments: DashboardPaymentsPayload | null =
+    dashboardDataQuery.data?.recentPayments ?? null;
+  const winnerItems: DashboardWinnersPayload | null =
+    dashboardDataQuery.data?.winnerItems ?? null;
+  const loading = dashboardDataQuery.isPending;
+  const refreshing = dashboardDataQuery.isFetching && !dashboardDataQuery.isPending;
+  const error = dashboardDataQuery.error
+    ? toErrorMessage(dashboardDataQuery.error)
+    : null;
 
   const summary =
     canonical?.summary ??
@@ -399,7 +393,7 @@ export default function CashierDashboardPage() {
         <div className="flex justify-end">
           <ActionButton
             variant="outline"
-            onClick={() => void loadDashboard("refresh")}
+            onClick={() => void dashboardDataQuery.refetch()}
             disabled={refreshing || loading}
             leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
@@ -494,7 +488,7 @@ export default function CashierDashboardPage() {
           <ERPErrorState
             title="Unable to load cashier dashboard"
             description={error}
-            onRetry={() => void loadDashboard("initial")}
+            onRetry={() => void dashboardDataQuery.refetch()}
           />
         ) : null}
 
