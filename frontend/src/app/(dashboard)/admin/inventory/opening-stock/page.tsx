@@ -17,6 +17,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ApiError } from "@/lib/api";
 import { invalidateAfterOpeningStockMutation } from "@/lib/operational-query-invalidation";
 import { ROUTES } from "@/lib/routes";
+import ProductPickerCombobox, { type ProductPickerValue } from "@/components/ui/ProductPickerCombobox";
 import {
   applyAdminOpeningStockBulkCsv,
   correctionAdminOpeningStockEntry,
@@ -24,14 +25,12 @@ import {
   fetchOpeningStockCsvTemplateText,
   listAdminOpeningStockBatches,
   listAdminOpeningStockEntries,
-  listInventoryItems,
   listStockLocations,
   patchAdminOpeningStockEntry,
   postAdminOpeningStockEntry,
   postOpeningStockImport,
   previewAdminOpeningStockBulkCsv,
   previewOpeningStockImport,
-  type InventoryItem,
   type OpeningStockBulkPreview,
   type OpeningStockEntryRow,
   type OpeningStockPreview,
@@ -57,12 +56,9 @@ export default function InventoryOpeningStockPage() {
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [entriesError, setEntriesError] = useState<string | null>(null);
 
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [itemsLoading, setItemsLoading] = useState(false);
-  const [itemSearch, setItemSearch] = useState("");
+  const [pickedItem, setPickedItem] = useState<ProductPickerValue | null>(null);
   const [locations, setLocations] = useState<StockLocation[]>([]);
 
-  const [manualItemId, setManualItemId] = useState<number | "">("");
   const [manualLocationId, setManualLocationId] = useState<number | "">("");
   const [manualQty, setManualQty] = useState("0.000");
   const [manualUnitCost, setManualUnitCost] = useState("");
@@ -99,21 +95,16 @@ export default function InventoryOpeningStockPage() {
   );
   const [batchesLoading, setBatchesLoading] = useState(false);
 
-  const selectedItem = useMemo(
-    () => items.find((i) => i.id === manualItemId) ?? null,
-    [items, manualItemId]
-  );
-
   const valuationPreview = useMemo(() => {
     const q = parseDec(manualQty);
     const c =
       manualUnitCost.trim() !== ""
         ? parseDec(manualUnitCost)
-        : selectedItem?.standard_unit_cost
-          ? parseDec(selectedItem.standard_unit_cost)
+        : pickedItem?.standard_unit_cost
+          ? parseDec(pickedItem.standard_unit_cost)
           : 0;
     return (q * c).toFixed(2);
-  }, [manualQty, manualUnitCost, selectedItem]);
+  }, [manualQty, manualUnitCost, pickedItem]);
 
   const loadEntries = useCallback(async () => {
     setEntriesLoading(true);
@@ -138,22 +129,6 @@ export default function InventoryOpeningStockPage() {
     }
   }, []);
 
-  const loadItems = useCallback(async (search: string) => {
-    setItemsLoading(true);
-    try {
-      const payload = await listInventoryItems({
-        page_size: 100,
-        search: search.trim() || undefined,
-        stock_tracking_enabled: true,
-      });
-      setItems(payload.results ?? []);
-    } catch {
-      setItems([]);
-    } finally {
-      setItemsLoading(false);
-    }
-  }, []);
-
   const loadBatches = useCallback(async () => {
     setBatchesLoading(true);
     try {
@@ -172,23 +147,16 @@ export default function InventoryOpeningStockPage() {
   }, [loadEntries, loadLocations]);
 
   useEffect(() => {
-    const t = window.setTimeout(() => {
-      void loadItems(itemSearch);
-    }, 280);
-    return () => window.clearTimeout(t);
-  }, [itemSearch, loadItems]);
-
-  useEffect(() => {
     if (tab === "history") void loadBatches();
   }, [tab, loadBatches]);
 
+  // Auto-fill location when product is picked
   useEffect(() => {
-    if (!manualItemId || manualLocationId !== "") return;
-    const item = items.find((i) => i.id === manualItemId);
-    if (item?.default_stock_location) {
-      setManualLocationId(item.default_stock_location);
+    if (!pickedItem || manualLocationId !== "") return;
+    if (pickedItem.default_stock_location_id) {
+      setManualLocationId(pickedItem.default_stock_location_id);
     }
-  }, [manualItemId, manualLocationId, items]);
+  }, [pickedItem, manualLocationId]);
 
   async function afterInventoryMutation() {
     await invalidateAfterOpeningStockMutation(queryClient);
@@ -196,7 +164,7 @@ export default function InventoryOpeningStockPage() {
   }
 
   function resetManualForm() {
-    setManualItemId("");
+    setPickedItem(null);
     setManualLocationId("");
     setManualQty("0.000");
     setManualUnitCost("");
@@ -209,7 +177,19 @@ export default function InventoryOpeningStockPage() {
   function beginEditDraft(row: OpeningStockEntryRow) {
     if (row.status !== "DRAFT") return;
     setEditingDraftId(row.id);
-    setManualItemId(row.inventory_item);
+    // Populate picker from row SKU/name if available
+    if (row.inventory_item) {
+      setPickedItem({
+        id: row.inventory_item,
+        sku: row.sku ?? "",
+        product_name: row.product_name ?? `Item #${row.inventory_item}`,
+        product_code: "",
+        category: "",
+        subcategory: "",
+        standard_unit_cost: row.unit_cost_snapshot ?? null,
+        unit_of_measure: "",
+      });
+    }
     setManualLocationId(row.stock_location);
     setManualQty(row.quantity);
     setManualUnitCost(row.unit_cost_snapshot ?? "");
@@ -224,12 +204,12 @@ export default function InventoryOpeningStockPage() {
     setManualSubmitting(true);
     setManualFieldErrors({});
     try {
-      if (!manualItemId || !manualLocationId) {
+      if (!pickedItem || !manualLocationId) {
         setManualFieldErrors({ base: "Product (inventory item) and location are required." });
         return;
       }
       const payload = {
-        inventory_item: Number(manualItemId),
+        inventory_item: pickedItem.id,
         stock_location: Number(manualLocationId),
         quantity: manualQty,
         effective_date: manualDate,
@@ -436,39 +416,26 @@ export default function InventoryOpeningStockPage() {
               description="Search inventory items by SKU or product code. Save as draft, then post to create one immutable ledger movement per row."
             >
               <form className="grid gap-4 md:grid-cols-2" onSubmit={(ev) => void handleSaveManualDraft(ev)}>
-                <label className="grid gap-1 text-sm">
-                  <span className="text-muted-foreground">Search items</span>
-                  <input
-                    type="search"
-                    value={itemSearch}
-                    onChange={(ev) => setItemSearch(ev.target.value)}
-                    placeholder="SKU / code / name"
-                    className="rounded-xl border border-border bg-background px-3 py-2"
-                  />
-                  <span className="text-xs text-muted-foreground">{itemsLoading ? "Loading…" : null}</span>
-                </label>
-                <label className="grid gap-1 text-sm">
-                  <span className="text-muted-foreground">Inventory item</span>
-                  <select
-                    required
+                <div className="grid gap-1 text-sm md:col-span-2">
+                  <span className="text-muted-foreground">Product / inventory item</span>
+                  <ProductPickerCombobox
+                    value={pickedItem}
+                    onChange={(item) => { setPickedItem(item); if (!item) setManualLocationId(""); }}
                     data-testid="opening-stock-item-select"
-                    className="rounded-xl border border-border bg-background px-3 py-2"
-                    value={manualItemId === "" ? "" : String(manualItemId)}
-                    onChange={(ev) =>
-                      setManualItemId(ev.target.value ? Number(ev.target.value) : "")
-                    }
-                  >
-                    <option value="">Select item…</option>
-                    {items.map((it) => (
-                      <option key={it.id} value={it.id}>
-                        {(it.sku || it.product_code || "").trim()} — {it.product_name ?? `#${it.product}`}
-                      </option>
-                    ))}
-                  </select>
+                    required
+                  />
+                  {pickedItem ? (
+                    <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      {pickedItem.product_code ? <span>Code: <span className="font-mono text-foreground">{pickedItem.product_code}</span></span> : null}
+                      {pickedItem.category ? <span>Category: {pickedItem.category}{pickedItem.subcategory ? ` › ${pickedItem.subcategory}` : ""}</span> : null}
+                      {pickedItem.standard_unit_cost ? <span>Std cost: <span className="font-semibold text-foreground">₹{Number(pickedItem.standard_unit_cost).toLocaleString("en-IN")}</span></span> : null}
+                      {pickedItem.unit_of_measure ? <span>Unit: {pickedItem.unit_of_measure}</span> : null}
+                    </div>
+                  ) : null}
                   {manualFieldErrors.inventory_item ? (
                     <span className="text-xs text-destructive">{manualFieldErrors.inventory_item}</span>
                   ) : null}
-                </label>
+                </div>
                 <label className="grid gap-1 text-sm">
                   <span className="text-muted-foreground">Warehouse / location</span>
                   <select
@@ -516,7 +483,7 @@ export default function InventoryOpeningStockPage() {
                     inputMode="decimal"
                     value={manualUnitCost}
                     onChange={(ev) => setManualUnitCost(ev.target.value)}
-                    placeholder={selectedItem?.standard_unit_cost ?? ""}
+                    placeholder={pickedItem?.standard_unit_cost ?? ""}
                     className="rounded-xl border border-border bg-background px-3 py-2"
                   />
                   {manualFieldErrors.unit_cost_snapshot ? (

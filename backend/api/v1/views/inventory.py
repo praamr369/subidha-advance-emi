@@ -691,42 +691,117 @@ class AdminInventoryItemSearchView(APIView):
 
     def get(self, request):
         term = (request.query_params.get("q") or "").strip()
-        queryset = InventoryItem.objects.select_related("product", "default_stock_location").filter(is_active=True)
+        category = (request.query_params.get("category") or "").strip()
+        subcategory = (request.query_params.get("subcategory") or "").strip()
+        stock_item_type = (request.query_params.get("stock_item_type") or "").strip()
+        include_locations = request.query_params.get("include_locations") == "1"
+
+        queryset = InventoryItem.objects.select_related(
+            "product", "default_stock_location"
+        ).filter(is_active=True)
+
         if term:
             queryset = queryset.filter(
                 Q(product__name__icontains=term)
                 | Q(sku__icontains=term)
                 | Q(product__product_code__icontains=term)
+                | Q(barcode__icontains=term)
             )
-        queryset = queryset.order_by("product__name", "id")[:30]
+        if category:
+            queryset = queryset.filter(product__category__iexact=category)
+        if subcategory:
+            queryset = queryset.filter(product__subcategory__iexact=subcategory)
+        if stock_item_type:
+            queryset = queryset.filter(stock_item_type=stock_item_type)
+
+        queryset = queryset.order_by("product__name", "id")[:40]
+
+        locations = (
+            list(StockLocation.objects.filter(is_active=True).order_by("name", "id"))
+            if include_locations
+            else []
+        )
+
         rows = []
-        locations = list(StockLocation.objects.filter(is_active=True).order_by("name", "id"))
         for item in queryset:
-            by_location = []
-            for location in locations:
-                qty = _location_quantity(inventory_item=item, stock_location=location)
-                if qty <= 0:
-                    continue
-                by_location.append(
-                    {
+            row = {
+                "id": item.id,
+                "inventory_item_id": item.id,
+                "product_id": item.product_id,
+                "product_name": item.product.name,
+                "product_code": item.product.product_code or "",
+                "sku": item.sku or "",
+                "category": item.product.category or "",
+                "subcategory": item.product.subcategory or "",
+                "stock_item_type": item.stock_item_type,
+                "unit_of_measure": item.unit_of_measure,
+                "standard_unit_cost": str(item.standard_unit_cost) if item.standard_unit_cost else None,
+                "barcode": item.barcode or "",
+                "default_stock_location_id": item.default_stock_location_id,
+                "default_stock_location_code": item.default_stock_location.code if item.default_stock_location else None,
+            }
+            if include_locations:
+                by_location = []
+                for location in locations:
+                    qty = _location_quantity(inventory_item=item, stock_location=location)
+                    if qty <= 0:
+                        continue
+                    by_location.append({
                         "stock_location_id": location.id,
                         "stock_location_name": location.name,
                         "stock_location_code": location.code,
                         "available_quantity": str(qty),
-                    }
-                )
-            rows.append(
-                {
-                    "id": item.id,
-                    "inventory_item_id": item.id,
-                    "product_id": item.product_id,
-                    "product_name": item.product.name,
-                    "sku": item.sku or "",
-                    "default_stock_location_id": item.default_stock_location_id,
-                    "available_by_location": by_location,
-                }
-            )
+                    })
+                row["available_by_location"] = by_location
+            rows.append(row)
+
         return Response({"count": len(rows), "results": rows})
+
+
+class AdminInventoryCategoriesView(APIView):
+    """Returns distinct category and subcategory values for picker filter chips."""
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from subscriptions.models import ProductCategoryMaster, ProductSubcategoryMaster
+        # Prefer master table entries; fall back to distinct raw strings on products
+        cat_masters = list(
+            ProductCategoryMaster.objects.filter(is_active=True)
+            .order_by("name")
+            .values("id", "name")
+        )
+        subcat_masters = list(
+            ProductSubcategoryMaster.objects.filter(is_active=True)
+            .select_related("category")
+            .order_by("category__name", "name")
+            .values("id", "name", "category__name")
+        )
+        # Also gather raw string values that appear on inventory items (products)
+        from django.db.models import Count
+        raw_cats = list(
+            InventoryItem.objects.filter(is_active=True)
+            .exclude(product__category="")
+            .values_list("product__category", flat=True)
+            .distinct()
+            .order_by("product__category")
+        )
+        raw_subcats = list(
+            InventoryItem.objects.filter(is_active=True)
+            .exclude(product__subcategory="")
+            .values("product__category", "product__subcategory")
+            .distinct()
+            .order_by("product__category", "product__subcategory")
+        )
+        stock_item_types = [
+            {"value": "FINISHED_GOOD", "label": "Finished Good"},
+            {"value": "ACCESSORY", "label": "Accessory"},
+            {"value": "RAW_MATERIAL", "label": "Raw Material"},
+        ]
+        return Response({
+            "categories": raw_cats,
+            "subcategories": [{"category": r["product__category"], "subcategory": r["product__subcategory"]} for r in raw_subcats],
+            "stock_item_types": stock_item_types,
+        })
 
 
 class AdminReturnLocationsSetupView(APIView):

@@ -98,9 +98,17 @@ export type AdminInventoryItemSearchRow = {
   inventory_item_id: number;
   product_id: number;
   product_name: string;
+  product_code: string;
   sku: string;
+  category: string;
+  subcategory: string;
+  stock_item_type: "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL";
+  unit_of_measure: string;
+  standard_unit_cost: string | null;
+  barcode: string;
   default_stock_location_id?: number | null;
-  available_by_location: AdminInventoryItemSearchLocationRow[];
+  default_stock_location_code?: string | null;
+  available_by_location?: AdminInventoryItemSearchLocationRow[];
 };
 
 export type StockLedgerRow = {
@@ -667,10 +675,35 @@ export function getInventoryItem(id: number | string) {
   return apiFetch<InventoryItem>(`/inventory/items/${id}/`);
 }
 
-export function searchAdminInventoryItems(params: { q: string }) {
+export type InventoryPickerParams = {
+  q?: string;
+  category?: string;
+  subcategory?: string;
+  stock_item_type?: string;
+  include_locations?: boolean;
+};
+
+export type InventoryCategoriesResponse = {
+  categories: string[];
+  subcategories: { category: string; subcategory: string }[];
+  stock_item_types: { value: string; label: string }[];
+};
+
+export function searchAdminInventoryItems(params: InventoryPickerParams = {}) {
+  const { include_locations, ...rest } = params;
+  const query: Record<string, string> = {};
+  if (rest.q) query.q = rest.q;
+  if (rest.category) query.category = rest.category;
+  if (rest.subcategory) query.subcategory = rest.subcategory;
+  if (rest.stock_item_type) query.stock_item_type = rest.stock_item_type;
+  if (include_locations) query.include_locations = "1";
   return apiFetch<{ count: number; results: AdminInventoryItemSearchRow[] }>(
-    `/admin/inventory/items/search/${buildQuery({ q: params.q })}`
+    `/admin/inventory/items/search/${buildQuery(query)}`
   );
+}
+
+export function listInventoryCategories() {
+  return apiFetch<InventoryCategoriesResponse>("/admin/inventory/categories/");
 }
 
 export function updateInventoryItem(
