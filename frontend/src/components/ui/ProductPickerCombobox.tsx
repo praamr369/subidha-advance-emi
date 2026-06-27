@@ -162,7 +162,7 @@ export default function ProductPickerCombobox({
         disabled={disabled}
         onClick={openPicker}
         className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
-          disabled ? "cursor-not-allowed opacity-60 bg-muted border-border" : "border-border bg-background hover:border-ring"
+          disabled ? "cursor-not-allowed opacity-60 bg-muted border-border" : "border-border bg-card hover:border-ring"
         } ${required && !value ? "border-destructive/60" : ""}`}
       >
         {value ? (
@@ -193,7 +193,7 @@ export default function ProductPickerCombobox({
 
       {/* Dropdown panel */}
       {open ? (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-border bg-background shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-border bg-card" style={{ boxShadow: "0 8px 40px -8px rgba(10,14,28,0.28), 0 2px 8px -2px rgba(10,14,28,0.14)" }}>
           {/* Search input */}
           <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2">
@@ -218,7 +218,7 @@ export default function ProductPickerCombobox({
                 <select
                   value={filterCategory}
                   onChange={(e) => { setFilterCategory(e.target.value); setFilterSubcategory(""); }}
-                  className="rounded-lg border border-border bg-background px-2 py-1 text-xs"
+                  className="rounded-lg border border-border bg-card px-2 py-1 text-xs"
                 >
                   <option value="">All categories</option>
                   {categories.categories.map((c) => (
@@ -232,7 +232,7 @@ export default function ProductPickerCombobox({
                 <select
                   value={filterSubcategory}
                   onChange={(e) => setFilterSubcategory(e.target.value)}
-                  className="rounded-lg border border-border bg-background px-2 py-1 text-xs"
+                  className="rounded-lg border border-border bg-card px-2 py-1 text-xs"
                 >
                   <option value="">All subcategories</option>
                   {visibleSubcats.map((s) => (
@@ -245,7 +245,7 @@ export default function ProductPickerCombobox({
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="rounded-lg border border-border bg-background px-2 py-1 text-xs"
+                className="rounded-lg border border-border bg-card px-2 py-1 text-xs"
               >
                 <option value="">All types</option>
                 {categories.stock_item_types.map((t) => (

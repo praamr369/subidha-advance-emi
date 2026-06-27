@@ -13,7 +13,6 @@ import {
 import { INVENTORY_CONTROL_DIRECTORY_GROUPS } from "@/components/admin/control-center/businessControlDirectories";
 import { WorkspaceDirectory } from "@/components/admin/control-center/WorkspaceDirectory";
 import ERPPageShell from "@/components/erp/ERPPageShell";
-import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ApiError } from "@/lib/api";
 import { invalidateAfterOpeningStockMutation } from "@/lib/operational-query-invalidation";
 import { ROUTES } from "@/lib/routes";
@@ -46,6 +45,26 @@ function todayIso(): string {
 function parseDec(s: string): number {
   const n = Number.parseFloat(String(s || "0"));
   return Number.isFinite(n) ? n : 0;
+}
+
+function fmt(n: string | number | null | undefined): string {
+  if (n === null || n === undefined || n === "") return "—";
+  const num = Number(n);
+  return Number.isFinite(num) ? num.toLocaleString("en-IN") : String(n);
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cls =
+    status === "POSTED"
+      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+      : status === "DRAFT"
+        ? "bg-amber-50 text-amber-800 border-amber-200"
+        : "bg-muted text-muted-foreground border-border";
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${cls}`}>
+      {status}
+    </span>
+  );
 }
 
 export default function InventoryOpeningStockPage() {
@@ -90,19 +109,16 @@ export default function InventoryOpeningStockPage() {
   const [legacyPreview, setLegacyPreview] = useState<OpeningStockPreview | null>(null);
   const [legacyBusy, setLegacyBusy] = useState(false);
 
-  const [batches, setBatches] = useState<Awaited<ReturnType<typeof listAdminOpeningStockBatches>> | null>(
-    null
-  );
+  const [batches, setBatches] = useState<Awaited<ReturnType<typeof listAdminOpeningStockBatches>> | null>(null);
   const [batchesLoading, setBatchesLoading] = useState(false);
 
   const valuationPreview = useMemo(() => {
     const q = parseDec(manualQty);
-    const c =
-      manualUnitCost.trim() !== ""
-        ? parseDec(manualUnitCost)
-        : pickedItem?.standard_unit_cost
-          ? parseDec(pickedItem.standard_unit_cost)
-          : 0;
+    const c = manualUnitCost.trim() !== ""
+      ? parseDec(manualUnitCost)
+      : pickedItem?.standard_unit_cost
+        ? parseDec(pickedItem.standard_unit_cost)
+        : 0;
     return (q * c).toFixed(2);
   }, [manualQty, manualUnitCost, pickedItem]);
 
@@ -132,8 +148,7 @@ export default function InventoryOpeningStockPage() {
   const loadBatches = useCallback(async () => {
     setBatchesLoading(true);
     try {
-      const data = await listAdminOpeningStockBatches();
-      setBatches(data);
+      setBatches(await listAdminOpeningStockBatches());
     } catch {
       setBatches(null);
     } finally {
@@ -141,21 +156,12 @@ export default function InventoryOpeningStockPage() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadEntries();
-    void loadLocations();
-  }, [loadEntries, loadLocations]);
+  useEffect(() => { void loadEntries(); void loadLocations(); }, [loadEntries, loadLocations]);
+  useEffect(() => { if (tab === "history") void loadBatches(); }, [tab, loadBatches]);
 
-  useEffect(() => {
-    if (tab === "history") void loadBatches();
-  }, [tab, loadBatches]);
-
-  // Auto-fill location when product is picked
   useEffect(() => {
     if (!pickedItem || manualLocationId !== "") return;
-    if (pickedItem.default_stock_location_id) {
-      setManualLocationId(pickedItem.default_stock_location_id);
-    }
+    if (pickedItem.default_stock_location_id) setManualLocationId(pickedItem.default_stock_location_id);
   }, [pickedItem, manualLocationId]);
 
   async function afterInventoryMutation() {
@@ -177,7 +183,6 @@ export default function InventoryOpeningStockPage() {
   function beginEditDraft(row: OpeningStockEntryRow) {
     if (row.status !== "DRAFT") return;
     setEditingDraftId(row.id);
-    // Populate picker from row SKU/name if available
     if (row.inventory_item) {
       setPickedItem({
         id: row.inventory_item,
@@ -205,7 +210,7 @@ export default function InventoryOpeningStockPage() {
     setManualFieldErrors({});
     try {
       if (!pickedItem || !manualLocationId) {
-        setManualFieldErrors({ base: "Product (inventory item) and location are required." });
+        setManualFieldErrors({ base: "Product and location are required." });
         return;
       }
       const payload = {
@@ -214,8 +219,7 @@ export default function InventoryOpeningStockPage() {
         quantity: manualQty,
         effective_date: manualDate,
         note: manualNote || "",
-        unit_cost_snapshot:
-          manualUnitCost.trim() !== "" ? manualUnitCost.trim() : null,
+        unit_cost_snapshot: manualUnitCost.trim() !== "" ? manualUnitCost.trim() : null,
       };
       if (editingDraftId) {
         await patchAdminOpeningStockEntry(editingDraftId, payload);
@@ -255,9 +259,7 @@ export default function InventoryOpeningStockPage() {
       const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = "opening_stock_template.csv";
-      a.click();
+      a.href = url; a.download = "opening_stock_template.csv"; a.click();
       URL.revokeObjectURL(url);
     } catch {
       setBulkError("Template download failed.");
@@ -266,12 +268,9 @@ export default function InventoryOpeningStockPage() {
 
   async function handleBulkPreview() {
     if (!bulkFile) return;
-    setBulkPreviewing(true);
-    setBulkError(null);
-    setBulkSuccess(null);
+    setBulkPreviewing(true); setBulkError(null); setBulkSuccess(null);
     try {
-      const p = await previewAdminOpeningStockBulkCsv(bulkFile, bulkDefaultDate);
-      setBulkPreview(p);
+      setBulkPreview(await previewAdminOpeningStockBulkCsv(bulkFile, bulkDefaultDate));
     } catch (e) {
       setBulkPreview(null);
       setBulkError(e instanceof Error ? e.message : "Preview failed.");
@@ -282,20 +281,13 @@ export default function InventoryOpeningStockPage() {
 
   async function handleBulkApply() {
     if (!bulkFile) return;
-    setBulkApplying(true);
-    setBulkError(null);
-    setBulkSuccess(null);
+    setBulkApplying(true); setBulkError(null); setBulkSuccess(null);
     try {
-      const summary = await applyAdminOpeningStockBulkCsv(bulkFile, {
-        dry_run: bulkDryRun,
-        auto_post: bulkAutoPost,
-        default_effective_date: bulkDefaultDate,
+      const s = await applyAdminOpeningStockBulkCsv(bulkFile, {
+        dry_run: bulkDryRun, auto_post: bulkAutoPost, default_effective_date: bulkDefaultDate,
       });
-      setBulkSuccess(
-        `Batch ${summary.batch_key.slice(0, 12)}… — created ${summary.created}, updated ${summary.updated}, posted ${summary.posted}, corrections ${summary.corrections_created}, skipped ${summary.skipped}, failed ${summary.failed}${summary.dry_run ? " (dry run — rolled back)" : ""}.`
-      );
-      setBulkPreview(null);
-      setBulkFile(null);
+      setBulkSuccess(`Batch ${s.batch_key.slice(0, 12)}… — created ${s.created}, updated ${s.updated}, posted ${s.posted}, corrections ${s.corrections_created}, skipped ${s.skipped}, failed ${s.failed}${s.dry_run ? " (dry run — rolled back)" : ""}.`);
+      setBulkPreview(null); setBulkFile(null);
       if (bulkInputRef.current) bulkInputRef.current.value = "";
       await afterInventoryMutation();
       if (tab === "history") void loadBatches();
@@ -311,13 +303,8 @@ export default function InventoryOpeningStockPage() {
     if (!correctionFor) return;
     setCorrBusy(true);
     try {
-      await correctionAdminOpeningStockEntry(correctionFor.id, {
-        reason: corrReason,
-        quantity_delta: corrDelta,
-      });
-      setCorrectionFor(null);
-      setCorrReason("");
-      setCorrDelta("");
+      await correctionAdminOpeningStockEntry(correctionFor.id, { reason: corrReason, quantity_delta: corrDelta });
+      setCorrectionFor(null); setCorrReason(""); setCorrDelta("");
       await afterInventoryMutation();
     } catch (err) {
       setEntriesError(err instanceof Error ? err.message : "Correction failed.");
@@ -327,31 +314,26 @@ export default function InventoryOpeningStockPage() {
   }
 
   const bulkHasFatalErrors = (bulkPreview?.error_rows ?? 0) > 0;
-  const canBulkApply =
-    Boolean(bulkFile) &&
-    Boolean(bulkPreview) &&
-    !bulkHasFatalErrors &&
-    !bulkApplying &&
-    !bulkPreviewing;
+  const canBulkApply = Boolean(bulkFile) && Boolean(bulkPreview) && !bulkHasFatalErrors && !bulkApplying && !bulkPreviewing;
 
-  const stats = useMemo(
-    () => [
-      { label: "Tab", value: tab === "manual" ? "Manual" : tab === "csv" ? "CSV" : "History", tone: "info" as const },
-      {
-        label: "Rows loaded",
-        value: entriesLoading ? "…" : String(entries.length),
-        tone: "default" as const,
-      },
-    ],
-    [tab, entries.length, entriesLoading]
-  );
+  const stats = useMemo(() => [
+    { label: "Draft rows", value: String(entries.filter(r => r.status === "DRAFT").length), tone: "warning" as const },
+    { label: "Posted rows", value: String(entries.filter(r => r.status === "POSTED").length), tone: "success" as const },
+    { label: "Total rows", value: entriesLoading ? "…" : String(entries.length), tone: "default" as const },
+  ], [entries, entriesLoading]);
+
+  const TABS: Array<[TabKey, string]> = [
+    ["manual", "Manual entry"],
+    ["csv", "CSV / bulk import"],
+    ["history", "Batch history"],
+  ];
 
   return (
     <ERPPageShell
       eyebrow="Inventory Opening Control"
       title="Opening Stock"
-      subtitle="Draft and post opening balances with explicit unit costs. Posted rows are immutable; corrections create stock adjustment drafts."
-      helperNote="Posted opening stock is immutable. Corrections create a new stock adjustment. Unit cost never defaults from product selling price (base_price)."
+      subtitle="Draft opening balances with explicit unit costs. Posted rows are immutable — corrections create new stock adjustment drafts."
+      helperNote="Posted opening stock is immutable. Corrections create a new stock adjustment. Unit cost never defaults from product selling price."
       helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
@@ -365,30 +347,24 @@ export default function InventoryOpeningStockPage() {
       stats={stats}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
-      <div className="space-y-6">
+      <div className="space-y-5">
         <WorkspaceDirectory
           title="Inventory route map"
           description="Navigate between opening stock, stock on hand, ledger, and workspace controls."
           groups={INVENTORY_CONTROL_DIRECTORY_GROUPS}
         />
 
-        <div className="flex flex-wrap gap-2 border-b border-border pb-2">
-          {(
-            [
-              ["manual", "Manual Entry"],
-              ["csv", "CSV import / bulk"],
-              ["history", "Import history"],
-            ] as const
-          ).map(([key, label]) => (
+        {/* Tab strip */}
+        <div className="flex gap-1 rounded-xl border border-border bg-muted p-1">
+          {TABS.map(([key, label]) => (
             <button
               key={key}
               type="button"
-              data-testid={`opening-stock-tab-${key}`}
               onClick={() => setTab(key)}
-              className={`rounded-t-lg px-4 py-2 text-sm font-medium transition ${
+              className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition ${
                 tab === key
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/60 text-muted-foreground hover:bg-muted"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {label}
@@ -397,27 +373,40 @@ export default function InventoryOpeningStockPage() {
         </div>
 
         {entriesError ? (
-          <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            <p>{entriesError}</p>
-            <button
-              type="button"
-              className="mt-2 text-xs font-semibold underline"
-              onClick={() => void loadEntries()}
-            >
-              Retry
-            </button>
+          <div className="flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <span>{entriesError}</span>
+            <button type="button" className="ml-4 font-semibold underline underline-offset-2" onClick={() => void loadEntries()}>Retry</button>
           </div>
         ) : null}
 
+        {/* ── MANUAL TAB ── */}
         {tab === "manual" ? (
-          <>
-            <ERPSectionShell
-              title="Manual draft"
-              description="Search inventory items by SKU or product code. Save as draft, then post to create one immutable ledger movement per row."
-            >
-              <form className="grid gap-4 md:grid-cols-2" onSubmit={(ev) => void handleSaveManualDraft(ev)}>
-                <div className="grid gap-1 text-sm md:col-span-2">
-                  <span className="text-muted-foreground">Product / inventory item</span>
+          <div className="space-y-5">
+
+            {/* Entry form card */}
+            <div className="rounded-2xl border border-border bg-card shadow-sm">
+              <div className="border-b border-border px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">
+                      {editingDraftId ? `Editing draft #${editingDraftId}` : "Add opening stock row"}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Search by SKU, name, product code or barcode — then set location, quantity and cost.
+                    </p>
+                  </div>
+                  {editingDraftId ? (
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">Editing draft</span>
+                  ) : null}
+                </div>
+              </div>
+
+              <form onSubmit={(ev) => void handleSaveManualDraft(ev)} className="p-5 space-y-5">
+                {/* Product picker — isolated z-context so dropdown floats above everything */}
+                <div className="relative z-[60] space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Product / inventory item <span className="text-destructive">*</span>
+                  </label>
                   <ProductPickerCombobox
                     value={pickedItem}
                     onChange={(item) => { setPickedItem(item); if (!item) setManualLocationId(""); }}
@@ -425,197 +414,232 @@ export default function InventoryOpeningStockPage() {
                     required
                   />
                   {pickedItem ? (
-                    <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                      {pickedItem.product_code ? <span>Code: <span className="font-mono text-foreground">{pickedItem.product_code}</span></span> : null}
-                      {pickedItem.category ? <span>Category: {pickedItem.category}{pickedItem.subcategory ? ` › ${pickedItem.subcategory}` : ""}</span> : null}
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+                      {pickedItem.product_code ? <span>Code: <span className="font-mono font-semibold text-foreground">{pickedItem.product_code}</span></span> : null}
+                      {pickedItem.category ? <span>Category: <span className="text-foreground">{pickedItem.category}{pickedItem.subcategory ? ` › ${pickedItem.subcategory}` : ""}</span></span> : null}
                       {pickedItem.standard_unit_cost ? <span>Std cost: <span className="font-semibold text-foreground">₹{Number(pickedItem.standard_unit_cost).toLocaleString("en-IN")}</span></span> : null}
-                      {pickedItem.unit_of_measure ? <span>Unit: {pickedItem.unit_of_measure}</span> : null}
+                      {pickedItem.unit_of_measure ? <span>Unit: <span className="text-foreground">{pickedItem.unit_of_measure}</span></span> : null}
                     </div>
                   ) : null}
                   {manualFieldErrors.inventory_item ? (
-                    <span className="text-xs text-destructive">{manualFieldErrors.inventory_item}</span>
+                    <p className="text-xs text-destructive">{manualFieldErrors.inventory_item}</p>
                   ) : null}
                 </div>
-                <label className="grid gap-1 text-sm">
-                  <span className="text-muted-foreground">Warehouse / location</span>
-                  <select
-                    required
-                    data-testid="opening-stock-location-select"
-                    className="rounded-xl border border-border bg-background px-3 py-2"
-                    value={manualLocationId === "" ? "" : String(manualLocationId)}
-                    onChange={(ev) =>
-                      setManualLocationId(ev.target.value ? Number(ev.target.value) : "")
-                    }
-                  >
-                    <option value="">Select location…</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.code} — {loc.name}
-                      </option>
-                    ))}
-                  </select>
-                  {manualFieldErrors.stock_location ? (
-                    <span className="text-xs text-destructive">{manualFieldErrors.stock_location}</span>
-                  ) : null}
-                </label>
-                <label className="grid gap-1 text-sm">
-                  <span className="text-muted-foreground">Quantity</span>
-                  <input
-                    required
-                    data-testid="opening-stock-qty-input"
-                    type="text"
-                    inputMode="decimal"
-                    value={manualQty}
-                    onChange={(ev) => setManualQty(ev.target.value)}
-                    className="rounded-xl border border-border bg-background px-3 py-2"
-                  />
-                  {manualFieldErrors.quantity ? (
-                    <span className="text-xs text-destructive">{manualFieldErrors.quantity}</span>
-                  ) : null}
-                </label>
-                <label className="grid gap-1 text-sm">
-                  <span className="text-muted-foreground">
-                    Unit cost (explicit; optional if standard cost on item)
-                  </span>
-                  <input
-                    data-testid="opening-stock-unit-cost-input"
-                    type="text"
-                    inputMode="decimal"
-                    value={manualUnitCost}
-                    onChange={(ev) => setManualUnitCost(ev.target.value)}
-                    placeholder={pickedItem?.standard_unit_cost ?? ""}
-                    className="rounded-xl border border-border bg-background px-3 py-2"
-                  />
-                  {manualFieldErrors.unit_cost_snapshot ? (
-                    <span className="text-xs text-destructive">{manualFieldErrors.unit_cost_snapshot}</span>
-                  ) : null}
-                </label>
-                <label className="grid gap-1 text-sm">
-                  <span className="text-muted-foreground">Effective date</span>
-                  <input
-                    required
-                    data-testid="opening-stock-effective-date-input"
-                    type="date"
-                    value={manualDate}
-                    onChange={(ev) => setManualDate(ev.target.value)}
-                    className="rounded-xl border border-border bg-background px-3 py-2"
-                  />
-                  {manualFieldErrors.effective_date ? (
-                    <span className="text-xs text-destructive">{manualFieldErrors.effective_date}</span>
-                  ) : null}
-                </label>
-                <label className="grid gap-1 text-sm md:col-span-2">
-                  <span className="text-muted-foreground">Note / reason</span>
-                  <textarea
-                    value={manualNote}
-                    onChange={(ev) => setManualNote(ev.target.value)}
-                    rows={2}
-                    className="rounded-xl border border-border bg-background px-3 py-2"
-                  />
-                </label>
-                <div className="md:col-span-2 flex flex-wrap items-center gap-3">
-                  <p className="text-sm text-muted-foreground">
-                    Valuation preview: <strong className="text-foreground">{valuationPreview}</strong>{" "}
-                    (quantity × resolved unit cost)
-                  </p>
-                  <button
-                    type="submit"
-                    disabled={manualSubmitting}
-                    className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-                  >
-                    {manualSubmitting ? "Saving…" : editingDraftId ? "Update draft" : "Save draft"}
-                  </button>
-                  {editingDraftId ? (
-                    <button
-                      type="button"
-                      className="rounded-xl border border-border px-4 py-2 text-sm"
-                      onClick={() => resetManualForm()}
+
+                {/* Form fields grid */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Warehouse / location <span className="text-destructive">*</span>
+                    </label>
+                    <select
+                      required
+                      data-testid="opening-stock-location-select"
+                      className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground"
+                      value={manualLocationId === "" ? "" : String(manualLocationId)}
+                      onChange={(ev) => setManualLocationId(ev.target.value ? Number(ev.target.value) : "")}
                     >
-                      Cancel edit
-                    </button>
-                  ) : null}
+                      <option value="">Select location…</option>
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>{loc.code} — {loc.name}</option>
+                      ))}
+                    </select>
+                    {manualFieldErrors.stock_location ? (
+                      <p className="text-xs text-destructive">{manualFieldErrors.stock_location}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Quantity <span className="text-destructive">*</span>
+                    </label>
+                    <input
+                      required
+                      data-testid="opening-stock-qty-input"
+                      type="text"
+                      inputMode="decimal"
+                      value={manualQty}
+                      onChange={(ev) => setManualQty(ev.target.value)}
+                      className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm"
+                    />
+                    {manualFieldErrors.quantity ? (
+                      <p className="text-xs text-destructive">{manualFieldErrors.quantity}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Unit cost
+                      <span className="ml-1 font-normal normal-case tracking-normal text-muted-foreground">
+                        (optional — falls back to standard cost)
+                      </span>
+                    </label>
+                    <input
+                      data-testid="opening-stock-unit-cost-input"
+                      type="text"
+                      inputMode="decimal"
+                      value={manualUnitCost}
+                      onChange={(ev) => setManualUnitCost(ev.target.value)}
+                      placeholder={pickedItem?.standard_unit_cost ?? "0.00"}
+                      className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm"
+                    />
+                    {manualFieldErrors.unit_cost_snapshot ? (
+                      <p className="text-xs text-destructive">{manualFieldErrors.unit_cost_snapshot}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Effective date <span className="text-destructive">*</span>
+                    </label>
+                    <input
+                      required
+                      data-testid="opening-stock-effective-date-input"
+                      type="date"
+                      value={manualDate}
+                      onChange={(ev) => setManualDate(ev.target.value)}
+                      className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm"
+                    />
+                    {manualFieldErrors.effective_date ? (
+                      <p className="text-xs text-destructive">{manualFieldErrors.effective_date}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Note / reason</label>
+                    <textarea
+                      value={manualNote}
+                      onChange={(ev) => setManualNote(ev.target.value)}
+                      rows={2}
+                      className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm resize-none"
+                    />
+                  </div>
                 </div>
+
+                {/* Footer bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted px-4 py-3">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Valuation preview: </span>
+                    <span className="font-semibold text-foreground">₹{Number(valuationPreview).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    <span className="ml-1 text-xs text-muted-foreground">(qty × resolved unit cost)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {editingDraftId ? (
+                      <button
+                        type="button"
+                        className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                        onClick={resetManualForm}
+                      >
+                        Cancel edit
+                      </button>
+                    ) : null}
+                    <button
+                      type="submit"
+                      disabled={manualSubmitting}
+                      className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                    >
+                      {manualSubmitting ? "Saving…" : editingDraftId ? "Update draft" : "Save draft"}
+                    </button>
+                  </div>
+                </div>
+
                 {manualFieldErrors.base ? (
-                  <p className="md:col-span-2 text-sm text-destructive">{manualFieldErrors.base}</p>
+                  <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    {manualFieldErrors.base}
+                  </p>
                 ) : null}
               </form>
-            </ERPSectionShell>
+            </div>
 
-            <ERPSectionShell title="Opening stock rows" description="Drafts are editable; posted rows are read-only.">
+            {/* Opening stock rows table */}
+            <div className="rounded-2xl border border-border bg-card shadow-sm">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Opening stock rows</div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Drafts are editable and postable. Posted rows create an immutable ledger entry.</p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-lg border border-border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  onClick={() => void loadEntries()}
+                >
+                  Refresh
+                </button>
+              </div>
+
               {entriesLoading ? (
-                <p className="text-sm text-muted-foreground" data-testid="opening-stock-list-skeleton">
+                <div className="px-5 py-8 text-center text-sm text-muted-foreground" data-testid="opening-stock-list-skeleton">
                   Loading rows…
-                </p>
+                </div>
               ) : entries.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No opening stock rows yet.</p>
+                <div className="px-5 py-10 text-center">
+                  <div className="text-sm font-medium text-foreground">No opening stock rows yet</div>
+                  <p className="mt-1 text-xs text-muted-foreground">Use the form above to add items from your old system.</p>
+                </div>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-border">
+                <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50 text-left text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2">ID</th>
-                        <th className="px-3 py-2">SKU</th>
-                        <th className="px-3 py-2">Location</th>
-                        <th className="px-3 py-2">Qty</th>
-                        <th className="px-3 py-2">Unit cost</th>
-                        <th className="px-3 py-2">Effective</th>
-                        <th className="px-3 py-2">Status</th>
-                        <th className="px-3 py-2">Actions</th>
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50">
+                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">#</th>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Product</th>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Location</th>
+                        <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Qty</th>
+                        <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Unit cost</th>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Effective</th>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-border">
                       {entries.map((row) => (
-                        <tr key={row.id} className="border-t border-border">
-                          <td className="px-3 py-2">{row.id}</td>
-                          <td className="px-3 py-2">{row.sku ?? "—"}</td>
-                          <td className="px-3 py-2">{row.stock_location_code}</td>
-                          <td className="px-3 py-2">{row.quantity}</td>
-                          <td className="px-3 py-2">{row.unit_cost_snapshot ?? "—"}</td>
-                          <td className="px-3 py-2">{row.effective_date.slice(0, 10)}</td>
-                          <td className="px-3 py-2">
-                            <span
-                              data-testid={`opening-stock-status-${row.id}`}
-                              className={
-                                row.status === "POSTED"
-                                  ? "text-emerald-800"
-                                  : row.status === "DRAFT"
-                                    ? "text-amber-800"
-                                    : "text-muted-foreground"
-                              }
-                            >
-                              {row.status}
-                            </span>
+                        <tr key={row.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{row.id}</td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-foreground">{row.product_name ?? "—"}</div>
+                            {row.sku ? <div className="text-xs font-mono text-muted-foreground">{row.sku}</div> : null}
                           </td>
-                          <td className="space-x-2 px-3 py-2 whitespace-nowrap">
-                            {row.status === "DRAFT" ? (
-                              <>
+                          <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{row.stock_location_code ?? "—"}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-foreground">{fmt(row.quantity)}</td>
+                          <td className="px-4 py-3 text-right text-foreground">
+                            {row.unit_cost_snapshot ? `₹${fmt(row.unit_cost_snapshot)}` : "—"}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{row.effective_date.slice(0, 10)}</td>
+                          <td className="px-4 py-3">
+                            <StatusBadge status={row.status} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              {row.status === "DRAFT" ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted"
+                                    onClick={() => beginEditDraft(row)}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground"
+                                    onClick={() => void handlePostRow(row.id)}
+                                  >
+                                    Post
+                                  </button>
+                                </>
+                              ) : row.status === "POSTED" ? (
                                 <button
                                   type="button"
-                                  className="text-primary underline text-xs font-semibold"
-                                  onClick={() => beginEditDraft(row)}
+                                  data-testid={`opening-stock-correction-open-${row.id}`}
+                                  className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted"
+                                  onClick={() => setCorrectionFor(row)}
                                 >
-                                  Edit
+                                  Correct
                                 </button>
-                                <button
-                                  type="button"
-                                  className="text-primary underline text-xs font-semibold"
-                                  onClick={() => void handlePostRow(row.id)}
-                                >
-                                  Post
-                                </button>
-                              </>
-                            ) : row.status === "POSTED" ? (
-                              <button
-                                type="button"
-                                data-testid={`opening-stock-correction-open-${row.id}`}
-                                className="text-primary underline text-xs font-semibold"
-                                onClick={() => setCorrectionFor(row)}
-                              >
-                                Create correction
-                              </button>
-                            ) : (
-                              "—"
-                            )}
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -623,281 +647,281 @@ export default function InventoryOpeningStockPage() {
                   </table>
                 </div>
               )}
-            </ERPSectionShell>
-          </>
+            </div>
+          </div>
         ) : null}
 
+        {/* ── CSV TAB ── */}
         {tab === "csv" ? (
-          <>
-            <ERPSectionShell
-              title="Bulk CSV (preview / apply)"
-              description="Columns: sku, product_code, warehouse_code, quantity, unit_cost, effective_date, update_mode, note. Duplicate file content shares a stable batch key for idempotent re-apply."
-            >
-              <div className="flex flex-wrap gap-2">
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-border bg-card shadow-sm">
+              <div className="border-b border-border px-5 py-4">
+                <div className="text-sm font-semibold text-foreground">Bulk CSV import</div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Columns: sku, product_code, warehouse_code, quantity, unit_cost, effective_date, update_mode, note. Duplicate file content shares a stable batch key for idempotent re-apply.
+                </p>
+              </div>
+              <div className="p-5 space-y-4">
                 <button
                   type="button"
                   data-testid="opening-stock-csv-template-btn"
-                  className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium"
+                  className="rounded-xl border border-border bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/80"
                   onClick={() => void handleTemplateDownload()}
                 >
                   Download CSV template
                 </button>
-              </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_200px_auto]">
-                <input
-                  ref={bulkInputRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  data-testid="opening-stock-csv-file-input"
-                  onChange={(ev: ChangeEvent<HTMLInputElement>) => {
-                    setBulkFile(ev.target.files?.[0] ?? null);
-                    setBulkPreview(null);
-                    setBulkError(null);
-                    setBulkSuccess(null);
-                  }}
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                />
-                <input
-                  type="date"
-                  value={bulkDefaultDate}
-                  onChange={(ev) => setBulkDefaultDate(ev.target.value)}
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                />
+
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+                  <input
+                    ref={bulkInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    data-testid="opening-stock-csv-file-input"
+                    onChange={(ev: ChangeEvent<HTMLInputElement>) => {
+                      setBulkFile(ev.target.files?.[0] ?? null);
+                      setBulkPreview(null); setBulkError(null); setBulkSuccess(null);
+                    }}
+                    className="rounded-xl border border-border bg-card px-3 py-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1 file:text-xs file:font-semibold"
+                  />
+                  <input
+                    type="date"
+                    value={bulkDefaultDate}
+                    onChange={(ev) => setBulkDefaultDate(ev.target.value)}
+                    className="rounded-xl border border-border bg-card px-3 py-2.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    data-testid="opening-stock-csv-preview-btn"
+                    disabled={!bulkFile || bulkPreviewing}
+                    className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold disabled:opacity-60 hover:bg-muted"
+                    onClick={() => void handleBulkPreview()}
+                  >
+                    {bulkPreviewing ? "Previewing…" : "Preview"}
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-5 text-sm">
+                  <label className="flex items-center gap-2 text-muted-foreground">
+                    <input type="checkbox" checked={bulkDryRun} onChange={(ev) => setBulkDryRun(ev.target.checked)} />
+                    Dry run (rollback after summary)
+                  </label>
+                  <label className="flex items-center gap-2 text-muted-foreground">
+                    <input type="checkbox" checked={bulkAutoPost} onChange={(ev) => setBulkAutoPost(ev.target.checked)} />
+                    Auto-post drafts after apply
+                  </label>
+                </div>
+
+                {bulkPreview ? (
+                  <div className="rounded-xl border border-border bg-muted px-4 py-3 space-y-1.5 text-sm">
+                    <div className="flex flex-wrap gap-4">
+                      <span className="text-muted-foreground">Ready: <strong className="text-foreground">{bulkPreview.ready_rows}</strong></span>
+                      <span className="text-muted-foreground">Errors: <strong className={bulkHasFatalErrors ? "text-destructive" : "text-foreground"}>{bulkPreview.error_rows}</strong></span>
+                      <span className="text-muted-foreground">Warnings: <strong className="text-foreground">{bulkPreview.warning_rows}</strong></span>
+                      <span className="text-muted-foreground">Total qty: <strong className="text-foreground">{bulkPreview.total_quantity_preview}</strong></span>
+                      <span className="text-muted-foreground">Valuation: <strong className="text-foreground">{bulkPreview.total_valuation_preview}</strong></span>
+                    </div>
+                    <p className="font-mono text-xs text-muted-foreground break-all">Batch: {bulkPreview.batch_key}</p>
+                  </div>
+                ) : null}
+
+                {bulkError ? <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{bulkError}</p> : null}
+                {bulkSuccess ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{bulkSuccess}</p> : null}
+
                 <button
                   type="button"
-                  data-testid="opening-stock-csv-preview-btn"
-                  disabled={!bulkFile || bulkPreviewing}
-                  className="rounded-xl border border-border px-4 py-2 text-sm disabled:opacity-60"
-                  onClick={() => void handleBulkPreview()}
+                  data-testid="opening-stock-csv-apply-btn"
+                  disabled={!canBulkApply}
+                  className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                  onClick={() => void handleBulkApply()}
                 >
-                  {bulkPreviewing ? "Preview…" : "Preview"}
+                  {bulkApplying ? "Applying…" : "Apply batch"}
                 </button>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-4 text-sm">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={bulkDryRun}
-                    onChange={(ev) => setBulkDryRun(ev.target.checked)}
-                  />
-                  Dry run (rollback after summary)
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={bulkAutoPost}
-                    onChange={(ev) => setBulkAutoPost(ev.target.checked)}
-                  />
-                  Auto-post drafts after apply
-                </label>
-              </div>
-              {bulkPreview ? (
-                <div className="mt-4 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm space-y-1">
-                  <p>
-                    Ready: <strong>{bulkPreview.ready_rows}</strong> · Errors:{" "}
-                    <strong className={bulkHasFatalErrors ? "text-destructive" : ""}>{bulkPreview.error_rows}</strong>{" "}
-                    · Warnings: <strong>{bulkPreview.warning_rows}</strong>
-                  </p>
-                  <p>
-                    Total qty: {bulkPreview.total_quantity_preview} · Total valuation:{" "}
-                    {bulkPreview.total_valuation_preview}
-                  </p>
-                  <p className="font-mono text-xs text-muted-foreground break-all">
-                    Batch key: {bulkPreview.batch_key}
-                  </p>
-                </div>
-              ) : null}
-              {bulkError ? <p className="mt-3 text-sm text-destructive">{bulkError}</p> : null}
-              {bulkSuccess ? <p className="mt-3 text-sm text-emerald-800">{bulkSuccess}</p> : null}
-              <button
-                type="button"
-                data-testid="opening-stock-csv-apply-btn"
-                disabled={!canBulkApply}
-                className="mt-4 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-                onClick={() => void handleBulkApply()}
-              >
-                {bulkApplying ? "Applying…" : "Apply"}
-              </button>
 
-              {bulkPreview?.rows?.length ? (
-                <div className="mt-6 overflow-x-auto rounded-xl border border-border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50 text-left text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2">Row</th>
-                        <th className="px-3 py-2">SKU</th>
-                        <th className="px-3 py-2">Qty</th>
-                        <th className="px-3 py-2">Unit cost</th>
-                        <th className="px-3 py-2">Mode</th>
-                        <th className="px-3 py-2">Action</th>
-                        <th className="px-3 py-2">Message</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bulkPreview.rows.map((r) => (
-                        <tr key={`${r.row}-${r.sku}`} className="border-t border-border">
-                          <td className="px-3 py-2">{r.row}</td>
-                          <td className="px-3 py-2">{r.sku ?? r.product_code ?? "—"}</td>
-                          <td className="px-3 py-2">{r.quantity ?? "—"}</td>
-                          <td className="px-3 py-2">{r.unit_cost ?? "—"}</td>
-                          <td className="px-3 py-2">{r.update_mode ?? "—"}</td>
-                          <td className="px-3 py-2">{r.action}</td>
-                          <td className="px-3 py-2">{r.message ?? "—"}</td>
+                {bulkPreview?.rows?.length ? (
+                  <div className="overflow-x-auto rounded-xl border border-border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/50">
+                          {["Row", "SKU", "Qty", "Unit cost", "Mode", "Action", "Message"].map((h) => (
+                            <th key={h} className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{h}</th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-            </ERPSectionShell>
-
-            <ERPSectionShell
-              title="Legacy opening ledger import"
-              description="Older additive path posts OPENING_BALANCE_IN movements directly from CSV (still duplicate-safe at ledger reference level)."
-            >
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto_auto]">
-                <input
-                  ref={legacyInputRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={(ev) => {
-                    setLegacyFile(ev.target.files?.[0] ?? null);
-                    setLegacyPreview(null);
-                  }}
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                />
-                <input
-                  type="date"
-                  value={legacyDate}
-                  onChange={(ev) => setLegacyDate(ev.target.value)}
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                />
-                <button
-                  type="button"
-                  disabled={!legacyFile || legacyBusy}
-                  className="rounded-xl border border-border px-3 py-2 text-sm disabled:opacity-60"
-                  onClick={async () => {
-                    if (!legacyFile) return;
-                    setLegacyBusy(true);
-                    try {
-                      setLegacyPreview(await previewOpeningStockImport(legacyFile));
-                    } finally {
-                      setLegacyBusy(false);
-                    }
-                  }}
-                >
-                  Legacy preview
-                </button>
-                <button
-                  type="button"
-                  disabled={
-                    !legacyFile ||
-                    !legacyPreview ||
-                    (legacyPreview?.error_rows ?? 0) > 0 ||
-                    legacyBusy
-                  }
-                  className="rounded-xl bg-muted px-3 py-2 text-sm font-medium disabled:opacity-60"
-                  onClick={async () => {
-                    if (!legacyFile) return;
-                    setLegacyBusy(true);
-                    try {
-                      await postOpeningStockImport(legacyFile, legacyDate);
-                      await afterInventoryMutation();
-                      setLegacyFile(null);
-                      setLegacyPreview(null);
-                      if (legacyInputRef.current) legacyInputRef.current.value = "";
-                    } finally {
-                      setLegacyBusy(false);
-                    }
-                  }}
-                >
-                  Legacy post
-                </button>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {bulkPreview.rows.map((r) => (
+                          <tr key={`${r.row}-${r.sku}`} className="hover:bg-muted/30">
+                            <td className="px-3 py-2 font-mono text-xs">{r.row}</td>
+                            <td className="px-3 py-2 font-mono text-xs">{r.sku ?? r.product_code ?? "—"}</td>
+                            <td className="px-3 py-2 text-right">{r.quantity ?? "—"}</td>
+                            <td className="px-3 py-2 text-right">{r.unit_cost ?? "—"}</td>
+                            <td className="px-3 py-2 text-xs">{r.update_mode ?? "—"}</td>
+                            <td className="px-3 py-2 text-xs font-medium">{r.action}</td>
+                            <td className="px-3 py-2 text-xs text-muted-foreground">{r.message ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </div>
-              {legacyPreview ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Ready {legacyPreview.ready_rows} · Errors {legacyPreview.error_rows}
-                </p>
-              ) : null}
-            </ERPSectionShell>
-          </>
+            </div>
+
+            {/* Legacy import */}
+            <div className="rounded-2xl border border-border bg-card shadow-sm">
+              <div className="border-b border-border px-5 py-4">
+                <div className="text-sm font-semibold text-foreground">Legacy opening ledger import</div>
+                <p className="mt-0.5 text-xs text-muted-foreground">Older additive path — posts OPENING_BALANCE_IN movements directly from CSV (duplicate-safe at ledger reference level).</p>
+              </div>
+              <div className="p-5 space-y-3">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto_auto]">
+                  <input
+                    ref={legacyInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={(ev) => { setLegacyFile(ev.target.files?.[0] ?? null); setLegacyPreview(null); }}
+                    className="rounded-xl border border-border bg-card px-3 py-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1 file:text-xs file:font-semibold"
+                  />
+                  <input
+                    type="date"
+                    value={legacyDate}
+                    onChange={(ev) => setLegacyDate(ev.target.value)}
+                    className="rounded-xl border border-border bg-card px-3 py-2.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={!legacyFile || legacyBusy}
+                    className="rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-medium disabled:opacity-60 hover:bg-muted"
+                    onClick={async () => {
+                      if (!legacyFile) return;
+                      setLegacyBusy(true);
+                      try { setLegacyPreview(await previewOpeningStockImport(legacyFile)); } finally { setLegacyBusy(false); }
+                    }}
+                  >
+                    Preview
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!legacyFile || !legacyPreview || (legacyPreview?.error_rows ?? 0) > 0 || legacyBusy}
+                    className="rounded-xl bg-muted px-3 py-2.5 text-sm font-medium disabled:opacity-60 hover:bg-muted/80"
+                    onClick={async () => {
+                      if (!legacyFile) return;
+                      setLegacyBusy(true);
+                      try {
+                        await postOpeningStockImport(legacyFile, legacyDate);
+                        await afterInventoryMutation();
+                        setLegacyFile(null); setLegacyPreview(null);
+                        if (legacyInputRef.current) legacyInputRef.current.value = "";
+                      } finally { setLegacyBusy(false); }
+                    }}
+                  >
+                    Post
+                  </button>
+                </div>
+                {legacyPreview ? (
+                  <p className="text-sm text-muted-foreground">
+                    Ready <strong className="text-foreground">{legacyPreview.ready_rows}</strong> · Errors <strong className={legacyPreview.error_rows > 0 ? "text-destructive" : "text-foreground"}>{legacyPreview.error_rows}</strong>
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
         ) : null}
 
+        {/* ── HISTORY TAB ── */}
         {tab === "history" ? (
-          <ERPSectionShell title="Import batch history" description="Last 50 CSV batch envelopes.">
-            {batchesLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
-            {!batchesLoading && batches?.results?.length ? (
-              <ul className="space-y-2 text-sm">
-                {batches.results.map((b) => (
-                  <li key={b.batch_key} className="rounded-lg border border-border px-3 py-2">
-                    <p className="font-mono text-xs break-all">{b.batch_key}</p>
-                    <p className="text-muted-foreground">
-                      {b.original_filename || "—"} · {b.created_at} · {b.created_by_username ?? "—"}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {!batchesLoading && !batches?.results?.length ? (
-              <p className="text-sm text-muted-foreground">No import batches recorded yet.</p>
-            ) : null}
-          </ERPSectionShell>
+          <div className="rounded-2xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border px-5 py-4">
+              <div className="text-sm font-semibold text-foreground">Batch import history</div>
+              <p className="mt-0.5 text-xs text-muted-foreground">Last 50 CSV batch envelopes recorded in this system.</p>
+            </div>
+            <div className="p-5">
+              {batchesLoading ? (
+                <p className="text-sm text-muted-foreground">Loading batches…</p>
+              ) : batches?.results?.length ? (
+                <ul className="space-y-2">
+                  {batches.results.map((b) => (
+                    <li key={b.batch_key} className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                      <p className="font-mono text-xs break-all text-foreground">{b.batch_key}</p>
+                      <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        <span>{b.original_filename || "—"}</span>
+                        <span>{b.created_at}</span>
+                        <span>{b.created_by_username ?? "—"}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="py-4 text-center text-sm text-muted-foreground">No import batches recorded yet.</p>
+              )}
+            </div>
+          </div>
         ) : null}
       </div>
 
+      {/* Correction modal */}
       {correctionFor ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center p-4 md:items-center"
+          style={{ background: "rgba(10,14,28,0.74)" }}
           role="dialog"
           aria-modal
           aria-labelledby="corr-title"
         >
-          <div className="max-w-lg rounded-xl border border-border bg-background p-6 shadow-lg w-full">
-            <h2 id="corr-title" className="text-lg font-semibold">
-              Correction for opening #{correctionFor.id}
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Creates a draft stock adjustment linked to this opening row. Reason is required.
-            </p>
-            <form className="mt-4 grid gap-3" onSubmit={(ev) => void submitCorrection(ev)}>
-              <label className="grid gap-1 text-sm">
-                <span>Reason</span>
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 id="corr-title" className="text-base font-semibold text-foreground">
+                  Stock correction — row #{correctionFor.id}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Creates a draft stock adjustment linked to this opening row. Reason is required.
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">{correctionFor.product_name ?? correctionFor.sku ?? `Item #${correctionFor.inventory_item}`}</span>
+              {" · "}{correctionFor.stock_location_code}{" · "}Qty: {correctionFor.quantity}
+            </div>
+            <form className="mt-4 space-y-4" onSubmit={(ev) => void submitCorrection(ev)}>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Reason <span className="text-destructive">*</span>
+                </label>
                 <textarea
                   required
                   data-testid="opening-stock-correction-reason"
                   value={corrReason}
                   onChange={(ev) => setCorrReason(ev.target.value)}
-                  className="rounded-xl border border-border px-3 py-2"
+                  className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm resize-none"
                   rows={3}
+                  placeholder="Explain why this correction is needed…"
                 />
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span>Quantity delta (+/-)</span>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Quantity delta (+/-) <span className="text-destructive">*</span>
+                </label>
                 <input
                   required
                   data-testid="opening-stock-correction-delta"
                   value={corrDelta}
                   onChange={(ev) => setCorrDelta(ev.target.value)}
-                  className="rounded-xl border border-border px-3 py-2"
+                  className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm"
                   placeholder="-1.000"
                 />
-              </label>
-              <div className="flex gap-2 pt-2">
+              </div>
+              <div className="flex items-center gap-3 pt-1">
                 <button
                   type="submit"
                   disabled={corrBusy}
-                  className="rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
+                  className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
                 >
                   {corrBusy ? "Saving…" : "Create correction draft"}
                 </button>
                 <button
                   type="button"
-                  className="rounded-xl border border-border px-4 py-2 text-sm"
-                  onClick={() => {
-                    setCorrectionFor(null);
-                    setCorrReason("");
-                    setCorrDelta("");
-                  }}
+                  className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                  onClick={() => { setCorrectionFor(null); setCorrReason(""); setCorrDelta(""); }}
                 >
                   Cancel
                 </button>

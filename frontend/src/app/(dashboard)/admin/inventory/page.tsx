@@ -1,24 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  ArrowRight,
   Boxes,
   ClipboardCheck,
-  PackageSearch,
+  Factory,
+  Layers,
+  Package,
+  PackageX,
   ScrollText,
+  TrendingDown,
   Truck,
   Warehouse,
+  Wrench,
 } from "lucide-react";
 
-import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
-import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
 import Phase7Guidance from "@/components/admin/workflow/Phase7Guidance";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
-import StatCard from "@/components/ui/StatCard";
 import { ROUTES } from "@/lib/routes";
 import { accountingDate, accountingErrorMessage } from "@/components/accounting/shared";
 import {
@@ -33,58 +38,98 @@ import {
   type StockSummaryRow,
 } from "@/services/inventory";
 
-const summaryColumns: EnterpriseColumnDef<StockSummaryRow>[] = [
-  { key: "product_code", header: "Product" },
-  { key: "sku", header: "SKU" },
-  { key: "stock_item_type", header: "Stock Type", render: (row) => row.stock_item_type.replaceAll("_", " ") },
-  {
-    key: "default_stock_location_name",
-    header: "Default Location",
-    render: (row) => row.default_stock_location_name || "Unassigned",
-  },
-  { key: "on_hand_qty", header: "On Hand" },
-  { key: "reserved_qty", header: "Reserved" },
-  { key: "available_qty", header: "Available" },
-  { key: "incoming_qty", header: "Incoming" },
-  { key: "required_for_winners", header: "Winners Req" },
-  { key: "required_for_confirmed_orders", header: "Confirmed Req" },
-  { key: "reorder_level_qty", header: "Reorder" },
-  {
-    key: "is_below_reorder",
-    header: "Alert",
-    render: (row) =>
-      row.is_below_reorder ? (
-        <ERPStatusBadge status="PENDING" label="Reorder needed" />
-      ) : (
-        <ERPStatusBadge status="ACTIVE" label="Healthy" />
-      ),
-  },
-];
+function getStockStatus(row: StockSummaryRow) {
+  const onHand = parseFloat(row.on_hand_qty || "0");
+  const available = parseFloat(row.available_qty || row.on_hand_qty || "0");
+  const reorder = parseFloat(row.reorder_level_qty || "0");
+  if (onHand <= 0) return "out";
+  if (reorder > 0 && onHand <= reorder) return "low";
+  if (available <= 0 && onHand > 0) return "reserved";
+  return "ok";
+}
 
-const locationColumns: EnterpriseColumnDef<StockLocation>[] = [
-  { key: "code", header: "Code" },
-  { key: "name", header: "Name" },
-  { key: "location_type", header: "Type" },
-  {
-    key: "is_active",
-    header: "Status",
-    render: (row) => <ERPStatusBadge status={row.is_active ? "ACTIVE" : "INACTIVE"} />,
-  },
-  { key: "notes", header: "Notes", render: (row) => row.notes?.trim() || "No notes" },
-];
+function KPIBlock({ label, value, sub, tone, icon, href }: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  tone?: "default" | "success" | "warning" | "danger" | "info";
+  icon: React.ReactNode;
+  href?: string;
+}) {
+  const toneCls = {
+    default: "border-border bg-card",
+    success: "border-emerald-200/60 bg-card",
+    warning: "border-amber-200/60 bg-card",
+    danger: "border-red-200/60 bg-card",
+    info: "border-sky-200/60 bg-card",
+  }[tone ?? "default"];
 
-const bridgeColumns: EnterpriseColumnDef<StockLedgerRow>[] = [
-  { key: "movement_date", header: "Date", render: (row) => accountingDate(row.movement_date) },
-  { key: "product_code", header: "Product" },
-  {
-    key: "stock_location_name",
-    header: "Location",
-    render: (row) => row.stock_location_name || "Unassigned",
-  },
-  { key: "movement_type", header: "Movement" },
-  { key: "reference_id", header: "Delivery Ref" },
-  { key: "notes", header: "Notes", render: (row) => row.notes?.trim() || "No notes" },
-];
+  const accentCls = {
+    default: "bg-muted/60 text-muted-foreground",
+    success: "bg-emerald-500/10 text-emerald-700",
+    warning: "bg-amber-500/10 text-amber-700",
+    danger: "bg-red-500/10 text-red-700",
+    info: "bg-sky-500/10 text-sky-700",
+  }[tone ?? "default"];
+
+  const inner = (
+    <div className={`group relative overflow-hidden rounded-2xl border p-5 shadow-sm transition hover:shadow-md ${toneCls}`}>
+      <div className={`absolute left-0 top-0 h-full w-1 rounded-r-full ${
+        tone === "success" ? "bg-emerald-500/70" :
+        tone === "warning" ? "bg-amber-500/70" :
+        tone === "danger" ? "bg-red-500/70" :
+        tone === "info" ? "bg-sky-500/70" :
+        "bg-muted-foreground/30"
+      }`} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+          <div className="mt-2 text-2xl font-bold text-foreground tabular-nums">{value}</div>
+          {sub ? <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{sub}</div> : null}
+        </div>
+        <div className={`shrink-0 rounded-xl p-2.5 ${accentCls}`}>{icon}</div>
+      </div>
+      {href ? (
+        <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-primary opacity-0 transition group-hover:opacity-100">
+          View <ArrowRight className="h-3 w-3" />
+        </div>
+      ) : null}
+    </div>
+  );
+
+  return href ? <Link href={href}>{inner}</Link> : inner;
+}
+
+function CategoryRow({ label, count, inStock, low, out, icon, color }: {
+  label: string;
+  count: number;
+  inStock: number;
+  low: number;
+  out: number;
+  icon: React.ReactNode;
+  color: string;
+}) {
+  return (
+    <div className="flex items-center gap-4 rounded-xl border border-border bg-muted/20 px-4 py-3">
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${color}`}>{icon}</div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold text-foreground">{label}</div>
+        <div className="mt-0.5 text-xs text-muted-foreground">{count} SKUs total</div>
+      </div>
+      <div className="hidden flex-wrap items-center gap-2 sm:flex">
+        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">{inStock} healthy</span>
+        {low > 0 ? <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">{low} low</span> : null}
+        {out > 0 ? <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-800">{out} out</span> : null}
+      </div>
+      <Link
+        href={ROUTES.admin.inventoryStockOnHand}
+        className="shrink-0 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
+      >
+        View
+      </Link>
+    </div>
+  );
+}
 
 export default function AdminInventoryPage() {
   const [loading, setLoading] = useState(true);
@@ -97,31 +142,22 @@ export default function AdminInventoryPage() {
 
   useEffect(() => {
     let cancelled = false;
-
     async function loadPage() {
       setLoading(true);
       try {
-        const [
-          itemsPayload,
-          summaryPayload,
-          adjustmentPayload,
-          locationPayload,
-          bridgePayload,
-        ] = await Promise.all([
+        const [itemsPayload, summaryPayload, adjPayload, locPayload, bridgePayload] = await Promise.all([
           listInventoryItems(),
           getStockSummary(),
           listStockAdjustments(),
           listStockLocations(),
-          listInventoryMovements({
-            movement_type: "EMI_DELIVERY_OUT,EMI_RETURN_IN",
-          }),
+          listInventoryMovements({ movement_type: "EMI_DELIVERY_OUT,EMI_RETURN_IN" }),
         ]);
         if (cancelled) return;
         setItemsCount(itemsPayload.count);
         setStockSummary(summaryPayload.results);
-        setAdjustments(adjustmentPayload.results);
-        setLocations(locationPayload.results);
-        setBridgeRows(bridgePayload.results.slice(0, 8));
+        setAdjustments(adjPayload.results);
+        setLocations(locPayload.results);
+        setBridgeRows(bridgePayload.results.slice(0, 10));
         setError(null);
       } catch (err) {
         if (cancelled) return;
@@ -130,16 +166,33 @@ export default function AdminInventoryPage() {
         if (!cancelled) setLoading(false);
       }
     }
-
     void loadPage();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  const belowReorder = stockSummary.filter((row) => row.is_below_reorder).length;
-  const draftAdjustments = adjustments.filter((row) => row.status === "DRAFT").length;
-  const activeLocations = locations.filter((row) => row.is_active).length;
+  const kpis = useMemo(() => {
+    const finished = stockSummary.filter(r => r.stock_item_type === "FINISHED_GOOD");
+    const raw = stockSummary.filter(r => r.stock_item_type === "RAW_MATERIAL");
+    const acc = stockSummary.filter(r => r.stock_item_type === "ACCESSORY");
+    const byStatus = (rows: StockSummaryRow[]) => ({
+      ok: rows.filter(r => getStockStatus(r) === "ok").length,
+      low: rows.filter(r => getStockStatus(r) === "low").length,
+      out: rows.filter(r => getStockStatus(r) === "out").length,
+    });
+    return {
+      total: stockSummary.length,
+      finished: { count: finished.length, ...byStatus(finished) },
+      raw: { count: raw.length, ...byStatus(raw) },
+      acc: { count: acc.length, ...byStatus(acc) },
+      outOfStock: stockSummary.filter(r => getStockStatus(r) === "out").length,
+      lowStock: stockSummary.filter(r => getStockStatus(r) === "low").length,
+      inStock: stockSummary.filter(r => getStockStatus(r) === "ok").length,
+      belowReorder: stockSummary.filter(r => r.is_below_reorder).length,
+    };
+  }, [stockSummary]);
+
+  const activeLocations = useMemo(() => locations.filter(l => l.is_active).length, [locations]);
+  const draftAdjustments = useMemo(() => adjustments.filter(a => a.status === "DRAFT").length, [adjustments]);
   const latestAdjustment = adjustments[0];
   const latestBridge = bridgeRows[0];
 
@@ -147,32 +200,27 @@ export default function AdminInventoryPage() {
     <ERPPageShell
       eyebrow="Inventory & Stock"
       title="Stock Posture"
-      subtitle="Inventory & Stock — Stock source workflow. On-hand, available, reserved, delivery-out, and adjustment posture from the live stock ledger."
-      helperNote="Stock counts here are derived from the explicit stock ledger and opening balances. Purchase payable and vendor payment belong to Purchases & Vendors — not to Inventory. No billing, payment, or accounting bridge posting happens from this page. Accounting bridge status for stock is tracked in Accounting & Reconciliation."
+      subtitle="Full inventory dashboard — stock by category, location, and status. Source workflow for all on-hand, available, reserved, and movement records."
+      helperNote="Stock counts derive from the explicit stock ledger and opening balances. Purchase payable and vendor payment belong to Purchases & Vendors — not Inventory."
       helperTone="info"
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory" },
       ]}
-      statusBadge={{ label: "Inventory & Stock — Source Workflow", tone: "info" }}
+      statusBadge={{ label: "Inventory & Stock", tone: "info" }}
       actions={[
         { href: ROUTES.admin.inventoryStockOnHand, label: "Stock on Hand", variant: "primary" },
         { href: ROUTES.admin.inventoryItems, label: "Items", variant: "secondary" },
-        { href: ROUTES.admin.inventoryLocations, label: "Locations", variant: "secondary" },
-        { href: ROUTES.admin.inventoryMovements, label: "Movements", variant: "secondary" },
-        { href: ROUTES.admin.inventoryLedger, label: "Ledger", variant: "secondary" },
-        { href: ROUTES.admin.inventoryAdjustments, label: "Adjustments", variant: "secondary" },
         { href: ROUTES.admin.inventoryOpeningStock, label: "Opening Stock", variant: "secondary" },
+        { href: ROUTES.admin.inventoryAdjustments, label: "Adjustments", variant: "secondary" },
         { href: ROUTES.admin.inventoryDemandPlanning, label: "Demand Planning", variant: "secondary" },
-        { href: ROUTES.admin.inventoryPurchaseNeeds, label: "Purchase Needs", variant: "secondary" },
-        { href: ROUTES.admin.inventoryReadiness, label: "Readiness", variant: "secondary" },
-        { href: ROUTES.admin.purchases, label: "Purchases & Vendors", variant: "secondary" },
+        { href: ROUTES.admin.purchases, label: "Purchases", variant: "secondary" },
       ]}
       stats={[
-        { label: "Tracked Items", value: String(itemsCount), tone: "info" },
-        { label: "Active Locations", value: String(activeLocations), tone: "info" },
-        { label: "Below Reorder", value: String(belowReorder), tone: belowReorder > 0 ? "warning" : "success" },
-        { label: "Draft Adjustments", value: String(draftAdjustments), tone: draftAdjustments > 0 ? "warning" : "default" },
+        { label: "Tracked Items", value: loading ? "—" : itemsCount, tone: "info" },
+        { label: "Active Locations", value: loading ? "—" : activeLocations, tone: "info" },
+        { label: "Below Reorder", value: loading ? "—" : kpis.belowReorder, tone: (!loading && kpis.belowReorder > 0 ? "warning" : "success") as "warning" | "success" },
+        { label: "Draft Adjustments", value: loading ? "—" : draftAdjustments, tone: (!loading && draftAdjustments > 0 ? "warning" : "default") as "warning" | "default" },
       ]}
     >
       {loading ? <ERPLoadingState label="Loading inventory operations..." /> : null}
@@ -180,53 +228,172 @@ export default function AdminInventoryPage() {
 
       {!loading && !error ? (
         <>
+          {/* Primary KPI band */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <KPIBlock
+              label="Total SKUs"
+              value={kpis.total}
+              sub="Inventory profiles with active stock tracking."
+              icon={<Boxes className="h-5 w-5" />}
+              tone="info"
+              href={ROUTES.admin.inventoryStockOnHand}
+            />
+            <KPIBlock
+              label="Stock Locations"
+              value={activeLocations}
+              sub="Active stores, warehouses, and showrooms."
+              icon={<Warehouse className="h-5 w-5" />}
+              tone={activeLocations > 0 ? "success" : "warning"}
+              href={ROUTES.admin.inventoryLocations}
+            />
+            <KPIBlock
+              label="Reorder Alerts"
+              value={kpis.belowReorder}
+              sub="Items at or below configured reorder level."
+              icon={<TrendingDown className="h-5 w-5" />}
+              tone={kpis.belowReorder > 0 ? "warning" : "success"}
+              href={ROUTES.admin.inventoryStockOnHand}
+            />
+            <KPIBlock
+              label="Out of Stock"
+              value={kpis.outOfStock}
+              sub="Zero on-hand — cannot fulfil new commitments."
+              icon={<PackageX className="h-5 w-5" />}
+              tone={kpis.outOfStock > 0 ? "danger" : "success"}
+              href={ROUTES.admin.inventoryStockOnHand}
+            />
+          </div>
+
+          {/* Category breakdown */}
           <ERPSectionShell
-            title="Stock posture — category separation"
-            description="Each stock category has a distinct meaning. No stock count is fabricated — all values come from the live ledger."
+            title="Inventory by category"
+            description="Stock posture broken down by product type — Finished Goods (for sale/delivery), Raw Materials (manufacturing input), Accessories (components and add-ons)."
           >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
-                <div className="font-semibold text-foreground">On hand</div>
-                <div className="text-xs text-muted-foreground">Physical stock present at a location, derived from opening stock + receipts − deliveries out + returns in + adjustments.</div>
-              </div>
-              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
-                <div className="font-semibold text-foreground">Available</div>
-                <div className="text-xs text-muted-foreground">On hand minus reserved quantity. Available for new delivery commitments.</div>
-              </div>
-              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
-                <div className="font-semibold text-foreground">Reserved</div>
-                <div className="text-xs text-muted-foreground">Stock committed to winners and confirmed orders pending delivery handover.</div>
-              </div>
-              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
-                <div className="font-semibold text-foreground">Delivery out</div>
-                <div className="text-xs text-muted-foreground">Stock issued via completed delivery. Reduces on-hand in the ledger via EMI_DELIVERY_OUT movement.</div>
-              </div>
-              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
-                <div className="font-semibold text-foreground">Adjustment</div>
-                <div className="text-xs text-muted-foreground">Counted stock correction approved through the adjustment workflow. Posted explicitly — not on page load.</div>
-              </div>
-              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
-                <div className="font-semibold text-foreground">Purchase receipt</div>
-                <div className="text-xs text-muted-foreground">
-                  Stock-in from goods receipt. Source workflow is{" "}
-                  <a href={ROUTES.admin.purchases} className="text-primary hover:underline">Purchases & Vendors</a>
-                  {" "}— not this page.
-                </div>
-              </div>
-              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1">
-                <div className="font-semibold text-foreground">Return / hold / maintenance</div>
-                <div className="text-xs text-muted-foreground">Returned and held stock from Delivery & Service returns. EMI_RETURN_IN movement restores on-hand.</div>
-              </div>
-              <div className="rounded-xl border border-border bg-amber-50 border-amber-200 px-4 py-3 space-y-1">
-                <div className="font-semibold text-amber-900">Accounting bridge</div>
-                <div className="text-xs text-amber-800">
-                  COGS and stock valuation bridge posting belong to{" "}
-                  <a href={ROUTES.admin.reconciliation} className="text-primary hover:underline">Accounting & Reconciliation</a>
-                  . Not shown or posted here.
-                </div>
-              </div>
+            <div className="space-y-2">
+              <CategoryRow
+                label="Finished Goods"
+                count={kpis.finished.count}
+                inStock={kpis.finished.ok}
+                low={kpis.finished.low}
+                out={kpis.finished.out}
+                icon={<Package className="h-4 w-4 text-sky-700" />}
+                color="bg-sky-100"
+              />
+              <CategoryRow
+                label="Raw Materials"
+                count={kpis.raw.count}
+                inStock={kpis.raw.ok}
+                low={kpis.raw.low}
+                out={kpis.raw.out}
+                icon={<Factory className="h-4 w-4 text-violet-700" />}
+                color="bg-violet-100"
+              />
+              <CategoryRow
+                label="Accessories"
+                count={kpis.acc.count}
+                inStock={kpis.acc.ok}
+                low={kpis.acc.low}
+                out={kpis.acc.out}
+                icon={<Wrench className="h-4 w-4 text-amber-700" />}
+                color="bg-amber-100"
+              />
             </div>
+
+            {/* Alert strip */}
+            {kpis.outOfStock > 0 || kpis.lowStock > 0 ? (
+              <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ${kpis.outOfStock > 0 ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>
+                  {kpis.outOfStock > 0 ? <><strong>{kpis.outOfStock}</strong> items out of stock — </> : null}
+                  {kpis.lowStock > 0 ? <><strong>{kpis.lowStock}</strong> items below reorder level — </> : null}
+                  review before creating new delivery or sale commitments.
+                </span>
+                <Link href={ROUTES.admin.inventoryStockOnHand} className="ml-auto shrink-0 rounded-lg border border-current/30 px-3 py-1 text-xs font-semibold hover:opacity-80">
+                  View register
+                </Link>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <span className="text-lg">✓</span>
+                All tracked items have stock above reorder levels.
+              </div>
+            )}
           </ERPSectionShell>
+
+          {/* Stock concept definitions + workflow guidance */}
+          <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+            <ERPSectionShell
+              title="Stock movement concepts"
+              description="Each stock category has a distinct meaning. No stock count is fabricated — all values come from the live ledger."
+            >
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  { title: "On hand", desc: "Physical stock present at a location — opening stock + receipts − deliveries out + returns + adjustments.", icon: <Layers className="h-4 w-4" /> },
+                  { title: "Available", desc: "On hand minus reserved quantity. Available for new delivery commitments.", icon: <Package className="h-4 w-4" /> },
+                  { title: "Reserved", desc: "Stock committed to winners and confirmed orders pending delivery handover.", icon: <ClipboardCheck className="h-4 w-4" /> },
+                  { title: "Delivery out", desc: "Stock issued via completed delivery — EMI_DELIVERY_OUT movement reduces on-hand.", icon: <Truck className="h-4 w-4" /> },
+                  { title: "Adjustment", desc: "Counted stock correction approved through the adjustment workflow.", icon: <ScrollText className="h-4 w-4" /> },
+                  { title: "Purchase receipt", desc: "Stock-in from goods receipt. Source workflow is Purchases & Vendors.", icon: <Warehouse className="h-4 w-4" /> },
+                ].map(({ title, desc, icon }) => (
+                  <div key={title} className="flex gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3">
+                    <div className="mt-0.5 shrink-0 text-muted-foreground">{icon}</div>
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">{title}</div>
+                      <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ERPSectionShell>
+
+            <ERPSectionShell title="Adjustment & activity" description="Draft adjustments and recent delivery movements.">
+              <div className="space-y-3">
+                <Link href={ROUTES.admin.inventoryAdjustments} className="flex items-start justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted/30 transition">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">Draft adjustments</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Awaiting review and approval</div>
+                  </div>
+                  <span className={`text-2xl font-bold tabular-nums ${draftAdjustments > 0 ? "text-amber-700" : "text-emerald-700"}`}>{draftAdjustments}</span>
+                </Link>
+
+                {latestAdjustment ? (
+                  <div className="rounded-xl border border-border bg-muted/20 px-4 py-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Latest adjustment</div>
+                    <div className="mt-1 text-sm font-semibold text-foreground">{latestAdjustment.adjustment_no}</div>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <ERPStatusBadge status={latestAdjustment.status} />
+                      <span>{accountingDate(latestAdjustment.adjustment_date)}</span>
+                    </div>
+                  </div>
+                ) : null}
+
+                {bridgeRows.length > 0 ? (
+                  <div className="rounded-xl border border-border bg-muted/20 px-4 py-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Recent delivery bridge</div>
+                    {bridgeRows.slice(0, 3).map((r, i) => (
+                      <div key={i} className="mt-2 flex items-center justify-between text-xs">
+                        <span className="font-mono text-muted-foreground">{r.product_code}</span>
+                        <span className="rounded bg-muted px-1.5 py-0.5 font-medium">{r.movement_type.replace(/_/g, " ")}</span>
+                        <span className="text-muted-foreground">{accountingDate(r.movement_date)}</span>
+                      </div>
+                    ))}
+                    {bridgeRows.length > 3 ? (
+                      <Link href={ROUTES.admin.inventoryMovements} className="mt-2 block text-xs font-medium text-primary hover:underline">
+                        View all {bridgeRows.length} movements →
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {latestBridge ? null : (
+                  <div className="rounded-xl border border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                    No delivery-linked movements yet. Delivered subscription items will appear here.
+                  </div>
+                )}
+              </div>
+            </ERPSectionShell>
+          </div>
+
           <Phase7Guidance
             items={[
               {
@@ -242,102 +409,6 @@ export default function AdminInventoryPage() {
               },
             ]}
           />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              label="Tracked Items"
-              value={String(itemsCount)}
-              subtext="Inventory profiles linked to the live product master."
-              icon={<Boxes className="h-5 w-5" />}
-              tone="info"
-            />
-            <StatCard
-              label="Locations"
-              value={String(activeLocations)}
-              subtext="Store, warehouse, and showroom stock locations available to staff."
-              icon={<Warehouse className="h-5 w-5" />}
-              tone={activeLocations > 0 ? "success" : "warning"}
-            />
-            <StatCard
-              label="Reorder Alerts"
-              value={String(belowReorder)}
-              subtext="Current stock at or below the configured reorder level."
-              icon={<PackageSearch className="h-5 w-5" />}
-              tone={belowReorder > 0 ? "warning" : "success"}
-            />
-            <StatCard
-              label="Latest Delivery Bridge"
-              value={latestBridge?.movement_type.replaceAll("_", " ") ?? "No bridge rows"}
-              subtext={
-                latestBridge
-                  ? `${latestBridge.product_code} • ${accountingDate(latestBridge.movement_date)}`
-                  : "Delivery-linked stock issue and return rows will surface here."
-              }
-              icon={<Truck className="h-5 w-5" />}
-            />
-          </div>
-
-          <ERPSectionShell
-            title="Stock Summary"
-            description="Live stock is derived from the explicit stock ledger and opening balances, not from product pricing or subscription records."
-          >
-            <EnterpriseDataTable
-              data={stockSummary}
-              columns={summaryColumns}
-              emptyTitle="No inventory items found"
-              emptyDescription="Create inventory profiles for products that need stock tracking."
-            />
-          </ERPSectionShell>
-
-          <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-            <ERPSectionShell
-              title="Location Master"
-              description="Warehouses and store locations stay operationally separate from product and contract truth."
-            >
-              <EnterpriseDataTable
-                data={locations}
-                columns={locationColumns}
-                emptyTitle="No stock locations found"
-                emptyDescription="Create at least one active stock location before daily stock operations expand."
-              />
-            </ERPSectionShell>
-
-            <ERPSectionShell
-              title="Adjustment Queue"
-              description="Draft adjustments remain non-operational until approved and posted."
-            >
-              <div className="grid gap-4">
-                <StatCard
-                  label="Draft Adjustments"
-                  value={String(draftAdjustments)}
-                  subtext="Draft rows still awaiting review."
-                  icon={<ClipboardCheck className="h-5 w-5" />}
-                  tone={draftAdjustments > 0 ? "warning" : "default"}
-                />
-                <StatCard
-                  label="Latest Adjustment"
-                  value={latestAdjustment?.adjustment_no ?? "No adjustments"}
-                  subtext={
-                    latestAdjustment
-                      ? `${latestAdjustment.status} • ${accountingDate(latestAdjustment.adjustment_date)}`
-                      : "Create a counted stock adjustment when physical stock differs from ledger stock."
-                  }
-                  icon={<ScrollText className="h-5 w-5" />}
-                />
-              </div>
-            </ERPSectionShell>
-          </div>
-
-          <ERPSectionShell
-            title="Stock source workflow — Delivery-Linked Movements"
-            description="Stock movement rows created by delivered and returned subscription deliveries. Stock truth lives here; purchase source workflow (vendor → PO → receipt → bill → payable) is tracked separately under Purchases & Vendors."
-          >
-            <EnterpriseDataTable
-              data={bridgeRows}
-              columns={bridgeColumns}
-              emptyTitle="No delivery-linked stock movements found"
-              emptyDescription="Delivered and returned subscription deliveries for bridge-enabled stock items will appear here."
-            />
-          </ERPSectionShell>
         </>
       ) : null}
     </ERPPageShell>

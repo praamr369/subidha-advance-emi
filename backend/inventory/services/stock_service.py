@@ -811,6 +811,9 @@ def build_stock_summary(
     stock_item_type: str | None = None,
     branch_id: int | None = None,
 ):
+    from inventory.models import SOFT_HOLD_MOVEMENT_TYPES, StockMovementType
+    from inventory.services.demand_planning_service import calculate_product_demand_bulk
+
     queryset = InventoryItem.objects.select_related("product", "default_stock_location").all()
     if item_id:
         queryset = queryset.filter(pk=item_id)
@@ -821,14 +824,58 @@ def build_stock_summary(
             models.Q(default_stock_location__branch_id=branch_id)
             | models.Q(stock_ledger__stock_location__branch_id=branch_id)
         ).distinct()
-    rows = []
-    for item in queryset:
-        on_hand = item.current_stock_quantity()
-        reserved_qty = item.reserved_qty()
-        available_qty = item.available_qty()
-        from inventory.services.demand_planning_service import calculate_product_demand
 
-        demand = calculate_product_demand(product_id=item.product_id)
+    items = list(queryset)
+    if not items:
+        return {"count": 0, "results": []}
+
+    item_ids = [i.id for i in items]
+    product_ids = [i.product_id for i in items]
+
+    # Bulk physical stock: SUM(in) - SUM(out) excluding soft-hold movements, per item
+    phys_qs = (
+        StockLedger.objects.filter(inventory_item_id__in=item_ids)
+        .exclude(movement_type__in=list(SOFT_HOLD_MOVEMENT_TYPES))
+        .values("inventory_item_id")
+        .annotate(total_in=models.Sum("quantity_in"), total_out=models.Sum("quantity_out"))
+    )
+    phys_map = {row["inventory_item_id"]: row for row in phys_qs}
+
+    # Bulk reserved qty: SALE_RESERVE (in) minus SALE_RELEASE (out), per item
+    reserve_qs = (
+        StockLedger.objects.filter(
+            inventory_item_id__in=item_ids,
+            movement_type__in=[StockMovementType.SALE_RESERVE, StockMovementType.SALE_RELEASE],
+        )
+        .values("inventory_item_id")
+        .annotate(reserved_in=models.Sum("quantity_in"), reserved_out=models.Sum("quantity_out"))
+    )
+    reserve_map = {row["inventory_item_id"]: row for row in reserve_qs}
+
+    # Bulk demand — 5 queries total regardless of item count
+    demand_map = calculate_product_demand_bulk(product_ids)
+
+    ZERO = Decimal("0.000")
+
+    rows = []
+    for item in items:
+        opening = Decimal(str(item.opening_stock_qty or ZERO))
+        phys = phys_map.get(item.id, {})
+        on_hand = (
+            Decimal(str(phys.get("total_in") or ZERO))
+            - Decimal(str(phys.get("total_out") or ZERO))
+            + opening
+        )
+        res = reserve_map.get(item.id, {})
+        reserved = max(
+            ZERO,
+            Decimal(str(res.get("reserved_in") or ZERO)) - Decimal(str(res.get("reserved_out") or ZERO)),
+        )
+        available = max(ZERO, on_hand - reserved)
+
+        demand = demand_map.get(item.product_id, {
+            "winners_pending_delivery": 0, "direct_sale_orders": 0, "rent_lease_commitments": 0,
+        })
         rows.append(
             {
                 "item_id": item.id,
@@ -840,11 +887,11 @@ def build_stock_summary(
                 "stock_tracking_enabled": item.stock_tracking_enabled,
                 "stock_item_type": item.stock_item_type,
                 "delivery_stock_bridge_enabled": item.delivery_stock_bridge_enabled,
-                "opening_stock_qty": f"{item.opening_stock_qty:.3f}",
+                "opening_stock_qty": f"{opening:.3f}",
                 "reorder_level_qty": f"{item.reorder_level_qty:.3f}",
                 "on_hand_qty": f"{on_hand:.3f}",
-                "reserved_qty": f"{reserved_qty:.3f}",
-                "available_qty": f"{available_qty:.3f}",
+                "reserved_qty": f"{reserved:.3f}",
+                "available_qty": f"{available:.3f}",
                 "incoming_qty": "0.000",
                 "required_for_winners": str(demand["winners_pending_delivery"]),
                 "required_for_confirmed_orders": str(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.core.cache import cache
 from django.db.models import F, Q, Sum
 from django.utils import timezone
 from rest_framework import permissions
@@ -22,11 +23,18 @@ from subscriptions.models import (
     SubscriptionDelivery,
 )
 
+_BADGE_CACHE_KEY = "admin_nav_badges"
+_BADGE_CACHE_TTL = 30  # seconds — fresh enough for navigation badges
+
 
 class AdminNavigationBadgesView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
+        cached = cache.get(_BADGE_CACHE_KEY)
+        if cached is not None:
+            return Response(cached)
+
         today = timezone.localdate()
         # Parse through the same filter parser used by outstandings for consistency.
         outstanding_payload = build_outstanding_ledger(
@@ -85,18 +93,18 @@ class AdminNavigationBadgesView(APIView):
         ).count()
         pending_draw_count = Batch.objects.filter(status="OPEN").count()
 
-        return Response(
-            {
-                "outstanding_count": int(outstanding_payload.get("count") or 0),
-                "overdue_count": int(overdue_count),
-                "pending_delivery_count": int(pending_delivery_count),
-                "pending_return_count": int(pending_return_count),
-                "pending_refund_count": int(pending_refund_count),
-                "pending_reversal_count": int(pending_reversal_count),
-                "open_support_ticket_count": int(open_support_ticket_count),
-                "low_stock_count": int(low_stock_count),
-                "inspection_stock_count": int(inspection_stock_count),
-                "unreconciled_count": int(unreconciled_count),
-                "pending_draw_count": int(pending_draw_count),
-            }
-        )
+        payload = {
+            "outstanding_count": int(outstanding_payload.get("count") or 0),
+            "overdue_count": int(overdue_count),
+            "pending_delivery_count": int(pending_delivery_count),
+            "pending_return_count": int(pending_return_count),
+            "pending_refund_count": int(pending_refund_count),
+            "pending_reversal_count": int(pending_reversal_count),
+            "open_support_ticket_count": int(open_support_ticket_count),
+            "low_stock_count": int(low_stock_count),
+            "inspection_stock_count": int(inspection_stock_count),
+            "unreconciled_count": int(unreconciled_count),
+            "pending_draw_count": int(pending_draw_count),
+        }
+        cache.set(_BADGE_CACHE_KEY, payload, _BADGE_CACHE_TTL)
+        return Response(payload)

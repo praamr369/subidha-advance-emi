@@ -16,7 +16,7 @@ from core.services.operational_visibility import (
     subscription_collectible_q,
 )
 from billing.models import BillingDocumentStatus, BillingInvoice, DirectSale
-from subscriptions.models import Emi, EmiStatus, PlanType, q2
+from subscriptions.models import Emi, EmiStatus, FinancialLedger, LedgerEntryType, PlanType, q2
 
 MONEY_ZERO = Decimal("0.00")
 
@@ -180,6 +180,18 @@ def parse_outstanding_filters(params) -> OutstandingLedgerFilters:
     )
 
 
+def _emi_net_paid_from_prefetch(emi: Emi) -> Decimal:
+    """Compute net paid from prefetched ledger_entries — avoids per-EMI DB queries."""
+    paid = MONEY_ZERO
+    reversed_ = MONEY_ZERO
+    for entry in emi.ledger_entries.all():
+        if entry.entry_type == LedgerEntryType.EMI_PAYMENT:
+            paid += Decimal(str(entry.amount or MONEY_ZERO))
+        elif entry.entry_type == LedgerEntryType.PAYMENT_REVERSAL:
+            reversed_ += Decimal(str(entry.amount or MONEY_ZERO))
+    return q2(max(q2(paid) - q2(reversed_), MONEY_ZERO))
+
+
 def _collect_subscription_rows(*, today: date) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     emis = (
@@ -190,12 +202,19 @@ def _collect_subscription_rows(*, today: date) -> list[dict[str, Any]]:
             "subscription__batch",
             "subscription__lucky_id",
         )
+        .prefetch_related(
+            Prefetch(
+                "ledger_entries",
+                queryset=FinancialLedger.objects.only("emi_id", "entry_type", "amount"),
+            )
+        )
         .filter(status=EmiStatus.PENDING)
         .filter(subscription_collectible_q("subscription__"))
         .order_by("due_date", "id")
     )
     for emi in emis:
-        outstanding = _money(emi.balance_amount())
+        paid_amount = _emi_net_paid_from_prefetch(emi)
+        outstanding = q2(max(q2(emi.amount) - paid_amount, MONEY_ZERO))
         if outstanding <= MONEY_ZERO:
             continue
         sub = emi.subscription
@@ -207,7 +226,6 @@ def _collect_subscription_rows(*, today: date) -> list[dict[str, Any]]:
             op = OP_RENT
         elif sub.plan_type == PlanType.LEASE:
             op = OP_LEASE
-        paid_amount = _money(emi.net_paid_amount())
         waived_amount = _money(emi.amount) - paid_amount - outstanding
         if waived_amount < MONEY_ZERO:
             waived_amount = MONEY_ZERO

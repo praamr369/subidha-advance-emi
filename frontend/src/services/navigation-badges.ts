@@ -14,6 +14,14 @@ export type AdminNavigationBadges = {
   pending_draw_count: number;
 };
 
+// Deduplicate concurrent in-flight requests — React StrictMode fires effects twice;
+// this ensures only one network call goes out per tick.
+let _inflight: Promise<AdminNavigationBadges> | null = null;
+
 export async function getAdminNavigationBadges(): Promise<AdminNavigationBadges> {
-  return apiFetch<AdminNavigationBadges>("/admin/dashboard/navigation-badges/");
+  if (_inflight) return _inflight;
+  _inflight = apiFetch<AdminNavigationBadges>("/admin/dashboard/navigation-badges/").finally(() => {
+    _inflight = null;
+  });
+  return _inflight;
 }

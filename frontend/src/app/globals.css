@@ -9,26 +9,27 @@
 
 :root {
   /* Warm retail workspace — brown/gold brand, soft neutrals (not cold blue-gray) */
-  --background: oklch(0.985 0.006 82);
-  --foreground: oklch(0.24 0.022 72);
+  /* Background is visibly grey-cream so white cards stand out clearly (desktop ERP style) */
+  --background: oklch(0.942 0.010 82);
+  --foreground: oklch(0.18 0.026 68);
 
-  --card: oklch(0.998 0.004 82);
-  --card-foreground: oklch(0.22 0.02 72);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.026 68);
 
-  --popover: oklch(0.998 0.004 82);
-  --popover-foreground: oklch(0.22 0.02 72);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.026 68);
 
   --primary: oklch(0.44 0.078 62);
   --primary-foreground: oklch(0.985 0.01 95);
 
-  --secondary: oklch(0.945 0.008 82);
-  --secondary-foreground: oklch(0.26 0.02 72);
+  --secondary: oklch(0.930 0.010 82);
+  --secondary-foreground: oklch(0.22 0.024 68);
 
-  --muted: oklch(0.952 0.007 82);
-  --muted-foreground: oklch(0.46 0.018 78);
+  --muted: oklch(0.922 0.010 82);
+  --muted-foreground: oklch(0.42 0.020 76);
 
-  --accent: oklch(0.93 0.028 78);
-  --accent-foreground: oklch(0.3 0.03 72);
+  --accent: oklch(0.91 0.030 78);
+  --accent-foreground: oklch(0.26 0.03 70);
   --success: oklch(0.48 0.09 145);
   --success-foreground: oklch(0.985 0.01 95);
   --warning: oklch(0.62 0.12 76);
@@ -41,8 +42,8 @@
   --destructive: oklch(0.52 0.18 28);
   --destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(0.88 0.012 82);
-  --input: oklch(0.87 0.012 82);
+  --border: oklch(0.82 0.016 80);
+  --input: oklch(0.80 0.016 80);
   --ring: oklch(0.52 0.085 62);
 
   /* Semantic surfaces for badges, posture cards, alerts (theme-aware) */
@@ -61,18 +62,18 @@
   --badge-inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.62);
   --hairline-shine: rgba(255, 255, 255, 0.55);
 
-  --surface-shell: oklch(0.978 0.005 82);
-  --surface-content: oklch(0.985 0.004 82);
-  --surface-card: oklch(0.995 0.004 82);
-  --surface-card-elevated: oklch(1 0.002 82);
-  --surface-card-soft: oklch(0.988 0.005 82);
-  --surface-card-glass: color-mix(in oklab, var(--surface-card-elevated) 82%, transparent);
-  --surface-inset: oklch(0.955 0.007 82);
-  --surface-accent-soft: color-mix(in oklab, var(--accent) 22%, var(--surface-card-elevated) 78%);
-  --surface-muted: oklch(0.958 0.006 82);
-  --surface-strong: oklch(0.94 0.009 82);
-  --surface-border-strong: oklch(0.84 0.014 82);
-  --surface-panel-outline: oklch(0.805 0.016 82);
+  --surface-shell: oklch(0.942 0.010 82);
+  --surface-content: oklch(0.938 0.010 82);
+  --surface-card: oklch(1 0 0);
+  --surface-card-elevated: oklch(1 0 0);
+  --surface-card-soft: oklch(0.994 0.003 82);
+  --surface-card-glass: color-mix(in oklab, var(--surface-card) 96%, transparent);
+  --surface-inset: oklch(0.930 0.012 82);
+  --surface-accent-soft: color-mix(in oklab, var(--accent) 22%, var(--surface-card) 78%);
+  --surface-muted: oklch(0.925 0.010 82);
+  --surface-strong: oklch(0.910 0.012 82);
+  --surface-border-strong: oklch(0.78 0.018 80);
+  --surface-panel-outline: oklch(0.76 0.020 80);
   --surface-shadow: 0 24px 56px -42px rgba(15, 23, 42, 0.56);
   --surface-shadow-lg: 0 34px 72px -46px rgba(15, 23, 42, 0.62);
   --popup-shadow-xl: 0 32px 90px -42px rgba(15, 23, 42, 0.78),
@@ -90,8 +91,8 @@
   --sidebar-item-active: oklch(0.4 0.048 82);
   --sidebar-item-active-border: oklch(0.78 0.07 85);
 
-  --topbar-surface: oklch(0.988 0.004 82);
-  --topbar-border: oklch(0.86 0.012 82);
+  --topbar-surface: oklch(1 0 0);
+  --topbar-border: oklch(0.82 0.016 80);
   --topbar-control: color-mix(in oklab, var(--surface-card-elevated) 88%, var(--surface-muted) 12%);
   /* Primary content cap at 100% zoom (presets in DashboardShell still override --workspace-max-width). */
   --workspace-max-width: min(100%, 1480px);
@@ -106,8 +107,8 @@
   --focus-glow: 0 0 0 3px color-mix(in oklab, var(--primary) 22%, transparent);
   --focus-ring-color: color-mix(in oklab, var(--primary) 80%, black 20%);
   --focus-ring-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 28%, transparent);
-  --control-bg: oklch(0.998 0.003 82);
-  --control-bg-soft: oklch(0.962 0.006 82);
+  --control-bg: oklch(1 0 0);
+  --control-bg-soft: oklch(0.958 0.008 82);
 
   --radius: 0.875rem;
   --radius-sm: calc(var(--radius) - 4px);
@@ -1163,29 +1164,8 @@ button {
 
 .dashboard-app {
   min-height: 100vh;
-  background:
-    radial-gradient(
-      circle at 8% 2%,
-      color-mix(in oklab, var(--primary) 13%, transparent),
-      transparent 36%
-    ),
-    radial-gradient(
-      circle at 86% -2%,
-      color-mix(in oklab, var(--accent) 18%, transparent),
-      transparent 34%
-    ),
-    repeating-linear-gradient(
-      90deg,
-      rgba(15, 23, 42, 0.024) 0,
-      rgba(15, 23, 42, 0.024) 1px,
-      transparent 1px,
-      transparent 96px
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--surface-shell) 90%, white 10%),
-      var(--surface-content)
-    );
+  /* Solid grey-cream body so white cards are clearly visible — no gradient noise bleeding through */
+  background: var(--surface-shell);
 }
 
 .dark .dashboard-app {
@@ -1481,6 +1461,16 @@ button {
   border-color: color-mix(in oklab, var(--border) 82%, var(--surface-muted) 18%) !important;
 }
 
+/* All modal backdrop overlays in the dashboard get a solid dark scrim — no transparent wash */
+.dashboard-app .bg-black\/30,
+.dashboard-app .bg-black\/40,
+.dashboard-app .bg-black\/45,
+.dashboard-app .bg-black\/50,
+.dashboard-app .bg-black\/55,
+.dashboard-app .bg-black\/60 {
+  background-color: rgba(10, 14, 28, 0.74) !important;
+}
+
 .subidha-popup-root {
   position: relative;
   z-index: 260;
@@ -1571,14 +1561,8 @@ button {
 }
 
 .dashboard-app .workflow-overlay {
-  background:
-    radial-gradient(
-      circle at top,
-      color-mix(in oklab, var(--surface-muted) 18%, transparent),
-      transparent 32%
-    ),
-    color-mix(in oklab, oklch(0.18 0.012 258) 72%, transparent);
-  backdrop-filter: blur(14px);
+  /* Solid dark scrim — no backdrop blur bleeding through the modal */
+  background: rgba(10, 14, 28, 0.74);
 }
 
 .dashboard-app .workflow-modal-panel,

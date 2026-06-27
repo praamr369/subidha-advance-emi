@@ -524,30 +524,8 @@ export default function AdminDashboardPage() {
     else setRefreshing(true);
 
     try {
-      const [
-        legacyPayload,
-        canonicalPayload,
-        overduePayload,
-        upcomingPayload,
-        recentPaymentsPayload,
-        reconciliationPayload,
-        winnerPayload,
-        deliverySummaryPayload,
-        supportQueuePayload,
-        leadQueuePayload,
-        requestQueuePayload,
-        branchOverviewPayload,
-        todayBranchOverviewPayload,
-        stockSummaryPayload,
-        purchaseDraftPayload,
-        purchaseApprovedPayload,
-        salaryPayablePayload,
-        expenseClaimPayload,
-        serviceDeskOverviewPayload,
-        openServiceCasePayload,
-        pendingReminderPayload,
-        failedReminderPayload,
-      ] = await Promise.all([
+      // Promise.allSettled so any single slow/failed API doesn't block the entire dashboard
+      const settled = await Promise.allSettled([
         getAdminDashboard(),
         getDashboardSummaryV2(dashboardQuery),
         listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
@@ -558,57 +536,62 @@ export default function AdminDashboardPage() {
         getAdminDeliverySummary(),
         listAdminSupportRequests({ status: "SUBMITTED" }),
         listAdminLeads({}),
-        listSubscriptionRequests("admin", {
-          status: "SUBMITTED",
-          page: 1,
-          pageSize: 1,
-        }),
+        listSubscriptionRequests("admin", { status: "SUBMITTED", page: 1, pageSize: 1 }),
         getBranchReportingOverview(branchReportingQuery),
         getBranchReportingOverview(todayBranchReportingQuery),
         getStockSummary({ branch: selectedBranchId || undefined }),
-        listPurchaseBills({
-          ...branchScopedQuery,
-          status: "DRAFT",
-        }),
-        listPurchaseBills({
-          ...branchScopedQuery,
-          status: "APPROVED",
-        }),
-        listSalarySheetsSafe({
-          ...branchScopedQuery,
-          status: "POSTED",
-        }),
-        listExpenseClaimsSafe({
-          ...branchScopedQuery,
-          status: "POSTED",
-        }),
+        listPurchaseBills({ ...branchScopedQuery, status: "DRAFT" }),
+        listPurchaseBills({ ...branchScopedQuery, status: "APPROVED" }),
+        listSalarySheetsSafe({ ...branchScopedQuery, status: "POSTED" }),
+        listExpenseClaimsSafe({ ...branchScopedQuery, status: "POSTED" }),
         getServiceDeskOverview(),
-        listServiceDeskCases({
-          ...branchScopedQuery,
-          status: "OPEN",
-        }),
-        listReminders({
-          status: "PENDING",
-          page_size: 1,
-        }),
-        listReminders({
-          status: "FAILED",
-          page_size: 1,
-        }),
+        listServiceDeskCases({ ...branchScopedQuery, status: "OPEN" }),
+        listReminders({ status: "PENDING", page_size: 1 }),
+        listReminders({ status: "FAILED", page_size: 1 }),
       ]);
+
+      function ok<T>(r: PromiseSettledResult<T>, fallback: T): T {
+        return r.status === "fulfilled" ? r.value : fallback;
+      }
+
+      // Core data — fail fast if the main dashboard call fails
+      if (settled[0].status === "rejected") throw settled[0].reason;
+      const legacyPayload = settled[0].value as LegacyDashboardPayload;
+
+      const canonicalPayload = ok(settled[1] as PromiseSettledResult<CanonicalDashboardPayload>, null);
+      const overduePayload = ok(settled[2] as PromiseSettledResult<DashboardDuePayload>, null);
+      const upcomingPayload = ok(settled[3] as PromiseSettledResult<DashboardDuePayload>, null);
+      const recentPaymentsPayload = ok(settled[4] as PromiseSettledResult<DashboardPaymentsPayload>, null);
+      const reconciliationPayload = ok(settled[5] as PromiseSettledResult<DashboardReconciliationPayload>, null);
+      const winnerPayload = ok(settled[6] as PromiseSettledResult<DashboardWinnersPayload>, null);
+      const deliverySummaryPayload = ok(settled[7] as PromiseSettledResult<DeliverySummaryPayload>, null);
+      const supportQueuePayload = ok(settled[8] as PromiseSettledResult<SupportQueuePayload>, null);
+      const leadQueuePayload = ok(settled[9] as PromiseSettledResult<LeadQueuePayload>, null);
+      const requestQueuePayload = ok(settled[10] as PromiseSettledResult<RequestQueuePayload>, null);
+      const branchOverviewPayload = ok(settled[11] as PromiseSettledResult<BranchReportingOverview>, null);
+      const todayBranchOverviewPayload = ok(settled[12] as PromiseSettledResult<BranchReportingOverview>, null);
+      const stockSummaryPayload = ok(settled[13] as PromiseSettledResult<StockSummaryPayload>, null);
+      const purchaseDraftPayload = ok(settled[14] as PromiseSettledResult<PurchaseBillListPayload>, null);
+      const purchaseApprovedPayload = ok(settled[15] as PromiseSettledResult<PurchaseBillListPayload>, null);
+      const salaryPayablePayload = ok(settled[16] as PromiseSettledResult<SalarySheetListPayload>, null);
+      const expenseClaimPayload = ok(settled[17] as PromiseSettledResult<ExpenseClaimListPayload>, null);
+      const serviceDeskOverviewPayload = ok(settled[18] as PromiseSettledResult<ServiceDeskOverview>, null);
+      const openServiceCasePayload = ok(settled[19] as PromiseSettledResult<ServiceDeskCasePayload>, null);
+      const pendingReminderPayload = ok(settled[20] as PromiseSettledResult<ReminderQueuePayload>, null);
+      const failedReminderPayload = ok(settled[21] as PromiseSettledResult<ReminderQueuePayload>, null);
+
       const branchMetricPayloads = selectedBranchId
-        ? [branchOverviewPayload]
-        : await Promise.all(
+        ? (branchOverviewPayload ? [branchOverviewPayload] : [])
+        : branchOverviewPayload
+        ? await Promise.allSettled(
             branchOverviewPayload.branches
               .filter((branch) => branch.status === "ACTIVE")
               .slice(0, 6)
               .map((branch) =>
-                getBranchReportingOverview({
-                  ...branchReportingQuery,
-                  branch_id: branch.id,
-                })
+                getBranchReportingOverview({ ...branchReportingQuery, branch_id: branch.id })
               )
-          );
+          ).then(rs => rs.filter(r => r.status === "fulfilled").map(r => (r as PromiseFulfilledResult<BranchReportingOverview>).value))
+        : [];
 
       setLegacy(legacyPayload);
       setCanonical(canonicalPayload);

@@ -4,11 +4,16 @@ import Link from "next/link";
 import type { NotificationSummaryResponse } from "@/services/notifications";
 import { getCustomerNotificationSummary } from "@/services/notifications";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import Image from "next/image";
 import {
   ArrowRight,
+  Package,
   RefreshCw,
   Sparkles,
+  Tag,
 } from "lucide-react";
+import { listPublicProducts, type PublicProduct } from "@/services/public";
+import { resolveApiMediaUrl } from "@/lib/media";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
@@ -123,6 +128,8 @@ export default function CustomerDashboardPage() {
     null
   );
   const [supportOpenCount, setSupportOpenCount] = useState<number | null>(null);
+  const [publicProducts, setPublicProducts] = useState<PublicProduct[]>([]);
+  const [productCategoryFilter, setProductCategoryFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -230,6 +237,13 @@ export default function CustomerDashboardPage() {
   useEffect(() => {
     void loadPage("initial");
   }, [loadPage]);
+
+  // Load product catalog independently — shows even if main dashboard is slow
+  useEffect(() => {
+    listPublicProducts()
+      .then(r => setPublicProducts(r.products))
+      .catch(() => null);
+  }, []);
 
   const summary =
     canonical?.summary ??
@@ -941,6 +955,85 @@ export default function CustomerDashboardPage() {
           title="No customer workspace data"
           description="Customer dashboard data is not currently available."
         />
+      ) : null}
+
+      {/* ── Products for future planning — loads independently of main dashboard ── */}
+      {publicProducts.length > 0 ? (
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Browse products</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Admin-approved catalog — available for EMI, rent, lease, or direct purchase. Start a subscription request anytime.
+              </p>
+            </div>
+            <Link href={ROUTES.customer.subscriptions} className="shrink-0 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted">
+              My subscriptions →
+            </Link>
+          </div>
+          {/* Category filter */}
+          {(() => {
+            const cats = Array.from(new Set(publicProducts.map(p => p.category).filter(Boolean))) as string[];
+            return cats.length > 1 ? (
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setProductCategoryFilter("")}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${!productCategoryFilter ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
+                  All
+                </button>
+                {cats.slice(0, 8).map(cat => (
+                  <button key={cat} type="button" onClick={() => setProductCategoryFilter(productCategoryFilter === cat ? "" : cat)}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${productCategoryFilter === cat ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            ) : null;
+          })()}
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+            {publicProducts
+              .filter(p => !productCategoryFilter || p.category === productCategoryFilter)
+              .slice(0, 8)
+              .map(product => {
+                const imgUrl = resolveApiMediaUrl(product.image ?? null);
+                return (
+                  <div key={product.id} className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:shadow-md">
+                    {imgUrl ? (
+                      <div className="relative h-36 overflow-hidden bg-muted">
+                        <Image src={imgUrl} alt={product.name} fill className="object-cover transition group-hover:scale-105" sizes="(max-width: 768px) 50vw, 25vw" />
+                      </div>
+                    ) : (
+                      <div className="flex h-36 items-center justify-center bg-muted/40">
+                        <Package className="h-10 w-10 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    <div className="p-3">
+                      <div className="truncate text-sm font-semibold text-foreground">{product.name}</div>
+                      <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{product.product_code}</div>
+                      {product.category ? (
+                        <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Tag className="h-3 w-3" /> {product.category}
+                        </div>
+                      ) : null}
+                      <div className="mt-2 text-sm font-bold text-foreground">
+                        ₹{Number(product.base_price).toLocaleString("en-IN")}
+                      </div>
+                      <Link
+                        href={ROUTES.customer.subscriptions}
+                        className="mt-2 flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                      >
+                        View my plans <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+          {publicProducts.filter(p => !productCategoryFilter || p.category === productCategoryFilter).length > 8 ? (
+            <p className="text-xs text-muted-foreground">
+              Showing 8 of {publicProducts.filter(p => !productCategoryFilter || p.category === productCategoryFilter).length} products. Contact support to start a new subscription.
+            </p>
+          ) : null}
+        </section>
       ) : null}
         </>
       }

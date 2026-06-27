@@ -211,6 +211,14 @@ def _serialize_direct_sale_line_payloads(lines: list[dict]) -> list[dict]:
         cgst_amount = _money(line.get("cgst_amount"))
         sgst_amount = _money(line.get("sgst_amount"))
         igst_amount = _money(line.get("igst_amount"))
+        # Default tax classification from the product master when the line omits it,
+        # so the HSN/SAC chosen at product creation flows through to invoices.
+        hsn_sac_code = (line.get("hsn_sac_code") or "").strip().upper()
+        if not hsn_sac_code:
+            hsn_sac_code = (getattr(product, "hsn_sac_code", None) or "").strip().upper()
+        gst_rate = line.get("gst_rate")
+        if gst_rate is None:
+            gst_rate = getattr(product, "gst_rate", None)
         payloads.append(
             {
                 "product": product,
@@ -220,7 +228,7 @@ def _serialize_direct_sale_line_payloads(lines: list[dict]) -> list[dict]:
                 "unit_price": unit_price,
                 "discount_amount": discount_amount,
                 "taxable_value": taxable_value,
-                "gst_rate": line.get("gst_rate"),
+                "gst_rate": gst_rate,
                 "cgst_amount": cgst_amount,
                 "sgst_amount": sgst_amount,
                 "igst_amount": igst_amount,
@@ -228,7 +236,7 @@ def _serialize_direct_sale_line_payloads(lines: list[dict]) -> list[dict]:
                 "product_code_snapshot": product_code,
                 "sku_snapshot": inventory_sku,
                 "unit_of_measure_snapshot": str(unit_of_measure).strip().upper(),
-                "hsn_sac_code": (line.get("hsn_sac_code") or "").strip().upper(),
+                "hsn_sac_code": hsn_sac_code,
                 "_create_purchase_requirement": bool(line.get("create_purchase_requirement")),
                 "_requirement_quantity": line.get("requirement_quantity"),
                 "_requirement_note": (line.get("requirement_note") or "").strip(),

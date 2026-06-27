@@ -13,6 +13,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
+import SmartSuggestField from "@/components/forms/SmartSuggestField";
 import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { getProduct, getProductCatalogOptions, updateProduct, type ProductCatalogOptions, type ProductRecord } from "@/services/products";
 
@@ -54,6 +55,8 @@ export default function AdminProductEditPage() {
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
   const [description, setDescription] = useState("");
+  const [hsnSacCode, setHsnSacCode] = useState("");
+  const [gstRate, setGstRate] = useState("");
   const [basePrice, setBasePrice] = useState("");
   const [active, setActive] = useState(true);
   const [planType, setPlanType] = useState<"EMI" | "RENT" | "LEASE">("EMI");
@@ -74,6 +77,8 @@ export default function AdminProductEditPage() {
     setCategory(next.category || "");
     setSubcategory(next.subcategory || "");
     setDescription(next.description || "");
+    setHsnSacCode(next.hsn_sac_code || "");
+    setGstRate(next.gst_rate != null ? String(next.gst_rate) : "");
     setBasePrice(Number(next.base_price || 0).toFixed(2));
     setActive(next.is_active !== false);
     setPlanType(safePlan(next.plan_type_default));
@@ -139,6 +144,8 @@ export default function AdminProductEditPage() {
         category,
         subcategory,
         description,
+        hsn_sac_code: hsnSacCode.trim().toUpperCase(),
+        gst_rate: gstRate.trim() ? gstRate.trim() : null,
         base_price: basePrice,
         is_active: active,
         plan_type_default: effectiveDefault(),
@@ -155,6 +162,8 @@ export default function AdminProductEditPage() {
         payload.set("category", category);
         payload.set("subcategory", subcategory);
         payload.set("description", description);
+        payload.set("hsn_sac_code", hsnSacCode.trim().toUpperCase());
+        if (gstRate.trim()) payload.set("gst_rate", gstRate.trim());
         payload.set("base_price", basePrice);
         payload.set("is_active", String(active));
         payload.set("plan_type_default", effectiveDefault());
@@ -226,6 +235,22 @@ export default function AdminProductEditPage() {
                 <label className="text-sm text-muted-foreground">Category<input className={fieldClass()} value={category} onChange={(event) => setCategory(event.target.value)} list="category-options" /><datalist id="category-options">{catalogOptions.categories.map((item) => <option key={item.id} value={item.name} />)}</datalist></label>
                 <label className="text-sm text-muted-foreground">Subcategory<input className={fieldClass()} value={subcategory} onChange={(event) => setSubcategory(event.target.value)} list="subcategory-options" /><datalist id="subcategory-options">{catalogOptions.subcategories.map((item) => <option key={item.id} value={item.name} />)}</datalist></label>
                 <label className="text-sm text-muted-foreground md:col-span-2">Description<textarea className={areaClass()} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+                <div className="md:col-span-2">
+                  <SmartSuggestField
+                    id="edit-product-hsn"
+                    label="HSN / SAC Code"
+                    value={hsnSacCode}
+                    onChange={setHsnSacCode}
+                    sourceText={[name, category, subcategory, description].filter(Boolean).join(" ")}
+                    fieldKey="product.hsn"
+                    placeholder="e.g. 8450"
+                    disabled={saving}
+                    onAccept={(s) => {
+                      if (s.gst_rate != null) setGstRate(String(s.gst_rate));
+                    }}
+                  />
+                </div>
+                <label className="text-sm text-muted-foreground">GST Rate (%)<input className={fieldClass()} type="number" min="0" step="0.01" value={gstRate} onChange={(event) => setGstRate(event.target.value)} /></label>
               </FormCard>
 
               <FormCard title="Capabilities" description="Controls future use in EMI, rent, lease, and direct-sale workflows.">

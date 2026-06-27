@@ -176,7 +176,7 @@ function RepairDialog({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="repair-mapping-title">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(10,14,28,0.74)" }} role="dialog" aria-modal="true" aria-labelledby="repair-mapping-title">
       <div className="w-full max-w-3xl rounded-xl border border-border bg-card p-5 shadow-2xl">
         <div id="repair-mapping-title" className="text-lg font-semibold text-foreground">Repair blocked collection mappings?</div>
         <p className="mt-2 text-sm text-muted-foreground">Repair creates or reuses a posting leaf ASSET account and remaps selected finance accounts only.</p>
@@ -494,16 +494,16 @@ export default function AdminAccountingSetupPage() {
       <RepairDialog open={repairDialogOpen} targets={repairTargets} preview={repairPreview} repairing={repairing} onClose={() => { if (repairing) return; setRepairDialogOpen(false); setRepairTargets([]); }} onConfirm={() => void confirmRepair()} />
 
       {applyDialogOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="apply-defaults-title">
-          <div className="w-full max-w-2xl rounded-xl border border-border bg-card p-5 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(10,14,28,0.74)" }} role="dialog" aria-modal="true" aria-labelledby="apply-defaults-title">
+          <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl">
             <div id="apply-defaults-title" className="text-base font-semibold text-foreground">Apply suggested accounting defaults?</div>
             <p className="mt-1 text-sm text-muted-foreground">This creates or claims canonical Chart of Accounts, seeds default Finance Accounts, and updates setup defaults only.</p>
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">{HISTORICAL_REPAIR_NOTE}</div>
             {defaultsPreview ? (
               <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-                <div className="rounded-xl border border-border bg-background p-3"><div className="font-semibold text-foreground">Canonical create</div><div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.create.length}</div></div>
-                <div className="rounded-xl border border-border bg-background p-3"><div className="font-semibold text-foreground">Claim existing</div><div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.claim.length}</div></div>
-                <div className="rounded-xl border border-border bg-background p-3"><div className="font-semibold text-foreground">Conflicts</div><div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.conflicts.length}</div></div>
+                <div className="rounded-xl border border-border bg-muted p-3"><div className="font-semibold text-foreground">Canonical create</div><div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.create.length}</div></div>
+                <div className="rounded-xl border border-border bg-muted p-3"><div className="font-semibold text-foreground">Claim existing</div><div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.claim.length}</div></div>
+                <div className="rounded-xl border border-border bg-muted p-3"><div className="font-semibold text-foreground">Conflicts</div><div className="mt-1 text-lg font-semibold text-foreground">{defaultsPreview.canonical_accounts.conflicts.length}</div></div>
               </div>
             ) : null}
             <div className="mt-5 flex justify-end gap-2"><ActionButton variant="ghost" onClick={() => setApplyDialogOpen(false)} disabled={saving}>Cancel</ActionButton><ActionButton variant="primary" onClick={confirmApplyDefaults} disabled={saving}>{saving ? "Applying..." : "Apply suggested defaults"}</ActionButton></div>

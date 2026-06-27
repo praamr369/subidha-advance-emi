@@ -431,6 +431,7 @@ INSTALLED_APPS = [
     "subscriptions",
     "reconciliation",
     "settlements",
+    "smart_fields",
     "django_extensions",
 ]
 

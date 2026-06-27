@@ -22,6 +22,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import FormActions from "@/components/ui/FormActions";
 import { FormSection } from "@/components/ui/operations";
+import SmartSuggestField from "@/components/forms/SmartSuggestField";
 import { apiFetch } from "@/lib/api";
 import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
 
@@ -53,6 +54,8 @@ type FieldErrors = Partial<
     | "category"
     | "subcategory"
     | "description"
+    | "hsn_sac_code"
+    | "gst_rate"
     | "image"
     | "is_emi_enabled"
     | "is_rent_enabled"
@@ -256,6 +259,8 @@ export default function AdminProductCreatePage() {
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
   const [description, setDescription] = useState("");
+  const [hsnSacCode, setHsnSacCode] = useState("");
+  const [gstRate, setGstRate] = useState("");
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>({
     categories: [],
     subcategories: [],
@@ -381,6 +386,8 @@ export default function AdminProductCreatePage() {
     setCategory("");
     setSubcategory("");
     setDescription("");
+    setHsnSacCode("");
+    setGstRate("");
     setIsActive(true);
     setIsEmiEnabled(true);
     setIsRentEnabled(false);
@@ -479,6 +486,12 @@ export default function AdminProductCreatePage() {
       }
       formData.append("subcategory", trimmedSubcategory);
       formData.append("description", trimmedDescription);
+      if (hsnSacCode.trim()) {
+        formData.append("hsn_sac_code", hsnSacCode.trim().toUpperCase());
+      }
+      if (gstRate.trim()) {
+        formData.append("gst_rate", gstRate.trim());
+      }
       formData.append("is_active", String(isActive));
       formData.append("is_emi_enabled", String(isEmiEnabled));
       formData.append("is_rent_enabled", String(isRentEnabled));
@@ -826,6 +839,49 @@ export default function AdminProductCreatePage() {
                   className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <FieldError message={fieldErrors.description} />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <SmartSuggestField
+                  id="product-hsn"
+                  label="HSN / SAC Code"
+                  value={hsnSacCode}
+                  onChange={(next) => {
+                    setHsnSacCode(next);
+                    setError(null);
+                  }}
+                  sourceText={[name, category, subcategory, description]
+                    .filter(Boolean)
+                    .join(" ")}
+                  fieldKey="product.hsn"
+                  placeholder="e.g. 8450"
+                  disabled={saving}
+                  error={fieldErrors.hsn_sac_code}
+                  onAccept={(s) => {
+                    if (s.gst_rate != null) setGstRate(String(s.gst_rate));
+                  }}
+                />
+
+                <div>
+                  <label
+                    htmlFor="product-gst-rate"
+                    className="mb-2 block text-sm font-medium text-foreground"
+                  >
+                    GST Rate (%)
+                  </label>
+                  <input
+                    id="product-gst-rate"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={gstRate}
+                    onChange={(event) => setGstRate(event.target.value)}
+                    placeholder="Auto-filled from HSN suggestion"
+                    disabled={saving}
+                    className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                  <FieldError message={fieldErrors.gst_rate} />
+                </div>
               </div>
             </div>
           </FormSection>

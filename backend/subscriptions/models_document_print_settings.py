@@ -9,6 +9,7 @@ from subscriptions.models_business_setup import BusinessProfile, BusinessSetupTi
 
 DOCUMENT_PRINT_LOGO_MAX_BYTES = 2 * 1024 * 1024
 DOCUMENT_PRINT_LOGO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+DOCUMENT_PRINT_SIGNATURE_MAX_BYTES = 1 * 1024 * 1024
 
 
 def document_print_logo_upload_to(instance, filename: str) -> str:
@@ -17,6 +18,14 @@ def document_print_logo_upload_to(instance, filename: str) -> str:
         extension = ".img"
     token = uuid4().hex[:12]
     return f"business/print-branding/logo-{token}{extension}"
+
+
+def document_print_signature_upload_to(instance, filename: str) -> str:
+    extension = Path(filename or "").suffix.lower()
+    if extension not in DOCUMENT_PRINT_LOGO_EXTENSIONS:
+        extension = ".img"
+    token = uuid4().hex[:12]
+    return f"business/print-branding/signature-{token}{extension}"
 
 
 class DocumentPrintLayoutDensity(models.TextChoices):
@@ -42,6 +51,7 @@ class DocumentPrintSettings(BusinessSetupTimeStampedModel):
         blank=True,
     )
     business_logo = models.ImageField(upload_to=document_print_logo_upload_to, null=True, blank=True)
+    authorized_signature = models.ImageField(upload_to=document_print_signature_upload_to, null=True, blank=True)
     business_name = models.CharField(max_length=255, blank=True, default="")
     business_tagline = models.CharField(max_length=255, blank=True, default="")
     print_address = models.TextField(blank=True, default="")
@@ -89,6 +99,15 @@ class DocumentPrintSettings(BusinessSetupTimeStampedModel):
             size = getattr(self.business_logo, "size", 0) or 0
             if size > DOCUMENT_PRINT_LOGO_MAX_BYTES:
                 errors["business_logo"] = "Logo must be 2 MB or smaller."
+
+        if self.authorized_signature:
+            name = getattr(self.authorized_signature, "name", "") or ""
+            extension = Path(name).suffix.lower()
+            if extension and extension not in DOCUMENT_PRINT_LOGO_EXTENSIONS:
+                errors["authorized_signature"] = "Signature image must be JPG, JPEG, PNG, WEBP, or GIF."
+            size = getattr(self.authorized_signature, "size", 0) or 0
+            if size > DOCUMENT_PRINT_SIGNATURE_MAX_BYTES:
+                errors["authorized_signature"] = "Signature image must be 1 MB or smaller."
 
         if errors:
             raise ValidationError(errors)

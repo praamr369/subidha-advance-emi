@@ -191,6 +191,9 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
     active_invoice_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     address = serializers.CharField(required=False, allow_blank=True)
     city = serializers.CharField(required=False, allow_blank=True)
+    district = serializers.CharField(required=False, allow_blank=True)
+    state = serializers.CharField(required=False, allow_blank=True)
+    pincode = serializers.CharField(required=False, allow_blank=True)
     user_is_active = serializers.BooleanField(source="user.is_active", read_only=True)
 
     # Phase 1 – additive read-only fields
@@ -210,6 +213,9 @@ class CustomerAdminSerializer(serializers.ModelSerializer):
             "phone",
             "address",
             "city",
+            "district",
+            "state",
+            "pincode",
             "kyc_status",
             "kyc_reviewed_by_username",
             "kyc_reviewed_at",
@@ -1499,6 +1505,8 @@ class ProductAdminSerializer(serializers.ModelSerializer):
             "unit_of_measure_master_name",
             "unit_of_measure",
             "description",
+            "hsn_sac_code",
+            "gst_rate",
             "image",
             "clear_image",
             "is_active",

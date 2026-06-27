@@ -1,0 +1,50 @@
+pincode,office_name,city,district,state,state_code
+110001,Connaught Place,New Delhi,New Delhi,Delhi,07
+110002,Darya Ganj,New Delhi,Central Delhi,Delhi,07
+110006,Chandni Chowk,New Delhi,Central Delhi,Delhi,07
+400001,Fort,Mumbai,Mumbai,Maharashtra,27
+400050,Bandra West,Mumbai,Mumbai Suburban,Maharashtra,27
+400070,Kurla,Mumbai,Mumbai Suburban,Maharashtra,27
+411001,Pune City,Pune,Pune,Maharashtra,27
+440001,Nagpur GPO,Nagpur,Nagpur,Maharashtra,27
+560001,Bangalore GPO,Bengaluru,Bengaluru Urban,Karnataka,29
+560034,Koramangala,Bengaluru,Bengaluru Urban,Karnataka,29
+560066,Whitefield,Bengaluru,Bengaluru Urban,Karnataka,29
+570001,Mysore GPO,Mysuru,Mysuru,Karnataka,29
+600001,Chennai GPO,Chennai,Chennai,Tamil Nadu,33
+600040,Anna Nagar,Chennai,Chennai,Tamil Nadu,33
+641001,Coimbatore HO,Coimbatore,Coimbatore,Tamil Nadu,33
+500001,Hyderabad GPO,Hyderabad,Hyderabad,Telangana,36
+500081,Gachibowli,Hyderabad,Rangareddy,Telangana,36
+700001,Kolkata GPO,Kolkata,Kolkata,West Bengal,19
+700019,Ballygunge,Kolkata,Kolkata,West Bengal,19
+700091,Salt Lake,Kolkata,North 24 Parganas,West Bengal,19
+711101,Howrah,Howrah,Howrah,West Bengal,19
+380001,Ahmedabad GPO,Ahmedabad,Ahmedabad,Gujarat,24
+390001,Vadodara HO,Vadodara,Vadodara,Gujarat,24
+395003,Surat,Surat,Surat,Gujarat,24
+302001,Jaipur GPO,Jaipur,Jaipur,Rajasthan,08
+342001,Jodhpur HO,Jodhpur,Jodhpur,Rajasthan,08
+226001,Lucknow GPO,Lucknow,Lucknow,Uttar Pradesh,09
+201301,Noida,Noida,Gautam Buddha Nagar,Uttar Pradesh,09
+208001,Kanpur HO,Kanpur,Kanpur Nagar,Uttar Pradesh,09
+122001,Gurgaon,Gurugram,Gurugram,Haryana,06
+121001,Faridabad,Faridabad,Faridabad,Haryana,06
+160017,Chandigarh,Chandigarh,Chandigarh,Chandigarh,04
+141001,Ludhiana HO,Ludhiana,Ludhiana,Punjab,03
+143001,Amritsar HO,Amritsar,Amritsar,Punjab,03
+462001,Bhopal GPO,Bhopal,Bhopal,Madhya Pradesh,23
+452001,Indore HO,Indore,Indore,Madhya Pradesh,23
+800001,Patna GPO,Patna,Patna,Bihar,10
+751001,Bhubaneswar GPO,Bhubaneswar,Khordha,Odisha,21
+682001,Ernakulam,Kochi,Ernakulam,Kerala,32
+695001,Thiruvananthapuram GPO,Thiruvananthapuram,Thiruvananthapuram,Kerala,32
+781001,Guwahati GPO,Guwahati,Kamrup Metropolitan,Assam,18
+834001,Ranchi GPO,Ranchi,Ranchi,Jharkhand,20
+492001,Raipur HO,Raipur,Raipur,Chhattisgarh,22
+248001,Dehradun HO,Dehradun,Dehradun,Uttarakhand,05
+171001,Shimla HO,Shimla,Shimla,Himachal Pradesh,02
+180001,Jammu GPO,Jammu,Jammu,Jammu and Kashmir,01
+530001,Visakhapatnam HO,Visakhapatnam,Visakhapatnam,Andhra Pradesh,37
+520001,Vijayawada HO,Vijayawada,Krishna,Andhra Pradesh,37
+403001,Panaji,Panaji,North Goa,Goa,30

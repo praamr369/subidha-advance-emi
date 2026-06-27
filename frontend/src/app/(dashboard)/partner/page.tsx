@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -9,9 +10,13 @@ import {
   CalendarClock,
   CircleDollarSign,
   CreditCard,
+  Package,
   RefreshCw,
+  Tag,
   Users,
 } from "lucide-react";
+import { listPublicProducts, type PublicProduct } from "@/services/public";
+import { resolveApiMediaUrl } from "@/lib/media";
 
 import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
 import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
@@ -78,6 +83,8 @@ export default function PartnerDashboardPage() {
   );
   const [notificationSummary, setNotificationSummary] =
     useState<NotificationSummaryResponse | null>(null);
+  const [products, setProducts] = useState<PublicProduct[]>([]);
+  const [productCategory, setProductCategory] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,15 +115,16 @@ export default function PartnerDashboardPage() {
       else setRefreshing(true);
 
       try {
+        // Promise.allSettled — secondary failures don't block the entire dashboard
         const [
-          legacyPayload,
-          canonicalPayload,
-          overduePayload,
-          upcomingPayload,
-          recentPaymentsPayload,
-          winnersPayload,
-          notificationPayload,
-        ] = await Promise.all([
+          legacyResult,
+          canonicalResult,
+          overdueResult,
+          upcomingResult,
+          recentPaymentsResult,
+          winnersResult,
+          notificationResult,
+        ] = await Promise.allSettled([
           getPartnerDashboard(),
           getDashboardSummaryV2(dashboardQuery),
           listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
@@ -126,13 +134,14 @@ export default function PartnerDashboardPage() {
           getPartnerNotificationSummary(),
         ]);
 
-        setLegacy(legacyPayload);
-        setCanonical(canonicalPayload);
-        setOverdue(overduePayload);
-        setUpcoming(upcomingPayload);
-        setRecentPayments(recentPaymentsPayload);
-        setWinnerItems(winnersPayload);
-        setNotificationSummary(notificationPayload);
+        if (legacyResult.status === "rejected") throw legacyResult.reason;
+        setLegacy(legacyResult.value);
+        setCanonical(canonicalResult.status === "fulfilled" ? canonicalResult.value : null);
+        setOverdue(overdueResult.status === "fulfilled" ? overdueResult.value : null);
+        setUpcoming(upcomingResult.status === "fulfilled" ? upcomingResult.value : null);
+        setRecentPayments(recentPaymentsResult.status === "fulfilled" ? recentPaymentsResult.value : null);
+        setWinnerItems(winnersResult.status === "fulfilled" ? winnersResult.value : null);
+        setNotificationSummary(notificationResult.status === "fulfilled" ? notificationResult.value : null);
         setError(null);
       } catch (err) {
         setError(toErrorMessage(err));
@@ -150,6 +159,13 @@ export default function PartnerDashboardPage() {
   useEffect(() => {
     void loadPage("initial");
   }, [loadPage]);
+
+  // Load products independently — does not affect main dashboard loading
+  useEffect(() => {
+    listPublicProducts()
+      .then(r => setProducts(r.products))
+      .catch(() => null);
+  }, []);
 
   const summary =
     canonical?.summary ??
@@ -406,6 +422,84 @@ export default function PartnerDashboardPage() {
         </WorkspaceSection>
 
         <KycDocumentPanel mode="self" portal="partner" />
+
+        {/* ── Products showcase ── partners see admin-approved products to market and sell */}
+        {products.length > 0 ? (
+          <WorkspaceSection
+            title="Products you can market"
+            description="Admin-approved product catalog — EMI, rent, and subscription plans available. Share these with your customers to grow your portfolio."
+            actionHref={ROUTES.partner.subscriptions}
+            actionLabel="My subscriptions"
+          >
+            {/* Category filter pills */}
+            {(() => {
+              const cats = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
+              return cats.length > 1 ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProductCategory("")}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${!productCategory ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"}`}
+                  >
+                    All
+                  </button>
+                  {cats.slice(0, 8).map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setProductCategory(productCategory === cat ? "" : cat)}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${productCategory === cat ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"}`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              ) : null;
+            })()}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {products
+                .filter(p => !productCategory || p.category === productCategory)
+                .slice(0, 8)
+                .map(product => {
+                  const imgUrl = resolveApiMediaUrl(product.image ?? null);
+                  return (
+                    <div key={product.id} className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:shadow-md">
+                      {imgUrl ? (
+                        <div className="relative h-36 w-full overflow-hidden bg-muted">
+                          <Image src={imgUrl} alt={product.name} fill className="object-cover transition group-hover:scale-105" sizes="(max-width: 768px) 50vw, 25vw" />
+                        </div>
+                      ) : (
+                        <div className="flex h-36 items-center justify-center bg-muted/40">
+                          <Package className="h-10 w-10 text-muted-foreground/40" />
+                        </div>
+                      )}
+                      <div className="p-3">
+                        <div className="truncate text-sm font-semibold text-foreground">{product.name}</div>
+                        <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{product.product_code}</div>
+                        {product.category ? (
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <Tag className="h-3 w-3" /> {product.category}
+                          </div>
+                        ) : null}
+                        <div className="mt-2 text-sm font-bold text-foreground">₹{Number(product.base_price).toLocaleString("en-IN")}</div>
+                        <Link
+                          href={`${ROUTES.partner.subscriptions}`}
+                          className="mt-2 flex items-center justify-between text-xs font-semibold text-primary hover:underline"
+                        >
+                          View subscription plans <ArrowRight className="h-3 w-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+            {products.length > 8 ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Showing 8 of {products.length} products. All are eligible for subscription, EMI, or direct-sale onboarding.
+              </p>
+            ) : null}
+          </WorkspaceSection>
+        ) : null}
 
         {loading ? <ERPLoadingState label="Loading partner dashboard..." /> : null}
 

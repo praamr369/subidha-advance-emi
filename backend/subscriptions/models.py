@@ -371,6 +371,10 @@ class Customer(TimeStampedModel):
     aml_cleared_at = models.DateTimeField(null=True, blank=True)
     address = models.TextField(blank=True, default="")
     city = models.CharField(max_length=100, blank=True, default="")
+    # Smart address fields — auto-filled from pincode lookup (additive, blank-safe).
+    district = models.CharField(max_length=100, blank=True, default="")
+    state = models.CharField(max_length=100, blank=True, default="")
+    pincode = models.CharField(max_length=10, blank=True, default="", db_index=True)
 
     # Phase 1 – additive fields (all nullable/blank-safe for existing rows)
     customer_source = models.CharField(
@@ -568,6 +572,14 @@ class Product(TimeStampedModel):
     )
     unit_of_measure = models.CharField(max_length=30, blank=True, default="PCS")
     description = models.TextField(blank=True, default="")
+    # Tax classification — master HSN/SAC value flows into billing/invoice lines.
+    hsn_sac_code = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    gst_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     image = models.ImageField(upload_to=product_image_upload_to, null=True, blank=True)
     is_active = models.BooleanField(default=True, db_index=True)
 

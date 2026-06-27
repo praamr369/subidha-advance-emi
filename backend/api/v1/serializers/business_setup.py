@@ -48,44 +48,65 @@ class BusinessProfileSerializer(BusinessSetupModelSerializer):
 
 class DocumentPrintSettingsSerializer(BusinessSetupModelSerializer):
     business_logo_url = serializers.SerializerMethodField()
+    authorized_signature_url = serializers.SerializerMethodField()
     clear_logo = serializers.BooleanField(write_only=True, required=False, default=False)
+    clear_signature = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = DocumentPrintSettings
         fields = "__all__"
-        read_only_fields = ("id", "created_at", "updated_at", "business_logo_url")
-        extra_kwargs = {"business_logo": {"required": False, "allow_null": True}}
+        read_only_fields = ("id", "created_at", "updated_at", "business_logo_url", "authorized_signature_url")
+        extra_kwargs = {
+            "business_logo": {"required": False, "allow_null": True},
+            "authorized_signature": {"required": False, "allow_null": True},
+        }
 
-    def get_business_logo_url(self, instance):
-        logo = getattr(instance, "business_logo", None)
-        if not logo:
+    def _image_url(self, field_value):
+        if not field_value:
             return ""
         try:
-            url = logo.url
+            url = field_value.url
         except ValueError:
             return ""
         request = self.context.get("request")
         return request.build_absolute_uri(url) if request else url
 
-    def validate_business_logo(self, value):
+    def get_business_logo_url(self, instance):
+        return self._image_url(getattr(instance, "business_logo", None))
+
+    def get_authorized_signature_url(self, instance):
+        return self._image_url(getattr(instance, "authorized_signature", None))
+
+    def _validate_image(self, value, max_bytes, label):
         if not value:
             return value
         extension = Path(getattr(value, "name", "") or "").suffix.lower()
         if extension not in DOCUMENT_PRINT_LOGO_EXTENSIONS:
-            raise serializers.ValidationError("Logo must be JPG, JPEG, PNG, WEBP, or GIF.")
+            raise serializers.ValidationError(f"{label} must be JPG, JPEG, PNG, WEBP, or GIF.")
         content_type = (getattr(value, "content_type", "") or "").lower()
         if content_type and not content_type.startswith("image/"):
-            raise serializers.ValidationError("Logo upload must be an image file.")
+            raise serializers.ValidationError(f"{label} upload must be an image file.")
         size = getattr(value, "size", 0) or 0
-        if size > DOCUMENT_PRINT_LOGO_MAX_BYTES:
-            raise serializers.ValidationError("Logo must be 2 MB or smaller.")
+        if size > max_bytes:
+            raise serializers.ValidationError(f"{label} must be {max_bytes // (1024*1024)} MB or smaller.")
         return value
+
+    def validate_business_logo(self, value):
+        return self._validate_image(value, DOCUMENT_PRINT_LOGO_MAX_BYTES, "Logo")
+
+    def validate_authorized_signature(self, value):
+        from subscriptions.models_document_print_settings import DOCUMENT_PRINT_SIGNATURE_MAX_BYTES
+        return self._validate_image(value, DOCUMENT_PRINT_SIGNATURE_MAX_BYTES, "Signature")
 
     def update(self, instance, validated_data):
         clear_logo = bool(validated_data.pop("clear_logo", False))
+        clear_signature = bool(validated_data.pop("clear_signature", False))
         if clear_logo and instance.business_logo:
             instance.business_logo.delete(save=False)
             instance.business_logo = None
+        if clear_signature and instance.authorized_signature:
+            instance.authorized_signature.delete(save=False)
+            instance.authorized_signature = None
         return super().update(instance, validated_data)
 
 

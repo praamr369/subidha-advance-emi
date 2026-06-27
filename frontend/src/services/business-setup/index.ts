@@ -5,6 +5,9 @@ export type DocumentPrintSettings = {
   business_profile?: number | null;
   business_logo?: string | null;
   business_logo_url?: string;
+  authorized_signature?: string | null;
+  authorized_signature_url?: string;
+  clear_signature?: boolean;
   business_name?: string;
   business_tagline?: string;
   print_address?: string;

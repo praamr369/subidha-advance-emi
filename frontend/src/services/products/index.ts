@@ -18,6 +18,8 @@ export type ProductRecord = {
   category?: string;
   subcategory?: string;
   description?: string;
+  hsn_sac_code?: string | null;
+  gst_rate?: string | number | null;
   image?: string | null;
   is_active?: boolean;
   plan_type_default?: "EMI" | "RENT" | "LEASE" | string | null;

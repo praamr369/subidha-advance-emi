@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Count, Q, Sum
 
 from inventory.models import (
     InventoryItem,
@@ -87,6 +87,88 @@ def calculate_product_demand(*, product_id: int) -> dict:
         "rent_lease_commitments": rent_lease_commitments,
         "total_required": f"{total_required:.3f}",
     }
+
+
+def calculate_product_demand_bulk(product_ids: list[int]) -> dict[int, dict]:
+    """
+    Bulk version of calculate_product_demand for multiple products in 5 queries total.
+    Returns {product_id: demand_dict} — keys match calculate_product_demand output.
+    """
+    if not product_ids:
+        return {}
+
+    active_statuses = [SubscriptionStatus.ACTIVE, SubscriptionStatus.DELIVERY_PENDING, SubscriptionStatus.HANDED_OVER]
+    pending_delivery_statuses = [
+        DeliveryStatus.PENDING, DeliveryStatus.SCHEDULED, DeliveryStatus.DISPATCHED,
+        DeliveryStatus.OUT_FOR_DELIVERY, DeliveryStatus.BLOCKED_STOCK_UNAVAILABLE,
+    ]
+
+    # 1) Active subscriptions per product
+    active_qs = (
+        Subscription.objects.filter(product_id__in=product_ids, status__in=active_statuses)
+        .values("product_id").annotate(cnt=Count("id"))
+    )
+    active_map = {row["product_id"]: row["cnt"] for row in active_qs}
+
+    # 2) Locked batch demand per product
+    locked_qs = (
+        Subscription.objects.filter(product_id__in=product_ids, batch__status="LOCKED")
+        .values("product_id").annotate(cnt=Count("id"))
+    )
+    locked_map = {row["product_id"]: row["cnt"] for row in locked_qs}
+
+    # 3) Winners pending delivery per product
+    winners_qs = (
+        Subscription.objects.filter(
+            product_id__in=product_ids,
+            status=SubscriptionStatus.WON,
+            deliveries__status__in=pending_delivery_statuses,
+        ).distinct().values("product_id").annotate(cnt=Count("id"))
+    )
+    winners_map = {row["product_id"]: row["cnt"] for row in winners_qs}
+
+    # 4) Direct sale orders per product
+    direct_map: dict[int, int] = {}
+    try:
+        from billing.models import DirectSale, DirectSaleStatus
+        direct_qs = (
+            DirectSale.objects.filter(
+                lines__product_id__in=product_ids,
+                status__in=[DirectSaleStatus.CONFIRMED, DirectSaleStatus.DELIVERED],
+            ).distinct().values("lines__product_id").annotate(cnt=Count("id", distinct=True))
+        )
+        direct_map = {row["lines__product_id"]: row["cnt"] for row in direct_qs}
+    except Exception:
+        pass
+
+    # 5) Rent/lease commitments per product
+    rent_qs = (
+        Subscription.objects.filter(
+            product_id__in=product_ids,
+            plan_type__in=["RENT", "LEASE"],
+            status__in=[SubscriptionStatus.ACTIVE, SubscriptionStatus.DELIVERY_PENDING],
+        ).values("product_id").annotate(cnt=Count("id"))
+    )
+    rent_map = {row["product_id"]: row["cnt"] for row in rent_qs}
+
+    result: dict[int, dict] = {}
+    for pid in product_ids:
+        active = active_map.get(pid, 0)
+        locked = locked_map.get(pid, 0)
+        winners = winners_map.get(pid, 0)
+        direct = direct_map.get(pid, 0)
+        rent = rent_map.get(pid, 0)
+        total = _qty(active + locked + winners + direct + rent)
+        result[pid] = {
+            "product_id": pid,
+            "active_subscriptions": active,
+            "locked_batch_demand": locked,
+            "winners_pending_delivery": winners,
+            "direct_sale_orders": direct,
+            "rent_lease_commitments": rent,
+            "total_required": f"{total:.3f}",
+        }
+    return result
 
 
 def get_product_stock_availability(*, product_id: int) -> dict:

@@ -25,6 +25,7 @@ import FormActions from "@/components/ui/FormActions";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { DetailItem as DetailRow, WorkspaceSection as SectionCard } from "@/components/ui/workspace";
 import OtpDeliveryReadinessCard from "@/domains/customers/components/OtpDeliveryReadinessCard";
+import PincodeField from "@/components/forms/PincodeField";
 import {
   buildForgotPasswordHref,
   resolvePasswordResetEmail,
@@ -272,6 +273,9 @@ export default function AdminCustomerCreatePage({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
+  const [district, setDistrict] = useState("");
+  const [state, setState] = useState("");
+  const [pincode, setPincode] = useState("");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -358,6 +362,9 @@ export default function AdminCustomerCreatePage({
     setName("");
     setPhone("");
     setCity("");
+    setDistrict("");
+    setState("");
+    setPincode("");
     setEmail("");
     setUsername("");
     setPassword("");
@@ -423,6 +430,9 @@ export default function AdminCustomerCreatePage({
           name: trimmedName,
           phone: trimmedPhone,
           city: trimmedCity,
+          district: district.trim(),
+          state: state.trim(),
+          pincode: pincode.trim(),
           email: trimmedEmail || "",
           username: trimmedUsername,
           password: password.trim(),
@@ -711,12 +721,45 @@ export default function AdminCustomerCreatePage({
               disabled={submitting}
             />
 
+            <PincodeField
+              id="customer-pincode"
+              label="PIN Code (auto-fills city / district / state)"
+              value={pincode}
+              onChange={setPincode}
+              onResolved={(option) => {
+                setCity(option.city);
+                setDistrict(option.district);
+                setState(option.state);
+              }}
+              disabled={submitting}
+            />
+
             <InputField
               id="customer-city"
               label="City / Area (Optional)"
               value={city}
               onChange={setCity}
               placeholder="Enter branch follow-up area"
+              icon={<UserCheck className="h-4 w-4" />}
+              disabled={submitting}
+            />
+
+            <InputField
+              id="customer-district"
+              label="District (Optional)"
+              value={district}
+              onChange={setDistrict}
+              placeholder="Auto-filled from PIN code"
+              icon={<UserCheck className="h-4 w-4" />}
+              disabled={submitting}
+            />
+
+            <InputField
+              id="customer-state"
+              label="State (Optional)"
+              value={state}
+              onChange={setState}
+              placeholder="Auto-filled from PIN code"
               icon={<UserCheck className="h-4 w-4" />}
               disabled={submitting}
             />
