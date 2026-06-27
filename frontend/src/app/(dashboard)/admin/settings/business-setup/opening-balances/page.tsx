@@ -63,8 +63,8 @@ function FinanceOpeningSection() {
   }
 
   const cashAccounts = accounts.filter((a) => a.kind === "CASH");
-  const bankAccounts = accounts.filter((a) => a.kind === "BANK");
-  const upiAccounts = accounts.filter((a) => a.kind === "UPI");
+  // Bank and UPI share the same physical money — show them together
+  const bankAndUpiAccounts = accounts.filter((a) => a.kind === "BANK" || a.kind === "UPI");
 
   function AccountRow({ account }: { account: FinanceAccount }) {
     const value = editing[account.id] ?? account.opening_balance;
@@ -110,17 +110,11 @@ function FinanceOpeningSection() {
         </div>
       ) : null}
 
-      {bankAccounts.length > 0 ? (
+      {bankAndUpiAccounts.length > 0 ? (
         <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bank Accounts (UPI goes through bank — enter combined balance)</div>
-          <div className="space-y-2">{bankAccounts.map((a) => <AccountRow key={a.id} account={a} />)}</div>
-        </div>
-      ) : null}
-
-      {upiAccounts.length > 0 ? (
-        <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">UPI Accounts</div>
-          <div className="space-y-2">{upiAccounts.map((a) => <AccountRow key={a.id} account={a} />)}</div>
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bank & UPI</div>
+          <div className="mb-2 text-xs text-muted-foreground">UPI payments settle into your bank account — they are the same physical money. Enter the combined balance once on your bank account; set UPI to 0.</div>
+          <div className="space-y-2">{bankAndUpiAccounts.map((a) => <AccountRow key={a.id} account={a} />)}</div>
         </div>
       ) : null}
 
@@ -131,7 +125,7 @@ function FinanceOpeningSection() {
       ) : null}
 
       <div className="text-xs text-muted-foreground">
-        Your cash: ₹10,000 · Bank/UPI: ₹15,000 (UPI is under bank — enter 15000 on your bank account above)
+        Tip: UPI and Bank share the same physical balance — enter the total on the Bank account; leave UPI account at 0 to avoid double-counting.
       </div>
     </div>
   );
@@ -372,7 +366,7 @@ export default function OpeningBalancesPage() {
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="text-sm font-semibold text-foreground">How to use this page</div>
           <div className="mt-2 grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
-            <div><span className="font-semibold text-foreground">1. Cash & Bank</span><br />Set your opening cash (₹10,000) and bank/UPI balance (₹15,000). UPI goes through your bank account — enter the combined amount as one bank figure.</div>
+            <div><span className="font-semibold text-foreground">1. Cash & Bank</span><br />Set your opening cash balance and bank/UPI balance. Bank and UPI are the same physical money — enter the combined amount on the Bank account and leave UPI at 0.</div>
             <div><span className="font-semibold text-foreground">2. Customer Outstandings</span><br />People who owe you money from old billbook records. Add each customer name + amount. Mark them settled when they pay.</div>
             <div><span className="font-semibold text-foreground">3. Vendor Outstandings</span><br />Suppliers you owe money to. Find them from your vendor list and enter the amount you owed on day 1.</div>
           </div>

@@ -205,7 +205,7 @@ export default function FinanceAccountEditDrawer({
       open={open}
       onClose={onClose}
       title={detail ? detail.name : "Edit finance account"}
-      description="Operational finance accounts can change only while they are still unused. Once counters, billing, or accounting usage exists, structural fields are locked."
+      description="Opening balance can be set any time before real transactions exist — even if a cash counter is already linked. Structural fields (kind, chart account) are locked once the account is in operational use."
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs text-muted-foreground">
@@ -301,20 +301,71 @@ export default function FinanceAccountEditDrawer({
                 />
               </label>
 
-              <label className="text-sm text-muted-foreground">
-                Kind
-                <select
-                  className={accountingFieldClassName()}
-                  value={form.kind}
-                  disabled={!isEditable(detail, "kind")}
-                  onChange={(event) => setForm((current) => ({ ...current, kind: event.target.value as FinanceAccount["kind"] }))}
-                >
-                  <option value="CASH">Cash</option>
-                  <option value="BANK">Bank</option>
-                  <option value="UPI">UPI</option>
-                </select>
-                <FieldLockHint reason={lockReason(detail, "kind")} />
-              </label>
+              {/* Kind selector — for BANK/UPI show a toggled mode picker */}
+              {(form.kind === "BANK" || form.kind === "UPI") ? (
+                <div className="md:col-span-2 rounded-xl border border-sky-200 bg-sky-50 p-4 space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-sky-900">Payment method type</div>
+                  <div className="text-xs text-sky-800">Bank and UPI share the same physical money — select which mode this account operates in.</div>
+                  <div className="flex gap-2">
+                    {(["BANK", "UPI"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        disabled={!isEditable(detail, "kind")}
+                        onClick={() => setForm((c) => ({ ...c, kind: mode }))}
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                          form.kind === mode
+                            ? "border-sky-500 bg-sky-600 text-white"
+                            : "border-border bg-background text-muted-foreground hover:border-sky-300"
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                      >
+                        {mode === "BANK" ? "Bank Transfer" : "UPI"}
+                      </button>
+                    ))}
+                  </div>
+                  <FieldLockHint reason={lockReason(detail, "kind")} />
+
+                  {form.kind === "BANK" ? (
+                    <label className="block text-sm text-sky-950">
+                      Bank account last 4 digits <span className="text-red-500">*</span>
+                      <input
+                        maxLength={4}
+                        placeholder="e.g. 4321"
+                        className={accountingFieldClassName()}
+                        value={form.bank_last4}
+                        onChange={(event) => setForm((current) => ({ ...current, bank_last4: event.target.value }))}
+                      />
+                      <span className="mt-1 block text-xs text-sky-700">Used to identify which bank account received the payment.</span>
+                    </label>
+                  ) : (
+                    <label className="block text-sm text-sky-950">
+                      UPI handle <span className="text-red-500">*</span>
+                      <input
+                        placeholder="e.g. yourname@upi"
+                        className={accountingFieldClassName()}
+                        value={form.upi_handle}
+                        onChange={(event) => setForm((current) => ({ ...current, upi_handle: event.target.value }))}
+                      />
+                      <span className="mt-1 block text-xs text-sky-700">UPI payments settle into your bank account — this is the VPA/handle customers pay to.</span>
+                    </label>
+                  )}
+                </div>
+              ) : (
+                <label className="text-sm text-muted-foreground">
+                  Kind
+                  <select
+                    className={accountingFieldClassName()}
+                    value={form.kind}
+                    disabled={!isEditable(detail, "kind")}
+                    onChange={(event) => setForm((current) => ({ ...current, kind: event.target.value as FinanceAccount["kind"] }))}
+                  >
+                    <option value="CASH">Cash</option>
+                    <option value="BANK">Bank</option>
+                    <option value="UPI">UPI</option>
+                  </select>
+                  <FieldLockHint reason={lockReason(detail, "kind")} />
+                </label>
+              )}
 
               <label className="text-sm text-muted-foreground">
                 Linked chart account
@@ -345,26 +396,10 @@ export default function FinanceAccountEditDrawer({
                   disabled={!isEditable(detail, "opening_balance")}
                   onChange={(event) => setForm((current) => ({ ...current, opening_balance: event.target.value }))}
                 />
+                {isEditable(detail, "opening_balance") ? (
+                  <span className="mt-1 block text-xs text-emerald-700">Enter the actual balance you had on the day you started using this system.</span>
+                ) : null}
                 <FieldLockHint reason={lockReason(detail, "opening_balance")} />
-              </label>
-
-              <label className="text-sm text-muted-foreground">
-                Bank last 4
-                <input
-                  maxLength={4}
-                  className={accountingFieldClassName()}
-                  value={form.bank_last4}
-                  onChange={(event) => setForm((current) => ({ ...current, bank_last4: event.target.value }))}
-                />
-              </label>
-
-              <label className="text-sm text-muted-foreground">
-                UPI handle
-                <input
-                  className={accountingFieldClassName()}
-                  value={form.upi_handle}
-                  onChange={(event) => setForm((current) => ({ ...current, upi_handle: event.target.value }))}
-                />
               </label>
 
               <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] px-4 py-3">

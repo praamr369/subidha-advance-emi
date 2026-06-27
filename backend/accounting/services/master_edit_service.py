@@ -220,6 +220,7 @@ class FinanceAccountEditPolicyService:
         editable_fields = ["name", "bank_last4", "upi_handle", "notes", "is_real_settlement_account"]
         locked_fields: dict[str, str] = {}
 
+        # Structural reason locks chart_account, kind, is_active (counters or any real usage).
         if usage["has_cash_counters"]:
             structural_reason = "This field is locked because active cash counters already route through this finance account."
         elif usage["has_accounting_documents"]:
@@ -230,18 +231,30 @@ class FinanceAccountEditPolicyService:
             structural_reason = "This field is locked because commission payout batches already reference this finance account."
         elif usage["has_historical_postings"]:
             structural_reason = "This field is locked because this finance account already has historical ledger postings through its linked chart account."
-        elif usage["has_opening_balance"]:
-            structural_reason = "This field is locked because the finance account already carries an opening balance."
         else:
             structural_reason = None
+
+        # Opening balance is independently governed: locked only when real financial
+        # transactions exist (payments, receipts, journals). A counter link alone does
+        # NOT lock opening balance — the admin must be able to set it during onboarding.
+        has_real_transactions = any([
+            usage["has_accounting_documents"],
+            usage["has_billing_documents"],
+            usage["has_commission_payout_usage"],
+            usage["has_historical_postings"],
+        ])
 
         if structural_reason:
             locked_fields["chart_account"] = structural_reason
             locked_fields["kind"] = structural_reason
-            locked_fields["opening_balance"] = structural_reason
             locked_fields["is_active"] = "Finance account cannot be deactivated because it is already in operational use."
         else:
-            editable_fields.extend(["chart_account", "kind", "opening_balance", "is_active"])
+            editable_fields.extend(["chart_account", "kind", "is_active"])
+
+        if has_real_transactions:
+            locked_fields["opening_balance"] = "Opening balance cannot be changed after real financial transactions (payments, invoices, or journal entries) exist."
+        else:
+            editable_fields.append("opening_balance")
 
         can_deactivate = "is_active" in editable_fields
         deactivate_reason = None if can_deactivate else locked_fields.get("is_active")
