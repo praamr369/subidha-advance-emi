@@ -4621,3 +4621,33 @@ class CostAllocationDetail(models.Model):
 
     def __str__(self):
         return f"{self.rule.code} → {self.cost_centre.code} ({self.allocation_percentage}%)"
+
+
+class BridgePostingApproval(AccountingTimeStampedModel):
+    """Admin approval gate for bridge posting workflows that require explicit sign-off."""
+
+    event_key = models.CharField(max_length=100, unique=True)
+    is_approved = models.BooleanField(default=False)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="bridge_posting_approvals",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="bridge_posting_revocations",
+    )
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    reason = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_bridge_posting_approvals"
+        ordering = ["event_key"]
+
+    def __str__(self):
+        state = "approved" if self.is_approved else "not approved"
+        return f"{self.event_key} ({state})"

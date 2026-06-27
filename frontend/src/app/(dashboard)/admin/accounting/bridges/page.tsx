@@ -108,7 +108,7 @@ function isPostableSetup(event: AccountingBridgeReadinessEvent): boolean {
 }
 
 function isBusinessReady(event: AccountingBridgeReadinessEvent): boolean {
-  return isPostableSetup(event) && isReconciled(event) && !isApprovalGated(event);
+  return isPostableSetup(event) && !isApprovalGated(event);
 }
 
 function missingFields(event: AccountingBridgeReadinessEvent): string[] {

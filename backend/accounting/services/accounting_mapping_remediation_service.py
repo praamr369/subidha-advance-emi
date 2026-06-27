@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import threading
+import time
 from dataclasses import dataclass
 from typing import Any
 
 from django.apps import apps
 from django.db import transaction
 from django.utils import timezone
+
+# Short-lived cache so that a single HTTP request calling _readiness_events_by_key
+# multiple times (via _event_reason) shares one build instead of N.
+_readiness_cache: dict[str, Any] = {}
+_readiness_cache_lock = threading.Lock()
+_READINESS_CACHE_TTL = 30  # seconds
 
 from accounting.models import (
     AccountingPostingProfile,
@@ -124,12 +132,20 @@ def _existing_mapping(spec: RemediationSpec) -> AccountingPostingProfile | None:
 
 
 def _readiness_events_by_key() -> dict[str, dict[str, Any]]:
+    now = time.monotonic()
+    with _readiness_cache_lock:
+        cached = _readiness_cache.get("data")
+        if cached is not None and now - _readiness_cache.get("ts", 0) < _READINESS_CACHE_TTL:
+            return cached
     payload = build_accounting_bridge_readiness_with_returns_damage_credit()
     events = {str(row.get("event_key") or "").strip().lower(): row for row in payload.get("events") or []}
     if "inventory_purchase_receive" in events and "purchase_inventory_receive" not in events:
         events["purchase_inventory_receive"] = {**events["inventory_purchase_receive"], "event_key": "purchase_inventory_receive", "label": "Purchase inventory receive"}
     if "commission_accrual" in events and "commission_approval" not in events:
         events["commission_approval"] = {**events["commission_accrual"], "event_key": "commission_approval", "label": "Commission approval"}
+    with _readiness_cache_lock:
+        _readiness_cache["data"] = events
+        _readiness_cache["ts"] = now
     return events
 
 
@@ -265,8 +281,16 @@ def _generic_row(event_key: str, event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_mapping_remediation_summary() -> dict[str, Any]:
-    events = _readiness_events_by_key()
+def build_mapping_remediation_summary(*, readiness_payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    if readiness_payload is not None:
+        raw = {str(row.get("event_key") or "").strip().lower(): row for row in readiness_payload.get("events") or []}
+        if "inventory_purchase_receive" in raw and "purchase_inventory_receive" not in raw:
+            raw["purchase_inventory_receive"] = {**raw["inventory_purchase_receive"], "event_key": "purchase_inventory_receive", "label": "Purchase inventory receive"}
+        if "commission_accrual" in raw and "commission_approval" not in raw:
+            raw["commission_approval"] = {**raw["commission_accrual"], "event_key": "commission_approval", "label": "Commission approval"}
+        events = raw
+    else:
+        events = _readiness_events_by_key()
     rows_by_key: dict[str, dict[str, Any]] = {}
     for spec in REMEDIATION_SPECS.values():
         rows_by_key[spec.event_type] = _special_row(spec)

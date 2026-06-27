@@ -889,7 +889,11 @@ def _vendor_payment_queryset(filters: BridgeCandidateFilters):
 
 
 def _stock_ledger_queryset(filters: BridgeCandidateFilters):
-    qs = StockLedger.objects.select_related("inventory_item", "inventory_item__product", "stock_location", "stock_location__branch")
+    # Exclude opening-balance movements — they are historical entries, not operational
+    # transactions needing bridge journal posting.
+    qs = StockLedger.objects.select_related(
+        "inventory_item", "inventory_item__product", "stock_location", "stock_location__branch"
+    ).exclude(movement_type=StockMovementType.OPENING_BALANCE_IN)
     return base._date_filter_qs(qs, filters, date_field="movement_date")
 
 

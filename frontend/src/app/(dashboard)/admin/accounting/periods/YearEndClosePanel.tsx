@@ -89,18 +89,24 @@ function remediationSteps(readiness: YearEndReadiness | null) {
   const numbering = readiness?.blocked_numbering_count ?? 0;
   const approval = readiness?.blocked_approval_count ?? 0;
   const unsupported = readiness?.unsupported_source_count ?? 0;
+  const staffAdvanceBoundary = readiness?.staff_advance_boundary ?? 0;
   const exceptions = readiness?.reconciliation_error_count ?? readiness?.exception_count ?? 0;
   const missingNumbering = readiness?.missing_numbering_profile_count ?? 0;
+  // OPEN_PERIODS = 1 means the current month is still open (intentional — must stay open for posting).
+  // It blocks year-end close until month-end when the admin locks it.
+  const currentMonthNote = open === 1 ? " (current month — lock at month-end)" : "";
   return [
-    { label: "OPEN_PERIODS", ok: open === 0, detail: open ? `${open} period(s) still OPEN` : "No open periods", href: ROUTES.admin.accountingPeriods },
-    { label: "UNPOSTED_BRIDGE_ITEMS", ok: unposted === 0, detail: unposted ? `${unposted} READY_UNPOSTED row(s)` : "No unposted bridge blockers", href: bridgeReconciliationHref({ status: "READY_UNPOSTED", financialYearId: readiness?.financial_year?.id }) },
+    { label: "OPEN_PERIODS", ok: open === 0, detail: open ? `${open} period(s) still OPEN${currentMonthNote}` : "No open periods", href: ROUTES.admin.accountingPeriods },
+    { label: "UNPOSTED_BRIDGE_ITEMS", ok: unposted === 0, detail: unposted ? `${unposted} READY_UNPOSTED row(s) — post via bridge reconciliation` : "No unposted bridge blockers", href: bridgeReconciliationHref({ status: "READY_UNPOSTED", financialYearId: readiness?.financial_year?.id }) },
     { label: "BLOCKED_BY_MAPPING", ok: mapping === 0 && blocked === 0, detail: mapping || blocked ? `${mapping || blocked} mapping/setup blocker(s)` : "No blocked mapping rows", href: MAPPING_AUDIT_HREF },
     { label: "BLOCKED_BY_PERIOD", ok: period === 0, detail: period ? `${period} period readiness blocker(s)` : "No bridge period blocker", href: ROUTES.admin.accountingPeriods },
     { label: "BLOCKED_BY_NUMBERING", ok: numbering === 0 && missingNumbering === 0, detail: numbering || missingNumbering ? `${numbering || missingNumbering} numbering issue(s)` : "Numbering profile ready", href: DOCUMENT_NUMBERING_HREF },
     { label: "BLOCKED_BY_APPROVAL", ok: approval === 0, detail: approval ? `${approval} approval blocker(s)` : "No approval blocker", href: ROUTES.admin.accountingBridgeReconciliation },
-    { label: "UNSUPPORTED_SOURCE", ok: unsupported === 0, detail: unsupported ? `${unsupported} unsupported source row(s)` : "No unsupported source blocker", href: MAPPING_AUDIT_HREF },
+    // staffAdvanceBoundary is a synthetic placeholder row, not a real transaction — excluded from real unsupported count.
+    { label: "UNSUPPORTED_SOURCE", ok: unsupported === 0, detail: unsupported ? `${unsupported} real unsupported source(s)` : staffAdvanceBoundary ? "StaffAdvance boundary (workflow not yet implemented — does not block close)" : "No unsupported source", href: MAPPING_AUDIT_HREF },
     { label: "RECONCILIATION_ERRORS", ok: exceptions === 0, detail: exceptions ? `${exceptions} exception(s)` : "No exceptions reported", href: RECONCILIATION_RUNS_HREF },
-    { label: "LOCK_ELIGIBLE_PERIODS", ok: open === 0, detail: open ? "Use the accounting periods table below" : "No open period blocker", href: ROUTES.admin.accountingPeriods },
+    // LOCK_ELIGIBLE_PERIODS is a follow-on from OPEN_PERIODS — not a separate issue.
+    { label: "LOCK_ELIGIBLE_PERIODS", ok: open === 0, detail: open ? `Lock remaining period(s) after daily posting/reconciliation review` : "All periods locked or closed", href: ROUTES.admin.accountingPeriods },
   ];
 }
 

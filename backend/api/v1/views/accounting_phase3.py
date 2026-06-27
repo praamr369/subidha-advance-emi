@@ -220,6 +220,95 @@ class AccountingPeriodViewSet(AdminAccountingPhase3ViewSet):
     def reopen_period(self, request, pk=None):
         return self.unlock_period(request, pk=pk)
 
+    @action(detail=False, methods=["post"], url_path="bulk-lock-open")
+    def bulk_lock_open(self, request):
+        """Lock all OPEN periods in the active financial year (or all years if no active FY).
+        Skips the period that covers today by default (exclude_current_period=true).
+        Returns count locked and any per-period errors."""
+        from django.utils import timezone
+        reason = (request.data or {}).get("reason", "Bulk lock from admin accounting cockpit.")
+        exclude_current = (request.data or {}).get("exclude_current_period", True)
+        qs = AccountingPeriod.objects.select_related("financial_year").filter(
+            status=AccountingPeriodStatus.OPEN
+        )
+        financial_year_id = (request.data or {}).get("financial_year_id")
+        if financial_year_id:
+            qs = qs.filter(financial_year_id=int(financial_year_id))
+        today = timezone.localdate()
+        if exclude_current:
+            qs = qs.exclude(start_date__lte=today, end_date__gte=today)
+        periods = list(qs.order_by("start_date"))
+        locked = []
+        errors = []
+        for period in periods:
+            try:
+                _, updated = lock_accounting_period(
+                    period_id=period.id,
+                    performed_by=request.user,
+                    reason=reason,
+                )
+                locked.append({"id": period.id, "code": period.code, "updated": updated})
+            except Exception as exc:
+                errors.append({"id": period.id, "code": period.code, "error": str(exc)})
+        return Response(
+            {
+                "locked_count": len(locked),
+                "error_count": len(errors),
+                "locked": locked,
+                "errors": errors,
+            }
+        )
+
+
+    @action(detail=False, methods=["post"], url_path="reopen-current")
+    def reopen_current(self, request):
+        """Reopen the accounting period that covers today, if it is LOCKED.
+        Safe to call even when the period is already OPEN."""
+        from django.utils import timezone
+        today = timezone.localdate()
+        period = (
+            AccountingPeriod.objects
+            .select_related("financial_year")
+            .filter(start_date__lte=today, end_date__gte=today)
+            .order_by("start_date", "id")
+            .first()
+        )
+        if period is None:
+            return Response({"detail": "No accounting period covers today.", "reopened": False}, status=status.HTTP_404_NOT_FOUND)
+        if period.status == AccountingPeriodStatus.OPEN and not period.is_locked:
+            payload = AccountingPeriodSerializer(period, context=self.get_serializer_context())
+            return Response({"detail": "Current period is already OPEN.", "reopened": False, "period": payload.data})
+        reason = (request.data or {}).get("reason", "Reopen current period to restore posting readiness.")
+        period, updated = unlock_accounting_period(
+            period_id=period.id,
+            performed_by=request.user,
+            reason=reason,
+        )
+        payload = AccountingPeriodSerializer(period, context=self.get_serializer_context())
+        return Response({"detail": f"Period {period.code} reopened.", "reopened": updated, "period": payload.data})
+
+    @action(detail=False, methods=["get"], url_path="current-period-status")
+    def current_period_status(self, request):
+        """Return the period that covers today and its posting readiness."""
+        from django.utils import timezone
+        today = timezone.localdate()
+        period = (
+            AccountingPeriod.objects
+            .select_related("financial_year", "locked_by")
+            .filter(start_date__lte=today, end_date__gte=today)
+            .order_by("start_date", "id")
+            .first()
+        )
+        if period is None:
+            return Response({"current_period": None, "posting_open": False, "message": "No period covers today."})
+        serializer = AccountingPeriodSerializer(period, context=self.get_serializer_context())
+        posting_open = period.status == AccountingPeriodStatus.OPEN and not period.is_locked
+        return Response({
+            "current_period": serializer.data,
+            "posting_open": posting_open,
+            "message": "Ready for posting." if posting_open else f"Period {period.code} is {period.status} — posting blocked.",
+        })
+
 
 class PostingLockViewSet(AdminAccountingPhase3ViewSet):
     queryset = PostingLock.objects.select_related("locked_by").all()

@@ -44,3 +44,32 @@ export function applyApprovedBrandItems(approved_item_ids: number[]): Promise<Re
 export function getBrandDataAudit(): Promise<{ count: number; results: Array<Record<string, unknown>> }> {
   return apiFetch("/admin/brand-data/audit/");
 }
+
+export type BrandDirectProfile = {
+  display_name: string;
+  tagline: string;
+  hero_subtitle: string;
+  support_phone: string;
+  whatsapp_phone: string;
+  support_email: string;
+  address_text: string;
+  business_hours: string;
+  map_url: string;
+  public_logo_url: string;
+  social_links: {
+    facebook_url: string;
+    instagram_url: string;
+    youtube_url: string;
+    justdial_url: string;
+    website_url: string;
+    whatsapp_url: string;
+  };
+};
+
+export function getBrandDirectProfile(): Promise<BrandDirectProfile> {
+  return apiFetch("/admin/brand-data/profile/");
+}
+
+export function saveBrandDirectProfile(data: Partial<BrandDirectProfile & BrandDirectProfile["social_links"]>): Promise<BrandDirectProfile> {
+  return apiFetch("/admin/brand-data/profile/", { method: "PATCH", body: data });
+}

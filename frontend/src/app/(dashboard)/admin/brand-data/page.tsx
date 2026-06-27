@@ -1,236 +1,222 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
-  applyApprovedBrandItems,
-  getBrandDataAudit,
-  listBrandSources,
-  previewGoogleBusinessImport,
-  previewManualBrandImport,
-  previewYoutubeImport,
-  reviewImportedItem,
-  type BrandImportItem,
+  getBrandDirectProfile,
+  saveBrandDirectProfile,
+  type BrandDirectProfile,
 } from "@/services/brand-data";
 
-const OP_LABELS = ["Advance EMI", "Rent", "Lease", "Direct Sale"] as const;
+type SocialPlatform = {
+  key: keyof BrandDirectProfile["social_links"];
+  label: string;
+  placeholder: string;
+  hint: string;
+};
+
+const SOCIAL_PLATFORMS: SocialPlatform[] = [
+  { key: "facebook_url", label: "Facebook", placeholder: "https://facebook.com/yourpage", hint: "Paste your Facebook page or profile URL" },
+  { key: "instagram_url", label: "Instagram", placeholder: "https://instagram.com/yourhandle", hint: "Paste your Instagram profile URL" },
+  { key: "youtube_url", label: "YouTube", placeholder: "https://youtube.com/@yourchannel", hint: "Paste your YouTube channel URL" },
+  { key: "whatsapp_url", label: "WhatsApp Business", placeholder: "https://wa.me/91XXXXXXXXXX", hint: "WhatsApp business link or wa.me URL" },
+  { key: "justdial_url", label: "Justdial", placeholder: "https://www.justdial.com/...", hint: "Your Justdial business listing URL" },
+  { key: "website_url", label: "Website", placeholder: "https://yourwebsite.com", hint: "Your public website URL" },
+];
+
+type FieldState = Omit<BrandDirectProfile, "social_links"> & BrandDirectProfile["social_links"];
+
+function emptyFields(): FieldState {
+  return {
+    display_name: "", tagline: "", hero_subtitle: "", support_phone: "",
+    whatsapp_phone: "", support_email: "", address_text: "", business_hours: "",
+    map_url: "", public_logo_url: "",
+    facebook_url: "", instagram_url: "", youtube_url: "",
+    whatsapp_url: "", justdial_url: "", website_url: "",
+  };
+}
+
+function profileToFields(p: BrandDirectProfile): FieldState {
+  return {
+    display_name: p.display_name,
+    tagline: p.tagline,
+    hero_subtitle: p.hero_subtitle,
+    support_phone: p.support_phone,
+    whatsapp_phone: p.whatsapp_phone,
+    support_email: p.support_email,
+    address_text: p.address_text,
+    business_hours: p.business_hours,
+    map_url: p.map_url,
+    public_logo_url: p.public_logo_url,
+    ...p.social_links,
+  };
+}
+
+function Field({
+  label, value, onChange, placeholder, hint, type = "text", multiline = false,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  placeholder?: string; hint?: string; type?: string; multiline?: boolean;
+}) {
+  const cls = "mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground";
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-foreground">{label}</label>
+      {hint ? <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
+      {multiline ? (
+        <textarea rows={3} className={cls} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+      ) : (
+        <input type={type} className={cls} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    </div>
+  );
+}
+
+function SaveBar({ onSave, busy, section }: { onSave: () => void; busy: boolean; section: string }) {
+  return (
+    <div className="flex items-center justify-end pt-2">
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={busy}
+        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+      >
+        {busy ? `Saving ${section}...` : `Save ${section}`}
+      </button>
+    </div>
+  );
+}
 
 export default function AdminBrandDataPage() {
-  const [manualJson, setManualJson] = useState("");
-  const [items, setItems] = useState<BrandImportItem[]>([]);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [auditRows, setAuditRows] = useState<Array<Record<string, unknown>>>([]);
-  const [sources, setSources] = useState<Array<Record<string, unknown>>>([]);
-  const [loading, setLoading] = useState(false);
+  const [fields, setFields] = useState<FieldState>(emptyFields());
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const sections = useMemo(
-    () => [
-      "Brand identity",
-      "Contact & location",
-      "Business operations",
-      "Social links",
-      "Media assets",
-      "Public website content",
-      "Import preview",
-      "Approval queue",
-      "Audit history",
-    ],
-    []
-  );
+  function set(key: keyof FieldState) {
+    return (value: string) => setFields((prev) => ({ ...prev, [key]: value }));
+  }
 
-  async function loadProviderStatus() {
+  async function load() {
     setLoading(true);
     setError(null);
     try {
-      const [sourcePayload, auditPayload] = await Promise.all([listBrandSources(), getBrandDataAudit()]);
-      setSources(sourcePayload.results);
-      setAuditRows(auditPayload.results);
+      const profile = await getBrandDirectProfile();
+      setFields(profileToFields(profile));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load provider status");
+      setError(err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : "Failed to load brand profile.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function runManualPreview() {
-    setLoading(true);
+  useEffect(() => { void load(); }, []);
+
+  async function save(section: string, keys: Array<keyof FieldState>) {
+    setBusy(section);
     setError(null);
-    setSuccess(null);
+    setNotice(null);
     try {
-      const payload = manualJson.trim() ? JSON.parse(manualJson) : {};
-      const result = await previewManualBrandImport(payload);
-      setItems(result.items || []);
-      setSelectedIds([]);
-      setSuccess(`Preview created with ${result.item_count} candidate items.`);
-      const auditPayload = await getBrandDataAudit();
-      setAuditRows(auditPayload.results);
+      const payload = Object.fromEntries(keys.map((k) => [k, fields[k]])) as Record<string, string>;
+      const updated = await saveBrandDirectProfile(payload);
+      setFields(profileToFields(updated));
+      setNotice(`${section} saved.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to run manual preview");
+      setError(err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : "Save failed.");
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   }
 
-  async function providerStub(handler: () => Promise<Record<string, unknown>>) {
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const payload = await handler();
-      setSuccess(String(payload.detail || "Provider status checked."));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Provider preview failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function mark(item_id: number, action: "approve" | "reject") {
-    await reviewImportedItem(item_id, action);
-    setItems((prev) => prev.map((item) => (item.id === item_id ? { ...item, approval_status: action === "approve" ? "APPROVED" : "REJECTED" } : item)));
-  }
-
-  async function applySelected() {
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await applyApprovedBrandItems(selectedIds);
-      setSuccess("Approved brand items applied to public profile safely.");
-      const auditPayload = await getBrandDataAudit();
-      setAuditRows(auditPayload.results);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Apply failed");
-    } finally {
-      setLoading(false);
-    }
+  if (loading) {
+    return (
+      <ERPPageShell eyebrow="Settings" title="Brand & Business Data" breadcrumbs={[{ label: "Admin", href: ROUTES.admin.root }, { label: "Brand Data" }]} statusBadge={{ label: "Admin Only", tone: "info" }}>
+        <LoadingBlock label="Loading brand profile..." />
+      </ERPPageShell>
+    );
   }
 
   return (
     <ERPPageShell
       eyebrow="Settings"
-      title="Brand & Business Data Center"
-      subtitle="Manage Subidha Furniture profile, public content, social links, media, and verified business details."
-      breadcrumbs={[
-        { label: "Admin", href: ROUTES.admin.root },
-        { label: "Brand Data" },
-      ]}
-      actions={[{ label: "Load Provider Status", href: ROUTES.admin.brandData }]}
+      title="Brand & Business Data"
+      subtitle="Manage your business identity, contact details, and social profiles. Paste any social link directly — no JSON required."
+      breadcrumbs={[{ label: "Admin", href: ROUTES.admin.root }, { label: "Brand Data" }]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
       <div className="space-y-6">
-        <section className="rounded border p-4">
-          <h3 className="text-sm font-semibold">Business operations</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{OP_LABELS.join(" • ")}</p>
-        </section>
+        {error ? <ErrorState title="Error" description={error} onRetry={() => void load()} /> : null}
+        {notice ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div>
+        ) : null}
 
-        <section className="grid gap-2 md:grid-cols-3">
-          {sections.map((label) => (
-            <div key={label} className="rounded border bg-card px-3 py-2 text-sm">
-              {label}
-            </div>
-          ))}
-        </section>
-
-        <section className="rounded border p-4">
-          <h3 className="text-sm font-semibold">Provider connection status</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button className="rounded border px-3 py-1 text-sm" onClick={() => void providerStub(previewGoogleBusinessImport)} type="button">
-              Google Business Profile
-            </button>
-            <button className="rounded border px-3 py-1 text-sm" onClick={() => void providerStub(previewYoutubeImport)} type="button">
-              YouTube
-            </button>
-            <button className="rounded border px-3 py-1 text-sm" onClick={() => void loadProviderStatus()} type="button">
-              Facebook / Justdial status
-            </button>
+        {/* Social Links — most prominent, matches user's request */}
+        <WorkspaceSection
+          title="Social & Online Presence"
+          description="Paste each profile or page URL directly. Saved immediately to your public business links — no batch or JSON required."
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            {SOCIAL_PLATFORMS.map((p) => (
+              <Field
+                key={p.key}
+                label={p.label}
+                value={fields[p.key]}
+                onChange={set(p.key)}
+                placeholder={p.placeholder}
+                hint={p.hint}
+              />
+            ))}
           </div>
-          {sources.length > 0 ? (
-            <div className="mt-3 text-sm text-muted-foreground">
-              {sources.map((s) => `${String(s.name)}: ${String(s.status_label || "Not configured")}`).join(" | ")}
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-muted-foreground">Not configured</p>
-          )}
-        </section>
-
-        <section className="rounded border p-4">
-          <h3 className="text-sm font-semibold">Manual import form</h3>
-          <textarea
-            className="mt-2 min-h-44 w-full rounded border p-2 font-mono text-xs"
-            placeholder='Paste structured JSON with fields like "brand_name", "phone", "facebook_url", "storefront_image_urls".'
-            value={manualJson}
-            onChange={(event) => setManualJson(event.target.value)}
+          <SaveBar
+            onSave={() => void save("social links", SOCIAL_PLATFORMS.map((p) => p.key))}
+            busy={busy === "social links"}
+            section="social links"
           />
-          <div className="mt-2 flex gap-2">
-            <button className="rounded border px-3 py-1 text-sm" onClick={() => void runManualPreview()} type="button">
-              Create Import Preview
-            </button>
-            <button className="rounded border px-3 py-1 text-sm" onClick={() => void applySelected()} type="button" disabled={selectedIds.length === 0}>
-              Apply Approved Items
-            </button>
+        </WorkspaceSection>
+
+        {/* Brand Identity */}
+        <WorkspaceSection title="Brand Identity" description="Public-facing business name, tagline, and description shown on your website and receipts.">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Business / Brand Name" value={fields.display_name} onChange={set("display_name")} placeholder="Subidha Furniture" />
+            <Field label="Tagline" value={fields.tagline} onChange={set("tagline")} placeholder="Quality furniture for every home" />
           </div>
-        </section>
+          <div className="mt-4">
+            <Field label="Short Description" value={fields.hero_subtitle} onChange={set("hero_subtitle")} placeholder="Brief description shown on homepage or receipts." multiline />
+          </div>
+          <div className="mt-4">
+            <Field label="Logo URL" value={fields.public_logo_url} onChange={set("public_logo_url")} placeholder="https://example.com/logo.png" hint="Direct link to your logo image (PNG or SVG recommended)" />
+          </div>
+          <SaveBar
+            onSave={() => void save("brand identity", ["display_name", "tagline", "hero_subtitle", "public_logo_url"])}
+            busy={busy === "brand identity"}
+            section="brand identity"
+          />
+        </WorkspaceSection>
 
-        {loading ? <LoadingBlock label="Loading brand-data workflow..." /> : null}
-        {error ? <ErrorState title="Brand-data operation failed" description={error} /> : null}
-        {success ? <div className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{success}</div> : null}
-
-        <section className="rounded border p-4">
-          <h3 className="text-sm font-semibold">Approval queue</h3>
-          {items.length === 0 ? (
-            <EmptyState title="No preview items yet" description="Run a manual preview to generate candidate fields for approval." />
-          ) : (
-            <div className="mt-2 space-y-2">
-              {items.map((item) => (
-                <label key={item.id} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
-                  <span>
-                    {item.field_key} ({item.item_type}) - {item.approval_status}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(item.id)}
-                      onChange={(event) =>
-                        setSelectedIds((prev) =>
-                          event.target.checked ? [...prev, item.id] : prev.filter((id) => id !== item.id)
-                        )
-                      }
-                    />
-                    <button className="rounded border px-2 py-1 text-xs" type="button" onClick={() => void mark(item.id, "approve")}>
-                      Approve
-                    </button>
-                    <button className="rounded border px-2 py-1 text-xs" type="button" onClick={() => void mark(item.id, "reject")}>
-                      Reject
-                    </button>
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="rounded border p-4">
-          <h3 className="text-sm font-semibold">Audit history</h3>
-          {auditRows.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">No brand-data audit events yet.</p>
-          ) : (
-            <ul className="mt-2 space-y-2 text-sm">
-              {auditRows.map((row) => (
-                <li key={String(row.id)} className="rounded border px-3 py-2">
-                  {String(row.event || "EVENT")} · {String(row.created_at || "")}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {/* Contact & Location */}
+        <WorkspaceSection title="Contact & Location" description="Phone, WhatsApp, email, address, opening hours, and Google Maps link.">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Support Phone" value={fields.support_phone} onChange={set("support_phone")} placeholder="+91 98765 43210" type="tel" />
+            <Field label="WhatsApp Number" value={fields.whatsapp_phone} onChange={set("whatsapp_phone")} placeholder="+91 98765 43210" type="tel" hint="Number only — wa.me link goes in Social section" />
+            <Field label="Email" value={fields.support_email} onChange={set("support_email")} placeholder="info@yourbusiness.com" type="email" />
+            <Field label="Google Maps URL" value={fields.map_url} onChange={set("map_url")} placeholder="https://maps.google.com/?q=..." hint="Paste the Share link from Google Maps" />
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <Field label="Address" value={fields.address_text} onChange={set("address_text")} placeholder="Shop No. 1, Main Road, City" multiline />
+            <Field label="Business Hours" value={fields.business_hours} onChange={set("business_hours")} placeholder="Mon–Sat: 10am–8pm, Sun: 11am–6pm" multiline />
+          </div>
+          <SaveBar
+            onSave={() => void save("contact & location", ["support_phone", "whatsapp_phone", "support_email", "address_text", "business_hours", "map_url"])}
+            busy={busy === "contact & location"}
+            section="contact & location"
+          />
+        </WorkspaceSection>
       </div>
     </ERPPageShell>
   );

@@ -80,8 +80,8 @@ class MappingAuditActionSerializer(serializers.Serializer):
     purpose = serializers.CharField(required=False, allow_blank=True)
 
 
-def _bridge_events_by_key() -> dict[str, dict[str, Any]]:
-    payload = build_accounting_bridge_readiness_with_returns_damage_credit()
+def _bridge_events_by_key(readiness_payload: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
+    payload = readiness_payload or build_accounting_bridge_readiness_with_returns_damage_credit()
     rows = {str(row.get("event_key") or "").strip(): row for row in payload.get("events") or []}
     for alias, source in ALIASES.items():
         if source in rows and alias not in rows:
@@ -89,8 +89,8 @@ def _bridge_events_by_key() -> dict[str, dict[str, Any]]:
     return rows
 
 
-def _remediation_rows_by_key() -> dict[str, dict[str, Any]]:
-    payload = build_mapping_remediation_summary()
+def _remediation_rows_by_key(readiness_payload: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
+    payload = build_mapping_remediation_summary(readiness_payload=readiness_payload)
     rows = {str(row.get("event_key") or row.get("event_type") or "").strip(): row for row in payload.get("rows") or []}
     for alias, source in ALIASES.items():
         if source in rows and alias not in rows:
@@ -219,24 +219,33 @@ def _audit_row(event_key: str, period: dict[str, Any], bridge: dict[str, Any] | 
 
 def build_mapping_audit_payload(*, read_only: bool = True) -> dict[str, Any]:
     period = build_accounting_bridge_period_readiness()
-    bridge_rows = _bridge_events_by_key()
-    remediation_rows = _remediation_rows_by_key()
+    # Compute readiness once and share it to avoid a second expensive build call.
+    readiness_payload = build_accounting_bridge_readiness_with_returns_damage_credit()
+    bridge_rows = _bridge_events_by_key(readiness_payload)
+    remediation_rows = _remediation_rows_by_key(readiness_payload)
     rows = [_audit_row(key, period, bridge_rows.get(key), remediation_rows.get(key)) for key in REQUIRED_EVENTS]
+    HEALTHY_STATUSES = {"READY", "POSTABLE", "READY_UNPOSTED", "POSTED", "RECONCILED"}
     ready = [row for row in rows if row["status"] in {"READY", "POSTABLE"}]
+    healthy = [row for row in rows if row["status"] in HEALTHY_STATUSES]
     missing = [row for row in rows if row["status"] == "BLOCKED_BY_MAPPING"]
     conflicts = [row for row in rows if row["blocker_code"] in {"CONFLICT", "WRONG_ACCOUNT_TYPE", "DUPLICATE_ACTIVE_MAPPING"}]
     unsupported = [row for row in rows if row["status"] == "UNSUPPORTED_SOURCE"]
     blocked_period = [row for row in rows if row["status"] == "BLOCKED_BY_PERIOD"]
     blocked_numbering = [row for row in rows if row["status"] == "BLOCKED_BY_NUMBERING"]
     blocked_approval = [row for row in rows if row["status"] == "BLOCKED_BY_APPROVAL"]
+    # Setup blockers are fixable config gaps (mapping/period/numbering).
+    # Approval blocks are intentional workflow gates — not a setup problem.
+    has_setup_blockers = bool(missing or conflicts or blocked_period or blocked_numbering)
+    has_approval_blocks = bool(blocked_approval)
+    non_healthy = [r for r in rows if r["status"] not in HEALTHY_STATUSES and r["status"] not in {"BLOCKED_BY_APPROVAL", "UNSUPPORTED_SOURCE"}]
     return {
         "generated_at": period.get("reference_date"),
         "read_only": read_only,
         "journal_entries_created": 0,
         "document_sequences_allocated": 0,
         "period_readiness": period,
-        "year_end_impact": "BLOCKED" if len(ready) != len(rows) else "READY",
-        "bridge_impact": "BLOCKED" if len(ready) != len(rows) else "READY",
+        "year_end_impact": "BLOCKED" if has_setup_blockers or non_healthy else "READY",
+        "bridge_impact": "BLOCKED" if has_setup_blockers else "APPROVAL_PENDING" if has_approval_blocks else "READY_UNPOSTED" if len(healthy) < len(rows) else "READY",
         "summary": {
             "total_events": len(rows),
             "ready": len([row for row in rows if row["status"] == "READY"]),
@@ -257,7 +266,7 @@ def build_mapping_audit_payload(*, read_only: bool = True) -> dict[str, Any]:
         "missing_mappings": missing,
         "conflicts": conflicts,
         "unsupported_events": unsupported,
-        "setup_blockers": [row for row in rows if row["status"] not in {"READY", "POSTABLE", "POSTED", "RECONCILED"}],
+        "setup_blockers": [row for row in rows if row["status"] not in HEALTHY_STATUSES],
     }
 
 
@@ -307,3 +316,63 @@ class AccountingMappingAuditValidateView(APIView):
 
     def post(self, request):
         return Response(build_mapping_audit_payload(read_only=True), status=status.HTTP_200_OK)
+
+
+class BridgePostingApprovalSerializer(serializers.Serializer):
+    event_key = serializers.CharField()
+    reason = serializers.CharField(required=False, default="", allow_blank=True)
+
+
+class BridgePostingApprovalView(APIView):
+    """Approve or revoke a bridge posting approval gate for a specific event key."""
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from accounting.models import BridgePostingApproval
+        from accounting.services.accounting_postability_service import APPROVAL_REQUIRED_EVENTS
+        approvals = {a.event_key: a for a in BridgePostingApproval.objects.all()}
+        rows = []
+        for key in sorted(APPROVAL_REQUIRED_EVENTS):
+            record = approvals.get(key)
+            rows.append({
+                "event_key": key,
+                "is_approved": record.is_approved if record else False,
+                "approved_by_id": record.approved_by_id if record else None,
+                "approved_at": record.approved_at.isoformat() if record and record.approved_at else None,
+                "revoked_at": record.revoked_at.isoformat() if record and record.revoked_at else None,
+                "reason": record.reason if record else "",
+            })
+        return Response({"approvals": rows})
+
+    def post(self, request):
+        from accounting.models import BridgePostingApproval
+        from django.utils import timezone
+        serializer = BridgePostingApprovalSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        event_key = serializer.validated_data["event_key"]
+        reason = serializer.validated_data.get("reason", "")
+        action = request.data.get("action", "approve")
+        obj, _ = BridgePostingApproval.objects.get_or_create(event_key=event_key)
+        if action == "revoke":
+            obj.is_approved = False
+            obj.revoked_by = request.user
+            obj.revoked_at = timezone.now()
+        else:
+            obj.is_approved = True
+            obj.approved_by = request.user
+            obj.approved_at = timezone.now()
+            obj.revoked_by = None
+            obj.revoked_at = None
+        obj.reason = reason
+        obj.save()
+        try:
+            audit = build_mapping_audit_payload()
+        except Exception:
+            audit = None
+        return Response({
+            "event_key": obj.event_key,
+            "is_approved": obj.is_approved,
+            "approved_at": obj.approved_at.isoformat() if obj.approved_at else None,
+            "audit": audit,
+        }, status=status.HTTP_200_OK)

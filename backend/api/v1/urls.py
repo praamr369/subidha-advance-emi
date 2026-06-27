@@ -19,6 +19,7 @@ from api.v1.views.accounting_mapping_audit import (
     AccountingMappingAuditSeedDefaultsView,
     AccountingMappingAuditValidateView,
     AccountingMappingAuditView,
+    BridgePostingApprovalView,
 )
 from api.v1.views.accounting_mapping_remediation import (
     AccountingMappingRemediationAcknowledgeView,
@@ -43,6 +44,7 @@ urlpatterns = [
     path("admin/accounting/mapping-audit/seed-safe-defaults/", AccountingMappingAuditSeedDefaultsView.as_view()),
     path("admin/accounting/mapping-audit/fix-event/", AccountingMappingAuditFixEventView.as_view()),
     path("admin/accounting/mapping-audit/validate/", AccountingMappingAuditValidateView.as_view()),
+    path("admin/accounting/bridge-posting-approvals/", BridgePostingApprovalView.as_view()),
     path("admin/accounting/mapping-remediation/", AccountingMappingRemediationView.as_view()),
     path("admin/accounting/mapping-remediation/create-account/", AccountingMappingRemediationCreateAccountView.as_view()),
     path("admin/accounting/mapping-remediation/apply/", AccountingMappingRemediationApplyView.as_view()),

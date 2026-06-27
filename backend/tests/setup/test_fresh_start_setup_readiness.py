@@ -5,6 +5,8 @@ from accounting.models import DocumentSequence, JournalEntry, MoneyMovement
 from billing.models import BillingInvoice, ReceiptDocument
 from inventory.models import StockLedger
 from reconciliation.models import ReconciliationItem
+from subscriptions.models import Batch, LuckyId, Product
+from subscriptions.models_business_setup import BusinessProfile
 from tests.helpers import create_admin_user, create_customer_user
 
 
@@ -67,6 +69,12 @@ class FreshStartSetupReadinessTests(APITestCase):
 
     def test_fresh_start_dry_run_does_not_create_financial_or_stock_records(self):
         before = self._counts()
+        setup_before = {
+            "business_profiles": BusinessProfile.objects.count(),
+            "products": Product.objects.count(),
+            "batches": Batch.objects.count(),
+            "lucky_ids": LuckyId.objects.count(),
+        }
         response = self.client.post("/api/v1/admin/setup/ensure-fresh-start/", {"dry_run": True}, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["journal_entries_created"], 0)
@@ -74,6 +82,15 @@ class FreshStartSetupReadinessTests(APITestCase):
         self.assertEqual(response.data["stock_ledger_created"], 0)
         self.assertEqual(response.data["reconciliation_items_created"], 0)
         self.assertEqual(self._counts(), before)
+        self.assertEqual(
+            {
+                "business_profiles": BusinessProfile.objects.count(),
+                "products": Product.objects.count(),
+                "batches": Batch.objects.count(),
+                "lucky_ids": LuckyId.objects.count(),
+            },
+            setup_before,
+        )
 
     def test_fresh_start_execute_does_not_create_operational_financial_records(self):
         before = self._counts()
@@ -87,6 +104,16 @@ class FreshStartSetupReadinessTests(APITestCase):
         self.assertEqual(after["reconciliation_items"], before["reconciliation_items"])
         self.assertEqual(after["stock_ledgers"], before["stock_ledgers"])
         self.assertEqual(response.data["document_numbers_allocated"], 0)
+        self.assertEqual(BusinessProfile.objects.filter(is_active=True).count(), 1)
+        self.assertTrue(Product.objects.filter(is_active=True, is_emi_enabled=True, is_direct_sale_enabled=True).exists())
+        self.assertTrue(Batch.objects.exists())
+        self.assertEqual(LuckyId.objects.count(), 100)
+        self.assertEqual(response.data["after"]["summary"]["blocker_count"], 0)
+        self.assertTrue(response.data["after"]["summary"]["core_operational_ready"])
+        self.assertEqual(response.data["after"]["summary"]["overall_status"], "READY")
+        sections_by_key = {s["key"]: s for s in response.data["after"]["sections"]}
+        self.assertNotEqual(sections_by_key["business_compliance"]["status"], "BLOCKED")
+        self.assertNotEqual(sections_by_key["policy_governance"]["status"], "BLOCKED")
 
     def test_non_admin_cannot_use_fresh_start_setup(self):
         customer = create_customer_user(username="fresh_start_customer", phone="9304000962")

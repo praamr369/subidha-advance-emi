@@ -10,8 +10,10 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import {
+  approveBridgePostingEvent,
   fixAccountingMappingAuditEvent,
   getAccountingMappingAudit,
+  revokeBridgePostingEvent,
   seedAccountingMappingSafeDefaults,
   validateAccountingMappingAudit,
   type AccountingMappingAuditPayload,
@@ -259,6 +261,26 @@ export default function AccountingMappingAuditPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getAccountingMappingAudit({ signal: controller.signal });
+        setPayload(data);
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(err instanceof Error ? err.message : "Failed to load accounting mapping audit.");
+        }
+      } finally {
+        if (!controller.signal.aborted) { setLoading(false); setRefreshing(false); }
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, []);
+
   async function load(silent = false) {
     if (silent) setRefreshing(true);
     else setLoading(true);
@@ -272,8 +294,6 @@ export default function AccountingMappingAuditPage() {
       setRefreshing(false);
     }
   }
-
-  useEffect(() => { void load(); }, []);
 
   async function seedDefaults() {
     setBusy("seed");
@@ -297,6 +317,33 @@ export default function AccountingMappingAuditPage() {
       setNotice("Validation completed. No source records, journals, receipts, payments, or document numbers were created.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to validate mapping audit.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function approveEvent(row: AccountingMappingAuditRow, action: "approve" | "revoke") {
+    setBusy(row.event_key);
+    setNotice(null);
+    try {
+      const result = action === "approve"
+        ? await approveBridgePostingEvent(row.event_key)
+        : await revokeBridgePostingEvent(row.event_key);
+      if (result.audit) {
+        setPayload(result.audit);
+      } else {
+        const refreshed = await getAccountingMappingAudit();
+        setPayload(refreshed);
+      }
+      setNotice(action === "approve" ? `${row.event_label} approved for bridge posting.` : `${row.event_label} approval revoked.`);
+    } catch (err) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message || "Failed to update approval.")
+          : err instanceof Error
+          ? err.message
+          : "Failed to update approval.";
+      setError(msg);
     } finally {
       setBusy(null);
     }
@@ -356,7 +403,20 @@ export default function AccountingMappingAuditPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mapping audit remediation</div>
-              <h2 className="mt-1 text-xl font-semibold text-foreground">Bridge impact: {payload?.bridge_impact ?? "Not loaded"}</h2>
+              <h2 className="mt-1 text-xl font-semibold text-foreground">
+                Bridge impact:{" "}
+                <span className={
+                  payload?.bridge_impact === "READY" ? "text-emerald-700" :
+                  payload?.bridge_impact === "READY_UNPOSTED" ? "text-blue-700" :
+                  payload?.bridge_impact === "APPROVAL_PENDING" ? "text-violet-700" :
+                  "text-amber-700"
+                }>
+                  {payload?.bridge_impact === "READY" ? "Setup Ready" :
+                   payload?.bridge_impact === "READY_UNPOSTED" ? "Setup Ready — Posting Pending" :
+                   payload?.bridge_impact === "APPROVAL_PENDING" ? "Setup Ready — Approval Required for some workflows" :
+                   payload?.bridge_impact ?? "Not loaded"}
+                </span>
+              </h2>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">Validation is read-only. READY_UNPOSTED means mapping setup is ready and posting is pending in bridge reconciliation, not a mapping failure. RentLeaseCollection settlement rows are separate from RentLeaseBillingDemand revenue, ReceiptDocument, customer advance, security deposit, and direct sale receipt rows. Payroll rows require Salary/Wages Expense and Salary Payable mappings plus JOURNAL_ENTRY numbering; payroll, staff, attendance, StaffAdvance, and payment records are not edited by accrual bridge posting.</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -367,9 +427,9 @@ export default function AccountingMappingAuditPage() {
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
             <SummaryCard label="Total events" value={summary.total_events} tone="border-border bg-muted/50 text-foreground" />
-            <SummaryCard label="Ready" value={summary.ready} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+            <SummaryCard label="Ready" value={(summary.ready ?? 0) + (summary.ready_unposted ?? 0)} tone="border-emerald-200 bg-emerald-50 text-emerald-900" />
+            <SummaryCard label="Posting pending" value={summary.ready_unposted ?? 0} tone="border-blue-200 bg-blue-50 text-blue-900" />
             <SummaryCard label="Missing" value={summary.missing_mapping} tone="border-amber-200 bg-amber-50 text-amber-950" />
-            <SummaryCard label="Conflicts" value={summary.conflicts} tone="border-red-200 bg-red-50 text-red-900" />
             <SummaryCard label="Unsupported" value={summary.unsupported} tone="border-red-200 bg-red-50 text-red-900" />
             <SummaryCard label="Period blocked" value={summary.blocked_by_period} tone="border-amber-200 bg-amber-50 text-amber-950" />
             <SummaryCard label="Numbering blocked" value={summary.blocked_by_numbering} tone="border-amber-200 bg-amber-50 text-amber-950" />
@@ -406,6 +466,11 @@ export default function AccountingMappingAuditPage() {
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold text-foreground">{row.event_label}</h3><MappingStatus value={row.status} /></div><div className="mt-1 text-xs text-muted-foreground">{row.module} · {row.source_model} · <span className="font-mono">{row.event_key}</span></div></div>
                         <div className="flex flex-wrap gap-2">
+                          {status === "BLOCKED_BY_APPROVAL" && !row.approval_ready ? (
+                            <button type="button" disabled={busy === row.event_key} onClick={() => void approveEvent(row, "approve")} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-950">{busy === row.event_key ? "Approving..." : "Approve workflow"}</button>
+                          ) : row.approval_ready && status !== "BLOCKED_BY_APPROVAL" && row.event_key && ["commission_approval","commission_payout","purchase_inventory_receive","inventory_purchase_receive"].includes(row.event_key) ? (
+                            <button type="button" disabled={busy === row.event_key} onClick={() => void approveEvent(row, "revoke")} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-950">{busy === row.event_key ? "Revoking..." : "Revoke approval"}</button>
+                          ) : null}
                           {canFix ? <button type="button" disabled={busy === row.event_key} onClick={() => void fixEvent(row)} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">{busy === row.event_key ? "Fixing..." : "Fix setup event"}</button> : null}
                           <Link href={routeForRow(row)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold">{isRentLeaseCollectionRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open collection settlement rows" : isPayrollRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open Payroll bridge rows" : isCommissionRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open Commission bridge rows" : isVendorPaymentRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open VendorPayment bridge rows" : isPurchaseBillRow(row) && READY_MAPPING_STATUSES.includes(status) ? "Open PurchaseBill bridge rows" : "Open suggested route"}</Link>
                         </div>

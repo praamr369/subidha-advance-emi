@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.db.models import Q, Sum
+from django.db.models import F, Q, Sum
 from django.utils import timezone
 from rest_framework import permissions
 from rest_framework.response import Response
@@ -10,8 +10,7 @@ from api.v1.permissions import IsAdmin
 from billing.models import CustomerRefund, CustomerRefundStatus, DirectSaleReturn, DirectSaleReturnStatus
 from billing.services.outstanding_ledger_service import build_outstanding_ledger, parse_outstanding_filters
 from core.services.operational_visibility import subscription_collectible_q
-from inventory.models import StockLedger, StockLocation
-from inventory.services.inventory_readiness_service import get_inventory_readiness_snapshot
+from inventory.models import InventoryItem, StockLedger, StockLocation
 from service_desk.support_ticket_models import SupportTicket, SupportTicketStatus
 from subscriptions.models import (
     Batch,
@@ -33,7 +32,6 @@ class AdminNavigationBadgesView(APIView):
         outstanding_payload = build_outstanding_ledger(
             filters=parse_outstanding_filters({"page": "1", "page_size": "1"})
         )
-        inventory_snapshot = get_inventory_readiness_snapshot()
 
         overdue_count = (
             Emi.objects.filter(status=EmiStatus.PENDING)
@@ -64,7 +62,13 @@ class AdminNavigationBadgesView(APIView):
         open_support_ticket_count = SupportTicket.objects.exclude(
             status__in=[SupportTicketStatus.RESOLVED, SupportTicketStatus.CLOSED, SupportTicketStatus.REJECTED]
         ).count()
-        low_stock_count = int(inventory_snapshot.get("low_stock_items_count") or 0)
+        # Count low-stock items using opening_stock_qty as a fast approximation.
+        # Avoids the full inventory readiness scan on every navigation load.
+        low_stock_count = InventoryItem.objects.filter(
+            stock_tracking_enabled=True,
+            reorder_level_qty__gt=0,
+            opening_stock_qty__lte=F("reorder_level_qty"),
+        ).count()
 
         inspection_locations = StockLocation.objects.filter(
             is_active=True

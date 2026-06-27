@@ -145,8 +145,8 @@ export function getRentLeaseAccountingSummary() {
   }>("/admin/rent-lease/accounting-summary/");
 }
 
-export function getRentLeasePostingBridgeConfig() {
-  return apiFetch<RentLeasePostingBridgeConfigResponse>("/admin/rent-lease/accounting-bridge/config/");
+export function getRentLeasePostingBridgeConfig(opts?: { signal?: AbortSignal }) {
+  return apiFetch<RentLeasePostingBridgeConfigResponse>("/admin/rent-lease/accounting-bridge/config/", { signal: opts?.signal });
 }
 
 export function enableRentLeasePostingBridge(input: RentLeasePostingBridgeApprovalInput) {

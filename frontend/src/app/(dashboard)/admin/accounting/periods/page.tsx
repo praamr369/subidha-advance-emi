@@ -12,6 +12,7 @@ import { getAccountingBridgeReconciliation, type AccountingBridgeReconciliationS
 import { seedSupportedAccountingMappings } from "@/services/accounting-mapping-remediation";
 import {
   activateFinancialYear,
+  bulkLockOpenPeriods,
   closeAccountingPeriod,
   createFinancialYear,
   createPostingLock,
@@ -23,9 +24,11 @@ import {
   lockAccountingPeriod,
   removePostingLock,
   reopenAccountingPeriod,
+  reopenCurrentPeriod,
   type AccountingPeriod,
   type AccountingPeriodReadiness,
   type AccountingPeriodStatus,
+  type BulkLockOpenResult,
   type FinancialYear,
   type PostingLock,
 } from "@/services/accounting";
@@ -195,6 +198,7 @@ export default function AccountingPeriodsPage() {
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [bulkLockResult, setBulkLockResult] = useState<BulkLockOpenResult | null>(null);
   const [fyForm, setFyForm] = useState({ code: "", name: "", start_date: "", end_date: "", notes: "" });
   const [lockForm, setLockForm] = useState({ lock_date: new Date().toISOString().slice(0, 10), reason: "" });
 
@@ -203,18 +207,17 @@ export default function AccountingPeriodsPage() {
   async function loadPage(mode: "initial" | "refresh" = "initial") {
     if (mode === "initial") setLoading(true); else setRefreshing(true);
     try {
-      const [fyPayload, periodPayload, lockPayload, readinessPayload, bridgePayload] = await Promise.all([
+      // Core page data — must all succeed for the page to be usable
+      const [fyPayload, periodPayload, lockPayload, readinessPayload] = await Promise.all([
         listFinancialYears(),
         listAccountingPeriods(),
         listPostingLocks(),
         getAccountingPeriodsReadiness(),
-        getAccountingBridgeReconciliation(),
       ]);
       setFinancialYears(fyPayload.results);
       setPeriods(periodPayload.results);
       setLocks(lockPayload.results);
       setReadiness(readinessPayload);
-      setBridgeSummary(bridgePayload.summary);
       setError(null);
     } catch (err) {
       setError(accountingErrorMessage(err, "Failed to load accounting period controls."));
@@ -223,11 +226,15 @@ export default function AccountingPeriodsPage() {
         setPeriods([]);
         setLocks([]);
         setReadiness(null);
-        setBridgeSummary(null);
       }
     } finally {
       if (mode === "initial") setLoading(false); else setRefreshing(false);
     }
+    // Bridge summary is non-critical — load separately so a slow/503 response
+    // doesn't blank the whole page.
+    getAccountingBridgeReconciliation()
+      .then((bridgePayload) => setBridgeSummary(bridgePayload.summary))
+      .catch(() => setBridgeSummary(null));
   }
 
   useEffect(() => { void loadPage("initial"); }, []);
@@ -298,6 +305,36 @@ export default function AccountingPeriodsPage() {
     }
   }
 
+  async function handleReopenCurrent() {
+    setActionBusy("reopen-current");
+    setError(null);
+    try {
+      const result = await reopenCurrentPeriod();
+      setNotice(result.detail);
+      await loadPage("refresh");
+    } catch (err) {
+      setError(accountingErrorMessage(err, "Failed to reopen current period."));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleBulkLockOpen() {
+    setActionBusy("bulk-lock");
+    setError(null);
+    setBulkLockResult(null);
+    try {
+      const result = await bulkLockOpenPeriods(activeFinancialYear?.id);
+      setBulkLockResult(result);
+      setNotice(`Bulk lock: ${result.locked_count} period(s) locked${result.error_count ? `, ${result.error_count} error(s)` : ""}.`);
+      await loadPage("refresh");
+    } catch (err) {
+      setError(accountingErrorMessage(err, "Failed to bulk lock open periods."));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   async function handleGeneratePeriods(year: FinancialYear) {
     setActionBusy(`fy-${year.id}`);
     try {
@@ -359,9 +396,24 @@ export default function AccountingPeriodsPage() {
         <button type="button" disabled={refreshing} onClick={() => loadPage("refresh")} className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">{refreshing ? "Refreshing…" : "Refresh"}</button>
         <button type="button" disabled={actionBusy === "period"} onClick={handleGenerateCurrentPeriod} className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">Generate current period</button>
         <button type="button" disabled={actionBusy === "seed"} onClick={handleSeedMappings} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/90 disabled:opacity-50">Seed supported mappings</button>
+        {openPeriodCount > 0 ? <button type="button" disabled={actionBusy === "bulk-lock"} onClick={() => void handleBulkLockOpen()} className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50">{actionBusy === "bulk-lock" ? "Locking…" : `Lock All ${openPeriodCount} Open Periods`}</button> : null}
       </div>
       {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</div> : null}
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div> : null}
+      {bulkLockResult && bulkLockResult.error_count > 0 ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><span className="font-semibold">Bulk lock errors ({bulkLockResult.error_count}):</span> {bulkLockResult.errors.map((e) => `${e.code}: ${e.error}`).join(" | ")}</div> : null}
+
+      {readiness && !readiness.is_ready ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <div className="font-semibold">Posting blocked — current period not open</div>
+          <p className="mt-1">{readiness.errors?.join(" ")}</p>
+          <p className="mt-1 text-xs text-red-700">This blocks rent/lease bridge posting, EMI bridge, and all journal posting. Reopen the current month period to restore posting readiness.</p>
+          <button type="button" disabled={actionBusy === "reopen-current"} onClick={() => void handleReopenCurrent()} className="mt-2 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-900 hover:bg-red-50 disabled:opacity-50">{actionBusy === "reopen-current" ? "Reopening…" : "Reopen Current Period"}</button>
+        </div>
+      ) : readiness?.is_ready ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+          <span className="font-semibold">Posting ready</span> — current period is OPEN and posting controls are satisfied.
+        </div>
+      ) : null}
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <MetricCard label="Financial years" value={financialYears.length} />

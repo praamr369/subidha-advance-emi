@@ -25,15 +25,26 @@ export default function PurchaseVendorBridgeReadinessPanel({ title, description,
   const [events, setEvents] = useState<AccountingBridgeReadinessEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     async function load() {
       try {
         const payload = await getAccountingBridgeReadiness();
         if (!cancelled) setEvents(payload.events ?? []);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load readiness.");
+        if (!cancelled) {
+          const msg =
+            err instanceof Error
+              ? err.message
+              : typeof err === "object" && err !== null && "message" in err
+                ? String((err as { message: unknown }).message)
+                : "Failed to load readiness.";
+          setError(msg);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -42,7 +53,7 @@ export default function PurchaseVendorBridgeReadinessPanel({ title, description,
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tick]);
 
   const visibleEvents = useMemo(() => {
     return eventKeys
@@ -64,7 +75,12 @@ export default function PurchaseVendorBridgeReadinessPanel({ title, description,
       </div>
 
       {loading ? <div className="mt-4 text-sm text-muted-foreground">Loading readiness...</div> : null}
-      {!loading && error ? <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{error}</div> : null}
+      {!loading && error ? (
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900 flex items-center justify-between gap-3">
+          <span>{error}</span>
+          <button type="button" onClick={() => setTick((n) => n + 1)} className="shrink-0 rounded-lg border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-900 hover:bg-red-50">Retry</button>
+        </div>
+      ) : null}
       {!loading && !error && visibleEvents.length === 0 ? (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           No matching purchase or vendor readiness events are exposed by the backend.

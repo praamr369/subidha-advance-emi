@@ -878,7 +878,15 @@ def build_accounting_bridge_reconciliation(filters: BridgeReconciliationFilters 
         "blocked_by_mapping_by_event": {key: value.get("BLOCKED_BY_MAPPING", 0) for key, value in _event_counts(rows).items() if value.get("BLOCKED_BY_MAPPING", 0)},
         "status_counts_by_event": _event_counts(rows),
         "blocking_groups": _blocking_groups(rows),
-        "unsupported_source_count": status_counts.get("UNSUPPORTED_SOURCE", 0),
+        # staff_advance is a synthetic boundary row always injected as UNSUPPORTED_SOURCE —
+        # it is not a real transaction. Exclude it from the count used by year-end close.
+        "unsupported_source_count": sum(
+            1 for row in rows
+            if _row_status(row) in {"UNSUPPORTED_SOURCE", "UNSUPPORTED"}
+            and row.get("event_key") != "staff_advance"
+            and row.get("source_model") != "StaffAdvance"
+        ),
+        "staff_advance_boundary": sum(1 for row in rows if row.get("event_key") == "staff_advance"),
         **candidate_summary,
     }
     phase_f_control_tower = _phase_f_control_tower(rows, period_readiness, readiness_blockers)

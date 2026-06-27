@@ -225,6 +225,85 @@ def set_item_approval(*, actor, item_id: int, action: str, note: str = "") -> di
     return {"item_id": item.id, "approval_status": item.approval_status}
 
 
+SOCIAL_LINK_PLATFORMS = {
+    "facebook_url": "FACEBOOK",
+    "instagram_url": "INSTAGRAM",
+    "youtube_url": "YOUTUBE",
+    "justdial_url": "JUSTDIAL",
+    "website_url": "WEBSITE",
+    "whatsapp_url": "WHATSAPP",
+}
+
+
+def get_public_profile() -> dict:
+    profile = PublicBusinessProfile.objects.filter(is_active=True).order_by("-id").first()
+    social_links = {link.platform: link.url for link in SocialLink.objects.filter(is_active=True)}
+    return {
+        "display_name": profile.display_name if profile else "",
+        "tagline": profile.tagline if profile else "",
+        "hero_subtitle": profile.hero_subtitle if profile else "",
+        "support_phone": profile.support_phone if profile else "",
+        "whatsapp_phone": profile.whatsapp_phone if profile else "",
+        "support_email": profile.support_email if profile else "",
+        "address_text": profile.address_text if profile else "",
+        "business_hours": profile.business_hours if profile else "",
+        "map_url": profile.map_url if profile else "",
+        "public_logo_url": profile.public_logo_url if profile else "",
+        "social_links": {
+            "facebook_url": social_links.get("FACEBOOK", profile.facebook_url if profile else ""),
+            "instagram_url": social_links.get("INSTAGRAM", profile.instagram_url if profile else ""),
+            "youtube_url": social_links.get("YOUTUBE", profile.youtube_url if profile else ""),
+            "justdial_url": social_links.get("JUSTDIAL", ""),
+            "website_url": social_links.get("WEBSITE", ""),
+            "whatsapp_url": social_links.get("WHATSAPP", ""),
+        },
+    }
+
+
+@transaction.atomic
+def upsert_public_profile(*, actor, data: dict) -> dict:
+    _ensure_admin(actor)
+    profile = PublicBusinessProfile.objects.filter(is_active=True).order_by("-id").first()
+    if profile is None:
+        profile = PublicBusinessProfile(is_active=True)
+
+    profile_fields = [
+        "display_name", "tagline", "hero_subtitle", "support_phone",
+        "whatsapp_phone", "support_email", "address_text", "business_hours",
+        "map_url", "public_logo_url",
+    ]
+    for field in profile_fields:
+        if field in data:
+            setattr(profile, field, (data[field] or "").strip())
+
+    profile.save()
+
+    for url_key, platform in SOCIAL_LINK_PLATFORMS.items():
+        if url_key not in data:
+            continue
+        url = (data[url_key] or "").strip()
+        if url:
+            SocialLink.objects.update_or_create(
+                platform=platform,
+                defaults={
+                    "label": platform.capitalize(),
+                    "url": url,
+                    "is_active": True,
+                    "is_public": True,
+                },
+            )
+        else:
+            SocialLink.objects.filter(platform=platform).update(is_active=False)
+
+    log_audit(
+        action_type=AuditLog.ActionType.PUBLIC_SITE_UPDATED,
+        instance=profile,
+        performed_by=actor,
+        metadata={"event": "BRAND_PROFILE_DIRECT_SAVED", "fields": list(data.keys())},
+    )
+    return get_public_profile()
+
+
 def audit_feed(*, limit: int = 100) -> dict:
     rows = (
         AuditLog.objects.filter(

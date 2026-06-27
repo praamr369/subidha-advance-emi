@@ -55,6 +55,7 @@ export type YearEndReadiness = {
   blocked_numbering_count: number;
   blocked_approval_count: number;
   unsupported_source_count: number;
+  staff_advance_boundary?: number;
   bridge_event_counts?: Record<string, Record<string, number>>;
   blocking_bridge_groups?: Array<{
     event_key: string;

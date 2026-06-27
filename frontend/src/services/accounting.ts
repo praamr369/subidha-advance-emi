@@ -1094,8 +1094,8 @@ export type AccountingSetupDefaultsPreviewResponse = {
 };
 export type AccountingSetupDefaultsApplyResponse = Record<string, unknown>;
 
-export function getAccountingSetupHealth() {
-  return apiFetch<AccountingSetupHealthResponse>("/admin/accounting/setup-health/");
+export function getAccountingSetupHealth(opts?: { signal?: AbortSignal }) {
+  return apiFetch<AccountingSetupHealthResponse>("/admin/accounting/setup-health/", { signal: opts?.signal });
 }
 
 export function previewAccountingSetupDefaults() {
@@ -1978,6 +1978,25 @@ export function reopenAccountingPeriod(id: number, reason = "") {
       body: JSON.stringify({ reason }),
     }
   );
+}
+
+export type BulkLockOpenResult = { locked_count: number; error_count: number; locked: { id: number; code: string; updated: boolean }[]; errors: { id: number; code: string; error: string }[] };
+export function bulkLockOpenPeriods(financialYearId?: number, reason = "Bulk lock from admin accounting cockpit.", excludeCurrentPeriod = true) {
+  return apiFetch<BulkLockOpenResult>("/accounting/periods/bulk-lock-open/", {
+    method: "POST",
+    body: JSON.stringify({ reason, exclude_current_period: excludeCurrentPeriod, ...(financialYearId ? { financial_year_id: financialYearId } : {}) }),
+  });
+}
+
+export type CurrentPeriodStatusResult = { current_period: AccountingPeriod | null; posting_open: boolean; message: string };
+export function getCurrentPeriodStatus() {
+  return apiFetch<CurrentPeriodStatusResult>("/accounting/periods/current-period-status/");
+}
+export function reopenCurrentPeriod(reason = "Reopen current period to restore posting readiness.") {
+  return apiFetch<{ detail: string; reopened: boolean; period?: AccountingPeriod }>("/accounting/periods/reopen-current/", {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export function getAccountingPeriodsReadiness() {

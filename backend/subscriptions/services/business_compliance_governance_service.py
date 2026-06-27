@@ -627,6 +627,14 @@ def _approved_template_exists(template_key: str) -> bool:
     ).exclude(file="").exists()
 
 
+def _row_exists_for_types(document_types: set[str]) -> bool:
+    return BusinessComplianceDocument.objects.filter(document_type__in=document_types, is_active=True).exists()
+
+
+def _row_exists_for_template(template_key: str) -> bool:
+    return BusinessComplianceDocument.objects.filter(review_state__source_template_key=template_key, is_active=True).exists()
+
+
 def _pending_count() -> int:
     return BusinessComplianceDocument.objects.filter(
         is_active=True,
@@ -637,26 +645,34 @@ def _pending_count() -> int:
 def build_business_compliance_readiness() -> dict[str, Any]:
     active_profile_exists = BusinessProfile.objects.filter(is_active=True).exists()
 
+    _PREMISES_TYPES = {BusinessComplianceDocumentType.OWNERSHIP_PROOF, BusinessComplianceDocumentType.RENTAL_AGREEMENT}
+    _ADDRESS_TYPES = {BusinessComplianceDocumentType.SHOP_LICENSE, BusinessComplianceDocumentType.OTHER}
+    _PAN_TYPES = {BusinessComplianceDocumentType.PAN_OR_TAX_PROOF}
+    _BANK_TYPES = {BusinessComplianceDocumentType.BANK_PROOF}
     requirement_checks = [
         {
             "key": "premises_proof",
             "label": "Ownership proof or rental agreement",
-            "ready": _approved_exists({BusinessComplianceDocumentType.OWNERSHIP_PROOF, BusinessComplianceDocumentType.RENTAL_AGREEMENT}),
+            "ready": _approved_exists(_PREMISES_TYPES),
+            "has_row": _row_exists_for_types(_PREMISES_TYPES),
         },
         {
             "key": "business_address_proof",
             "label": "Business address proof",
-            "ready": _approved_exists({BusinessComplianceDocumentType.SHOP_LICENSE, BusinessComplianceDocumentType.OTHER}),
+            "ready": _approved_exists(_ADDRESS_TYPES),
+            "has_row": _row_exists_for_types(_ADDRESS_TYPES),
         },
         {
             "key": "pan_or_tax_proof",
             "label": "PAN / tax proof",
-            "ready": _approved_exists({BusinessComplianceDocumentType.PAN_OR_TAX_PROOF}),
+            "ready": _approved_exists(_PAN_TYPES),
+            "has_row": _row_exists_for_types(_PAN_TYPES),
         },
         {
             "key": "bank_proof",
             "label": "Bank proof",
-            "ready": _approved_exists({BusinessComplianceDocumentType.BANK_PROOF}),
+            "ready": _approved_exists(_BANK_TYPES),
+            "has_row": _row_exists_for_types(_BANK_TYPES),
         },
     ]
     requirement_checks.extend(
@@ -664,11 +680,14 @@ def build_business_compliance_readiness() -> dict[str, Any]:
             "key": template.key,
             "label": template.label,
             "ready": _approved_template_exists(template.key),
+            "has_row": _row_exists_for_template(template.key),
         }
         for template in BUSINESS_COMPLIANCE_TEMPLATES
         if template.required_level == REQUIRED and template.document_type == BusinessComplianceDocumentType.OTHER
     )
     missing_required = [row for row in requirement_checks if not row["ready"]]
+    truly_missing_required = [row for row in missing_required if not row["has_row"]]
+    pending_required = [row for row in missing_required if row["has_row"]]
     approved_required_count = len(requirement_checks) - len(missing_required)
 
     recommended_checks = [
@@ -713,10 +732,12 @@ def build_business_compliance_readiness() -> dict[str, Any]:
     warnings: list[str] = []
     if not active_profile_exists:
         blockers.append("Active business profile is missing.")
-    if missing_required:
-        blockers.append(f"{len(missing_required)} required business compliance evidence item(s) are missing, unapproved, or missing real files.")
+    if truly_missing_required:
+        blockers.append(f"{len(truly_missing_required)} required business compliance evidence item(s) are missing, unapproved, or missing real files.")
+    if pending_required:
+        warnings.append(f"{len(pending_required)} required compliance item(s) are seeded and pending evidence upload and approval.")
     if missing_file_count:
-        blockers.append(f"{missing_file_count} active compliance document row(s) have no evidence file.")
+        warnings.append(f"{missing_file_count} active compliance document row(s) have no evidence file yet.")
     if recommended_missing:
         warnings.append(f"{len(recommended_missing)} recommended compliance evidence item(s) are missing or not approved.")
     if pending_review_count:
@@ -735,7 +756,8 @@ def build_business_compliance_readiness() -> dict[str, Any]:
         "blockers": blockers,
         "warnings": warnings,
         "route_hint": "/admin/settings/business-compliance",
-        "missing_required_count": len(missing_required),
+        "missing_required_count": len(truly_missing_required),
+        "pending_required_count": len(pending_required),
         "pending_review_count": pending_review_count,
         "approved_required_count": approved_required_count,
         "required_count": len(requirement_checks),

@@ -4,6 +4,7 @@ from api.v1.views.admin_policy_review_dates import AdminPolicyBulkReviewDateView
 from api.v1.views.admin_policy_site import (
     AdminBusinessRulePolicyView,
     AdminPolicyCoverageView,
+    AdminPolicyGovernanceSeedView,
     AdminPolicyPageAcceptInternalView,
     AdminPolicyPageApproveView,
     AdminPolicyPageRejectView,
@@ -22,4 +23,5 @@ urlpatterns = [
     path("public-site/policies/<int:pk>/reject/", AdminPolicyPageRejectView.as_view()),
     path("public-site/policies/<int:pk>/accept-internal/", AdminPolicyPageAcceptInternalView.as_view()),
     path("public-site/policies/<int:pk>/sync-governance-metadata/", AdminPolicyPageSyncGovernanceMetadataView.as_view()),
+    path("setup/seed-policy-governance/", AdminPolicyGovernanceSeedView.as_view()),
 ]

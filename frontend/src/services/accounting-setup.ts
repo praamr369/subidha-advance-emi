@@ -371,8 +371,8 @@ function buildMatrixFromReadiness(payload: AccountingSetupReadinessPayload): Acc
   };
 }
 
-export async function getAccountingSetupReadiness(): Promise<AccountingSetupReadinessPayload> {
-  return request<AccountingSetupReadinessPayload>("/admin/accounting/setup/readiness/");
+export async function getAccountingSetupReadiness(opts?: { signal?: AbortSignal }): Promise<AccountingSetupReadinessPayload> {
+  return request<AccountingSetupReadinessPayload>("/admin/accounting/setup/readiness/", { signal: opts?.signal });
 }
 
 export async function getAccountingSetupStatus(): Promise<AccountingSetupStatusPayload> {

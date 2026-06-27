@@ -588,7 +588,7 @@ def validate_active_asset_finance_account(finance_account: FinanceAccount | None
 def _active_mapping_for_purpose(purpose: str) -> FinanceAccountCoaMapping | None:
     return (
         FinanceAccountCoaMapping.objects.select_related("finance_account", "chart_account")
-        .filter(purpose=purpose, is_active=True)
+        .filter(purpose=purpose, is_active=True, finance_account__is_active=True)
         .order_by("-is_default", "id")
         .first()
     )

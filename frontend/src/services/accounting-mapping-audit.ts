@@ -92,8 +92,8 @@ export type AccountingMappingAuditSeedResponse = {
   document_sequences_allocated: number;
 };
 
-export async function getAccountingMappingAudit(): Promise<AccountingMappingAuditPayload> {
-  return request<AccountingMappingAuditPayload>("/admin/accounting/mapping-audit/");
+export async function getAccountingMappingAudit(opts?: { signal?: AbortSignal }): Promise<AccountingMappingAuditPayload> {
+  return request<AccountingMappingAuditPayload>("/admin/accounting/mapping-audit/", { signal: opts?.signal, timeoutMs: 30000 });
 }
 
 export async function seedAccountingMappingSafeDefaults(): Promise<AccountingMappingAuditSeedResponse> {
@@ -116,6 +116,22 @@ export async function fixAccountingMappingAuditEvent(input: { event_key: string;
   return request<{ audit: AccountingMappingAuditPayload }>("/admin/accounting/mapping-audit/fix-event/", {
     method: "POST",
     body: JSON.stringify(input),
+    retryCount: 0,
+  });
+}
+
+export async function approveBridgePostingEvent(event_key: string, reason = ""): Promise<{ event_key: string; is_approved: boolean; approved_at: string | null; audit: AccountingMappingAuditPayload }> {
+  return request("/admin/accounting/bridge-posting-approvals/", {
+    method: "POST",
+    body: JSON.stringify({ event_key, reason, action: "approve" }),
+    retryCount: 0,
+  });
+}
+
+export async function revokeBridgePostingEvent(event_key: string): Promise<{ event_key: string; is_approved: boolean; audit: AccountingMappingAuditPayload }> {
+  return request("/admin/accounting/bridge-posting-approvals/", {
+    method: "POST",
+    body: JSON.stringify({ event_key, action: "revoke" }),
     retryCount: 0,
   });
 }

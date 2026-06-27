@@ -5,6 +5,11 @@ from typing import Any
 
 from accounting.services.accounting_bridge_readiness_service import build_accounting_bridge_period_readiness
 
+
+def _is_event_approved(event_key: str) -> bool:
+    from accounting.models import BridgePostingApproval
+    return BridgePostingApproval.objects.filter(event_key=event_key, is_approved=True).exists()
+
 READY = "READY"
 POSTABLE = "POSTABLE"
 READY_UNPOSTED = "READY_UNPOSTED"
@@ -108,7 +113,7 @@ def evaluate_accounting_postability(
     journal_numbering_ready = bool(period.get("journal_numbering_ready"))
     period_ready = active_financial_year_ready and accounting_period_ready
     needs_approval = bool(approval_required if approval_required is not None else key in APPROVAL_REQUIRED_EVENTS)
-    approval_ready = not needs_approval
+    approval_ready = not needs_approval or _is_event_approved(key)
 
     if not supported:
         status = UNSUPPORTED_SOURCE

@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.brand_data import (
     BrandApplySerializer,
+    BrandDirectProfileSerializer,
     BrandImportItemActionSerializer,
     BrandManualPreviewSerializer,
 )
@@ -13,9 +14,11 @@ from subscriptions.services.brand_data_import_service import (
     apply_approved_items,
     audit_feed,
     create_manual_preview,
+    get_public_profile,
     list_sources,
     provider_preview_stub,
     set_item_approval,
+    upsert_public_profile,
 )
 
 
@@ -76,3 +79,19 @@ class AdminBrandDataApplyView(_AdminBrandBase):
 class AdminBrandDataAuditView(_AdminBrandBase):
     def get(self, request):
         return Response(audit_feed())
+
+
+class AdminBrandDirectProfileView(_AdminBrandBase):
+    """Read and directly update the public business profile + social links without the batch/approval workflow."""
+
+    def get(self, request):
+        return Response(get_public_profile())
+
+    def patch(self, request):
+        serializer = BrandDirectProfileSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = upsert_public_profile(actor=request.user, data=serializer.validated_data)
+        except Exception as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(result)

@@ -537,6 +537,7 @@ from api.v1.views.admin_brand_data import (
     AdminBrandDataSocialLinkActionView,
     AdminBrandDataSourcesView,
     AdminBrandDataYoutubePreviewView,
+    AdminBrandDirectProfileView,
 )
 from api.v1.views.reversal_control import (
     AdminReversalCaseApproveView,
@@ -1044,6 +1045,7 @@ urlpatterns = [
     path("brand-data/import/social-link/", AdminBrandDataSocialLinkActionView.as_view()),
     path("brand-data/apply/", AdminBrandDataApplyView.as_view()),
     path("brand-data/audit/", AdminBrandDataAuditView.as_view()),
+    path("brand-data/profile/", AdminBrandDirectProfileView.as_view()),
     path("finance/reversal-control/", AdminReversalControlDashboardView.as_view()),
     path("finance/reversal-cases/", AdminReversalCaseListCreateView.as_view()),
     path("finance/reversal-cases/<int:pk>/", AdminReversalCaseDetailView.as_view()),

@@ -436,3 +436,71 @@ class AdminBusinessComplianceDocumentRevokePublicSummaryView(_AdminBusinessCompl
 class AdminBusinessComplianceSummaryView(_AdminPolicyBase):
     def get(self, request):
         return Response(get_public_business_compliance_summary())
+
+
+class AdminPolicyGovernanceSeedView(_AdminPolicyBase):
+    """Seed all required policy templates and auto-publish public ones / accept internal ones.
+
+    GET  → dry-run preview (no mutations).
+    POST → execute seed + publish + accept.
+    """
+
+    def get(self, request):
+        from subscriptions.services.policy_coverage_catalog import INTERNAL, PUBLIC, get_policy_coverage_specs
+        specs = get_policy_coverage_specs()
+        coverage = build_policy_coverage_matrix()
+        public_missing = sum(1 for row in coverage["results"] if row["visibility"] == PUBLIC and row["status"] != "PUBLISHED")
+        internal_pending = sum(1 for row in coverage["results"] if row["visibility"] == INTERNAL and not row["internal_ready"])
+        return Response({
+            "mode": "dry_run_preview",
+            "public_policies_total": sum(1 for s in specs if s.visibility == PUBLIC),
+            "internal_policies_total": sum(1 for s in specs if s.visibility == INTERNAL),
+            "public_not_published": public_missing,
+            "internal_not_accepted": internal_pending,
+            "action": "POST to this endpoint to seed and publish all required policies.",
+            "safety_contract": "This endpoint creates policy page records and publishes them. It does not create financial records, journals, receipts, or contracts.",
+        })
+
+    def post(self, request):
+        from subscriptions.services.policy_coverage_catalog import INTERNAL, PUBLIC, get_policy_coverage_specs
+        from subscriptions.services.policy_governance_service import hydrate_policy_governance_metadata
+
+        seed_result = seed_default_policy_pages(performed_by=request.user)
+        specs = get_policy_coverage_specs()
+        published = accepted = skipped = 0
+        errors: list[str] = []
+        for spec in specs:
+            policy = PolicyPage.objects.filter(slug=spec.slug).order_by("-version", "-id").first()
+            if policy is None:
+                skipped += 1
+                continue
+            if spec.visibility == PUBLIC:
+                if policy.status == "PUBLISHED":
+                    skipped += 1
+                    continue
+                try:
+                    publish_policy_page(policy=policy, performed_by=request.user, review_now=True)
+                    published += 1
+                except Exception as exc:
+                    errors.append(f"{spec.slug}: {exc}")
+                    skipped += 1
+            elif spec.visibility == INTERNAL:
+                meta = hydrate_policy_governance_metadata(policy)
+                if meta.internal_acceptance_at or policy.status in {"APPROVED", "PUBLISHED"}:
+                    skipped += 1
+                    continue
+                try:
+                    accept_internal_policy(policy, performed_by=request.user)
+                    accepted += 1
+                except Exception as exc:
+                    errors.append(f"{spec.slug}: {exc}")
+                    skipped += 1
+        return Response({
+            "status": "DONE" if not errors else "PARTIAL",
+            "seed_result": seed_result,
+            "public_published": published,
+            "internal_accepted": accepted,
+            "skipped": skipped,
+            "errors": errors,
+            "safety_contract": "Policy seed and publish complete. No financial records were created.",
+        }, status=status.HTTP_200_OK)
