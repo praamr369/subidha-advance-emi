@@ -47,6 +47,8 @@ export default function StaffAttendancePage() {
     }
   }, [load]);
 
+  const attendanceRows = Array.isArray(data?.results) ? data.results : [];
+
   return (
     <div className="space-y-6 p-1">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -78,14 +80,14 @@ export default function StaffAttendancePage() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading attendance…</p>
-      ) : !data || data.results.length === 0 ? (
+      ) : !data || attendanceRows.length === 0 ? (
         <p className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
           No attendance records found for your profile.
         </p>
       ) : (
         <div className="space-y-4">
           <section className="grid gap-3 sm:grid-cols-4">
-            {Object.entries(data.counts).map(([status, count]) => (
+            {Object.entries(data.counts ?? {}).map(([status, count]) => (
               <div
                 key={status}
                 className="rounded-2xl border border-border bg-card p-4 shadow-sm"
@@ -111,7 +113,7 @@ export default function StaffAttendancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {data.results.map((row) => (
+                {attendanceRows.map((row) => (
                   <tr key={row.id}>
                     <td className="px-4 py-3">{row.attendance_date}</td>
                     <td className="px-4 py-3 font-semibold">{row.status}</td>

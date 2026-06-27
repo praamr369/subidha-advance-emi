@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   createContext,
   useCallback,
@@ -68,8 +69,6 @@ import SidebarHoverCard from "@/components/layout/SidebarHoverCard";
 import BusinessSetupWorkflowBanner from "@/components/admin/business-setup/BusinessSetupWorkflowBanner";
 import WorkflowProvider from "@/components/workflows/WorkflowProvider";
 import AdminWorkspaceMenubar from "@/components/layout/AdminWorkspaceMenubar";
-import CommandPalette from "@/components/workflows/CommandPalette";
-import QuickActionLauncher from "@/components/workflows/QuickActionLauncher";
 import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { getStoredSession } from "@/lib/auth/session";
@@ -87,6 +86,15 @@ import { useAuth } from "@/providers/AuthProvider";
 import { pushRecent, readFavorites, readRecents, toggleFavorite } from "@/lib/workspace-prefs";
 import { cn } from "@/lib/utils";
 import { getAdminNavigationBadges } from "@/services/navigation-badges";
+
+const CommandPalette = dynamic(
+  () => import("@/components/workflows/CommandPalette"),
+  { ssr: false }
+);
+const QuickActionLauncher = dynamic(
+  () => import("@/components/workflows/QuickActionLauncher"),
+  { ssr: false }
+);
 
 const DashboardShellContext = createContext(false);
 
@@ -674,9 +682,14 @@ function SidebarContent({
         if (!cancelled) setQueueBadges({});
       }
     };
-    void loadBadges();
+    // Navigation badges are useful context, but they must not contend with the
+    // route's primary data during the first render.
+    const timeoutId = window.setTimeout(() => {
+      void loadBadges();
+    }, 750);
     return () => {
       cancelled = true;
+      window.clearTimeout(timeoutId);
     };
   }, [role]);
 

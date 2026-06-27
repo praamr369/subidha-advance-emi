@@ -226,62 +226,75 @@ export default function VendorDashboardPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
 
-  const dashboardQuery = useQuery({
-    queryKey: ["vendor", "dashboard"],
-    queryFn: async () => {
-      const [dashboardResult, productsResult, ordersResult, outstandingResult, notificationsResult] =
-        await Promise.allSettled([
-        listVendorDashboard(),
-        listVendorProducts(),
-        listVendorPurchaseOrders(),
-        getVendorOutstanding(),
-        getVendorNotificationSummary(),
-      ]);
-      if (dashboardResult.status === "rejected") throw dashboardResult.reason;
-
-      const productsPayload =
-        productsResult.status === "fulfilled"
-          ? (productsResult.value as { results?: VendorProduct[] } | VendorProduct[])
-          : [];
-      const ordersPayload =
-        ordersResult.status === "fulfilled"
-          ? (ordersResult.value as { results?: VendorPO[] } | VendorPO[])
-          : [];
-
-      return {
-        dashboard: dashboardResult.value as VendorDashboard,
-        products: Array.isArray(productsPayload)
-          ? productsPayload
-          : (productsPayload.results ?? []),
-        purchaseOrders: Array.isArray(ordersPayload)
-          ? ordersPayload
-          : (ordersPayload.results ?? []),
-        outstanding:
-          outstandingResult.status === "fulfilled"
-            ? (outstandingResult.value as VendorOutstanding)
-            : null,
-        notificationSummary:
-          notificationsResult.status === "fulfilled"
-            ? notificationsResult.value
-            : null,
-      };
-    },
+  const coreQuery = useQuery({
+    queryKey: ["vendor", "dashboard", "core"],
+    queryFn: listVendorDashboard,
+  });
+  const productsQuery = useQuery({
+    queryKey: ["vendor", "dashboard", "products"],
+    queryFn: listVendorProducts,
+    enabled: coreQuery.isSuccess,
+  });
+  const purchaseOrdersQuery = useQuery({
+    queryKey: ["vendor", "dashboard", "purchase-orders"],
+    queryFn: listVendorPurchaseOrders,
+    enabled: coreQuery.isSuccess,
+  });
+  const outstandingQuery = useQuery({
+    queryKey: ["vendor", "dashboard", "outstanding"],
+    queryFn: getVendorOutstanding,
+    enabled: coreQuery.isSuccess,
+  });
+  const notificationSummaryQuery = useQuery({
+    queryKey: ["vendor", "dashboard", "notification-summary"],
+    queryFn: getVendorNotificationSummary,
+    enabled: coreQuery.isSuccess,
   });
 
-  const dashboard = dashboardQuery.data?.dashboard ?? null;
-  const products = dashboardQuery.data?.products ?? EMPTY_VENDOR_PRODUCTS;
-  const purchaseOrders =
-    dashboardQuery.data?.purchaseOrders ?? EMPTY_VENDOR_PURCHASE_ORDERS;
-  const outstanding = dashboardQuery.data?.outstanding ?? null;
+  const productsPayload = productsQuery.data as
+    | { results?: VendorProduct[] }
+    | VendorProduct[]
+    | undefined;
+  const ordersPayload = purchaseOrdersQuery.data as
+    | { results?: VendorPO[] }
+    | VendorPO[]
+    | undefined;
+  const dashboard = (coreQuery.data as VendorDashboard | undefined) ?? null;
+  const products = productsPayload
+    ? Array.isArray(productsPayload)
+      ? productsPayload
+      : (productsPayload.results ?? EMPTY_VENDOR_PRODUCTS)
+    : EMPTY_VENDOR_PRODUCTS;
+  const purchaseOrders = ordersPayload
+    ? Array.isArray(ordersPayload)
+      ? ordersPayload
+      : (ordersPayload.results ?? EMPTY_VENDOR_PURCHASE_ORDERS)
+    : EMPTY_VENDOR_PURCHASE_ORDERS;
+  const outstanding =
+    (outstandingQuery.data as VendorOutstanding | undefined) ?? null;
   const notifSummary: NotificationSummaryResponse | null =
-    dashboardQuery.data?.notificationSummary ?? null;
-  const loading = dashboardQuery.isPending;
-  const refreshing = dashboardQuery.isFetching && !dashboardQuery.isPending;
-  const error = dashboardQuery.error
-    ? dashboardQuery.error instanceof Error
-      ? dashboardQuery.error.message
+    notificationSummaryQuery.data ?? null;
+  const loading = coreQuery.isPending;
+  const refreshing = [
+    coreQuery,
+    productsQuery,
+    purchaseOrdersQuery,
+    outstandingQuery,
+    notificationSummaryQuery,
+  ].some((query) => query.isFetching && !query.isPending);
+  const error = coreQuery.error
+    ? coreQuery.error instanceof Error
+      ? coreQuery.error.message
       : "Unable to load vendor dashboard."
     : null;
+
+  function refreshDashboard() {
+    void coreQuery.refetch();
+    void productsQuery.refetch();
+    void purchaseOrdersQuery.refetch();
+    void outstandingQuery.refetch();
+    void notificationSummaryQuery.refetch();
+  }
 
   // Derived filter lists
   const categories = useMemo(() => {
@@ -320,7 +333,7 @@ export default function VendorDashboardPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => void dashboardQuery.refetch()}
+              onClick={refreshDashboard}
               disabled={loading || refreshing}
               className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
             >
@@ -342,7 +355,7 @@ export default function VendorDashboardPage() {
         {loading ? (
           <ERPLoadingState label="Loading vendor dashboard…" />
         ) : error ? (
-          <ERPErrorState title="Dashboard unavailable" description={error} onRetry={() => void dashboardQuery.refetch()} />
+          <ERPErrorState title="Dashboard unavailable" description={error} onRetry={() => void coreQuery.refetch()} />
         ) : (
           <>
             {/* ── KPI band ── */}

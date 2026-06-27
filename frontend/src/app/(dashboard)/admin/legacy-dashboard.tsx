@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -473,6 +480,10 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const coreRequestIdRef = useRef(0);
+  const secondaryRequestIdRef = useRef(0);
+  const secondaryReadyRef = useRef(false);
+  const loadSecondaryDashboardRef = useRef<() => void>(() => undefined);
   const [windowPreset, setWindowPreset] =
     useState<DashboardWindowPreset>("THIS_MONTH");
   const [startDate, setStartDate] = useState("");
@@ -519,130 +530,180 @@ export default function AdminDashboardPage() {
     [selectedBranchId]
   );
 
-  const loadDashboard = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+  const loadCoreDashboard = useCallback(async (
+    mode: "initial" | "refresh" = "initial"
+  ): Promise<boolean> => {
+    const requestId = ++coreRequestIdRef.current;
     if (mode === "initial") setLoading(true);
     else setRefreshing(true);
 
     try {
-      // Promise.allSettled so any single slow/failed API doesn't block the entire dashboard
-      const settled = await Promise.allSettled([
-        getAdminDashboard(),
-        getDashboardSummaryV2(dashboardQuery),
-        listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
-        listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
-        listDashboardRecentPayments({ ...dashboardQuery, limit: 8 }),
-        listDashboardReconciliationExceptions({ ...dashboardQuery, limit: 4 }),
-        listDashboardWinners({ ...dashboardQuery, limit: 4 }),
-        getAdminDeliverySummary(),
-        listAdminSupportRequests({ status: "SUBMITTED" }),
-        listAdminLeads({}),
-        listSubscriptionRequests("admin", { status: "SUBMITTED", page: 1, pageSize: 1 }),
-        getBranchReportingOverview(branchReportingQuery),
-        getBranchReportingOverview(todayBranchReportingQuery),
-        getStockSummary({ branch: selectedBranchId || undefined }),
-        listPurchaseBills({ ...branchScopedQuery, status: "DRAFT" }),
-        listPurchaseBills({ ...branchScopedQuery, status: "APPROVED" }),
-        listSalarySheetsSafe({ ...branchScopedQuery, status: "POSTED" }),
-        listExpenseClaimsSafe({ ...branchScopedQuery, status: "POSTED" }),
-        getServiceDeskOverview(),
-        listServiceDeskCases({ ...branchScopedQuery, status: "OPEN" }),
-        listReminders({ status: "PENDING", page_size: 1 }),
-        listReminders({ status: "FAILED", page_size: 1 }),
-      ]);
-
-      function ok<T>(r: PromiseSettledResult<T>, fallback: T): T {
-        return r.status === "fulfilled" ? r.value : fallback;
-      }
-
-      // Core data — fail fast if the main dashboard call fails
-      if (settled[0].status === "rejected") throw settled[0].reason;
-      const legacyPayload = settled[0].value as LegacyDashboardPayload;
-
-      const canonicalPayload = ok(settled[1] as PromiseSettledResult<CanonicalDashboardPayload>, null);
-      const overduePayload = ok(settled[2] as PromiseSettledResult<DashboardDuePayload>, null);
-      const upcomingPayload = ok(settled[3] as PromiseSettledResult<DashboardDuePayload>, null);
-      const recentPaymentsPayload = ok(settled[4] as PromiseSettledResult<DashboardPaymentsPayload>, null);
-      const reconciliationPayload = ok(settled[5] as PromiseSettledResult<DashboardReconciliationPayload>, null);
-      const winnerPayload = ok(settled[6] as PromiseSettledResult<DashboardWinnersPayload>, null);
-      const deliverySummaryPayload = ok(settled[7] as PromiseSettledResult<DeliverySummaryPayload>, null);
-      const supportQueuePayload = ok(settled[8] as PromiseSettledResult<SupportQueuePayload>, null);
-      const leadQueuePayload = ok(settled[9] as PromiseSettledResult<LeadQueuePayload>, null);
-      const requestQueuePayload = ok(settled[10] as PromiseSettledResult<RequestQueuePayload>, null);
-      const branchOverviewPayload = ok(settled[11] as PromiseSettledResult<BranchReportingOverview>, null);
-      const todayBranchOverviewPayload = ok(settled[12] as PromiseSettledResult<BranchReportingOverview>, null);
-      const stockSummaryPayload = ok(settled[13] as PromiseSettledResult<StockSummaryPayload>, null);
-      const purchaseDraftPayload = ok(settled[14] as PromiseSettledResult<PurchaseBillListPayload>, null);
-      const purchaseApprovedPayload = ok(settled[15] as PromiseSettledResult<PurchaseBillListPayload>, null);
-      const salaryPayablePayload = ok(settled[16] as PromiseSettledResult<SalarySheetListPayload>, null);
-      const expenseClaimPayload = ok(settled[17] as PromiseSettledResult<ExpenseClaimListPayload>, null);
-      const serviceDeskOverviewPayload = ok(settled[18] as PromiseSettledResult<ServiceDeskOverview>, null);
-      const openServiceCasePayload = ok(settled[19] as PromiseSettledResult<ServiceDeskCasePayload>, null);
-      const pendingReminderPayload = ok(settled[20] as PromiseSettledResult<ReminderQueuePayload>, null);
-      const failedReminderPayload = ok(settled[21] as PromiseSettledResult<ReminderQueuePayload>, null);
-
-      const branchMetricPayloads = selectedBranchId
-        ? (branchOverviewPayload ? [branchOverviewPayload] : [])
-        : branchOverviewPayload
-        ? await Promise.allSettled(
-            branchOverviewPayload.branches
-              .filter((branch) => branch.status === "ACTIVE")
-              .slice(0, 6)
-              .map((branch) =>
-                getBranchReportingOverview({ ...branchReportingQuery, branch_id: branch.id })
-              )
-          ).then(rs => rs.filter(r => r.status === "fulfilled").map(r => (r as PromiseFulfilledResult<BranchReportingOverview>).value))
-        : [];
-
+      const legacyPayload = await getAdminDashboard();
+      if (requestId !== coreRequestIdRef.current) return false;
       setLegacy(legacyPayload);
-      setCanonical(canonicalPayload);
-      setOverdue(overduePayload);
-      setUpcoming(upcomingPayload);
-      setRecentPayments(recentPaymentsPayload);
-      setReconciliationItems(reconciliationPayload);
-      setWinnerItems(winnerPayload);
-      setDeliverySummary(deliverySummaryPayload);
-      setSupportQueue(supportQueuePayload);
-      setLeadQueue(leadQueuePayload);
-      setRequestQueue(requestQueuePayload);
-      setBranchOverview(branchOverviewPayload);
-      setTodayBranchOverview(todayBranchOverviewPayload);
-      setBranchBreakdowns(branchMetricPayloads);
-      setStockSummary(stockSummaryPayload);
-      setPurchaseDrafts(purchaseDraftPayload);
-      setPurchaseApproved(purchaseApprovedPayload);
-      setSalaryPayables(salaryPayablePayload);
-      setExpenseClaimQueue(expenseClaimPayload);
-      setServiceDeskOverview(serviceDeskOverviewPayload);
-      setOpenServiceCases(openServiceCasePayload);
-      setPendingReminderQueue(pendingReminderPayload);
-      setFailedReminderQueue(failedReminderPayload);
       setError(null);
+      return true;
     } catch (err) {
+      if (requestId !== coreRequestIdRef.current) return false;
       setError(toErrorMessage(err));
       if (mode === "initial") {
         setLegacy(null);
-        setCanonical(null);
-        setDeliverySummary(null);
-        setSupportQueue(null);
-        setLeadQueue(null);
-        setRequestQueue(null);
-        setBranchOverview(null);
-        setTodayBranchOverview(null);
-        setBranchBreakdowns([]);
-        setStockSummary(null);
-        setPurchaseDrafts(null);
-        setPurchaseApproved(null);
-        setSalaryPayables(null);
-        setExpenseClaimQueue(null);
-        setServiceDeskOverview(null);
-        setOpenServiceCases(null);
-        setPendingReminderQueue(null);
-        setFailedReminderQueue(null);
       }
+      return false;
     } finally {
-      if (mode === "initial") setLoading(false);
-      else setRefreshing(false);
+      if (requestId === coreRequestIdRef.current) {
+        if (mode === "initial") setLoading(false);
+        else setRefreshing(false);
+      }
     }
+  }, []);
+
+  const loadSecondaryDashboard = useCallback(() => {
+    const requestId = ++secondaryRequestIdRef.current;
+    const isCurrentRequest = () => requestId === secondaryRequestIdRef.current;
+
+    function loadSecondary<T>(
+      request: Promise<T>,
+      apply: (value: T) => void,
+      clear: () => void
+    ) {
+      void request
+        .then((value) => {
+          if (isCurrentRequest()) apply(value);
+        })
+        .catch(() => {
+          if (isCurrentRequest()) clear();
+        });
+    }
+
+    loadSecondary(getDashboardSummaryV2(dashboardQuery), setCanonical, () =>
+      setCanonical(null)
+    );
+    loadSecondary(
+      listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+      setOverdue,
+      () => setOverdue(null)
+    );
+    loadSecondary(
+      listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+      setUpcoming,
+      () => setUpcoming(null)
+    );
+    loadSecondary(
+      listDashboardRecentPayments({ ...dashboardQuery, limit: 8 }),
+      setRecentPayments,
+      () => setRecentPayments(null)
+    );
+    loadSecondary(
+      listDashboardReconciliationExceptions({ ...dashboardQuery, limit: 4 }),
+      setReconciliationItems,
+      () => setReconciliationItems(null)
+    );
+    loadSecondary(
+      listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+      setWinnerItems,
+      () => setWinnerItems(null)
+    );
+    loadSecondary(getAdminDeliverySummary(), setDeliverySummary, () =>
+      setDeliverySummary(null)
+    );
+    loadSecondary(
+      listAdminSupportRequests({ status: "SUBMITTED" }),
+      setSupportQueue,
+      () => setSupportQueue(null)
+    );
+    loadSecondary(listAdminLeads({}), setLeadQueue, () => setLeadQueue(null));
+    loadSecondary(
+      listSubscriptionRequests("admin", {
+        status: "SUBMITTED",
+        page: 1,
+        pageSize: 1,
+      }),
+      setRequestQueue,
+      () => setRequestQueue(null)
+    );
+    loadSecondary(
+      getBranchReportingOverview(todayBranchReportingQuery),
+      setTodayBranchOverview,
+      () => setTodayBranchOverview(null)
+    );
+    loadSecondary(
+      getStockSummary({ branch: selectedBranchId || undefined }),
+      setStockSummary,
+      () => setStockSummary(null)
+    );
+    loadSecondary(
+      listPurchaseBills({ ...branchScopedQuery, status: "DRAFT" }),
+      setPurchaseDrafts,
+      () => setPurchaseDrafts(null)
+    );
+    loadSecondary(
+      listPurchaseBills({ ...branchScopedQuery, status: "APPROVED" }),
+      setPurchaseApproved,
+      () => setPurchaseApproved(null)
+    );
+    loadSecondary(
+      listSalarySheetsSafe({ ...branchScopedQuery, status: "POSTED" }),
+      setSalaryPayables,
+      () => setSalaryPayables(null)
+    );
+    loadSecondary(
+      listExpenseClaimsSafe({ ...branchScopedQuery, status: "POSTED" }),
+      setExpenseClaimQueue,
+      () => setExpenseClaimQueue(null)
+    );
+    loadSecondary(getServiceDeskOverview(), setServiceDeskOverview, () =>
+      setServiceDeskOverview(null)
+    );
+    loadSecondary(
+      listServiceDeskCases({ ...branchScopedQuery, status: "OPEN" }),
+      setOpenServiceCases,
+      () => setOpenServiceCases(null)
+    );
+    loadSecondary(
+      listReminders({ status: "PENDING", page_size: 1 }),
+      setPendingReminderQueue,
+      () => setPendingReminderQueue(null)
+    );
+    loadSecondary(
+      listReminders({ status: "FAILED", page_size: 1 }),
+      setFailedReminderQueue,
+      () => setFailedReminderQueue(null)
+    );
+
+    void getBranchReportingOverview(branchReportingQuery)
+      .then(async (branchPayload) => {
+        if (!isCurrentRequest()) return;
+        setBranchOverview(branchPayload);
+
+        if (selectedBranchId) {
+          setBranchBreakdowns([branchPayload]);
+          return;
+        }
+
+        const results = await Promise.allSettled(
+          branchPayload.branches
+            .filter((branch) => branch.status === "ACTIVE")
+            .slice(0, 6)
+            .map((branch) =>
+              getBranchReportingOverview({
+                ...branchReportingQuery,
+                branch_id: branch.id,
+              })
+            )
+        );
+        if (!isCurrentRequest()) return;
+        setBranchBreakdowns(
+          results.flatMap((result) =>
+            result.status === "fulfilled" ? [result.value] : []
+          )
+        );
+      })
+      .catch(() => {
+        if (!isCurrentRequest()) return;
+        setBranchOverview(null);
+        setBranchBreakdowns([]);
+      });
   }, [
     branchReportingQuery,
     branchScopedQuery,
@@ -651,9 +712,37 @@ export default function AdminDashboardPage() {
     todayBranchReportingQuery,
   ]);
 
+  loadSecondaryDashboardRef.current = loadSecondaryDashboard;
+
   useEffect(() => {
-    void loadDashboard("initial");
-  }, [loadDashboard]);
+    let active = true;
+    void loadCoreDashboard("initial").then((loaded) => {
+      if (!active || !loaded) return;
+      secondaryReadyRef.current = true;
+      loadSecondaryDashboardRef.current();
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [loadCoreDashboard]);
+
+  useEffect(() => {
+    if (!secondaryReadyRef.current) return;
+    loadSecondaryDashboard();
+  }, [loadSecondaryDashboard]);
+
+  const refreshDashboard = useCallback(() => {
+    void loadCoreDashboard("refresh");
+    loadSecondaryDashboard();
+  }, [loadCoreDashboard, loadSecondaryDashboard]);
+
+  const retryDashboard = useCallback(async () => {
+    const loaded = await loadCoreDashboard("initial");
+    if (!loaded) return;
+    secondaryReadyRef.current = true;
+    loadSecondaryDashboard();
+  }, [loadCoreDashboard, loadSecondaryDashboard]);
 
   const summary =
     canonical?.summary ??
@@ -892,7 +981,7 @@ export default function AdminDashboardPage() {
           </div>
           <ActionButton
             variant="outline"
-            onClick={() => void loadDashboard("refresh")}
+            onClick={refreshDashboard}
             disabled={refreshing || loading}
             leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
@@ -916,7 +1005,7 @@ export default function AdminDashboardPage() {
           <ErrorState
             title="Unable to load admin dashboard"
             description={error}
-            onRetry={() => void loadDashboard("initial")}
+            onRetry={() => void retryDashboard()}
           />
         ) : null}
 

@@ -103,6 +103,8 @@ export default function CashierVariancePage() {
     return "bg-yellow-100 text-yellow-700 border-yellow-300";
   };
 
+  const varianceRows = Array.isArray(data?.results) ? data.results : [];
+
   return (
     <ERPPageShell
       eyebrow="Finance · Settlements"
@@ -117,7 +119,7 @@ export default function CashierVariancePage() {
       stats={[
         { label: "Threshold", value: data ? `₹${Number(data.threshold).toLocaleString("en-IN")}` : `₹${Number(threshold).toLocaleString("en-IN")}`, tone: "default" },
         { label: "Breaches", value: data ? data.total_breaches : "—", tone: data && data.total_breaches > 0 ? "danger" : "success" },
-        { label: "Records Shown", value: data ? data.results.length : "—", tone: "info" },
+        { label: "Records Shown", value: data ? varianceRows.length : "—", tone: "info" },
       ]}
     >
 
@@ -216,7 +218,7 @@ export default function CashierVariancePage() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {data.results.map(row => {
+              {varianceRows.map(row => {
                 const escalated = escalateResults[row.id];
                 const escalateErr = escalateErrors[row.id];
                 const isBusy = escalating === row.id;

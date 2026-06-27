@@ -40,9 +40,66 @@ export type CustomerTimelineEvent = {
 };
 
 export type CustomerTimelineResponse = {
+  customer_id?: number;
   count: number;
   results: CustomerTimelineEvent[];
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeTimelineEvent(value: unknown): CustomerTimelineEvent | null {
+  if (!isRecord(value)) return null;
+  if (
+    (typeof value.event_id !== "string" && typeof value.event_id !== "number") ||
+    typeof value.event_type !== "string" ||
+    typeof value.title !== "string" ||
+    typeof value.severity !== "string"
+  ) {
+    return null;
+  }
+
+  const sourceId = value.source_id;
+  return {
+    event_id: String(value.event_id),
+    event_type: value.event_type,
+    event_date: typeof value.event_date === "string" ? value.event_date : null,
+    title: value.title,
+    description: typeof value.description === "string" ? value.description : "",
+    source_model: typeof value.source_model === "string" ? value.source_model : "",
+    source_id:
+      typeof sourceId === "string" || typeof sourceId === "number"
+        ? sourceId
+        : null,
+    status: typeof value.status === "string" ? value.status : "",
+    severity: value.severity,
+  };
+}
+
+function normalizeCustomerTimeline(
+  payload: unknown
+): CustomerTimelineResponse {
+  const source = isRecord(payload) ? payload : {};
+  const rawEvents = Array.isArray(source.events)
+    ? source.events
+    : Array.isArray(source.results)
+      ? source.results
+      : [];
+  const results = rawEvents.flatMap((event) => {
+    const normalized = normalizeTimelineEvent(event);
+    return normalized ? [normalized] : [];
+  });
+  const rawCount = Number(source.count);
+
+  return {
+    ...(typeof source.customer_id === "number"
+      ? { customer_id: source.customer_id }
+      : {}),
+    count: Number.isFinite(rawCount) && rawCount >= 0 ? rawCount : results.length,
+    results,
+  };
+}
 
 export type CustomerTimelineParams = {
   event_type?: string;
@@ -65,7 +122,10 @@ export async function fetchCustomerTimeline(
   if (params.limit != null) qs.set("limit", String(params.limit));
   if (params.ordering) qs.set("ordering", params.ordering);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return apiFetch<CustomerTimelineResponse>(`/admin/customers/${customerId}/timeline/${suffix}`);
+  const payload = await apiFetch<unknown>(
+    `/admin/customers/${customerId}/timeline/${suffix}`
+  );
+  return normalizeCustomerTimeline(payload);
 }
 
 // =====================================================

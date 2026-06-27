@@ -74,6 +74,8 @@ export default function NotificationCenterPanel({
     return ["", ...Array.from(merged).sort()];
   }, [modulesInResults]);
 
+  const notifications = Array.isArray(data?.results) ? data.results : [];
+
   async function onMarkRead(id: number) {
     setBusyId(id);
     try {
@@ -168,12 +170,12 @@ export default function NotificationCenterPanel({
 
       {loading && <LoadingBlock label="Loading notifications…" />}
       {error && <ErrorState title="Could not load" message={error} onRetry={() => void load()} />}
-      {!loading && !error && data && data.results.length === 0 && (
+      {!loading && !error && data && notifications.length === 0 && (
         <EmptyState title="No notifications" description="You are caught up. New system alerts will appear here." />
       )}
-      {!loading && !error && data && data.results.length > 0 && (
+      {!loading && !error && data && notifications.length > 0 && (
         <ul className="divide-y divide-border rounded-xl border border-border bg-card">
-          {data.results.map((row) => (
+          {notifications.map((row) => (
             <li key={row.id} className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">

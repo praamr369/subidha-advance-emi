@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/constants";
+import { API_BASE_URL, API_TIMEOUT_MS } from "@/lib/constants";
 import { clearSession, getStoredSession } from "@/lib/auth/session";
 import {
   getAccessToken,
@@ -42,9 +42,74 @@ export type ApiFetchBody =
 export type ApiFetchOptions = Omit<RequestInit, "body" | "headers"> & {
   headers?: HeadersInit;
   body?: ApiFetchBody;
+  /**
+   * GET-only request deadline. Use `null` or `0` for a deliberately unbounded
+   * download/stream. Mutation requests are never timed out by this shared
+   * client because aborting a financial write does not prove it was not posted.
+   */
+  timeoutMs?: number | null;
 };
 
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
+let refreshAccessTokenPromise: Promise<string | null> | null = null;
+
+type ManagedRequestSignal = {
+  signal: AbortSignal | null | undefined;
+  cleanup: () => void;
+};
+
+function getRequestTimeoutMs(
+  method: string,
+  configuredTimeoutMs: number | null | undefined
+): number | null {
+  if (method !== "GET") return null;
+  if (configuredTimeoutMs === null || configuredTimeoutMs === 0) return null;
+
+  const timeoutMs = configuredTimeoutMs ?? API_TIMEOUT_MS;
+  return Number.isFinite(timeoutMs) && timeoutMs > 0
+    ? timeoutMs
+    : API_TIMEOUT_MS;
+}
+
+function createManagedRequestSignal(
+  callerSignal: AbortSignal | null | undefined,
+  timeoutMs: number | null
+): ManagedRequestSignal {
+  if (timeoutMs === null) {
+    return { signal: callerSignal, cleanup: () => undefined };
+  }
+
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const abortFromCaller = (): void => {
+    controller.abort(callerSignal?.reason);
+  };
+
+  const cleanup = (): void => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    callerSignal?.removeEventListener("abort", abortFromCaller);
+  };
+
+  if (callerSignal?.aborted) {
+    abortFromCaller();
+  } else {
+    callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+    timeoutId = setTimeout(() => {
+      controller.abort(
+        new DOMException(
+          `GET request timed out after ${timeoutMs}ms`,
+          "TimeoutError"
+        )
+      );
+    }, timeoutMs);
+  }
+
+  return { signal: controller.signal, cleanup };
+}
 
 function normalizeHeaders(headers?: HeadersInit): Record<string, string> {
   if (!headers) return {};
@@ -352,7 +417,7 @@ function looksLikeJsonString(value: string): boolean {
   );
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+async function performAccessTokenRefresh(): Promise<string | null> {
   const refreshToken =
     getRefreshToken() ?? getStoredSession()?.refreshToken ?? null;
 
@@ -387,6 +452,20 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshAccessTokenPromise) {
+    return refreshAccessTokenPromise;
+  }
+
+  refreshAccessTokenPromise = performAccessTokenRefresh();
+
+  try {
+    return await refreshAccessTokenPromise;
+  } finally {
+    refreshAccessTokenPromise = null;
+  }
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   options: ApiFetchOptions = {},
@@ -413,6 +492,7 @@ export async function apiFetch<T = unknown>(
     accessToken,
     options.credentials ?? null,
     options.cache ?? null,
+    options.timeoutMs === undefined ? API_TIMEOUT_MS : options.timeoutMs,
     headers,
   ]);
   const existingRequest = inFlightGetRequests.get(requestKey);
@@ -478,18 +558,31 @@ async function apiFetchInternal<T>(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  const method = (options.method || "GET").toUpperCase();
+  const {
+    timeoutMs: configuredTimeoutMs,
+    signal: callerSignal,
+    ...requestOptions
+  } = options;
+  const managedSignal = createManagedRequestSignal(
+    callerSignal,
+    getRequestTimeoutMs(method, configuredTimeoutMs)
+  );
+
   let response: Response;
+  let parsed: ParsedResponseBody;
   try {
     response = await fetch(buildApiUrl(path), {
-      ...options,
+      ...requestOptions,
       body: requestBody,
       headers,
+      signal: managedSignal.signal,
     });
-  } catch (error) {
-    throw error;
+    parsed = await parseResponseBody(response);
+  } finally {
+    managedSignal.cleanup();
   }
 
-  const parsed = await parseResponseBody(response);
   const body = parsed.body;
 
   if (!response.ok) {

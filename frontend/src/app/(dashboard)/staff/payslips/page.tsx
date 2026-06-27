@@ -14,7 +14,7 @@ export default function StaffPayslipsPage() {
       title="Payslips"
       description="Read-only history of your own salary sheets and payment posture. Salary payments cannot be created from the staff portal."
       load={getStaffPayslips}
-      empty={(data) => data.results.length === 0}
+      empty={(data) => !Array.isArray(data.results) || data.results.length === 0}
       emptyMessage="No payslips are available for your profile."
       render={(data) => (
         <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
@@ -31,7 +31,7 @@ export default function StaffPayslipsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {data.results.map((row) => (
+              {(Array.isArray(data.results) ? data.results : []).map((row) => (
                 <tr key={row.id}>
                   <td className="px-4 py-3 font-semibold">{row.year}-{String(row.month).padStart(2, "0")}</td>
                   <td className="px-4 py-3">{formatRupee(row.gross_amount)}</td>

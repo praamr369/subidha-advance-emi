@@ -84,6 +84,8 @@ export function CustomerRiskPanel({ customerId }: Props) {
     );
   }
 
+  const reasonCodes = Array.isArray(profile.reason_codes) ? profile.reason_codes : [];
+
   return (
     <div
       className="rounded-xl border border-border bg-background p-5"
@@ -107,13 +109,13 @@ export function CustomerRiskPanel({ customerId }: Props) {
         </div>
       </div>
 
-      {profile.reason_codes.length > 0 && (
+      {reasonCodes.length > 0 && (
         <div className="mt-4" data-testid="customer-risk-reason-codes">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Reason codes
           </div>
           <div className="flex flex-wrap gap-2">
-            {profile.reason_codes.map((code) => (
+            {reasonCodes.map((code) => (
               <span
                 key={code}
                 className="inline-flex rounded border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground"

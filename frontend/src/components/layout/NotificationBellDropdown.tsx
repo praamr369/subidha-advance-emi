@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Bell } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { NavigationRole } from "@/config/navigation";
@@ -53,55 +53,79 @@ function centerHref(role: NavigationRole): string {
   }
 }
 
-async function fetchBellSnapshot(role: NavigationRole): Promise<NotificationBellSnapshot> {
+async function fetchBellUnreadCount(role: NavigationRole): Promise<number> {
   if (role === "ADMIN") {
-    const [listRes, countRes] = await Promise.all([
-      listAdminNotifications({ limit: 6 }),
-      getAdminNotificationUnreadCount(),
-    ]);
-    return {
-      items: listRes.results ?? [],
-      unread: countRes.unread_count ?? listRes.unread_count ?? 0,
-    };
+    const response = await getAdminNotificationUnreadCount();
+    return response.unread_count ?? 0;
   }
   if (role === "CASHIER") {
-    const [listRes, countRes] = await Promise.all([
-      listCashierNotifications({ limit: 6 }),
-      getCashierNotificationUnreadCount(),
-    ]);
-    return {
-      items: listRes.results ?? [],
-      unread: countRes.unread_count ?? listRes.unread_count ?? 0,
-    };
+    const response = await getCashierNotificationUnreadCount();
+    return response.unread_count ?? 0;
   }
-  const [listRes, summary] = await Promise.all(
+
+  const summary =
     role === "CUSTOMER"
-      ? [listCustomerNotifications({ limit: 6 }), getCustomerNotificationSummary()]
+      ? await getCustomerNotificationSummary()
       : role === "PARTNER"
-        ? [listPartnerNotifications({ limit: 6 }), getPartnerNotificationSummary()]
+        ? await getPartnerNotificationSummary()
         : role === "VENDOR"
-          ? [listVendorNotifications({ limit: 6 }), getVendorNotificationSummary()]
-          : [listNotifications({ limit: 6 }), getNotificationSummary()]
-  );
+          ? await getVendorNotificationSummary()
+          : await getNotificationSummary();
+
+  return summary.unread_count ?? 0;
+}
+
+async function fetchBellItems(role: NavigationRole): Promise<NotificationBellSnapshot> {
+  const listRes =
+    role === "ADMIN"
+      ? await listAdminNotifications({ limit: 6 })
+      : role === "CASHIER"
+        ? await listCashierNotifications({ limit: 6 })
+        : role === "CUSTOMER"
+          ? await listCustomerNotifications({ limit: 6 })
+          : role === "PARTNER"
+            ? await listPartnerNotifications({ limit: 6 })
+            : role === "VENDOR"
+              ? await listVendorNotifications({ limit: 6 })
+              : await listNotifications({ limit: 6 });
+
   return {
     items: listRes.results ?? [],
-    unread: summary.unread_count ?? listRes.unread_count ?? 0,
+    unread: listRes.unread_count ?? 0,
   };
 }
 
 export default function NotificationBellDropdown({ role }: { role: NavigationRole }) {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
-  const queryKey = notificationKeys.bell(role);
+  const queryKey = useMemo(() => notificationKeys.bell(role), [role]);
+  const unreadQueryKey = useMemo(
+    () => [...queryKey, "unread"] as const,
+    [queryKey]
+  );
+  const listQueryKey = useMemo(
+    () => [...queryKey, "list"] as const,
+    [queryKey]
+  );
   const [open, setOpen] = useState(false);
   const [mobileSheet, setMobileSheet] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  const bellQuery = useQuery({
-    queryKey,
-    queryFn: () => fetchBellSnapshot(role),
+  const unreadQuery = useQuery({
+    queryKey: unreadQueryKey,
+    queryFn: () => fetchBellUnreadCount(role),
     enabled: isAuthenticated,
     staleTime: 15_000,
+  });
+
+  const listQuery = useQuery({
+    queryKey: listQueryKey,
+    queryFn: () => fetchBellItems(role),
+    enabled: isAuthenticated && open,
+    // Opening the menu has always refreshed its contents. Keeping the list
+    // stale preserves that behavior while the query key single-flights any
+    // overlapping open/retry request and prevents stale response races.
+    staleTime: 0,
   });
 
   useEffect(() => {
@@ -135,26 +159,30 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  async function onToggle() {
-    const next = !open;
-    setOpen(next);
-    if (next && isAuthenticated) {
-      void bellQuery.refetch();
-    }
+  function onToggle() {
+    setOpen((current) => !current);
   }
 
-  const unreadCount = !isAuthenticated ? 0 : (bellQuery.data?.unread ?? null);
-  const items = bellQuery.data?.items ?? [];
-  const dropdownBusy = open && bellQuery.isFetching;
+  const unreadCount = !isAuthenticated ? 0 : (unreadQuery.data ?? null);
+  const items = listQuery.data?.items ?? [];
+  const dropdownBusy = open && listQuery.isFetching;
 
   async function onMarkRead(id: number) {
-    const previous = queryClient.getQueryData<NotificationBellSnapshot>(queryKey);
-    if (previous) {
-      const target = previous.items.find((n) => n.id === id);
+    const previousList = queryClient.getQueryData<NotificationBellSnapshot>(listQueryKey);
+    const previousUnread = queryClient.getQueryData<number>(unreadQueryKey);
+    if (previousList) {
+      const target = previousList.items.find((n) => n.id === id);
       const decrement = target && !target.is_read ? 1 : 0;
-      queryClient.setQueryData<NotificationBellSnapshot>(queryKey, {
-        unread: Math.max(0, previous.unread - decrement),
-        items: previous.items.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
+      const nextUnread = Math.max(
+        0,
+        (previousUnread ?? previousList.unread) - decrement
+      );
+      queryClient.setQueryData<number>(unreadQueryKey, nextUnread);
+      queryClient.setQueryData<NotificationBellSnapshot>(listQueryKey, {
+        unread: nextUnread,
+        items: previousList.items.map((n) =>
+          n.id === id ? { ...n, is_read: true } : n
+        ),
       });
     }
     try {
@@ -166,25 +194,37 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
         await markNotificationRead(id);
       }
     } catch {
-      if (previous) {
-        queryClient.setQueryData(queryKey, previous);
+      if (previousList) {
+        queryClient.setQueryData(listQueryKey, previousList);
+      }
+      if (previousUnread !== undefined) {
+        queryClient.setQueryData(unreadQueryKey, previousUnread);
+      } else {
+        void queryClient.invalidateQueries({ queryKey: unreadQueryKey });
       }
     }
   }
 
   async function onMarkAllRead() {
     if (role !== "CUSTOMER" && role !== "PARTNER" && role !== "VENDOR") return;
-    const previous = queryClient.getQueryData<NotificationBellSnapshot>(queryKey);
-    queryClient.setQueryData<NotificationBellSnapshot>(queryKey, {
+    const previousList = queryClient.getQueryData<NotificationBellSnapshot>(listQueryKey);
+    const previousUnread = queryClient.getQueryData<number>(unreadQueryKey);
+    queryClient.setQueryData<number>(unreadQueryKey, 0);
+    queryClient.setQueryData<NotificationBellSnapshot>(listQueryKey, {
       unread: 0,
-      items: (previous?.items ?? []).map((n) => ({ ...n, is_read: true })),
+      items: (previousList?.items ?? []).map((n) => ({ ...n, is_read: true })),
     });
     try {
       await markAllNotificationsRead();
       await queryClient.invalidateQueries({ queryKey });
     } catch {
-      if (previous) {
-        queryClient.setQueryData(queryKey, previous);
+      if (previousList) {
+        queryClient.setQueryData(listQueryKey, previousList);
+      }
+      if (previousUnread !== undefined) {
+        queryClient.setQueryData(unreadQueryKey, previousUnread);
+      } else {
+        void queryClient.invalidateQueries({ queryKey: unreadQueryKey });
       }
     }
   }
@@ -251,14 +291,14 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
                   Open center
                 </Link>
               </div>
-              <div className="max-h-[58dvh] overflow-y-auto py-2" aria-busy={dropdownBusy || bellQuery.isPending}>
-                {bellQuery.isError ? (
+              <div className="max-h-[58dvh] overflow-y-auto py-2" aria-busy={dropdownBusy || listQuery.isPending}>
+                {listQuery.isError ? (
                   <ErrorState
                     title="Notifications unavailable"
-                    message={bellQuery.error instanceof Error ? bellQuery.error.message : "Try again."}
-                    onRetry={() => void bellQuery.refetch()}
+                    message={listQuery.error instanceof Error ? listQuery.error.message : "Try again."}
+                    onRetry={() => void listQuery.refetch()}
                   />
-                ) : dropdownBusy || (bellQuery.isPending && !bellQuery.data) ? (
+                ) : dropdownBusy || (listQuery.isPending && !listQuery.data) ? (
                   <NotificationListSkeleton rows={4} />
                 ) : items.length === 0 ? (
                   <p className="px-1 py-3 text-xs text-muted-foreground">You are caught up.</p>
@@ -334,15 +374,15 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
           </div>
           <div
             className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain py-2"
-            aria-busy={dropdownBusy || bellQuery.isPending}
+            aria-busy={dropdownBusy || listQuery.isPending}
           >
-            {bellQuery.isError ? (
+            {listQuery.isError ? (
               <ErrorState
                 title="Notifications unavailable"
-                message={bellQuery.error instanceof Error ? bellQuery.error.message : "Try again."}
-                onRetry={() => void bellQuery.refetch()}
+                message={listQuery.error instanceof Error ? listQuery.error.message : "Try again."}
+                onRetry={() => void listQuery.refetch()}
               />
-            ) : dropdownBusy || (bellQuery.isPending && !bellQuery.data) ? (
+            ) : dropdownBusy || (listQuery.isPending && !listQuery.data) ? (
               <NotificationListSkeleton rows={4} />
             ) : items.length === 0 ? (
               <p className="px-1 py-3 text-xs text-muted-foreground">You are caught up.</p>

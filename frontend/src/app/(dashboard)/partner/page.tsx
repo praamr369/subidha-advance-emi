@@ -95,68 +95,80 @@ export default function PartnerDashboardPage() {
     [endDate, startDate, windowPreset]
   );
 
-  const dashboardDataQuery = useQuery({
-    queryKey: ["partner", "dashboard", dashboardQuery],
-    queryFn: async () => {
-      const [
-          legacyResult,
-          canonicalResult,
-          overdueResult,
-          upcomingResult,
-          recentPaymentsResult,
-          winnersResult,
-          notificationResult,
-      ] = await Promise.allSettled([
-          getPartnerDashboard(),
-          getDashboardSummaryV2(dashboardQuery),
-          listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
-          listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
-          listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
-          listDashboardWinners({ ...dashboardQuery, limit: 4 }),
-          getPartnerNotificationSummary(),
-      ]);
-
-      if (legacyResult.status === "rejected") throw legacyResult.reason;
-      return {
-        legacy: legacyResult.value,
-        canonical:
-          canonicalResult.status === "fulfilled" ? canonicalResult.value : null,
-        overdue: overdueResult.status === "fulfilled" ? overdueResult.value : null,
-        upcoming: upcomingResult.status === "fulfilled" ? upcomingResult.value : null,
-        recentPayments:
-          recentPaymentsResult.status === "fulfilled"
-            ? recentPaymentsResult.value
-            : null,
-        winnerItems:
-          winnersResult.status === "fulfilled" ? winnersResult.value : null,
-        notificationSummary:
-          notificationResult.status === "fulfilled" ? notificationResult.value : null,
-      };
-    },
+  const coreQuery = useQuery({
+    queryKey: ["partner", "dashboard", "core"],
+    queryFn: getPartnerDashboard,
+  });
+  const canonicalQuery = useQuery({
+    queryKey: ["partner", "dashboard", "summary", dashboardQuery],
+    queryFn: () => getDashboardSummaryV2(dashboardQuery),
+    enabled: coreQuery.isSuccess,
+  });
+  const overdueQuery = useQuery({
+    queryKey: ["partner", "dashboard", "overdue", dashboardQuery],
+    queryFn: () => listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const upcomingQuery = useQuery({
+    queryKey: ["partner", "dashboard", "upcoming", dashboardQuery],
+    queryFn: () => listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const recentPaymentsQuery = useQuery({
+    queryKey: ["partner", "dashboard", "recent-payments", dashboardQuery],
+    queryFn: () => listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const winnersQuery = useQuery({
+    queryKey: ["partner", "dashboard", "winners", dashboardQuery],
+    queryFn: () => listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const notificationSummaryQuery = useQuery({
+    queryKey: ["partner", "dashboard", "notification-summary"],
+    queryFn: getPartnerNotificationSummary,
+    enabled: coreQuery.isSuccess,
   });
   const productsQuery = useQuery({
     queryKey: ["public", "products", "partner-dashboard"],
     queryFn: listPublicProducts,
+    enabled: coreQuery.isSuccess,
   });
 
-  const legacy: LegacyDashboardPayload | null =
-    dashboardDataQuery.data?.legacy ?? null;
-  const canonical: CanonicalDashboardPayload | null =
-    dashboardDataQuery.data?.canonical ?? null;
-  const overdue: DashboardDuePayload | null = dashboardDataQuery.data?.overdue ?? null;
-  const upcoming: DashboardDuePayload | null = dashboardDataQuery.data?.upcoming ?? null;
+  const legacy: LegacyDashboardPayload | null = coreQuery.data ?? null;
+  const canonical: CanonicalDashboardPayload | null = canonicalQuery.data ?? null;
+  const overdue: DashboardDuePayload | null = overdueQuery.data ?? null;
+  const upcoming: DashboardDuePayload | null = upcomingQuery.data ?? null;
   const recentPayments: DashboardPaymentsPayload | null =
-    dashboardDataQuery.data?.recentPayments ?? null;
+    recentPaymentsQuery.data ?? null;
   const winnerItems: DashboardWinnersPayload | null =
-    dashboardDataQuery.data?.winnerItems ?? null;
+    winnersQuery.data ?? null;
   const notificationSummary: NotificationSummaryResponse | null =
-    dashboardDataQuery.data?.notificationSummary ?? null;
+    notificationSummaryQuery.data ?? null;
   const products: PublicProduct[] = productsQuery.data?.products ?? [];
-  const loading = dashboardDataQuery.isPending;
-  const refreshing = dashboardDataQuery.isFetching && !dashboardDataQuery.isPending;
-  const error = dashboardDataQuery.error
-    ? toErrorMessage(dashboardDataQuery.error)
+  const loading = coreQuery.isPending;
+  const refreshing = [
+    coreQuery,
+    canonicalQuery,
+    overdueQuery,
+    upcomingQuery,
+    recentPaymentsQuery,
+    winnersQuery,
+    notificationSummaryQuery,
+  ].some((query) => query.isFetching && !query.isPending);
+  const error = coreQuery.error
+    ? toErrorMessage(coreQuery.error)
     : null;
+
+  function refreshDashboard() {
+    void coreQuery.refetch();
+    void canonicalQuery.refetch();
+    void overdueQuery.refetch();
+    void upcomingQuery.refetch();
+    void recentPaymentsQuery.refetch();
+    void winnersQuery.refetch();
+    void notificationSummaryQuery.refetch();
+  }
 
   const summary =
     canonical?.summary ??
@@ -314,7 +326,7 @@ export default function PartnerDashboardPage() {
         <div className="flex justify-end">
           <ActionButton
             variant="outline"
-            onClick={() => void dashboardDataQuery.refetch()}
+            onClick={refreshDashboard}
             disabled={refreshing || loading}
             leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
@@ -498,7 +510,7 @@ export default function PartnerDashboardPage() {
           <ERPErrorState
             title="Unable to load partner dashboard"
             description={error}
-            onRetry={() => void dashboardDataQuery.refetch()}
+            onRetry={() => void coreQuery.refetch()}
           />
         ) : null}
 

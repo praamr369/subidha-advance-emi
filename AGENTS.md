@@ -292,3 +292,73 @@ For major tasks:
 3. implement in production-ready form
 4. preserve backward compatibility
 5. explain tradeoffs clearly
+
+## Imported Claude Cowork project instructions
+
+# SUBIDHA CORE — Claude Instructions
+
+## Permanent UI priority
+
+Admin / Superuser / Owner UI must be desktop-first ERP/POS/control-room style.
+
+Customer / Partner / Vendor / Staff / Public UI must be mobile-first.
+
+Do not migrate to Vite or any other framework. Keep Next.js App Router + React + TypeScript.
+
+Read before frontend UI work:
+- docs/admin-ui/subidha_admin_desktop_ui_priority_handover.md
+
+## Backend safety
+
+Do not change backend financial logic unless explicitly requested.
+
+Never change EMI calculation, Lucky Plan draw, winner waiver, payment posting, receipt generation, invoice generation, accounting bridge, journal creation, stock ledger, reconciliation, commission, payout, deposit/refund, rent/lease lifecycle, or direct sale finalization without explicit approval.
+
+## Frontend rules
+
+Use real backend APIs only.
+Do not invent endpoints.
+Do not invent fields.
+Do not create fake operational UI.
+Do not add dead buttons.
+Do not calculate financial truth in frontend.
+
+## Admin UI rule
+
+Admin routes use desktop shell:
+- dense workbench
+- data grid
+- command bar
+- right inspector
+- drawer-based create/edit
+- print/export/peripheral actions
+- keyboard shortcuts
+
+## Non-admin UI rule
+
+Customer, partner, vendor, staff, and public routes use mobile-first shells:
+- cards
+- bottom navigation where useful
+- large touch targets
+- simple forms
+- no dense admin grids
+
+## Validation
+
+For frontend changes run:
+cd frontend
+npm run check:routes
+npm run typecheck
+npm run lint
+npm run build:smoke
+
+For backend changes run relevant Django tests.
+
+Always report:
+- files changed
+- routes added/hidden
+- backend endpoints used
+- backend gaps found
+- tests run
+- test results
+- risks

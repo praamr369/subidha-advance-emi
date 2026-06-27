@@ -106,8 +106,15 @@ export function RentalAssetReadinessPanel({ subscriptionId }: Props) {
   }
 
   const readiness = data.activation_readiness;
-  const canHandover = readiness.can_reach_active_or_handover;
-  const hasLinkedAssets = data.linked_assets.length > 0;
+  const blockerCodes = Array.isArray(readiness?.blocker_codes)
+    ? readiness.blocker_codes
+    : [];
+  const missingDocuments = Array.isArray(readiness?.missing_documents)
+    ? readiness.missing_documents
+    : [];
+  const linkedAssets = Array.isArray(data.linked_assets) ? data.linked_assets : [];
+  const canHandover = Boolean(readiness?.can_reach_active_or_handover);
+  const hasLinkedAssets = linkedAssets.length > 0;
 
   return (
     <div
@@ -135,9 +142,9 @@ export function RentalAssetReadinessPanel({ subscriptionId }: Props) {
         </span>
       </div>
 
-      {readiness.blocker_codes.length > 0 && (
+      {blockerCodes.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2" data-testid="rental-asset-blockers">
-          {readiness.blocker_codes.map((code) => (
+          {blockerCodes.map((code) => (
             <span
               key={code}
               className="inline-flex rounded border border-amber-300 bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800"
@@ -148,19 +155,19 @@ export function RentalAssetReadinessPanel({ subscriptionId }: Props) {
         </div>
       )}
 
-      {readiness.missing_documents.length > 0 && (
+      {missingDocuments.length > 0 && (
         <div className="mt-3 rounded-xl border border-border bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-          Missing documents: {readiness.missing_documents.join(", ")}
+          Missing documents: {missingDocuments.join(", ")}
         </div>
       )}
 
       {hasLinkedAssets ? (
         <div className="mt-4" data-testid="rental-asset-linked-assets">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Linked assets ({data.linked_assets.length})
+            Linked assets ({linkedAssets.length})
           </div>
           <div className="space-y-2">
-            {data.linked_assets.map((asset) => (
+            {linkedAssets.map((asset) => (
               <AssetRow key={asset.id} asset={asset} />
             ))}
           </div>

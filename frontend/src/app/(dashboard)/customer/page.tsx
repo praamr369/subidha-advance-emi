@@ -129,95 +129,115 @@ export default function CustomerDashboardPage() {
     [endDate, startDate, windowPreset]
   );
 
-  const dashboardDataQuery = useQuery({
-    queryKey: ["customer", "dashboard", dashboardQuery],
-    queryFn: async () => {
-      const [
-          legacyResult,
-          canonicalResult,
-          overdueResult,
-          upcomingResult,
-          recentPaymentsResult,
-          winnersResult,
-          directSaleSummaryResult,
-          directSalesListResult,
-          notificationSummaryResult,
-          deliveriesResult,
-          supportOpenResult,
-      ] = await Promise.allSettled([
-          getCustomerDashboard(),
-          getDashboardSummaryV2(dashboardQuery),
-          listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
-          listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
-          listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
-          listDashboardWinners({ ...dashboardQuery, limit: 4 }),
-          getCustomerDirectSaleSummary(),
-          listCustomerDirectSales({ page: 1, pageSize: 5 }),
-          getCustomerNotificationSummary(),
-          listCustomerDeliveries(),
-          listCustomerSupportTickets("open"),
-      ]);
-
-      if (legacyResult.status !== "fulfilled") throw legacyResult.reason;
-      return {
-        legacy: legacyResult.value,
-        canonical:
-          canonicalResult.status === "fulfilled" ? canonicalResult.value : null,
-        overdue: overdueResult.status === "fulfilled" ? overdueResult.value : null,
-        upcoming: upcomingResult.status === "fulfilled" ? upcomingResult.value : null,
-        recentPayments:
-          recentPaymentsResult.status === "fulfilled"
-            ? recentPaymentsResult.value
-            : null,
-        winnerItems:
-          winnersResult.status === "fulfilled" ? winnersResult.value : null,
-        directSaleSummary:
-          directSaleSummaryResult.status === "fulfilled"
-            ? directSaleSummaryResult.value
-            : null,
-        latestDirectSales:
-          directSalesListResult.status === "fulfilled"
-            ? directSalesListResult.value.results
-            : [],
-        notificationSummary:
-          notificationSummaryResult.status === "fulfilled"
-            ? notificationSummaryResult.value
-            : null,
-        deliverySummary:
-          deliveriesResult.status === "fulfilled" ? deliveriesResult.value.summary : null,
-        supportOpenCount:
-          supportOpenResult.status === "fulfilled" ? supportOpenResult.value.count : null,
-      };
-    },
+  const coreQuery = useQuery({
+    queryKey: ["customer", "dashboard", "core"],
+    queryFn: getCustomerDashboard,
+  });
+  const canonicalQuery = useQuery({
+    queryKey: ["customer", "dashboard", "summary", dashboardQuery],
+    queryFn: () => getDashboardSummaryV2(dashboardQuery),
+    enabled: coreQuery.isSuccess,
+  });
+  const overdueQuery = useQuery({
+    queryKey: ["customer", "dashboard", "overdue", dashboardQuery],
+    queryFn: () => listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const upcomingQuery = useQuery({
+    queryKey: ["customer", "dashboard", "upcoming", dashboardQuery],
+    queryFn: () => listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const recentPaymentsQuery = useQuery({
+    queryKey: ["customer", "dashboard", "recent-payments", dashboardQuery],
+    queryFn: () => listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const winnersQuery = useQuery({
+    queryKey: ["customer", "dashboard", "winners", dashboardQuery],
+    queryFn: () => listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const directSaleSummaryQuery = useQuery({
+    queryKey: ["customer", "dashboard", "direct-sale-summary"],
+    queryFn: getCustomerDirectSaleSummary,
+    enabled: coreQuery.isSuccess,
+  });
+  const directSalesQuery = useQuery({
+    queryKey: ["customer", "dashboard", "direct-sales", 1, 5],
+    queryFn: () => listCustomerDirectSales({ page: 1, pageSize: 5 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const notificationSummaryQuery = useQuery({
+    queryKey: ["customer", "dashboard", "notification-summary"],
+    queryFn: getCustomerNotificationSummary,
+    enabled: coreQuery.isSuccess,
+  });
+  const deliveriesQuery = useQuery({
+    queryKey: ["customer", "dashboard", "deliveries"],
+    queryFn: () => listCustomerDeliveries(),
+    enabled: coreQuery.isSuccess,
+  });
+  const supportQuery = useQuery({
+    queryKey: ["customer", "dashboard", "support", "open"],
+    queryFn: () => listCustomerSupportTickets("open"),
+    enabled: coreQuery.isSuccess,
   });
   const productsQuery = useQuery({
     queryKey: ["public", "products", "customer-dashboard"],
     queryFn: listPublicProducts,
+    enabled: coreQuery.isSuccess,
   });
 
-  const legacy: LegacyDashboardResponse | null = dashboardDataQuery.data?.legacy ?? null;
-  const canonical: CanonicalDashboardPayload | null = dashboardDataQuery.data?.canonical ?? null;
-  const overdue: DashboardDuePayload | null = dashboardDataQuery.data?.overdue ?? null;
-  const upcoming: DashboardDuePayload | null = dashboardDataQuery.data?.upcoming ?? null;
+  const legacy: LegacyDashboardResponse | null = coreQuery.data ?? null;
+  const canonical: CanonicalDashboardPayload | null = canonicalQuery.data ?? null;
+  const overdue: DashboardDuePayload | null = overdueQuery.data ?? null;
+  const upcoming: DashboardDuePayload | null = upcomingQuery.data ?? null;
   const recentPayments: DashboardPaymentsPayload | null =
-    dashboardDataQuery.data?.recentPayments ?? null;
+    recentPaymentsQuery.data ?? null;
   const winnerItems: DashboardWinnersPayload | null =
-    dashboardDataQuery.data?.winnerItems ?? null;
+    winnersQuery.data ?? null;
   const directSaleSummary: DirectSaleSummaryPayload | null =
-    dashboardDataQuery.data?.directSaleSummary ?? null;
+    directSaleSummaryQuery.data ?? null;
   const latestDirectSales: CustomerDirectSaleListItem[] =
-    dashboardDataQuery.data?.latestDirectSales ?? [];
+    directSalesQuery.data?.results ?? [];
   const notificationSummary: NotificationSummaryResponse | null =
-    dashboardDataQuery.data?.notificationSummary ?? null;
+    notificationSummaryQuery.data ?? null;
   const deliverySummary: DeliveryReportSummary | null =
-    dashboardDataQuery.data?.deliverySummary ?? null;
-  const supportOpenCount: number | null = dashboardDataQuery.data?.supportOpenCount ?? null;
+    deliveriesQuery.data?.summary ?? null;
+  const supportOpenCount: number | null = supportQuery.data?.count ?? null;
   const publicProducts: PublicProduct[] = productsQuery.data?.products ?? [];
-  const loading = dashboardDataQuery.isPending;
-  const refreshing = dashboardDataQuery.isFetching && !dashboardDataQuery.isPending;
-  const error = dashboardDataQuery.error
-    ? toErrorMessage(dashboardDataQuery.error)
+  const loading = coreQuery.isPending;
+  const refreshing = [
+    coreQuery,
+    canonicalQuery,
+    overdueQuery,
+    upcomingQuery,
+    recentPaymentsQuery,
+    winnersQuery,
+    directSaleSummaryQuery,
+    directSalesQuery,
+    notificationSummaryQuery,
+    deliveriesQuery,
+    supportQuery,
+  ].some((query) => query.isFetching && !query.isPending);
+  const error = coreQuery.error
+    ? toErrorMessage(coreQuery.error)
     : null;
+
+  function refreshDashboard() {
+    void coreQuery.refetch();
+    void canonicalQuery.refetch();
+    void overdueQuery.refetch();
+    void upcomingQuery.refetch();
+    void recentPaymentsQuery.refetch();
+    void winnersQuery.refetch();
+    void directSaleSummaryQuery.refetch();
+    void directSalesQuery.refetch();
+    void notificationSummaryQuery.refetch();
+    void deliveriesQuery.refetch();
+    void supportQuery.refetch();
+  }
 
   const summary =
     canonical?.summary ??
@@ -401,7 +421,7 @@ export default function CustomerDashboardPage() {
             actions={
               <ActionButton
                 variant="outline"
-                onClick={() => void dashboardDataQuery.refetch()}
+                onClick={refreshDashboard}
                 leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
               >
                 {refreshing ? "Refreshing..." : "Refresh"}
@@ -508,7 +528,7 @@ export default function CustomerDashboardPage() {
         <ERPErrorState
           title="Unable to load customer workspace"
           description={error}
-          onRetry={() => void dashboardDataQuery.refetch()}
+          onRetry={() => void coreQuery.refetch()}
         />
       ) : null}
 

@@ -142,7 +142,11 @@ export function DocumentReadinessPanel({ subscriptionId }: Props) {
     );
   }
 
-  if (!data || data.required_documents.length === 0) {
+  const requiredDocuments = Array.isArray(data?.required_documents)
+    ? data.required_documents
+    : [];
+
+  if (!data || requiredDocuments.length === 0) {
     return (
       <div
         className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground"
@@ -155,8 +159,10 @@ export function DocumentReadinessPanel({ subscriptionId }: Props) {
     );
   }
 
-  const blockerCodes = data.overall.blocker_codes;
-  const isReady = data.overall.ready;
+  const blockerCodes = Array.isArray(data.overall?.blocker_codes)
+    ? data.overall.blocker_codes
+    : [];
+  const isReady = Boolean(data.overall?.ready);
 
   return (
     <div
@@ -196,7 +202,7 @@ export function DocumentReadinessPanel({ subscriptionId }: Props) {
       )}
 
       <div className="mt-4 space-y-2" data-testid="document-readiness-list">
-        {data.required_documents.map((doc) => (
+        {requiredDocuments.map((doc) => (
           <VaultDocumentRow key={doc.document_key} doc={doc} />
         ))}
       </div>

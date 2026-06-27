@@ -38,6 +38,7 @@ const routeMap: Record<string, string> = {
 
 export default async function PublicPoliciesPage() {
   const payload = await listPublicPolicies().catch(() => ({ count: 0, results: [] }));
+  const policies = Array.isArray(payload.results) ? payload.results : [];
 
   return (
     <PublicPageShell
@@ -63,13 +64,13 @@ export default async function PublicPoliciesPage() {
           These pages are published through the legal/policy workflow. Draft or archived legal text is not publicly visible.
         </p>
 
-        {payload.results.length === 0 ? (
+        {policies.length === 0 ? (
           <div className="mt-5 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
             Policy pages are being reviewed and will be published soon. Until then, use the rule summaries above and contact the branch for transaction-specific clarification.
           </div>
         ) : (
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {payload.results.map((policy) => {
+            {policies.map((policy) => {
               const href = routeMap[policy.slug] || `/policies/${policy.slug}`;
               return (
                 <article key={`${policy.slug}-${policy.version}`} className="public-card public-card-animated p-5">

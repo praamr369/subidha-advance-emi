@@ -119,7 +119,9 @@ export function CustomerTimelinePanel({ customerId }: Props) {
     );
   }
 
-  if (!data || data.results.length === 0) {
+  const events = Array.isArray(data?.results) ? data.results : [];
+
+  if (!data || events.length === 0) {
     return (
       <div
         className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground"
@@ -146,7 +148,7 @@ export function CustomerTimelinePanel({ customerId }: Props) {
         </button>
       </div>
       <div className="space-y-2">
-        {data.results.map((event) => (
+        {events.map((event) => (
           <TimelineEventRow key={event.event_id} event={event} />
         ))}
       </div>

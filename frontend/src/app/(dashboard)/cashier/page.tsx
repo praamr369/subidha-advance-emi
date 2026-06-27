@@ -177,59 +177,64 @@ export default function CashierDashboardPage() {
     [endDate, startDate, windowPreset]
   );
 
-  const dashboardDataQuery = useQuery({
-    queryKey: ["cashier", "dashboard", dashboardQuery],
-    queryFn: async () => {
-      const [
-        legacyResult,
-        canonicalResult,
-        overdueResult,
-        upcomingResult,
-        recentPaymentsResult,
-        winnersResult,
-      ] = await Promise.allSettled([
-        getCashierDashboard(),
-        getDashboardSummaryV2(dashboardQuery),
-        listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
-        listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
-        listDashboardRecentPayments({ ...dashboardQuery, limit: 12 }),
-        listDashboardWinners({ ...dashboardQuery, limit: 4 }),
-      ]);
-
-      if (legacyResult.status === "rejected") throw legacyResult.reason;
-      return {
-        legacy: legacyResult.value,
-        canonical:
-          canonicalResult.status === "fulfilled" ? canonicalResult.value : null,
-        overdue: overdueResult.status === "fulfilled" ? overdueResult.value : null,
-        upcoming: upcomingResult.status === "fulfilled" ? upcomingResult.value : null,
-        recentPayments:
-          recentPaymentsResult.status === "fulfilled"
-            ? recentPaymentsResult.value
-            : null,
-        winnerItems:
-          winnersResult.status === "fulfilled" ? winnersResult.value : null,
-      };
-    },
+  const coreQuery = useQuery({
+    queryKey: ["cashier", "dashboard", "core"],
+    queryFn: getCashierDashboard,
+  });
+  const canonicalQuery = useQuery({
+    queryKey: ["cashier", "dashboard", "summary", dashboardQuery],
+    queryFn: () => getDashboardSummaryV2(dashboardQuery),
+    enabled: coreQuery.isSuccess,
+  });
+  const overdueQuery = useQuery({
+    queryKey: ["cashier", "dashboard", "overdue", dashboardQuery],
+    queryFn: () => listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const upcomingQuery = useQuery({
+    queryKey: ["cashier", "dashboard", "upcoming", dashboardQuery],
+    queryFn: () => listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const recentPaymentsQuery = useQuery({
+    queryKey: ["cashier", "dashboard", "recent-payments", dashboardQuery],
+    queryFn: () => listDashboardRecentPayments({ ...dashboardQuery, limit: 12 }),
+    enabled: coreQuery.isSuccess,
+  });
+  const winnersQuery = useQuery({
+    queryKey: ["cashier", "dashboard", "winners", dashboardQuery],
+    queryFn: () => listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+    enabled: coreQuery.isSuccess,
   });
 
-  const legacy: LegacyDashboardPayload | null =
-    dashboardDataQuery.data?.legacy ?? null;
-  const canonical: CanonicalDashboardPayload | null =
-    dashboardDataQuery.data?.canonical ?? null;
-  const overdue: DashboardDuePayload | null =
-    dashboardDataQuery.data?.overdue ?? null;
-  const upcoming: DashboardDuePayload | null =
-    dashboardDataQuery.data?.upcoming ?? null;
+  const legacy: LegacyDashboardPayload | null = coreQuery.data ?? null;
+  const canonical: CanonicalDashboardPayload | null = canonicalQuery.data ?? null;
+  const overdue: DashboardDuePayload | null = overdueQuery.data ?? null;
+  const upcoming: DashboardDuePayload | null = upcomingQuery.data ?? null;
   const recentPayments: DashboardPaymentsPayload | null =
-    dashboardDataQuery.data?.recentPayments ?? null;
-  const winnerItems: DashboardWinnersPayload | null =
-    dashboardDataQuery.data?.winnerItems ?? null;
-  const loading = dashboardDataQuery.isPending;
-  const refreshing = dashboardDataQuery.isFetching && !dashboardDataQuery.isPending;
-  const error = dashboardDataQuery.error
-    ? toErrorMessage(dashboardDataQuery.error)
+    recentPaymentsQuery.data ?? null;
+  const winnerItems: DashboardWinnersPayload | null = winnersQuery.data ?? null;
+  const loading = coreQuery.isPending;
+  const refreshing = [
+    coreQuery,
+    canonicalQuery,
+    overdueQuery,
+    upcomingQuery,
+    recentPaymentsQuery,
+    winnersQuery,
+  ].some((query) => query.isFetching && !query.isPending);
+  const error = coreQuery.error
+    ? toErrorMessage(coreQuery.error)
     : null;
+
+  function refreshDashboard() {
+    void coreQuery.refetch();
+    void canonicalQuery.refetch();
+    void overdueQuery.refetch();
+    void upcomingQuery.refetch();
+    void recentPaymentsQuery.refetch();
+    void winnersQuery.refetch();
+  }
 
   const summary =
     canonical?.summary ??
@@ -393,7 +398,7 @@ export default function CashierDashboardPage() {
         <div className="flex justify-end">
           <ActionButton
             variant="outline"
-            onClick={() => void dashboardDataQuery.refetch()}
+            onClick={refreshDashboard}
             disabled={refreshing || loading}
             leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
           >
@@ -488,7 +493,7 @@ export default function CashierDashboardPage() {
           <ERPErrorState
             title="Unable to load cashier dashboard"
             description={error}
-            onRetry={() => void dashboardDataQuery.refetch()}
+            onRetry={() => void coreQuery.refetch()}
           />
         ) : null}
 
