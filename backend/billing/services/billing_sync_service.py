@@ -137,7 +137,7 @@ def sync_subscription_billing_profile(
     subscription = (
         Subscription.objects.select_for_update()
         .select_related("customer", "product")
-        .prefetch_related("emis", "emis__payments", "deliveries")
+        .prefetch_related("emis", "emis__payments", "emis__ledger_entries", "deliveries")
         .get(pk=subscription_id)
     )
 

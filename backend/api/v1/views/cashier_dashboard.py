@@ -27,6 +27,7 @@ def _pending_emi_queryset(*, user):
             "subscription__batch",
             "subscription__lucky_id",
         )
+        .prefetch_related("ledger_entries")
         .filter(status=EmiStatus.PENDING)
         .filter(subscription_collectible_q("subscription__"))
         .order_by("due_date", "month_no", "id")

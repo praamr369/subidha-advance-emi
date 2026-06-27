@@ -2672,6 +2672,19 @@ class Emi(TimeStampedModel):
         super().save(*args, **kwargs)
 
     def net_paid_amount(self) -> Decimal:
+        # Fast path: when ledger_entries are prefetched (list views / bulk loops)
+        # self.ledger_entries.all() returns the cached queryset — zero extra queries.
+        if "ledger_entries" in getattr(self, "_prefetched_objects_cache", {}):
+            paid = MONEY_ZERO
+            reversed_ = MONEY_ZERO
+            for entry in self.ledger_entries.all():
+                if entry.entry_type == LedgerEntryType.EMI_PAYMENT:
+                    paid += Decimal(str(entry.amount or MONEY_ZERO))
+                elif entry.entry_type == LedgerEntryType.PAYMENT_REVERSAL:
+                    reversed_ += Decimal(str(entry.amount or MONEY_ZERO))
+            return q2(max(q2(paid) - q2(reversed_), MONEY_ZERO))
+
+        # Slow path: aggregate queries for single-object detail (no prefetch).
         effective_paid = (
             FinancialLedger.objects.filter(
                 emi=self,
