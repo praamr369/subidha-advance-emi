@@ -290,7 +290,7 @@ export default function InventoryStockOnHandPage() {
             >
               <option value="">All locations</option>
               {locationOptions.map(loc => (
-                <option key={loc} value={loc}><MapPin className="h-3 w-3" /> {loc}</option>
+                <option key={loc} value={loc}>{loc}</option>
               ))}
             </select>
           ) : null}
