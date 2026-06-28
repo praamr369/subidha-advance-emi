@@ -586,6 +586,7 @@ from api.v1.views.online_enquiries import (
     AdminOnlineEnquirySuggestVendorsView,
 )
 from api.v1.views.vendor_ops import (
+    AdminFinanceOpeningBalanceView,
     AdminCustomerOpeningOutstandingDetailView,
     AdminCustomerOpeningOutstandingView,
     AdminVendorAccountLinkView,
@@ -1085,6 +1086,7 @@ urlpatterns = [
     path("vendors/<int:pk>/outstanding/", AdminVendorOutstandingView.as_view()),
     path("opening-balances/customers/", AdminCustomerOpeningOutstandingView.as_view()),
     path("opening-balances/customers/<int:pk>/", AdminCustomerOpeningOutstandingDetailView.as_view()),
+    path("opening-balances/finance-accounts/<int:pk>/", AdminFinanceOpeningBalanceView.as_view()),
     path("vendors/<int:pk>/products/", AdminVendorProductsView.as_view()),
     path("vendors/<int:pk>/purchases/", AdminVendorPurchasesView.as_view()),
     path("vendors/<int:pk>/purchase-returns/", AdminVendorPurchaseReturnsView.as_view()),

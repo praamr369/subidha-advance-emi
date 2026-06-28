@@ -19,8 +19,12 @@ export async function listAdminVendorLedger(id: number): Promise<ApiListResponse
   return apiFetch(`/admin/vendors/${id}/ledger/`);
 }
 
-export async function setVendorOpeningBalance(id: number, amount: string, notes?: string): Promise<ApiObject> {
-  return apiFetch(`/admin/vendors/${id}/ledger/`, { method: "POST", body: { amount, notes: notes ?? "" } });
+export async function setVendorOpeningBalance(id: number, amount: string, entry_date: string, notes?: string): Promise<ApiObject> {
+  return apiFetch(`/admin/vendors/${id}/ledger/`, { method: "POST", body: { amount, entry_date, notes: notes ?? "" } });
+}
+
+export async function setFinanceOpeningBalance(id: number, amount: string, entry_date: string): Promise<ApiObject> {
+  return apiFetch(`/admin/opening-balances/finance-accounts/${id}/`, { method: "POST", body: { amount, entry_date } });
 }
 
 // ── Customer opening outstandings (BillBook migration) ────────────────────

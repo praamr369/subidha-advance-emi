@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -99,45 +100,49 @@ class AdminVendorLedgerView(APIView):
         return Response({"count": payload["count"], "results": VendorLedgerEntrySerializer(rows, many=True).data})
 
     def post(self, request, pk: int):
-        """Create an OPENING_BALANCE ledger entry for a vendor. Idempotent: replaces existing opening entry."""
-        from django.utils import timezone as tz
-        from decimal import Decimal, InvalidOperation
+        """Post an auditable vendor opening payable and balanced migration journal."""
+        from datetime import date
+        from accounting.services.opening_balance_migration_service import set_vendor_opening_balance
         vendor = get_object_or_404(Vendor, pk=pk)
-        amount_raw = (request.data.get("amount") or "0").strip() if isinstance(request.data.get("amount"), str) else str(request.data.get("amount") or 0)
         try:
-            amount = Decimal(amount_raw)
-        except InvalidOperation:
-            return Response({"error": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
-        if amount < Decimal("0"):
-            return Response({"error": "Amount must be zero or positive."}, status=status.HTTP_400_BAD_REQUEST)
-        notes = (request.data.get("notes") or "").strip()
-        posted_at_raw = request.data.get("posted_at")
-        try:
-            posted_at = tz.datetime.fromisoformat(str(posted_at_raw)) if posted_at_raw else tz.now()
-        except (ValueError, TypeError):
-            posted_at = tz.now()
-        # Replace any existing opening balance entry (only one allowed per vendor)
-        VendorLedgerEntry.objects.filter(vendor=vendor, entry_type="OPENING_BALANCE").delete()
-        entry = None
-        if amount > Decimal("0"):
-            entry = VendorLedgerEntry.objects.create(
+            entry_date = date.fromisoformat(str(request.data.get("entry_date") or timezone.localdate()))
+            result = set_vendor_opening_balance(
                 vendor=vendor,
-                entry_type="OPENING_BALANCE",
-                debit=amount,
-                credit=Decimal("0.00"),
-                balance_after=amount,
-                posted_at=posted_at,
-                created_by=request.user,
-                notes=notes or "Opening balance from previous system (BillBook migration).",
+                amount=request.data.get("amount", "0"),
+                entry_date=entry_date,
+                notes=(request.data.get("notes") or "").strip(),
+                actor=request.user,
             )
+        except (TypeError, ValueError) as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         from accounting.services.vendor_ledger_service import get_vendor_outstanding
         return Response({
-            "vendor_id": vendor.id,
+            **result,
             "vendor_name": vendor.name,
-            "entry_id": entry.id if entry else None,
-            "opening_balance": str(amount),
             "outstanding": get_vendor_outstanding(vendor),
         }, status=status.HTTP_200_OK)
+
+
+class AdminFinanceOpeningBalanceView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        from datetime import date
+        from accounting.models import FinanceAccount
+        from accounting.services.opening_balance_migration_service import set_finance_account_opening_balance
+
+        account = get_object_or_404(FinanceAccount, pk=pk, is_real_settlement_account=True)
+        try:
+            entry_date = date.fromisoformat(str(request.data.get("entry_date") or timezone.localdate()))
+            result = set_finance_account_opening_balance(
+                finance_account=account,
+                amount=request.data.get("amount", "0"),
+                entry_date=entry_date,
+                actor=request.user,
+            )
+        except (TypeError, ValueError) as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class AdminVendorOutstandingView(APIView):
@@ -571,14 +576,18 @@ class AdminCustomerOpeningOutstandingView(APIView):
             entry_date = date.fromisoformat(str(entry_date_raw)) if entry_date_raw else tz.now().date()
         except (ValueError, TypeError):
             entry_date = tz.now().date()
-        obj = CustomerOpeningOutstanding.objects.create(
-            customer_name=customer_name,
-            phone=(data.get("phone") or "").strip(),
-            outstanding_amount=amount,
-            entry_date=entry_date,
-            notes=(data.get("notes") or "").strip(),
-            created_by=request.user,
-        )
+        from accounting.services.opening_balance_migration_service import create_customer_opening_outstanding
+        try:
+            obj = create_customer_opening_outstanding(
+                customer_name=customer_name,
+                phone=(data.get("phone") or "").strip(),
+                amount=amount,
+                entry_date=entry_date,
+                notes=(data.get("notes") or "").strip(),
+                actor=request.user,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({
             "id": obj.id,
             "customer_name": obj.customer_name,
@@ -586,6 +595,8 @@ class AdminCustomerOpeningOutstandingView(APIView):
             "outstanding_amount": str(obj.outstanding_amount),
             "entry_date": str(obj.entry_date),
             "notes": obj.notes,
+            "journal_entry_id": obj._journal_entry.id,
+            "journal_entry_no": obj._journal_entry.entry_no,
         }, status=status.HTTP_201_CREATED)
 
 
@@ -594,17 +605,20 @@ class AdminCustomerOpeningOutstandingDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def patch(self, request, pk: int):
-        from django.utils import timezone as tz
         obj = get_object_or_404(CustomerOpeningOutstanding, pk=pk)
         if "is_settled" in request.data:
-            obj.is_settled = bool(request.data["is_settled"])
-            obj.settled_at = tz.now() if obj.is_settled else None
+            return Response(
+                {"detail": "Opening receivables must be settled through a real customer collection and allocation workflow; this migration page cannot mark money as received."},
+                status=status.HTTP_409_CONFLICT,
+            )
         if "notes" in request.data:
             obj.notes = (request.data["notes"] or "").strip()
         obj.save()
         return Response({"id": obj.id, "customer_name": obj.customer_name, "is_settled": obj.is_settled, "settled_at": obj.settled_at and obj.settled_at.isoformat()})
 
     def delete(self, request, pk: int):
-        obj = get_object_or_404(CustomerOpeningOutstanding, pk=pk)
-        obj.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        get_object_or_404(CustomerOpeningOutstanding, pk=pk)
+        return Response(
+            {"detail": "Posted opening balances cannot be deleted. Create an audited correction/reversal instead."},
+            status=status.HTTP_409_CONFLICT,
+        )

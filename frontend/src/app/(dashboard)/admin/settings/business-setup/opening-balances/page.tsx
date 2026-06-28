@@ -7,15 +7,14 @@ import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupL
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
-import { listFinanceAccounts, updateFinanceAccount, type FinanceAccount } from "@/services/accounting";
+import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import {
   listAdminVendors,
   getAdminVendorOutstanding,
   setVendorOpeningBalance,
+  setFinanceOpeningBalance,
   listCustomerOpeningOutstandings,
   createCustomerOpeningOutstanding,
-  settleCustomerOpeningOutstanding,
-  deleteCustomerOpeningOutstanding,
   type CustomerOpeningOutstanding,
 } from "@/services/vendor-ops";
 
@@ -42,6 +41,7 @@ function FinanceOpeningSection() {
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [entryDate, setEntryDate] = useState(today());
 
   useEffect(() => {
     void listFinanceAccounts({ is_real_settlement_account: "true" }).then((res) => {
@@ -55,7 +55,7 @@ function FinanceOpeningSection() {
     setBusy(account.id);
     setError(null);
     try {
-      await updateFinanceAccount(account.id, { opening_balance: amount });
+      await setFinanceOpeningBalance(account.id, amount, entryDate);
       setAccounts((prev) => prev.map((a) => a.id === account.id ? { ...a, opening_balance: amount } : a));
       setNotice(`${account.name} opening balance saved.`);
     } catch (e) { setError(toErr(e)); }
@@ -98,8 +98,11 @@ function FinanceOpeningSection() {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-        Enter the actual cash and bank balances you had on the day you started using this system. UPI payments come through your bank account — enter the combined bank+UPI balance as one bank account figure.
+        Enter balances as of the system cutover date. Saving posts a separate balanced journal against Retained Earnings / Opening Balance Adjustment; it does not create receipts or rewrite old transactions.
       </div>
+      <label className="block max-w-xs text-xs font-medium text-muted-foreground">Migration / cutover date
+        <input type="date" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={entryDate} onChange={(event) => setEntryDate(event.target.value)} />
+      </label>
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div> : null}
       {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
 
@@ -140,6 +143,7 @@ function VendorOpeningSection() {
   const [busy, setBusy] = useState<number | null>(null);
   const [saved, setSaved] = useState<Record<number, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [entryDate, setEntryDate] = useState(today());
 
   useEffect(() => {
     void listAdminVendors().then((res) => {
@@ -163,7 +167,7 @@ function VendorOpeningSection() {
     setBusy(vendorId);
     setError(null);
     try {
-      await setVendorOpeningBalance(vendorId, amount);
+      await setVendorOpeningBalance(vendorId, amount, entryDate);
       setExistingBalances((prev) => ({ ...prev, [vendorId]: amount }));
       setSaved((prev) => ({ ...prev, [vendorId]: true }));
     } catch (e) { setError(toErr(e)); }
@@ -180,8 +184,11 @@ function VendorOpeningSection() {
     <div className="space-y-4">
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div> : null}
       <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-        Enter what you owed each vendor on the day you started. This becomes their opening payable balance. Set to 0 if nothing was owed.
+        Enter what you owed each vendor at cutover. Each save retains prior ledger rows and posts Accounts Payable against the opening-balance adjustment account.
       </div>
+      <label className="block max-w-xs text-xs font-medium text-muted-foreground">Migration / cutover date
+        <input type="date" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={entryDate} onChange={(event) => setEntryDate(event.target.value)} />
+      </label>
       <div className="space-y-2">
         {vendors.map((vendor) => {
           const amount = amounts[vendor.id] ?? existingBalances[vendor.id] ?? "0.00";
@@ -251,24 +258,10 @@ function CustomerOpeningSection() {
     finally { setBusy(false); }
   }
 
-  async function settle(id: number) {
-    try {
-      await settleCustomerOpeningOutstanding(id, true);
-      await load();
-    } catch (e) { setError(toErr(e)); }
-  }
-
-  async function remove(id: number) {
-    try {
-      await deleteCustomerOpeningOutstanding(id);
-      await load();
-    } catch (e) { setError(toErr(e)); }
-  }
-
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
-        Enter each customer who owes you money from your old billbook records. These are people who bought furniture on credit and have an outstanding balance.
+        Enter each old customer receivable separately. Saving posts Accounts Receivable against Retained Earnings / Opening Balance Adjustment. Later payments must use the real collection workflow; this page cannot mark money as received.
       </div>
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div> : null}
       {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{notice}</div> : null}
@@ -320,8 +313,7 @@ function CustomerOpeningSection() {
                   <div className="text-xs text-muted-foreground">{row.phone ? `${row.phone} · ` : ""}{row.entry_date}{row.notes ? ` · ${row.notes}` : ""}</div>
                 </div>
                 <div className="text-sm font-semibold tabular-nums text-foreground">{formatRupee(row.outstanding_amount)}</div>
-                <button type="button" onClick={() => void settle(row.id)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100">Mark settled</button>
-                <button type="button" onClick={() => void remove(row.id)} className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/40">Remove</button>
+                <Link href={ROUTES.admin.financeCollect} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100">Collect payment</Link>
               </div>
             ))}
           </div>
