@@ -76,10 +76,14 @@ def _staff_status(staff_rows: list[dict[str, Any]]) -> str:
     return "READY"
 
 
+def _staff_posting_rows(staff_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [row for row in staff_rows if row.get("event_key") == staff_advance_bridge.EVENT_KEY]
+
+
 def _staff_counts(staff_rows: list[dict[str, Any]]) -> dict[str, int]:
     return {
         "ready_unposted": sum(1 for row in staff_rows if _row_status(row) == "READY_UNPOSTED"),
-        "posted_unverified": sum(1 for row in staff_rows if row.get("posted_unverified") or row.get("reconciliation_state") == "POSTED_UNVERIFIED" or _row_status(row) == "POSTED_UNVERIFIED"),
+        "posted_unverified": sum(1 for row in staff_rows if row.get("posted_unverified") or row.get("reconciliation_state") == "POSTED_UNVERIFIED" or _row_status(row) in {"POSTED", "POSTED_UNVERIFIED"}),
         "reconciled": sum(1 for row in staff_rows if _row_status(row) == "RECONCILED" or row.get("reconciliation_state") == "RECONCILED"),
         "blocked": sum(1 for row in staff_rows if _row_status(row).startswith("BLOCKED")),
         "unsupported": sum(1 for row in staff_rows if _row_status(row) in {"UNSUPPORTED", "UNSUPPORTED_SOURCE"}),
@@ -99,6 +103,7 @@ def _action_link() -> dict[str, Any]:
 
 def _merge_control_tower(payload: dict[str, Any], rows: list[dict[str, Any]], staff_rows: list[dict[str, Any]]) -> dict[str, Any]:
     tower = dict(payload.get("phase_f_control_tower") or {})
+    staff_posting_rows = _staff_posting_rows(staff_rows)
     inventory = []
     staff_seen = False
     for item in tower.get("source_inventory") or []:
@@ -115,7 +120,7 @@ def _merge_control_tower(payload: dict[str, Any], rows: list[dict[str, Any]], st
                     "event_key": staff_advance_bridge.EVENT_KEY,
                     "accounting_shape": "Dr staff advance receivable, Cr concrete cash/bank/UPI finance account",
                     "source_owner": "accounting.StaffAdvance",
-                    "status": _staff_status(staff_rows),
+                    "status": _staff_status(staff_posting_rows),
                     "counts": counts,
                     "primary_blocker_type": "mapping" if counts["blocked"] else None,
                     "can_post": False,
@@ -134,7 +139,7 @@ def _merge_control_tower(payload: dict[str, Any], rows: list[dict[str, Any]], st
                 "event_key": staff_advance_bridge.EVENT_KEY,
                 "accounting_shape": "Dr staff advance receivable, Cr concrete cash/bank/UPI finance account",
                 "source_owner": "accounting.StaffAdvance",
-                "status": _staff_status(staff_rows),
+                "status": _staff_status(staff_posting_rows),
                 "counts": _staff_counts(staff_rows),
                 "primary_blocker_type": None,
                 "can_post": False,
@@ -172,6 +177,7 @@ def _merge_control_tower(payload: dict[str, Any], rows: list[dict[str, Any]], st
 
 def _merge_production_validation(payload: dict[str, Any], staff_rows: list[dict[str, Any]]) -> dict[str, Any]:
     validation = dict(payload.get("production_accounting_validation") or {})
+    staff_posting_rows = _staff_posting_rows(staff_rows)
     workflows = []
     for workflow in validation.get("workflows") or []:
         if workflow.get("source_model") == staff_advance_bridge.SOURCE_MODEL and workflow.get("event_key") == staff_advance_bridge.EVENT_KEY:
@@ -184,10 +190,10 @@ def _merge_production_validation(payload: dict[str, Any], staff_rows: list[dict[
                     "bridge_source_ownership": "F26 StaffAdvance bridge",
                     "expected_candidate_status": "READY_UNPOSTED or blocked by setup controls",
                     "expected_reconciliation_posture": "Staff advance posting must be verified before reconciled.",
-                    "status": _staff_status(staff_rows),
-                    "current_row_count": len(staff_rows),
-                    "posted_unverified_count": _staff_counts(staff_rows)["posted_unverified"],
-                    "reconciled_count": _staff_counts(staff_rows)["reconciled"],
+                    "status": _staff_status(staff_posting_rows),
+                    "current_row_count": len(staff_posting_rows),
+                    "posted_unverified_count": _staff_counts(staff_posting_rows)["posted_unverified"],
+                    "reconciled_count": _staff_counts(staff_posting_rows)["reconciled"],
                     "expected_action": _action_link(),
                 }
             )
@@ -221,7 +227,18 @@ def _recompute_summary(payload: dict[str, Any], rows: list[dict[str, Any]], staf
             "blocked_by_numbering_count": status_counts.get("BLOCKED_BY_NUMBERING", 0),
             "blocked_by_approval_count": status_counts.get("BLOCKED_BY_APPROVAL", 0),
             "unposted_bridge_item_count": status_counts.get("READY_UNPOSTED", 0),
-            "posted_unverified_count": sum(1 for row in rows if row.get("posted_unverified") or row.get("reconciliation_state") == "POSTED_UNVERIFIED" or _row_status(row) == "POSTED_UNVERIFIED"),
+            "posted_unverified_count": sum(
+                1
+                for row in rows
+                if row.get("posted_unverified")
+                or row.get("reconciliation_state") == "POSTED_UNVERIFIED"
+                or _row_status(row) == "POSTED_UNVERIFIED"
+                or (
+                    row.get("source_model") == staff_advance_bridge.SOURCE_MODEL
+                    and _row_status(row) == "POSTED"
+                    and row.get("reconciliation_state") != "RECONCILED"
+                )
+            ),
             "unsupported_source_count": status_counts.get("UNSUPPORTED_SOURCE", 0) + status_counts.get("UNSUPPORTED", 0),
             "staff_advance_boundary": 0,
             "staff_advance_supported_count": len(staff_rows),

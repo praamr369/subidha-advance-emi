@@ -431,7 +431,7 @@ def summarize_candidate_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
     return {
         "staff_advance_ready_unposted_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") == EVENT_KEY and row.get("status") == "READY_UNPOSTED"),
         "staff_advance_posted_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") == EVENT_KEY and row.get("status") == "POSTED"),
-        "staff_advance_posted_unverified_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") == EVENT_KEY and row.get("reconciliation_state") == "POSTED_UNVERIFIED"),
+        "staff_advance_posted_unverified_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") == EVENT_KEY and (row.get("reconciliation_state") == "POSTED_UNVERIFIED" or (row.get("status") == "POSTED" and row.get("reconciliation_state") != "RECONCILED"))),
         "staff_advance_reconciled_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") == EVENT_KEY and row.get("status") == "RECONCILED"),
         "staff_advance_blocked_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("event_key") == EVENT_KEY and str(row.get("status") or "").startswith("BLOCKED")),
         "staff_advance_unsupported_count": sum(1 for row in rows if row.get("source_model") == SOURCE_MODEL and row.get("status") in {"UNSUPPORTED_SOURCE", "SKIPPED_NOT_APPLICABLE"}),

@@ -11,7 +11,7 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 
 from accounting.models import AccountingPeriod, AccountingPeriodStatus, DocumentSequence, FinancialYear, JournalEntry, JournalEntryLine, MoneyMovement
-from accounting.services.accounting_bridge_reconciliation_read_service import BridgeReconciliationFilters, build_accounting_bridge_reconciliation
+from accounting.services.accounting_bridge_reconciliation_purchase_bill_read_service import BridgeReconciliationFilters, build_accounting_bridge_reconciliation
 from billing.models import BillingInvoice, ReceiptDocument
 from reconciliation.models import ReconciliationItem
 from settlements.models import SettlementAllocation

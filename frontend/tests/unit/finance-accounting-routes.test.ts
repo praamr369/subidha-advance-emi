@@ -11,6 +11,7 @@ const taxonomySource = readFileSync(join(thisFileDir, "../../src/config/admin-mo
 
 const financeAppRoot = join(thisFileDir, "../../src/app/(dashboard)/admin/finance");
 const accountingAppRoot = join(thisFileDir, "../../src/app/(dashboard)/admin/accounting");
+const bridgeReconciliationPage = join(accountingAppRoot, "bridge-reconciliation/page.tsx");
 const legacyPaymentListPage = join(thisFileDir, "../../src/modules/payments/pages/AdminPaymentListPage.tsx");
 
 // ── Phase 4: canonical Finance Operations route constants ─────────────────────
@@ -79,8 +80,17 @@ test("legacy /admin/outstandings page file still exists", () => {
 
 test("/admin/accounting/bridge-reconciliation page file exists", () => {
   assert.ok(
-    existsSync(join(accountingAppRoot, "bridge-reconciliation/page.tsx")),
+    existsSync(bridgeReconciliationPage),
     "Missing /admin/accounting/bridge-reconciliation/page.tsx"
+  );
+});
+
+test("bridge reconciliation treats StaffAdvance as a supported backend source", () => {
+  const page = readFileSync(bridgeReconciliationPage, "utf8");
+  assert.ok(page.includes('{ value: "StaffAdvance", label: "Staff Advance" }'));
+  assert.ok(
+    !page.includes('if (workflow.source_model === "StaffAdvance") return "UNSUPPORTED_BOUNDARY";'),
+    "StaffAdvance status must come from the backend reconciliation payload"
   );
 });
 
@@ -249,12 +259,10 @@ test("/admin/finance/customer-credits is now implemented as a finance source sur
   assert.ok(page.includes("createCustomerCredit"), "customer-credits page must use the customer-credits create API");
 });
 
-test("Phase 4 gap: /admin/finance/refunds is documented but has no dedicated page", () => {
-  // Per architecture: refunds go through /admin/finance/reversal-control.
-  // This test confirms no standalone refunds page exists.
+test("/admin/finance/refunds is a focused view over audited reversal control", () => {
   const refundsPath = join(financeAppRoot, "refunds/page.tsx");
-  assert.ok(
-    !existsSync(refundsPath),
-    "/admin/finance/refunds must NOT have a page yet (documented gap: use reversal-control)"
-  );
+  assert.ok(existsSync(refundsPath), "/admin/finance/refunds page must exist");
+  const page = readFileSync(refundsPath, "utf8");
+  assert.ok(page.includes("listReversalCases"), "refunds must reuse audited reversal-control cases");
+  assert.ok(page.includes("financeReversalControl"), "refunds must link back to reversal control");
 });

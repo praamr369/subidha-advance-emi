@@ -62,6 +62,7 @@ const SOURCE_MODEL_OPTIONS = [
   { value: "CommissionPayoutBatch", label: "Commission Payout Batch" },
   { value: "SalarySheet", label: "Salary Sheet" },
   { value: "SalaryPayment", label: "Salary Payment" },
+  { value: "StaffAdvance", label: "Staff Advance" },
 ];
 
 const SAFETY_COPY =
@@ -184,7 +185,6 @@ function workflowDisplayStatus(workflow: ProductionAccountingValidationWorkflow)
   const rowCount = Number(workflow.current_row_count ?? 0);
   const eventKey = String(workflow.event_key || "");
   if (workflow.source_model === "WinnerHistory") return "VALIDATION_ONLY";
-  if (workflow.source_model === "StaffAdvance") return "UNSUPPORTED_BOUNDARY";
   if (eventKey === "ADVANCE_ALLOCATION") return status;
   if (rowCount === 0 && eventKey.endsWith("_blockers")) return "NO_CURRENT_BLOCKERS";
   if (rowCount === 0 && eventKey === "posted_unverified_review") return "NO_CURRENT_POSTED_UNVERIFIED";

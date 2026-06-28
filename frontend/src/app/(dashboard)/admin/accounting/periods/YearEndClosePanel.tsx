@@ -89,7 +89,6 @@ function remediationSteps(readiness: YearEndReadiness | null) {
   const numbering = readiness?.blocked_numbering_count ?? 0;
   const approval = readiness?.blocked_approval_count ?? 0;
   const unsupported = readiness?.unsupported_source_count ?? 0;
-  const staffAdvanceBoundary = readiness?.staff_advance_boundary ?? 0;
   const exceptions = readiness?.reconciliation_error_count ?? readiness?.exception_count ?? 0;
   const missingNumbering = readiness?.missing_numbering_profile_count ?? 0;
   // OPEN_PERIODS = 1 means the current month is still open (intentional — must stay open for posting).
@@ -102,8 +101,7 @@ function remediationSteps(readiness: YearEndReadiness | null) {
     { label: "BLOCKED_BY_PERIOD", ok: period === 0, detail: period ? `${period} period readiness blocker(s)` : "No bridge period blocker", href: ROUTES.admin.accountingPeriods },
     { label: "BLOCKED_BY_NUMBERING", ok: numbering === 0 && missingNumbering === 0, detail: numbering || missingNumbering ? `${numbering || missingNumbering} numbering issue(s)` : "Numbering profile ready", href: DOCUMENT_NUMBERING_HREF },
     { label: "BLOCKED_BY_APPROVAL", ok: approval === 0, detail: approval ? `${approval} approval blocker(s)` : "No approval blocker", href: ROUTES.admin.accountingBridgeReconciliation },
-    // staffAdvanceBoundary is a synthetic placeholder row, not a real transaction — excluded from real unsupported count.
-    { label: "UNSUPPORTED_SOURCE", ok: unsupported === 0, detail: unsupported ? `${unsupported} real unsupported source(s)` : staffAdvanceBoundary ? "StaffAdvance boundary (workflow not yet implemented — does not block close)" : "No unsupported source", href: MAPPING_AUDIT_HREF },
+    { label: "UNSUPPORTED_SOURCE", ok: unsupported === 0, detail: unsupported ? `${unsupported} real unsupported source(s)` : "No unsupported source", href: MAPPING_AUDIT_HREF },
     { label: "RECONCILIATION_ERRORS", ok: exceptions === 0, detail: exceptions ? `${exceptions} exception(s)` : "No exceptions reported", href: RECONCILIATION_RUNS_HREF },
     // LOCK_ELIGIBLE_PERIODS is a follow-on from OPEN_PERIODS — not a separate issue.
     { label: "LOCK_ELIGIBLE_PERIODS", ok: open === 0, detail: open ? `Lock remaining period(s) after daily posting/reconciliation review` : "All periods locked or closed", href: ROUTES.admin.accountingPeriods },
