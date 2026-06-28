@@ -153,7 +153,7 @@ def _legacy_visible_snapshot() -> dict[str, Any]:
     return {
         "active_count": len(active),
         "active": [_finance_account_row(account) for account in active],
-        "operator_note": "Legacy finance-account rows are ignored by the two-account health check. Only Main Cash Desk and Main UPI / Bank Account are go-live settlement containers.",
+        "operator_note": "Non-canonical finance-account rows are kept out of operator-facing readiness. Only Main Cash Desk and Main UPI / Bank Account are go-live settlement containers.",
     }
 
 
@@ -375,19 +375,6 @@ def get_accounting_setup_health() -> dict[str, Any]:
                     operator_action="Apply Accounting Setup defaults so UPI and Bank methods use the same finance account with separate mapping purposes.",
                 )
             )
-
-    legacy_snapshot = finance_accounts["LEGACY_HIDDEN"]
-    if legacy_snapshot["active_count"]:
-        infos.append(
-            _issue(
-                level="INFO",
-                code="LEGACY_FINANCE_ACCOUNTS_IGNORED",
-                message="Old finance-account rows exist but are ignored by the two-account setup health check.",
-                affected_ids=[int(row["id"]) for row in legacy_snapshot["active"]],
-                repairable=False,
-                operator_action="No action required for launch; only Main Cash Desk and Main UPI / Bank Account are operator-facing.",
-            )
-        )
 
     required_collection_keys = {spec.key for spec in MANUAL_COLLECTION_CHART_ACCOUNTS}
     required_profile_keys = {spec.key for spec in SYSTEM_POSTING_PROFILE_ACCOUNTS}
