@@ -54,7 +54,9 @@ It is not a cash desk, not a bank account, and must not appear in receipt select
 
 ## Legacy rows
 
-Old standard rows such as `Branch Cash Desk`, `Main Bank Account`, `UPI Account`, and `Payment Gateway Settlement Account` are deactivated by setup defaults instead of deleted. This preserves historical foreign keys and old posted records.
+Old standard rows such as `Branch Cash Desk`, `Main Bank Account`, `UPI Account`, and `Payment Gateway Settlement Account` are deleted by Accounting Setup defaults when they are unused.
+
+If a legacy row already has protected business references such as historical payments, counters, receipts, day-close records, or posted documents, setup preserves that row and reports it under `legacy_cleanup.preserved` instead of corrupting data.
 
 ## Setup endpoint behavior
 
@@ -64,4 +66,5 @@ Running Accounting Setup defaults now applies the `TWO_REAL_SETTLEMENT_ACCOUNTS`
 - Creates or repairs/reuses `Main UPI / Bank Account`.
 - Reassigns default bank, UPI, and payment-gateway collection mappings to `Main UPI / Bank Account`.
 - Keeps all semantic COA mappings active through the hidden system anchor.
-- Deactivates legacy standard settlement rows safely.
+- Deletes unused legacy standard settlement rows and their mapping rows.
+- Preserves legacy rows only when existing business references require it.
