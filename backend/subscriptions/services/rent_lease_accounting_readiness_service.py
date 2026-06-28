@@ -18,7 +18,7 @@ from subscriptions.services.rent_lease_finance_sync_service import get_active_ac
 
 POSTING_MODE_AUDIT_DEFERRED = "AUDIT_DEFERRED"
 POSTING_MODE_POSTING_ENABLED = "POSTING_ENABLED"
-POSTING_APPROVAL_REQUIRED_ACTION = "Enable bridge posting through approved accounting bridge workflow."
+POSTING_APPROVAL_REQUIRED_ACTION = "Rent/lease bridge setup is automatic. Complete Period Controls separately before posting execution."
 
 
 def _account_payload(account: ChartOfAccount | None) -> dict[str, Any] | None:
@@ -152,16 +152,16 @@ def _period_readiness_payload() -> dict[str, Any]:
 def get_rent_lease_accounting_readiness(*, auto_create: bool = True) -> dict[str, Any]:
     mapping = get_active_account_mapping(auto_create=auto_create)
     field_errors: dict[str, list[str]] = {}
-    blockers: list[str] = []
+    mapping_blockers: list[str] = []
     period_readiness = _period_readiness_payload()
 
     if ChartOfAccount.objects.filter(is_active=True).count() == 0:
-        blockers.append("Chart of Accounts records are missing.")
+        mapping_blockers.append("Chart of Accounts records are missing.")
     if FinanceAccount.objects.filter(is_active=True).count() == 0:
-        blockers.append("Finance accounts are missing.")
+        mapping_blockers.append("Finance accounts are missing.")
 
     if mapping is None:
-        blockers.append("Active rent/lease account mapping is missing.")
+        mapping_blockers.append("Active rent/lease account mapping is missing.")
     else:
         checks = [
             ("monthly_income_account", mapping.monthly_income_account, ChartOfAccountType.INCOME, "Monthly income account"),
@@ -173,16 +173,14 @@ def get_rent_lease_accounting_readiness(*, auto_create: bool = True) -> dict[str
             error = _chart_error(account, expected_type, label)
             if error:
                 field_errors.setdefault(field, []).append(error)
-                blockers.append(error)
+                mapping_blockers.append(error)
         settlement_error = _settlement_error(mapping.settlement_finance_account)
         if settlement_error:
             field_errors.setdefault("settlement_finance_account", []).append(settlement_error)
-            blockers.append(settlement_error)
+            mapping_blockers.append(settlement_error)
 
-    mapping_blockers = list(blockers)
     mapping_ready = not mapping_blockers
-    blockers.extend(period_readiness["blockers"])
-    status = "READY" if not blockers else "NEEDS_ACCOUNTING_PERIOD" if period_readiness["blockers"] and mapping_ready else "NEEDS_MAPPING"
+    status = "READY" if mapping_ready else "NEEDS_MAPPING"
     extra_ids = _extra_mapping_ids(mapping.id if mapping else None)
     accounts = {
         "monthly_income": _account_payload(mapping.monthly_income_account) if mapping else None,
@@ -216,29 +214,30 @@ def get_rent_lease_accounting_readiness(*, auto_create: bool = True) -> dict[str
     posting_bridge_approved = bool(bridge_state["posting_bridge_approved"])
     posting_bridge_ready = bool(bridge_state["posting_bridge_ready"])
     posting_mode = bridge_state["posting_mode"]
+    period_blockers = list(period_readiness["blockers"])
     posting_message = (
-        "Operational source collection, mapping, and posting bridge approval are ready. Future explicit posting execution is enabled."
+        "Rent/lease bridge setup is ready. Future posting execution is controlled separately by Accounting Period / Financial Year readiness."
         if posting_bridge_ready
-        else "Operational source collection and mapping are ready. Accounting bridge posting remains audit-deferred until approval is enabled."
-        if mapping_ready and period_readiness["posting_controls_ready"]
-        else "Financial year, accounting period, or journal numbering setup must be completed before bridge posting."
+        else "Rent/lease COA and FinanceAccount mapping is ready. Bridge setup will be enabled by Accounting Setup defaults."
         if mapping_ready
-        else blockers[0] if blockers else "Rent/lease accounting mapping is not ready."
+        else mapping_blockers[0] if mapping_blockers else "Rent/lease accounting mapping is not ready."
     )
     return {
         "status": status,
-        "reason": "Rent/lease accounting bridge is ready." if status == "READY" else blockers[0] if blockers else "",
+        "reason": "Rent/lease accounting mapping is ready." if status == "READY" else mapping_blockers[0] if mapping_blockers else "",
         "mapping_id": mapping.id if mapping else None,
         "field_errors": field_errors,
-        "blockers": blockers,
+        "blockers": mapping_blockers,
+        "period_blockers": period_blockers,
         "source_collection_enabled": True,
-        "accounting_bridge_enabled": mapping_ready and period_readiness["posting_controls_ready"],
+        "accounting_bridge_enabled": mapping_ready,
         "collection_ready": True,
         "mapping_ready": mapping_ready,
         "financial_year_ready": period_readiness["financial_year_ready"],
         "accounting_period_ready": period_readiness["accounting_period_ready"],
         "journal_numbering_ready": period_readiness["journal_numbering_ready"],
         "posting_controls_ready": period_readiness["posting_controls_ready"],
+        "posting_execution_ready": bool(posting_bridge_ready and period_readiness["posting_controls_ready"]),
         "posting_bridge_ready": posting_bridge_ready,
         "posting_bridge_approved": posting_bridge_approved,
         "posting_mode": posting_mode,
