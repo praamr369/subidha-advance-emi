@@ -23,11 +23,12 @@ type FinanceAccountMappingPanelProps = {
   onRepairAll?: (financeAccounts: AccountingSetupReadinessFinanceAccount[]) => void;
 };
 
-function paymentMethodLabel(kind: string): string {
-  if (kind === "CASH") return "Cash";
-  if (kind === "BANK") return "Bank";
-  if (kind === "UPI") return "UPI";
-  return kind || "-";
+function paymentMethodLabel(account: AccountingSetupReadinessFinanceAccount): string {
+  if (account.name === "Main UPI / Bank Account") return "Bank / UPI / Card";
+  if (account.kind === "CASH") return "Cash";
+  if (account.kind === "BANK") return "Bank";
+  if (account.kind === "UPI") return "UPI";
+  return account.kind || "-";
 }
 
 function chartLabel(account?: AccountingSetupReadinessChartAccount | null): string {
@@ -72,7 +73,7 @@ export default function FinanceAccountMappingPanel({
         <div>
           <div className="text-sm font-semibold text-foreground">Business Finance Accounts</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            Finance Accounts are where money is received or paid. Collection accounts must map to active posting-enabled leaf ASSET accounts.
+            Operator-facing money containers: Main Cash Desk and Main UPI / Bank Account. Bank, UPI, card, and gateway remain separate payment methods inside the same digital container.
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -84,11 +85,11 @@ export default function FinanceAccountMappingPanel({
           >
             {repairId ? "Repairing..." : `Repair all blocked (${repairableAccounts.length})`}
           </ActionButton>
-          <div className="text-xs text-muted-foreground">Operational collection accounts only</div>
+          <div className="text-xs text-muted-foreground">Two operational collection accounts only</div>
         </div>
       </div>
       <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
-        Blocked from collection selectors until mapped to a posting-enabled leaf ASSET account. System posting profiles are not shown here.
+        Only these two Finance Accounts should be selectable for live collections. System posting profiles and payment-method ledger mappings are not customer collection destinations.
       </div>
       <div className="mt-3 overflow-x-auto">
         <table className="min-w-full text-left text-xs">
@@ -127,7 +128,7 @@ export default function FinanceAccountMappingPanel({
                       <div className="text-[11px] text-muted-foreground">{account.branch?.name || "All branches"}</div>
                     </td>
                     <td className="px-2 py-2">Payment collection</td>
-                    <td className="px-2 py-2">{paymentMethodLabel(account.kind)}</td>
+                    <td className="px-2 py-2">{paymentMethodLabel(account)}</td>
                     <td className="px-2 py-2">
                       {isEditing ? (
                         <select
