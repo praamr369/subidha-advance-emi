@@ -16,6 +16,11 @@ from accounting.services.finance_account_readiness import (
     chart_account_is_posting_ready,
     finance_account_readiness,
 )
+from accounting.services.setup_defaults_service import (
+    LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAMES,
+    MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME,
+    MAIN_CASH_FINANCE_ACCOUNT_NAME,
+)
 from subscriptions.services.rent_lease_posting_bridge_config_service import (
     get_rent_lease_posting_bridge_state,
 )
@@ -31,6 +36,12 @@ RENT_LEASE_SOURCE_COLLECTION_COPY = (
 RENT_LEASE_POSTING_OPERATOR_ACTION = "Enable bridge posting through approved accounting bridge workflow."
 RENT_LEASE_POSTING_MODE = "AUDIT_DEFERRED"
 NOT_EXPOSED = "Not exposed"
+TWO_ACCOUNT_OPERATOR_COPY = "Only Main Cash Desk and Main UPI / Bank Account are operator-facing settlement accounts."
+CANONICAL_SETTLEMENT_ACCOUNT_NAMES = {
+    MAIN_CASH_FINANCE_ACCOUNT_NAME,
+    MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME,
+}
+LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAME_SET = set(LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAMES)
 
 
 @dataclass(frozen=True)
@@ -165,8 +176,26 @@ def _chart_payload(account: ChartOfAccount | None) -> dict[str, Any] | None:
     }
 
 
+def _is_canonical_operator_finance_account(account: FinanceAccount) -> bool:
+    return bool(
+        account.is_active
+        and account.is_real_settlement_account
+        and account.name in CANONICAL_SETTLEMENT_ACCOUNT_NAMES
+    )
+
+
+def _is_legacy_standard_finance_account(account: FinanceAccount) -> bool:
+    return bool(account.name in LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAME_SET)
+
+
 def _finance_account_payload(account: FinanceAccount) -> dict[str, Any]:
     readiness = finance_account_readiness(account)
+    is_canonical_operator_account = _is_canonical_operator_finance_account(account)
+    is_legacy_standard_account = _is_legacy_standard_finance_account(account)
+    diagnostic_only = bool(readiness.diagnostic_only or is_legacy_standard_account)
+    selectable = bool(readiness.selectable_for_collection and is_canonical_operator_account)
+    operational = bool(readiness.operational_collection_account and is_canonical_operator_account)
+    legacy_note = "Legacy setup row hidden by two-account finance setup. Run Accounting Setup defaults to delete it when unused."
     return {
         "id": account.id,
         "name": account.name,
@@ -179,15 +208,16 @@ def _finance_account_payload(account: FinanceAccount) -> dict[str, Any]:
         "mapped_chart_account": _chart_payload(getattr(account, "chart_account", None)),
         "is_active": account.is_active,
         "is_real_settlement_account": account.is_real_settlement_account,
-        "operational_collection_account": readiness.operational_collection_account,
-        "system_posting_profile": readiness.system_posting_profile,
-        "diagnostic_only": readiness.diagnostic_only,
-        "collection_ready": readiness.collection_ready,
-        "selectable_for_collection": readiness.selectable_for_collection,
-        "is_selectable_collection_account": readiness.selectable_for_collection,
-        "collection_blocker_reason": readiness.collection_blocker_reason,
-        "recommended_action": readiness.recommended_action or (None if readiness.selectable_for_collection else LEAF_ASSET_ACTION),
-        "account_role": "system_posting_profile" if readiness.diagnostic_only else "operational_collection_account",
+        "operational_collection_account": operational,
+        "system_posting_profile": bool(readiness.system_posting_profile or diagnostic_only),
+        "diagnostic_only": diagnostic_only,
+        "legacy_standard_account": is_legacy_standard_account,
+        "collection_ready": bool(readiness.collection_ready and is_canonical_operator_account),
+        "selectable_for_collection": selectable,
+        "is_selectable_collection_account": selectable,
+        "collection_blocker_reason": legacy_note if is_legacy_standard_account else readiness.collection_blocker_reason,
+        "recommended_action": legacy_note if is_legacy_standard_account else readiness.recommended_action or (None if selectable else LEAF_ASSET_ACTION),
+        "account_role": "legacy_hidden" if is_legacy_standard_account else "system_posting_profile" if diagnostic_only else "operational_collection_account",
     }
 
 
@@ -263,19 +293,19 @@ def _lookup_account_key(
     }
 
 
-def _collection_requirement(kind: str, finance_accounts: list[dict[str, Any]]) -> dict[str, Any]:
-    accounts = [row for row in finance_accounts if row["kind"] == kind and row["operational_collection_account"]]
+def _collection_requirement(role_key: str, label: str, account_names: set[str], finance_accounts: list[dict[str, Any]]) -> dict[str, Any]:
+    accounts = [row for row in finance_accounts if row["name"] in account_names and row["operational_collection_account"]]
     ready = [row for row in accounts if row["selectable_for_collection"]]
     blocked = [row for row in accounts if not row["selectable_for_collection"]]
     return {
-        "key": f"{kind.lower()}_collection_account",
-        "label": f"{kind} collection account",
+        "key": role_key,
+        "label": label,
         "kind": "operational_collection_account",
         "ready": bool(ready),
         "ready_accounts": ready,
         "blocked_accounts": blocked,
-        "blocker": None if ready else f"No posting-ready {kind} collection account is selectable.",
-        "recommended_action": None if ready else LEAF_ASSET_ACTION,
+        "blocker": None if ready else f"No posting-ready {label} is selectable.",
+        "recommended_action": None if ready else "Run Accounting Setup defaults to create/repair the two canonical settlement accounts.",
     }
 
 
@@ -374,7 +404,9 @@ def build_accounting_setup_matrix() -> dict[str, Any]:
         .prefetch_related("chart_account__children")
         .order_by("kind", "name", "id")
     )
-    finance_accounts = [_finance_account_payload(account) for account in finance_account_models]
+    finance_accounts_all = [_finance_account_payload(account) for account in finance_account_models]
+    finance_accounts = [row for row in finance_accounts_all if not row.get("legacy_standard_account")]
+    hidden_legacy_accounts = [row for row in finance_accounts_all if row.get("legacy_standard_account")]
 
     chart_accounts = [
         _chart_payload(account)
@@ -406,9 +438,8 @@ def build_accounting_setup_matrix() -> dict[str, Any]:
         mappings_by_purpose.setdefault(mapping.purpose, []).append(mapping)
 
     collection_requirements = [
-        _collection_requirement(FinanceAccountKind.CASH, finance_accounts),
-        _collection_requirement(FinanceAccountKind.BANK, finance_accounts),
-        _collection_requirement(FinanceAccountKind.UPI, finance_accounts),
+        _collection_requirement("cash_collection_account", "Main Cash Desk", {MAIN_CASH_FINANCE_ACCOUNT_NAME}, finance_accounts),
+        _collection_requirement("bank_upi_collection_account", "Main UPI / Bank Account", {MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME}, finance_accounts),
     ]
     posting_profile_readiness = [
         _profile_readiness_item(spec, mappings_by_purpose, profiles_by_key) for spec in POSTING_PROFILE_SPECS
@@ -438,6 +469,7 @@ def build_accounting_setup_matrix() -> dict[str, Any]:
     return {
         "modules": modules,
         "finance_accounts": finance_accounts,
+        "hidden_legacy_finance_accounts": hidden_legacy_accounts,
         "operational_collection_accounts": operational_accounts,
         "diagnostic_system_accounts": diagnostic_accounts,
         "chart_accounts": chart_accounts,
@@ -446,12 +478,13 @@ def build_accounting_setup_matrix() -> dict[str, Any]:
         "posting_profile_readiness": posting_profile_readiness,
         "collection_requirements": collection_requirements,
         "operator_copy": {
-            "finance_accounts": "Finance Accounts are where money is received or paid.",
+            "finance_accounts": TWO_ACCOUNT_OPERATOR_COPY,
             "posting_profiles": "Posting Profiles decide which ledger accounts are debited and credited.",
             "chart_of_accounts": "Chart of Accounts is the ledger structure.",
             "system_profiles": "System posting profiles are diagnostic only and cannot receive customer collections.",
             "blocked_collection": OPERATOR_BLOCKED_COPY,
             "rent_lease_source_collection": RENT_LEASE_SOURCE_COLLECTION_COPY,
+            "hidden_legacy_accounts": "Old Branch Cash, old Bank, old UPI, and Payment Gateway FinanceAccount rows are hidden here and deleted by Accounting Setup defaults when unused.",
         },
         "not_exposed_label": NOT_EXPOSED,
         "summary": {
@@ -463,5 +496,7 @@ def build_accounting_setup_matrix() -> dict[str, Any]:
             "selectable_collection_accounts_count": len(selectable_accounts),
             "operational_collection_accounts_count": len(operational_accounts),
             "diagnostic_system_accounts_count": len(diagnostic_accounts),
+            "hidden_legacy_finance_accounts_count": len(hidden_legacy_accounts),
+            "two_account_operating_model": True,
         },
     }
