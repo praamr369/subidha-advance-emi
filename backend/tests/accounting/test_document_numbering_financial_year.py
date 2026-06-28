@@ -120,6 +120,28 @@ class DocumentNumberingFinancialYearTests(TestCase):
         self.assertEqual(sequence.prefix, "CUSTOMJV")
         self.assertEqual(sequence.next_number, 42)
 
+    def test_safe_defaults_reuse_profile_when_financial_year_code_contains_space_after_fy(self):
+        fy = self._activate_fy(code="FY 2026", start=date(2026, 1, 1), end=date(2026, 12, 31))
+        self._open_period(fy, start=date(2026, 1, 1), end=date(2026, 12, 31))
+        existing = DocumentSequence.objects.create(
+            series_code="JOURNAL",
+            document_type=DocumentType.JOURNAL_ENTRY,
+            financial_year="2026",
+            financial_year_ref=fy,
+            prefix="JV",
+            next_number=7,
+            is_active=True,
+        )
+
+        apply_accounting_setup_defaults(performed_by=self.admin)
+
+        self.assertEqual(
+            DocumentSequence.objects.filter(document_type=DocumentType.JOURNAL_ENTRY, financial_year="2026", is_active=True).count(),
+            1,
+        )
+        existing.refresh_from_db()
+        self.assertEqual(existing.next_number, 7)
+
     def test_duplicate_number_is_blocked_before_issue(self):
         fy = self._activate_fy()
         self._open_period(fy)

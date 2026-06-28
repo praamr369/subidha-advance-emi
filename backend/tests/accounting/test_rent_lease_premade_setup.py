@@ -49,6 +49,15 @@ class RentLeasePremadeAccountingSetupTests(TestCase):
         self.assertEqual(mapping.deposit_refund_account.account_type, ChartOfAccountType.ASSET)
         self.assertEqual(mapping.damage_recovery_income_account.account_type, ChartOfAccountType.INCOME)
         self.assertIsNotNone(mapping.settlement_finance_account)
+        self.assertEqual(mapping.settlement_finance_account.name, "Main Cash Desk")
+        self.assertEqual(
+            FinanceAccount.objects.filter(
+                kind=FinanceAccountKind.CASH,
+                is_real_settlement_account=True,
+                is_active=True,
+            ).count(),
+            1,
+        )
         self.assertTrue(mapping.settlement_finance_account.is_active)
         self.assertTrue(mapping.settlement_finance_account.is_real_settlement_account)
         self.assertEqual(mapping.settlement_finance_account.chart_account.account_type, ChartOfAccountType.ASSET)

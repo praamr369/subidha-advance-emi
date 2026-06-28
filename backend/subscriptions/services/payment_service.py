@@ -11,7 +11,7 @@ from django.utils import timezone
 from reconciliation.services.financial_source_lifecycle_event_service import (
     create_lifecycle_event_for_operational_cancellation,
 )
-from accounting.models import FinanceAccount, FinanceAccountKind
+from accounting.models import FinanceAccount, FinanceAccountKind, FinanceAccountMappingPurpose
 from accounting.services.finance_account_collection_guard import (
     assert_finance_account_allowed_for_payment_collection,
 )
@@ -326,6 +326,22 @@ def _fallback_finance_account_for_method(method: str):
     )
     if candidates:
         return candidates[0]
+    if normalized == "UPI":
+        # Fresh setup intentionally combines bank and UPI into one physical
+        # settlement account. Resolve it through its UPI purpose mapping when
+        # no separate legacy UPI-kind account exists.
+        return (
+            FinanceAccount.objects.select_related("chart_account")
+            .filter(
+                kind=FinanceAccountKind.BANK,
+                is_active=True,
+                is_real_settlement_account=True,
+                coa_mappings__purpose=FinanceAccountMappingPurpose.UPI_COLLECTION,
+                coa_mappings__is_active=True,
+            )
+            .order_by("id")
+            .first()
+        )
     return None
 
 

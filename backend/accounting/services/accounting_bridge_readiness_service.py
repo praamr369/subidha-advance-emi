@@ -20,6 +20,7 @@ from accounting.models import (
     RentLeaseAccountingAccountMapping,
 )
 from accounting.services.accounting_setup_catalog import CANONICAL_CHART_ACCOUNT_BY_KEY
+from accounting.services.setup_defaults_service import MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME
 from accounting.services.document_sequence_service import (
     DocumentNumberingSetupError,
     DocumentType,
@@ -681,6 +682,23 @@ def _validate_finance_account_kind(kind: str, *, finance_accounts: list[dict[str
         .filter(kind=kind, is_active=True, is_real_settlement_account=True)
         .order_by("name", "id")
     )
+    if not accounts and kind == FinanceAccountKind.UPI:
+        # The approved two-account operating model deliberately uses one
+        # physical Main UPI / Bank Account for both BANK and UPI methods. Its
+        # UPI_COLLECTION mapping is the method-specific accounting control.
+        accounts = list(
+            FinanceAccount.objects.select_related("chart_account")
+            .filter(
+                name__iexact=MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME,
+                kind=FinanceAccountKind.BANK,
+                is_active=True,
+                is_real_settlement_account=True,
+                coa_mappings__purpose=FinanceAccountMappingPurpose.UPI_COLLECTION,
+                coa_mappings__is_active=True,
+            )
+            .distinct()
+            .order_by("name", "id")
+        )
     if not accounts:
         return [
             {

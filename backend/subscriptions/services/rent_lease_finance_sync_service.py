@@ -27,6 +27,7 @@ from accounting.models import (
 )
 from accounting.services.journal_posting_service import create_journal_entry, post_journal_entry
 from accounting.services.finance_account_readiness import finance_account_readiness
+from accounting.services.setup_defaults_service import MAIN_CASH_FINANCE_ACCOUNT_NAME
 from accounting.services.system_accounts_service import ensure_system_account
 from subscriptions.models import (
     AuditLog,
@@ -217,15 +218,18 @@ def ensure_premade_rent_lease_accounting_setup(*, performed_by=None) -> RentLeas
     customer_advance_liability_account = _chart("CUSTOMER_ADVANCE_UNEARNED_REVENUE")
 
     cash_account = deposit_refund_account
+    # Rent/lease, EMI, direct-sale, and outstanding cash collections share the
+    # same physical cash desk. Their source ledgers and posting profiles remain
+    # separate; only the real settlement container is common.
     settlement_account, _ = FinanceAccount.objects.get_or_create(
-        name="Cash Counter - Rent/Lease Collections",
+        name=MAIN_CASH_FINANCE_ACCOUNT_NAME,
         defaults={
             "kind": FinanceAccountKind.CASH,
             "chart_account": cash_account,
             "opening_balance": MONEY_ZERO,
             "is_real_settlement_account": True,
             "is_active": True,
-            "notes": "Premade rent/lease settlement account for cash, deposit, refund, and damage bridge postings.",
+            "notes": "Canonical cash settlement account shared by all cash collection workflows.",
         },
     )
     if (
@@ -248,7 +252,7 @@ def ensure_premade_rent_lease_accounting_setup(*, performed_by=None) -> RentLeas
             "is_active": True,
             "is_default": False,
             "updated_by": performed_by,
-            "notes": "Premade rent/lease settlement collection mapping.",
+            "notes": "Canonical cash settlement mapping shared by all cash collection workflows.",
         },
     )
 

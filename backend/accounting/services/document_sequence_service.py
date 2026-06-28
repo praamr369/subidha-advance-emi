@@ -94,7 +94,11 @@ def legacy_financial_year_code(reference_date: date) -> str:
 
 def _legacy_code_for_financial_year(financial_year: FinancialYear) -> str:
     code = (financial_year.code or "").strip().upper()
-    return code[2:] if code.startswith("FY") else code
+    # Financial-year codes may be stored as either ``FY2026-27`` or
+    # ``FY 2026``. DocumentSequence.save() trims the legacy value, so the
+    # lookup must use the same normalization or it misses the existing row and
+    # then violates the active (document_type, financial_year) constraint.
+    return (code[2:] if code.startswith("FY") else code).strip()
 
 
 def _active_financial_year() -> FinancialYear:

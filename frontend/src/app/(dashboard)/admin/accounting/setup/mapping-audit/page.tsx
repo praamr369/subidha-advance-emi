@@ -297,6 +297,7 @@ export default function AccountingMappingAuditPage() {
 
   async function seedDefaults() {
     setBusy("seed");
+    setError(null);
     setNotice(null);
     try {
       const result = await seedAccountingMappingSafeDefaults();
@@ -311,6 +312,7 @@ export default function AccountingMappingAuditPage() {
 
   async function validateAll() {
     setBusy("validate");
+    setError(null);
     setNotice(null);
     try {
       setPayload(await validateAccountingMappingAudit());

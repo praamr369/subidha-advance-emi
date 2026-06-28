@@ -125,6 +125,44 @@ class SetupDefaultsAndHealthTests(TestCase):
         self.assertEqual(mapping.deposit_refund_account.system_code, "CASH_COLLECTION")
         self.assertEqual(mapping.damage_recovery_income_account.system_code, "DAMAGE_RECOVERY")
         self.assertIsNotNone(mapping.settlement_finance_account_id)
+        self.assertEqual(mapping.settlement_finance_account.name, "Main Cash Desk")
+
+    def test_apply_defaults_collapses_unused_rent_lease_cash_desk_into_main_cash_desk(self):
+        cash_chart = ChartOfAccount.objects.create(
+            code="CASH-1000",
+            system_code="CASH_COLLECTION",
+            name="Cash in Hand",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        legacy_cash = FinanceAccount.objects.create(
+            name="Cash Counter - Rent/Lease Collections",
+            kind=FinanceAccountKind.CASH,
+            chart_account=cash_chart,
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+        RentLeaseAccountingAccountMapping.objects.create(
+            monthly_income_account=ChartOfAccount.objects.create(
+                code="OLD-RENT", name="Old Rent", account_type=ChartOfAccountType.INCOME
+            ),
+            deposit_liability_account=ChartOfAccount.objects.create(
+                code="OLD-DEP", name="Old Deposit", account_type=ChartOfAccountType.LIABILITY
+            ),
+            deposit_refund_account=cash_chart,
+            damage_recovery_income_account=ChartOfAccount.objects.create(
+                code="OLD-DMG", name="Old Damage", account_type=ChartOfAccountType.INCOME
+            ),
+            settlement_finance_account=legacy_cash,
+            is_active=True,
+        )
+
+        apply_accounting_setup_defaults(performed_by=self.admin)
+
+        mapping = RentLeaseAccountingAccountMapping.objects.get(is_active=True)
+        self.assertEqual(mapping.settlement_finance_account.name, "Main Cash Desk")
+        self.assertFalse(FinanceAccount.objects.filter(pk=legacy_cash.pk).exists())
 
     def test_setup_health_reports_multiple_ready_cash_accounts_as_info(self):
         apply_accounting_setup_defaults(performed_by=self.admin)

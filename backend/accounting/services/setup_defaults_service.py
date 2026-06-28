@@ -38,6 +38,7 @@ MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME = "Main UPI / Bank Account"
 # protected business references, setup preserves it and reports the blocker.
 LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAMES: tuple[str, ...] = (
     "Branch Cash Desk",
+    "Cash Counter - Rent/Lease Collections",
     "Main Bank Account",
     "UPI Account",
     "Payment Gateway Settlement Account",
@@ -732,8 +733,6 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
         "CASH": cash,
         "BANK_UPI": bank_upi,
     }
-    legacy_cleanup = _delete_legacy_standard_finance_accounts(keep_ids={cash.id, bank_upi.id})
-
     profiles_created: list[dict[str, Any]] = []
     profiles_updated: list[dict[str, Any]] = []
     for spec in SYSTEM_POSTING_PROFILE_ACCOUNTS:
@@ -776,6 +775,10 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
         chart_accounts=chart_accounts,
         finance_accounts=finance_accounts,
     )
+    # Repoint setup mappings before removing unused legacy settlement rows. This
+    # lets an old rent/lease-only cash desk collapse into Main Cash Desk safely,
+    # while rows with real historical business references remain protected.
+    legacy_cleanup = _delete_legacy_standard_finance_accounts(keep_ids={cash.id, bank_upi.id})
     journal_numbering = _ensure_journal_entry_numbering_profile()
 
     legacy_marked: list[dict[str, Any]] = []
