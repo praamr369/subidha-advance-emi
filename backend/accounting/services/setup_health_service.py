@@ -12,7 +12,9 @@ from accounting.models import (
     AccountingPostingProfile,
     ChartOfAccount,
     FinanceAccount,
+    FinanceAccountCoaMapping,
     FinanceAccountKind,
+    FinanceAccountMappingPurpose,
     JournalEntry,
     JournalEntryLine,
     JournalEntryStatus,
@@ -23,6 +25,18 @@ from accounting.services.accounting_setup_catalog import (
     SYSTEM_POSTING_PROFILE_ACCOUNTS,
 )
 from accounting.services.finance_account_readiness import finance_account_readiness
+from accounting.services.setup_defaults_service import (
+    LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAMES,
+    MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME,
+    MAIN_CASH_FINANCE_ACCOUNT_NAME,
+)
+
+BANK_UPI_FINANCE_ACCOUNT_KEY = "BANK_UPI"
+DIGITAL_COLLECTION_PURPOSES: tuple[str, ...] = (
+    FinanceAccountMappingPurpose.BANK_COLLECTION,
+    FinanceAccountMappingPurpose.UPI_COLLECTION,
+    FinanceAccountMappingPurpose.PAYMENT_GATEWAY_COLLECTION,
+)
 
 
 def _norm_name(value: str | None) -> str:
@@ -91,10 +105,22 @@ def _canonical_account_health() -> dict[str, Any]:
     return {"missing": missing, "present": present, "claimable": claimable, "conflicts": conflicts}
 
 
-def _finance_kind_snapshot(kind: str) -> dict[str, Any]:
+def _finance_account_row(account: FinanceAccount) -> dict[str, Any]:
+    return {
+        "id": account.id,
+        "name": account.name,
+        "kind": account.kind,
+        "chart_account_id": account.chart_account_id,
+        "chart_account_code": getattr(account.chart_account, "code", None),
+        "chart_account_name": getattr(account.chart_account, "name", None),
+        "chart_account_is_active": getattr(account.chart_account, "is_active", None),
+    }
+
+
+def _finance_account_snapshot_for_name(name: str) -> dict[str, Any]:
     active = list(
         FinanceAccount.objects.filter(
-            kind=kind,
+            name__iexact=name,
             is_active=True,
             is_real_settlement_account=True,
         )
@@ -102,23 +128,42 @@ def _finance_kind_snapshot(kind: str) -> dict[str, Any]:
         .order_by("id")
     )
     linked_to_inactive = [
-        a.id for a in active if getattr(a, "chart_account_id", None) and not getattr(a.chart_account, "is_active", True)
+        account.id
+        for account in active
+        if getattr(account, "chart_account_id", None) and not getattr(account.chart_account, "is_active", True)
     ]
     return {
         "active_count": len(active),
-        "active": [
-            {
-                "id": a.id,
-                "name": a.name,
-                "chart_account_id": a.chart_account_id,
-                "chart_account_code": getattr(a.chart_account, "code", None),
-                "chart_account_name": getattr(a.chart_account, "name", None),
-                "chart_account_is_active": getattr(a.chart_account, "is_active", None),
-            }
-            for a in active
-        ],
+        "active": [_finance_account_row(account) for account in active],
         "linked_to_inactive_coa_ids": linked_to_inactive,
     }
+
+
+def _legacy_visible_snapshot() -> dict[str, Any]:
+    legacy_names = [*LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAMES, "Cash Counter - Rent/Lease Collections"]
+    active = list(
+        FinanceAccount.objects.filter(
+            name__in=legacy_names,
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+        .select_related("chart_account")
+        .order_by("name", "id")
+    )
+    return {
+        "active_count": len(active),
+        "active": [_finance_account_row(account) for account in active],
+        "operator_note": "Legacy finance-account rows are ignored by the two-account health check. Only Main Cash Desk and Main UPI / Bank Account are go-live settlement containers.",
+    }
+
+
+def _collection_mapping_ready(finance_account: FinanceAccount, purpose: str) -> bool:
+    return FinanceAccountCoaMapping.objects.filter(
+        finance_account=finance_account,
+        purpose=purpose,
+        is_active=True,
+        chart_account__is_active=True,
+    ).exists()
 
 
 def _journal_integrity_snapshot() -> dict[str, int]:
@@ -150,9 +195,9 @@ def _coa_snapshot() -> dict[str, Any]:
     legacy_count = ChartOfAccount.objects.filter(is_legacy=True).count()
 
     names = list(ChartOfAccount.objects.filter(is_active=True).values_list("name", flat=True))
-    normalized = [_norm_name(n) for n in names if _norm_name(n)]
+    normalized = [_norm_name(name) for name in names if _norm_name(name)]
     counts = Counter(normalized)
-    duplicate_names = [name for name, c in counts.items() if c > 1][:50]
+    duplicate_names = [name for name, count in counts.items() if count > 1][:50]
 
     system_code_conflicts: list[dict[str, Any]] = []
     for key, spec in CANONICAL_CHART_ACCOUNT_BY_KEY.items():
@@ -240,15 +285,17 @@ def get_accounting_setup_health() -> dict[str, Any]:
     """
     Go-live focused accounting readiness health.
 
-    This intentionally does not mutate data. Use setup_defaults_service.apply_accounting_setup_defaults()
-    to apply canonical defaults.
+    UPI and Bank are separate payment methods but they intentionally resolve to
+    the same physical FinanceAccount container: Main UPI / Bank Account.
     """
 
     canonical_accounts = _canonical_account_health()
     finance_accounts = {
-        FinanceAccountKind.CASH: _finance_kind_snapshot(FinanceAccountKind.CASH),
-        FinanceAccountKind.BANK: _finance_kind_snapshot(FinanceAccountKind.BANK),
-        FinanceAccountKind.UPI: _finance_kind_snapshot(FinanceAccountKind.UPI),
+        FinanceAccountKind.CASH: _finance_account_snapshot_for_name(MAIN_CASH_FINANCE_ACCOUNT_NAME),
+        FinanceAccountKind.BANK: _finance_account_snapshot_for_name(MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME),
+        FinanceAccountKind.UPI: _finance_account_snapshot_for_name(MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME),
+        BANK_UPI_FINANCE_ACCOUNT_KEY: _finance_account_snapshot_for_name(MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME),
+        "LEGACY_HIDDEN": _legacy_visible_snapshot(),
     }
     posting_profiles = _posting_profiles_snapshot()
     journals = _journal_integrity_snapshot()
@@ -259,65 +306,88 @@ def get_accounting_setup_health() -> dict[str, Any]:
     warnings: list[Any] = []
     infos: list[dict[str, Any]] = []
 
-    for kind, snapshot in finance_accounts.items():
-        if snapshot["active_count"] == 0:
-            blockers.append(
-                _issue(
-                    level="ERROR",
-                    code=f"MISSING_ACTIVE_{kind}_FINANCE_ACCOUNT",
-                    message=f"Missing active {kind} FinanceAccount.",
-                    operator_action=f"Create or activate a {kind} collection finance account.",
-                )
+    cash_accounts = FinanceAccount.objects.select_related("chart_account").filter(
+        name__iexact=MAIN_CASH_FINANCE_ACCOUNT_NAME,
+        is_active=True,
+        is_real_settlement_account=True,
+    )
+    bank_upi_accounts = FinanceAccount.objects.select_related("chart_account").filter(
+        name__iexact=MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME,
+        is_active=True,
+        is_real_settlement_account=True,
+    )
+
+    if not cash_accounts.exists():
+        blockers.append(
+            _issue(
+                level="ERROR",
+                code="MISSING_ACTIVE_CASH_FINANCE_ACCOUNT",
+                message="Missing active Main Cash Desk FinanceAccount.",
+                operator_action="Apply Accounting Setup defaults to create or repair Main Cash Desk.",
             )
-        if snapshot["active_count"] > 1:
-            active_ids = [int(row["id"]) for row in snapshot["active"]]
-            ready_ids = []
-            blocked_ids = []
-            for account in FinanceAccount.objects.select_related("chart_account").filter(pk__in=active_ids):
-                readiness = finance_account_readiness(account)
-                if readiness.selectable_for_collection:
-                    ready_ids.append(account.id)
-                else:
-                    blocked_ids.append(account.id)
-            if blocked_ids:
-                warnings.append(
-                    _issue(
-                        level="WARNING",
-                        code=f"MULTIPLE_ACTIVE_{kind}_ACCOUNTS_WITH_BLOCKED_MAPPING",
-                        message=(
-                            f"Multiple active {kind} FinanceAccounts configured; "
-                            f"{len(blocked_ids)} account(s) are not collection-ready."
-                        ),
-                        affected_ids=blocked_ids,
-                        repairable=True,
-                        operator_action="Repair blocked collection mappings or deactivate only truly unused accounts.",
-                    )
-                )
-            else:
-                infos.append(
-                    _issue(
-                        level="INFO",
-                        code=f"MULTIPLE_ACTIVE_{kind}_ACCOUNTS",
-                        message=(
-                            f"Multiple active {kind} FinanceAccounts configured; each account is mapped "
-                            "and collection-ready, so this is informational."
-                        ),
-                        affected_ids=ready_ids,
-                        repairable=False,
-                        operator_action="No action required unless one account is obsolete or mislabeled.",
-                    )
-                )
-        if snapshot["linked_to_inactive_coa_ids"]:
+        )
+    if not bank_upi_accounts.exists():
+        blockers.append(
+            _issue(
+                level="ERROR",
+                code="MISSING_ACTIVE_BANK_UPI_FINANCE_ACCOUNT",
+                message="Missing active Main UPI / Bank Account FinanceAccount.",
+                operator_action="Apply Accounting Setup defaults to create or repair the combined Bank/UPI finance account.",
+            )
+        )
+
+    for account in [*cash_accounts, *bank_upi_accounts]:
+        readiness = finance_account_readiness(account)
+        if not readiness.selectable_for_collection:
             blockers.append(
                 _issue(
                     level="ERROR",
-                    code=f"{kind}_FINANCE_ACCOUNT_LINKED_TO_INACTIVE_COA",
-                    message=f"{kind} FinanceAccount linked to inactive ChartOfAccount.",
-                    affected_ids=snapshot["linked_to_inactive_coa_ids"],
+                    code="CANONICAL_FINANCE_ACCOUNT_NOT_COLLECTION_READY",
+                    message=f"{account.name} is not ready for payment collection.",
+                    affected_ids=[account.id],
                     repairable=True,
-                    operator_action="Map affected finance accounts to active posting ASSET accounts.",
+                    operator_action=readiness.recommended_action or "Repair collection mapping for this canonical finance account.",
                 )
             )
+        if getattr(account, "chart_account_id", None) and not getattr(account.chart_account, "is_active", True):
+            blockers.append(
+                _issue(
+                    level="ERROR",
+                    code="CANONICAL_FINANCE_ACCOUNT_LINKED_TO_INACTIVE_COA",
+                    message=f"{account.name} is linked to an inactive ChartOfAccount.",
+                    affected_ids=[account.id],
+                    repairable=True,
+                    operator_action="Map the finance account to an active posting ASSET account.",
+                )
+            )
+
+    bank_upi = bank_upi_accounts.order_by("id").first()
+    if bank_upi is not None:
+        missing_digital_purposes = [purpose for purpose in DIGITAL_COLLECTION_PURPOSES if not _collection_mapping_ready(bank_upi, purpose)]
+        if missing_digital_purposes:
+            blockers.append(
+                _issue(
+                    level="ERROR",
+                    code="BANK_UPI_COLLECTION_MAPPING_INCOMPLETE",
+                    message="Main UPI / Bank Account must carry Bank, UPI, and payment-gateway collection mappings.",
+                    affected_ids=[bank_upi.id],
+                    repairable=True,
+                    operator_action="Apply Accounting Setup defaults so UPI and Bank methods use the same finance account with separate mapping purposes.",
+                )
+            )
+
+    legacy_snapshot = finance_accounts["LEGACY_HIDDEN"]
+    if legacy_snapshot["active_count"]:
+        infos.append(
+            _issue(
+                level="INFO",
+                code="LEGACY_FINANCE_ACCOUNTS_IGNORED",
+                message="Old finance-account rows exist but are ignored by the two-account setup health check.",
+                affected_ids=[int(row["id"]) for row in legacy_snapshot["active"]],
+                repairable=False,
+                operator_action="No action required for launch; only Main Cash Desk and Main UPI / Bank Account are operator-facing.",
+            )
+        )
 
     required_collection_keys = {spec.key for spec in MANUAL_COLLECTION_CHART_ACCOUNTS}
     required_profile_keys = {spec.key for spec in SYSTEM_POSTING_PROFILE_ACCOUNTS}
@@ -361,6 +431,13 @@ def get_accounting_setup_health() -> dict[str, Any]:
         "issues": [*blockers, *warnings, *infos],
         "generated_at": timezone.now().isoformat(),
         "finance_accounts": finance_accounts,
+        "finance_account_model": {
+            "operating_model": "TWO_REAL_SETTLEMENT_ACCOUNTS",
+            "cash_account_name": MAIN_CASH_FINANCE_ACCOUNT_NAME,
+            "digital_account_name": MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME,
+            "bank_and_upi_share_same_finance_account": True,
+            "payment_method_split_is_preserved": True,
+        },
         "canonical_accounts": canonical_accounts,
         "posting_profiles": posting_profiles,
         "coa": coa,
