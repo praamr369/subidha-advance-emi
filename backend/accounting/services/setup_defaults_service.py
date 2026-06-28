@@ -33,9 +33,9 @@ from accounting.services.system_accounts_service import ensure_system_account
 MAIN_CASH_FINANCE_ACCOUNT_NAME = "Main Cash Desk"
 MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME = "Main UPI / Bank Account"
 
-# These names are older/default operator-facing rows. They are not deleted because
-# historical FK references must remain intact; setup defaults only makes them
-# inactive so one-admin daily operation has two real selectable settlement books.
+# These are old standard setup rows. In a fresh/startup database they are deleted
+# so the admin sees only two real settlement accounts. If an old row already has
+# protected business references, setup preserves it and reports the blocker.
 LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAMES: tuple[str, ...] = (
     "Branch Cash Desk",
     "Main Bank Account",
@@ -264,6 +264,11 @@ def preview_accounting_setup_defaults() -> dict[str, Any]:
             }
         )
 
+    legacy_to_delete = [
+        {"id": row.id, "name": row.name, "kind": row.kind}
+        for row in FinanceAccount.objects.filter(name__in=LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAMES).order_by("id")
+    ]
+
     posting_profiles_create: list[dict[str, Any]] = []
     posting_profiles_update: list[dict[str, Any]] = []
     for spec in SYSTEM_POSTING_PROFILE_ACCOUNTS:
@@ -297,7 +302,7 @@ def preview_accounting_setup_defaults() -> dict[str, Any]:
     for kind, snapshot in finance_dupes.items():
         if snapshot["active_count"] > 1:
             manual_review.append(
-                f"Multiple active {kind} finance accounts detected; setup defaults will keep only the canonical two real settlement accounts active when safe."
+                f"Multiple active {kind} finance accounts detected; setup defaults will delete unused legacy standard finance accounts and keep only the canonical two real settlement accounts."
             )
     if canonical["conflicts"]:
         manual_review.append("Canonical COA conflicts detected (code/system_code mismatches).")
@@ -309,6 +314,7 @@ def preview_accounting_setup_defaults() -> dict[str, Any]:
         "finance_accounts": {
             "to_create": finance_to_create,
             "to_update": finance_to_update,
+            "to_delete_if_unused": legacy_to_delete,
             "duplicates": finance_dupes,
             "target_real_settlement_accounts": [
                 MAIN_CASH_FINANCE_ACCOUNT_NAME,
@@ -418,17 +424,49 @@ def _ensure_ledger_anchor_finance_account(*, bank_chart: ChartOfAccount) -> Fina
     )
 
 
-def _deactivate_legacy_standard_finance_accounts(*, keep_ids: set[int]) -> list[dict[str, Any]]:
-    deactivated: list[dict[str, Any]] = []
-    for account in FinanceAccount.objects.filter(name__in=LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAMES, is_active=True).order_by("id"):
+def _finance_account_protected_reference_labels(account: FinanceAccount) -> list[str]:
+    labels: list[str] = []
+    for relation in FinanceAccount._meta.related_objects:
+        if relation.related_model == FinanceAccountCoaMapping:
+            continue
+        field_name = relation.field.name
+        try:
+            if relation.related_model.objects.filter(**{field_name: account}).exists():
+                labels.append(relation.related_model._meta.label)
+        except Exception:
+            labels.append(relation.related_model._meta.label)
+    return sorted(set(labels))
+
+
+def _delete_legacy_standard_finance_accounts(*, keep_ids: set[int]) -> dict[str, list[dict[str, Any]]]:
+    deleted: list[dict[str, Any]] = []
+    preserved: list[dict[str, Any]] = []
+    for account in FinanceAccount.objects.filter(name__in=LEGACY_STANDARD_SETTLEMENT_ACCOUNT_NAMES).order_by("id"):
         if account.id in keep_ids:
             continue
-        prior = (account.notes or "").strip()
-        account.is_active = False
-        account.notes = (f"{prior}\n" if prior else "") + "Deactivated by two-account accounting setup; historical references preserved."
-        account.save(update_fields=["is_active", "notes", "updated_at"])
-        deactivated.append({"id": account.id, "name": account.name, "kind": account.kind})
-    return deactivated
+        protected_refs = _finance_account_protected_reference_labels(account)
+        if protected_refs:
+            preserved.append(
+                {
+                    "id": account.id,
+                    "name": account.name,
+                    "kind": account.kind,
+                    "reason": "PROTECTED_BUSINESS_REFERENCES",
+                    "references": protected_refs,
+                }
+            )
+            continue
+        mapping_count, _ = FinanceAccountCoaMapping.objects.filter(finance_account=account).delete()
+        deleted.append(
+            {
+                "id": account.id,
+                "name": account.name,
+                "kind": account.kind,
+                "deleted_mapping_rows": mapping_count,
+            }
+        )
+        account.delete()
+    return {"deleted": deleted, "preserved": preserved}
 
 
 def _unset_other_defaults(*, purpose: str, keep_mapping_id: int | None = None) -> int:
@@ -533,7 +571,6 @@ def _ensure_collection_mappings(
         elif purpose in COLLECTION_PURPOSES:
             target_finance = finance_accounts["BANK_UPI"]
         else:
-            # Keep ledger-only semantic mappings out of operator receipt selectors.
             target_finance = ledger_anchor
         synced.append(
             _upsert_default_mapping(
@@ -544,8 +581,6 @@ def _ensure_collection_mappings(
             )
         )
 
-    # Preserve compatibility for any custom active real settlement accounts created
-    # by tests or legacy data. These are not made default.
     created_coverage: list[dict[str, Any]] = []
     for account in FinanceAccount.objects.filter(is_active=True, is_real_settlement_account=True).select_related("chart_account"):
         if account.kind == FinanceAccountKind.CASH:
@@ -697,7 +732,7 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
         "CASH": cash,
         "BANK_UPI": bank_upi,
     }
-    legacy_deactivated = _deactivate_legacy_standard_finance_accounts(keep_ids={cash.id, bank_upi.id})
+    legacy_cleanup = _delete_legacy_standard_finance_accounts(keep_ids={cash.id, bank_upi.id})
 
     profiles_created: list[dict[str, Any]] = []
     profiles_updated: list[dict[str, Any]] = []
@@ -767,7 +802,7 @@ def apply_accounting_setup_defaults(*, performed_by=None) -> dict[str, Any]:
                 },
             },
             "real_settlement_account_count": 2,
-            "legacy_deactivated": legacy_deactivated,
+            "legacy_cleanup": legacy_cleanup,
             "ledger_anchor_id": ledger_anchor.id,
             "ledger_anchor_note": "Internal non-settlement FK anchor retained for validation and historical compatibility; hidden from receipt selectors.",
         },
