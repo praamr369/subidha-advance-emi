@@ -59,6 +59,17 @@ export type PaymentCollectionResult = {
     chart_account_code?: string | null;
   } | null;
   reconciliation_status?: string | null;
+  receipt_created?: boolean;
+  receipt?: {
+    id: number;
+    receipt_no?: string | null;
+    status?: string;
+    receipt_date?: string;
+    amount?: string;
+    payment?: number | null;
+    posted_journal_entry?: number | null;
+    posted_journal_entry_no?: string | null;
+  };
   detail?: string;
 };
 
@@ -481,6 +492,7 @@ function buildPaymentRegisterQuery(params: {
   q?: string;
   method?: string;
   reversalState?: string;
+  receiptState?: string;
   dateFrom?: string;
   dateTo?: string;
   subscription?: number | string;
@@ -496,6 +508,7 @@ function buildPaymentRegisterQuery(params: {
   if (params.q) search.set("q", String(params.q));
   if (params.method) search.set("method", params.method);
   if (params.reversalState) search.set("reversal_state", params.reversalState);
+  if (params.receiptState) search.set("receipt_state", params.receiptState);
   if (params.dateFrom) search.set("date_from", params.dateFrom);
   if (params.dateTo) search.set("date_to", params.dateTo);
   if (params.subscription) search.set("subscription", String(params.subscription));
@@ -567,6 +580,7 @@ export async function listPayments(params?: {
   q?: string;
   method?: string;
   reversalState?: string;
+  receiptState?: string;
   dateFrom?: string;
   dateTo?: string;
   subscription?: number | string;
@@ -639,6 +653,7 @@ export async function getAdminPaymentRegister(params?: {
   q?: string;
   method?: string;
   reversalState?: string;
+  receiptState?: string;
   dateFrom?: string;
   dateTo?: string;
   subscription?: number | string;

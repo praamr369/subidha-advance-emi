@@ -804,7 +804,9 @@ export default function AdminPaymentCollectPage({
 
       setSubmitResult(result);
       setSuccessMessage(
-        `Payment #${result.payment.id} recorded successfully for EMI #${result.emi.id}.`
+        result.receipt
+          ? `Payment #${result.payment.id} and receipt ${result.receipt.receipt_no || `#${result.receipt.id}`} posted successfully for EMI #${result.emi.id}.`
+          : `Payment #${result.payment.id} recorded successfully for EMI #${result.emi.id}.`
       );
       setUnifiedLastPaymentSummary(
         `Last payment status: success — payment #${result.payment.id} for EMI #${result.emi.id} (${formatCurrency(result.payment.amount)} · ${String(result.payment.method ?? result.payment.payment_method ?? form.payment_method).toUpperCase()}).`
@@ -1496,6 +1498,30 @@ export default function AdminPaymentCollectPage({
                       #{submitResult.payment.id}
                     </dd>
                   </div>
+                  {submitResult.receipt ? (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
+                        <dt className="text-emerald-800">Receipt</dt>
+                        <dd className="font-medium text-emerald-900">
+                          {submitResult.receipt.receipt_no || `#${submitResult.receipt.id}`}
+                        </dd>
+                      </div>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Link
+                          href={`/admin/billing/receipts/${submitResult.receipt.id}/print`}
+                          className="inline-flex h-9 items-center rounded-xl bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800"
+                        >
+                          Print Receipt
+                        </Link>
+                        <Link
+                          href={`/admin/billing/receipts?payment=${submitResult.payment.id}`}
+                          className="inline-flex h-9 items-center rounded-xl border border-emerald-300 px-3 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
+                        >
+                          Receipt Register
+                        </Link>
+                      </div>
+                    </>
+                  ) : null}
                   <div className="flex items-start justify-between gap-3">
                     <dt className="text-emerald-800">EMI ID</dt>
                     <dd className="font-medium text-emerald-900">#{submitResult.emi.id}</dd>

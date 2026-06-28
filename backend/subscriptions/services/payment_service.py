@@ -3,6 +3,7 @@ import logging
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
@@ -978,6 +979,20 @@ def reverse_payment_for_admin(
         reason=reason,
     )
 
+    receipt_voided = False
+    try:
+        receipt = payment.receipt_document
+    except ObjectDoesNotExist:
+        receipt = None
+    if receipt is not None and receipt.status == "POSTED":
+        from billing.services.billing_service import void_receipt_document
+
+        _receipt, receipt_voided = void_receipt_document(
+            receipt_id=receipt.id,
+            performed_by=reversed_by,
+            reason=f"Payment reversal: {reason}",
+        )
+
     _reconcile_after_payment(subscription, emi)
     _sync_billing_best_effort(
         subscription=subscription,
@@ -1004,4 +1019,5 @@ def reverse_payment_for_admin(
         "emi": emi,
         "subscription": subscription,
         "updated": True,
+        "receipt_voided": receipt_voided,
     }

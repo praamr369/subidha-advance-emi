@@ -122,6 +122,14 @@ export type AccountingBridgePeriodReadiness = {
   warnings?: string[];
 };
 
-export async function getAccountingBridgeReadiness(): Promise<AccountingBridgeReadinessPayload> {
-  return request<AccountingBridgeReadinessPayload>("/admin/accounting/bridge-readiness/");
+export async function getAccountingBridgeReadiness(
+  eventKeys: string[] = []
+): Promise<AccountingBridgeReadinessPayload> {
+  const search = new URLSearchParams();
+  const keys = eventKeys.map((key) => key.trim()).filter(Boolean);
+  if (keys.length) search.set("event_keys", keys.join(","));
+  const query = search.toString();
+  return request<AccountingBridgeReadinessPayload>(
+    `/admin/accounting/bridge-readiness/${query ? `?${query}` : ""}`
+  );
 }

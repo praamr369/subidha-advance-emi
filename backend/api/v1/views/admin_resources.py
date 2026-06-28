@@ -1905,6 +1905,10 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
             self.request.query_params.get("reversal_state", "")
             or ""
         ).strip().lower()
+        receipt_state = (
+            self.request.query_params.get("receipt_state", "")
+            or ""
+        ).strip().lower()
 
         reversed_lookup = self._reversal_lookup()
 
@@ -1963,6 +1967,11 @@ class PaymentAdminViewSet(AdminOnlyModelViewSet):
             queryset = queryset.filter(**{reversed_lookup: True})
         elif reversal_state == "active":
             queryset = queryset.exclude(**{reversed_lookup: True})
+
+        if receipt_state == "missing":
+            queryset = queryset.filter(receipt_document__isnull=True)
+        elif receipt_state == "linked":
+            queryset = queryset.filter(receipt_document__isnull=False)
 
         if q:
             search_filter = (

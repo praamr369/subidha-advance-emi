@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from billing.models import BillingDocumentStatus, ReceiptDocument
 from subscriptions.models import FinancialLedger, LedgerEntryType, Payment
 from tests.helpers import (
     create_admin_user,
@@ -15,6 +16,8 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -22,6 +25,15 @@ class AdminPaymentApiTests(APITestCase):
     def setUp(self):
         self.admin = create_admin_user()
         self.client.force_authenticate(user=self.admin)
+        ensure_test_accounting_posting_prerequisites(
+            date(2026, 3, 17),
+            performed_by=self.admin,
+        )
+        ensure_document_numbering_profile_for_date(
+            "EMI_RECEIPT",
+            date(2026, 3, 17),
+            performed_by=self.admin,
+        )
 
         self.partner = create_partner_user()
         self.customer = create_customer_profile(name="Amrita", phone="7407533262")
@@ -100,6 +112,9 @@ class AdminPaymentApiTests(APITestCase):
         self.assertIn("emi", response.data)
         self.assertIn("subscription", response.data)
         self.assertTrue(response.data["created"])
+        self.assertTrue(response.data["receipt_created"])
+        self.assertEqual(response.data["receipt"]["payment"], response.data["payment"]["id"])
+        self.assertEqual(response.data["receipt"]["status"], BillingDocumentStatus.POSTED)
 
     def test_admin_payment_collect_card_method_success(self):
         response = self.client.post(
@@ -160,6 +175,8 @@ class AdminPaymentApiTests(APITestCase):
             msg=f"Unexpected duplicate collect response: {second.status_code} {second.data}",
         )
         self.assertFalse(second.data["created"])
+        self.assertFalse(second.data["receipt_created"])
+        self.assertEqual(first.data["receipt"]["id"], second.data["receipt"]["id"])
 
     def test_admin_cash_partial_without_reference_requires_idempotency_key(self):
         response = self.client.post(
@@ -243,6 +260,10 @@ class AdminPaymentApiTests(APITestCase):
             msg=f"Unexpected reverse response: {response.status_code} {response.data}",
         )
         self.assertEqual(response.data["detail"], "Payment reversed successfully.")
+        self.assertEqual(
+            ReceiptDocument.objects.get(payment_id=payment_id).status,
+            BillingDocumentStatus.VOID,
+        )
 
     def test_admin_payment_reverse_requires_reason(self):
         collect = self.client.post(

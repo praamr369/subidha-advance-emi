@@ -161,13 +161,11 @@ const ICON_MAP: Record<NavIconKey, React.ComponentType<{ className?: string }>> 
 
 const SIDEBAR_COLLAPSED_LEGACY_KEY = "subidha:dashboard-sidebar-collapsed:v1";
 const SIDEBAR_GROUPS_KEY = "subidha:dashboard-sidebar-groups:v1";
-const OPERATOR_MODE_KEY = "subidha:operator-mode:v1";
 /** Browser-local layout preference only (max width of dashboard content stage). Not financial data. */
 const WORKSPACE_WIDTH_PRESET_KEY = "subidha:workspace-width-preset:v1";
 /** Browser-local content width caps (100% zoom friendly; still bounded by viewport). */
 const WORKSPACE_WIDTH_CSS_VALUES = ["1440px", "1480px", "1680px"] as const;
 const DASHBOARD_SHELL_EVENT = "subidha:dashboard-shell";
-type OperatorMode = "SIMPLE" | "ADVANCED";
 
 function sidebarCollapsedKey(sessionId: number | null, role: NavigationRole) {
   if (!sessionId) return SIDEBAR_COLLAPSED_LEGACY_KEY;
@@ -225,16 +223,6 @@ function readExpandedGroups(): Record<string, boolean> {
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
-  }
-}
-
-function readOperatorMode(): OperatorMode {
-  if (typeof window === "undefined") return "SIMPLE";
-  try {
-    const raw = window.localStorage.getItem(OPERATOR_MODE_KEY);
-    return raw === "ADVANCED" ? "ADVANCED" : "SIMPLE";
-  } catch {
-    return "SIMPLE";
   }
 }
 
@@ -596,19 +584,6 @@ function SidebarContent({
   const normalizedNavQuery = navQuery.trim().toLowerCase();
   const [favorites, setFavorites] = useState<string[]>(() => (sessionId ? readFavorites(sessionId, role) : []));
   const [queueBadges, setQueueBadges] = useState<Record<string, number>>({});
-  const [operatorMode, setOperatorMode] = useState<OperatorMode>(() =>
-    role === "ADMIN" ? readOperatorMode() : "ADVANCED"
-  );
-  const persistOperatorMode = useCallback((value: OperatorMode) => {
-    setOperatorMode(value);
-    try {
-      window.localStorage.setItem(OPERATOR_MODE_KEY, value);
-    } catch {
-      // preference-only
-    }
-    notifyDashboardShellChanged();
-  }, []);
-
   const favoriteLinks = useMemo(() => {
     if (favorites.length === 0) return [];
     const allItems = navGroups.flatMap((group) => flattenShellItems(group.items));
@@ -629,31 +604,10 @@ function SidebarContent({
       .filter((item): item is { href: string; label: string } => Boolean(item));
   }, [navGroups, role, sessionId]);
 
-  const modeFilteredGroups = useMemo(() => {
-    if (role !== "ADMIN" || operatorMode !== "SIMPLE") return navGroups;
-    // Simple mode shows all 15 groups but restricts Accounting & Reconciliation
-    // to the most essential daily items so daily operators aren't overwhelmed.
-    const simpleAccountingAllowed = new Set([
-      "Reconciliation",
-      "Accounting Control Center",
-      "Accounting Setup",
-      "Journals",
-    ]);
-    return navGroups
-      .map((group) => {
-        if (group.title !== "Accounting & Reconciliation") return group;
-        return {
-          ...group,
-          items: group.items.filter((item) => simpleAccountingAllowed.has(item.label)),
-        };
-      })
-      .filter((group) => group.items.length > 0);
-  }, [navGroups, operatorMode, role]);
-
   const visibleGroups = useMemo(() => {
-    if (!normalizedNavQuery) return modeFilteredGroups;
+    if (!normalizedNavQuery) return navGroups;
 
-    return modeFilteredGroups
+    return navGroups
       .map((group) => {
         const groupMatch = group.title.toLowerCase().includes(normalizedNavQuery);
         if (groupMatch) return group;
@@ -663,7 +617,7 @@ function SidebarContent({
         };
       })
       .filter((group) => group.items.length > 0);
-  }, [modeFilteredGroups, normalizedNavQuery]);
+  }, [navGroups, normalizedNavQuery]);
 
   useEffect(() => {
     if (role !== "ADMIN") return;
@@ -913,32 +867,6 @@ function SidebarContent({
               {formatRoleLabel(role)}
             </div>
           </div>
-          <ToggleGroup
-            type="single"
-            value={operatorMode}
-            aria-label="Operator mode"
-            title="Simple hides advanced finance modules. Advanced shows the full catalog."
-            onValueChange={(value: string) => {
-              if (value !== "SIMPLE" && value !== "ADVANCED") return;
-              persistOperatorMode(value as OperatorMode);
-            }}
-            className="gap-0.5 rounded-lg border-0 bg-card/[0.04] p-0.5 shadow-none ring-1 ring-inset ring-white/[0.06]"
-          >
-            <ToggleGroupItem
-              value="SIMPLE"
-              aria-label="Simple workflow view"
-              className="h-7 rounded-md px-2 text-[11px] font-semibold text-[var(--sidebar-item-muted)] shadow-none hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
-            >
-              Simple
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="ADVANCED"
-              aria-label="Advanced ERP view"
-              className="h-7 rounded-md px-2 text-[11px] font-semibold text-[var(--sidebar-item-muted)] shadow-none hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
-            >
-              Advanced
-            </ToggleGroupItem>
-          </ToggleGroup>
         </div>
         <div className="flex gap-2">
           <Link
@@ -1161,41 +1089,6 @@ function SidebarContent({
                   <Maximize2 className="mx-auto h-3.5 w-3.5" />
                 </ToggleGroupItem>
               </ToggleGroup>
-              {role === "ADMIN" ? (
-                <ToggleGroup
-                  type="single"
-                  value={operatorMode}
-                  data-testid={isMobile ? "operator-mode-toggle-mobile" : "operator-mode-toggle"}
-                  aria-label={operatorMode === "SIMPLE" ? "Switch Advanced" : "Switch Simple"}
-                  title="Simple hides advanced finance modules in the sidebar. Advanced shows the full catalog."
-                  onValueChange={(value: string) => {
-                    if (value !== "SIMPLE" && value !== "ADVANCED") return;
-                    persistOperatorMode(value as OperatorMode);
-                  }}
-                  onClick={(event) => {
-                    if (event.target !== event.currentTarget) return;
-                    persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE");
-                  }}
-                  className="gap-0 rounded-md border-0 bg-card/[0.04] p-0.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]"
-                >
-                  <ToggleGroupItem
-                    value="SIMPLE"
-                    aria-label="Simple workflow view"
-                    onClick={() => persistOperatorMode(operatorMode === "SIMPLE" ? "ADVANCED" : "SIMPLE")}
-                    className="h-7 rounded px-2 text-[11px] font-semibold text-[var(--sidebar-item-muted)] shadow-none hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
-                  >
-                    Simple
-                  </ToggleGroupItem>
-                  <ToggleGroupItem
-                    value="ADVANCED"
-                    aria-label="Advanced ERP view"
-                    onClick={() => persistOperatorMode("ADVANCED")}
-                    className="h-7 rounded px-2 text-[11px] font-semibold text-[var(--sidebar-item-muted)] shadow-none hover:text-[var(--sidebar-foreground)] data-[state=on]:bg-[color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] data-[state=on]:text-[var(--sidebar-primary)]"
-                  >
-                    Advanced
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              ) : null}
             </div>
           </div>
         </div>

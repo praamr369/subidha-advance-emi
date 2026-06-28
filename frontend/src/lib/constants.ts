@@ -7,7 +7,10 @@ export const SESSION_KEY = "subidha_session";
 export const DEFAULT_PAGE_SIZE = 20;
 
 // backward-compatible exports used by existing pages
-export const API_TIMEOUT_MS = 10_000;
+// Local and production dashboard/report reads can legitimately exceed ten
+// seconds while Django is aggregating operational data. Aborting those reads
+// caused a false dashboard failure and a matching "Broken pipe" in Django.
+export const API_TIMEOUT_MS = 60_000;
 export const API_BASE_URL = ENV_API_BASE_URL;
 export const APP_ROUTES = {
   home: "/",

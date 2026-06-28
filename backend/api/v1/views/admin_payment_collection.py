@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
+from django.db import transaction
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,6 +17,8 @@ from api.v1.serializers.admin_resources import PaymentAdminSerializer
 from api.v1.throttles.auth_password_reset import PaymentMutationThrottle
 from subscriptions.models import Emi, EmiStatus, FinancialLedger, LedgerEntryType, MONEY_ZERO, PaymentMethod, SubscriptionStatus
 from subscriptions.services.payment_service import record_emi_payment
+from billing.services.billing_service import generate_emi_payment_receipt
+from api.v1.serializers.billing import ReceiptDocumentSerializer
 
 
 class IdempotentAdminPaymentCollectSerializer(serializers.Serializer):
@@ -93,6 +96,7 @@ class IdempotentAdminPaymentCollectView(APIView):
     throttle_classes = [PaymentMutationThrottle]
 
     @require_capability("billing.collect")
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
         serializer = IdempotentAdminPaymentCollectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -135,6 +139,18 @@ class IdempotentAdminPaymentCollectView(APIView):
         subscription_obj = result["subscription"]
         finance_account = result.get("finance_account")
         reconciliation = result.get("reconciliation")
+
+        try:
+            receipt, receipt_created = generate_emi_payment_receipt(
+                payment_id=payment_obj.id,
+                finance_account_id=finance_account.id,
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            transaction.set_rollback(True)
+            if isinstance(exc, FinanceAccountPostingReadinessError):
+                return Response(exc.as_payload(), status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         effective_paid = (
             FinancialLedger.objects.filter(emi=emi_obj, entry_type=LedgerEntryType.EMI_PAYMENT).aggregate(total=Sum("amount"))["total"]
@@ -181,6 +197,11 @@ class IdempotentAdminPaymentCollectView(APIView):
                     else None
                 ),
                 "reconciliation_status": getattr(reconciliation, "status", None),
+                "receipt_created": receipt_created,
+                "receipt": ReceiptDocumentSerializer(
+                    receipt,
+                    context={"request": request},
+                ).data,
             },
             status=status.HTTP_201_CREATED if result.get("created", True) else status.HTTP_200_OK,
         )

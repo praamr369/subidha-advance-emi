@@ -329,6 +329,7 @@ export default function AdminPaymentsPage() {
   const initialQuery = (searchParams.get("q") || "").trim();
   const initialMethod = (searchParams.get("method") || "").trim().toUpperCase();
   const initialReversalState = (searchParams.get("reversal_state") || "").trim().toLowerCase();
+  const initialReceiptState = (searchParams.get("receipt_state") || "").trim().toLowerCase();
   const initialDateFrom = (searchParams.get("date_from") || "").trim();
   const initialDateTo = (searchParams.get("date_to") || "").trim();
   const initialSubscriptionFilter = parseIdFilter(searchParams.get("subscription"));
@@ -357,6 +358,7 @@ export default function AdminPaymentsPage() {
   const [query, setQuery] = useState(initialQuery);
   const [method, setMethod] = useState(initialMethod);
   const [reversalState, setReversalState] = useState(initialReversalState);
+  const [receiptState, setReceiptState] = useState(initialReceiptState);
   const [dateFrom, setDateFrom] = useState(initialDateFrom);
   const [dateTo, setDateTo] = useState(initialDateTo);
   const [subscriptionFilter, setSubscriptionFilter] = useState(initialSubscriptionFilter);
@@ -378,6 +380,7 @@ export default function AdminPaymentsPage() {
           q: query,
           method,
           reversalState,
+          receiptState,
           dateFrom,
           dateTo,
           subscription: subscriptionFilter || undefined,
@@ -414,7 +417,7 @@ export default function AdminPaymentsPage() {
         }
       }
     },
-    [query, method, reversalState, dateFrom, dateTo, subscriptionFilter, customerFilter, batchFilter, partnerFilter, emiFilter, page]
+    [query, method, reversalState, receiptState, dateFrom, dateTo, subscriptionFilter, customerFilter, batchFilter, partnerFilter, emiFilter, page]
   );
 
   useEffect(() => {
@@ -426,6 +429,7 @@ export default function AdminPaymentsPage() {
     const nextQuery = (params.get("q") || "").trim();
     const nextMethod = (params.get("method") || "").trim().toUpperCase();
     const nextReversalState = (params.get("reversal_state") || "").trim().toLowerCase();
+    const nextReceiptState = (params.get("receipt_state") || "").trim().toLowerCase();
     const nextDateFrom = (params.get("date_from") || "").trim();
     const nextDateTo = (params.get("date_to") || "").trim();
 
@@ -438,6 +442,7 @@ export default function AdminPaymentsPage() {
     setQuery(nextQuery);
     setMethod(nextMethod);
     setReversalState(nextReversalState);
+    setReceiptState(nextReceiptState);
     setDateFrom(nextDateFrom);
     setDateTo(nextDateTo);
     setSubscriptionFilter(parseIdFilter(params.get("subscription")));

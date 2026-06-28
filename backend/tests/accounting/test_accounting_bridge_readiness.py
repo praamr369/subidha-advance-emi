@@ -45,6 +45,19 @@ class AccountingBridgeReadinessTests(APITestCase):
         self.assertIn("summary", response.data)
         self.assertIn("events", response.data)
 
+    def test_readiness_endpoint_filters_requested_event_keys(self):
+        requested = {"advance_emi_collection", "subscription_emi_payment"}
+        response = self.client.get(
+            "/api/v1/admin/accounting/bridge-readiness/",
+            {"event_keys": ",".join(sorted(requested))},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {event["event_key"] for event in response.data["events"]},
+            requested,
+        )
+        self.assertEqual(set(response.data["requested_event_keys"]), requested)
+
     def test_each_configured_event_returns_structured_status(self):
         response = self.client.get("/api/v1/admin/accounting/bridge-readiness/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)

@@ -115,7 +115,9 @@ def _collection_posture(start: date, end: date) -> dict:
             allocation_metadata__reversal__is_reversed=True
         ).count()
 
-        missing_receipt_count = qs.filter(receipt_document__isnull=True).count()
+        missing_receipt_count = qs.filter(receipt_document__isnull=True).exclude(
+            allocation_metadata__reversal__is_reversed=True
+        ).count()
 
         status = STATUS_OK
         warnings: list[str] = []
@@ -805,6 +807,8 @@ def build_financial_action_items(as_of: date | None = None, period: dict | None 
         missing = Payment.objects.filter(
             payment_date__gte=start, payment_date__lte=end,
             receipt_document__isnull=True,
+        ).exclude(
+            allocation_metadata__reversal__is_reversed=True
         ).count()
         if missing > 0:
             items.append(_action_item(
@@ -814,7 +818,11 @@ def build_financial_action_items(as_of: date | None = None, period: dict | None 
                 description=f"{missing} payment(s) in period have no linked receipt document.",
                 source_area="collection",
                 count=missing,
-                action_url="/admin/receipts",
+                action_url=(
+                    "/admin/payments?receipt_state=missing"
+                    f"&date_from={start.isoformat()}&date_to={end.isoformat()}"
+                    "&reversal_state=active"
+                ),
             ))
     except Exception:
         pass

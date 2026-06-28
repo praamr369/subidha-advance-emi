@@ -40,7 +40,11 @@ import {
   buildAdminReconciliationRoute,
   buildAdminSubscriptionRoute,
 } from "@/lib/route-builders";
-import { listReceiptDocuments, type ReceiptDocument } from "@/services/billing";
+import {
+  generateEmiReceipt,
+  listReceiptDocuments,
+  type ReceiptDocument,
+} from "@/services/billing";
 
 type PaymentDetailRecord = {
   id: number;
@@ -61,6 +65,8 @@ type PaymentDetailRecord = {
   emi?: number | null;
   emi_id?: number | null;
   emi_month_no?: number | null;
+  finance_account?: number | null;
+  finance_account_id?: number | null;
   collected_by?: number | null;
   collected_by_id?: number | null;
   collected_by_username?: string | null;
@@ -359,6 +365,7 @@ export default function AdminPaymentDetailRoutePage() {
   const [receiptDocuments, setReceiptDocuments] = useState<ReceiptDocument[]>([]);
   const [receiptDocumentsLoading, setReceiptDocumentsLoading] = useState(false);
   const [receiptDocumentsError, setReceiptDocumentsError] = useState<string | null>(null);
+  const [generatingReceipt, setGeneratingReceipt] = useState(false);
 
   const loadPage = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -764,6 +771,31 @@ export default function AdminPaymentDetailRoutePage() {
                     >
                       Open Receipt Register
                     </Link>
+                  ) : resolvedPayment.finance_account_id && !isReversed ? (
+                    <button
+                      type="button"
+                      disabled={generatingReceipt}
+                      onClick={async () => {
+                        setGeneratingReceipt(true);
+                        setReceiptDocumentsError(null);
+                        try {
+                          await generateEmiReceipt(
+                            resolvedPayment.id,
+                            resolvedPayment.finance_account_id as number
+                          );
+                          await loadPage("refresh");
+                        } catch (err) {
+                          setReceiptDocumentsError(
+                            err instanceof Error ? err.message : "Unable to generate receipt document."
+                          );
+                        } finally {
+                          setGeneratingReceipt(false);
+                        }
+                      }}
+                      className="inline-flex h-9 items-center justify-center rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {generatingReceipt ? "Generating…" : "Generate Receipt"}
+                    </button>
                   ) : null
                 }
               />

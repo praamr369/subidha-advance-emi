@@ -34,10 +34,13 @@ export default function AccountingBridgeReadinessIndicator({
 
     async function load() {
       try {
-        const payload = await getAccountingBridgeReadiness();
+        const keys = eventKey.split("|").filter(Boolean);
+        const payload = await getAccountingBridgeReadiness(keys);
         if (!mounted) return;
-        const wanted = new Set(eventKey.split("|").filter(Boolean));
-        setEvents(payload.events.filter((event) => wanted.has(event.event_key)));
+        const wanted = new Set(keys);
+        const rows = Array.isArray(payload.events) ? payload.events : [];
+        setEvents(rows.filter((event) => wanted.has(event.event_key)));
+        setError(null);
       } catch (err) {
         if (!mounted) return;
         setError(err instanceof Error ? err.message : "Bridge readiness unavailable.");
@@ -52,7 +55,7 @@ export default function AccountingBridgeReadinessIndicator({
 
   const statusLabel = useMemo(() => {
     if (error) return "Unavailable";
-    if (!events.length) return "Checking";
+    if (!events.length) return "Not configured";
     if (events.some((event) => event.status === "ERROR" || event.status === "NOT_CONFIGURED")) return "Blocked";
     if (events.some((event) => event.status === "WARNING")) return "Needs review";
     return "Ready";
@@ -67,7 +70,7 @@ export default function AccountingBridgeReadinessIndicator({
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accounting bridge readiness</div>
           <div className="mt-1 font-semibold text-foreground">{title}</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            Readiness only. No journal posting or receipt generation is available from this indicator.
+            Live mapping and posting readiness for the selected collection events. Receipt creation remains controlled by the payment workflow.
           </div>
         </div>
         <div className="flex items-center gap-2">

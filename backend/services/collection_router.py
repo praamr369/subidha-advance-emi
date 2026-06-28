@@ -8,8 +8,10 @@ from __future__ import annotations
 from typing import Any
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 
 from billing.services.direct_sale_collection_service import collect_direct_sale_payment
+from billing.services.billing_service import generate_emi_payment_receipt
 from subscriptions.models import ContractReferenceType, PlanType, RentLeaseDemandType, Subscription
 from subscriptions.services.payment_service import record_emi_payment
 from subscriptions.services import contract_reference_service as crs
@@ -50,6 +52,7 @@ def _fallback_collection_idempotency_key(
     )
 
 
+@transaction.atomic
 def route_collection(
     *,
     source_type: str,
@@ -113,13 +116,21 @@ def route_collection(
             idempotency_key=payment_idempotency_key,
             **audit_kwargs,
         )
+        receipt, receipt_created = generate_emi_payment_receipt(
+            payment_id=result["payment"].id,
+            finance_account_id=finance_account_id,
+            performed_by=collected_by,
+        )
         return {
             "source_type": source_type,
             "created": result.get("created", True),
             "payment_id": result["payment"].id,
             "emi_id": result["emi"].id,
             "subscription_id": result["subscription"].id,
-            "message": "Advance EMI collection posted through the existing payment service.",
+            "receipt_id": receipt.id,
+            "receipt_no": receipt.receipt_no,
+            "receipt_created": receipt_created,
+            "message": "Advance EMI payment and receipt posted successfully.",
         }
 
     if source_type == ContractReferenceType.DIRECT_SALE:

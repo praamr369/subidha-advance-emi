@@ -8,6 +8,7 @@ from accounting.services.accounting_bridge_reconciliation_read_service import (
     build_accounting_bridge_reconciliation,
 )
 from accounting.services.accounting_postability_service import canonicalize_bridge_readiness_payload
+from accounting.services.accounting_bridge_readiness_service import build_accounting_bridge_readiness
 from accounting.services.returns_damage_credit_bridge_readiness_service import (
     build_accounting_bridge_readiness_with_returns_damage_credit,
 )
@@ -39,8 +40,25 @@ class AccountingBridgeReconciliationQuerySerializer(serializers.Serializer):
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated, IsAdmin])
 def accounting_bridge_readiness(request):
-    payload = build_accounting_bridge_readiness_with_returns_damage_credit()
-    return Response(canonicalize_bridge_readiness_payload(payload, as_source_rows=False), status=status.HTTP_200_OK)
+    requested_keys = {
+        key.strip()
+        for key in (request.query_params.get("event_keys") or "").split(",")
+        if key.strip()
+    }
+    payload = (
+        build_accounting_bridge_readiness()
+        if requested_keys
+        else build_accounting_bridge_readiness_with_returns_damage_credit()
+    )
+    canonical = canonicalize_bridge_readiness_payload(payload, as_source_rows=False)
+    if requested_keys:
+        canonical["events"] = [
+            event
+            for event in canonical.get("events", [])
+            if event.get("event_key") in requested_keys
+        ]
+        canonical["requested_event_keys"] = sorted(requested_keys)
+    return Response(canonical, status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])

@@ -56,17 +56,10 @@ test.describe("admin dashboard smoke", () => {
     }
   });
 
-  test("admin advanced mode still accessible via operator mode toggle", async ({ page }) => {
+  test("admin exposes one merged sidebar without an operator mode selector", async ({ page }) => {
     await page.goto("/admin");
-    const operatorToggle = page.getByTestId("operator-mode-toggle");
-    await expect(operatorToggle).toBeVisible();
-    await expect(operatorToggle).toHaveAccessibleName(/Switch Advanced|Switch Simple/);
-    const advancedRadio = operatorToggle.getByRole("radio", { name: /advanced erp/i });
-    const simpleRadio = operatorToggle.getByRole("radio", { name: /simple workflow/i });
-    await advancedRadio.click();
-    await expect(advancedRadio).toHaveAttribute("aria-checked", "true");
-    await simpleRadio.click();
-    await expect(simpleRadio).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByTestId("operator-mode-toggle")).toHaveCount(0);
+    await expect(page.getByRole("complementary").getByRole("button", { name: /Accounting & Reconciliation/i })).toBeVisible();
   });
 });
 
