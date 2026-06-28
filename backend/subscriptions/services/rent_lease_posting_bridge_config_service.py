@@ -14,6 +14,7 @@ ENABLE_RENT_LEASE_POSTING_CONFIRMATION = "ENABLE RENT LEASE POSTING"
 DISABLE_RENT_LEASE_POSTING_CONFIRMATION = "DISABLE RENT LEASE POSTING"
 POSTING_MODE_AUDIT_DEFERRED = "AUDIT_DEFERRED"
 POSTING_MODE_POSTING_ENABLED = "POSTING_ENABLED"
+AUTO_READY_REASON = "Automatic Accounting Setup bridge readiness. Posting execution remains controlled by Period Controls."
 
 
 def _serialize_config(config: RentLeasePostingBridgeConfig) -> dict[str, Any]:
@@ -31,6 +32,17 @@ def _serialize_config(config: RentLeasePostingBridgeConfig) -> dict[str, Any]:
     }
 
 
+def _auto_ready_config_payload(config: RentLeasePostingBridgeConfig, *, mapping_ready: bool) -> dict[str, Any]:
+    payload = _serialize_config(config)
+    if mapping_ready:
+        payload["is_enabled"] = True
+        payload["reason"] = payload.get("reason") or AUTO_READY_REASON
+        payload["auto_ready_by_setup"] = True
+    else:
+        payload["auto_ready_by_setup"] = False
+    return payload
+
+
 def get_rent_lease_posting_bridge_config() -> RentLeasePostingBridgeConfig:
     config, _ = RentLeasePostingBridgeConfig.objects.get_or_create(pk=1)
     return config
@@ -41,16 +53,16 @@ def get_rent_lease_posting_bridge_state(*, readiness: dict[str, Any] | None = No
     readiness = readiness or {}
     mapping_ready = bool(readiness.get("mapping_ready") or readiness.get("status") == "READY")
     period_controls_ready = bool(readiness.get("posting_controls_ready", False))
-    bridge_setup_ready = bool(config.is_enabled and mapping_ready)
+    bridge_setup_ready = bool(mapping_ready)
     return {
-        "config": _serialize_config(config),
-        "is_enabled": config.is_enabled,
-        "posting_bridge_approved": config.is_enabled,
+        "config": _auto_ready_config_payload(config, mapping_ready=mapping_ready),
+        "is_enabled": bridge_setup_ready,
+        "posting_bridge_approved": bridge_setup_ready,
         "posting_bridge_ready": bridge_setup_ready,
         "posting_execution_ready": bool(bridge_setup_ready and period_controls_ready),
         "period_controls_ready": period_controls_ready,
         "posting_mode": POSTING_MODE_POSTING_ENABLED if bridge_setup_ready else POSTING_MODE_AUDIT_DEFERRED,
-        "blocked_reason": "" if bridge_setup_ready else "Rent/lease accounting mapping is not ready." if not mapping_ready else "Rent/lease bridge setup is not enabled.",
+        "blocked_reason": "" if bridge_setup_ready else "Rent/lease accounting mapping is not ready.",
         "period_blocked_reason": "" if period_controls_ready else "Accounting period and financial-year controls are handled in Period Controls.",
     }
 
@@ -79,7 +91,7 @@ def enable_rent_lease_posting_bridge(actor, reason: str, confirmation: str) -> d
     )
     readiness = _readiness_for_enable()
     if not readiness.get("mapping_ready"):
-        raise ValidationError({"readiness": "Rent/lease COA and finance account mapping must be valid before enabling bridge setup."})
+        raise ValidationError({"readiness": "Rent/lease COA and finance account mapping must be valid before bridge setup."})
 
     config = RentLeasePostingBridgeConfig.objects.select_for_update().filter(pk=1).first()
     if config is None:
@@ -109,7 +121,7 @@ def enable_rent_lease_posting_bridge(actor, reason: str, confirmation: str) -> d
     )
     from subscriptions.services.rent_lease_accounting_readiness_service import get_rent_lease_accounting_readiness
 
-    return {"detail": "Rent/lease bridge setup enabled. Posting execution still depends on Period Controls.", "config": _serialize_config(config), "readiness": get_rent_lease_accounting_readiness(auto_create=False)}
+    return {"detail": "Rent/lease bridge setup is ready. Posting execution still depends on Period Controls.", "config": _auto_ready_config_payload(config, mapping_ready=True), "readiness": get_rent_lease_accounting_readiness(auto_create=False)}
 
 
 @transaction.atomic
@@ -142,4 +154,4 @@ def disable_rent_lease_posting_bridge(actor, reason: str, confirmation: str) -> 
     )
     from subscriptions.services.rent_lease_accounting_readiness_service import get_rent_lease_accounting_readiness
 
-    return {"detail": "Rent/lease bridge setup disabled. Future explicit rent/lease posting is unavailable.", "config": _serialize_config(config), "readiness": get_rent_lease_accounting_readiness(auto_create=False)}
+    return {"detail": "Rent/lease bridge setup disabled for manual review.", "config": _auto_ready_config_payload(config, mapping_ready=False), "readiness": get_rent_lease_accounting_readiness(auto_create=False)}
