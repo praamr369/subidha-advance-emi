@@ -9,6 +9,7 @@ from django.db.models import Model
 from accounting.models import AccountingBridgePosting
 from accounting.services import accounting_bridge_candidate_service as base
 from accounting.services import accounting_bridge_customer_advance_refund_service as extended
+from accounting.services import accounting_bridge_staff_advance_service as staff_advance_bridge
 from billing.models import BillingCreditNote, BillingDebitNote, BillingInvoice, DirectSaleReturn, ReceiptDocument
 from subscriptions.models import Commission, CommissionPayoutBatch, CommissionPayoutLine, Payment, RentLeaseBillingDemand
 
@@ -44,6 +45,10 @@ def _source_kind(candidate_id: str) -> str:
     return source_kind
 
 
+def _is_staff_advance(candidate_id: str) -> bool:
+    return staff_advance_bridge.is_staff_advance_candidate(candidate_id)
+
+
 def _locked_base_candidate(candidate_id: str) -> tuple[dict[str, Any], Model]:
     source_kind, source_pk, event_key = base._parse_candidate_id(candidate_id)
     source = BASE_SOURCE_FACTORIES.get(source_kind)
@@ -58,11 +63,36 @@ def _locked_base_candidate(candidate_id: str) -> tuple[dict[str, Any], Model]:
 
 
 def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
+    if _is_staff_advance(candidate_id):
+        return staff_advance_bridge.preview_bridge_candidate(candidate_id)
     return extended.preview_bridge_candidate(candidate_id)
 
 
 def batch_preview_bridge_candidates(candidate_ids: list[str]) -> dict[str, Any]:
-    return extended.batch_preview_bridge_candidates(candidate_ids)
+    previews = []
+    blockers: dict[str, list[str]] = {}
+    total_debit = base._money("0.00")
+    total_credit = base._money("0.00")
+    for candidate_id in candidate_ids:
+        try:
+            preview = preview_bridge_candidate(candidate_id)
+            previews.append(preview)
+            total_debit += base._money(preview["total_debit"])
+            total_credit += base._money(preview["total_credit"])
+            if not preview.get("can_post"):
+                blockers[candidate_id] = preview.get("blockers") or ["Candidate is not postable."]
+        except Exception as exc:
+            blockers[candidate_id] = [str(exc)]
+    return {
+        "selected_count": len(candidate_ids),
+        "postable_count": sum(1 for item in previews if item.get("can_post")),
+        "blocked_count": len(blockers),
+        "total_debit": f"{total_debit:.2f}",
+        "total_credit": f"{total_credit:.2f}",
+        "is_balanced": total_debit == total_credit,
+        "previews": previews,
+        "blockers": blockers,
+    }
 
 
 @transaction.atomic
@@ -237,6 +267,14 @@ def _post_base_candidate(*, candidate_id: str, idempotency_key: str, confirmed: 
 
 
 def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed: bool, posting_note: str = "", actor) -> dict[str, Any]:
+    if _is_staff_advance(candidate_id):
+        return staff_advance_bridge.post_bridge_candidate(
+            candidate_id=candidate_id,
+            idempotency_key=idempotency_key,
+            confirmed=confirmed,
+            posting_note=posting_note,
+            actor=actor,
+        )
     if _source_kind(candidate_id) in BASE_SOURCE_FACTORIES:
         return _post_base_candidate(
             candidate_id=candidate_id,
@@ -267,7 +305,11 @@ def batch_post_bridge_candidates(*, candidate_ids: list[str], idempotency_keys: 
                 posting_note=posting_note,
                 actor=actor,
             )
-            (posted if result["posted"] else already_posted).append(result)
+            payload = {"candidate_id": candidate_id, **result}
+            if result.get("already_posted"):
+                already_posted.append(payload)
+            else:
+                posted.append(payload)
         except Exception as exc:
             errors[candidate_id] = [str(exc)]
     return {
