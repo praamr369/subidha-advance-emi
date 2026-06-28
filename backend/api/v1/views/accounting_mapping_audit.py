@@ -178,7 +178,7 @@ def _audit_row(event_key: str, period: dict[str, Any], bridge: dict[str, Any] | 
         source_model=source_model,
         bridge_row=bridge,
         period_readiness=period,
-        source_workflow_exists=event_key != "staff_advance" and bridge is not None,
+        source_workflow_exists=bridge is not None,
     )
     mapping_status = "READY" if postability["mapping_ready"] else "BLOCKED_BY_MAPPING"
     status_value = str(postability["status"])
@@ -203,7 +203,7 @@ def _audit_row(event_key: str, period: dict[str, Any], bridge: dict[str, Any] | 
         "period_blocker_reason": postability.get("blocker_reason") if status_value == "BLOCKED_BY_PERIOD" else None,
         "numbering_readiness": "READY" if postability["journal_numbering_ready"] else "BLOCKED_BY_NUMBERING",
         "bridge_status": (bridge or {}).get("status"),
-        "can_seed": event_key != "staff_advance" and postability["status"] in {"BLOCKED_BY_MAPPING", "BLOCKED_BY_PERIOD", "BLOCKED_BY_NUMBERING"},
+        "can_seed": postability["status"] in {"BLOCKED_BY_MAPPING", "BLOCKED_BY_PERIOD", "BLOCKED_BY_NUMBERING"},
         "can_apply_mapping": bool((remediation or {}).get("can_apply_mapping") or (remediation or {}).get("can_map_account")),
         "can_post": False,
         "severity": severity,
@@ -297,8 +297,6 @@ class AccountingMappingAuditFixEventView(APIView):
         serializer.is_valid(raise_exception=True)
         event_key = serializer.validated_data["event_key"]
         action = serializer.validated_data["action"]
-        if event_key == "staff_advance":
-            return Response({"detail": "StaffAdvance workflow is unsupported and cannot be auto-fixed."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             if action == "create_account":
                 result = create_missing_mapped_account(event_type=event_key, actor=request.user)

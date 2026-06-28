@@ -84,6 +84,7 @@ SYSTEM_POSTING_PROFILE_ACCOUNTS: tuple[CanonicalChartAccountSpec, ...] = (
     CanonicalChartAccountSpec(key="PAYROLL_DEDUCTIONS_CLEARING", code="PAY-2200", name="Payroll Deductions Clearing", account_type=ChartOfAccountType.LIABILITY),
     CanonicalChartAccountSpec(key="EMPLOYEE_REIMBURSEMENT_PAYABLE", code="PAY-2300", name="Employee Reimbursement Payable", account_type=ChartOfAccountType.LIABILITY),
     CanonicalChartAccountSpec(key="SALARY_EXPENSE", code="PAY-5100", name="Salary Expense", account_type=ChartOfAccountType.EXPENSE),
+    CanonicalChartAccountSpec(key="STAFF_ADVANCE_ASSET", code="STAFF-1100", name="Staff Advance Receivable", account_type=ChartOfAccountType.ASSET),
     CanonicalChartAccountSpec(key="INPUT_GST", code="GST-1100", name="Input GST Receivable", account_type=ChartOfAccountType.ASSET),
     CanonicalChartAccountSpec(key="OUTPUT_GST", code="GST-2100", name="Output GST Payable", account_type=ChartOfAccountType.LIABILITY),
     CanonicalChartAccountSpec(key="GST_ADJUSTMENTS", code="GST-5100", name="GST Adjustments", account_type=ChartOfAccountType.EXPENSE),

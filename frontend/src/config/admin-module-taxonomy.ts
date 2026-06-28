@@ -211,7 +211,7 @@ export const ADMIN_MODULE_TAXONOMY: AdminModuleDefinition[] = [
     effect: "payroll",
     safetyRule: "Staff creation, onboarding, and attendance must not create salary payments, payroll journals, money movements, receipts, accounting bridge postings, or reconciliation items automatically. Payroll accounting bridge status and reconciliation evidence belong to Accounting & Reconciliation. Staff deactivation must preserve payroll, attendance, documents, salary records, and audit history.",
     uiPattern: "object_pages",
-    primaryRoutes: [ROUTES.admin.hr, ROUTES.admin.hrStaff, ROUTES.admin.hrAttendance, ROUTES.admin.hrPayroll, ROUTES.admin.hrSalaryPayments, ROUTES.admin.hrLeave, ROUTES.admin.hrExpenses, ROUTES.admin.hrStaffDocuments],
+    primaryRoutes: [ROUTES.admin.hr, ROUTES.admin.hrStaff, ROUTES.admin.hrAttendance, ROUTES.admin.hrPayroll, ROUTES.admin.hrSalaryPayments, ROUTES.admin.hrStaffAdvances, ROUTES.admin.hrLeave, ROUTES.admin.hrExpenses, ROUTES.admin.hrStaffDocuments],
   },
   {
     key: "bi_reports",

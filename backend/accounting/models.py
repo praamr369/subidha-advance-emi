@@ -3074,6 +3074,75 @@ class SalaryPayment(AccountingTimeStampedModel):
         self.full_clean()
         super().save(*args, **kwargs)
 
+
+class StaffAdvanceStatus(models.TextChoices):
+    DRAFT = "DRAFT", "Draft"
+    APPROVED = "APPROVED", "Approved"
+    DISBURSED = "DISBURSED", "Disbursed"
+    PARTIALLY_RECOVERED = "PARTIALLY_RECOVERED", "Partially Recovered"
+    RECOVERED = "RECOVERED", "Recovered"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class StaffAdvance(AccountingTimeStampedModel):
+    employee = models.ForeignKey(EmployeeProfile, on_delete=models.PROTECT, related_name="staff_advances")
+    request_date = models.DateField(db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    recovered_amount = models.DecimalField(max_digits=12, decimal_places=2, default=MONEY_ZERO, validators=[MinValueValidator(MONEY_ZERO)])
+    reason = models.TextField()
+    status = models.CharField(max_length=24, choices=StaffAdvanceStatus.choices, default=StaffAdvanceStatus.DRAFT, db_index=True)
+    finance_account = models.ForeignKey(FinanceAccount, on_delete=models.PROTECT, null=True, blank=True, related_name="staff_advances")
+    reference_no = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="approved_staff_advances")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    disbursed_at = models.DateTimeField(null=True, blank=True)
+    posted_journal_entry = models.OneToOneField(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="posted_staff_advance")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounting_staff_advances"
+        ordering = ["-request_date", "-id"]
+
+    @property
+    def outstanding_amount(self):
+        return max((self.amount or MONEY_ZERO) - (self.recovered_amount or MONEY_ZERO), MONEY_ZERO)
+
+    def clean(self):
+        errors = {}
+        if self.recovered_amount > self.amount:
+            errors["recovered_amount"] = "Recovered amount cannot exceed the advance amount."
+        if self.finance_account_id and not self.finance_account.is_active:
+            errors["finance_account"] = "Finance account must be active."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        _posted_reference_guard(self, label="staff advance")
+        self.reason = (self.reason or "").strip()
+        self.reference_no = (self.reference_no or "").strip()
+        self.notes = (self.notes or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class StaffAdvanceRecovery(AccountingTimeStampedModel):
+    staff_advance = models.ForeignKey(StaffAdvance, on_delete=models.PROTECT, related_name="recoveries")
+    recovery_date = models.DateField(db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    finance_account = models.ForeignKey(FinanceAccount, on_delete=models.PROTECT, related_name="staff_advance_recoveries")
+    reference_no = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    posted_journal_entry = models.OneToOneField(JournalEntry, on_delete=models.PROTECT, related_name="posted_staff_advance_recovery")
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="recorded_staff_advance_recoveries")
+
+    class Meta:
+        db_table = "accounting_staff_advance_recoveries"
+        ordering = ["-recovery_date", "-id"]
+
+    def save(self, *args, **kwargs):
+        self.reference_no = (self.reference_no or "").strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Salary Payment {self.id or 'new'}"
 

@@ -16,6 +16,33 @@ export type HrSummary = {
 
 export type HrOption = { value: string; label: string };
 
+export type HrStaffAdvance = {
+  id: number; employee: number; employee_name: string; employee_code: string;
+  request_date: string; amount: string; recovered_amount: string; outstanding_amount: string;
+  reason: string; status: string; finance_account: number | null; finance_account_name?: string | null;
+  reference_no: string; journal_entry_no?: string | null;
+};
+
+export async function listHrStaffAdvances() {
+  return apiFetch<{ count: number; results: HrStaffAdvance[] }>("/admin/hr/staff-advances/");
+}
+
+export async function createHrStaffAdvance(payload: { employee: number; request_date: string; amount: string; reason: string; notes?: string }) {
+  return apiFetch<HrStaffAdvance>("/admin/hr/staff-advances/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function approveHrStaffAdvance(id: number) {
+  return apiFetch<HrStaffAdvance>(`/admin/hr/staff-advances/${id}/approve/`, { method: "POST", body: JSON.stringify({}) });
+}
+
+export async function disburseHrStaffAdvance(id: number, payload: { finance_account: number; disbursement_date: string; reference_no?: string }) {
+  return apiFetch<HrStaffAdvance>(`/admin/hr/staff-advances/${id}/disburse/`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function recoverHrStaffAdvance(id: number, payload: { finance_account: number; recovery_date: string; amount: string; reference_no?: string }) {
+  return apiFetch<HrStaffAdvance>(`/admin/hr/staff-advances/${id}/recover/`, { method: "POST", body: JSON.stringify(payload) });
+}
+
 export type HrStaffOptions = {
   employment_statuses: HrOption[];
   employment_types: HrOption[];

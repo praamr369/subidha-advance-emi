@@ -107,9 +107,7 @@ EVENT_ACTION_OVERRIDES: dict[str, dict[str, Any]] = {
     "security_deposit_collection": {"label": "Security deposit collection", "module": "subscriptions", "action_href": FINANCE_ACCOUNT_HREF},
 }
 
-UNSUPPORTED_EVENTS = {
-    "staff_advance": "StaffAdvance workflow is not enabled. Configure only after a real StaffAdvance source model exists.",
-}
+UNSUPPORTED_EVENTS: dict[str, str] = {}
 
 
 def _source_model_exists(spec: RemediationSpec) -> bool:

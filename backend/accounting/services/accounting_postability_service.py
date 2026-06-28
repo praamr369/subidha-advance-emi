@@ -104,8 +104,6 @@ def evaluate_accounting_postability(
     key = (event_key or "").strip()
     period = period_readiness or build_accounting_bridge_period_readiness()
     supported = bool(source_workflow_exists if source_workflow_exists is not None else bridge_row is not None)
-    if key == "staff_advance":
-        supported = False
     mapping_state = _mapping_status(bridge_row)
     mapping_ready = mapping_state == READY
     active_financial_year_ready = bool(period.get("financial_year_ready"))

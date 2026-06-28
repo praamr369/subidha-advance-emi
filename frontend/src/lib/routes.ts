@@ -109,6 +109,7 @@ export const ROUTES = {
     hrAttendance: "/admin/hr/attendance",
     hrPayroll: "/admin/hr/payroll",
     hrSalaryPayments: "/admin/hr/salary-payments",
+    hrStaffAdvances: "/admin/hr/staff-advances",
     hrLeave: "/admin/hr/leave",
     hrExpenses: "/admin/hr/expenses",
     hrStaffDocuments: "/admin/hr/staff-documents",

@@ -19,6 +19,7 @@ from accounting.models import (
     PayrollPeriod,
     SalaryPayment,
     SalarySheet,
+    StaffAdvance,
     Vendor,
     JournalEntryGroup,
 )
@@ -86,6 +87,7 @@ from api.v1.serializers.accounting import (
     PayrollPeriodSerializer,
     SalaryPaymentSerializer,
     SalarySheetSerializer,
+    StaffAdvanceSerializer,
     VendorSerializer,
 )
 
@@ -660,6 +662,61 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
         if branch_id:
             queryset = queryset.filter(branch_id=branch_id)
         return queryset
+
+
+class StaffAdvanceViewSet(AdminAccountingModelViewSet):
+    queryset = StaffAdvance.objects.select_related("employee", "finance_account", "posted_journal_entry", "approved_by").prefetch_related("recoveries", "recoveries__finance_account", "recoveries__posted_journal_entry").all()
+    serializer_class = StaffAdvanceSerializer
+    search_fields = ["employee__employee_code", "employee__name", "reason", "reference_no"]
+    ordering = ["-request_date", "-id"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.query_params.get("employee"):
+            queryset = queryset.filter(employee_id=self.request.query_params["employee"])
+        if self.request.query_params.get("status"):
+            queryset = queryset.filter(status=self.request.query_params["status"])
+        return queryset
+
+    @action(detail=True, methods=["post"])
+    def approve(self, request, pk=None):
+        from accounting.services.staff_advance_service import approve_staff_advance
+        try:
+            row = approve_staff_advance(staff_advance_id=int(pk), performed_by=request.user)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(self.get_serializer(row).data)
+
+    @action(detail=True, methods=["post"])
+    def disburse(self, request, pk=None):
+        from datetime import date
+        from accounting.services.staff_advance_service import disburse_staff_advance
+        try:
+            account = FinanceAccount.objects.get(pk=request.data.get("finance_account"))
+            row = disburse_staff_advance(
+                staff_advance_id=int(pk), finance_account=account,
+                disbursement_date=date.fromisoformat(str(request.data.get("disbursement_date"))),
+                reference_no=str(request.data.get("reference_no") or ""), performed_by=request.user,
+            )
+        except (FinanceAccount.DoesNotExist, TypeError, ValueError) as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(self.get_serializer(row).data)
+
+    @action(detail=True, methods=["post"])
+    def recover(self, request, pk=None):
+        from datetime import date
+        from accounting.services.staff_advance_service import recover_staff_advance
+        try:
+            account = FinanceAccount.objects.get(pk=request.data.get("finance_account"))
+            recover_staff_advance(
+                staff_advance_id=int(pk), amount=request.data.get("amount"), finance_account=account,
+                recovery_date=date.fromisoformat(str(request.data.get("recovery_date"))),
+                reference_no=str(request.data.get("reference_no") or ""), performed_by=request.user,
+            )
+            row = self.get_queryset().get(pk=pk)
+        except (FinanceAccount.DoesNotExist, TypeError, ValueError) as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(self.get_serializer(row).data)
 
 
 class EmployeeExpenseClaimViewSet(AdminAccountingModelViewSet):

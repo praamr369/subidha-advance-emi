@@ -63,6 +63,20 @@ PAYROLL_SUPPLEMENTAL_EVENT_REGISTRY: tuple[BridgeEventSpec, ...] = (
         required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
         operator_action="Validate expense claim payment mapping only. Readiness does not approve claims or create payment journals.",
     ),
+    BridgeEventSpec(
+        event_key="staff_advance",
+        label="Staff advance",
+        source_module="accounting",
+        source_app="accounting",
+        source_model="StaffAdvance",
+        event_group="HR & Payroll",
+        debit_requirements=("STAFF_ADVANCE_ASSET",),
+        credit_requirements=("Active cash/bank/UPI FinanceAccount mapped to active ASSET COA",),
+        debit_coa_system_codes=("STAFF_ADVANCE_ASSET",),
+        credit_mapping_purposes=(FinanceAccountMappingPurpose.CASH_COLLECTION, FinanceAccountMappingPurpose.BANK_COLLECTION, FinanceAccountMappingPurpose.UPI_COLLECTION),
+        required_finance_account_kinds=COLLECTION_FINANCE_ACCOUNT_KINDS,
+        operator_action="Create and approve the staff advance in HR, then disburse it through an active settlement finance account. Posting is explicit and idempotent.",
+    ),
 )
 
 
@@ -152,20 +166,6 @@ def build_payroll_readiness_events() -> list[dict[str, Any]]:
         else:
             events.append(_validate_event_spec(spec))
 
-    if _model_exists("accounting", "StaffAdvance"):
-        # Reserved for a future real StaffAdvance source model. No source model exists in the current repo state.
-        pass
-    else:
-        events.append(
-            _not_configured_event(
-                event_key="staff_advance",
-                label="Staff advance",
-                source_model="StaffAdvance",
-                debit=("STAFF_ADVANCE asset",),
-                credit=("Active cash/bank/UPI FinanceAccount mapped to active ASSET COA",),
-                action="No StaffAdvance source model exists. Do not show or post staff advances until a real auditable source workflow is added.",
-            )
-        )
     return events
 
 

@@ -36,6 +36,8 @@ from accounting.models import (
     SalarySheetLine,
     SalarySheet,
     SalarySheetStatus,
+    StaffAdvance,
+    StaffAdvanceRecovery,
     Vendor,
 )
 from accounting.services.journal_posting_service import (
@@ -1310,6 +1312,30 @@ class SalaryPaymentSerializer(serializers.ModelSerializer):
             )
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+
+class StaffAdvanceRecoverySerializer(serializers.ModelSerializer):
+    finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
+    journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
+
+    class Meta:
+        model = StaffAdvanceRecovery
+        fields = ["id", "recovery_date", "amount", "finance_account", "finance_account_name", "reference_no", "posted_journal_entry", "journal_entry_no", "recorded_by", "created_at"]
+        read_only_fields = ["id", "posted_journal_entry", "journal_entry_no", "recorded_by", "created_at"]
+
+
+class StaffAdvanceSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source="employee.name", read_only=True)
+    employee_code = serializers.CharField(source="employee.employee_code", read_only=True)
+    finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
+    journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
+    outstanding_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    recoveries = StaffAdvanceRecoverySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = StaffAdvance
+        fields = ["id", "employee", "employee_name", "employee_code", "request_date", "amount", "recovered_amount", "outstanding_amount", "reason", "status", "finance_account", "finance_account_name", "reference_no", "approved_by", "approved_at", "disbursed_at", "posted_journal_entry", "journal_entry_no", "notes", "recoveries", "created_at", "updated_at"]
+        read_only_fields = ["id", "recovered_amount", "outstanding_amount", "status", "finance_account", "approved_by", "approved_at", "disbursed_at", "posted_journal_entry", "journal_entry_no", "recoveries", "created_at", "updated_at"]
 
 
 class EmployeeAttendanceSerializer(serializers.ModelSerializer):

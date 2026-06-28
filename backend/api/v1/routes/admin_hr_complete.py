@@ -20,6 +20,7 @@ from api.v1.views.accounting import (
     SalarySheetViewSet,
     EmployeeExpenseClaimViewSet,
     EmployeeExpenseClaimPaymentViewSet,
+    StaffAdvanceViewSet,
 )
 from api.v1.views.staff_tasks import StaffTaskAdminViewSet
 
@@ -78,6 +79,8 @@ router.register(
     EmployeeExpenseClaimPaymentViewSet,
     basename="hr-payroll-payments"
 )
+
+router.register(r"staff-advances", StaffAdvanceViewSet, basename="hr-staff-advances")
 
 # ============================================================================
 # EXPENSE CLAIMS MANAGEMENT
