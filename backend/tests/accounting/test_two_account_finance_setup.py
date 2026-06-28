@@ -3,8 +3,11 @@ from __future__ import annotations
 from django.test import TestCase
 
 from accounting.models import (
+    ChartOfAccount,
+    ChartOfAccountType,
     FinanceAccount,
     FinanceAccountCoaMapping,
+    FinanceAccountKind,
     FinanceAccountMappingPurpose,
 )
 from accounting.services.finance_account_collection_guard import (
@@ -37,6 +40,36 @@ class TwoAccountFinanceSetupTests(TestCase):
             active_real_accounts,
             [MAIN_CASH_FINANCE_ACCOUNT_NAME, MAIN_BANK_UPI_FINANCE_ACCOUNT_NAME],
         )
+
+    def test_apply_defaults_deletes_unused_legacy_finance_accounts_and_their_mappings(self):
+        legacy_chart = ChartOfAccount.objects.create(
+            code="LEGACY-UPI-ASSET",
+            name="Legacy UPI Asset",
+            account_type=ChartOfAccountType.ASSET,
+            is_active=True,
+            allow_manual_posting=True,
+        )
+        legacy = FinanceAccount.objects.create(
+            name="UPI Account",
+            kind=FinanceAccountKind.UPI,
+            chart_account=legacy_chart,
+            is_active=True,
+            is_real_settlement_account=True,
+        )
+        FinanceAccountCoaMapping.objects.create(
+            finance_account=legacy,
+            chart_account=legacy_chart,
+            purpose=FinanceAccountMappingPurpose.UPI_COLLECTION,
+            is_active=True,
+            is_default=True,
+        )
+
+        payload = apply_accounting_setup_defaults(performed_by=self.admin)
+
+        self.assertFalse(FinanceAccount.objects.filter(pk=legacy.pk).exists())
+        self.assertFalse(FinanceAccountCoaMapping.objects.filter(finance_account_id=legacy.pk).exists())
+        deleted_names = {row["name"] for row in payload["finance_accounts"]["legacy_cleanup"]["deleted"]}
+        self.assertIn("UPI Account", deleted_names)
 
     def test_combined_upi_bank_account_is_default_for_bank_upi_and_gateway_collections(self):
         apply_accounting_setup_defaults(performed_by=self.admin)
