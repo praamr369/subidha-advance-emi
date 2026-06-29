@@ -363,14 +363,31 @@ def _ensure_opening_stock(
 def _ensure_vendor_categories() -> dict[str, VendorCategory]:
     result: dict[str, VendorCategory] = {}
     for category_code, category_name, _ in CATEGORY_SPECS:
-        vendor_category, _ = VendorCategory.objects.get_or_create(
-            code=f"V-{category_code}",
-            defaults={
-                "name": category_name,
-                "description": f"Sandbox vendor category for {category_name}.",
-                "is_active": True,
-            },
+        code = f"V-{category_code}"
+        vendor_category = (
+            VendorCategory.objects.filter(code=code).first()
+            or VendorCategory.objects.filter(name__iexact=category_name).first()
         )
+        if vendor_category is None:
+            vendor_category = VendorCategory.objects.create(
+                code=code,
+                name=category_name,
+                description=f"Sandbox vendor category for {category_name}.",
+                is_active=True,
+            )
+        else:
+            updates = []
+            if vendor_category.code != code:
+                vendor_category.code = code
+                updates.append("code")
+            if vendor_category.description != f"Sandbox vendor category for {category_name}.":
+                vendor_category.description = f"Sandbox vendor category for {category_name}."
+                updates.append("description")
+            if not vendor_category.is_active:
+                vendor_category.is_active = True
+                updates.append("is_active")
+            if updates:
+                vendor_category.save(update_fields=[*updates, "updated_at"])
         result[category_code] = vendor_category
     return result
 
