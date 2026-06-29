@@ -30,7 +30,7 @@ fi
 CHECK_SETTINGS_MODULE="${CHECK_SETTINGS_MODULE:-core.settings.test}"
 DEPLOY_CHECK_SETTINGS_MODULE="${DEPLOY_CHECK_SETTINGS_MODULE:-core.settings.production}"
 DEPLOY_CHECK_DJANGO_ENV="${DEPLOY_CHECK_DJANGO_ENV:-production}"
-DEPLOY_CHECK_SECRET_KEY="${DEPLOY_CHECK_SECRET_KEY:-release-candidate-deploy-check-secret-key-2026-rotate-before-production-a7m4q2x9}"
+DEPLOY_CHECK_SECRET_KEY="${DEPLOY_CHECK_SECRET_KEY:-release-candidate-deploy-check-secret}"
 DEPLOY_CHECK_ALLOWED_HOSTS="${DEPLOY_CHECK_ALLOWED_HOSTS:-localhost}"
 DEPLOY_CHECK_DATABASE_URL="${DEPLOY_CHECK_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/subidha_rc}"
 DEPLOY_CHECK_CSRF_TRUSTED_ORIGINS="${DEPLOY_CHECK_CSRF_TRUSTED_ORIGINS:-http://localhost}"
@@ -54,15 +54,19 @@ append_test_target_if_present() {
   fi
 }
 
-# Audited patch-specific backend test modules present across the integrated hardening branches.
 append_test_target_if_present "api/v1/tests_health.py" "api.v1.tests_health"
 append_test_target_if_present "api/v1/tests_financial_truth.py" "api.v1.tests_financial_truth"
 append_test_target_if_present "api/v1/tests_payment_pagination.py" "api.v1.tests_payment_pagination"
 append_test_target_if_present "api/v1/tests_subscription_schedule_rebuild.py" "api.v1.tests_subscription_schedule_rebuild"
 append_test_target_if_present "api/v1/tests_batch_status.py" "api.v1.tests_batch_status"
-# Phase 3 contract lifecycle and Direct Sale numbering
 append_test_target_if_present "api/v1/tests_contract_phase3.py" "api.v1.tests_contract_phase3"
 append_test_target_if_present "tests/billing/test_direct_sale_numbers.py" "tests.billing.test_direct_sale_numbers"
+
+# Production finance/accounting/reconciliation guardrails.
+append_test_target_if_present "tests/accounting/__init__.py" "tests.accounting"
+append_test_target_if_present "tests/reconciliation/__init__.py" "tests.reconciliation"
+append_test_target_if_present "tests/api/test_accounting_setup_health_defaults_api.py" "tests.api.test_accounting_setup_health_defaults_api"
+append_test_target_if_present "tests/api/test_admin_finance_transfers.py" "tests.api.test_admin_finance_transfers"
 
 DJANGO_ENV="$TEST_CHECK_DJANGO_ENV" \
 DJANGO_ALLOWED_HOSTS="$TEST_CHECK_ALLOWED_HOSTS" \
