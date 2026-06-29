@@ -3455,6 +3455,7 @@ class VendorSettlement(AccountingTimeStampedModel):
         related_name="vendor_settlements",
     )
     reference_no = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
     purchase_bill = models.ForeignKey(
         "inventory.PurchaseBill",
         on_delete=models.PROTECT,
@@ -3504,6 +3505,7 @@ class VendorSettlement(AccountingTimeStampedModel):
             self.settlement_no or generate_vendor_settlement_no()
         ).strip().upper()
         self.reference_no = (self.reference_no or "").strip() or None
+        self.notes = (self.notes or "").strip()
         if self.branch_id is None:
             self.branch = (
                 getattr(self.finance_account, "branch", None)

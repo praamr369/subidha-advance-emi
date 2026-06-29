@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from accounting.models import CustomerOpeningOutstanding, Vendor, VendorLedgerEntry, VendorProduct, VendorQuote, VendorQuoteRequest
 from accounts.models import User
+from billing.models import PurchaseReturn
 from accounting.services.vendor_ledger_service import (
     get_vendor_ledger,
     get_vendor_outstanding,
@@ -103,7 +104,7 @@ class AdminVendorLedgerView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request, pk: int):
-        vendor = Vendor.objects.get(pk=pk)
+        vendor = get_object_or_404(Vendor, pk=pk)
         payload = get_vendor_ledger(
             vendor,
             {
@@ -165,7 +166,7 @@ class AdminVendorOutstandingView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request, pk: int):
-        vendor = Vendor.objects.get(pk=pk)
+        vendor = get_object_or_404(Vendor, pk=pk)
         return Response(get_vendor_outstanding(vendor))
 
 
@@ -173,7 +174,7 @@ class AdminVendorPurchasesView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request, pk: int):
-        vendor = Vendor.objects.get(pk=pk)
+        vendor = get_object_or_404(Vendor, pk=pk)
         return Response(get_vendor_purchase_summary(vendor))
 
 
@@ -181,8 +182,51 @@ class AdminVendorPurchaseReturnsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request, pk: int):
-        vendor = Vendor.objects.get(pk=pk)
+        vendor = get_object_or_404(Vendor, pk=pk)
         return Response(get_vendor_return_summary(vendor))
+
+
+class AdminVendorPurchaseReturnListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        queryset = PurchaseReturn.objects.select_related("vendor", "purchase_bill").order_by(
+            "-return_date", "-created_at", "-id"
+        )
+        vendor_id = request.query_params.get("vendor")
+        status_value = (request.query_params.get("status") or "").strip().upper()
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+        if vendor_id:
+            queryset = queryset.filter(vendor_id=vendor_id)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if date_from:
+            queryset = queryset.filter(return_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(return_date__lte=date_to)
+
+        count = queryset.count()
+        rows = [
+            {
+                "id": row.id,
+                "return_no": row.return_no,
+                "return_date": row.return_date,
+                "status": row.status,
+                "vendor": row.vendor_id,
+                "vendor_name": row.vendor.name,
+                "purchase_bill": row.purchase_bill_id,
+                "purchase_bill_no": row.purchase_bill.bill_no,
+                "reason": row.reason,
+                "subtotal": str(row.subtotal),
+                "tax_total": str(row.tax_total),
+                "grand_total": str(row.grand_total),
+                "posted_journal_entry": row.posted_journal_entry_id,
+                "posted_at": row.posted_at,
+            }
+            for row in queryset[:500]
+        ]
+        return Response({"count": count, "results": rows})
 
 
 class AdminVendorSourcingSuggestView(APIView):
@@ -318,7 +362,7 @@ class AdminVendorAccountLinkView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request, pk: int):
-        vendor = Vendor.objects.select_related("linked_user").get(pk=pk)
+        vendor = get_object_or_404(Vendor.objects.select_related("linked_user"), pk=pk)
         return Response({"vendor_id": vendor.id, "linked_user_id": vendor.linked_user_id})
 
     def post(self, request, pk: int):
@@ -330,7 +374,7 @@ class AdminVendorAccountLinkView(APIView):
     def delete(self, request, pk: int):
         serializer = VendorAccountLinkSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        vendor = Vendor.objects.get(pk=pk)
+        vendor = get_object_or_404(Vendor, pk=pk)
         old_user_id = vendor.linked_user_id
         vendor.linked_user = None
         vendor.save(update_fields=["linked_user", "updated_at"])
@@ -345,7 +389,7 @@ class AdminVendorAccountLinkView(APIView):
     def _mutate(self, request, *, pk: int):
         serializer = VendorAccountLinkSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        vendor = Vendor.objects.get(pk=pk)
+        vendor = get_object_or_404(Vendor, pk=pk)
         user_id = serializer.validated_data.get("user_id")
         if not user_id:
             return Response({"user_id": ["user_id is required."]}, status=status.HTTP_400_BAD_REQUEST)

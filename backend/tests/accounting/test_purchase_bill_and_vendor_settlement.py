@@ -9,10 +9,12 @@ from accounting.models import (
     FinanceAccount,
     FinanceAccountKind,
     Vendor,
+    VendorLedgerEntry,
     VendorSettlement,
 )
 from accounting.services.purchase_bill_posting_service import approve_purchase_bill, post_purchase_bill_from_accounting
 from accounting.services.vendor_settlement_service import post_vendor_settlement
+from accounting.services.vendor_ledger_service import get_vendor_outstanding
 from inventory.models import (
     InventoryItem,
     InventoryItemType,
@@ -125,3 +127,23 @@ class PurchaseBillAndVendorSettlementTests(TestCase):
             sum(item.debit_amount for item in settlement.posted_journal_entry.lines.all()),
             sum(item.credit_amount for item in settlement.posted_journal_entry.lines.all()),
         )
+        self.assertTrue(
+            VendorLedgerEntry.objects.filter(
+                vendor=self.vendor,
+                entry_type="PAYMENT_TO_VENDOR",
+                source_type="VENDOR_SETTLEMENT",
+                source_id=settlement.id,
+                credit=Decimal("1180.00"),
+            ).exists()
+        )
+        self.assertEqual(Decimal(get_vendor_outstanding(self.vendor)["outstanding"]), Decimal("0.00"))
+
+        overpayment = VendorSettlement.objects.create(
+            vendor=self.vendor,
+            settlement_date=date(2026, 4, 22),
+            amount=Decimal("1.00"),
+            finance_account=self.cash_account,
+            purchase_bill=purchase_bill,
+        )
+        with self.assertRaisesMessage(ValueError, "exceeds purchase bill outstanding"):
+            post_vendor_settlement(vendor_settlement_id=overpayment.id, posted_by=self.admin)

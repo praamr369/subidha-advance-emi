@@ -12,6 +12,7 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ProcurementConfirmDialog from "@/components/procurement/ProcurementConfirmDialog";
 import { buildAdminVendorPaymentVoucherPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 import {
   createVendorPayment,
   listVendorBills,
@@ -46,20 +47,19 @@ function rupees(v?: string | null) {
 interface CreatePaymentFormProps {
   vendors: VendorLite[];
   bills: VendorBill[];
+  financeAccounts: FinanceAccount[];
   onSaved: (payment: VendorPayment) => void;
   onCancel: () => void;
 }
 
-const PAYMENT_METHODS = ["BANK_TRANSFER", "CHEQUE", "CASH", "UPI", "NEFT", "RTGS", "IMPS"];
-
-function CreatePaymentForm({ vendors, bills, onSaved, onCancel }: CreatePaymentFormProps) {
+function CreatePaymentForm({ vendors, bills, financeAccounts, onSaved, onCancel }: CreatePaymentFormProps) {
   const today = new Date().toISOString().slice(0, 10);
   const [vendorId, setVendorId] = useState("");
   const [billId, setBillId] = useState("");
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(today);
   const [referenceNo, setReferenceNo] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
+  const [financeAccountId, setFinanceAccountId] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -67,17 +67,18 @@ function CreatePaymentForm({ vendors, bills, onSaved, onCancel }: CreatePaymentF
   const selectedBill = bills.find((b) => String(b.id) === billId);
   const vendorBills = bills.filter(
     (b) => !vendorId || String(b.vendor) === vendorId
-  ).filter((b) => b.status === "POSTED");
+  ).filter((b) => b.status === "POSTED" && Number(b.outstanding_amount ?? b.grand_total ?? 0) > 0);
 
-  // Auto-fill amount from selected bill grand total
+  // The backend supplies the bill-level outstanding amount.
   useEffect(() => {
-    if (selectedBill) setAmount(selectedBill.grand_total ?? "");
+    if (selectedBill) setAmount(selectedBill.outstanding_amount ?? selectedBill.grand_total ?? "");
   }, [billId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!vendorId) errs.vendor = "Vendor is required.";
+    if (!financeAccountId) errs.finance_account = "Finance account is required.";
     if (!amount || parseFloat(amount) <= 0) errs.amount = "Amount must be greater than 0.";
     if (!paymentDate) errs.payment_date = "Date is required.";
     if (Object.keys(errs).length) { setErrors(errs); return; }
@@ -89,8 +90,9 @@ function CreatePaymentForm({ vendors, bills, onSaved, onCancel }: CreatePaymentF
         vendor: Number(vendorId),
         vendor_bill: billId ? Number(billId) : null,
         amount,
+        finance_account: Number(financeAccountId),
         reference_no: referenceNo || undefined,
-        notes: `${paymentMethod}${notes ? ` — ${notes}` : ""}`,
+        notes: notes || undefined,
       });
       onSaved(payment);
     } catch (err: unknown) {
@@ -107,7 +109,7 @@ function CreatePaymentForm({ vendors, bills, onSaved, onCancel }: CreatePaymentF
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Vendor *</label>
-          <select value={vendorId} onChange={(e) => { setVendorId(e.target.value); setBillId(""); }} className={inputCls}>
+          <select value={vendorId} onChange={(e) => { setVendorId(e.target.value); setBillId(""); setAmount(""); }} className={inputCls}>
             <option value="">— Select Vendor —</option>
             {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
@@ -118,7 +120,7 @@ function CreatePaymentForm({ vendors, bills, onSaved, onCancel }: CreatePaymentF
           <select value={billId} onChange={(e) => setBillId(e.target.value)} className={inputCls}>
             <option value="">— None —</option>
             {vendorBills.map((b) => (
-              <option key={b.id} value={b.id}>{b.bill_no} — {rupees(b.grand_total)}</option>
+              <option key={b.id} value={b.id}>{b.bill_no} — Outstanding {rupees(b.outstanding_amount ?? b.grand_total)}</option>
             ))}
           </select>
         </div>
@@ -133,10 +135,12 @@ function CreatePaymentForm({ vendors, bills, onSaved, onCancel }: CreatePaymentF
           {errors.payment_date ? <p className="mt-0.5 text-[10px] text-red-600">{errors.payment_date}</p> : null}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Payment Method</label>
-          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={inputCls}>
-            {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m.replace(/_/g, " ")}</option>)}
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Finance Account *</label>
+          <select value={financeAccountId} onChange={(e) => setFinanceAccountId(e.target.value)} className={inputCls}>
+            <option value="">— Select Cash / Bank / UPI —</option>
+            {financeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} ({account.kind})</option>)}
           </select>
+          {errors.finance_account ? <p className="mt-0.5 text-[10px] text-red-600">{errors.finance_account}</p> : null}
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Reference No</label>
@@ -260,6 +264,7 @@ export default function AdminVendorPaymentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [vendors, setVendors] = useState<VendorLite[]>([]);
   const [bills, setBills] = useState<VendorBill[]>([]);
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState<VendorPayment | null>(null);
 
@@ -267,15 +272,21 @@ export default function AdminVendorPaymentsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [payRes, vendorRes, billRes] = await Promise.allSettled([
-        listVendorPayments(),
+      const [payRes, vendorRes, billRes, financeRes] = await Promise.allSettled([
+        listVendorPayments({ page_size: 200 }),
         listVendorsLite({ page_size: 200, is_active: true }),
         listVendorBills({ status: "POSTED", page_size: 200 }),
+        listFinanceAccounts({ page_size: 500, is_active: 1, for_payment_collection: 1 }),
       ]);
       if (payRes.status === "fulfilled") setRows(payRes.value.results);
       else setError("Failed to load vendor payments.");
       if (vendorRes.status === "fulfilled") setVendors(vendorRes.value.results);
+      else setError("Failed to load vendors for vendor payments.");
       if (billRes.status === "fulfilled") setBills(billRes.value.results);
+      else setError("Failed to load posted vendor bills.");
+      if (financeRes.status === "fulfilled") {
+        setFinanceAccounts(financeRes.value.results.filter((account) => account.is_real_settlement_account !== false));
+      } else setError("Failed to load finance accounts for vendor payments.");
     } finally {
       setLoading(false);
     }
@@ -291,6 +302,7 @@ export default function AdminVendorPaymentsPage() {
   function handlePosted(payment: VendorPayment) {
     setRows((prev) => prev.map((r) => (r.id === payment.id ? payment : r)));
     setSelected(payment);
+    void load();
   }
 
   return (
@@ -322,7 +334,7 @@ export default function AdminVendorPaymentsPage() {
         {showCreate ? (
           <div className="mb-6 rounded-xl border border-border bg-card p-5">
             <h3 className="mb-4 text-sm font-semibold text-foreground">New Vendor Payment</h3>
-            <CreatePaymentForm vendors={vendors} bills={bills} onSaved={handleSaved} onCancel={() => setShowCreate(false)} />
+            <CreatePaymentForm vendors={vendors} bills={bills} financeAccounts={financeAccounts} onSaved={handleSaved} onCancel={() => setShowCreate(false)} />
           </div>
         ) : null}
 

@@ -857,6 +857,8 @@ export type AccountingPurchaseBill = {
   subtotal: string;
   tax_total: string;
   grand_total: string;
+  posted_settled_amount?: string;
+  outstanding_amount?: string;
   stock_location?: number | null;
   stock_location_code?: string | null;
   stock_location_name?: string | null;
@@ -901,6 +903,8 @@ export type VendorSettlement = {
   status: "DRAFT" | "POSTED" | "CANCELLED";
   posted_journal_entry?: number | null;
   posted_journal_entry_no?: string | null;
+  journal_entry_no?: string | null;
+  notes?: string;
 };
 
 export type AccountingBridgePosting = {

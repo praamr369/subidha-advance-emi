@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.db.models import Sum
 from rest_framework import serializers
 
 from inventory.models import (
@@ -486,6 +487,8 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
     stock_location_name = serializers.CharField(source="stock_location.name", read_only=True)
     itc_claimable = serializers.SerializerMethodField()
     supplier_gst_as_cost = serializers.SerializerMethodField()
+    posted_settled_amount = serializers.SerializerMethodField()
+    outstanding_amount = serializers.SerializerMethodField()
     lines = PurchaseBillLineSerializer(many=True, required=False)
 
     class Meta:
@@ -511,6 +514,8 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
             "finance_account_name",
             "itc_claimable",
             "supplier_gst_as_cost",
+            "posted_settled_amount",
+            "outstanding_amount",
             "posted_journal_entry",
             "posted_journal_entry_no",
             "notes",
@@ -526,6 +531,15 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_posted_settled_amount(self, obj):
+        total = obj.vendor_settlements.filter(status="POSTED").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        return f"{Decimal(str(total)).quantize(Decimal('0.01')):.2f}"
+
+    def get_outstanding_amount(self, obj):
+        settled = Decimal(self.get_posted_settled_amount(obj))
+        outstanding = Decimal(str(obj.grand_total or "0.00")) - settled
+        return f"{max(outstanding, Decimal('0.00')).quantize(Decimal('0.01')):.2f}"
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -727,6 +741,7 @@ class VendorContactSerializer(serializers.ModelSerializer):
 
 
 class VendorAgreementSerializer(serializers.ModelSerializer):
+    agreement_no = serializers.CharField(required=False, allow_blank=True, max_length=60)
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
 
     class Meta:
@@ -1026,12 +1041,15 @@ class VendorBillLineSerializer(serializers.ModelSerializer):
 
 
 class VendorBillSerializer(serializers.ModelSerializer):
+    bill_no = serializers.CharField(required=False, allow_blank=True, max_length=60)
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
     purchase_order_no = serializers.CharField(source="purchase_order.po_no", read_only=True)
     goods_receipt_no = serializers.CharField(source="goods_receipt.receipt_no", read_only=True)
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
     posted_journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
     lines = VendorBillLineSerializer(many=True)
+    posted_paid_amount = serializers.SerializerMethodField()
+    outstanding_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = VendorBill
@@ -1051,6 +1069,8 @@ class VendorBillSerializer(serializers.ModelSerializer):
             "subtotal",
             "tax_total",
             "grand_total",
+            "posted_paid_amount",
+            "outstanding_amount",
             "posted_journal_entry",
             "posted_journal_entry_no",
             "notes",
@@ -1059,6 +1079,15 @@ class VendorBillSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "status", "posted_journal_entry", "posted_journal_entry_no", "created_at", "updated_at"]
+
+    def get_posted_paid_amount(self, obj):
+        total = obj.payments.filter(status="POSTED").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        return f"{Decimal(str(total)).quantize(Decimal('0.01')):.2f}"
+
+    def get_outstanding_amount(self, obj):
+        paid = Decimal(self.get_posted_paid_amount(obj))
+        outstanding = Decimal(str(obj.grand_total or "0.00")) - paid
+        return f"{max(outstanding, Decimal('0.00')).quantize(Decimal('0.01')):.2f}"
 
     def create(self, validated_data):
         lines = validated_data.pop("lines", [])
@@ -1092,6 +1121,7 @@ class VendorBillSerializer(serializers.ModelSerializer):
 
 
 class VendorPaymentSerializer(serializers.ModelSerializer):
+    payment_no = serializers.CharField(required=False, allow_blank=True, max_length=60)
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
     vendor_bill_no = serializers.CharField(source="vendor_bill.bill_no", read_only=True)
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
@@ -1122,8 +1152,30 @@ class VendorPaymentSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
         vendor = attrs.get("vendor") or getattr(getattr(self, "instance", None), "vendor", None)
         vendor_bill = attrs.get("vendor_bill") or getattr(getattr(self, "instance", None), "vendor_bill", None)
+        finance_account = attrs.get("finance_account") or getattr(instance, "finance_account", None)
+        amount = attrs.get("amount") or getattr(instance, "amount", None)
         if vendor and vendor_bill and vendor_bill.vendor_id != vendor.id:
             raise serializers.ValidationError({"vendor_bill": "Vendor bill does not belong to selected vendor."})
+        if vendor_bill and vendor_bill.status != "POSTED":
+            raise serializers.ValidationError({"vendor_bill": "Only posted vendor bills can be paid."})
+        if vendor_bill and amount is not None:
+            payments = vendor_bill.payments.filter(status="POSTED")
+            if instance is not None:
+                payments = payments.exclude(pk=instance.pk)
+            already_paid = payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+            outstanding = Decimal(str(vendor_bill.grand_total)) - Decimal(str(already_paid))
+            if Decimal(str(amount)) > outstanding:
+                raise serializers.ValidationError(
+                    {"amount": f"Amount exceeds vendor bill outstanding amount ({outstanding:.2f})."}
+                )
+        if finance_account is not None:
+            if not finance_account.is_active:
+                raise serializers.ValidationError({"finance_account": "Select an active finance account."})
+            if not finance_account.is_real_settlement_account:
+                raise serializers.ValidationError(
+                    {"finance_account": "Select a real cash, bank, UPI, or gateway settlement account."}
+                )
         return attrs

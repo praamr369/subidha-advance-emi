@@ -1389,7 +1389,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
             preview = preview_bridge_candidate(candidate_id)
             if not preview["can_post"]:
                 raise ValueError("; ".join(preview["blockers"]) or "Candidate is not postable.")
-            row = VendorPayment.objects.select_for_update().select_related("vendor", "vendor_bill", "finance_account", "finance_account__chart_account").get(pk=candidate["source_id"])
+            row = VendorPayment.objects.select_for_update(of=("self",)).select_related("vendor", "vendor_bill", "finance_account", "finance_account__chart_account").get(pk=candidate["source_id"])
             before = _vendor_payment_snapshot(row)
             lines, _warnings, finance_account = _lines_for_candidate(candidate)
             total_debit, total_credit = base._line_totals(lines)

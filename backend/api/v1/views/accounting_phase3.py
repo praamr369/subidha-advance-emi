@@ -64,6 +64,7 @@ from accounting.services.vendor_settlement_service import (
 )
 from inventory.models import PurchaseBill
 from api.v1.permissions import IsAdmin
+from api.v1.pagination import AdminAccountingPagination
 from api.v1.serializers.accounting_phase3 import (
     AccountingBridgePostingSerializer,
     AccountingBookQuerySerializer,
@@ -433,6 +434,7 @@ class AccountingPurchaseBillViewSet(AdminAccountingPhase3ViewSet):
         "lines__inventory_item__product",
     ).all()
     serializer_class = PurchaseBillSerializer
+    pagination_class = AdminAccountingPagination
     search_fields = ["bill_no", "vendor__name"]
     ordering_fields = ["bill_date", "created_at", "bill_no"]
     ordering = ["-bill_date", "-created_at", "-id"]
@@ -498,6 +500,7 @@ class VendorSettlementViewSet(AdminAccountingPhase3ViewSet):
         "posted_journal_entry",
     ).all()
     serializer_class = VendorSettlementSerializer
+    pagination_class = AdminAccountingPagination
     search_fields = ["settlement_no", "vendor__name", "reference_no"]
     ordering_fields = ["settlement_date", "created_at", "settlement_no"]
     ordering = ["-settlement_date", "-created_at", "-id"]
@@ -505,8 +508,17 @@ class VendorSettlementViewSet(AdminAccountingPhase3ViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         branch_id = self.request.query_params.get("branch")
+        vendor_id = self.request.query_params.get("vendor")
+        purchase_bill_id = self.request.query_params.get("purchase_bill")
+        status_value = (self.request.query_params.get("status") or "").strip().upper()
         if branch_id:
             queryset = queryset.filter(branch_id=branch_id)
+        if vendor_id:
+            queryset = queryset.filter(vendor_id=vendor_id)
+        if purchase_bill_id:
+            queryset = queryset.filter(purchase_bill_id=purchase_bill_id)
+        if status_value:
+            queryset = queryset.filter(status=status_value)
         return queryset
 
     def get_serializer_class(self):
@@ -518,10 +530,13 @@ class VendorSettlementViewSet(AdminAccountingPhase3ViewSet):
     def post_settlement(self, request, pk=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        settlement, updated = post_vendor_settlement(
-            vendor_settlement_id=int(pk),
-            posted_by=request.user,
-        )
+        try:
+            settlement, updated = post_vendor_settlement(
+                vendor_settlement_id=int(pk),
+                posted_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
         payload = VendorSettlementSerializer(settlement, context=self.get_serializer_context())
         return Response({"updated": updated, "vendor_settlement": payload.data})
 
@@ -529,11 +544,14 @@ class VendorSettlementViewSet(AdminAccountingPhase3ViewSet):
     def cancel(self, request, pk=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        settlement, updated = cancel_vendor_settlement(
-            vendor_settlement_id=int(pk),
-            performed_by=request.user,
-            reason=serializer.validated_data.get("reason", ""),
-        )
+        try:
+            settlement, updated = cancel_vendor_settlement(
+                vendor_settlement_id=int(pk),
+                performed_by=request.user,
+                reason=serializer.validated_data.get("reason", ""),
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
         payload = VendorSettlementSerializer(settlement, context=self.get_serializer_context())
         return Response({"updated": updated, "vendor_settlement": payload.data})
 

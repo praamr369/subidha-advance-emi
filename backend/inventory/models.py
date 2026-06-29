@@ -17,6 +17,10 @@ MONEY_ZERO = Decimal("0.00")
 QUANTITY_ZERO = Decimal("0.000")
 
 
+def _generate_inventory_reference(prefix: str) -> str:
+    return f"{prefix}-{timezone.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+
+
 def _default_branch():
     try:
         from branch_control.services.branch_service import default_branch_for_model
@@ -1151,7 +1155,7 @@ class VendorBill(InventoryTimeStampedModel):
             self,
             immutable_statuses={VendorBillStatus.POSTED, VendorBillStatus.CANCELLED},
         )
-        self.bill_no = (self.bill_no or "").strip().upper()
+        self.bill_no = ((self.bill_no or "").strip() or _generate_inventory_reference("VBILL")).upper()
         self.notes = (self.notes or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
@@ -1203,7 +1207,7 @@ class VendorPayment(InventoryTimeStampedModel):
             self,
             immutable_statuses={VendorPaymentStatus.POSTED, VendorPaymentStatus.CANCELLED},
         )
-        self.payment_no = (self.payment_no or "").strip().upper()
+        self.payment_no = ((self.payment_no or "").strip() or _generate_inventory_reference("VPAY")).upper()
         self.reference_no = (self.reference_no or "").strip()
         self.notes = (self.notes or "").strip()
         self.full_clean()
@@ -1240,7 +1244,7 @@ class VendorAgreement(InventoryTimeStampedModel):
         ordering = ["-effective_from", "-created_at", "-id"]
 
     def save(self, *args, **kwargs):
-        self.agreement_no = (self.agreement_no or "").strip().upper()
+        self.agreement_no = ((self.agreement_no or "").strip() or _generate_inventory_reference("VAGR")).upper()
         self.payment_terms = (self.payment_terms or "").strip()
         self.notes = (self.notes or "").strip()
         self.full_clean()

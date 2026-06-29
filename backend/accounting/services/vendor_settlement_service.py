@@ -3,11 +3,14 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Sum
 
 from accounting.models import MONEY_ZERO, VendorSettlement, VendorSettlementStatus
 from accounting.services.bridge_posting_service import post_bridge_entry
 from accounting.services.journal_posting_service import _log_accounting_event
 from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+from accounting.services.vendor_ledger_service import append_vendor_ledger_entry, get_vendor_outstanding
+from inventory.models import PurchaseBill, PurchaseBillStatus
 
 
 def _money(value) -> Decimal:
@@ -17,7 +20,7 @@ def _money(value) -> Decimal:
 @transaction.atomic
 def post_vendor_settlement(*, vendor_settlement_id: int, posted_by):
     settlement = (
-        VendorSettlement.objects.select_for_update()
+        VendorSettlement.objects.select_for_update(of=("self",))
         .select_related(
             "vendor",
             "finance_account",
@@ -31,6 +34,34 @@ def post_vendor_settlement(*, vendor_settlement_id: int, posted_by):
         return settlement, False
     if settlement.status == VendorSettlementStatus.CANCELLED:
         raise ValueError("Cancelled settlements cannot be posted.")
+    if settlement.status != VendorSettlementStatus.DRAFT:
+        raise ValueError("Only draft vendor settlements can be posted.")
+    if not settlement.finance_account.is_active:
+        raise ValueError("Inactive finance accounts cannot be used for vendor settlements.")
+    if not settlement.finance_account.is_real_settlement_account:
+        raise ValueError("Vendor settlements require a real cash, bank, UPI, or gateway finance account.")
+
+    if settlement.purchase_bill_id:
+        purchase_bill = PurchaseBill.objects.select_for_update().get(pk=settlement.purchase_bill_id)
+        if purchase_bill.vendor_id != settlement.vendor_id:
+            raise ValueError("Selected purchase bill does not belong to the settlement vendor.")
+        if purchase_bill.status != PurchaseBillStatus.POSTED:
+            raise ValueError("Only posted purchase bills can be settled.")
+        already_settled = VendorSettlement.objects.filter(
+            purchase_bill_id=purchase_bill.id,
+            status=VendorSettlementStatus.POSTED,
+        ).exclude(pk=settlement.pk).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        bill_outstanding = _money(purchase_bill.grand_total) - _money(already_settled)
+        if _money(settlement.amount) > bill_outstanding:
+            raise ValueError(
+                f"Settlement exceeds purchase bill outstanding amount ({bill_outstanding:.2f})."
+            )
+
+    vendor_outstanding = _money(get_vendor_outstanding(settlement.vendor)["outstanding"])
+    if _money(settlement.amount) > vendor_outstanding:
+        raise ValueError(
+            f"Settlement exceeds vendor outstanding amount ({vendor_outstanding:.2f})."
+        )
 
     accounts = ensure_phase3_system_accounts()
     payable_account = accounts["ACCOUNTS_PAYABLE"]
@@ -58,6 +89,16 @@ def post_vendor_settlement(*, vendor_settlement_id: int, posted_by):
     settlement.posted_journal_entry = posted_journal
     settlement.status = VendorSettlementStatus.POSTED
     settlement.save(update_fields=["posted_journal_entry", "status", "updated_at"])
+    append_vendor_ledger_entry(
+        vendor_id=settlement.vendor_id,
+        entry_type="PAYMENT_TO_VENDOR",
+        source_type="VENDOR_SETTLEMENT",
+        source_id=settlement.id,
+        source_reference=settlement.settlement_no,
+        credit=settlement.amount,
+        created_by=posted_by,
+        notes=f"Vendor settlement posted via journal {posted_journal.entry_no}.",
+    )
     _log_accounting_event(
         event="ACCOUNTING_VENDOR_SETTLEMENT_POSTED",
         instance=settlement,

@@ -4,7 +4,7 @@ type ApiObject = Record<string, unknown>;
 type ApiListResponse = { results?: ApiObject[]; [key: string]: unknown };
 
 export async function listAdminVendors(): Promise<ApiListResponse> {
-  return apiFetch("/admin/vendors/");
+  return apiFetch("/admin/vendors/?page_size=200");
 }
 
 export async function getAdminVendor(id: number): Promise<ApiObject> {
@@ -73,6 +73,37 @@ export async function listAdminVendorPurchases(id: number): Promise<ApiListRespo
 
 export async function listAdminVendorPurchaseReturns(id: number): Promise<ApiListResponse> {
   return apiFetch(`/admin/vendors/${id}/purchase-returns/`);
+}
+
+export type AdminVendorPurchaseReturn = {
+  id: number;
+  return_no: string;
+  return_date: string;
+  status: "DRAFT" | "POSTED" | "CANCELLED";
+  vendor: number;
+  vendor_name: string;
+  purchase_bill: number;
+  purchase_bill_no: string;
+  reason: string;
+  subtotal: string;
+  tax_total: string;
+  grand_total: string;
+  posted_journal_entry?: number | null;
+  posted_at?: string | null;
+};
+
+export async function listAdminVendorPurchaseReturnRegister(params: {
+  vendor?: number;
+  status?: string;
+  date_from?: string;
+  date_to?: string;
+} = {}): Promise<{ count: number; results: AdminVendorPurchaseReturn[] }> {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiFetch(`/admin/vendor-purchase-returns/${suffix}`);
 }
 
 export async function listAdminVendorProducts(vendorId: number): Promise<ApiListResponse> {

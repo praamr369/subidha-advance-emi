@@ -1,11 +1,104 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
-import { accountingErrorMessage } from "@/components/accounting/shared";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
-import { listVendorBills, listVendorPayments, type VendorBill, type VendorPayment } from "@/services/inventory";
-export default function AdminVendorPayablesPage(){const [bills,setBills]=useState<VendorBill[]>([]);const [payments,setPayments]=useState<VendorPayment[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState<string|null>(null);useEffect(()=>{let active=true;async function load(){try{const [billPayload,paymentPayload]=await Promise.all([listVendorBills(),listVendorPayments()]);if(!active)return;setBills(billPayload.results);setPayments(paymentPayload.results);}catch(err){if(!active)return;setError(accountingErrorMessage(err,"Failed to load vendor payables."));}finally{if(active)setLoading(false);}}void load();return()=>{active=false;};},[]);const rows=useMemo(()=>{const paidByVendor:Record<number,number>={};for(const row of payments){if(row.status!=="POSTED")continue;paidByVendor[row.vendor]=(paidByVendor[row.vendor]||0)+Number(row.amount||0);}return bills.filter((row)=>row.status!=="CANCELLED").map((row)=>{const total=Number(row.grand_total||0);const paid=paidByVendor[row.vendor]||0;const outstanding=Math.max(0,total-paid);return {...row,paid:paid.toFixed(2),outstanding:outstanding.toFixed(2)};});},[bills,payments]);const columns:EnterpriseColumnDef<VendorBill & {paid:string;outstanding:string;}>[]=[{key:"bill_no",header:"Bill No"},{key:"vendor_name",header:"Vendor"},{key:"grand_total",header:"Bill Total"},{key:"paid",header:"Paid to date"},{key:"outstanding",header:"Outstanding"},{key:"status",header:"Status"}];return <ERPPageShell eyebrow="Purchases & Vendors"
-      title="Vendor Payables" subtitle="Vendor payable source: payable obligations derived from entered purchase bills and confirmed vendor payments." breadcrumbs={[{label:"Admin",href:ROUTES.admin.dashboard},{label:"Purchases",href:ROUTES.admin.purchases},{label:"Vendor Payables"}]} statusBadge={{ label: "Admin Only", tone: "info" as const }}><WorkspaceSection title="Vendor payable source" description="Payable balance per bill is computed from entered purchase bills minus payments with confirmed status. Accounting bridge status and reconciliation evidence are tracked separately in Accounting & Reconciliation."><EnterpriseDataTable data={rows} columns={columns} loading={loading} error={error} emptyTitle="No payable rows" emptyDescription="Enter purchase bills to create vendor payable source records."/></WorkspaceSection></ERPPageShell>;}
+import { listVendorBills, type VendorBill } from "@/services/inventory";
+
+export default function AdminVendorPayablesPage() {
+  const [bills, setBills] = useState<VendorBill[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const payload = await listVendorBills({ page_size: 200 });
+      setBills(payload.results);
+      setError(null);
+    } catch (err) {
+      setBills([]);
+      setError(accountingErrorMessage(err, "Failed to load vendor payables."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const rows = useMemo(
+    () => bills.filter((bill) => bill.status !== "CANCELLED"),
+    [bills]
+  );
+  const postedOutstanding = rows
+    .filter((bill) => bill.status === "POSTED")
+    .reduce((total, bill) => total + Number(bill.outstanding_amount || 0), 0);
+
+  const columns: EnterpriseColumnDef<VendorBill>[] = [
+    { key: "bill_no", header: "Bill No" },
+    { key: "vendor_name", header: "Vendor" },
+    { key: "grand_total", header: "Bill Total", render: (row) => accountingMoney(row.grand_total) },
+    {
+      key: "posted_paid_amount",
+      header: "Posted Paid",
+      render: (row) => accountingMoney(row.posted_paid_amount),
+    },
+    {
+      key: "outstanding_amount",
+      header: "Outstanding",
+      render: (row) => accountingMoney(row.outstanding_amount),
+    },
+    { key: "status", header: "Status", render: (row) => <ERPStatusBadge status={row.status} /> },
+  ];
+
+  return (
+    <ERPPageShell
+      eyebrow="Purchases & Vendors"
+      title="Vendor Payables"
+      subtitle="Bill-level payable balances calculated by the backend from posted vendor payments."
+      breadcrumbs={[
+        { label: "Admin", href: ROUTES.admin.dashboard },
+        { label: "Purchases", href: ROUTES.admin.purchases },
+        { label: "Vendor Payables" },
+      ]}
+      actions={[
+        { href: ROUTES.admin.purchaseVendorPayments, label: "Vendor Payments", variant: "primary" },
+        { href: ROUTES.admin.accountingVendorSettlements, label: "Accounting Settlements", variant: "secondary" },
+      ]}
+      stats={[
+        { label: "Bills", value: rows.length, tone: "info" },
+        { label: "Posted outstanding", value: accountingMoney(postedOutstanding), tone: "warning" },
+      ]}
+      statusBadge={{ label: "Admin Only", tone: "info" as const }}
+    >
+      <WorkspaceSection
+        title="Vendor payable source"
+        description="Each bill subtracts only payments posted against that bill. Unallocated vendor payments are not falsely distributed across every bill."
+      >
+        <EnterpriseDataTable
+          data={rows}
+          columns={columns}
+          loading={loading}
+          error={error}
+          onRetry={() => void load()}
+          emptyTitle="No payable rows"
+          emptyDescription="Enter and post vendor bills to create vendor payable source records."
+          toolbar={
+            <Link className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold hover:bg-muted" href={ROUTES.admin.purchaseVendorPayments}>
+              Record payment
+            </Link>
+          }
+        />
+      </WorkspaceSection>
+    </ERPPageShell>
+  );
+}

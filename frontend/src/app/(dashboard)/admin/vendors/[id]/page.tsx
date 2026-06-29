@@ -33,6 +33,8 @@ export default function AdminVendorDetailPage() {
   const [tab, setTab] = useState<TabKey>("overview");
 
   const [vendor, setVendor] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [ledger, setLedger] = useState<Record<string, unknown>[]>([]);
   const [outstanding, setOutstanding] = useState<string>("0.00");
   const [accountLink, setAccountLink] = useState<Record<string, unknown> | null>(null);
@@ -66,6 +68,12 @@ export default function AdminVendorDetailPage() {
   }, [id]);
 
   useEffect(() => {
+    if (!Number.isFinite(id) || id < 1) {
+      setLoadError("Invalid vendor identifier.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     void Promise.all([
       getAdminVendor(id),
       listAdminVendorLedger(id),
@@ -82,7 +90,11 @@ export default function AdminVendorDetailPage() {
       setAccountLink(a as Record<string, unknown>);
       setPurchases(p as Record<string, unknown>);
       setPurchaseReturns(r as Record<string, unknown>);
-    });
+      setLoadError(null);
+    }).catch((err) => {
+      setLoadError(accountingErrorMessage(err, "Could not load the vendor workspace."));
+      setVendor(null);
+    }).finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => {
@@ -142,6 +154,10 @@ export default function AdminVendorDetailPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
     >
+      {loading ? <ERPLoadingState label="Loading vendor workspace..." /> : null}
+      {!loading && loadError ? <ERPErrorState title="Unable to load vendor" description={loadError} /> : null}
+      {!loading && !loadError ? (
+      <>
       <ERPDataToolbar
         left={
           <div className="flex flex-wrap items-center gap-2">
@@ -333,6 +349,8 @@ export default function AdminVendorDetailPage() {
           </div>
         </div>
       )}
+      </>
+      ) : null}
     </ERPPageShell>
   );
 }

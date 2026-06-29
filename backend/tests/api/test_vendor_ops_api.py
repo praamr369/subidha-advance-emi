@@ -422,7 +422,7 @@ class VendorOpsApiTests(APITestCase):
             status="POSTED",
             grand_total=Decimal("500.00"),
         )
-        PurchaseReturn.objects.create(
+        purchase_return = PurchaseReturn.objects.create(
             return_no="PR-PH2-002",
             purchase_bill=pb,
             vendor=self.vendor,
@@ -433,6 +433,14 @@ class VendorOpsApiTests(APITestCase):
         )
         after = CustomerCreditLedger.objects.filter(customer=self.customer).count()
         self.assertEqual(before, after)
+        register_response = self.client.get(
+            f"/api/v1/admin/vendor-purchase-returns/?vendor={self.vendor.id}"
+        )
+        self.assertEqual(register_response.status_code, status.HTTP_200_OK, register_response.data)
+        self.assertIn(
+            purchase_return.id,
+            {row["id"] for row in register_response.data["results"]},
+        )
 
     def test_vendor_user_cannot_see_another_vendor_ledger(self):
         self.client.force_authenticate(user=self.admin)

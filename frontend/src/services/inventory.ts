@@ -458,6 +458,8 @@ export type VendorBill = {
   subtotal: string;
   tax_total: string;
   grand_total: string;
+  posted_paid_amount?: string;
+  outstanding_amount?: string;
   posted_journal_entry?: number | null;
   posted_journal_entry_no?: string | null;
   notes?: string;
@@ -954,7 +956,7 @@ export function createVendorPayment(payload: {
   vendor: number;
   vendor_bill?: number | null;
   amount: string;
-  finance_account?: number | null;
+  finance_account: number;
   reference_no?: string;
   notes?: string;
 }) {

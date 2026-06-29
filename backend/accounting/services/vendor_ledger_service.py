@@ -4,9 +4,63 @@ from decimal import Decimal
 
 from django.db.models import Q, Sum
 
-from accounting.models import Vendor, VendorLedgerEntry
+from accounting.models import Vendor, VendorLedgerEntry, VendorSettlement, VendorSettlementStatus
 from billing.models import PurchaseReturn, PurchaseReturnStatus
 from inventory.models import PurchaseBill, PurchaseBillStatus, PurchaseOrder, PurchaseOrderStatus, VendorPayment, VendorPaymentStatus
+
+
+def _money(value) -> Decimal:
+    return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
+
+
+def append_vendor_ledger_entry(
+    *,
+    vendor_id: int,
+    entry_type: str,
+    source_type: str,
+    source_id: int,
+    source_reference: str,
+    debit: Decimal = Decimal("0.00"),
+    credit: Decimal = Decimal("0.00"),
+    created_by=None,
+    notes: str = "",
+) -> tuple[VendorLedgerEntry, bool]:
+    """Append one idempotent vendor-ledger row for a posted source record."""
+    Vendor.objects.select_for_update().get(pk=vendor_id)
+    existing = VendorLedgerEntry.objects.filter(
+        vendor_id=vendor_id,
+        entry_type=entry_type,
+        source_type=source_type,
+        source_id=source_id,
+    ).first()
+    if existing is not None:
+        return existing, False
+
+    previous = VendorLedgerEntry.objects.filter(vendor_id=vendor_id).order_by("-posted_at", "-id").first()
+    debit_amount = _money(debit)
+    credit_amount = _money(credit)
+    balance_after = _money((previous.balance_after if previous else Decimal("0.00")) + debit_amount - credit_amount)
+    row = VendorLedgerEntry.objects.create(
+        vendor_id=vendor_id,
+        entry_type=entry_type,
+        source_type=source_type,
+        source_id=source_id,
+        source_reference=(source_reference or "").strip(),
+        debit=debit_amount,
+        credit=credit_amount,
+        balance_after=balance_after,
+        created_by=created_by,
+        notes=(notes or "").strip(),
+    )
+    return row, True
+
+
+def _unledgered_source_total(queryset, *, source_types: list[str], amount_field: str) -> Decimal:
+    represented_ids = VendorLedgerEntry.objects.filter(
+        source_type__in=source_types,
+        source_id__isnull=False,
+    ).values_list("source_id", flat=True)
+    return queryset.exclude(id__in=represented_ids).aggregate(total=Sum(amount_field))["total"] or Decimal("0.00")
 
 
 def get_vendor_ledger(vendor: Vendor, filters: dict | None = None) -> dict:
@@ -45,17 +99,27 @@ def get_vendor_outstanding(vendor: Vendor) -> dict:
     return_entry_reduction = _entry_reduction("PURCHASE_RETURN")
     debit_note_reduction = _entry_reduction("DEBIT_NOTE")
 
-    purchase_bills = bill_entry_net if bill_entry_net != Decimal("0.00") else (
-        PurchaseBill.objects.filter(vendor=vendor, status__in=[PurchaseBillStatus.APPROVED, PurchaseBillStatus.POSTED]).aggregate(total=Sum("grand_total"))["total"]
-        or Decimal("0.00")
+    purchase_bills = bill_entry_net + _unledgered_source_total(
+        PurchaseBill.objects.filter(
+            vendor=vendor,
+            status__in=[PurchaseBillStatus.APPROVED, PurchaseBillStatus.POSTED],
+        ),
+        source_types=["PURCHASE_BILL", "ACCOUNTING_PURCHASE_BILL"],
+        amount_field="grand_total",
     )
-    vendor_payments = payment_entry_reduction if payment_entry_reduction != Decimal("0.00") else (
-        VendorPayment.objects.filter(vendor=vendor, status=VendorPaymentStatus.POSTED).aggregate(total=Sum("amount"))["total"]
-        or Decimal("0.00")
+    vendor_payments = payment_entry_reduction + _unledgered_source_total(
+        VendorPayment.objects.filter(vendor=vendor, status=VendorPaymentStatus.POSTED),
+        source_types=["VENDOR_PAYMENT"],
+        amount_field="amount",
+    ) + _unledgered_source_total(
+        VendorSettlement.objects.filter(vendor=vendor, status=VendorSettlementStatus.POSTED),
+        source_types=["VENDOR_SETTLEMENT"],
+        amount_field="amount",
     )
-    purchase_returns = return_entry_reduction if return_entry_reduction != Decimal("0.00") else (
-        PurchaseReturn.objects.filter(vendor=vendor, status=PurchaseReturnStatus.POSTED).aggregate(total=Sum("grand_total"))["total"]
-        or Decimal("0.00")
+    purchase_returns = return_entry_reduction + _unledgered_source_total(
+        PurchaseReturn.objects.filter(vendor=vendor, status=PurchaseReturnStatus.POSTED),
+        source_types=["PURCHASE_RETURN"],
+        amount_field="grand_total",
     )
     debit_notes = debit_note_reduction if debit_note_reduction != Decimal("0.00") else Decimal("0.00")
     adjustments = VendorLedgerEntry.objects.filter(vendor=vendor, entry_type__in=["CREDIT_ADJUSTMENT", "MANUAL_ADJUSTMENT"]).aggregate(

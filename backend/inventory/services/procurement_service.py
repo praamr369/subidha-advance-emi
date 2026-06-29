@@ -91,7 +91,7 @@ def convert_purchase_request_to_po(*, purchase_request_id: int, performed_by=Non
     from django.utils import timezone as _tz
 
     pr = (
-        PurchaseRequest.objects.select_for_update()
+        PurchaseRequest.objects.select_for_update(of=("self",))
         .select_related("vendor", "stock_location", "branch")
         .prefetch_related("lines", "lines__inventory_item")
         .get(pk=purchase_request_id)
@@ -167,7 +167,7 @@ def cancel_purchase_order(*, purchase_order_id: int, performed_by=None):
 @transaction.atomic
 def post_goods_receipt(*, goods_receipt_id: int, posted_by=None):
     receipt = (
-        GoodsReceipt.objects.select_for_update()
+        GoodsReceipt.objects.select_for_update(of=("self",))
         .select_related("purchase_order", "purchase_order__vendor", "stock_location")
         .prefetch_related("lines", "lines__inventory_item")
         .get(pk=goods_receipt_id)
@@ -252,7 +252,7 @@ def post_goods_receipt(*, goods_receipt_id: int, posted_by=None):
 @transaction.atomic
 def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
     bill = (
-        VendorBill.objects.select_for_update()
+        VendorBill.objects.select_for_update(of=("self",))
         .select_related("vendor", "finance_account", "finance_account__chart_account")
         .prefetch_related("lines", "lines__inventory_item")
         .get(pk=vendor_bill_id)
@@ -351,14 +351,22 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
 
 @transaction.atomic
 def post_vendor_payment(*, vendor_payment_id: int, posted_by=None):
-    payment = VendorPayment.objects.select_for_update().select_related(
+    payment = VendorPayment.objects.select_for_update(of=("self",)).select_related(
         "finance_account", "finance_account__chart_account", "vendor", "vendor_bill"
     ).get(pk=vendor_payment_id)
     if payment.status == VendorPaymentStatus.POSTED and payment.posted_journal_entry_id:
         return payment, False
     if payment.status != VendorPaymentStatus.DRAFT:
         raise ValueError("Only draft vendor payments can be posted.")
+    if not payment.finance_account.is_active:
+        raise ValueError("Inactive finance accounts cannot be used for vendor payments.")
+    if not payment.finance_account.is_real_settlement_account:
+        raise ValueError("Vendor payments require a real cash, bank, UPI, or gateway finance account.")
     if payment.vendor_bill_id:
+        if payment.vendor_bill.vendor_id != payment.vendor_id:
+            raise ValueError("Selected vendor bill does not belong to the payment vendor.")
+        if payment.vendor_bill.status != VendorBillStatus.POSTED:
+            raise ValueError("Only posted vendor bills can be paid.")
         prior_paid = VendorPayment.objects.filter(
             vendor_bill_id=payment.vendor_bill_id,
             status=VendorPaymentStatus.POSTED,
