@@ -20,6 +20,7 @@ ROLE_CAPABILITY_FALLBACKS: dict[str, set[str]] = {
         "billing.override_allocation",
         "accounting.view",
         "accounting.reverse_entry",
+        "finance.transfer.create",
         "batch.lock",
         "draw.commit",
         "draw.complete",
