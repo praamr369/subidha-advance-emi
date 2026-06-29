@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -97,9 +98,8 @@ class AdminFinanceTransferView(APIView):
         if status_filter:
             queryset = queryset.filter(status=status_filter)
         if account_id.isdigit():
-            queryset = queryset.filter(
-                from_finance_account_id=int(account_id)
-            ) | queryset.filter(to_finance_account_id=int(account_id))
+            account_pk = int(account_id)
+            queryset = queryset.filter(Q(from_finance_account_id=account_pk) | Q(to_finance_account_id=account_pk))
         if date_from:
             queryset = queryset.filter(movement_date__gte=date_from)
         if date_to:
