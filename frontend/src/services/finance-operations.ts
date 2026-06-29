@@ -57,6 +57,9 @@ export type FinanceTransferRecord = {
 
 export type FinanceTransferListResponse = {
   count: number;
+  page?: number;
+  page_size?: number;
+  total_pages?: number;
   results: FinanceTransferRecord[];
 };
 
@@ -67,6 +70,24 @@ export type CreateFinanceTransferPayload = {
   amount: string;
   reference_no?: string;
   notes?: string;
+};
+
+export type FinanceTransferPreview = {
+  can_post: boolean;
+  idempotency_key: string;
+  movement_date: string;
+  amount: string;
+  reference_no?: string | null;
+  from_finance_account: Record<string, unknown>;
+  to_finance_account: Record<string, unknown>;
+  lines: Array<Record<string, unknown>>;
+  total_debit: string;
+  total_credit: string;
+  is_balanced: boolean;
+  already_posted?: boolean;
+  existing_transfer_id?: number | null;
+  existing_movement_no?: string | null;
+  safety_text?: string;
 };
 
 export type CreateFinanceTransferResult = {
@@ -97,16 +118,41 @@ export async function getReconciliationOverview() {
   return apiFetch<ReconciliationOverviewResponse>("/admin/reconciliation/overview/");
 }
 
-export async function listFinanceTransfers() {
-  return apiFetch<FinanceTransferListResponse>("/admin/finance-transfers/");
+export async function listFinanceTransfers(params: { page?: number; page_size?: number; status?: string; finance_account_id?: number | string } = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim()) {
+      query.set(key, String(value));
+    }
+  });
+  return apiFetch<FinanceTransferListResponse>(`/admin/finance-transfers/${query.toString() ? `?${query.toString()}` : ""}`);
+}
+
+export async function previewFinanceTransfer(payload: CreateFinanceTransferPayload) {
+  const response = await apiFetch<FinanceOperationEnvelope<FinanceTransferPreview>>(
+    "/admin/finance-transfers/",
+    {
+      method: "POST",
+      body: JSON.stringify({ ...payload, preview: true }),
+    }
+  );
+  return unwrapEnvelope(response);
 }
 
 export async function createFinanceTransfer(payload: CreateFinanceTransferPayload) {
+  const preview = await previewFinanceTransfer(payload);
+  if (!preview.can_post || !preview.idempotency_key) {
+    throw new Error("Finance transfer preview did not return a postable idempotency key.");
+  }
   const response = await apiFetch<FinanceOperationEnvelope<CreateFinanceTransferResult>>(
     "/admin/finance-transfers/",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        idempotency_key: preview.idempotency_key,
+        confirm: true,
+      }),
     }
   );
   return unwrapEnvelope(response);
