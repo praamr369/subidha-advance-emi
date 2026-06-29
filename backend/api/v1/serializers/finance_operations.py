@@ -77,6 +77,10 @@ class FinanceTransferCreateSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     reference_no = serializers.CharField(required=False, allow_blank=True, max_length=100)
     notes = serializers.CharField(required=False, allow_blank=True)
+    idempotency_key = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True, max_length=160)
+    preview = serializers.BooleanField(required=False, default=False)
+    confirm = serializers.BooleanField(required=False, default=False)
+    confirm_text = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True, max_length=40)
 
     def validate_amount(self, value):
         if _money(value) <= Decimal("0.00"):
@@ -89,4 +93,16 @@ class FinanceTransferCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"to_finance_account_id": "Source and destination finance accounts must be different."}
             )
+        if not attrs.get("preview"):
+            confirmed = bool(attrs.get("confirm")) or (attrs.get("confirm_text") or "").strip().upper() in {
+                "POST",
+                "CONFIRM",
+                "POST TRANSFER",
+                "TRANSFER",
+            }
+            if not confirmed:
+                raise serializers.ValidationError("Explicit confirm=true or confirm_text is required before posting a finance transfer.")
+            if not (attrs.get("idempotency_key") or "").strip():
+                raise serializers.ValidationError({"idempotency_key": "idempotency_key is required after preview."})
+            attrs["confirmed"] = confirmed
         return attrs
