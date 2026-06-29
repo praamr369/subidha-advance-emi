@@ -23,6 +23,7 @@ from accounting.services.vendor_quote_service import (
 )
 from accounting.services.vendor_sourcing_service import suggest_vendors_for_order
 from api.v1.permissions import IsAdmin, IsVendor
+from api.v1.pagination import AdminListPagination
 from api.v1.serializers.vendor_ops import (
     VendorAccountLinkSerializer,
     VendorCategorySerializer,
@@ -43,6 +44,21 @@ class AdminVendorViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
     queryset = Vendor.objects.prefetch_related("categories", "addresses", "service_areas", "products").all().order_by("name", "id")
     serializer_class = VendorOpsSerializer
+    pagination_class = AdminListPagination
+    filterset_fields = ["status", "is_active", "categories"]
+    search_fields = [
+        "vendor_code",
+        "name",
+        "display_name",
+        "legal_name",
+        "contact_person",
+        "phone",
+        "email",
+        "gstin",
+        "pan",
+    ]
+    ordering_fields = ["name", "vendor_code", "status", "created_at", "updated_at"]
+    ordering = ["name", "id"]
     http_method_names = ["get", "post", "patch", "head", "options"]
 
 

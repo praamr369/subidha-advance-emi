@@ -77,12 +77,10 @@ export default function AccountingVendorsPage() {
     else setRefreshing(true);
 
     try {
-      const payload = await listVendors();
+      const payload = await listVendors({ page_size: 500 });
       setVendors(payload.results);
       setSelectedVendorId((current) =>
-        current && payload.results.some((vendor) => vendor.id === current)
-          ? current
-          : payload.results[0]?.id ?? null
+        current && payload.results.some((vendor) => vendor.id === current) ? current : null
       );
       setError(null);
     } catch (err) {

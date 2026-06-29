@@ -1563,6 +1563,7 @@ class Vendor(AccountingTimeStampedModel):
         ordering = ["name", "id"]
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
         self.name = (self.name or "").strip()
         self.vendor_code = (self.vendor_code or "").strip().upper()
         self.display_name = (self.display_name or "").strip()
@@ -1579,12 +1580,17 @@ class Vendor(AccountingTimeStampedModel):
         self.notes = (self.notes or "").strip()
         if not self.display_name:
             self.display_name = self.name
-        if not self.vendor_code:
-            base = f"VND-{timezone.now().strftime('%Y%m%d')}-{(self.pk or 0):06d}"
-            self.vendor_code = base.upper()
+        if not self.vendor_code and not is_new:
+            self.vendor_code = f"VND-{timezone.now().strftime('%Y%m%d')}-{self.pk:06d}"
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = set(update_fields) | {"vendor_code"}
         self.is_active = self.status in {"ACTIVE", "ON_HOLD"} and bool(self.is_active)
         self.full_clean()
         super().save(*args, **kwargs)
+        if not self.vendor_code:
+            self.vendor_code = f"VND-{timezone.now().strftime('%Y%m%d')}-{self.pk:06d}"
+            type(self).objects.filter(pk=self.pk).update(vendor_code=self.vendor_code)
 
     def __str__(self):
         return self.name

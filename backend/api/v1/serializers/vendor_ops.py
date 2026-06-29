@@ -14,9 +14,32 @@ from accounting.models import (
     VendorQuoteRequest,
     VendorServiceArea,
 )
+from crm.services.party_service import sync_party_for_vendor
 
 
 class VendorCategorySerializer(serializers.ModelSerializer):
+    def validate_name(self, value):
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise serializers.ValidationError("Name is required.")
+        queryset = VendorCategory.objects.filter(name__iexact=cleaned)
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("A vendor category with this name already exists.")
+        return cleaned
+
+    def validate_code(self, value):
+        cleaned = (value or "").strip().upper()
+        if not cleaned:
+            raise serializers.ValidationError("Code is required.")
+        queryset = VendorCategory.objects.filter(code__iexact=cleaned)
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("A vendor category with this code already exists.")
+        return cleaned
+
     class Meta:
         model = VendorCategory
         fields = "__all__"
@@ -136,6 +159,35 @@ class VendorOpsSerializer(serializers.ModelSerializer):
     service_areas = VendorServiceAreaSerializer(many=True, required=False, read_only=True)
     products = VendorProductSerializer(many=True, required=False, read_only=True)
 
+    def validate_name(self, value):
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise serializers.ValidationError("Name is required.")
+        return cleaned
+
+    def validate_vendor_code(self, value):
+        cleaned = (value or "").strip().upper()
+        if not cleaned:
+            return ""
+        queryset = Vendor.objects.filter(vendor_code__iexact=cleaned)
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("A vendor with this code already exists.")
+        return cleaned
+
+    def create(self, validated_data):
+        vendor = super().create(validated_data)
+        request = self.context.get("request")
+        sync_party_for_vendor(vendor, performed_by=getattr(request, "user", None))
+        return vendor
+
+    def update(self, instance, validated_data):
+        vendor = super().update(instance, validated_data)
+        request = self.context.get("request")
+        sync_party_for_vendor(vendor, performed_by=getattr(request, "user", None))
+        return vendor
+
     class Meta:
         model = Vendor
         fields = [
@@ -148,8 +200,11 @@ class VendorOpsSerializer(serializers.ModelSerializer):
             "phone",
             "whatsapp",
             "email",
+            "address",
             "gstin",
             "pan",
+            "state_code",
+            "state_name",
             "status",
             "payment_terms",
             "credit_period_days",

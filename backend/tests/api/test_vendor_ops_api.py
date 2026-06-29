@@ -16,6 +16,7 @@ from accounting.models import (
     VendorServiceArea,
 )
 from billing.models import CustomerCreditLedger, PurchaseReturn
+from crm.models import PartyLink, PartyLinkRole
 from inventory.models import PurchaseBill, PurchaseOrder
 from tests.helpers import (
     create_admin_user,
@@ -227,11 +228,67 @@ class VendorOpsApiTests(APITestCase):
         self.assertEqual(patch_response.status_code, status.HTTP_200_OK, patch_response.data)
         self.assertEqual(patch_response.data["contact_person"], "Ops Lead")
 
+    def test_admin_can_create_multiple_vendors_with_distinct_codes_and_party_links(self):
+        self.client.force_authenticate(user=self.admin)
+
+        created = []
+        for suffix in ("Two", "Three"):
+            response = self.client.post(
+                "/api/v1/admin/vendors/",
+                {
+                    "name": f"Vendor {suffix}",
+                    "display_name": f"Vendor {suffix}",
+                    "phone": f"93990020{len(created) + 1:02d}",
+                    "status": "ACTIVE",
+                },
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+            created.append(response.data)
+
+        self.assertNotEqual(created[0]["id"], created[1]["id"])
+        self.assertNotEqual(created[0]["vendor_code"], created[1]["vendor_code"])
+        self.assertNotIn("000000", created[0]["vendor_code"])
+        self.assertNotIn("000000", created[1]["vendor_code"])
+        self.assertEqual(
+            PartyLink.objects.filter(
+                role_type=PartyLinkRole.VENDOR,
+                source_model="Vendor",
+                source_pk__in=[created[0]["id"], created[1]["id"]],
+            ).count(),
+            2,
+        )
+
+        list_response = self.client.get("/api/v1/admin/vendors/?page_size=200")
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK, list_response.data)
+        returned_ids = {row["id"] for row in list_response.data["results"]}
+        self.assertTrue({created[0]["id"], created[1]["id"]}.issubset(returned_ids))
+
     def test_vendor_categories_endpoint_works(self):
         self.client.force_authenticate(user=self.admin)
         response = self.client.get("/api/v1/admin/vendors/categories/")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertGreaterEqual(len(response.data), 1)
+
+        create_response = self.client.post(
+            "/api/v1/admin/vendors/categories/",
+            {
+                "name": "Raw Material Supplier",
+                "code": "raw_material_supplier",
+                "description": "Approved raw material suppliers.",
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.data)
+        self.assertEqual(create_response.data["code"], "RAW_MATERIAL_SUPPLIER")
+
+        duplicate_response = self.client.post(
+            "/api/v1/admin/vendors/categories/",
+            {"name": "Another category", "code": "raw_material_supplier"},
+            format="json",
+        )
+        self.assertEqual(duplicate_response.status_code, status.HTTP_400_BAD_REQUEST, duplicate_response.data)
 
     def test_vendor_address_and_service_area_serialize_in_detail(self):
         self.client.force_authenticate(user=self.admin)
