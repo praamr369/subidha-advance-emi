@@ -13,6 +13,17 @@ from accounting.services.accounting_bridge_safe_post_service import batch_post_b
 STATUS_ALIASES = {"POSTED_UNVERIFIED", "BLOCKED", "UNSUPPORTED"}
 
 
+def _positive_int(value, *, default: int, maximum: int | None = None) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    parsed = max(1, parsed)
+    if maximum is not None:
+        parsed = min(parsed, maximum)
+    return parsed
+
+
 def _row_matches_status_alias(row: dict, requested_status: str) -> bool:
     value = (requested_status or "").strip().upper()
     row_status = str(row.get("status") or "").strip().upper()
@@ -85,8 +96,24 @@ class AccountingBridgeReconciliationView(APIView):
             account=(request.query_params.get("account") or "").strip() or None,
         )
         payload = build_accounting_bridge_reconciliation(filters)
+        rows = payload.get("results", [])
         if requested_status in STATUS_ALIASES:
-            payload = {**payload, "results": [row for row in payload.get("results", []) if _row_matches_status_alias(row, requested_status)]}
+            rows = [row for row in rows if _row_matches_status_alias(row, requested_status)]
+
+        page = _positive_int(request.query_params.get("page"), default=1)
+        page_size = _positive_int(request.query_params.get("page_size"), default=200, maximum=500)
+        total_count = len(rows)
+        offset = (page - 1) * page_size
+        payload = {
+            **payload,
+            "results": rows[offset : offset + page_size],
+            "pagination": {
+                "count": total_count,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": (total_count + page_size - 1) // page_size if page_size else 1,
+            },
+        }
         return Response(payload)
 
 
