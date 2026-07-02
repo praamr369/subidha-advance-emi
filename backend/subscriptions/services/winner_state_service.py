@@ -60,25 +60,42 @@ def get_revealed_winning_draw(subscription: Subscription) -> LuckyDraw | None:
         return None
 
     prefetched = getattr(subscription, "_prefetched_objects_cache", {})
-    prefetched_draws = prefetched.get("winning_draws") or []
-    matching_prefetched = [
-        draw
-        for draw in prefetched_draws
-        if draw.is_revealed
-        and (
-            draw.winner_subscription_id == subscription.id
+    if "winning_draws" in prefetched:
+        # An empty prefetched list means "prefetched, and there are no draws"
+        # -- do NOT fall through to a per-subscription DB query, or dashboards
+        # that load hundreds of subscriptions degrade into an N+1.
+        matching_prefetched = [
+            draw
+            for draw in prefetched["winning_draws"]
+            if draw.is_revealed
+            and (
+                draw.winner_subscription_id == subscription.id
+                or (
+                    subscription.lucky_id_id
+                    and draw.winner_lucky_id_id == subscription.lucky_id_id
+                )
+            )
+        ]
+        if matching_prefetched:
+            matching_prefetched.sort(
+                key=lambda draw: (draw.draw_month or 0, draw.id or 0),
+                reverse=True,
+            )
+            return matching_prefetched[0]
+        # winning_draws only covers draws that set winner_subscription. A
+        # draw can mark winner_lucky_id alone, so keep the DB fallback for
+        # subscriptions that carry any winner signal; everything else can
+        # safely skip the query.
+        has_winner_signal = bool(
+            subscription.winner_month is not None
+            or subscription.status == SubscriptionStatus.WON
             or (
                 subscription.lucky_id_id
-                and draw.winner_lucky_id_id == subscription.lucky_id_id
+                and getattr(subscription.lucky_id, "status", None) == LuckyIdStatus.WON
             )
         )
-    ]
-    if matching_prefetched:
-        matching_prefetched.sort(
-            key=lambda draw: (draw.draw_month or 0, draw.id or 0),
-            reverse=True,
-        )
-        return matching_prefetched[0]
+        if not has_winner_signal:
+            return None
 
     filters = Q(winner_subscription_id=subscription.id)
     if subscription.lucky_id_id:

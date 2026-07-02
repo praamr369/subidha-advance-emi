@@ -338,8 +338,10 @@ def _build_winner_surface(summary: dict[str, object], *, scope: DashboardScope) 
     }
 
 
-def _build_reconciliation_surface(queryset) -> dict[str, object]:
-    payload = build_reconciliation_attention_payload(queryset)
+def _build_reconciliation_surface(queryset, *, preloaded_subscriptions=None) -> dict[str, object]:
+    payload = build_reconciliation_attention_payload(
+        queryset, preloaded_subscriptions=preloaded_subscriptions
+    )
     return {
         "checked_count": payload["checked_count"],
         "flagged_count": payload["flagged_count"],
@@ -482,7 +484,8 @@ def get_dashboard_summary(
     )
     winner_surface = _build_winner_surface(summary, scope=scope)
     reconciliation = _build_reconciliation_surface(
-        _apply_activity_window(queryset, effective_window)
+        _apply_activity_window(queryset, effective_window),
+        preloaded_subscriptions=subscriptions,
     )
     identity = scope.get_identity_payload(actor_user)
 

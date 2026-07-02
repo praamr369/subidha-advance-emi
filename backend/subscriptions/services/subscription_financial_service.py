@@ -86,9 +86,27 @@ def get_subscription_detail_queryset():
     )
 
 
+def _related_rows(instance, manager_name: str, ordering: tuple[str, ...]):
+    """
+    Read a related manager without defeating prefetch_related.
+
+    Calling .order_by() on a prefetched manager builds a NEW queryset and
+    bypasses the prefetch cache, so dashboards that load hundreds of
+    subscriptions fall into an N+1 (one query per subscription plus one per
+    EMI). The Prefetch objects in get_subscription_detail_queryset() already
+    apply the same ordering, so use the cache when it exists and only order
+    at the database when this row was loaded without prefetching.
+    """
+    prefetched = getattr(instance, "_prefetched_objects_cache", None) or {}
+    manager = getattr(instance, manager_name)
+    if manager_name in prefetched:
+        return list(manager.all())
+    return list(manager.all().order_by(*ordering))
+
+
 def build_subscription_financial_snapshot(subscription: Subscription) -> dict:
     is_emi_plan = subscription.plan_type == "EMI"
-    emis = list(subscription.emis.all().order_by("month_no", "id"))
+    emis = _related_rows(subscription, "emis", ("month_no", "id"))
     total_amount = q2(subscription.total_amount)
     total_emi_amount = MONEY_ZERO
     paid_amount = MONEY_ZERO
@@ -113,7 +131,7 @@ def build_subscription_financial_snapshot(subscription: Subscription) -> dict:
         amount = q2(emi.amount)
         total_emi_amount = q2(total_emi_amount + amount)
 
-        ledger_entries = list(emi.ledger_entries.all().order_by("created_at", "id"))
+        ledger_entries = _related_rows(emi, "ledger_entries", ("created_at", "id"))
 
         emi_payment_total = MONEY_ZERO
         emi_reversal_total = MONEY_ZERO
@@ -483,19 +501,31 @@ def build_customer_dashboard_summary(subscriptions) -> dict[str, object]:
     }
 
 
-def build_reconciliation_attention_payload(queryset) -> dict:
-    subscription_ids = queryset.values("pk")
-    subscriptions = (
-        get_subscription_detail_queryset()
-        .filter(pk__in=subscription_ids)
-        .order_by("id")
-    )
-
+def build_reconciliation_attention_payload(queryset, *, preloaded_subscriptions=None) -> dict:
     checked_count = queryset.count()
     flagged_rows: list[dict] = []
 
-    for subscription in subscriptions.iterator(chunk_size=100):
-        snapshot = build_subscription_financial_snapshot(subscription)
+    if preloaded_subscriptions is not None:
+        # Reuse rows the caller already loaded (and possibly snapshotted) so
+        # the dashboard doesn't run the heavy prefetch + snapshot pass twice.
+        window_ids = set(queryset.values_list("pk", flat=True))
+        rows = sorted(
+            (s for s in preloaded_subscriptions if s.pk in window_ids),
+            key=lambda s: s.pk,
+        )
+    else:
+        subscription_ids = queryset.values("pk")
+        rows = (
+            get_subscription_detail_queryset()
+            .filter(pk__in=subscription_ids)
+            .order_by("id")
+            .iterator(chunk_size=100)
+        )
+
+    for subscription in rows:
+        snapshot = getattr(subscription, "_subscription_financial_snapshot", None)
+        if snapshot is None:
+            snapshot = build_subscription_financial_snapshot(subscription)
         pending_outstanding = _decimal(snapshot["pending_amount"])
         computed_outstanding = _decimal(snapshot["remaining_amount"])
         delta = q2(abs(pending_outstanding - computed_outstanding))
