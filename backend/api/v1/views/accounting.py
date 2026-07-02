@@ -665,7 +665,7 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
 
 
 class StaffAdvanceViewSet(AdminAccountingModelViewSet):
-    queryset = StaffAdvance.objects.select_related("employee", "finance_account", "posted_journal_entry", "approved_by").prefetch_related("recoveries", "recoveries__finance_account", "recoveries__posted_journal_entry").all()
+    queryset = StaffAdvance.objects.select_related("employee", "finance_account", "posted_journal_entry", "approved_by").prefetch_related("recoveries", "recoveries__finance_account", "recoveries__posted_journal_entry", "recoveries__salary_sheet").all()
     serializer_class = StaffAdvanceSerializer
     search_fields = ["employee__employee_code", "employee__name", "reason", "reference_no"]
     ordering = ["-request_date", "-id"]

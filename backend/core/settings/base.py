@@ -585,7 +585,11 @@ KYC_CONTRACT_GATING_ENABLED = _parse_bool(
     default=False,
 )
 
-EMAIL_BACKEND = (
+# EMAIL_BACKEND_FALLBACK is the env/static backend used when no admin-configured,
+# enabled EmailSMTPSettings row exists in the database. EMAIL_BACKEND itself always
+# points at the dynamic wrapper so an admin can turn on real SMTP (e.g. Gmail) from
+# the settings UI without a process restart, with zero behavior change until they do.
+EMAIL_BACKEND_FALLBACK = (
     os.getenv("EMAIL_BACKEND")
     or (
         "django.core.mail.backends.console.EmailBackend"
@@ -593,6 +597,7 @@ EMAIL_BACKEND = (
         else "django.core.mail.backends.smtp.EmailBackend"
     )
 ).strip()
+EMAIL_BACKEND = "subscriptions.services.dynamic_smtp_email_backend.DynamicSMTPEmailBackend"
 EMAIL_HOST = (os.getenv("EMAIL_HOST") or "localhost").strip()
 EMAIL_PORT = _parse_int(
     os.getenv("EMAIL_PORT"),

@@ -23,6 +23,7 @@ from accounting.models import (
     FinanceAccount,
     LeaveRequest,
     LeaveRequestStatus,
+    LeaveType,
     PayrollPeriod,
     PayrollPeriodStatus,
     SalaryPayment,
@@ -329,6 +330,71 @@ def approve_leave_request(*, leave_request_id: int, approved_by):
     return leave_request, True
 
 
+def leave_balance_rows(*, employee: EmployeeProfile, year: int | None = None) -> list[dict]:
+    """
+    Year-to-date leave balance per active leave type, including monthly
+    accrual: `earned_to_date` is the annual allowance prorated over the months
+    elapsed so far this year (allowance/12 x current month, capped at the
+    annual figure), so an 18-day EL allowance earns 1.5 days per month.
+    `available_now` = earned so far minus APPROVED days taken this year;
+    `remaining_this_year` = full annual allowance minus taken.
+    """
+    from django.db.models import Sum
+
+    today = timezone.localdate()
+    if year is None:
+        year = today.year
+    months_elapsed = today.month if year == today.year else (12 if year < today.year else 0)
+
+    rows: list[dict] = []
+    for leave_type in LeaveType.objects.filter(is_active=True).order_by("code"):
+        taken = (
+            LeaveRequest.objects.filter(
+                employee=employee,
+                leave_type=leave_type,
+                status=LeaveRequestStatus.APPROVED,
+                start_date__year=year,
+            ).aggregate(total=Sum("day_count"))["total"]
+            or Decimal("0.0")
+        )
+        pending = (
+            LeaveRequest.objects.filter(
+                employee=employee,
+                leave_type=leave_type,
+                status=LeaveRequestStatus.DRAFT,
+                start_date__year=year,
+            ).aggregate(total=Sum("day_count"))["total"]
+            or Decimal("0.0")
+        )
+        allowance = leave_type.annual_allowance_days
+        earned = None
+        available = None
+        remaining = None
+        if allowance is not None:
+            allowance = Decimal(str(allowance))
+            earned = min(
+                (allowance / Decimal("12") * Decimal(months_elapsed)).quantize(Decimal("0.1")),
+                allowance,
+            )
+            available = earned - Decimal(str(taken))
+            remaining = allowance - Decimal(str(taken))
+        rows.append(
+            {
+                "leave_type_id": leave_type.id,
+                "leave_type_code": leave_type.code,
+                "leave_type_name": leave_type.name,
+                "is_paid": leave_type.is_paid,
+                "annual_allowance_days": str(allowance) if allowance is not None else None,
+                "earned_to_date": str(earned) if earned is not None else None,
+                "taken_this_year": str(taken),
+                "pending_approval": str(pending),
+                "available_now": str(available) if available is not None else None,
+                "remaining_this_year": str(remaining) if remaining is not None else None,
+            }
+        )
+    return rows
+
+
 @transaction.atomic
 def reject_leave_request(*, leave_request_id: int, rejection_reason: str, rejected_by):
     leave_request = LeaveRequest.objects.select_for_update().get(pk=leave_request_id)
@@ -519,6 +585,38 @@ def _build_generated_salary_lines(*, employee: EmployeeProfile, payroll_period: 
                 }
             )
 
+    from accounting.services.staff_advance_service import total_outstanding_staff_advance
+
+    outstanding_advance = total_outstanding_staff_advance(employee_id=employee.id)
+    if outstanding_advance > MONEY_ZERO:
+        earnings_so_far = sum(
+            (_money(line["amount"]) for line in lines if line["component_type"] == CompensationComponentType.EARNING),
+            MONEY_ZERO,
+        )
+        deductions_so_far = sum(
+            (_money(line["amount"]) for line in lines if line["component_type"] == CompensationComponentType.DEDUCTION),
+            MONEY_ZERO,
+        )
+        available_for_recovery = _money(earnings_so_far - deductions_so_far)
+        advance_deduction_amount = min(outstanding_advance, available_for_recovery) if available_for_recovery > MONEY_ZERO else MONEY_ZERO
+        if advance_deduction_amount > MONEY_ZERO:
+            lines.append(
+                {
+                    "component_name": "Staff Advance Recovery",
+                    "component_type": CompensationComponentType.DEDUCTION,
+                    "source_type": SalaryLineSourceType.STAFF_ADVANCE_DEDUCTION,
+                    "source_reference": payroll_period.code,
+                    "quantity": Decimal("1.00"),
+                    "rate": advance_deduction_amount,
+                    "amount": advance_deduction_amount,
+                    "sort_order": len(lines) + 1,
+                    "notes": (
+                        f"Outstanding advance {outstanding_advance:.2f}; recovering "
+                        f"{advance_deduction_amount:.2f} this period, capped to available net pay."
+                    ),
+                }
+            )
+
     return lines
 
 
@@ -581,6 +679,12 @@ def upsert_salary_sheet_draft(*, payload: dict, salary_sheet_id: int | None = No
             payload["payroll_period"] = payroll_period
         if payroll_period.status == PayrollPeriodStatus.CLOSED:
             raise ValueError("Payroll period is closed.")
+        # gross/deductions/net are non-nullable with no default, so the initial
+        # insert needs placeholder values even though the block below always
+        # recomputes and re-saves them from the actual line items right after.
+        payload.setdefault("gross_amount", Decimal("0.00"))
+        payload.setdefault("deductions_amount", Decimal("0.00"))
+        payload.setdefault("net_amount", Decimal("0.00"))
         salary_sheet = SalarySheet.objects.create(**payload)
     else:
         salary_sheet = SalarySheet.objects.select_for_update().select_related("payroll_period").get(pk=salary_sheet_id)

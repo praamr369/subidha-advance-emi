@@ -9,10 +9,10 @@ import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
 import {
-  createCustomerCredit,
-  executeCustomerCreditPosting,
-  listCustomerCredits,
-  previewCustomerCreditPosting,
+  createCustomerAdvance,
+  executeCustomerAdvancePosting,
+  listCustomerAdvances,
+  previewCustomerAdvancePosting,
   type BridgePostingPreview,
 } from "@/services/rent-lease-accounting-bridge";
 
@@ -47,7 +47,7 @@ export default function AdminCustomerCreditsPage() {
   async function load() {
     setLoading(true);
     try {
-      const payload = await listCustomerCredits();
+      const payload = await listCustomerAdvances();
       const nextRows = payload.results ?? [];
       setRows(nextRows);
       setSelectedId((current) => current ?? firstRowId(nextRows));
@@ -68,7 +68,7 @@ export default function AdminCustomerCreditsPage() {
 
   async function createCredit() {
     try {
-      await createCustomerCredit({
+      await createCustomerAdvance({
         customer_id: form.customer_id ? Number(form.customer_id) : null,
         amount: form.amount,
         transaction_type: form.transaction_type,
@@ -96,7 +96,7 @@ export default function AdminCustomerCreditsPage() {
   async function runPreview() {
     if (!selectedId) return;
     try {
-      setPreview(await previewCustomerCreditPosting(selectedId));
+      setPreview(await previewCustomerAdvancePosting(selectedId));
       setNotice("Posting preview loaded. Review debit and credit lines before execute.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to preview customer credit posting.");
@@ -108,7 +108,7 @@ export default function AdminCustomerCreditsPage() {
     const ok = window.confirm("Execute customer credit posting? Duplicate execution is protected by the backend idempotency key.");
     if (!ok) return;
     try {
-      const result = await executeCustomerCreditPosting(selectedId);
+      const result = await executeCustomerAdvancePosting(selectedId);
       setNotice(`Posted customer credit. Journal ${result.journal_entry_no || result.journal_entry_id || "created"}.`);
       setPreview(result.preview);
       await load();

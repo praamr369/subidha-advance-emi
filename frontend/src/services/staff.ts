@@ -206,3 +206,73 @@ export function updateAdminStaffLogin(id: number, login_enabled: boolean) {
     body: JSON.stringify({ login_enabled }),
   });
 }
+
+export function resetAdminStaffLoginPassword(id: number, temporary_password?: string) {
+  return request<AdminStaffIdentity>(`/admin/staff-identities/${id}/reset-password/`, {
+    method: "POST",
+    body: JSON.stringify(temporary_password ? { temporary_password } : {}),
+  });
+}
+
+export type StaffLeaveType = {
+  id: number;
+  code: string;
+  name: string;
+  is_paid: boolean;
+  annual_allowance_days: string | null;
+  is_active: boolean;
+};
+
+export type StaffLeaveRequest = {
+  id: number;
+  request_no: string;
+  employee: number;
+  employee_name: string;
+  leave_type: number;
+  leave_type_name: string;
+  start_date: string;
+  end_date: string;
+  day_count: string;
+  status: string;
+  reason: string;
+  cancel_reason?: string;
+};
+
+export type StaffLeaveBalanceRow = {
+  leave_type_id: number;
+  leave_type_code: string;
+  leave_type_name: string;
+  is_paid: boolean;
+  annual_allowance_days: string | null;
+  earned_to_date: string | null;
+  taken_this_year: string;
+  pending_approval: string;
+  available_now: string | null;
+  remaining_this_year: string | null;
+};
+
+export function getStaffLeaveTypes() {
+  return request<{ results: StaffLeaveType[] }>("/staff/leave-types/");
+}
+
+export function getStaffLeaveRequests() {
+  return request<{ results: StaffLeaveRequest[] }>("/staff/leave-requests/");
+}
+
+export function createStaffLeaveRequest(payload: { leave_type: number; start_date: string; end_date?: string; reason?: string }) {
+  return request<StaffLeaveRequest>("/staff/leave-requests/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function cancelStaffLeaveRequest(id: number, reason?: string) {
+  return request<StaffLeaveRequest>(`/staff/leave-requests/${id}/cancel/`, {
+    method: "POST",
+    body: JSON.stringify(reason ? { reason } : {}),
+  });
+}
+
+export function getStaffLeaveBalance() {
+  return request<{ year: number; results: StaffLeaveBalanceRow[] }>("/staff/leave-balance/");
+}

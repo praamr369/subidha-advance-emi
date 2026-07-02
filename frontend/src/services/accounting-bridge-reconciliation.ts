@@ -108,7 +108,11 @@ export type PhaseFControlTower = {
   source_inventory?: PhaseFSourceInventoryItem[];
   groups?: Record<string, Record<string, number>>;
   phase_counts?: Record<string, Record<string, number>>;
-  readiness?: Record<string, unknown>;
+  readiness?: {
+    state?: string;
+    primary_state?: string;
+    counts?: { ready_unposted?: number; posted_unverified?: number };
+  };
   guardrails?: Record<string, boolean>;
 };
 

@@ -17,11 +17,17 @@ def ensure_phase3_system_accounts():
     accounts = {}
 
     for spec in CANONICAL_CHART_ACCOUNTS:
+        # Manual-collection accounts (cash/bank/UPI/gateway) must stay
+        # posting-enabled: the finance-account readiness gate requires
+        # allow_manual_posting on the mapped chart account, so forcing these
+        # back to False here blocked every customer collection after the first
+        # posting sync. System posting-profile accounts stay locked down.
         accounts[spec.key] = _ensure_system_account(
             system_code=spec.key,
             code=spec.code,
             name=spec.name,
             account_type=spec.account_type,
+            allow_manual_posting=spec.role == "manual_collection" and spec.allow_manual_posting,
         )
 
     # Legacy return-key compatibility (do not break existing callers).

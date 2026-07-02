@@ -13,6 +13,8 @@ from api.v1.serializers.business_setup import (
     DocumentNumberingStateSerializer,
     DocumentNumberingUpdateSerializer,
     DocumentPrintSettingsSerializer,
+    EmailSMTPSettingsSerializer,
+    EmailSMTPTestRequestSerializer,
     ModularResetExecuteRequestSerializer,
     ResetScopePreviewRequestSerializer,
     RestoreExecuteRequestSerializer,
@@ -40,6 +42,13 @@ from subscriptions.services.document_numbering_service import (
     upsert_document_numbering,
 )
 from subscriptions.services.document_print_settings_service import get_or_create_document_print_settings
+from subscriptions.services.email_smtp_settings_service import (
+    get_or_create_email_smtp_settings,
+    record_test_result,
+    send_test_email,
+)
+from subscriptions.services.audit_service import log_audit
+from subscriptions.models import AuditLog
 from subscriptions.services.business_reset_governance_service import (
     build_reset_preview,
     create_backup_job,
@@ -111,6 +120,81 @@ class AdminBusinessProfileView(APIView):
         settings_obj = get_or_create_document_print_settings()
         payload["document_print_settings"] = DocumentPrintSettingsSerializer(settings_obj, context={"request": request}).data
         return Response(payload, status=status.HTTP_200_OK)
+
+
+class AdminEmailSmtpSettingsView(APIView):
+    """
+    Admin-only SMTP transport settings (e.g. Gmail app-password login) used to
+    send outbound email such as customer/user OTP password-reset codes. The
+    app password is write-only: it is accepted on PATCH but never echoed back
+    in plain text or ciphertext by GET/PATCH responses.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        settings_obj = get_or_create_email_smtp_settings()
+        return Response(EmailSMTPSettingsSerializer(settings_obj).data, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        settings_obj = get_or_create_email_smtp_settings()
+        serializer = EmailSMTPSettingsSerializer(settings_obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        settings_obj = serializer.save()
+        log_audit(
+            action_type=AuditLog.ActionType.EMAIL_SMTP_SETTINGS_UPDATED,
+            instance=settings_obj,
+            performed_by=request.user,
+            metadata={
+                "smtp_host": settings_obj.smtp_host,
+                "smtp_username": settings_obj.smtp_username,
+                "is_enabled": settings_obj.is_enabled,
+            },
+        )
+        return Response(EmailSMTPSettingsSerializer(settings_obj).data, status=status.HTTP_200_OK)
+
+
+class AdminEmailSmtpTestView(APIView):
+    """
+    Sends one real test email using the currently saved SMTP settings, so an
+    admin can verify Gmail app-password credentials before relying on them
+    for live customer/user OTP delivery.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        serializer = EmailSMTPTestRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        recipient = serializer.validated_data["recipient"]
+
+        settings_obj = get_or_create_email_smtp_settings()
+        if not settings_obj.smtp_username or not settings_obj.has_app_password:
+            return Response(
+                {"detail": "Save an SMTP username and app password before sending a test email."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            send_test_email(settings_obj=settings_obj, recipient=recipient)
+        except Exception as exc:
+            record_test_result(settings_obj=settings_obj, success=False, message=str(exc))
+            log_audit(
+                action_type=AuditLog.ActionType.EMAIL_SMTP_TEST_SENT,
+                instance=settings_obj,
+                performed_by=request.user,
+                metadata={"recipient": recipient, "success": False, "error": str(exc)},
+            )
+            return Response({"detail": f"Test email failed: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        record_test_result(settings_obj=settings_obj, success=True, message=f"Test email sent to {recipient}.")
+        log_audit(
+            action_type=AuditLog.ActionType.EMAIL_SMTP_TEST_SENT,
+            instance=settings_obj,
+            performed_by=request.user,
+            metadata={"recipient": recipient, "success": True},
+        )
+        return Response(EmailSMTPSettingsSerializer(settings_obj).data, status=status.HTTP_200_OK)
 
 
 class BusinessSetupChecklistView(APIView):

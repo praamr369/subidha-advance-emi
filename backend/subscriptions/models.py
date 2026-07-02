@@ -3684,6 +3684,8 @@ class AuditLog(models.Model):
         USER_CREATED = "USER_CREATED", "User Created"   
         USER_UPDATED = "USER_UPDATED", "User Updated"
         PUBLIC_SITE_UPDATED = "PUBLIC_SITE_UPDATED", "Public Site Updated"
+        EMAIL_SMTP_SETTINGS_UPDATED = "EMAIL_SMTP_SETTINGS_UPDATED", "Email SMTP Settings Updated"
+        EMAIL_SMTP_TEST_SENT = "EMAIL_SMTP_TEST_SENT", "Email SMTP Test Sent"
         USER_ACTIVATED = "USER_ACTIVATED", "User Activated"
         USER_DEACTIVATED = "USER_DEACTIVATED", "User Deactivated"
         USER_PASSWORD_RESET = "USER_PASSWORD_RESET", "User Password Reset"

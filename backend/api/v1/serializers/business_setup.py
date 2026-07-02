@@ -9,6 +9,7 @@ from subscriptions.models_document_print_settings import (
     DOCUMENT_PRINT_LOGO_MAX_BYTES,
     DocumentPrintSettings,
 )
+from subscriptions.models_email_smtp_settings import EmailSMTPSettings
 
 
 class BusinessSetupModelSerializer(serializers.ModelSerializer):
@@ -279,3 +280,56 @@ class LocalSandboxResetSerializer(serializers.Serializer):
     confirm_phrase = serializers.CharField()
     dry_run = serializers.BooleanField(default=True)
     sandbox_only = serializers.BooleanField(default=True)
+
+
+class EmailSMTPSettingsSerializer(BusinessSetupModelSerializer):
+    has_app_password = serializers.SerializerMethodField()
+    app_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    class Meta:
+        model = EmailSMTPSettings
+        fields = [
+            "id",
+            "smtp_host",
+            "smtp_port",
+            "use_tls",
+            "use_ssl",
+            "smtp_username",
+            "app_password",
+            "has_app_password",
+            "from_email",
+            "from_name",
+            "is_enabled",
+            "last_test_at",
+            "last_test_success",
+            "last_test_message",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ("id", "last_test_at", "last_test_success", "last_test_message", "created_at", "updated_at")
+
+    def get_has_app_password(self, instance):
+        return instance.has_app_password
+
+    def update(self, instance, validated_data):
+        app_password = validated_data.pop("app_password", None)
+        for attribute, value in validated_data.items():
+            setattr(instance, attribute, value)
+        if app_password:
+            instance.set_app_password(app_password)
+        self._validate_instance(instance)
+        instance.save()
+        return instance
+
+    def create(self, validated_data):
+        app_password = validated_data.pop("app_password", None)
+        instance = self.Meta.model(**validated_data)
+        if app_password:
+            instance.set_app_password(app_password)
+        self._validate_instance(instance)
+        instance.save()
+        return instance
+
+
+class EmailSMTPTestRequestSerializer(serializers.Serializer):
+    recipient = serializers.EmailField()

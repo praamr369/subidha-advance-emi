@@ -896,6 +896,7 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "attendance_policy",
             "shift_name",
             "salary_effective_from",
+            "salary_pay_day",
             "temporary_contract_end_date",
             "daily_wage_rate",
             "hourly_wage_rate",
@@ -1317,11 +1318,31 @@ class SalaryPaymentSerializer(serializers.ModelSerializer):
 class StaffAdvanceRecoverySerializer(serializers.ModelSerializer):
     finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
     journal_entry_no = serializers.CharField(source="posted_journal_entry.entry_no", read_only=True)
+    salary_sheet_period = serializers.SerializerMethodField()
 
     class Meta:
         model = StaffAdvanceRecovery
-        fields = ["id", "recovery_date", "amount", "finance_account", "finance_account_name", "reference_no", "posted_journal_entry", "journal_entry_no", "recorded_by", "created_at"]
+        fields = [
+            "id",
+            "recovery_date",
+            "amount",
+            "recovery_source",
+            "finance_account",
+            "finance_account_name",
+            "salary_sheet",
+            "salary_sheet_period",
+            "reference_no",
+            "posted_journal_entry",
+            "journal_entry_no",
+            "recorded_by",
+            "created_at",
+        ]
         read_only_fields = ["id", "posted_journal_entry", "journal_entry_no", "recorded_by", "created_at"]
+
+    def get_salary_sheet_period(self, instance):
+        if not instance.salary_sheet_id:
+            return None
+        return f"{instance.salary_sheet.year}-{instance.salary_sheet.month:02d}"
 
 
 class StaffAdvanceSerializer(serializers.ModelSerializer):

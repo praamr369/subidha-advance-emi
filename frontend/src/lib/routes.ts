@@ -132,6 +132,7 @@ export const ROUTES = {
     settingsBusinessSetupChartAccounts: "/admin/settings/business-setup/chart-accounts",
     settingsBusinessSetupStaff: "/admin/settings/business-setup/staff",
     settingsBusinessSetupPrintBranding: "/admin/settings/business-setup/print-branding",
+    settingsBusinessSetupEmailSmtp: "/admin/settings/business-setup/email-smtp",
     settingsBusinessSetupFinanceAccounts: "/admin/settings/business-setup/finance-accounts",
     settingsBusinessSetupDocumentNumbering: "/admin/settings/business-setup/document-numbering",
     settingsBusinessSetupPublicSite: "/admin/settings/business-setup/public-site",
@@ -441,6 +442,7 @@ export const ROUTES = {
     attendance: "/staff/attendance",
     payslips: "/staff/payslips",
     salary: "/staff/salary",
+    leave: "/staff/leave",
   },
 
   vendor: {

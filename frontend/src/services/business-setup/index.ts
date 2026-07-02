@@ -61,6 +61,25 @@ export type BusinessProfile = {
   document_print_settings?: DocumentPrintSettings;
 };
 
+export type EmailSMTPSettings = {
+  id?: number;
+  smtp_host?: string;
+  smtp_port?: number;
+  use_tls?: boolean;
+  use_ssl?: boolean;
+  smtp_username?: string;
+  app_password?: string;
+  has_app_password?: boolean;
+  from_email?: string;
+  from_name?: string;
+  is_enabled?: boolean;
+  last_test_at?: string | null;
+  last_test_success?: boolean | null;
+  last_test_message?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type SetupChecklistItem = { key: string; label: string; level?: "required" | "recommended" | "optional" | string; status: string; detail: string; route?: string };
 export type SetupChecklist = { is_ready_for_go_live: boolean; percent_complete: number; items: SetupChecklistItem[]; counts?: Record<string, unknown> };
 export type SetupReadinessStatus = "READY" | "REQUIRED_PENDING" | "BLOCKED" | "WARNING" | "INFO" | "APPROVAL_GATED" | "FUTURE_UNSUPPORTED" | "NEEDS_SETUP" | "OPTIONAL" | "FUTURE" | string;
@@ -83,6 +102,9 @@ export async function getBusinessProfile(): Promise<BusinessProfile | null> { tr
 export async function saveBusinessProfile(payload: Partial<BusinessProfile>): Promise<BusinessProfile> { return apiFetch<BusinessProfile>("/admin/business-profile/", { method: "PATCH", body: payload }); }
 export async function getDocumentPrintSettings(): Promise<DocumentPrintSettings> { return apiFetch<DocumentPrintSettings>("/admin/business-profile/?section=document-print-settings"); }
 export async function saveDocumentPrintSettings(payload: Partial<DocumentPrintSettings> | FormData): Promise<DocumentPrintSettings> { return apiFetch<DocumentPrintSettings>("/admin/business-profile/?section=document-print-settings", { method: "PATCH", body: payload }); }
+export async function getEmailSmtpSettings(): Promise<EmailSMTPSettings> { return apiFetch<EmailSMTPSettings>("/admin/settings/email-smtp/"); }
+export async function saveEmailSmtpSettings(payload: Partial<EmailSMTPSettings>): Promise<EmailSMTPSettings> { return apiFetch<EmailSMTPSettings>("/admin/settings/email-smtp/", { method: "PATCH", body: payload }); }
+export async function sendEmailSmtpTest(recipient: string): Promise<EmailSMTPSettings> { return apiFetch<EmailSMTPSettings>("/admin/settings/email-smtp/test/", { method: "POST", body: { recipient } }); }
 export async function getSetupChecklist(): Promise<SetupChecklist> { return apiFetch<SetupChecklist>("/admin/business-setup/checklist/"); }
 export async function getSetupReadiness(): Promise<SetupReadinessPayload> { return apiFetch<SetupReadinessPayload>("/admin/setup/readiness/"); }
 export async function previewFreshStartSetup(): Promise<EnsureFreshStartSetupResult> { return apiFetch<EnsureFreshStartSetupResult>("/admin/setup/ensure-fresh-start/"); }

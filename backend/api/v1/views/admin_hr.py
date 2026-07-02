@@ -25,6 +25,7 @@ from accounting.models import (
     EmployeeProfile,
     EmploymentType,
     LeaveRequest,
+    LeaveType,
     PayrollPeriod,
     SalaryPayment,
     SalarySheet,
@@ -40,6 +41,7 @@ from accounting.services.hr_workspace_service import (
     reject_leave_request_action,
     _write_audit,
 )
+from accounting.services.workforce_service import leave_balance_rows, upsert_leave_request_draft
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting import (
     EmployeeAttendanceSerializer,
@@ -481,6 +483,20 @@ class AdminHrStaffPatchView(_AdminBase):
         return Response(EmployeeProfileSerializer(updated, context={"request": request}).data)
 
 
+class AdminHrStaffLeaveBalanceView(_AdminBase):
+    """
+    Admin view of one staff member's leave balance: earned to date (monthly
+    accrual), taken, pending approval, and remaining -- same numbers the staff
+    member sees on their own portal.
+    """
+
+    def get(self, request, staff_id: int):
+        employee = get_object_or_404(EmployeeProfile, pk=staff_id)
+        year = timezone.localdate().year
+        rows = leave_balance_rows(employee=employee, year=year)
+        return Response({"year": year, "employee_id": employee.id, "results": rows}, status=status.HTTP_200_OK)
+
+
 class HrStaffStatusSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=[("DEACTIVATE", "DEACTIVATE"), ("REACTIVATE", "REACTIVATE")])
     reason = serializers.CharField(required=False, allow_blank=True)
@@ -682,6 +698,15 @@ class HrLeavePatchSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
 
 
+class AdminHrLeaveRequestCreateSerializer(serializers.Serializer):
+    employee = serializers.IntegerField()
+    leave_type = serializers.IntegerField()
+    start_date = serializers.DateField()
+    end_date = serializers.DateField(required=False, allow_null=True)
+    reason = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
 class AdminHrLeaveRequestsListCreateView(_AdminBase):
     def get(self, request):
         qs = LeaveRequest.objects.select_related("employee", "leave_type").all().order_by("-created_at", "-id")
@@ -695,7 +720,38 @@ class AdminHrLeaveRequestsListCreateView(_AdminBase):
         return Response({"count": qs.count(), "results": LeaveRequestSerializer(results, many=True, context={"request": request}).data})
 
     def post(self, request):
-        raise serializers.ValidationError({"detail": "Create leave requests via the leave request module."})
+        serializer = AdminHrLeaveRequestCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        vd = serializer.validated_data
+        start_date = vd["start_date"]
+        end_date = vd.get("end_date") or start_date
+
+        employee = get_object_or_404(EmployeeProfile, pk=vd["employee"])
+        leave_type = get_object_or_404(LeaveType, pk=vd["leave_type"], is_active=True)
+
+        try:
+            leave_request = upsert_leave_request_draft(
+                payload={
+                    "employee": employee,
+                    "leave_type": leave_type,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "reason": vd.get("reason", ""),
+                    "notes": vd.get("notes", ""),
+                },
+                performed_by=request.user,
+            )
+        except (ValueError, DjangoValidationError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        _write_audit(
+            actor=request.user,
+            action_type="HR_LEAVE_REQUEST_CREATED_BY_ADMIN",
+            model_name="LeaveRequest",
+            object_id=leave_request.id,
+            metadata={"employee_id": employee.id, "leave_type_id": leave_type.id, "start_date": str(start_date), "end_date": str(end_date)},
+        )
+        return Response(LeaveRequestSerializer(leave_request, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
 class AdminHrLeaveRequestPatchView(_AdminBase):

@@ -9,6 +9,7 @@ from accounting.models import (
     ChartOfAccount,
     StaffAdvance,
     StaffAdvanceRecovery,
+    StaffAdvanceRecoverySource,
     StaffAdvanceStatus,
     JournalEntryType,
 )
@@ -21,6 +22,12 @@ def _asset_account() -> ChartOfAccount:
     if account is None:
         raise ValueError("STAFF_ADVANCE_ASSET is missing. Run Accounting Setup defaults first.")
     return account
+
+
+def _payroll_deductions_clearing_account() -> ChartOfAccount:
+    from accounting.services.operational_accounts_service import ensure_phase3_system_accounts
+
+    return ensure_phase3_system_accounts()["PAYROLL_DEDUCTIONS_CLEARING"]
 
 
 def _money(value) -> Decimal:
@@ -106,6 +113,73 @@ def recover_staff_advance(*, staff_advance_id: int, amount, finance_account, rec
         amount=value,
         finance_account=finance_account,
         reference_no=reference_no,
+        posted_journal_entry=journal,
+        recorded_by=performed_by,
+    )
+    row.recovered_amount += value
+    row.status = StaffAdvanceStatus.RECOVERED if row.recovered_amount == row.amount else StaffAdvanceStatus.PARTIALLY_RECOVERED
+    row.save(update_fields=["recovered_amount", "status", "updated_at"])
+    return recovery
+
+
+def outstanding_staff_advances(*, employee_id: int):
+    return (
+        StaffAdvance.objects.filter(
+            employee_id=employee_id,
+            status__in=[StaffAdvanceStatus.DISBURSED, StaffAdvanceStatus.PARTIALLY_RECOVERED],
+        )
+        .order_by("request_date", "id")
+    )
+
+
+def total_outstanding_staff_advance(*, employee_id: int) -> Decimal:
+    total = Decimal("0.00")
+    for advance in outstanding_staff_advances(employee_id=employee_id):
+        total += advance.outstanding_amount
+    return total
+
+
+@transaction.atomic
+def recover_staff_advance_via_salary(*, staff_advance_id: int, amount, salary_sheet, performed_by) -> StaffAdvanceRecovery:
+    """
+    Recovers a staff advance by deducting it from a posted salary sheet
+    instead of a cash/bank collection. No money physically moves through a
+    finance account. The salary sheet's own posting already credited
+    Payroll Deductions Clearing for this deduction line (a suspense
+    liability); this call clears that suspense balance to its real
+    destination: debit Payroll Deductions Clearing / credit Staff Advance
+    Asset. It does not touch Salary Payable again -- that was already set
+    correctly (net of deductions) by the salary sheet posting itself.
+    """
+    row = StaffAdvance.objects.select_for_update().select_related("employee").get(pk=staff_advance_id)
+    if row.status not in {StaffAdvanceStatus.DISBURSED, StaffAdvanceStatus.PARTIALLY_RECOVERED}:
+        raise ValueError("Only disbursed staff advances can receive recovery payments.")
+    value = _money(amount)
+    if value > row.outstanding_amount:
+        raise ValueError("Recovery amount cannot exceed the outstanding staff advance.")
+
+    journal = create_journal_entry(
+        entry_date=salary_sheet.payroll_period.end_date if salary_sheet.payroll_period_id else timezone.localdate(),
+        entry_type=JournalEntryType.SYSTEM_BRIDGE,
+        memo=f"Staff advance recovery via salary - {row.employee.name}",
+        source_model="StaffAdvance",
+        source_id=str(row.id),
+        source_type="STAFF_ADVANCE_SALARY_RECOVERY",
+        source_reference=f"STAFF-ADVANCE:{row.id}:SALARY-RECOVERY:{salary_sheet.id}",
+        voucher_type="STAFF_ADVANCE",
+        lines=[
+            {"chart_account": _payroll_deductions_clearing_account(), "debit_amount": value, "credit_amount": Decimal("0.00"), "description": f"Clear deduction from salary sheet {salary_sheet.year}-{salary_sheet.month:02d}"},
+            {"chart_account": _asset_account(), "debit_amount": Decimal("0.00"), "credit_amount": value, "description": "Reduce staff advance receivable"},
+        ],
+    )
+    journal, _ = post_journal_entry(journal_entry_id=journal.id, posted_by=performed_by)
+    recovery = StaffAdvanceRecovery.objects.create(
+        staff_advance=row,
+        recovery_date=salary_sheet.payroll_period.end_date if salary_sheet.payroll_period_id else timezone.localdate(),
+        amount=value,
+        recovery_source=StaffAdvanceRecoverySource.SALARY_DEDUCTION,
+        salary_sheet=salary_sheet,
+        reference_no=f"SALARY-{salary_sheet.year}-{salary_sheet.month:02d}",
         posted_journal_entry=journal,
         recorded_by=performed_by,
     )

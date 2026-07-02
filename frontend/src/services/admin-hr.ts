@@ -16,11 +16,25 @@ export type HrSummary = {
 
 export type HrOption = { value: string; label: string };
 
+export type HrStaffAdvanceRecovery = {
+  id: number;
+  recovery_date: string;
+  amount: string;
+  recovery_source: "CASH" | "SALARY_DEDUCTION";
+  finance_account: number | null;
+  finance_account_name?: string | null;
+  salary_sheet: number | null;
+  salary_sheet_period?: string | null;
+  reference_no: string;
+  journal_entry_no?: string | null;
+};
+
 export type HrStaffAdvance = {
   id: number; employee: number; employee_name: string; employee_code: string;
   request_date: string; amount: string; recovered_amount: string; outstanding_amount: string;
   reason: string; status: string; finance_account: number | null; finance_account_name?: string | null;
   reference_no: string; journal_entry_no?: string | null;
+  recoveries?: HrStaffAdvanceRecovery[];
 };
 
 export async function listHrStaffAdvances() {
@@ -80,6 +94,7 @@ export type HrStaff = {
   attendance_policy?: string;
   shift_name?: string;
   salary_effective_from?: string | null;
+  salary_pay_day?: number | null;
   temporary_contract_end_date?: string | null;
   daily_wage_rate?: string | null;
   hourly_wage_rate?: string | null;
@@ -204,6 +219,7 @@ export type HrSalaryPayment = {
   branch_name?: string | null;
   finance_account_name?: string | null;
   reference_no?: string;
+  posted_journal_entry_no?: string | null;
   created_at?: string;
 };
 
@@ -354,6 +370,33 @@ export async function patchHrLeaveRequest(leaveRequestId: number, payload: { act
   return apiFetch(`/admin/hr/leave-requests/${leaveRequestId}/`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
+export async function createHrLeaveRequest(payload: { employee: number; leave_type: number; start_date: string; end_date?: string; reason?: string; notes?: string }) {
+  return apiFetch<HrLeaveRequest>("/admin/hr/leave-requests/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export type HrLeaveType = { id: number; code: string; name: string; is_paid: boolean; annual_allowance_days: string | null; is_active: boolean };
+
+export type HrLeaveBalanceRow = {
+  leave_type_id: number;
+  leave_type_code: string;
+  leave_type_name: string;
+  is_paid: boolean;
+  annual_allowance_days: string | null;
+  earned_to_date: string | null;
+  taken_this_year: string;
+  pending_approval: string;
+  available_now: string | null;
+  remaining_this_year: string | null;
+};
+
+export async function getHrStaffLeaveBalance(staffId: number) {
+  return apiFetch<{ year: number; employee_id: number; results: HrLeaveBalanceRow[] }>(`/admin/hr/staff/${staffId}/leave-balance/`);
+}
+
+export async function listHrLeaveTypes(params: Record<string, string | number | undefined | null> = {}) {
+  return apiFetch<{ count: number; results: HrLeaveType[] }>(`/admin/hr/leave-types/${queryString(params)}`);
+}
+
 export async function listHrExpenseClaims(params: Record<string, string | number | undefined | null> = {}) {
   return apiFetch<{ count: number; results: HrExpenseClaim[] }>(`/admin/hr/expense-claims/${queryString(params)}`);
 }
@@ -368,6 +411,18 @@ export async function getHrPayroll(params: Record<string, string | number | unde
 
 export async function listHrSalaryPayments(params: Record<string, string | number | undefined | null> = {}) {
   return apiFetch<{ count: number; results: HrSalaryPayment[] }>(`/admin/hr/salary-payments/${queryString(params)}`);
+}
+
+export async function approveSalarySheet(salarySheetId: number) {
+  return apiFetch<{ updated: boolean; salary_sheet: HrPayrollSheet }>(`/admin/hr/payroll/${salarySheetId}/approve/`, { method: "POST", body: {} });
+}
+
+export async function postSalarySheet(salarySheetId: number) {
+  return apiFetch<{ updated: boolean; salary_sheet: HrPayrollSheet }>(`/admin/hr/payroll/${salarySheetId}/post/`, { method: "POST", body: {} });
+}
+
+export async function recordSalaryPayment(payload: { salary_sheet: number; payment_date: string; amount: string; finance_account: number; reference_no?: string }) {
+  return apiFetch<HrSalaryPayment>("/admin/hr/salary-payments/", { method: "POST", body: payload });
 }
 
 export async function setHrStaffStatus(staffId: number, action: "DEACTIVATE" | "REACTIVATE", reason?: string) {

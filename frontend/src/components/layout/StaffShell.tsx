@@ -11,6 +11,7 @@ const STAFF_NAV = [
   { href: ROUTES.staff.dashboard, label: "Dashboard" },
   { href: ROUTES.staff.profile, label: "My Profile" },
   { href: ROUTES.staff.attendance, label: "Attendance" },
+  { href: ROUTES.staff.leave, label: "Leave" },
   { href: ROUTES.staff.payslips, label: "Payslips" },
   { href: ROUTES.staff.salary, label: "Salary Summary" },
 ];

@@ -88,6 +88,7 @@ def _ensure_system_account(
     code: str,
     name: str,
     account_type: str,
+    allow_manual_posting: bool = False,
 ) -> ChartOfAccount:
     # Preserve import compatibility for existing callers.
     result = ensure_system_account(
@@ -95,7 +96,7 @@ def _ensure_system_account(
         code=code,
         name=name,
         account_type=account_type,
-        allow_manual_posting=False,
+        allow_manual_posting=allow_manual_posting,
         reactivate=False,
     )
     return result.account

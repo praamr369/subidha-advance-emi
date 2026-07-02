@@ -3,6 +3,10 @@ from django.urls import path
 from api.v1.views.staff_portal import (
     StaffAttendanceView,
     StaffDashboardView,
+    StaffLeaveBalanceView,
+    StaffLeaveRequestCancelView,
+    StaffLeaveRequestsView,
+    StaffLeaveTypeListView,
     StaffPayslipDetailView,
     StaffPayslipListView,
     StaffProfileView,
@@ -30,6 +34,11 @@ urlpatterns = [
     path("reports/", StaffReportsView.as_view(), name="staff-reports"),
     path("tasks/", StaffTaskListView.as_view(), name="staff-tasks"),
     path("tasks/<int:pk>/complete/", StaffTaskCompleteView.as_view(), name="staff-task-complete"),
+    # Self-service leave
+    path("leave-types/", StaffLeaveTypeListView.as_view(), name="staff-leave-types"),
+    path("leave-requests/", StaffLeaveRequestsView.as_view(), name="staff-leave-requests"),
+    path("leave-requests/<int:pk>/cancel/", StaffLeaveRequestCancelView.as_view(), name="staff-leave-request-cancel"),
+    path("leave-balance/", StaffLeaveBalanceView.as_view(), name="staff-leave-balance"),
     # KYC self-service (Phase KYC)
     path("kyc/documents/", StaffSelfKycDocumentListUploadView.as_view(), name="staff-kyc-documents"),
     path("kyc/documents/upload/", StaffSelfKycDocumentListUploadView.as_view(), name="staff-kyc-upload"),

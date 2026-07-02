@@ -22,32 +22,45 @@ import {
 } from "@/components/ui/operations";
 import { ROUTES } from "@/lib/routes";
 import { listBranches, type BranchRecord } from "@/services/branch-control";
-import { listAdminStaffIdentities, type AdminStaffIdentity } from "@/services/staff";
 import {
+  createAdminStaffIdentity,
+  listAdminStaffIdentities,
+  resetAdminStaffLoginPassword,
+  updateAdminStaffLogin,
+  type AdminStaffIdentity,
+} from "@/services/staff";
+import {
+  approveSalarySheet,
   createHrStaffDocument,
   getAdminAuditTimeline,
   downloadHrSalaryAgreementPdf,
   downloadHrStaffProfilePdf,
   getHrPayroll,
   getHrStaff,
+  getHrStaffLeaveBalance,
   listHrAttendance,
   listHrExpenseClaims,
   listHrLeaveRequests,
   listHrSalaryPayments,
   listHrStaffDocuments,
+  markHrAttendance,
   patchHrStaff,
   patchHrStaffDocument,
+  postSalarySheet,
+  recordSalaryPayment,
   setHrStaffStatus,
   reviewHrStaffDocument,
   type HrAttendance,
   type AdminAuditEntry,
   type HrExpenseClaim,
+  type HrLeaveBalanceRow,
   type HrLeaveRequest,
   type HrPayrollSheet,
   type HrSalaryPayment,
   type HrStaff,
   type HrStaffDocument,
 } from "@/services/admin-hr";
+import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 
 const EMPLOYMENT_TYPES = ["PERMANENT_MONTHLY", "TEMPORARY", "DAILY_WAGE", "HOURLY", "PIECE_RATE", "MANUFACTURING", "SERVICE"];
 const DETAIL_TABS = ["Overview", "Employment", "Attendance", "Payroll", "Documents", "KYC", "Access", "Timeline"] as const;
@@ -70,6 +83,7 @@ type EditForm = {
   piece_rate_amount: string;
   piece_rate_unit_label: string;
   salary_effective_from: string;
+  salary_pay_day: string;
   temporary_contract_end_date: string;
   kyc_id_type: string;
   kyc_id_number: string;
@@ -110,6 +124,7 @@ function formFromStaff(staff: HrStaff): EditForm {
     piece_rate_amount: staff.piece_rate_amount || "",
     piece_rate_unit_label: staff.piece_rate_unit_label || "",
     salary_effective_from: staff.salary_effective_from || "",
+    salary_pay_day: staff.salary_pay_day != null ? String(staff.salary_pay_day) : "",
     temporary_contract_end_date: staff.temporary_contract_end_date || "",
     kyc_id_type: staff.kyc_id_type || "",
     kyc_id_number: staff.kyc_id_number || "",
@@ -250,6 +265,7 @@ function EditPanel({
         bank_ifsc: form.bank_ifsc.trim(),
         upi_id: form.upi_id.trim(),
         salary_effective_from: form.salary_effective_from || null,
+        salary_pay_day: form.salary_pay_day ? Number(form.salary_pay_day) : null,
         temporary_contract_end_date: form.temporary_contract_end_date || null,
         kyc_id_type: form.kyc_id_type.trim(),
         kyc_id_number: form.kyc_id_number.trim(),
@@ -317,6 +333,7 @@ function EditPanel({
             {field("Piece rate", <input className={inputClass} value={form.piece_rate_amount} onChange={(event) => update("piece_rate_amount", event.target.value)} />)}
             {field("Piece unit", <input className={inputClass} value={form.piece_rate_unit_label} onChange={(event) => update("piece_rate_unit_label", event.target.value)} />)}
             {field("Payroll eligible", <select className={inputClass} value={form.payroll_eligible ? "true" : "false"} onChange={(event) => update("payroll_eligible", event.target.value === "true")}><option value="false">No</option><option value="true">Yes</option></select>)}
+            {field("Salary pay day (1-28)", <input type="number" min={1} max={28} className={inputClass} value={form.salary_pay_day} onChange={(event) => update("salary_pay_day", event.target.value)} placeholder="e.g. 2" />)}
             {field("Payment mode", <select className={inputClass} value={form.payment_mode} onChange={(event) => update("payment_mode", event.target.value)}><option value="CASH">Cash</option><option value="BANK">Bank</option><option value="UPI">UPI</option></select>)}
           </>
         ) : null}
@@ -366,6 +383,7 @@ export default function AdminHrStaffProfilePage() {
   const [documents, setDocuments] = useState<HrStaffDocument[]>([]);
   const [attendance, setAttendance] = useState<HrAttendance[]>([]);
   const [leave, setLeave] = useState<HrLeaveRequest[]>([]);
+  const [leaveBalance, setLeaveBalance] = useState<HrLeaveBalanceRow[]>([]);
   const [expenses, setExpenses] = useState<HrExpenseClaim[]>([]);
   const [salarySheets, setSalarySheets] = useState<HrPayrollSheet[]>([]);
   const [salaryPayments, setSalaryPayments] = useState<HrSalaryPayment[]>([]);
@@ -379,27 +397,100 @@ export default function AdminHrStaffProfilePage() {
   const [reviewModal, setReviewModal] = useState<{ documentId: number; action: "verify" | "reject"; title: string } | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [accessSaving, setAccessSaving] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [payrollSaving, setPayrollSaving] = useState<number | null>(null);
+  const [payrollError, setPayrollError] = useState<string | null>(null);
+  const [payForm, setPayForm] = useState<{ salarySheetId: number; amount: string; financeAccount: string; referenceNo: string; paymentDate: string } | null>(null);
+  const [attMonth, setAttMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [attForm, setAttForm] = useState({ date: new Date().toISOString().slice(0, 10), status: "PRESENT", worked_hours: "", overtime_hours: "", notes: "" });
+  const [attSaving, setAttSaving] = useState(false);
+  const [attError, setAttError] = useState<string | null>(null);
+  const [attMessage, setAttMessage] = useState<string | null>(null);
 
   const attendanceSummary = useMemo(() => {
     const count = (status: string) => attendance.filter((row) => row.status === status).length;
-    return { present: count("PRESENT"), absent: count("ABSENT"), late: count("LATE"), leave: count("LEAVE") };
-  }, [attendance]);
+    const [year, month] = attMonth.split("-").map(Number);
+    const daysInMonth = year && month ? new Date(year, month, 0).getDate() : 0;
+    return {
+      present: count("PRESENT"),
+      halfDay: count("HALF_DAY"),
+      absent: count("ABSENT"),
+      leave: count("LEAVE"),
+      notMarked: Math.max(daysInMonth - attendance.length, 0),
+      daysInMonth,
+    };
+  }, [attendance, attMonth]);
+
+  async function loadAttendanceMonth(month: string) {
+    if (!staffId) return;
+    const [year, monthNo] = month.split("-").map(Number);
+    if (!year || !monthNo) return;
+    const lastDay = new Date(year, monthNo, 0).getDate();
+    try {
+      const payload = await listHrAttendance(`employee=${staffId}&from=${month}-01&to=${month}-${String(lastDay).padStart(2, "0")}`);
+      setAttendance([...payload.results].sort((a, b) => (a.attendance_date < b.attendance_date ? -1 : 1)));
+      setAttError(null);
+    } catch (err) {
+      setAttError(err instanceof Error ? err.message : "Unable to load attendance for the month.");
+    }
+  }
+
+  useEffect(() => {
+    void loadAttendanceMonth(attMonth);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staffId, attMonth]);
+
+  async function submitAttendance() {
+    if (!staff) return;
+    if (!attForm.date) {
+      setAttError("Pick a date to mark.");
+      return;
+    }
+    setAttSaving(true);
+    setAttError(null);
+    setAttMessage(null);
+    try {
+      await markHrAttendance({
+        employee: staff.id,
+        attendance_date: attForm.date,
+        status: attForm.status,
+        notes: attForm.notes || undefined,
+        worked_hours: attForm.worked_hours || null,
+        overtime_hours: attForm.overtime_hours || null,
+      });
+      setAttMessage(`Attendance saved: ${attForm.date} marked ${attForm.status}.`);
+      setAttForm((current) => ({ ...current, notes: "" }));
+      await loadAttendanceMonth(attMonth);
+    } catch (err) {
+      setAttError(err instanceof Error ? err.message : "Failed to save attendance.");
+    } finally {
+      setAttSaving(false);
+    }
+  }
 
   async function load() {
     if (!staffId) return;
     try {
       setLoading(true);
-      const [staffPayload, branchPayload, docsPayload, attendancePayload, leavePayload, expensePayload, payrollPayload, paymentPayload, identityPayload] = await Promise.all([
+      const [staffPayload, branchPayload, docsPayload, leavePayload, expensePayload, payrollPayload, paymentPayload, identityPayload, financeAccountPayload, leaveBalancePayload] = await Promise.all([
         getHrStaff(staffId),
         listBranches({ status: "ACTIVE" }),
         listHrStaffDocuments({ employee: staffId }),
-        listHrAttendance(`employee=${staffId}`),
         listHrLeaveRequests({ employee: staffId }),
         listHrExpenseClaims({ employee: staffId }),
         getHrPayroll({ employee: staffId }),
         listHrSalaryPayments({ employee: staffId }),
         listAdminStaffIdentities(),
+        listFinanceAccounts({ is_active: 1 }),
+        getHrStaffLeaveBalance(staffId),
       ]);
+      setLeaveBalance(leaveBalancePayload.results);
+      setFinanceAccounts(financeAccountPayload.results);
       const identity = identityPayload.results.find((item) => item.employee === staffPayload.id) || null;
       const auditPayloads = await Promise.all([
         getAdminAuditTimeline("EmployeeProfile", staffPayload.id),
@@ -410,7 +501,6 @@ export default function AdminHrStaffProfilePage() {
       setIdentity(identity);
       setBranches(branchPayload.results);
       setDocuments(docsPayload.results);
-      setAttendance(attendancePayload.results);
       setLeave(leavePayload.results);
       setExpenses(expensePayload.results);
       setSalarySheets(payrollPayload.salary_sheets);
@@ -440,6 +530,128 @@ export default function AdminHrStaffProfilePage() {
     if (staff.is_active && !reason?.trim()) return;
     await setHrStaffStatus(staff.id, action, reason?.trim());
     await load();
+  }
+
+  async function createLoginForStaff() {
+    if (!staff) return;
+    const username = loginUsername.trim();
+    if (!username) {
+      setAccessError("Enter a username for the new login.");
+      return;
+    }
+    setAccessSaving(true);
+    setAccessError(null);
+    try {
+      const created = await createAdminStaffIdentity({
+        employee: staff.id,
+        name: staff.name,
+        phone: staff.phone,
+        email: loginEmail.trim() || undefined,
+        username,
+        joining_date: staff.joining_date,
+        login_enabled: true,
+      });
+      setGeneratedPassword(created.temporary_password || null);
+      setLoginUsername("");
+      setLoginEmail("");
+      await load();
+    } catch (err) {
+      setAccessError(err instanceof Error ? err.message : "Unable to create staff login.");
+    } finally {
+      setAccessSaving(false);
+    }
+  }
+
+  async function toggleLoginEnabled() {
+    if (!identity) return;
+    setAccessSaving(true);
+    setAccessError(null);
+    try {
+      await updateAdminStaffLogin(identity.id, !identity.login_enabled);
+      await load();
+    } catch (err) {
+      setAccessError(err instanceof Error ? err.message : "Unable to update login status.");
+    } finally {
+      setAccessSaving(false);
+    }
+  }
+
+  async function resetLoginPassword() {
+    if (!identity) return;
+    if (!window.confirm(`Reset the password for ${identity.username}? The old password stops working immediately.`)) return;
+    setAccessSaving(true);
+    setAccessError(null);
+    try {
+      const updated = await resetAdminStaffLoginPassword(identity.id);
+      setGeneratedPassword(updated.temporary_password || null);
+      await load();
+    } catch (err) {
+      setAccessError(err instanceof Error ? err.message : "Unable to reset password.");
+    } finally {
+      setAccessSaving(false);
+    }
+  }
+
+  async function approveSheet(sheetId: number) {
+    setPayrollSaving(sheetId);
+    setPayrollError(null);
+    try {
+      await approveSalarySheet(sheetId);
+      await load();
+    } catch (err) {
+      setPayrollError(err instanceof Error ? err.message : "Unable to approve salary sheet.");
+    } finally {
+      setPayrollSaving(null);
+    }
+  }
+
+  async function postSheet(sheetId: number) {
+    setPayrollSaving(sheetId);
+    setPayrollError(null);
+    try {
+      await postSalarySheet(sheetId);
+      await load();
+    } catch (err) {
+      setPayrollError(err instanceof Error ? err.message : "Unable to post salary sheet.");
+    } finally {
+      setPayrollSaving(null);
+    }
+  }
+
+  function openPayForm(sheet: HrPayrollSheet) {
+    setPayrollError(null);
+    setPayForm({
+      salarySheetId: sheet.id,
+      amount: sheet.outstanding_amount || sheet.net_amount,
+      financeAccount: financeAccounts[0] ? String(financeAccounts[0].id) : "",
+      referenceNo: "",
+      paymentDate: new Date().toISOString().slice(0, 10),
+    });
+  }
+
+  async function submitPayment() {
+    if (!payForm) return;
+    if (!payForm.financeAccount) {
+      setPayrollError("Select a cash/bank account to pay from.");
+      return;
+    }
+    setPayrollSaving(payForm.salarySheetId);
+    setPayrollError(null);
+    try {
+      await recordSalaryPayment({
+        salary_sheet: payForm.salarySheetId,
+        payment_date: payForm.paymentDate,
+        amount: payForm.amount,
+        finance_account: Number(payForm.financeAccount),
+        reference_no: payForm.referenceNo.trim() || undefined,
+      });
+      setPayForm(null);
+      await load();
+    } catch (err) {
+      setPayrollError(err instanceof Error ? err.message : "Unable to record salary payment.");
+    } finally {
+      setPayrollSaving(null);
+    }
   }
 
   async function uploadDocument() {
@@ -593,6 +805,7 @@ export default function AdminHrStaffProfilePage() {
           <Detail label="Cost center" value={staff.cost_center_code} />
           <Detail label="Payroll expense account" value={staff.payroll_expense_account || "Not mapped"} />
           <Detail label="Salary effective date" value={staff.salary_effective_from} />
+          <Detail label="Salary pay day" value={staff.salary_pay_day ? `Day ${staff.salary_pay_day} of month` : "Not set"} />
           <Detail label="Contract end date" value={staff.temporary_contract_end_date} />
         </div>
       </DetailPanel> : null}
@@ -635,15 +848,66 @@ export default function AdminHrStaffProfilePage() {
 
       {activeTab === "KYC" ? <KycDocumentPanel mode="admin" owner="staff" ownerId={staff.id} /> : null}
 
-      {activeTab === "Attendance" ? <DetailPanel title="Attendance Summary">
-        <div className="mb-4 grid gap-3 sm:grid-cols-4">
-          <Detail label="Present" value={attendanceSummary.present} />
-          <Detail label="Absent" value={attendanceSummary.absent} />
-          <Detail label="Late" value={attendanceSummary.late} />
-          <Detail label="Leave" value={attendanceSummary.leave} />
+      {activeTab === "Attendance" ? <DetailPanel title="Attendance" description="Month-wise attendance for this staff member. Marking a date that already has a record updates it (correction), so mistakes can be fixed by re-marking the same date.">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Month</label>
+          <input type="month" value={attMonth} onChange={(e) => setAttMonth(e.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+          <span className="text-xs text-muted-foreground">{attendanceSummary.daysInMonth} days in month · {attendance.length} marked</span>
         </div>
-        <TinyTable empty="No recent attendance rows" columns={["Date", "Status", "Hours", "Notes"]} rows={attendance.slice(0, 10).map((row) => [row.attendance_date, row.status, row.worked_hours, row.notes])} />
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-5">
+          <Detail label="Present" value={attendanceSummary.present} />
+          <Detail label="Half day" value={attendanceSummary.halfDay} />
+          <Detail label="Leave" value={attendanceSummary.leave} />
+          <Detail label="Absent" value={attendanceSummary.absent} />
+          <Detail label="Not marked" value={attendanceSummary.notMarked} />
+        </div>
+
+        {attMessage ? <div className="mb-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">{attMessage}</div> : null}
+        {attError ? <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{attError}</div> : null}
+
+        <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-4">
+          <div className="text-sm font-semibold text-foreground">Mark / correct attendance</div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-5">
+            <input type="date" value={attForm.date} onChange={(e) => setAttForm((c) => ({ ...c, date: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <select value={attForm.status} onChange={(e) => setAttForm((c) => ({ ...c, status: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+              <option value="PRESENT">Present</option>
+              <option value="HALF_DAY">Half day</option>
+              <option value="ABSENT">Absent</option>
+              <option value="LEAVE">Leave</option>
+            </select>
+            <input type="number" step="0.5" min="0" placeholder="Worked hrs" value={attForm.worked_hours} onChange={(e) => setAttForm((c) => ({ ...c, worked_hours: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <input type="number" step="0.5" min="0" placeholder="OT hrs" value={attForm.overtime_hours} onChange={(e) => setAttForm((c) => ({ ...c, overtime_hours: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <input placeholder="Notes" value={attForm.notes} onChange={(e) => setAttForm((c) => ({ ...c, notes: e.target.value }))} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+          </div>
+          <button type="button" onClick={() => void submitAttendance()} disabled={attSaving} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
+            {attSaving ? "Saving…" : "Save attendance"}
+          </button>
+        </div>
+
+        <TinyTable empty="No attendance marked in this month" columns={["Date", "Status", "Worked hrs", "OT hrs", "Notes"]} rows={attendance.map((row) => [row.attendance_date, row.status, row.worked_hours, row.overtime_hours, row.notes])} />
         <Link href={ROUTES.admin.hrAttendance} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open Attendance page</Link>
+      </DetailPanel> : null}
+
+      {activeTab === "Attendance" ? <DetailPanel title="Leave Balance" description="Earned = annual allowance accrued month by month this year (EL: 18/year = 1.5/month). Available now = earned so far minus approved days taken. The staff member sees these same numbers on their own portal login.">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {leaveBalance.length === 0 ? <p className="text-sm text-muted-foreground">No active leave types configured.</p> : leaveBalance.map((row) => (
+            <div key={row.leave_type_id} className="rounded-2xl border border-border bg-muted/20 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.leave_type_name} ({row.leave_type_code})</span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${row.is_paid ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{row.is_paid ? "Paid" : "Unpaid"}</span>
+              </div>
+              <div className="mt-2 text-2xl font-semibold text-foreground">{row.available_now ?? "—"} <span className="text-sm font-normal text-muted-foreground">available now</span></div>
+              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <dt>Earned to date</dt><dd className="text-right font-semibold text-foreground">{row.earned_to_date ?? "—"}</dd>
+                <dt>Used (approved)</dt><dd className="text-right font-semibold text-foreground">{row.taken_this_year}</dd>
+                <dt>Pending approval</dt><dd className="text-right font-semibold text-foreground">{row.pending_approval}</dd>
+                <dt>Annual allowance</dt><dd className="text-right font-semibold text-foreground">{row.annual_allowance_days ?? "Unlimited"}</dd>
+                <dt>Left this year</dt><dd className="text-right font-semibold text-foreground">{row.remaining_this_year ?? "—"}</dd>
+              </dl>
+            </div>
+          ))}
+        </div>
       </DetailPanel> : null}
 
       {activeTab === "Attendance" ? <DetailPanel title="Leave & Expense Summary">
@@ -659,11 +923,66 @@ export default function AdminHrStaffProfilePage() {
         </div>
       </DetailPanel> : null}
 
-      {activeTab === "Payroll" ? <DetailPanel title="Payroll History">
+      {activeTab === "Payroll" ? <DetailPanel title="Payroll History" description="Move a draft salary sheet through Approve -> Post -> Pay. Pay can be recorded any day once the sheet is posted -- it does not have to wait for the staff member's salary pay day.">
+        {payrollError ? <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{payrollError}</div> : null}
         <div className="grid gap-4 xl:grid-cols-2">
-          <TinyTable empty="No salary sheets" columns={["Period", "Gross", "Net", "Status"]} rows={salarySheets.slice(0, 8).map((row) => [`${row.year}-${String(row.month).padStart(2, "0")}`, row.gross_amount, row.net_amount, row.status])} />
+          <TinyTable
+            empty="No salary sheets"
+            columns={["Period", "Gross", "Net", "Outstanding", "Status", "Actions"]}
+            rows={salarySheets.slice(0, 8).map((row) => [
+              `${row.year}-${String(row.month).padStart(2, "0")}`,
+              row.gross_amount,
+              row.net_amount,
+              row.outstanding_amount || row.net_amount,
+              <ERPStatusBadge key="status" status={row.status} />,
+              <div key="actions" className="flex flex-wrap gap-2">
+                {row.status === "DRAFT" ? (
+                  <button type="button" disabled={payrollSaving === row.id} className="rounded-md border border-border px-2 py-1 text-xs font-semibold disabled:opacity-60" onClick={() => void approveSheet(row.id)}>Approve</button>
+                ) : null}
+                {row.status === "APPROVED" ? (
+                  <button type="button" disabled={payrollSaving === row.id} className="rounded-md border border-border px-2 py-1 text-xs font-semibold disabled:opacity-60" onClick={() => void postSheet(row.id)}>Post Salary</button>
+                ) : null}
+                {(row.status === "POSTED" || row.status === "PAID_PARTIAL") ? (
+                  <button type="button" disabled={payrollSaving === row.id} className="rounded-md border border-emerald-500 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60" onClick={() => openPayForm(row)}>Pay</button>
+                ) : null}
+                {row.status === "PAID" ? <span className="text-xs text-muted-foreground">Fully paid</span> : null}
+              </div>,
+            ])}
+          />
           <TinyTable empty="No salary payments" columns={["Date", "Amount", "Account", "Reference"]} rows={salaryPayments.slice(0, 8).map((row) => [row.payment_date, row.amount, row.finance_account_name || "Unavailable", row.reference_no || "Unavailable"])} />
         </div>
+
+        {payForm ? (
+          <div className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
+            <div className="text-sm font-semibold text-emerald-900">Record salary payment</div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Payment date
+                <input type="date" className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.paymentDate} onChange={(event) => setPayForm({ ...payForm, paymentDate: event.target.value })} />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Amount
+                <input className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.amount} onChange={(event) => setPayForm({ ...payForm, amount: event.target.value })} />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Pay from account
+                <select className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.financeAccount} onChange={(event) => setPayForm({ ...payForm, financeAccount: event.target.value })}>
+                  <option value="">Select account</option>
+                  {financeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Reference (optional)
+                <input className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={payForm.referenceNo} onChange={(event) => setPayForm({ ...payForm, referenceNo: event.target.value })} />
+              </label>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <ActionButton variant="primary" loading={payrollSaving === payForm.salarySheetId} onClick={() => void submitPayment()}>Confirm Payment</ActionButton>
+              <ActionButton variant="ghost" onClick={() => setPayForm(null)}>Cancel</ActionButton>
+            </div>
+          </div>
+        ) : null}
+
         <Link href={ROUTES.admin.hrPayroll} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Open Payroll page</Link>
       </DetailPanel> : null}
 
@@ -674,6 +993,41 @@ export default function AdminHrStaffProfilePage() {
           <Detail label="Login enabled" value={identity ? (identity.login_enabled ? "Yes" : "No") : "Unavailable"} />
           <Detail label="Capability group" value="Staff role capability matrix is managed in role permissions." />
         </div>
+
+        {accessError ? <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{accessError}</div> : null}
+
+        {generatedPassword ? (
+          <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="font-semibold">New password (shown once -- copy it now, it cannot be retrieved again):</div>
+            <div className="mt-1 font-mono text-base">{generatedPassword}</div>
+            <ActionButton variant="ghost" onClick={() => setGeneratedPassword(null)}>Dismiss</ActionButton>
+          </div>
+        ) : null}
+
+        {!identity ? (
+          <div className="mt-4 rounded-xl border border-border bg-card p-4">
+            <div className="text-sm font-semibold text-foreground">Create staff portal login</div>
+            <p className="mt-1 text-xs text-muted-foreground">Creates a STAFF-role login tied to this employee profile.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Username
+                <input className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Email (optional)
+                <input className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none focus:border-primary" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} />
+              </label>
+            </div>
+            <div className="mt-3">
+              <ActionButton variant="primary" loading={accessSaving} onClick={() => void createLoginForStaff()}>Create Login</ActionButton>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ActionButton variant="ghost" loading={accessSaving} onClick={() => void toggleLoginEnabled()}>{identity.login_enabled ? "Disable Login" : "Enable Login"}</ActionButton>
+            <ActionButton variant="ghost" loading={accessSaving} onClick={() => void resetLoginPassword()}>Reset Password</ActionButton>
+          </div>
+        )}
       </DetailPanel> : null}
 
       {activeTab === "Timeline" ? (

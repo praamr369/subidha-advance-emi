@@ -328,6 +328,7 @@ class SalaryLineSourceType(models.TextChoices):
     COMPONENT = "COMPONENT", "Component"
     OVERTIME = "OVERTIME", "Overtime"
     LEAVE_DEDUCTION = "LEAVE_DEDUCTION", "Leave Deduction"
+    STAFF_ADVANCE_DEDUCTION = "STAFF_ADVANCE_DEDUCTION", "Staff Advance Deduction"
     MANUAL = "MANUAL", "Manual"
 
 
@@ -2287,6 +2288,12 @@ class EmployeeProfile(AccountingTimeStampedModel):
     attendance_policy = models.CharField(max_length=120, blank=True, default="")
     shift_name = models.CharField(max_length=120, blank=True, default="")
     salary_effective_from = models.DateField(null=True, blank=True)
+    salary_pay_day = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(28)],
+        help_text="Day of month salary is paid (1-28).",
+    )
     temporary_contract_end_date = models.DateField(null=True, blank=True)
     daily_wage_rate = models.DecimalField(
         max_digits=12,
@@ -2969,7 +2976,7 @@ class SalarySheetLine(AccountingTimeStampedModel):
         db_index=True,
     )
     source_type = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=SalaryLineSourceType.choices,
         default=SalaryLineSourceType.MANUAL,
         db_index=True,
@@ -3122,8 +3129,18 @@ class StaffAdvance(AccountingTimeStampedModel):
         if errors:
             raise ValidationError(errors)
 
+    # Fields the recovery workflow is expected to keep updating after
+    # disbursement (recording each recovery reduces the outstanding balance
+    # and advances the status). The immutability guard below protects the
+    # disbursement itself (amount, employee, posted_journal_entry, ...) --
+    # not these lifecycle-tracking fields.
+    RECOVERY_TRACKING_FIELDS = frozenset({"recovered_amount", "status", "updated_at"})
+
     def save(self, *args, **kwargs):
-        _posted_reference_guard(self, label="staff advance")
+        update_fields = kwargs.get("update_fields")
+        is_recovery_tracking_update = bool(update_fields) and set(update_fields) <= self.RECOVERY_TRACKING_FIELDS
+        if not is_recovery_tracking_update:
+            _posted_reference_guard(self, label="staff advance")
         self.reason = (self.reason or "").strip()
         self.reference_no = (self.reference_no or "").strip()
         self.notes = (self.notes or "").strip()
@@ -3131,11 +3148,27 @@ class StaffAdvance(AccountingTimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class StaffAdvanceRecoverySource(models.TextChoices):
+    CASH = "CASH", "Cash / Bank Recovery"
+    SALARY_DEDUCTION = "SALARY_DEDUCTION", "Salary Deduction"
+
+
 class StaffAdvanceRecovery(AccountingTimeStampedModel):
     staff_advance = models.ForeignKey(StaffAdvance, on_delete=models.PROTECT, related_name="recoveries")
     recovery_date = models.DateField(db_index=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
-    finance_account = models.ForeignKey(FinanceAccount, on_delete=models.PROTECT, related_name="staff_advance_recoveries")
+    recovery_source = models.CharField(
+        max_length=20,
+        choices=StaffAdvanceRecoverySource.choices,
+        default=StaffAdvanceRecoverySource.CASH,
+        db_index=True,
+    )
+    finance_account = models.ForeignKey(
+        FinanceAccount, on_delete=models.PROTECT, null=True, blank=True, related_name="staff_advance_recoveries"
+    )
+    salary_sheet = models.ForeignKey(
+        "accounting.SalarySheet", on_delete=models.PROTECT, null=True, blank=True, related_name="staff_advance_recoveries"
+    )
     reference_no = models.CharField(max_length=100, blank=True, default="", db_index=True)
     posted_journal_entry = models.OneToOneField(JournalEntry, on_delete=models.PROTECT, related_name="posted_staff_advance_recovery")
     recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="recorded_staff_advance_recoveries")
@@ -3144,13 +3177,24 @@ class StaffAdvanceRecovery(AccountingTimeStampedModel):
         db_table = "accounting_staff_advance_recoveries"
         ordering = ["-recovery_date", "-id"]
 
+    def clean(self):
+        errors = {}
+        if self.recovery_source == StaffAdvanceRecoverySource.CASH and not self.finance_account_id:
+            errors["finance_account"] = "Finance account is required for a cash/bank recovery."
+        if self.recovery_source == StaffAdvanceRecoverySource.SALARY_DEDUCTION and not self.salary_sheet_id:
+            errors["salary_sheet"] = "Salary sheet is required for a salary-deduction recovery."
+        if self.finance_account_id and self.salary_sheet_id:
+            errors["__all__"] = "A recovery is either a cash/bank recovery or a salary deduction, not both."
+        if errors:
+            raise ValidationError(errors)
+
     def save(self, *args, **kwargs):
         self.reference_no = (self.reference_no or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Salary Payment {self.id or 'new'}"
+        return f"Staff Advance Recovery {self.id or 'new'}"
 
 
 class EmployeeExpenseClaim(AccountingTimeStampedModel):

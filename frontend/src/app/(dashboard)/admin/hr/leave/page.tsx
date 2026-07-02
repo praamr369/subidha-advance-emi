@@ -8,18 +8,37 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
-import { listHrLeaveRequests, patchHrLeaveRequest, type HrLeaveRequest } from "@/services/admin-hr";
+import {
+  createHrLeaveRequest,
+  listHrLeaveRequests,
+  listHrLeaveTypes,
+  listHrStaff,
+  patchHrLeaveRequest,
+  type HrLeaveRequest,
+  type HrLeaveType,
+  type HrStaff,
+} from "@/services/admin-hr";
 
 export default function AdminHrLeaveRequestsPage() {
   const [rows, setRows] = useState<HrLeaveRequest[]>([]);
+  const [staff, setStaff] = useState<HrStaff[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<HrLeaveType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ employee: "", leave_type: "", start_date: "", end_date: "", reason: "" });
 
   async function load() {
     try {
       setLoading(true);
-      const payload = await listHrLeaveRequests();
+      const [payload, staffPayload, leaveTypePayload] = await Promise.all([
+        listHrLeaveRequests(),
+        listHrStaff(),
+        listHrLeaveTypes({ is_active: 1 }),
+      ]);
       setRows(payload.results);
+      setStaff(staffPayload.results);
+      setLeaveTypes(leaveTypePayload.results);
       setError(null);
     } catch (err: unknown) {
       setRows([]);
@@ -42,6 +61,30 @@ export default function AdminHrLeaveRequestsPage() {
     }
   }
 
+  async function createForStaff() {
+    if (!form.employee || !form.leave_type || !form.start_date) {
+      setError("Select staff, leave type, and a start date.");
+      return;
+    }
+    setCreating(true);
+    setError(null);
+    try {
+      await createHrLeaveRequest({
+        employee: Number(form.employee),
+        leave_type: Number(form.leave_type),
+        start_date: form.start_date,
+        end_date: form.end_date || undefined,
+        reason: form.reason || undefined,
+      });
+      setForm({ employee: "", leave_type: "", start_date: "", end_date: "", reason: "" });
+      await load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Unable to create leave request for staff.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <ERPPageShell
       eyebrow="Staff HR"
@@ -55,13 +98,35 @@ export default function AdminHrLeaveRequestsPage() {
       statusBadge={{ label: "Admin Only", tone: "info" }}
       stats={[
         { label: "Requests", value: loading ? "—" : rows.length, tone: "info" },
-        { label: "Pending", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "PENDING").length, tone: !loading && rows.filter(r => String(r.status).toUpperCase() === "PENDING").length > 0 ? "warning" : "success" },
+        { label: "Awaiting decision", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "DRAFT").length, tone: !loading && rows.filter(r => String(r.status).toUpperCase() === "DRAFT").length > 0 ? "warning" : "success" },
         { label: "Approved", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "APPROVED").length, tone: "success" },
         { label: "Rejected", value: loading ? "—" : rows.filter(r => String(r.status).toUpperCase() === "REJECTED").length, tone: "default" },
       ]}
     >
       {loading ? <ERPLoadingState label="Loading leave requests..." /> : null}
       {!loading && error ? <ERPErrorState title="Leave requests unavailable" description={error} onRetry={() => void load()} /> : null}
+
+      {!loading ? (
+        <ERPSectionShell title="Apply leave for staff" description="Raise a leave request directly on a staff member's behalf. It lands in the same draft state as staff self-service requests, so it still goes through Approve/Reject below.">
+          <div className="grid gap-3 md:grid-cols-5">
+            <select className="rounded-xl border px-3 py-2 text-sm" value={form.employee} onChange={(e) => setForm((c) => ({ ...c, employee: e.target.value }))}>
+              <option value="">Select staff</option>
+              {staff.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.employee_code})</option>)}
+            </select>
+            <select className="rounded-xl border px-3 py-2 text-sm" value={form.leave_type} onChange={(e) => setForm((c) => ({ ...c, leave_type: e.target.value }))}>
+              <option value="">Select leave type</option>
+              {leaveTypes.map((lt) => <option key={lt.id} value={lt.id}>{lt.name} ({lt.code})</option>)}
+            </select>
+            <input type="date" className="rounded-xl border px-3 py-2 text-sm" value={form.start_date} onChange={(e) => setForm((c) => ({ ...c, start_date: e.target.value }))} />
+            <input type="date" className="rounded-xl border px-3 py-2 text-sm" placeholder="End date (optional)" value={form.end_date} onChange={(e) => setForm((c) => ({ ...c, end_date: e.target.value }))} />
+            <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Reason" value={form.reason} onChange={(e) => setForm((c) => ({ ...c, reason: e.target.value }))} />
+          </div>
+          <button type="button" disabled={creating} className="mt-3 rounded-xl border px-3 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => void createForStaff()}>
+            {creating ? "Creating..." : "Apply leave for staff"}
+          </button>
+        </ERPSectionShell>
+      ) : null}
+
       {!loading && !error && rows.length === 0 ? (
         <ERPEmptyState title="No leave requests" description="Leave requests will appear once staff submits them through the leave module." />
       ) : null}

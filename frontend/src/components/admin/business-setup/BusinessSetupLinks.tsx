@@ -6,6 +6,7 @@ const links = [
   { href: ROUTES.admin.settingsBusinessSetup, label: "Business Setup" },
   { href: ROUTES.admin.settingsBusinessSetupProfile, label: "Business Profile" },
   { href: ROUTES.admin.settingsBusinessSetupPrintBranding, label: "Print & PDF Branding" },
+  { href: ROUTES.admin.settingsBusinessSetupEmailSmtp, label: "Email (SMTP / OTP)" },
   { href: ROUTES.admin.settingsBusinessSetupPublicSite, label: "Public Site" },
   { href: ROUTES.admin.settingsPolicies, label: "Policy Governance" },
   { href: ROUTES.admin.settingsBusinessCompliance, label: "Business Compliance" },

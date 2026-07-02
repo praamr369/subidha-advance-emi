@@ -9,6 +9,17 @@ import { approveHrStaffAdvance, createHrStaffAdvance, disburseHrStaffAdvance, li
 const today = () => new Date().toISOString().slice(0, 10);
 const message = (error: unknown) => error instanceof Error ? error.message : "Request failed.";
 
+function recoveryBreakdown(row: HrStaffAdvance) {
+  const recoveries = row.recoveries || [];
+  if (recoveries.length === 0) return null;
+  const cash = recoveries.filter((r) => r.recovery_source === "CASH").reduce((sum, r) => sum + Number(r.amount), 0);
+  const salary = recoveries.filter((r) => r.recovery_source === "SALARY_DEDUCTION").reduce((sum, r) => sum + Number(r.amount), 0);
+  const parts = [];
+  if (cash > 0) parts.push(`₹${cash.toFixed(2)} cash`);
+  if (salary > 0) parts.push(`₹${salary.toFixed(2)} salary`);
+  return parts.join(" + ");
+}
+
 export default function StaffAdvancesPage() {
   const [rows, setRows] = useState<HrStaffAdvance[]>([]);
   const [staff, setStaff] = useState<HrStaff[]>([]);
@@ -47,7 +58,7 @@ export default function StaffAdvancesPage() {
       </section>
       <section className="rounded-xl border bg-card p-4">
         <div className="mb-3 flex items-center gap-3"><h2 className="font-semibold">Advance register</h2><select className="ml-auto rounded-lg border px-3 py-2 text-sm" value={account} onChange={(e) => setAccount(e.target.value)}><option value="">Settlement account</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></div>
-        <div className="overflow-auto"><table className="min-w-[1000px] w-full text-sm"><thead><tr className="text-left"><th>Staff</th><th>Date</th><th>Amount</th><th>Recovered</th><th>Outstanding</th><th>Status</th><th>Journal</th><th>Actions</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-t"><td className="py-3">{row.employee_code} · {row.employee_name}<div className="text-xs text-muted-foreground">{row.reason}</div></td><td>{row.request_date}</td><td>₹{row.amount}</td><td>₹{row.recovered_amount}</td><td>₹{row.outstanding_amount}</td><td>{row.status}</td><td>{row.journal_entry_no || "Pending"}</td><td><div className="flex gap-2">{row.status === "DRAFT" ? <button className="rounded border px-2 py-1" onClick={() => void run(() => approveHrStaffAdvance(row.id), "Advance approved.")}>Approve</button> : null}{row.status === "APPROVED" ? <button className="rounded border px-2 py-1" disabled={!account} onClick={() => void run(() => disburseHrStaffAdvance(row.id, { finance_account: Number(account), disbursement_date: today() }), "Advance disbursed and journal posted.")}>Disburse</button> : null}{["DISBURSED", "PARTIALLY_RECOVERED"].includes(row.status) ? <><input className="w-24 rounded border px-2 py-1" placeholder="Recover" value={recovery[row.id] || ""} onChange={(e) => setRecovery({ ...recovery, [row.id]: e.target.value })} /><button className="rounded border px-2 py-1" disabled={!account || !recovery[row.id]} onClick={() => void run(() => recoverHrStaffAdvance(row.id, { finance_account: Number(account), recovery_date: today(), amount: recovery[row.id] }), "Recovery posted.")}>Recover</button></> : null}</div></td></tr>)}</tbody></table></div>
+        <div className="overflow-auto"><table className="min-w-[1000px] w-full text-sm"><thead><tr className="text-left"><th>Staff</th><th>Date</th><th>Amount</th><th>Recovered</th><th>Outstanding</th><th>Status</th><th>Journal</th><th>Actions</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="border-t"><td className="py-3">{row.employee_code} · {row.employee_name}<div className="text-xs text-muted-foreground">{row.reason}</div></td><td>{row.request_date}</td><td>₹{row.amount}</td><td>₹{row.recovered_amount}{recoveryBreakdown(row) ? <div className="text-xs text-muted-foreground">{recoveryBreakdown(row)}</div> : null}</td><td>₹{row.outstanding_amount}</td><td>{row.status}</td><td>{row.journal_entry_no || "Pending"}</td><td><div className="flex gap-2">{row.status === "DRAFT" ? <button className="rounded border px-2 py-1" onClick={() => void run(() => approveHrStaffAdvance(row.id), "Advance approved.")}>Approve</button> : null}{row.status === "APPROVED" ? <button className="rounded border px-2 py-1" disabled={!account} onClick={() => void run(() => disburseHrStaffAdvance(row.id, { finance_account: Number(account), disbursement_date: today() }), "Advance disbursed and journal posted.")}>Disburse</button> : null}{["DISBURSED", "PARTIALLY_RECOVERED"].includes(row.status) ? <><input className="w-24 rounded border px-2 py-1" placeholder="Recover" value={recovery[row.id] || ""} onChange={(e) => setRecovery({ ...recovery, [row.id]: e.target.value })} /><button className="rounded border px-2 py-1" disabled={!account || !recovery[row.id]} onClick={() => void run(() => recoverHrStaffAdvance(row.id, { finance_account: Number(account), recovery_date: today(), amount: recovery[row.id] }), "Recovery posted.")}>Recover (cash)</button></> : null}</div><div className="mt-1 text-xs text-muted-foreground">Salary-deduction recoveries apply automatically when a posted salary sheet includes a Staff Advance Recovery line.</div></td></tr>)}</tbody></table></div>
       </section>
     </div>
   </ERPPageShell>;

@@ -135,6 +135,10 @@ class AdminStaffLoginToggleSerializer(serializers.Serializer):
     login_enabled = serializers.BooleanField()
 
 
+class AdminStaffPasswordResetSerializer(serializers.Serializer):
+    temporary_password = serializers.CharField(required=False, allow_blank=True, write_only=True, min_length=8)
+
+
 class StaffProfilePayloadSerializer(serializers.Serializer):
     user = serializers.DictField()
     profile = serializers.DictField()
