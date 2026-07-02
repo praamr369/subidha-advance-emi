@@ -47,7 +47,7 @@ type FormState = {
   notes: string;
 };
 
-const PAYMENT_METHOD_OPTIONS: FormState["payment_method"][] = ["CASH", "UPI", "BANK", "CARD"];
+const PAYMENT_METHOD_OPTIONS: FormState["payment_method"][] = ["CASH", "UPI", "CARD"];
 
 function formatMoney(value?: string | number | null): string {
   const numeric = Number(value ?? 0);
@@ -213,6 +213,11 @@ export default function AdminDirectSaleCollectForm({
 
   const availableFinanceAccounts = useMemo(() => {
     const methodFiltered = financeAccounts.filter((account) => {
+      // Combined "UPI / Bank" method: most businesses run one UPI-linked bank
+      // account, so both kinds must be selectable.
+      if (form.payment_method === "UPI" || form.payment_method === "BANK") {
+        return account.kind === "UPI" || account.kind === "BANK";
+      }
       if (form.payment_method === "CARD") return account.kind === "BANK";
       return account.kind === form.payment_method;
     });
@@ -646,7 +651,7 @@ export default function AdminDirectSaleCollectForm({
               >
                 {PAYMENT_METHOD_OPTIONS.map((method) => (
                   <option key={method} value={method}>
-                    {method === "BANK" ? "Bank Transfer" : method}
+                    {method === "UPI" ? "UPI / Bank" : method === "BANK" ? "Bank Transfer" : method}
                   </option>
                 ))}
               </select>

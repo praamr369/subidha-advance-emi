@@ -67,8 +67,7 @@ type FormState = {
 
 const PAYMENT_METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
   { value: "CASH", label: "Cash" },
-  { value: "UPI", label: "UPI" },
-  { value: "BANK", label: "Bank Transfer" },
+  { value: "UPI", label: "UPI / Bank" },
   { value: "CARD", label: "Card" },
 ];
 
@@ -344,11 +343,18 @@ export default function AdminPaymentCollectPage({
     : counters;
   const availableFinanceAccounts = useMemo(
     () =>
-      financeAccounts.filter((account) =>
-        form.payment_method === "CARD"
-          ? account.kind === "BANK"
-          : account.kind === form.payment_method
-      ),
+      financeAccounts.filter((account) => {
+        // The combined "UPI / Bank" method must offer both account kinds --
+        // most businesses run a single UPI-linked bank account, so limiting
+        // UPI to kind === "UPI" left the dropdown empty.
+        if (form.payment_method === "UPI" || form.payment_method === "BANK") {
+          return account.kind === "UPI" || account.kind === "BANK";
+        }
+        if (form.payment_method === "CARD") {
+          return account.kind === "BANK";
+        }
+        return account.kind === form.payment_method;
+      }),
     [financeAccounts, form.payment_method]
   );
   const selectableFinanceAccounts = useMemo(

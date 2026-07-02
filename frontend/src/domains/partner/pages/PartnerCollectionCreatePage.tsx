@@ -43,8 +43,7 @@ const PAYMENT_METHOD_OPTIONS: Array<{
   label: string;
 }> = [
   { value: "CASH", label: "Cash" },
-  { value: "UPI", label: "UPI" },
-  { value: "BANK", label: "Bank Transfer" },
+  { value: "UPI", label: "UPI / Bank" },
 ];
 
 function getTodayDateInputValue(): string {
