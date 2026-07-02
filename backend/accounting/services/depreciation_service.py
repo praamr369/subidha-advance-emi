@@ -66,8 +66,12 @@ def calculate_asset_depreciation(asset: Asset) -> Decimal:
 
 @transaction.atomic
 def run_depreciation(*, run_id: int, performed_by):
+    # created_by is nullable, so select_related() on it produces a LEFT OUTER
+    # JOIN; Postgres rejects SELECT ... FOR UPDATE on the nullable side of an
+    # outer join. select_for_update(of=("self",)) limits the row lock to the
+    # DepreciationRun table itself, which is all that's needed here.
     depreciation_run = (
-        DepreciationRun.objects.select_for_update()
+        DepreciationRun.objects.select_for_update(of=("self",))
         .select_related("created_by")
         .prefetch_related("lines")
         .get(pk=run_id)
