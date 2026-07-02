@@ -51,12 +51,30 @@ def build_turnover_summary(*, start_date: date | None = None, end_date: date | N
         ).aggregate(total=Sum("collected_amount"))["total"]
     )
 
+    # DirectSale has no source_reference field (the original filter crashed
+    # the endpoint with a FieldError). Service turnover is identified by
+    # sales whose notes or line descriptions mark them as SERVICE work.
+    from django.db.models import Q
+
     service_turnover = _money(
         DirectSale.objects.filter(
             sale_date__gte=start,
             sale_date__lte=end,
-            source_reference__icontains="SERVICE",
-        ).aggregate(total=Sum("grand_total"))["total"]
+        )
+        .filter(
+            Q(notes__icontains="SERVICE") | Q(lines__description__icontains="SERVICE")
+        )
+        .exclude(
+            status__in=[
+                "CANCELLED",
+                "CANCELLED_PRE_INVOICE",
+                "CANCELLED_AFTER_DELIVERY",
+                "REVERSED_POST_INVOICE",
+                "ARCHIVED",
+            ]
+        )
+        .distinct()
+        .aggregate(total=Sum("grand_total"))["total"]
     )
 
     supplier_gst_as_cost = _money(

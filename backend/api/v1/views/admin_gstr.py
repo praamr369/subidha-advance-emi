@@ -70,20 +70,24 @@ def _build_gstr_data(date_from: date | None, date_to: date | None) -> dict:
     )
 
     # ── DirectSale lines ────────────────────────────────────────────────────
+    # DirectSale carries sale_no/sale_date and snapshot fields -- the previous
+    # field names (invoice_no/invoice_date/customer_name/...) do not exist on
+    # the model and crashed this report with a FieldError.
     ds_lines = (
         DirectSaleLine.objects.filter(
             direct_sale__status__in={"CONFIRMED", "DELIVERED", "INVOICED"},
-            direct_sale__invoice_date__gte=df,
-            direct_sale__invoice_date__lte=dt,
+            direct_sale__sale_date__gte=df,
+            direct_sale__sale_date__lte=dt,
+            direct_sale__tax_mode="GST",
         )
         .select_related("direct_sale")
         .values(
-            "direct_sale__invoice_no",
-            "direct_sale__invoice_date",
-            "direct_sale__customer_name",
+            "direct_sale__sale_no",
+            "direct_sale__sale_date",
+            "direct_sale__customer_name_snapshot",
             "direct_sale__customer_gstin",
-            "direct_sale__place_of_supply",
-            "product_name",
+            "direct_sale__customer_snapshot_place_of_supply",
+            "description",
             "hsn_sac_code",
             "gst_rate",
             "taxable_value",
@@ -114,12 +118,12 @@ def _build_gstr_data(date_from: date | None, date_to: date | None) -> dict:
 
     def _norm_ds(r: dict) -> dict:
         return {
-            "doc_no": r["direct_sale__invoice_no"] or "",
-            "doc_date": str(r["direct_sale__invoice_date"]),
-            "customer_name": r["direct_sale__customer_name"] or "",
+            "doc_no": r["direct_sale__sale_no"] or "",
+            "doc_date": str(r["direct_sale__sale_date"]),
+            "customer_name": r["direct_sale__customer_name_snapshot"] or "",
             "customer_gstin": (r["direct_sale__customer_gstin"] or "").upper(),
-            "pos": r["direct_sale__place_of_supply"] or "",
-            "description": r["product_name"] or "",
+            "pos": r["direct_sale__customer_snapshot_place_of_supply"] or "",
+            "description": r["description"] or "",
             "hsn": (r["hsn_sac_code"] or "").upper(),
             "gst_rate": _money(r["gst_rate"]),
             "taxable_value": _money(r["taxable_value"]),

@@ -18,7 +18,7 @@ class LeadSerializer(serializers.ModelSerializer):
     assigned_to_full_name = serializers.SerializerMethodField()
     converted_customer_name = serializers.CharField(source="converted_customer.name", read_only=True, default=None)
     product_name = serializers.CharField(source="interested_product.name", read_only=True, default=None)
-    public_lead_id = serializers.IntegerField(source="public_lead_id", read_only=True, default=None)
+    public_lead_id = serializers.IntegerField(read_only=True, default=None)
 
     class Meta:
         model = Lead
