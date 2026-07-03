@@ -42,6 +42,7 @@ media/
 staticfiles/
 
 # Django local settings or secrets
+reset-live-state.env
 backend/.env
 backend/.env.*
 !backend/.env.production.template
