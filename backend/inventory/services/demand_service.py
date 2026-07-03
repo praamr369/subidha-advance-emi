@@ -149,7 +149,9 @@ def get_purchase_suggestions(*, product_ids: Optional[list[int]] = None) -> list
 
     suggestions = []
 
-    for item in qs:
+    from inventory.services.stock_service import attach_bulk_stock_quantities
+
+    for item in attach_bulk_stock_quantities(qs):
         physical = item.current_stock_quantity()
         reserved = item.reserved_qty()
         available = item.available_qty()

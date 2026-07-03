@@ -102,16 +102,24 @@ def _legacy_code_for_financial_year(financial_year: FinancialYear) -> str:
 
 
 def _active_financial_year() -> FinancialYear:
-    financial_year = FinancialYear.objects.filter(is_active=True).order_by("-start_date", "-id").first()
+    from accounting.services.period_service import get_active_financial_year
+
+    financial_year = get_active_financial_year()
     if financial_year is None:
         raise DocumentNumberingSetupError("No active financial year is configured. Activate a financial year before issuing documents.")
     return financial_year
 
 
 def resolve_financial_year_for_document_date(document_date: date) -> FinancialYear:
+    # Bridge/reconciliation surfaces call this once per candidate row, so use
+    # the short-lived FY/period memo instead of two queries per row.
+    from accounting.services.period_service import list_financial_years_cached
+
     day = document_date or timezone.localdate()
     active = _active_financial_year()
-    resolved = FinancialYear.objects.filter(start_date__lte=day, end_date__gte=day).order_by("-is_active", "-start_date", "-id").first()
+    candidates = [row for row in list_financial_years_cached() if row.start_date <= day <= row.end_date]
+    candidates.sort(key=lambda row: (row.is_active, row.start_date, row.id or 0), reverse=True)
+    resolved = candidates[0] if candidates else None
     if resolved is None:
         raise DocumentNumberingSetupError("Document date is outside every configured financial year.")
     if resolved.pk != active.pk:
@@ -120,7 +128,12 @@ def resolve_financial_year_for_document_date(document_date: date) -> FinancialYe
 
 
 def current_period_for_date(document_date: date) -> AccountingPeriod | None:
-    return AccountingPeriod.objects.filter(start_date__lte=document_date, end_date__gte=document_date).order_by("start_date", "id").first()
+    from accounting.services.period_service import list_periods_cached
+
+    return next(
+        (row for row in list_periods_cached() if row.start_date <= document_date <= row.end_date),
+        None,
+    )
 
 
 def render_document_number(

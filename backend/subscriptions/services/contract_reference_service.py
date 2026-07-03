@@ -490,7 +490,10 @@ def _advance_emi_position(subscription: Subscription) -> dict[str, object]:
     rows = []
     overdue_amount = MONEY_ZERO
     today = timezone.localdate()
-    for emi in subscription.emis.order_by("due_date", "month_no", "id"):
+    # prefetch ledger_entries so balance_amount() uses the in-memory fast path
+    # instead of two FinancialLedger aggregates per EMI (30 queries per
+    # subscription in receivables search).
+    for emi in subscription.emis.order_by("due_date", "month_no", "id").prefetch_related("ledger_entries"):
         status = str(emi.status or "").upper()
         if status in {EmiStatus.PAID, EmiStatus.WAIVED}:
             continue

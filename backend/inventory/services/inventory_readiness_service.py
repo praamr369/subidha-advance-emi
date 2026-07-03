@@ -286,7 +286,9 @@ def get_inventory_readiness_snapshot() -> dict[str, Any]:
     over_reserved = 0
     products_without_stock: list[dict[str, Any]] = []
     low_stock_items: list[dict[str, Any]] = []
-    for item in active_stock_items.select_related("product").iterator(chunk_size=500):
+    from inventory.services.stock_service import attach_bulk_stock_quantities
+
+    for item in attach_bulk_stock_quantities(active_stock_items.select_related("product")):
         physical = item.current_stock_quantity()
         reserved = item.reserved_qty()
         available = item.available_qty()

@@ -128,7 +128,20 @@ class AdminWaiverClassificationMatrixView(_AdminPolicyBase):
 
 class AdminPolicyPageListCreateView(_AdminPolicyBase):
     def get(self, request):
-        queryset = PolicyPage.objects.all().order_by("slug", "-version", "-id")
+        queryset = (
+            PolicyPage.objects.all()
+            .select_related(
+                "created_by",
+                "updated_by",
+                "published_by",
+                "governance_metadata__owner",
+                "governance_metadata__reviewer",
+                "governance_metadata__approved_by",
+                "governance_metadata__archived_by",
+                "governance_metadata__internal_accepted_by",
+            )
+            .order_by("slug", "-version", "-id")
+        )
 
         slug = (request.query_params.get("slug") or "").strip().lower()
         status_value = (request.query_params.get("status") or "").strip().upper()

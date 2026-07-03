@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time as _time
 from calendar import month_name, monthrange
 from datetime import date
 
@@ -9,6 +10,53 @@ from django.utils import timezone
 from accounting.models import AccountingPeriod, AccountingPeriodStatus, FinancialYear, PostingLock
 from subscriptions.models import AuditLog
 from subscriptions.services.audit_service import log_audit
+
+# Short-lived in-process memo for the active FY and its periods. Analytics
+# surfaces (bridge reconciliation, year-end readiness) resolve the period for
+# hundreds of rows in one request; without this each row costs two queries.
+# FY/period rows only change on explicit admin actions, which invalidate the
+# memo below, so a few seconds of staleness is safe.
+_PERIOD_MEMO_TTL_SECONDS = 5.0
+_period_memo: dict[str, tuple[float, object]] = {}
+
+
+def _memo_get(key: str):
+    entry = _period_memo.get(key)
+    if entry is None:
+        return None
+    stored_at, value = entry
+    if _time.monotonic() - stored_at > _PERIOD_MEMO_TTL_SECONDS:
+        _period_memo.pop(key, None)
+        return None
+    return value
+
+
+def _memo_set(key: str, value) -> None:
+    _period_memo[key] = (_time.monotonic(), value)
+
+
+def invalidate_period_memo() -> None:
+    _period_memo.clear()
+
+
+def list_financial_years_cached() -> list[FinancialYear]:
+    """All financial years, newest first, memoized for a few seconds."""
+    rows = _memo_get("all_fys")
+    if rows is None:
+        rows = list(FinancialYear.objects.order_by("-start_date", "-id"))
+        _memo_set("all_fys", rows)
+    return rows
+
+
+def list_periods_cached() -> list[AccountingPeriod]:
+    """All accounting periods in start-date order, memoized for a few seconds."""
+    rows = _memo_get("all_periods")
+    if rows is None:
+        rows = list(
+            AccountingPeriod.objects.select_related("financial_year").order_by("start_date", "id")
+        )
+        _memo_set("all_periods", rows)
+    return rows
 
 
 def financial_year_bounds(reference_date: date) -> tuple[date, date]:
@@ -25,7 +73,13 @@ def financial_year_code(reference_date: date) -> str:
 
 
 def get_active_financial_year() -> FinancialYear | None:
-    return FinancialYear.objects.filter(is_active=True).order_by("-start_date", "-id").first()
+    cached = _memo_get("active_fy")
+    if cached is not None:
+        return cached
+    financial_year = FinancialYear.objects.filter(is_active=True).order_by("-start_date", "-id").first()
+    if financial_year is not None:
+        _memo_set("active_fy", financial_year)
+    return financial_year
 
 
 @transaction.atomic
@@ -40,6 +94,7 @@ def activate_financial_year(financial_year_id: int, performed_by) -> FinancialYe
     financial_year.activated_at = timezone.now()
     financial_year.activated_by = performed_by
     financial_year.save(update_fields=["is_active", "activated_at", "activated_by", "updated_at"])
+    invalidate_period_memo()
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=financial_year,
@@ -91,6 +146,7 @@ def generate_monthly_periods(financial_year_id: int, performed_by) -> dict:
         periods.append(period)
         current = _next_month_start(current)
 
+    invalidate_period_memo()
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=financial_year,
@@ -139,6 +195,7 @@ def generate_current_period(*, reference_date: date | None = None, performed_by=
         end_date=period_end,
         status=AccountingPeriodStatus.OPEN,
     )
+    invalidate_period_memo()
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
         instance=period,
@@ -163,15 +220,18 @@ def resolve_accounting_period(posting_date: date) -> AccountingPeriod:
         raise ValueError(
             f"Posting date {posting_date.isoformat()} is outside active financial year {financial_year.code}."
         )
-    period = (
-        AccountingPeriod.objects.select_related("financial_year", "locked_by")
-        .filter(
-            financial_year=financial_year,
-            start_date__lte=posting_date,
-            end_date__gte=posting_date,
+    memo_key = f"fy_periods:{financial_year.pk}"
+    periods = _memo_get(memo_key)
+    if periods is None:
+        periods = list(
+            AccountingPeriod.objects.select_related("financial_year", "locked_by")
+            .filter(financial_year=financial_year)
+            .order_by("start_date", "id")
         )
-        .order_by("start_date", "id")
-        .first()
+        _memo_set(memo_key, periods)
+    period = next(
+        (row for row in periods if row.start_date <= posting_date <= row.end_date),
+        None,
     )
     if period is None:
         raise ValueError(f"No accounting period is configured for posting date {posting_date.isoformat()}.")
@@ -288,6 +348,7 @@ def set_accounting_period_status(
             "updated_at",
         ]
     )
+    invalidate_period_memo()
 
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,

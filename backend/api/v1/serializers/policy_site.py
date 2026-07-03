@@ -133,7 +133,20 @@ class PolicyPageAdminSerializer(serializers.ModelSerializer):
         )
 
     def _meta(self, obj: PolicyPage):
-        return hydrate_policy_governance_metadata(obj)
+        # ~26 SerializerMethodFields call this per policy row; without a
+        # per-instance cache the list endpoint ran a get_or_create query for
+        # every field of every policy (1000+ queries for ~39 policies).
+        cached = getattr(obj, "_governance_metadata_cache", None)
+        if cached is None:
+            from django.core.exceptions import ObjectDoesNotExist
+
+            try:
+                # zero queries when the view select_related the relation
+                cached = obj.governance_metadata
+            except ObjectDoesNotExist:
+                cached = hydrate_policy_governance_metadata(obj)
+            obj._governance_metadata_cache = cached
+        return cached
 
     def get_visibility(self, obj: PolicyPage) -> str:
         return self._meta(obj).visibility

@@ -326,6 +326,9 @@ class InventoryItem(InventoryTimeStampedModel):
 
     def current_stock_quantity(self) -> Decimal:
         """Physical stock: excludes soft-hold (reservation) entries."""
+        cached = getattr(self, "_physical_stock_cache", None)
+        if cached is not None:
+            return cached
         aggregate = self.stock_ledger.exclude(
             movement_type__in=list(SOFT_HOLD_MOVEMENT_TYPES)
         ).aggregate(
@@ -341,6 +344,9 @@ class InventoryItem(InventoryTimeStampedModel):
         Quantity currently soft-reserved via SALE_RESERVE minus SALE_RELEASE.
         This represents committed stock not yet physically consumed.
         """
+        cached = getattr(self, "_reserved_stock_cache", None)
+        if cached is not None:
+            return cached
         aggregate = self.stock_ledger.filter(
             movement_type__in=[
                 StockMovementType.SALE_RESERVE,

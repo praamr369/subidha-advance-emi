@@ -38,6 +38,59 @@ def _quantity(value) -> Decimal:
     return Decimal(str(value or "0")).quantize(Decimal("0.001"))
 
 
+def attach_bulk_stock_quantities(items) -> list[InventoryItem]:
+    """
+    Precompute physical and reserved stock for many InventoryItems in two
+    grouped queries and attach them as per-instance caches, so subsequent
+    calls to current_stock_quantity()/reserved_qty()/available_qty() are free.
+
+    Dashboards and readiness reports that loop over every item were issuing
+    two SUM queries per item (500+ queries for ~250 items); this collapses
+    that to two queries total while reusing the exact same aggregation
+    semantics as the model methods.
+    """
+    rows = list(items)
+    if not rows:
+        return rows
+    item_ids = [item.id for item in rows]
+
+    zero = Decimal("0")
+    physical_map: dict[int, tuple[Decimal, Decimal]] = {}
+    for agg in (
+        StockLedger.objects.filter(inventory_item_id__in=item_ids)
+        .exclude(movement_type__in=list(SOFT_HOLD_MOVEMENT_TYPES))
+        .values("inventory_item_id")
+        .annotate(total_in=Sum("quantity_in"), total_out=Sum("quantity_out"))
+    ):
+        physical_map[agg["inventory_item_id"]] = (
+            Decimal(str(agg["total_in"] or zero)),
+            Decimal(str(agg["total_out"] or zero)),
+        )
+
+    reserved_map: dict[int, tuple[Decimal, Decimal]] = {}
+    for agg in (
+        StockLedger.objects.filter(
+            inventory_item_id__in=item_ids,
+            movement_type__in=[StockMovementType.SALE_RESERVE, StockMovementType.SALE_RELEASE],
+        )
+        .values("inventory_item_id")
+        .annotate(reserved_in=Sum("quantity_in"), reserved_out=Sum("quantity_out"))
+    ):
+        reserved_map[agg["inventory_item_id"]] = (
+            Decimal(str(agg["reserved_in"] or zero)),
+            Decimal(str(agg["reserved_out"] or zero)),
+        )
+
+    for item in rows:
+        total_in, total_out = physical_map.get(item.id, (zero, zero))
+        item._physical_stock_cache = (
+            total_in - total_out + Decimal(str(item.opening_stock_qty or zero))
+        )
+        reserved_in, reserved_out = reserved_map.get(item.id, (zero, zero))
+        item._reserved_stock_cache = max(zero, reserved_in - reserved_out)
+    return rows
+
+
 def _money(value) -> Decimal:
     return Decimal(str(value or "0.00")).quantize(Decimal("0.01"))
 

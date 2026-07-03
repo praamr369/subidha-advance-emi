@@ -146,9 +146,11 @@ def build_admin_erp_summary() -> dict:
 
     def _inventory_alert_candidates(query_slice):
         """Safe ERP inventory counts using actual InventoryItem APIs (no guessed math)."""
+        from inventory.services.stock_service import attach_bulk_stock_quantities
+
         low: list[InventoryItem] = []
         out: list[InventoryItem] = []
-        for item in query_slice:
+        for item in attach_bulk_stock_quantities(query_slice):
             if not item.stock_tracking_enabled:
                 continue
             try:
