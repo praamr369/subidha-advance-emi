@@ -49,6 +49,150 @@ def _next_draw_date_for_batch(today: date, draw_day: int) -> date:
     return date(today.year, today.month + 1, draw_day)
 
 
+def _chart_balance(system_code: str) -> str:
+    from django.db.models import Sum
+    from accounting.models import JournalEntryLine, JournalEntryStatus
+
+    row = JournalEntryLine.objects.filter(
+        chart_account__system_code=system_code,
+        journal_entry__status=JournalEntryStatus.POSTED,
+    ).aggregate(debit=Sum("debit_amount"), credit=Sum("credit_amount"))
+    return _money((row["debit"] or 0) - (row["credit"] or 0))
+
+
+def _build_module_kpis(today: date) -> dict:
+    """
+    One cheap KPI block per business module so the admin dashboard can show
+    the whole business from a single API call (cached with the dashboard).
+    Every number here is a COUNT or SUM the database can answer directly.
+    """
+    from django.db.models import Q as _Q, Sum
+    from accounting.models import (
+        EmployeeExpenseClaim,
+        EmployeeProfile,
+        ExpenseClaimStatus,
+        LeaveRequest,
+        LeaveRequestStatus,
+        SalarySheet,
+        SalarySheetStatus,
+        StaffAdvance,
+        StaffAdvanceStatus,
+    )
+    from billing.models import DirectSale
+    from crm.models import FollowUpTask, FollowUpTaskStatus, Lead, LeadStage, Opportunity, OpportunityStage
+    from inventory.models import (
+        GoodsReceipt,
+        GoodsReceiptStatus,
+        PurchaseOrder,
+        PurchaseOrderStatus,
+        VendorBill,
+        VendorBillStatus,
+    )
+    from service_desk.models import ServiceDeskCase
+    from service_desk.support_ticket_models import SupportTicket, SupportTicketStatus
+    from subscriptions.models import (
+        RentLeaseBillingDemand,
+        RentLeaseDemandStatus,
+        RentLeaseDemandType,
+        SubscriptionStatus,
+    )
+    from subscriptions.models import PlanType as _PlanType
+    from subscriptions.models import Subscription as _Subscription
+
+    month_start = today.replace(day=1)
+    cancelled_sale_statuses = [
+        "CANCELLED",
+        "CANCELLED_PRE_INVOICE",
+        "CANCELLED_AFTER_DELIVERY",
+        "REVERSED_POST_INVOICE",
+        "RETURNED",
+        "ARCHIVED",
+        "EXCHANGED_CLOSED",
+    ]
+    live_sales = DirectSale.objects.exclude(status__in=cancelled_sale_statuses)
+    today_sales = live_sales.filter(sale_date=today).aggregate(total=Sum("grand_total"), n=Count("id"))
+    month_sales = live_sales.filter(sale_date__gte=month_start, sale_date__lte=today).aggregate(
+        total=Sum("grand_total"), n=Count("id")
+    )
+    sales_outstanding = live_sales.filter(balance_total__gt=0).aggregate(
+        total=Sum("balance_total"), n=Count("id")
+    )
+
+    rent_lease_active = (
+        _Subscription.objects.filter(
+            plan_type__in=[_PlanType.RENT, _PlanType.LEASE],
+            status=SubscriptionStatus.ACTIVE,
+        )
+        .values("plan_type")
+        .annotate(n=Count("id"))
+    )
+    rent_lease_counts = {row["plan_type"]: row["n"] for row in rent_lease_active}
+    deposits_held = RentLeaseBillingDemand.objects.filter(
+        demand_type=RentLeaseDemandType.SECURITY_DEPOSIT
+    ).aggregate(total=Sum("held_amount"))["total"]
+    demands_open = RentLeaseBillingDemand.objects.filter(
+        demand_type__in=[RentLeaseDemandType.RENT_MONTHLY, RentLeaseDemandType.LEASE_MONTHLY],
+        status__in=[RentLeaseDemandStatus.PENDING, RentLeaseDemandStatus.PARTIAL, RentLeaseDemandStatus.OVERDUE],
+    ).aggregate(total=Sum("amount"), n=Count("id"))
+
+    return {
+        "treasury": {
+            "cash_in_hand": _chart_balance("CASH_COLLECTION"),
+            "bank_balance": _chart_balance("BANK_COLLECTION"),
+        },
+        "sales": {
+            "today_count": int(today_sales["n"] or 0),
+            "today_amount": _money(today_sales["total"]),
+            "month_count": int(month_sales["n"] or 0),
+            "month_amount": _money(month_sales["total"]),
+            "outstanding_count": int(sales_outstanding["n"] or 0),
+            "outstanding_amount": _money(sales_outstanding["total"]),
+        },
+        "rent_lease": {
+            "active_rent": int(rent_lease_counts.get(_PlanType.RENT, 0)),
+            "active_lease": int(rent_lease_counts.get(_PlanType.LEASE, 0)),
+            "deposits_held": _money(deposits_held),
+            "open_demand_count": int(demands_open["n"] or 0),
+            "open_demand_amount": _money(demands_open["total"]),
+        },
+        "purchasing": {
+            "open_purchase_orders": PurchaseOrder.objects.filter(
+                status__in=[PurchaseOrderStatus.DRAFT, PurchaseOrderStatus.SENT, PurchaseOrderStatus.PARTIALLY_RECEIVED]
+            ).count(),
+            "draft_goods_receipts": GoodsReceipt.objects.filter(status=GoodsReceiptStatus.DRAFT).count(),
+            "draft_vendor_bills": VendorBill.objects.filter(status=VendorBillStatus.DRAFT).count(),
+        },
+        "hr": {
+            "active_staff": EmployeeProfile.objects.filter(is_active=True).count(),
+            "pending_leave_requests": LeaveRequest.objects.filter(status=LeaveRequestStatus.DRAFT).count(),
+            "open_expense_claims": EmployeeExpenseClaim.objects.exclude(
+                status__in=[ExpenseClaimStatus.PAID, ExpenseClaimStatus.REJECTED]
+            ).count(),
+            "unpaid_salary_sheets": SalarySheet.objects.filter(
+                status__in=[SalarySheetStatus.DRAFT, SalarySheetStatus.APPROVED, SalarySheetStatus.POSTED, SalarySheetStatus.PAID_PARTIAL]
+            ).count(),
+            "outstanding_staff_advances": StaffAdvance.objects.filter(
+                status__in=[StaffAdvanceStatus.DISBURSED, StaffAdvanceStatus.PARTIALLY_RECOVERED]
+            ).count(),
+        },
+        "crm": {
+            "open_leads": Lead.objects.exclude(stage__in=[LeadStage.CONVERTED, LeadStage.LOST]).count(),
+            "open_opportunities": Opportunity.objects.filter(stage=OpportunityStage.OPEN).count(),
+            "follow_ups_due": FollowUpTask.objects.filter(
+                status=FollowUpTaskStatus.OPEN, due_at__lte=timezone.now()
+            ).count(),
+        },
+        "support": {
+            "open_tickets": SupportTicket.objects.exclude(
+                status__in=[SupportTicketStatus.RESOLVED, SupportTicketStatus.CLOSED, SupportTicketStatus.REJECTED]
+            ).count(),
+            "open_delivery_cases": ServiceDeskCase.objects.filter(
+                status__in=["OPEN", "UNDER_REVIEW", "AUTHORIZED", "IN_SERVICE"]
+            ).count(),
+        },
+    }
+
+
 def build_admin_dashboard(*, actor_user=None):
 
     # ------------------------------
@@ -333,6 +477,11 @@ def build_admin_dashboard(*, actor_user=None):
 
         # 🏦 System Health
         "financial_health": financial_health,
+
+        # 🧩 All-module KPI block (treasury, sales, rent/lease, purchasing,
+        # HR, CRM, support) so the dashboard covers every module from this
+        # single cached payload.
+        "modules": _build_module_kpis(today),
     }
 
     # ------------------------------

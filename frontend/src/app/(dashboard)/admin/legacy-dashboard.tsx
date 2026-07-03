@@ -237,6 +237,57 @@ function DashboardKpiCard({
   );
 }
 
+function ModuleSummaryCard({
+  title,
+  href,
+  icon,
+  rows,
+  alert = false,
+}: {
+  title: string;
+  href: string;
+  icon: ReactNode;
+  rows: Array<{ label: string; value: string; emphasize?: boolean }>;
+  alert?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group flex flex-col rounded-[1.4rem] border p-4 shadow-[0_14px_36px_-30px_rgba(15,23,42,0.5)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_45px_-32px_rgba(15,23,42,0.6)] ${
+        alert
+          ? "border-amber-300/70 bg-amber-50/60 dark:bg-amber-500/10"
+          : "border-border bg-card"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <div className="rounded-lg border border-border bg-card p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+            {icon}
+          </div>
+          <div className="text-sm font-semibold text-foreground">{title}</div>
+        </div>
+        <ArrowRight className="h-4 w-4 opacity-40 transition group-hover:translate-x-0.5 group-hover:opacity-80" />
+      </div>
+      <dl className="mt-3 space-y-1.5">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-baseline justify-between gap-3 text-sm">
+            <dt className="text-muted-foreground">{row.label}</dt>
+            <dd
+              className={
+                row.emphasize
+                  ? "font-semibold text-amber-700 dark:text-amber-400"
+                  : "font-semibold text-foreground"
+              }
+            >
+              {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Link>
+  );
+}
+
 function HorizontalBar({
   label,
   value,
@@ -1011,6 +1062,179 @@ export default function AdminDashboardPage() {
 
         {!loading && !error && legacy && summary ? (
           <>
+            {legacy.modules ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <DashboardKpiCard
+                  label="Cash in hand"
+                  value={money(legacy.modules.treasury.cash_in_hand)}
+                  detail="Live balance of the cash ledger from posted journals."
+                  href={ROUTES.admin.finance}
+                  tone="success"
+                  icon={<Wallet className="h-5 w-5 text-emerald-700" />}
+                />
+                <DashboardKpiCard
+                  label="Bank / UPI balance"
+                  value={money(legacy.modules.treasury.bank_balance)}
+                  detail="Live balance of the bank ledger from posted journals."
+                  href={ROUTES.admin.finance}
+                  tone="info"
+                  icon={<CreditCard className="h-5 w-5 text-sky-700" />}
+                />
+                <DashboardKpiCard
+                  label="Sales this month"
+                  value={money(legacy.modules.sales.month_amount)}
+                  detail={`${legacy.modules.sales.month_count} sale(s) this month · ${legacy.modules.sales.today_count} today (${money(legacy.modules.sales.today_amount)})`}
+                  href={ROUTES.admin.billingDirectSales}
+                  tone="info"
+                  icon={<ShoppingCart className="h-5 w-5 text-indigo-700" />}
+                />
+                <DashboardKpiCard
+                  label="Sale dues outstanding"
+                  value={money(legacy.modules.sales.outstanding_amount)}
+                  detail={`${legacy.modules.sales.outstanding_count} direct sale(s) carry an unpaid balance.`}
+                  href={ROUTES.admin.billingDirectSales}
+                  tone={legacy.modules.sales.outstanding_count > 0 ? "warning" : "success"}
+                  icon={<CircleDollarSign className="h-5 w-5 text-amber-700" />}
+                />
+              </div>
+            ) : null}
+
+            {legacy.modules ? (
+              <WorkspaceSection
+                title="All modules at a glance"
+                description="Live counters from every business module. Click any card to open that module's workspace."
+              >
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <ModuleSummaryCard
+                    title="Lucky Plan / EMI"
+                    href={ROUTES.admin.subscriptions}
+                    icon={<BadgeCheck className="h-4 w-4 text-sky-700" />}
+                    alert={legacy.emi.overdue > 0}
+                    rows={[
+                      { label: "Active subscriptions", value: String(legacy.subscriptions.active) },
+                      { label: "Pending EMIs", value: String(legacy.emi.pending) },
+                      { label: "Overdue EMIs", value: String(legacy.emi.overdue), emphasize: legacy.emi.overdue > 0 },
+                    ]}
+                  />
+                  <ModuleSummaryCard
+                    title="Rent & Lease"
+                    href={ROUTES.admin.rentLease}
+                    icon={<Building2 className="h-4 w-4 text-violet-700" />}
+                    alert={legacy.modules.rent_lease.open_demand_count > 0}
+                    rows={[
+                      {
+                        label: "Active contracts",
+                        value: `${legacy.modules.rent_lease.active_rent} rent · ${legacy.modules.rent_lease.active_lease} lease`,
+                      },
+                      { label: "Deposits held", value: money(legacy.modules.rent_lease.deposits_held) },
+                      {
+                        label: "Open demands",
+                        value: `${legacy.modules.rent_lease.open_demand_count} (${money(legacy.modules.rent_lease.open_demand_amount)})`,
+                        emphasize: legacy.modules.rent_lease.open_demand_count > 0,
+                      },
+                    ]}
+                  />
+                  <ModuleSummaryCard
+                    title="Inventory & Purchasing"
+                    href={ROUTES.admin.inventory}
+                    icon={<PackageSearch className="h-4 w-4 text-slate-700" />}
+                    alert={
+                      legacy.modules.purchasing.draft_goods_receipts +
+                        legacy.modules.purchasing.draft_vendor_bills >
+                      0
+                    }
+                    rows={[
+                      { label: "Open purchase orders", value: String(legacy.modules.purchasing.open_purchase_orders) },
+                      { label: "Draft goods receipts", value: String(legacy.modules.purchasing.draft_goods_receipts) },
+                      { label: "Draft vendor bills", value: String(legacy.modules.purchasing.draft_vendor_bills) },
+                    ]}
+                  />
+                  <ModuleSummaryCard
+                    title="HR & Payroll"
+                    href={ROUTES.admin.hrStaff}
+                    icon={<Users className="h-4 w-4 text-emerald-700" />}
+                    alert={
+                      legacy.modules.hr.pending_leave_requests + legacy.modules.hr.unpaid_salary_sheets > 0
+                    }
+                    rows={[
+                      { label: "Active staff", value: String(legacy.modules.hr.active_staff) },
+                      {
+                        label: "Pending leave / claims",
+                        value: `${legacy.modules.hr.pending_leave_requests} / ${legacy.modules.hr.open_expense_claims}`,
+                        emphasize: legacy.modules.hr.pending_leave_requests > 0,
+                      },
+                      {
+                        label: "Unpaid salaries / advances",
+                        value: `${legacy.modules.hr.unpaid_salary_sheets} / ${legacy.modules.hr.outstanding_staff_advances}`,
+                        emphasize: legacy.modules.hr.unpaid_salary_sheets > 0,
+                      },
+                    ]}
+                  />
+                  <ModuleSummaryCard
+                    title="CRM Pipeline"
+                    href={ROUTES.admin.crm}
+                    icon={<BarChart3 className="h-4 w-4 text-indigo-700" />}
+                    alert={legacy.modules.crm_modules.follow_ups_due > 0}
+                    rows={[
+                      { label: "Open leads", value: String(legacy.modules.crm_modules.open_leads) },
+                      { label: "Open opportunities", value: String(legacy.modules.crm_modules.open_opportunities) },
+                      {
+                        label: "Follow-ups due",
+                        value: String(legacy.modules.crm_modules.follow_ups_due),
+                        emphasize: legacy.modules.crm_modules.follow_ups_due > 0,
+                      },
+                    ]}
+                  />
+                  <ModuleSummaryCard
+                    title="Support & Service"
+                    href={ROUTES.admin.serviceDeskTickets}
+                    icon={<ShieldAlert className="h-4 w-4 text-rose-700" />}
+                    alert={legacy.modules.support.open_tickets > 0}
+                    rows={[
+                      {
+                        label: "Open support tickets",
+                        value: String(legacy.modules.support.open_tickets),
+                        emphasize: legacy.modules.support.open_tickets > 0,
+                      },
+                      { label: "Delivery cases in progress", value: String(legacy.modules.support.open_delivery_cases) },
+                    ]}
+                  />
+                  <ModuleSummaryCard
+                    title="Batches & Draws"
+                    href={ROUTES.admin.batches}
+                    icon={<CalendarClock className="h-4 w-4 text-amber-700" />}
+                    rows={[
+                      { label: "Live batches", value: String(legacy.batches.live_batches ?? legacy.batches.total_batches) },
+                      { label: "Draws completed", value: String(legacy.batches.total_draws) },
+                      {
+                        label: "Next draw",
+                        value: legacy.batches.next_draw_batch
+                          ? legacy.batches.next_draw_batch.days_until_draw != null
+                            ? `${legacy.batches.next_draw_batch.batch_code} · in ${legacy.batches.next_draw_batch.days_until_draw}d`
+                            : legacy.batches.next_draw_batch.batch_code
+                          : "—",
+                      },
+                    ]}
+                  />
+                  <ModuleSummaryCard
+                    title="Commissions"
+                    href={ROUTES.admin.financeCommissions}
+                    icon={<Percent className="h-4 w-4 text-teal-700" />}
+                    alert={(legacy.commission_summary?.pending_count ?? 0) > 0}
+                    rows={[
+                      {
+                        label: "Pending payout",
+                        value: money(legacy.commission_summary?.pending_commission ?? "0.00"),
+                        emphasize: (legacy.commission_summary?.pending_count ?? 0) > 0,
+                      },
+                      { label: "Settled", value: money(legacy.commission_summary?.settled_commission ?? "0.00") },
+                      { label: "Entries", value: String(legacy.commission_summary?.total_count ?? 0) },
+                    ]}
+                  />
+                </div>
+              </WorkspaceSection>
+            ) : null}
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <DashboardKpiCard
                 label="Collections (Window scope)"

@@ -115,6 +115,47 @@ export type AdminDashboardResponse = {
     lucky_number?: number | null;
     is_reversed?: boolean;
   }>;
+  modules?: AdminDashboardModules;
+};
+
+export type AdminDashboardModules = {
+  treasury: { cash_in_hand: string; bank_balance: string };
+  sales: {
+    today_count: number;
+    today_amount: string;
+    month_count: number;
+    month_amount: string;
+    outstanding_count: number;
+    outstanding_amount: string;
+  };
+  rent_lease: {
+    active_rent: number;
+    active_lease: number;
+    deposits_held: string;
+    open_demand_count: number;
+    open_demand_amount: string;
+  };
+  purchasing: {
+    open_purchase_orders: number;
+    draft_goods_receipts: number;
+    draft_vendor_bills: number;
+  };
+  hr: {
+    active_staff: number;
+    pending_leave_requests: number;
+    open_expense_claims: number;
+    unpaid_salary_sheets: number;
+    outstanding_staff_advances: number;
+  };
+  crm_modules: {
+    open_leads: number;
+    open_opportunities: number;
+    follow_ups_due: number;
+  };
+  support: {
+    open_tickets: number;
+    open_delivery_cases: number;
+  };
 };
 
 type AdminDashboardPayload = {
@@ -179,6 +220,15 @@ type AdminDashboardPayload = {
   };
   financial_health?: Record<string, unknown>;
   recent_activity?: unknown[];
+  modules?: {
+    treasury?: Record<string, unknown>;
+    sales?: Record<string, unknown>;
+    rent_lease?: Record<string, unknown>;
+    purchasing?: Record<string, unknown>;
+    hr?: Record<string, unknown>;
+    crm?: Record<string, unknown>;
+    support?: Record<string, unknown>;
+  };
 };
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -343,10 +393,66 @@ function normalizeDueSubscriptions(
   });
 }
 
+function normalizeModules(
+  payload: AdminDashboardPayload["modules"]
+): AdminDashboardModules | undefined {
+  if (!payload) return undefined;
+  const treasury = payload.treasury ?? {};
+  const sales = payload.sales ?? {};
+  const rentLease = payload.rent_lease ?? {};
+  const purchasing = payload.purchasing ?? {};
+  const hr = payload.hr ?? {};
+  const crm = payload.crm ?? {};
+  const support = payload.support ?? {};
+  return {
+    treasury: {
+      cash_in_hand: toMoneyString(treasury.cash_in_hand),
+      bank_balance: toMoneyString(treasury.bank_balance),
+    },
+    sales: {
+      today_count: toNumber(sales.today_count),
+      today_amount: toMoneyString(sales.today_amount),
+      month_count: toNumber(sales.month_count),
+      month_amount: toMoneyString(sales.month_amount),
+      outstanding_count: toNumber(sales.outstanding_count),
+      outstanding_amount: toMoneyString(sales.outstanding_amount),
+    },
+    rent_lease: {
+      active_rent: toNumber(rentLease.active_rent),
+      active_lease: toNumber(rentLease.active_lease),
+      deposits_held: toMoneyString(rentLease.deposits_held),
+      open_demand_count: toNumber(rentLease.open_demand_count),
+      open_demand_amount: toMoneyString(rentLease.open_demand_amount),
+    },
+    purchasing: {
+      open_purchase_orders: toNumber(purchasing.open_purchase_orders),
+      draft_goods_receipts: toNumber(purchasing.draft_goods_receipts),
+      draft_vendor_bills: toNumber(purchasing.draft_vendor_bills),
+    },
+    hr: {
+      active_staff: toNumber(hr.active_staff),
+      pending_leave_requests: toNumber(hr.pending_leave_requests),
+      open_expense_claims: toNumber(hr.open_expense_claims),
+      unpaid_salary_sheets: toNumber(hr.unpaid_salary_sheets),
+      outstanding_staff_advances: toNumber(hr.outstanding_staff_advances),
+    },
+    crm_modules: {
+      open_leads: toNumber(crm.open_leads),
+      open_opportunities: toNumber(crm.open_opportunities),
+      follow_ups_due: toNumber(crm.follow_ups_due),
+    },
+    support: {
+      open_tickets: toNumber(support.open_tickets),
+      open_delivery_cases: toNumber(support.open_delivery_cases),
+    },
+  };
+}
+
 export async function getAdminDashboard(): Promise<AdminDashboardResponse> {
   const dashboard = await apiFetch<AdminDashboardPayload>("/admin/dashboard/");
 
   return {
+    modules: normalizeModules(dashboard.modules),
     summary: normalizeSummary(dashboard.summary),
     winner_surface: normalizeWinnerSurface(dashboard.winner_surface),
     reconciliation: normalizeReconciliation(dashboard.reconciliation),
