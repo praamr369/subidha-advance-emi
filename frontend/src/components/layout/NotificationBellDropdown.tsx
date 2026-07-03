@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+import { subscribeRealtime } from "@/lib/realtime";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { NavigationRole } from "@/config/navigation";
@@ -127,6 +129,18 @@ export default function NotificationBellDropdown({ role }: { role: NavigationRol
     // overlapping open/retry request and prevents stale response races.
     staleTime: 0,
   });
+
+  // Live updates: the shared SSE stream pushes the unread count as it
+  // changes, so the badge updates without waiting for the next REST fetch.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    return subscribeRealtime({
+      onNotifications: ({ unread_count }) => {
+        queryClient.setQueryData(unreadQueryKey, unread_count);
+        void queryClient.invalidateQueries({ queryKey: listQueryKey });
+      },
+    });
+  }, [isAuthenticated, queryClient, unreadQueryKey, listQueryKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

@@ -85,7 +85,7 @@ import {
 import { useAuth } from "@/providers/AuthProvider";
 import { pushRecent, readFavorites, readRecents, toggleFavorite } from "@/lib/workspace-prefs";
 import { cn } from "@/lib/utils";
-import { getAdminNavigationBadges } from "@/services/navigation-badges";
+import { subscribeRealtime } from "@/lib/realtime";
 
 const CommandPalette = dynamic(
   () => import("@/components/workflows/CommandPalette"),
@@ -621,30 +621,20 @@ function SidebarContent({
 
   useEffect(() => {
     if (role !== "ADMIN") return;
-    let cancelled = false;
-    const loadBadges = async () => {
-      try {
-        const payload = await getAdminNavigationBadges();
-        if (cancelled) return;
+    // Live badge updates over the shared SSE stream. The server pushes the
+    // full badge payload immediately on connect and again whenever it
+    // changes, so no initial REST fetch is needed; the stream falls back to
+    // reconnect-with-backoff on its own if the connection drops.
+    return subscribeRealtime({
+      onBadges: (payload) => {
         setQueueBadges(
           Object.entries(payload).reduce<Record<string, number>>((acc, [key, value]) => {
             acc[`admin.badges.${key}`] = Number(value || 0);
             return acc;
           }, {})
         );
-      } catch {
-        if (!cancelled) setQueueBadges({});
-      }
-    };
-    // Navigation badges are useful context, but they must not contend with the
-    // route's primary data during the first render.
-    const timeoutId = window.setTimeout(() => {
-      void loadBadges();
-    }, 750);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-    };
+      },
+    });
   }, [role]);
 
   useEffect(() => {

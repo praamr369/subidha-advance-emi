@@ -5,6 +5,7 @@ from brochures.urls import public_urlpatterns as brochure_public_urlpatterns
 from brochures.urls import public_quotation_urlpatterns
 
 from api.v1.views.health import PublicApiDeepHealthView, PublicApiHealthView
+from api.v1.views.realtime import RealtimeTicketView, realtime_stream
 from api.v1.views.admin_payment_collection import IdempotentAdminPaymentCollectView
 from api.v1.views.accounting_bridge_reconciliation import (
     AccountingBridgeBatchPostView,
@@ -41,6 +42,8 @@ from smart_fields.views import (
 urlpatterns = [
     path("health/", PublicApiHealthView.as_view()),
     path("health/deep/", PublicApiDeepHealthView.as_view()),
+    path("realtime/ticket/", RealtimeTicketView.as_view()),
+    path("realtime/stream/", realtime_stream),
     path("auth/", include("api.v1.routes.auth")),
     path("admin/payments/collect/", IdempotentAdminPaymentCollectView.as_view()),
     path("admin/products/register/", AdminProductRegisterView.as_view()),

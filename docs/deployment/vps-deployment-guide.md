@@ -98,8 +98,14 @@ cd /srv/subidha-core/backend
 set -a
 . /etc/subidha-core/backend.env
 set +a
-gunicorn core.wsgi:application --bind 127.0.0.1:8000 --workers 3 --timeout 120
+gunicorn core.wsgi:application --bind 127.0.0.1:8000 --workers 3 --worker-class gthread --threads 16 --timeout 120
 ```
+
+Note: `--worker-class gthread --threads 16` is required. The realtime SSE
+stream (`/api/v1/realtime/stream/`, used by the notification bell and admin
+navigation badges) holds a connection open for ~50 seconds per browser tab;
+with default sync workers a handful of open dashboards would occupy every
+worker and block the entire API.
 
 ## 6) Frontend Deployment Commands
 
@@ -133,7 +139,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/srv/subidha-core/backend
 EnvironmentFile=/etc/subidha-core/backend.env
-ExecStart=/srv/subidha-core/backend/.venv/bin/gunicorn core.wsgi:application --bind 127.0.0.1:8000 --workers 3 --timeout 120
+ExecStart=/srv/subidha-core/backend/.venv/bin/gunicorn core.wsgi:application --bind 127.0.0.1:8000 --workers 3 --worker-class gthread --threads 16 --timeout 120
 Restart=always
 RestartSec=5
 
