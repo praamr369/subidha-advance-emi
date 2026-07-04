@@ -55,14 +55,12 @@ come from the configured business profile — nothing is hardcoded or invented.
 
 ## Needs owner / manual action
 
-- **Product category landing pages** (`/products/beds`, `/sofas`, `/wardrobes`,
-  `/dining-tables`, `/mattresses`, `/appliances`): the live catalogue at `/products`
-  already filters by category client-side, and category names come from the
-  database (admin-managed). Hardcoding six category routes risks mismatching the
-  real category values. **Decision needed:** either (a) standardise DB category
-  names to these six and generate category routes from the public product API, or
-  (b) keep the single `/products` page with category filters. Until decided, these
-  routes are intentionally not created to avoid empty/mismatched pages.
+- **Product category landing pages** — **RESOLVED in SEO-2.** Six static
+  category pages (`/products/beds`, `/sofas`, `/wardrobes`, `/dining-tables`,
+  `/mattresses`, `/appliances`) now exist, built on the existing public products
+  API with term-based category matching and safe empty states. No migration. See
+  `docs/seo/product-category-seo.md`. A future SEO-3 could add admin-managed
+  category slugs and public product-detail pages.
 - **Google Business Profile**: see `docs/seo/google-business-profile-checklist.md`.
 - **Local citations / directories**: see `docs/seo/local-citation-checklist.md`.
 - **Business profile content**: ensure the admin → Business Setup → Public Site
