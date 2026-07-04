@@ -1,5 +1,9 @@
 from django.urls import path
 
+from api.v1.views.catalog import (
+    PartnerCatalogFacetsView,
+    PartnerCatalogListView,
+)
 from api.v1.views.partner_kyc import (
     PartnerSelfKycAuditTrailView,
     PartnerSelfKycDocumentDownloadView,
@@ -76,4 +80,7 @@ urlpatterns = [
     path("kyc/documents/upload/", PartnerSelfKycDocumentListUploadView.as_view()),
     path("kyc/documents/<int:doc_id>/download/", PartnerSelfKycDocumentDownloadView.as_view()),
     path("kyc/audit-trail/", PartnerSelfKycAuditTrailView.as_view()),
+    # Approved product catalog — browse to raise a request for a customer
+    path("catalog/", PartnerCatalogListView.as_view()),
+    path("catalog/facets/", PartnerCatalogFacetsView.as_view()),
 ]

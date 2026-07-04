@@ -66,6 +66,7 @@ type RoleRouteNamespace = Record<string, string>;
 type PartnerRoutes = {
   root: string;
   dashboard: string;
+  catalog: string;
   customers: string;
   subscriptions: string;
   subscriptionRequests: string;
@@ -80,6 +81,7 @@ type PartnerRoutes = {
 type CustomerRoutes = {
   root: string;
   dashboard: string;
+  catalog: string;
   subscriptions: string;
   contractAmendments: string;
   payments: string;
@@ -104,6 +106,7 @@ type CashierRoutes = {
 type VendorRoutes = {
   root: string;
   dashboard: string;
+  catalog: string;
   quotes: string;
   orders: string;
   ledger: string;
@@ -139,6 +142,7 @@ const roleRouteNamespaces = ROUTES as unknown as RoleRouteNamespaces;
 const PARTNER_ROUTES = buildRouteNamespace<PartnerRoutes>(roleRouteNamespaces.partner, {
   root: "/partner",
   dashboard: "/partner",
+  catalog: "/partner/catalog",
   customers: "/partner/customers",
   subscriptions: "/partner/subscriptions",
   subscriptionRequests: "/partner/subscription-requests",
@@ -153,6 +157,7 @@ const PARTNER_ROUTES = buildRouteNamespace<PartnerRoutes>(roleRouteNamespaces.pa
 const CUSTOMER_ROUTES = buildRouteNamespace<CustomerRoutes>(roleRouteNamespaces.customer, {
   root: "/customer",
   dashboard: "/customer/dashboard",
+  catalog: "/customer/catalog",
   subscriptions: "/customer/subscriptions",
   contractAmendments: "/customer/contract-amendments",
   payments: "/customer/payments",
@@ -177,6 +182,7 @@ const CASHIER_ROUTES = buildRouteNamespace<CashierRoutes>(roleRouteNamespaces.ca
 const VENDOR_ROUTES = buildRouteNamespace<VendorRoutes>(roleRouteNamespaces.vendor, {
   root: "/vendor",
   dashboard: "/vendor",
+  catalog: "/vendor/catalog",
   quotes: "/vendor/quotes",
   orders: "/vendor/orders",
   ledger: "/vendor/ledger",
@@ -254,6 +260,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
   ADMIN: ADMIN_PARENT_NAVIGATION,
   PARTNER: [
     { title: "Dashboard", icon: "dashboard", items: [{ label: "Dashboard", href: PARTNER_ROUTES.dashboard, icon: "dashboard" }] },
+    { title: "Product Catalog", icon: "products", items: [{ label: "Product Catalog", href: PARTNER_ROUTES.catalog, icon: "products" }] },
     { title: "My Customers", icon: "customers", items: [{ label: "My Customers", href: PARTNER_ROUTES.customers, icon: "customers" }] },
     { title: "Contract Amendments", icon: "subscriptions", items: [{ label: "Customer amendment requests", href: PARTNER_ROUTES.contractAmendments, icon: "subscriptions" }] },
     { title: "Leads", icon: "leads", items: [{ label: "Leads", href: PARTNER_ROUTES.subscriptionRequests, icon: "leads" }] },
@@ -265,6 +272,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
   ],
   CUSTOMER: [
     { title: "Dashboard", icon: "home", items: [{ label: "Dashboard", href: CUSTOMER_ROUTES.dashboard, icon: "home" }] },
+    { title: "Product Catalog", icon: "products", items: [{ label: "Product Catalog", href: CUSTOMER_ROUTES.catalog, icon: "products" }] },
     {
       title: "My Contracts",
       icon: "subscriptions",
@@ -312,6 +320,7 @@ export const groupedNavigationByRole: Record<NavigationRole, NavGroup[]> = {
   ],
   VENDOR: [
     { title: "Dashboard", items: [{ label: "Dashboard", href: VENDOR_ROUTES.dashboard, icon: "dashboard", description: "Vendor operational dashboard." }] },
+    { title: "Business Catalog", items: [{ label: "Business Catalog", href: VENDOR_ROUTES.catalog, icon: "products", description: "Product categories the business sources from vendors." }] },
     { title: "Quote Requests", items: [{ label: "Quote Requests", href: VENDOR_ROUTES.quotes, icon: "billing", description: "Quote requests and submissions." }] },
     { title: "Purchase Orders", items: [{ label: "Purchase Orders", href: VENDOR_ROUTES.orders, icon: "procurement", description: "Purchase order visibility." }] },
     { title: "Ledger", items: [{ label: "Ledger", href: VENDOR_ROUTES.ledger, icon: "accounting", description: "Vendor ledger entries." }] },
