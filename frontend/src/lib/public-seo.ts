@@ -150,3 +150,36 @@ export function buildBreadcrumbJsonLd(items: Array<{ name: string; path?: string
     })),
   };
 }
+
+/**
+ * FAQPage JSON-LD. Only pass FAQs that are also rendered visibly on the page —
+ * Google requires FAQ structured data to match on-page content.
+ */
+export function buildFaqJsonLd(faqs: ReadonlyArray<{ question: string; answer: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: { "@type": "Answer", text: faq.answer },
+    })),
+  };
+}
+
+/**
+ * ItemList JSON-LD for a category landing page. Pass only public-visible items;
+ * never include internal cost/stock/accounting fields.
+ */
+export function buildItemListJsonLd(items: ReadonlyArray<{ name: string; path: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      url: absolutePublicUrl(item.path),
+    })),
+  };
+}

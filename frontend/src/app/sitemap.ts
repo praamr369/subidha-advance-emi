@@ -9,6 +9,9 @@ const MONTHLY = "monthly" as const;
 // Static public pages with their crawl priority
 const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] }> = [
   { path: "/", priority: 1.0, changeFrequency: DAILY },
+  { path: "/furniture-store-asansol", priority: 0.95, changeFrequency: WEEKLY },
+  { path: "/lucky-plan-emi-furniture-asansol", priority: 0.95, changeFrequency: WEEKLY },
+  { path: "/delivery-asansol", priority: 0.85, changeFrequency: MONTHLY },
   { path: "/products", priority: 0.9, changeFrequency: DAILY },
   { path: "/lucky-plan", priority: 0.9, changeFrequency: WEEKLY },
   { path: "/about", priority: 0.8, changeFrequency: MONTHLY },
