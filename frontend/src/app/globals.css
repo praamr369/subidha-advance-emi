@@ -2145,3 +2145,79 @@ button {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
+
+/* ============================================================
+   Immersive landing (cinematic, scroll + pointer reactive).
+   Real 3D depth via CSS transforms driven by JS custom props.
+   All motion is progressive enhancement and respects
+   prefers-reduced-motion.
+   ============================================================ */
+.imx-scene {
+  perspective: 1400px;
+  perspective-origin: 50% 40%;
+  transform-style: preserve-3d;
+}
+.imx-layer {
+  will-change: transform;
+  transform: translate3d(
+      calc(var(--imx-mx, 0) * var(--imx-depth, 0) * 1px),
+      calc((var(--imx-my, 0) * var(--imx-depth, 0) + var(--imx-scroll, 0) * var(--imx-drift, 0)) * 1px),
+      0
+    )
+    rotateX(calc(var(--imx-my, 0) * var(--imx-tilt, 0) * -1deg))
+    rotateY(calc(var(--imx-mx, 0) * var(--imx-tilt, 0) * 1deg));
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.imx-reveal {
+  opacity: 0;
+  transform: translate3d(0, 34px, 0) scale(0.98);
+  transition: opacity 720ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 720ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--imx-delay, 0ms);
+}
+.imx-reveal.imx-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+.imx-sweep {
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    color-mix(in oklab, var(--primary) 26%, transparent) 48%,
+    transparent 62%
+  );
+  background-size: 280% 280%;
+  animation: imx-sweep 7.5s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+@keyframes imx-sweep {
+  0% { background-position: 120% 0%; }
+  50% { background-position: -20% 100%; }
+  100% { background-position: 120% 0%; }
+}
+.imx-float { animation: imx-float 6s ease-in-out infinite; }
+@keyframes imx-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -10px, 0); }
+}
+.imx-cue span { animation: imx-cue 1.8s ease-in-out infinite; }
+@keyframes imx-cue {
+  0%, 100% { transform: translateY(0); opacity: 0.4; }
+  50% { transform: translateY(7px); opacity: 1; }
+}
+.imx-progress-fill {
+  transform-origin: top;
+  transform: scaleY(var(--imx-progress, 0));
+  transition: transform 120ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .imx-layer,
+  .imx-reveal {
+    transform: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+  }
+  .imx-sweep,
+  .imx-float,
+  .imx-cue span { animation: none !important; }
+}

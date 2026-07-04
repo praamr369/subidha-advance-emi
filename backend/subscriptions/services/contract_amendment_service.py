@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from subscriptions.models import AuditLog, ContractAmendment, Customer, PlanType, Product, Subscription, SubscriptionStatus
+from subscriptions.models import AuditLog, BatchStatus, ContractAmendment, Customer, EmiStatus, PlanType, Product, Subscription, SubscriptionStatus
 from subscriptions.models_contract_amendment import PHASE1_AMENDMENT_TYPES
 from subscriptions.services.audit_service import log_audit
 
@@ -36,6 +36,55 @@ _PRODUCT_CHANGE_TERMINAL_STATUSES = {
     "TERMINATED",
     "REVERSED",
 }
+
+# Lucky advance-EMI draw integrity: once a batch enters the cryptographic draw
+# pipeline its eligibility snapshot is frozen and hash-chained — contract data
+# (product, lucky ID, batch, tenure, amounts) referenced by those frozen rows
+# must never change afterwards. Waivers are likewise irreversible winner
+# outcomes derived from the draw.
+_LUCKY_SEALED_BATCH_STATUSES = {
+    BatchStatus.READY_TO_LOCK,
+    BatchStatus.LOCKED,
+    BatchStatus.DRAW_IN_PROGRESS,
+    BatchStatus.DRAW_COMMITTED,
+    BatchStatus.DRAW_COMPLETED,
+    BatchStatus.COMPLETED,
+    BatchStatus.CLOSED,
+}
+
+
+def lucky_plan_amendment_block_reason(source: Subscription | None) -> str:
+    """Return why amendments are sealed for a lucky advance-EMI contract, or ''.
+
+    Business rule: amendments and product changes are allowed only BEFORE the
+    batch draw and BEFORE any waiver. After the draw (or once the batch is
+    locked for its cryptographic eligibility snapshot) the contract is sealed.
+    Applies only to EMI-plan subscriptions that participate in a lucky batch;
+    rent/lease contracts and direct sales are governed by their own rules.
+    """
+    if source is None or source.plan_type != PlanType.EMI or not source.batch_id:
+        return ""
+    batch = source.batch
+    if batch is not None:
+        if batch.status in _LUCKY_SEALED_BATCH_STATUSES:
+            return (
+                f"Lucky plan contract is sealed: batch '{batch.batch_code}' is in draw stage "
+                f"'{batch.status}'. Amendments and product changes are only allowed before the "
+                "batch is locked for its draw."
+            )
+        if batch.locked_at is not None or batch.lucky_draws.exists():
+            return (
+                f"Lucky plan contract is sealed: batch '{batch.batch_code}' has already run a "
+                "cryptographically committed draw. Amendments cannot modify contracts referenced "
+                "by a frozen eligibility snapshot."
+            )
+    if source.emis.filter(status=EmiStatus.WAIVED).exists():
+        return (
+            "Lucky plan contract is sealed: a draw waiver has already been applied to this "
+            "contract. Amendments and product changes are not allowed after a waiver."
+        )
+    return ""
+
 
 _HIGH_RISK_AMENDMENTS = {
     "TENURE_EXTENSION",
@@ -290,6 +339,10 @@ def _product_change_block_reason(amendment: ContractAmendment) -> str:
     source = amendment.source_contract()
     if not source:
         return "Source subscription is required for product reference correction."
+    if amendment.contract_type == "EMI_SUBSCRIPTION":
+        sealed_reason = lucky_plan_amendment_block_reason(source)
+        if sealed_reason:
+            return sealed_reason
     if source.status in _PRODUCT_CHANGE_TERMINAL_STATUSES:
         return f"Product reference correction is blocked for terminal subscription status '{source.status}'."
     if source.status not in _AMENDABLE_STATUSES:
@@ -322,6 +375,10 @@ def phase3_implementation_metadata(amendment: ContractAmendment) -> dict:
     config = _PHASE3_IMPLEMENTABLE_AMENDMENTS.get(amendment.amendment_type)
     if amendment.status != "APPROVED":
         return {"is_implementable": False, "implementation_block_reason": "Implementation requires APPROVED status.", "implementable_fields": sorted(config["allowed_fields"]) if config else []}
+    if amendment.contract_type == "EMI_SUBSCRIPTION":
+        sealed_reason = lucky_plan_amendment_block_reason(amendment.source_contract())
+        if sealed_reason:
+            return {"is_implementable": False, "implementation_block_reason": sealed_reason, "implementable_fields": sorted(config["allowed_fields"]) if config else []}
     if not config:
         return {"is_implementable": False, "implementation_block_reason": _PHASE3_BLOCK_MESSAGE, "implementable_fields": []}
     values = amendment.approved_values or amendment.requested_values or amendment.new_values or {}
@@ -368,6 +425,9 @@ def create_amendment(*, subscription: Subscription | None = None, rent_lease_con
     source = _source_for(contract_type=contract_type, subscription=subscription, rent_lease_contract=rent_lease_contract)
     if source.status not in _AMENDABLE_STATUSES:
         raise ValidationError(f"Cannot request an amendment on a contract in status '{source.status}'.")
+    sealed_reason = lucky_plan_amendment_block_reason(source if contract_type == "EMI_SUBSCRIPTION" else None)
+    if sealed_reason:
+        raise ValidationError({"subscription": sealed_reason})
     values = requested_values if requested_values is not None else (new_values or {})
     old_values = previous_values if previous_values is not None else _snapshot_for(source)
     amendment = ContractAmendment.objects.create(
@@ -408,6 +468,10 @@ def mark_under_review(*, amendment: ContractAmendment, reviewed_by, admin_note: 
 def approve_amendment(*, amendment: ContractAmendment, approved_by, approved_values: dict | None = None, admin_note: str = "") -> ContractAmendment:
     if amendment.status not in {"REQUESTED", "UNDER_REVIEW"}:
         raise ValidationError(f"Cannot approve amendment in status '{amendment.status}'.")
+    if amendment.contract_type == "EMI_SUBSCRIPTION":
+        sealed_reason = lucky_plan_amendment_block_reason(amendment.source_contract())
+        if sealed_reason:
+            raise ValidationError({"subscription": sealed_reason})
     amendment.status = "APPROVED"
     amendment.approved_by = approved_by
     amendment.approved_at = timezone.now()

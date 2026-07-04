@@ -17,7 +17,7 @@ from subscriptions.models import (
 
 class AdminRentContractCreateSerializer(serializers.Serializer):
     customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
-    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter(is_active=True))
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter(is_active=True).exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"]))
     tenure_months = serializers.IntegerField(min_value=1)
     start_date = serializers.DateField(required=False)
     security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2)
@@ -37,7 +37,7 @@ class AdminRentContractCreateSerializer(serializers.Serializer):
 
 class AdminLeaseContractCreateSerializer(serializers.Serializer):
     customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
-    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter(is_active=True))
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter(is_active=True).exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"]))
     tenure_months = serializers.IntegerField(min_value=1)
     start_date = serializers.DateField(required=False)
     security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2)

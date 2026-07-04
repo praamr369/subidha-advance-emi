@@ -1,0 +1,5034 @@
+[
+{
+  "model": "accounting.financialyear",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-01T16:33:24.195Z",
+    "updated_at": "2026-07-01T16:33:27.166Z",
+    "code": "FY26",
+    "name": "Financial Year 2026 2027",
+    "start_date": "2026-04-01",
+    "end_date": "2027-03-31",
+    "is_active": true,
+    "activated_at": "2026-07-01T16:33:27.147Z",
+    "activated_by": 1,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-01T16:33:39.100Z",
+    "updated_at": "2026-07-03T02:25:53.381Z",
+    "series_code": "JOURNAL",
+    "document_type": "JOURNAL_ENTRY",
+    "financial_year": "26",
+    "financial_year_ref": 1,
+    "prefix": "JV",
+    "suffix": "",
+    "pattern": "JV/FY{FY}/{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 67,
+    "padding": 5,
+    "last_issued_at": "2026-07-03T02:25:53.381Z",
+    "is_active": true,
+    "is_system_seeded": true
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-07-01T16:34:32.221Z",
+    "updated_at": "2026-07-02T12:06:24.533Z",
+    "series_code": "DIRSALE",
+    "document_type": "DIRECT_SALE",
+    "financial_year": "26",
+    "financial_year_ref": 1,
+    "prefix": "SALE",
+    "suffix": "",
+    "pattern": "SALE/FY{FY}/{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 16,
+    "padding": 5,
+    "last_issued_at": "2026-07-02T12:06:24.533Z",
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-07-01T16:34:32.689Z",
+    "updated_at": "2026-07-02T12:06:24.787Z",
+    "series_code": "BILL_INV",
+    "document_type": "TAX_INVOICE",
+    "financial_year": "26",
+    "financial_year_ref": 1,
+    "prefix": "INV",
+    "suffix": "",
+    "pattern": "INV/FY{FY}/{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 16,
+    "padding": 5,
+    "last_issued_at": "2026-07-02T12:06:24.771Z",
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-07-01T16:34:33.276Z",
+    "updated_at": "2026-07-01T16:34:33.288Z",
+    "series_code": "RENT_INV",
+    "document_type": "RENT_INVOICE",
+    "financial_year": "26",
+    "financial_year_ref": 1,
+    "prefix": "RNT",
+    "suffix": "",
+    "pattern": "RNT/FY{FY}/{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 1,
+    "padding": 5,
+    "last_issued_at": null,
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-07-01T16:34:33.869Z",
+    "updated_at": "2026-07-01T16:34:33.881Z",
+    "series_code": "LEASE_INV",
+    "document_type": "LEASE_INVOICE",
+    "financial_year": "26",
+    "financial_year_ref": 1,
+    "prefix": "LSE",
+    "suffix": "",
+    "pattern": "LSE/FY{FY}/{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 1,
+    "padding": 5,
+    "last_issued_at": null,
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-07-01T16:34:34.430Z",
+    "updated_at": "2026-07-01T16:34:34.437Z",
+    "series_code": "EMI_RECEIPT",
+    "document_type": "EMI_RECEIPT",
+    "financial_year": "26",
+    "financial_year_ref": 1,
+    "prefix": "EMI",
+    "suffix": "",
+    "pattern": "EMI/FY{FY}/{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 1,
+    "padding": 5,
+    "last_issued_at": null,
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-07-01T16:34:34.977Z",
+    "updated_at": "2026-07-03T02:25:53.247Z",
+    "series_code": "BILL_RCT",
+    "document_type": "DIRECT_SALE_RECEIPT",
+    "financial_year": "26",
+    "financial_year_ref": 1,
+    "prefix": "RCP",
+    "suffix": "",
+    "pattern": "RCP/FY{FY}/{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 17,
+    "padding": 5,
+    "last_issued_at": "2026-07-03T02:25:53.241Z",
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 8,
+  "fields": {
+    "created_at": "2026-07-01T16:34:35.511Z",
+    "updated_at": "2026-07-01T16:34:35.523Z",
+    "series_code": "DEP_RCT",
+    "document_type": "SECURITY_DEPOSIT_RECEIPT",
+    "financial_year": "26",
+    "financial_year_ref": 1,
+    "prefix": "DEP",
+    "suffix": "",
+    "pattern": "DEP/FY{FY}/{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 1,
+    "padding": 5,
+    "last_issued_at": null,
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 9,
+  "fields": {
+    "created_at": "2026-07-01T16:34:36.042Z",
+    "updated_at": "2026-07-01T16:34:36.051Z",
+    "series_code": "BILL_CN",
+    "document_type": "CREDIT_NOTE",
+    "financial_year": "26",
+    "financial_year_ref": 1,
+    "prefix": "CN",
+    "suffix": "",
+    "pattern": "CN/FY{FY}/{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 1,
+    "padding": 5,
+    "last_issued_at": null,
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 10,
+  "fields": {
+    "created_at": "2026-07-01T16:34:36.592Z",
+    "updated_at": "2026-07-01T16:34:36.592Z",
+    "series_code": "BILL_DN",
+    "document_type": "DEBIT_NOTE",
+    "financial_year": "26",
+    "financial_year_ref": 1,
+    "prefix": "DN",
+    "suffix": "",
+    "pattern": "DN/FY{FY}/{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 1,
+    "padding": 5,
+    "last_issued_at": null,
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 12,
+  "fields": {
+    "created_at": "2026-07-02T14:14:24.501Z",
+    "updated_at": "2026-07-02T14:14:24.581Z",
+    "series_code": "SUPPORT_TKT_2026_27",
+    "document_type": "SUPPORT_TKT_2026_27",
+    "financial_year": "2026-27",
+    "financial_year_ref": null,
+    "prefix": "TKT-2026-27",
+    "suffix": "",
+    "pattern": "",
+    "reset_policy": "YEARLY",
+    "next_number": 3,
+    "padding": 5,
+    "last_issued_at": "2026-07-02T14:14:24.581Z",
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.documentsequence",
+  "pk": 14,
+  "fields": {
+    "created_at": "2026-07-02T14:18:55.578Z",
+    "updated_at": "2026-07-02T14:19:47.526Z",
+    "series_code": "BILL_RET",
+    "document_type": "BILL_RET",
+    "financial_year": "2026-27",
+    "financial_year_ref": null,
+    "prefix": "RET-2026-27",
+    "suffix": "",
+    "pattern": "{PREFIX}-{number}",
+    "reset_policy": "YEARLY",
+    "next_number": 3,
+    "padding": 5,
+    "last_issued_at": "2026-07-02T14:19:47.510Z",
+    "is_active": true,
+    "is_system_seeded": false
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.104Z",
+    "updated_at": "2026-07-02T12:05:54.711Z",
+    "code": "CASH-1000",
+    "name": "Cash in Hand",
+    "account_type": "ASSET",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": true,
+    "system_code": "CASH_COLLECTION",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.515Z",
+    "updated_at": "2026-07-02T12:05:54.727Z",
+    "code": "BANK-1010",
+    "name": "Bank Account",
+    "account_type": "ASSET",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": true,
+    "system_code": "BANK_COLLECTION",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.596Z",
+    "updated_at": "2026-07-02T12:05:54.727Z",
+    "code": "UPI-1020",
+    "name": "UPI Collection Account",
+    "account_type": "ASSET",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": true,
+    "system_code": "UPI_COLLECTION",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.644Z",
+    "updated_at": "2026-07-02T14:12:49.155Z",
+    "code": "AR-1000",
+    "name": "Accounts Receivable",
+    "account_type": "ASSET",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "CUSTOMER_RECEIVABLE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.701Z",
+    "updated_at": "2026-07-02T14:12:49.218Z",
+    "code": "SEC-2300",
+    "name": "Rent/Lease Security Deposit Liability",
+    "account_type": "LIABILITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "SECURITY_DEPOSIT_LIABILITY",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.740Z",
+    "updated_at": "2026-07-02T14:12:49.171Z",
+    "code": "ADV-2200",
+    "name": "Customer Advances and Unapplied Receipts",
+    "account_type": "LIABILITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "CUSTOMER_ADVANCE_UNEARNED_REVENUE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 8,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.781Z",
+    "updated_at": "2026-07-02T14:12:49.203Z",
+    "code": "RENT-4000",
+    "name": "Rent Income",
+    "account_type": "INCOME",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "RENT_INCOME",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 9,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.823Z",
+    "updated_at": "2026-07-02T14:12:49.218Z",
+    "code": "LEASE-4000",
+    "name": "Lease Income",
+    "account_type": "INCOME",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "LEASE_INCOME",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 10,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.867Z",
+    "updated_at": "2026-07-02T14:12:49.241Z",
+    "code": "DMG-4000",
+    "name": "Damage Recovery Income",
+    "account_type": "INCOME",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "DAMAGE_RECOVERY",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 11,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.912Z",
+    "updated_at": "2026-07-02T14:12:49.203Z",
+    "code": "EMI-5200",
+    "name": "EMI Winner Waiver Expense",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "EMI_WAIVER_EXPENSE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 12,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.334Z",
+    "updated_at": "2026-07-02T12:05:54.727Z",
+    "code": "PGW-1030",
+    "name": "Payment Gateway Settlement Account",
+    "account_type": "ASSET",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": true,
+    "system_code": "PAYMENT_GATEWAY_COLLECTION",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 13,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.380Z",
+    "updated_at": "2026-07-01T18:09:40.870Z",
+    "code": "AP-2000",
+    "name": "Accounts Payable",
+    "account_type": "LIABILITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "ACCOUNTS_PAYABLE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 14,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.398Z",
+    "updated_at": "2026-07-01T18:09:40.886Z",
+    "code": "INV-1200",
+    "name": "Inventory Asset",
+    "account_type": "ASSET",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "INVENTORY_ASSET",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 15,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.412Z",
+    "updated_at": "2026-07-01T18:09:40.895Z",
+    "code": "INV-1210",
+    "name": "Work In Progress Inventory",
+    "account_type": "ASSET",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "WORK_IN_PROGRESS_INVENTORY",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 16,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.438Z",
+    "updated_at": "2026-07-01T18:09:40.901Z",
+    "code": "COGS-5000",
+    "name": "Cost of Goods Sold",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "COGS",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 17,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.454Z",
+    "updated_at": "2026-07-01T18:09:40.906Z",
+    "code": "INV-5100",
+    "name": "Inventory Adjustments",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "INVENTORY_ADJUSTMENT",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 18,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.473Z",
+    "updated_at": "2026-07-01T18:09:40.915Z",
+    "code": "MFG-5200",
+    "name": "Manufacturing Wastage / Scrap Expense",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "MANUFACTURING_WASTAGE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 19,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.493Z",
+    "updated_at": "2026-07-01T18:09:40.925Z",
+    "code": "PUR-5000",
+    "name": "Purchase Expense",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "PURCHASE_EXPENSE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 20,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.515Z",
+    "updated_at": "2026-07-01T18:09:40.947Z",
+    "code": "REV-4000",
+    "name": "Sales Revenue",
+    "account_type": "INCOME",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "SALES_REVENUE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 21,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.539Z",
+    "updated_at": "2026-07-01T18:09:40.973Z",
+    "code": "REV-4010",
+    "name": "Sales Returns and Allowances",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "SALES_RETURNS",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 22,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.559Z",
+    "updated_at": "2026-07-01T18:09:41.012Z",
+    "code": "EMI-4000",
+    "name": "Advance EMI Collection Income",
+    "account_type": "INCOME",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "EMI_INCOME",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 23,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.570Z",
+    "updated_at": "2026-07-01T18:09:41.023Z",
+    "code": "EMI-2100",
+    "name": "EMI Collection Clearing",
+    "account_type": "LIABILITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "EMI_COLLECTION_CLEARING",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 24,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.585Z",
+    "updated_at": "2026-07-01T18:09:41.029Z",
+    "code": "EMI-2200",
+    "name": "EMI Winner Waiver Reserve",
+    "account_type": "LIABILITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "EMI_WAIVER_RESERVE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 25,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.614Z",
+    "updated_at": "2026-07-01T18:09:41.086Z",
+    "code": "COM-2100",
+    "name": "Partner Commission Payable",
+    "account_type": "LIABILITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "PARTNER_COMMISSION_PAYABLE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 26,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.624Z",
+    "updated_at": "2026-07-01T18:09:41.093Z",
+    "code": "COM-5100",
+    "name": "Partner Commission Expense",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "PARTNER_COMMISSION_EXPENSE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 27,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.640Z",
+    "updated_at": "2026-07-01T18:09:41.113Z",
+    "code": "DEL-4000",
+    "name": "Delivery Charges Income",
+    "account_type": "INCOME",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "DELIVERY_CHARGES_INCOME",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 28,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.660Z",
+    "updated_at": "2026-07-01T18:09:41.121Z",
+    "code": "DEL-5100",
+    "name": "Delivery Expense",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "DELIVERY_EXPENSE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 29,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.681Z",
+    "updated_at": "2026-07-01T18:09:41.146Z",
+    "code": "PAY-2100",
+    "name": "Salary Payable",
+    "account_type": "LIABILITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "SALARY_PAYABLE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 30,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.697Z",
+    "updated_at": "2026-07-01T18:09:41.164Z",
+    "code": "PAY-2200",
+    "name": "Payroll Deductions Clearing",
+    "account_type": "LIABILITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "PAYROLL_DEDUCTIONS_CLEARING",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 31,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.715Z",
+    "updated_at": "2026-07-01T18:09:41.173Z",
+    "code": "PAY-2300",
+    "name": "Employee Reimbursement Payable",
+    "account_type": "LIABILITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "EMPLOYEE_REIMBURSEMENT_PAYABLE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 32,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.731Z",
+    "updated_at": "2026-07-01T18:09:41.192Z",
+    "code": "PAY-5100",
+    "name": "Salary Expense",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "SALARY_EXPENSE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 33,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.767Z",
+    "updated_at": "2026-07-01T18:09:41.202Z",
+    "code": "STAFF-1100",
+    "name": "Staff Advance Receivable",
+    "account_type": "ASSET",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "STAFF_ADVANCE_ASSET",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 34,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.781Z",
+    "updated_at": "2026-07-01T18:09:41.221Z",
+    "code": "GST-1100",
+    "name": "Input GST Receivable",
+    "account_type": "ASSET",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "INPUT_GST",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 35,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.804Z",
+    "updated_at": "2026-07-01T18:09:41.236Z",
+    "code": "GST-2100",
+    "name": "Output GST Payable",
+    "account_type": "LIABILITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "OUTPUT_GST",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 36,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.816Z",
+    "updated_at": "2026-07-01T18:09:41.250Z",
+    "code": "GST-5100",
+    "name": "GST Adjustments",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "GST_ADJUSTMENTS",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 37,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.826Z",
+    "updated_at": "2026-07-01T18:09:41.269Z",
+    "code": "DEP-5200",
+    "name": "Depreciation Expense",
+    "account_type": "EXPENSE",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "DEPRECIATION_EXPENSE",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 38,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.836Z",
+    "updated_at": "2026-07-01T18:09:41.286Z",
+    "code": "DEP-1250",
+    "name": "Accumulated Depreciation",
+    "account_type": "ASSET",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "ACCUMULATED_DEPRECIATION",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 39,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.857Z",
+    "updated_at": "2026-07-01T18:09:41.298Z",
+    "code": "EQ-3000",
+    "name": "Owner Capital",
+    "account_type": "EQUITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "OWNER_CAPITAL",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.chartofaccount",
+  "pk": 40,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.880Z",
+    "updated_at": "2026-07-01T18:09:41.311Z",
+    "code": "EQ-3100",
+    "name": "Retained Earnings / Opening Balance Adjustment",
+    "account_type": "EQUITY",
+    "parent": null,
+    "is_active": true,
+    "allow_manual_posting": false,
+    "system_code": "RETAINED_EARNINGS",
+    "is_legacy": false,
+    "legacy_reason": "",
+    "superseded_by": null,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.financeaccount",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-01T16:32:03.989Z",
+    "updated_at": "2026-07-01T17:33:05.945Z",
+    "name": "Main Cash Desk",
+    "branch": 1,
+    "kind": "CASH",
+    "chart_account": 1,
+    "opening_balance": "10000.00",
+    "is_real_settlement_account": true,
+    "is_active": true,
+    "bank_last4": "",
+    "upi_handle": "",
+    "notes": "Canonical cash settlement account shared by all cash collection workflows."
+  }
+},
+{
+  "model": "accounting.financeaccount",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.913Z",
+    "updated_at": "2026-07-01T17:33:06.042Z",
+    "name": "Main UPI / Bank Account",
+    "branch": 1,
+    "kind": "BANK",
+    "chart_account": 2,
+    "opening_balance": "15000.00",
+    "is_real_settlement_account": true,
+    "is_active": true,
+    "bank_last4": "",
+    "upi_handle": "",
+    "notes": "Canonical combined UPI/bank settlement account.\nCanonical combined UPI/bank settlement account."
+  }
+},
+{
+  "model": "accounting.financeaccount",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.953Z",
+    "updated_at": "2026-07-01T16:32:11.969Z",
+    "name": "Ledger posting profiles (system)",
+    "branch": 1,
+    "kind": "BANK",
+    "chart_account": 2,
+    "opening_balance": "0.00",
+    "is_real_settlement_account": false,
+    "is_active": true,
+    "bank_last4": "",
+    "upi_handle": "",
+    "notes": "System posting profiles anchor (hidden from receipts)."
+  }
+},
+{
+  "model": "accounting.costcentre",
+  "pk": 1,
+  "fields": {
+    "code": "CC-SHOWROOM",
+    "name": "Showroom Operations",
+    "centre_type": "DEPARTMENT",
+    "branch": 1,
+    "manager": 1,
+    "is_active": true,
+    "created_at": "2026-07-03T18:04:35.062Z",
+    "updated_at": "2026-07-03T18:04:35.062Z"
+  }
+},
+{
+  "model": "accounting.costcentre",
+  "pk": 2,
+  "fields": {
+    "code": "CC-WAREHOUSE",
+    "name": "Warehouse & Logistics",
+    "centre_type": "DEPARTMENT",
+    "branch": 1,
+    "manager": 1,
+    "is_active": true,
+    "created_at": "2026-07-03T18:04:35.078Z",
+    "updated_at": "2026-07-03T18:04:35.078Z"
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.980Z",
+    "updated_at": "2026-07-01T16:32:11.984Z",
+    "key": "CUSTOMER_RECEIVABLE",
+    "label": "Accounts Receivable",
+    "chart_account": 5,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-07-01T16:32:11.996Z",
+    "updated_at": "2026-07-01T16:32:12.000Z",
+    "key": "CUSTOMER_ADVANCE_UNEARNED_REVENUE",
+    "label": "Customer Advances and Unapplied Receipts",
+    "chart_account": 7,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.004Z",
+    "updated_at": "2026-07-01T16:32:12.008Z",
+    "key": "ACCOUNTS_PAYABLE",
+    "label": "Accounts Payable",
+    "chart_account": 13,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.012Z",
+    "updated_at": "2026-07-01T16:32:12.017Z",
+    "key": "INVENTORY_ASSET",
+    "label": "Inventory Asset",
+    "chart_account": 14,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.023Z",
+    "updated_at": "2026-07-01T16:32:12.027Z",
+    "key": "WORK_IN_PROGRESS_INVENTORY",
+    "label": "Work In Progress Inventory",
+    "chart_account": 15,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.033Z",
+    "updated_at": "2026-07-01T16:33:40.579Z",
+    "key": "COGS",
+    "label": "Cost of Goods Sold / Delivery Out Expense",
+    "chart_account": 16,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.042Z",
+    "updated_at": "2026-07-01T16:32:12.044Z",
+    "key": "INVENTORY_ADJUSTMENT",
+    "label": "Inventory Adjustments",
+    "chart_account": 17,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 8,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.046Z",
+    "updated_at": "2026-07-01T16:32:12.048Z",
+    "key": "MANUFACTURING_WASTAGE",
+    "label": "Manufacturing Wastage / Scrap Expense",
+    "chart_account": 18,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 9,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.051Z",
+    "updated_at": "2026-07-01T16:32:12.053Z",
+    "key": "PURCHASE_EXPENSE",
+    "label": "Purchase Expense",
+    "chart_account": 19,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 10,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.055Z",
+    "updated_at": "2026-07-01T16:32:12.057Z",
+    "key": "SALES_REVENUE",
+    "label": "Sales Revenue",
+    "chart_account": 20,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 11,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.059Z",
+    "updated_at": "2026-07-01T16:32:12.062Z",
+    "key": "SALES_RETURNS",
+    "label": "Sales Returns and Allowances",
+    "chart_account": 21,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 12,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.063Z",
+    "updated_at": "2026-07-01T16:32:12.065Z",
+    "key": "EMI_INCOME",
+    "label": "Advance EMI Collection Income",
+    "chart_account": 22,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 13,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.072Z",
+    "updated_at": "2026-07-01T16:32:12.079Z",
+    "key": "EMI_COLLECTION_CLEARING",
+    "label": "EMI Collection Clearing",
+    "chart_account": 23,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 14,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.084Z",
+    "updated_at": "2026-07-01T16:32:12.088Z",
+    "key": "EMI_WAIVER_RESERVE",
+    "label": "EMI Winner Waiver Reserve",
+    "chart_account": 24,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 15,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.095Z",
+    "updated_at": "2026-07-01T16:32:12.099Z",
+    "key": "EMI_WAIVER_EXPENSE",
+    "label": "EMI Winner Waiver Expense",
+    "chart_account": 11,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 16,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.101Z",
+    "updated_at": "2026-07-01T16:32:12.106Z",
+    "key": "RENT_INCOME",
+    "label": "Rent Income",
+    "chart_account": 8,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 17,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.110Z",
+    "updated_at": "2026-07-01T16:32:12.118Z",
+    "key": "LEASE_INCOME",
+    "label": "Lease Income",
+    "chart_account": 9,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 18,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.123Z",
+    "updated_at": "2026-07-01T16:32:12.127Z",
+    "key": "SECURITY_DEPOSIT_LIABILITY",
+    "label": "Rent/Lease Security Deposit Liability",
+    "chart_account": 6,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 19,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.131Z",
+    "updated_at": "2026-07-01T16:32:12.133Z",
+    "key": "PARTNER_COMMISSION_PAYABLE",
+    "label": "Partner Commission Payable",
+    "chart_account": 25,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 20,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.140Z",
+    "updated_at": "2026-07-01T16:32:12.146Z",
+    "key": "PARTNER_COMMISSION_EXPENSE",
+    "label": "Partner Commission Expense",
+    "chart_account": 26,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 21,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.155Z",
+    "updated_at": "2026-07-01T16:32:12.160Z",
+    "key": "DELIVERY_CHARGES_INCOME",
+    "label": "Delivery Charges Income",
+    "chart_account": 27,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 22,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.162Z",
+    "updated_at": "2026-07-01T16:32:12.168Z",
+    "key": "DELIVERY_EXPENSE",
+    "label": "Delivery Expense",
+    "chart_account": 28,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 23,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.174Z",
+    "updated_at": "2026-07-01T16:32:12.176Z",
+    "key": "DAMAGE_RECOVERY",
+    "label": "Damage Recovery Income",
+    "chart_account": 10,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 24,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.180Z",
+    "updated_at": "2026-07-01T16:32:12.185Z",
+    "key": "SALARY_PAYABLE",
+    "label": "Salary Payable",
+    "chart_account": 29,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 25,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.193Z",
+    "updated_at": "2026-07-01T16:32:12.197Z",
+    "key": "PAYROLL_DEDUCTIONS_CLEARING",
+    "label": "Payroll Deductions Clearing",
+    "chart_account": 30,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 26,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.199Z",
+    "updated_at": "2026-07-01T16:32:12.200Z",
+    "key": "EMPLOYEE_REIMBURSEMENT_PAYABLE",
+    "label": "Employee Reimbursement Payable",
+    "chart_account": 31,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 27,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.206Z",
+    "updated_at": "2026-07-01T16:32:12.210Z",
+    "key": "SALARY_EXPENSE",
+    "label": "Salary Expense",
+    "chart_account": 32,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 28,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.214Z",
+    "updated_at": "2026-07-01T16:32:12.217Z",
+    "key": "STAFF_ADVANCE_ASSET",
+    "label": "Staff Advance Receivable",
+    "chart_account": 33,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 29,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.224Z",
+    "updated_at": "2026-07-01T16:32:12.229Z",
+    "key": "INPUT_GST",
+    "label": "Input GST Receivable",
+    "chart_account": 34,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 30,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.234Z",
+    "updated_at": "2026-07-01T16:32:12.240Z",
+    "key": "OUTPUT_GST",
+    "label": "Output GST Payable",
+    "chart_account": 35,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 31,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.244Z",
+    "updated_at": "2026-07-01T16:32:12.248Z",
+    "key": "GST_ADJUSTMENTS",
+    "label": "GST Adjustments",
+    "chart_account": 36,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 32,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.248Z",
+    "updated_at": "2026-07-01T16:32:12.258Z",
+    "key": "DEPRECIATION_EXPENSE",
+    "label": "Depreciation Expense",
+    "chart_account": 37,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 33,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.262Z",
+    "updated_at": "2026-07-01T16:32:12.262Z",
+    "key": "ACCUMULATED_DEPRECIATION",
+    "label": "Accumulated Depreciation",
+    "chart_account": 38,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 34,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.267Z",
+    "updated_at": "2026-07-01T16:32:12.277Z",
+    "key": "OWNER_CAPITAL",
+    "label": "Owner Capital",
+    "chart_account": 39,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.accountingpostingprofile",
+  "pk": 35,
+  "fields": {
+    "created_at": "2026-07-01T16:32:12.279Z",
+    "updated_at": "2026-07-01T16:32:12.286Z",
+    "key": "RETAINED_EARNINGS",
+    "label": "Retained Earnings / Opening Balance Adjustment",
+    "chart_account": 40,
+    "is_system_only": true,
+    "is_active": true,
+    "description": "Canonical system posting profile."
+  }
+},
+{
+  "model": "accounting.businesstaxprofile",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-01T06:56:49.498Z",
+    "updated_at": "2026-07-01T06:56:49.507Z",
+    "mode": "GST_UNREGISTERED",
+    "legal_name": "Subidha Furniture",
+    "gstin": "",
+    "pan": "",
+    "state_code": "",
+    "state_name": "",
+    "effective_from": "2026-07-01",
+    "effective_to": null,
+    "is_active": true,
+    "notes": ""
+  }
+},
+{
+  "model": "accounting.rentleasepostingbridgeconfig",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-06-29T15:58:44.919Z",
+    "updated_at": "2026-06-29T15:58:44.919Z",
+    "is_enabled": false,
+    "enabled_at": null,
+    "enabled_by": null,
+    "disabled_at": null,
+    "disabled_by": null,
+    "reason": "",
+    "last_readiness_snapshot": {}
+  }
+},
+{
+  "model": "branch_control.branch",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-01T16:31:38.436Z",
+    "updated_at": "2026-07-01T16:31:38.451Z",
+    "code": "BR-MAIN",
+    "name": "Main Showroom",
+    "status": "ACTIVE",
+    "is_primary": true,
+    "phone": "+919476490946",
+    "email": "subidhafurnitureofficial@gmail.com",
+    "address": "aad",
+    "notes": ""
+  }
+},
+{
+  "model": "branch_control.cashcounter",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-01T16:36:38.392Z",
+    "updated_at": "2026-07-01T16:36:38.401Z",
+    "code": "CTR-01",
+    "name": "Main Cash Desk",
+    "branch": 1,
+    "finance_account": 1,
+    "assigned_user": null,
+    "is_active": true,
+    "notes": ""
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-06-27T08:40:58.960Z",
+    "updated_at": "2026-06-27T08:40:58.960Z",
+    "pincode": "110001",
+    "office_name": "Connaught Place",
+    "city": "New Delhi",
+    "district": "New Delhi",
+    "state": "Delhi",
+    "state_code": "07",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-06-27T08:40:58.978Z",
+    "updated_at": "2026-06-27T08:40:58.978Z",
+    "pincode": "110002",
+    "office_name": "Darya Ganj",
+    "city": "New Delhi",
+    "district": "Central Delhi",
+    "state": "Delhi",
+    "state_code": "07",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-06-27T08:40:58.978Z",
+    "updated_at": "2026-06-27T08:40:58.978Z",
+    "pincode": "110006",
+    "office_name": "Chandni Chowk",
+    "city": "New Delhi",
+    "district": "Central Delhi",
+    "state": "Delhi",
+    "state_code": "07",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-06-27T08:40:58.992Z",
+    "updated_at": "2026-06-27T08:40:58.992Z",
+    "pincode": "400001",
+    "office_name": "Fort",
+    "city": "Mumbai",
+    "district": "Mumbai",
+    "state": "Maharashtra",
+    "state_code": "27",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-06-27T08:40:58.992Z",
+    "updated_at": "2026-06-27T08:40:58.992Z",
+    "pincode": "400050",
+    "office_name": "Bandra West",
+    "city": "Mumbai",
+    "district": "Mumbai Suburban",
+    "state": "Maharashtra",
+    "state_code": "27",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.008Z",
+    "updated_at": "2026-06-27T08:40:59.008Z",
+    "pincode": "400070",
+    "office_name": "Kurla",
+    "city": "Mumbai",
+    "district": "Mumbai Suburban",
+    "state": "Maharashtra",
+    "state_code": "27",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.008Z",
+    "updated_at": "2026-06-27T08:40:59.008Z",
+    "pincode": "411001",
+    "office_name": "Pune City",
+    "city": "Pune",
+    "district": "Pune",
+    "state": "Maharashtra",
+    "state_code": "27",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 8,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.008Z",
+    "updated_at": "2026-06-27T08:40:59.008Z",
+    "pincode": "440001",
+    "office_name": "Nagpur GPO",
+    "city": "Nagpur",
+    "district": "Nagpur",
+    "state": "Maharashtra",
+    "state_code": "27",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 9,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.008Z",
+    "updated_at": "2026-06-27T08:40:59.008Z",
+    "pincode": "560001",
+    "office_name": "Bangalore GPO",
+    "city": "Bengaluru",
+    "district": "Bengaluru Urban",
+    "state": "Karnataka",
+    "state_code": "29",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 10,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.024Z",
+    "updated_at": "2026-06-27T08:40:59.024Z",
+    "pincode": "560034",
+    "office_name": "Koramangala",
+    "city": "Bengaluru",
+    "district": "Bengaluru Urban",
+    "state": "Karnataka",
+    "state_code": "29",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 11,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.024Z",
+    "updated_at": "2026-06-27T08:40:59.024Z",
+    "pincode": "560066",
+    "office_name": "Whitefield",
+    "city": "Bengaluru",
+    "district": "Bengaluru Urban",
+    "state": "Karnataka",
+    "state_code": "29",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 12,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.039Z",
+    "updated_at": "2026-06-27T08:40:59.039Z",
+    "pincode": "570001",
+    "office_name": "Mysore GPO",
+    "city": "Mysuru",
+    "district": "Mysuru",
+    "state": "Karnataka",
+    "state_code": "29",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 13,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.039Z",
+    "updated_at": "2026-06-27T08:40:59.039Z",
+    "pincode": "600001",
+    "office_name": "Chennai GPO",
+    "city": "Chennai",
+    "district": "Chennai",
+    "state": "Tamil Nadu",
+    "state_code": "33",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 14,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.056Z",
+    "updated_at": "2026-06-27T08:40:59.056Z",
+    "pincode": "600040",
+    "office_name": "Anna Nagar",
+    "city": "Chennai",
+    "district": "Chennai",
+    "state": "Tamil Nadu",
+    "state_code": "33",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 15,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.056Z",
+    "updated_at": "2026-06-27T08:40:59.056Z",
+    "pincode": "641001",
+    "office_name": "Coimbatore HO",
+    "city": "Coimbatore",
+    "district": "Coimbatore",
+    "state": "Tamil Nadu",
+    "state_code": "33",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 16,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.056Z",
+    "updated_at": "2026-06-27T08:40:59.056Z",
+    "pincode": "500001",
+    "office_name": "Hyderabad GPO",
+    "city": "Hyderabad",
+    "district": "Hyderabad",
+    "state": "Telangana",
+    "state_code": "36",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 17,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.071Z",
+    "updated_at": "2026-06-27T08:40:59.071Z",
+    "pincode": "500081",
+    "office_name": "Gachibowli",
+    "city": "Hyderabad",
+    "district": "Rangareddy",
+    "state": "Telangana",
+    "state_code": "36",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 18,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.071Z",
+    "updated_at": "2026-06-27T08:40:59.071Z",
+    "pincode": "700001",
+    "office_name": "Kolkata GPO",
+    "city": "Kolkata",
+    "district": "Kolkata",
+    "state": "West Bengal",
+    "state_code": "19",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 19,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.071Z",
+    "updated_at": "2026-06-27T08:40:59.071Z",
+    "pincode": "700019",
+    "office_name": "Ballygunge",
+    "city": "Kolkata",
+    "district": "Kolkata",
+    "state": "West Bengal",
+    "state_code": "19",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 20,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.071Z",
+    "updated_at": "2026-06-27T08:40:59.071Z",
+    "pincode": "700091",
+    "office_name": "Salt Lake",
+    "city": "Kolkata",
+    "district": "North 24 Parganas",
+    "state": "West Bengal",
+    "state_code": "19",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 21,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.087Z",
+    "updated_at": "2026-06-27T08:40:59.087Z",
+    "pincode": "711101",
+    "office_name": "Howrah",
+    "city": "Howrah",
+    "district": "Howrah",
+    "state": "West Bengal",
+    "state_code": "19",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 22,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.087Z",
+    "updated_at": "2026-06-27T08:40:59.087Z",
+    "pincode": "380001",
+    "office_name": "Ahmedabad GPO",
+    "city": "Ahmedabad",
+    "district": "Ahmedabad",
+    "state": "Gujarat",
+    "state_code": "24",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 23,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.087Z",
+    "updated_at": "2026-06-27T08:40:59.087Z",
+    "pincode": "390001",
+    "office_name": "Vadodara HO",
+    "city": "Vadodara",
+    "district": "Vadodara",
+    "state": "Gujarat",
+    "state_code": "24",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 24,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.103Z",
+    "updated_at": "2026-06-27T08:40:59.103Z",
+    "pincode": "395003",
+    "office_name": "Surat",
+    "city": "Surat",
+    "district": "Surat",
+    "state": "Gujarat",
+    "state_code": "24",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 25,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.103Z",
+    "updated_at": "2026-06-27T08:40:59.103Z",
+    "pincode": "302001",
+    "office_name": "Jaipur GPO",
+    "city": "Jaipur",
+    "district": "Jaipur",
+    "state": "Rajasthan",
+    "state_code": "08",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 26,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.103Z",
+    "updated_at": "2026-06-27T08:40:59.103Z",
+    "pincode": "342001",
+    "office_name": "Jodhpur HO",
+    "city": "Jodhpur",
+    "district": "Jodhpur",
+    "state": "Rajasthan",
+    "state_code": "08",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 27,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.119Z",
+    "updated_at": "2026-06-27T08:40:59.119Z",
+    "pincode": "226001",
+    "office_name": "Lucknow GPO",
+    "city": "Lucknow",
+    "district": "Lucknow",
+    "state": "Uttar Pradesh",
+    "state_code": "09",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 28,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.119Z",
+    "updated_at": "2026-06-27T08:40:59.119Z",
+    "pincode": "201301",
+    "office_name": "Noida",
+    "city": "Noida",
+    "district": "Gautam Buddha Nagar",
+    "state": "Uttar Pradesh",
+    "state_code": "09",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 29,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.119Z",
+    "updated_at": "2026-06-27T08:40:59.119Z",
+    "pincode": "208001",
+    "office_name": "Kanpur HO",
+    "city": "Kanpur",
+    "district": "Kanpur Nagar",
+    "state": "Uttar Pradesh",
+    "state_code": "09",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 30,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.135Z",
+    "updated_at": "2026-06-27T08:40:59.135Z",
+    "pincode": "122001",
+    "office_name": "Gurgaon",
+    "city": "Gurugram",
+    "district": "Gurugram",
+    "state": "Haryana",
+    "state_code": "06",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 31,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.135Z",
+    "updated_at": "2026-06-27T08:40:59.135Z",
+    "pincode": "121001",
+    "office_name": "Faridabad",
+    "city": "Faridabad",
+    "district": "Faridabad",
+    "state": "Haryana",
+    "state_code": "06",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 32,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.151Z",
+    "updated_at": "2026-06-27T08:40:59.151Z",
+    "pincode": "160017",
+    "office_name": "Chandigarh",
+    "city": "Chandigarh",
+    "district": "Chandigarh",
+    "state": "Chandigarh",
+    "state_code": "04",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 33,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.151Z",
+    "updated_at": "2026-06-27T08:40:59.151Z",
+    "pincode": "141001",
+    "office_name": "Ludhiana HO",
+    "city": "Ludhiana",
+    "district": "Ludhiana",
+    "state": "Punjab",
+    "state_code": "03",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 34,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.167Z",
+    "updated_at": "2026-06-27T08:40:59.167Z",
+    "pincode": "143001",
+    "office_name": "Amritsar HO",
+    "city": "Amritsar",
+    "district": "Amritsar",
+    "state": "Punjab",
+    "state_code": "03",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 35,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.167Z",
+    "updated_at": "2026-06-27T08:40:59.167Z",
+    "pincode": "462001",
+    "office_name": "Bhopal GPO",
+    "city": "Bhopal",
+    "district": "Bhopal",
+    "state": "Madhya Pradesh",
+    "state_code": "23",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 36,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.183Z",
+    "updated_at": "2026-06-27T08:40:59.183Z",
+    "pincode": "452001",
+    "office_name": "Indore HO",
+    "city": "Indore",
+    "district": "Indore",
+    "state": "Madhya Pradesh",
+    "state_code": "23",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 37,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.183Z",
+    "updated_at": "2026-06-27T08:40:59.183Z",
+    "pincode": "800001",
+    "office_name": "Patna GPO",
+    "city": "Patna",
+    "district": "Patna",
+    "state": "Bihar",
+    "state_code": "10",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 38,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.183Z",
+    "updated_at": "2026-06-27T08:40:59.199Z",
+    "pincode": "751001",
+    "office_name": "Bhubaneswar GPO",
+    "city": "Bhubaneswar",
+    "district": "Khordha",
+    "state": "Odisha",
+    "state_code": "21",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 39,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.199Z",
+    "updated_at": "2026-06-27T08:40:59.199Z",
+    "pincode": "682001",
+    "office_name": "Ernakulam",
+    "city": "Kochi",
+    "district": "Ernakulam",
+    "state": "Kerala",
+    "state_code": "32",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 40,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.199Z",
+    "updated_at": "2026-06-27T08:40:59.199Z",
+    "pincode": "695001",
+    "office_name": "Thiruvananthapuram GPO",
+    "city": "Thiruvananthapuram",
+    "district": "Thiruvananthapuram",
+    "state": "Kerala",
+    "state_code": "32",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 41,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.217Z",
+    "updated_at": "2026-06-27T08:40:59.217Z",
+    "pincode": "781001",
+    "office_name": "Guwahati GPO",
+    "city": "Guwahati",
+    "district": "Kamrup Metropolitan",
+    "state": "Assam",
+    "state_code": "18",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 42,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.224Z",
+    "updated_at": "2026-06-27T08:40:59.224Z",
+    "pincode": "834001",
+    "office_name": "Ranchi GPO",
+    "city": "Ranchi",
+    "district": "Ranchi",
+    "state": "Jharkhand",
+    "state_code": "20",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 43,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.226Z",
+    "updated_at": "2026-06-27T08:40:59.226Z",
+    "pincode": "492001",
+    "office_name": "Raipur HO",
+    "city": "Raipur",
+    "district": "Raipur",
+    "state": "Chhattisgarh",
+    "state_code": "22",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 44,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.234Z",
+    "updated_at": "2026-06-27T08:40:59.234Z",
+    "pincode": "248001",
+    "office_name": "Dehradun HO",
+    "city": "Dehradun",
+    "district": "Dehradun",
+    "state": "Uttarakhand",
+    "state_code": "05",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 45,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.238Z",
+    "updated_at": "2026-06-27T08:40:59.239Z",
+    "pincode": "171001",
+    "office_name": "Shimla HO",
+    "city": "Shimla",
+    "district": "Shimla",
+    "state": "Himachal Pradesh",
+    "state_code": "02",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 46,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.244Z",
+    "updated_at": "2026-06-27T08:40:59.245Z",
+    "pincode": "180001",
+    "office_name": "Jammu GPO",
+    "city": "Jammu",
+    "district": "Jammu",
+    "state": "Jammu and Kashmir",
+    "state_code": "01",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 47,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.251Z",
+    "updated_at": "2026-06-27T08:40:59.252Z",
+    "pincode": "530001",
+    "office_name": "Visakhapatnam HO",
+    "city": "Visakhapatnam",
+    "district": "Visakhapatnam",
+    "state": "Andhra Pradesh",
+    "state_code": "37",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 48,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.258Z",
+    "updated_at": "2026-06-27T08:40:59.259Z",
+    "pincode": "520001",
+    "office_name": "Vijayawada HO",
+    "city": "Vijayawada",
+    "district": "Krishna",
+    "state": "Andhra Pradesh",
+    "state_code": "37",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.pincodelocation",
+  "pk": 49,
+  "fields": {
+    "created_at": "2026-06-27T08:40:59.265Z",
+    "updated_at": "2026-06-27T08:40:59.265Z",
+    "pincode": "403001",
+    "office_name": "Panaji",
+    "city": "Panaji",
+    "district": "North Goa",
+    "state": "Goa",
+    "state_code": "30",
+    "source": "SEED",
+    "hit_count": 0
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.669Z",
+    "updated_at": "2026-06-27T08:40:53.669Z",
+    "code": "8415",
+    "description": "Air conditioners (window/split)",
+    "gst_rate": "28.00",
+    "chapter": "84",
+    "keywords": "air conditioner ac split window cooling inverter",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 2,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.684Z",
+    "updated_at": "2026-06-27T08:40:53.684Z",
+    "code": "8418",
+    "description": "Refrigerators and freezers",
+    "gst_rate": "18.00",
+    "chapter": "84",
+    "keywords": "refrigerator fridge freezer deep cooler double door single",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 3,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.684Z",
+    "updated_at": "2026-06-27T08:40:53.684Z",
+    "code": "8450",
+    "description": "Washing machines (household)",
+    "gst_rate": "18.00",
+    "chapter": "84",
+    "keywords": "washing machine washer dryer front load top load fully automatic",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 4,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.684Z",
+    "updated_at": "2026-06-27T08:40:53.684Z",
+    "code": "8508",
+    "description": "Vacuum cleaners",
+    "gst_rate": "18.00",
+    "chapter": "85",
+    "keywords": "vacuum cleaner cleaning dust",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 5,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.700Z",
+    "updated_at": "2026-06-27T08:40:53.700Z",
+    "code": "8516",
+    "description": "Electric heaters irons geysers and water heaters",
+    "gst_rate": "18.00",
+    "chapter": "85",
+    "keywords": "geyser water heater immersion iron press electric kettle toaster room heater",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 6,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.700Z",
+    "updated_at": "2026-06-27T08:40:53.700Z",
+    "code": "8528",
+    "description": "Televisions and monitors",
+    "gst_rate": "28.00",
+    "chapter": "85",
+    "keywords": "television tv led lcd smart oled monitor screen display",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 7,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.700Z",
+    "updated_at": "2026-06-27T08:40:53.700Z",
+    "code": "8517",
+    "description": "Mobile phones and smartphones",
+    "gst_rate": "18.00",
+    "chapter": "85",
+    "keywords": "mobile phone smartphone cellphone handset android iphone",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 8,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.716Z",
+    "updated_at": "2026-06-27T08:40:53.716Z",
+    "code": "8471",
+    "description": "Laptops desktops and computers",
+    "gst_rate": "18.00",
+    "chapter": "84",
+    "keywords": "laptop computer desktop notebook pc tablet",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 9,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.722Z",
+    "updated_at": "2026-06-27T08:40:53.722Z",
+    "code": "8443",
+    "description": "Printers and multifunction devices",
+    "gst_rate": "18.00",
+    "chapter": "84",
+    "keywords": "printer scanner photocopier multifunction inkjet laser",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 10,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.729Z",
+    "updated_at": "2026-06-27T08:40:53.729Z",
+    "code": "8414",
+    "description": "Fans air circulators and exhaust fans",
+    "gst_rate": "18.00",
+    "chapter": "84",
+    "keywords": "fan ceiling table pedestal exhaust cooler air circulator",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 11,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.735Z",
+    "updated_at": "2026-06-27T08:40:53.735Z",
+    "code": "8422",
+    "description": "Dishwashers",
+    "gst_rate": "18.00",
+    "chapter": "84",
+    "keywords": "dishwasher dish washing",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 12,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.741Z",
+    "updated_at": "2026-06-27T08:40:53.741Z",
+    "code": "8509",
+    "description": "Mixers grinders and food processors",
+    "gst_rate": "18.00",
+    "chapter": "85",
+    "keywords": "mixer grinder juicer food processor blender wet",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 13,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.748Z",
+    "updated_at": "2026-06-27T08:40:53.748Z",
+    "code": "8466",
+    "description": "Microwave ovens and induction cooktops",
+    "gst_rate": "18.00",
+    "chapter": "85",
+    "keywords": "microwave oven induction cooktop otg convection",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 14,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.754Z",
+    "updated_at": "2026-06-27T08:40:53.754Z",
+    "code": "9403",
+    "description": "Furniture (wooden metal modular)",
+    "gst_rate": "18.00",
+    "chapter": "94",
+    "keywords": "furniture sofa table chair bed wardrobe cupboard cabinet desk dining",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 15,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.760Z",
+    "updated_at": "2026-06-27T08:40:53.760Z",
+    "code": "9401",
+    "description": "Seats chairs and sofas",
+    "gst_rate": "18.00",
+    "chapter": "94",
+    "keywords": "chair sofa seat recliner stool bench",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 16,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.767Z",
+    "updated_at": "2026-06-27T08:40:53.767Z",
+    "code": "9404",
+    "description": "Mattresses cushions and bedding",
+    "gst_rate": "18.00",
+    "chapter": "94",
+    "keywords": "mattress cushion pillow bedding foam spring coir",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 17,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.773Z",
+    "updated_at": "2026-06-27T08:40:53.773Z",
+    "code": "8711",
+    "description": "Motorcycles scooters and mopeds",
+    "gst_rate": "28.00",
+    "chapter": "87",
+    "keywords": "motorcycle scooter bike moped two wheeler ev electric",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 18,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.779Z",
+    "updated_at": "2026-06-27T08:40:53.779Z",
+    "code": "8712",
+    "description": "Bicycles",
+    "gst_rate": "12.00",
+    "chapter": "87",
+    "keywords": "bicycle cycle pedal kids gear",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 19,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.786Z",
+    "updated_at": "2026-06-27T08:40:53.786Z",
+    "code": "8713",
+    "description": "Wheelchairs and carriages for disabled",
+    "gst_rate": "5.00",
+    "chapter": "87",
+    "keywords": "wheelchair invalid carriage disabled",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 20,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.792Z",
+    "updated_at": "2026-06-27T08:40:53.792Z",
+    "code": "6109",
+    "description": "T-shirts and vests (cotton)",
+    "gst_rate": "5.00",
+    "chapter": "61",
+    "keywords": "tshirt t-shirt vest cotton apparel clothing",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 21,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.798Z",
+    "updated_at": "2026-06-27T08:40:53.798Z",
+    "code": "6203",
+    "description": "Mens suits trousers and shirts",
+    "gst_rate": "12.00",
+    "chapter": "62",
+    "keywords": "shirt trouser suit pant menswear apparel",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 22,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.805Z",
+    "updated_at": "2026-06-27T08:40:53.805Z",
+    "code": "6204",
+    "description": "Womens suits dresses and skirts",
+    "gst_rate": "12.00",
+    "chapter": "62",
+    "keywords": "dress saree skirt kurti womenswear apparel",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 23,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.810Z",
+    "updated_at": "2026-06-27T08:40:53.810Z",
+    "code": "6403",
+    "description": "Footwear with leather uppers",
+    "gst_rate": "18.00",
+    "chapter": "64",
+    "keywords": "shoe footwear sandal leather boot slipper",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 24,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.817Z",
+    "updated_at": "2026-06-27T08:40:53.817Z",
+    "code": "7113",
+    "description": "Jewellery of gold and silver",
+    "gst_rate": "3.00",
+    "chapter": "71",
+    "keywords": "jewellery gold silver ring necklace ornament",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 25,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.824Z",
+    "updated_at": "2026-06-27T08:40:53.826Z",
+    "code": "9101",
+    "description": "Wrist watches and clocks",
+    "gst_rate": "18.00",
+    "chapter": "91",
+    "keywords": "watch wristwatch clock smartwatch",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 26,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.830Z",
+    "updated_at": "2026-06-27T08:40:53.830Z",
+    "code": "9006",
+    "description": "Cameras and photographic equipment",
+    "gst_rate": "18.00",
+    "chapter": "90",
+    "keywords": "camera dslr lens photography video",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 27,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.836Z",
+    "updated_at": "2026-06-27T08:40:53.836Z",
+    "code": "8519",
+    "description": "Audio systems speakers and headphones",
+    "gst_rate": "18.00",
+    "chapter": "85",
+    "keywords": "speaker headphone earphone soundbar audio bluetooth music",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 28,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.845Z",
+    "updated_at": "2026-06-27T08:40:53.845Z",
+    "code": "4820",
+    "description": "Notebooks registers and stationery",
+    "gst_rate": "18.00",
+    "chapter": "48",
+    "keywords": "notebook register diary stationery paper",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 29,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.847Z",
+    "updated_at": "2026-06-27T08:40:53.847Z",
+    "code": "4901",
+    "description": "Books printed",
+    "gst_rate": "0.00",
+    "chapter": "49",
+    "keywords": "book printed textbook novel",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 30,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.853Z",
+    "updated_at": "2026-06-27T08:40:53.853Z",
+    "code": "3004",
+    "description": "Medicaments and medicines",
+    "gst_rate": "12.00",
+    "chapter": "30",
+    "keywords": "medicine medicament tablet capsule drug pharma",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 31,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.856Z",
+    "updated_at": "2026-06-27T08:40:53.856Z",
+    "code": "3304",
+    "description": "Cosmetics and beauty preparations",
+    "gst_rate": "18.00",
+    "chapter": "33",
+    "keywords": "cosmetic makeup cream lotion beauty lipstick",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 32,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.858Z",
+    "updated_at": "2026-06-27T08:40:53.858Z",
+    "code": "3401",
+    "description": "Soaps and bath products",
+    "gst_rate": "18.00",
+    "chapter": "34",
+    "keywords": "soap bath wash detergent bar",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 33,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.861Z",
+    "updated_at": "2026-06-27T08:40:53.861Z",
+    "code": "2106",
+    "description": "Food preparations and supplements",
+    "gst_rate": "18.00",
+    "chapter": "21",
+    "keywords": "food supplement protein nutrition powder",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 34,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.863Z",
+    "updated_at": "2026-06-27T08:40:53.864Z",
+    "code": "9504",
+    "description": "Video games consoles and toys",
+    "gst_rate": "18.00",
+    "chapter": "95",
+    "keywords": "gaming console video game playstation xbox toy",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.hsncode",
+  "pk": 35,
+  "fields": {
+    "created_at": "2026-06-27T08:40:53.866Z",
+    "updated_at": "2026-06-27T08:40:53.866Z",
+    "code": "9999",
+    "description": "General goods (uncategorised)",
+    "gst_rate": "18.00",
+    "chapter": "99",
+    "keywords": "general goods miscellaneous item product",
+    "is_active": true
+  }
+},
+{
+  "model": "smart_fields.fieldsuggestionmapping",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-06-27T08:41:10.702Z",
+    "updated_at": "2026-06-27T08:41:10.703Z",
+    "field_key": "product.hsn",
+    "input_normalized": "lg fully automatic washing machine",
+    "suggested_value": "8450",
+    "suggested_label": "Washing machines",
+    "gst_rate": "18.00",
+    "source": "CONFIRMED",
+    "hit_count": 1
+  }
+},
+{
+  "model": "subscriptions.businessprofile",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-06-30T06:33:28.259Z",
+    "updated_at": "2026-07-01T06:38:37.775Z",
+    "legal_name": "Pradip Roy",
+    "trade_name": "Subidha Furniture",
+    "business_code": "SUBIDHA-ASN-001",
+    "primary_email": "subidhafurnitureofficial@gmail.com",
+    "primary_phone": "+919476490946",
+    "alternate_phone": "",
+    "website_url": "https://subidhafurnitureasansol.com",
+    "address_line_1": "South Dhadka Sukantapally",
+    "address_line_2": "Near Rupkatha Cinema Hall",
+    "landmark": "Dakhin Dhadka",
+    "city": "Asansol",
+    "district": "Paschim Barddhaman",
+    "state": "West Bengal",
+    "postal_code": "713302",
+    "country": "India",
+    "gstin": "",
+    "pan_number": "CXEPR2903N",
+    "invoice_prefix": "SFI",
+    "receipt_prefix": "SFR",
+    "default_currency_code": "INR",
+    "timezone_name": "Asia/Kolkata",
+    "logo_url": "",
+    "is_active": true
+  }
+},
+{
+  "model": "subscriptions.branch",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-03T18:31:39.089Z",
+    "updated_at": "2026-07-03T18:31:39.089Z",
+    "code": "BR-ASN",
+    "name": "Asansol main",
+    "branch_type": "BRANCH",
+    "email": "",
+    "phone": "",
+    "manager_name": "",
+    "address_line_1": "",
+    "address_line_2": "",
+    "landmark": "",
+    "city": "",
+    "district": "",
+    "state": "",
+    "postal_code": "",
+    "country": "India",
+    "is_head_office": false,
+    "is_active": true,
+    "opened_on": null,
+    "notes": ""
+  }
+},
+{
+  "model": "subscriptions.financeaccount",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-03T18:31:39.105Z",
+    "updated_at": "2026-07-03T18:31:39.105Z",
+    "code": "FA-CASH",
+    "name": "Cash account",
+    "account_type": "CASH",
+    "account_holder_name": "",
+    "provider_name": "",
+    "bank_name": "",
+    "branch_name": "",
+    "masked_account_number": "",
+    "ifsc_code": "",
+    "upi_handle": "",
+    "notes": "",
+    "is_active": true
+  }
+},
+{
+  "model": "subscriptions.cashdesk",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-03T18:31:39.137Z",
+    "updated_at": "2026-07-03T18:31:39.137Z",
+    "code": "CD-01",
+    "name": "Front desk",
+    "branch": 1,
+    "desk_type": "CASH",
+    "default_finance_account": 1,
+    "allow_cash_collection": true,
+    "allow_bank_collection": false,
+    "allow_upi_collection": false,
+    "receipt_printer_name": "",
+    "device_label": "",
+    "is_default_for_branch": false,
+    "is_active": true,
+    "notes": ""
+  }
+},
+{
+  "model": "subscriptions.chartaccount",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-03T18:31:39.184Z",
+    "updated_at": "2026-07-03T18:31:39.184Z",
+    "code": "CA-1001",
+    "name": "Cash in hand",
+    "account_category": "ASSET",
+    "account_group": "CASH",
+    "parent": null,
+    "description": "",
+    "is_system": false,
+    "is_active": true,
+    "allow_manual_posting": true,
+    "display_order": 0
+  }
+},
+{
+  "model": "subscriptions.documentprintsettings",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-06-30T06:33:28.299Z",
+    "updated_at": "2026-07-01T07:48:55.968Z",
+    "business_profile": 1,
+    "business_logo": "",
+    "authorized_signature": "",
+    "business_name": "Subidha Furniture",
+    "business_tagline": "",
+    "print_address": "South Dhadka Sukantapally\r\nNear Rupkatha Cinema Hall\r\nDakhin Dhadka\r\nAsansol, Paschim Barddhaman, West Bengal, 713302, India",
+    "print_phone": "+919476490946",
+    "print_email": "subidhafurnitureofficial@gmail.com",
+    "print_website": "www.subidhafurnitureasansol.com",
+    "tax_label": "PAN: CXEPR2903N",
+    "invoice_terms": "This is a system-generated invoice copy. All amounts, taxes, discounts, and balances shown are drawn from posted backend business records only and are accurate as of the print/generation time shown above.\nThis invoice does not by itself confirm that payment has been received; payment is confirmed only by a corresponding backend receipt/payment record.\nAny handwritten note, verbal assurance, or edited paper copy that conflicts with the backend record has no effect and does not bind the business.\nGST/tax treatment, if applicable, follows the business's current registration status recorded in the system at the time of invoice generation.\nFor billing queries, discrepancies, or corrections, contact the business using the details shown on this document within a reasonable time of receipt.",
+    "receipt_terms": "This is a system-generated receipt copy confirming only the amount recorded as received against the reference shown above.\nA receipt that has been voided, cancelled, or reversed in the backend is retained for audit purposes only and is not valid proof of an active or collectable payment.\nIf this receipt is presented as proof of payment but the backend payment record shows a different status (pending, reversed, or unmatched), the backend record controls.\nDuplicate, altered, or reissued receipts must be verified against the backend record before being relied upon.",
+    "delivery_challan_terms": "This delivery challan confirms physical handling, dispatch, or handover of goods only and does not, by itself, confirm that payment has been settled or that ownership has transferred.\nStock movement, receivables, accounting entries, and payment status remain governed exclusively by the corresponding posted backend records, not by this printed copy.\nThe receiving party should inspect the goods at handover and note any visible discrepancy in quantity or condition on this challan at the time of receipt; claims raised later are subject to the applicable delivery/warranty policy.",
+    "subscription_contract_terms": "This document displays Lucky Plan / Advance EMI subscription terms exactly as recorded in the backend contract at the time of printing; it does not itself create, amend, or waive any contractual obligation.\nWhere a winner benefit applies, it waives only the specific future, unpaid EMI rows identified in the backend waiver record for this subscription -- it does not refund EMIs already paid and does not apply to any other subscription or contract.\nEMI due dates, amounts, and payment status shown here are subject to change if the backend record is later corrected, amended, or reconciled; the backend record at the time of any dispute is controlling.\nThis is not a certificate of a cash prize, lottery, or chance-based winning; it is a contractual waiver of future instalments under the terms of the underlying purchase/subscription contract.",
+    "rent_lease_contract_terms": "This document displays rent/lease contract terms, monthly demand, and possession details exactly as recorded in the backend contract at the time of printing.\nSecurity deposit refund eligibility, deduction amount, and asset return condition are determined solely through the backend deposit-refund and return-inspection workflow, not by this printed copy.\nContinued possession, use, and care of the leased asset remain subject to the signed contract terms and the Rental/Lease Policy, both of which take precedence over any informal understanding.\nOwnership of the asset does not transfer under a rent/lease contract unless a separate, distinct sale document is issued and recorded in the backend.",
+    "purchase_bill_terms": "This is a system-generated copy of a vendor purchase bill recorded in the backend vendor/purchase workflow; it is provided for internal reference and audit purposes.\nVendor payable balance, stock inward quantity, and any related accounting postings are governed exclusively by the corresponding posted backend records, not by this printed copy.\nDiscrepancies between this copy and the vendor's original bill must be reported to the accounts team for reconciliation before payment is finalised.",
+    "vendor_voucher_terms": "This is a system-generated copy of a vendor payment voucher recorded in the backend vendor-payment workflow; it is provided for internal reference and audit purposes only.\nThis document does not itself create, approve, post, reverse, or settle any vendor payable, accounting entry, or bank/cash transaction -- those actions occur only through the corresponding approved backend workflow.\nA printed or duplicate copy of this voucher must be verified against the backend payment record before being treated as proof of payment made.",
+    "account_statement_terms": "This statement is generated from existing backend report or customer/account records available at the time of generation only.\nWhere opening balance, running balance, reconciliation status, or customer totals are not shown, they have not been inferred, estimated, or calculated for this printout -- the absence of a figure is not a representation that the balance is zero.\nThis statement is provided for reference and reconciliation support; in case of any discrepancy, the underlying posted backend ledger and transaction records are controlling, not this summary.",
+    "report_footer_note": "Generated by Subidha Furniture (SUBIDHA CORE) for internal audit and business record-keeping. This footer confirms print/display formatting only and does not itself create, alter, approve, or settle any financial, contractual, or accounting record.",
+    "authorized_signatory_label": "Authorized Signature",
+    "customer_signature_label": "Customer Signature",
+    "document_layout_density": "COMPACT",
+    "show_watermark": true,
+    "show_logo": true,
+    "is_active": true
+  }
+},
+{
+  "model": "subscriptions.businesspolicy",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-03T18:31:39.374Z",
+    "updated_at": "2026-07-03T18:31:39.374Z",
+    "key": "emi_grace_days",
+    "value_type": "BOOL",
+    "value": "5",
+    "scope_type": "GLOBAL",
+    "scope_key": "",
+    "effective_from": null,
+    "effective_to": null,
+    "is_active": true,
+    "created_by": null,
+    "updated_by": null,
+    "metadata": {}
+  }
+},
+{
+  "model": "subscriptions.plantemplate",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-03T18:31:39.529Z",
+    "updated_at": "2026-07-03T18:31:39.529Z",
+    "template_code": "PT-EMI-20",
+    "name": "Standard 20-month EMI",
+    "description": "",
+    "plan_type": "EMI",
+    "tenure_months": null,
+    "default_down_payment_percent": null,
+    "default_security_deposit_percent": null,
+    "default_grace_days": null,
+    "is_lucky_plan_eligible": false,
+    "requires_batch": false,
+    "requires_lucky_id": false,
+    "is_active": true,
+    "metadata": {},
+    "created_by": null,
+    "updated_by": null
+  }
+},
+{
+  "model": "subscriptions.businessrulepolicy",
+  "pk": 1,
+  "fields": {
+    "created_at": "2026-07-01T06:56:49.442Z",
+    "updated_at": "2026-07-01T06:56:49.459Z",
+    "name": "Default legal controls",
+    "is_active": true,
+    "plan_type": "PRODUCT_INSTALLMENT",
+    "benefit_type": "CONTRACTUAL_WAIVER",
+    "selection_method": "HASH_FAIRNESS",
+    "funding_source": "COMPANY_MARGIN",
+    "risk_status": "ADVOCATE_REVIEW_REQUIRED",
+    "refund_sla_working_days": 7,
+    "late_payment_charge_enabled": false,
+    "late_payment_charge_configured": false,
+    "late_payment_charge_label": "Late Payment Charge",
+    "partner_receipt_admin_approval_required": true,
+    "kyc_masking_required": true,
+    "deposit_refund_requires_inspection": true,
+    "gst_documents_require_hsn_sac": true,
+    "non_gst_document_labels": [
+      "Retail Bill",
+      "Sale Bill",
+      "Money Receipt",
+      "Plan Receipt",
+      "Security Deposit Receipt",
+      "Commercial Waiver Note",
+      "Commercial Credit Note",
+      "Refund Record"
+    ],
+    "notes": "Seeded default controls: public waiver launch blocked until advocate/CA approval.",
+    "updated_by": null
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 40,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.550Z",
+    "updated_at": "2026-07-01T07:45:14.710Z",
+    "slug": "terms",
+    "version": 1,
+    "category": "GENERAL",
+    "title": "Terms and Conditions",
+    "summary": "General terms for using Subidha Furniture's website, direct sale, Lucky Plan EMI, rent/lease, delivery, payment, and service workflows.",
+    "content": "# Terms and Conditions\n\nThese Terms and Conditions apply to all customer-facing business activities of **Subidha Furniture**, operated by **Pradip Roy** / **Pradip Roy**, Business Code **SUBIDHA-ASN-001**, from **[Dhadka]**.\n\n## 1. Scope\n\nThese terms apply when a person uses our website, submits an enquiry, registers as a customer, accepts a quotation, buys a product, joins a Lucky Plan EMI subscription, enters a rent/lease contract, pays an amount, receives delivery, requests service, or communicates with our staff.\n\n## 2. Business records are controlling\n\nInvoices, receipts, contracts, payment records, delivery records, support tickets, audit logs, and approved backend-generated documents are the official business records. Screenshots, verbal promises, informal messages, and handwritten notes are not final unless matched with approved business records.\n\n## 3. Customer responsibility\n\nCustomers must provide correct name, phone, address, payment reference, identity/KYC information where required, delivery availability, and product/service details. Incorrect or incomplete information may delay order, delivery, refund, service, warranty, EMI processing, rent/lease possession, or account support.\n\n## 4. Product and price confirmation\n\nProduct images, brochures, catalogue descriptions, and website listings are informational. Final product, price, discount, tax, delivery charge, warranty, and terms are confirmed only through approved quotation, invoice, contract, or receipt.\n\n## 5. Direct sale, EMI, rent, and lease separation\n\nDirect sale, Lucky Plan EMI, rent, and lease are separate workflows. A direct sale does not create a Lucky ID. A Lucky Plan subscription does not create a rent/lease contract. Rent/lease possession does not transfer ownership unless a written sale document is issued.\n\n## 6. Legal rights preserved\n\nThese terms do not remove statutory consumer rights under applicable Indian law. Where a written contract or policy gives additional business rules, both the contract and policy apply unless prohibited by law.\n\n## 7. Contact and jurisdiction\n\nSupport is available at **+91 94764 90946**, **subidhafurnitureofficial@gmail.com**, and **South Dhadka Sukantapally, Near Rupkatha Cinema Hall, Dakhin Dhadka, Asansol, Paschim Barddhaman, West Bengal, 713302, India**. Subject to applicable consumer law, disputes are ordinarily handled under the competent jurisdiction of **Asansol, West Bengal, India**.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 41,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.597Z",
+    "updated_at": "2026-07-01T07:19:22.607Z",
+    "slug": "privacy",
+    "version": 1,
+    "category": "PRIVACY",
+    "title": "Privacy Policy",
+    "summary": "Explains how Subidha Furniture collects, uses, stores, protects, and handles customer personal data.",
+    "content": "# Privacy Policy\n\nSubidha Furniture respects customer privacy and processes personal data only for lawful business purposes connected with furniture sales, Lucky Plan EMI, rent/lease, delivery, payment, service, support, compliance, audit, and dispute handling.\n\n## 1. Data we collect\n\nWe may collect name, phone, email, address, KYC details, payment references, contract records, product selections, delivery details, service photos, support conversations, invoices, receipts, and account login/security information.\n\n## 2. Why we use data\n\nWe use data to create customer accounts, handle enquiries, prepare quotations, generate invoices/receipts, manage EMI schedules, run Lucky Plan records, process rent/lease possession and deposits, schedule delivery, provide warranty/service support, prevent fraud, reconcile payments, comply with tax/accounting/legal duties, and resolve disputes.\n\n## 3. Sharing\n\nWe may share limited data with staff, authorised partners, delivery staff, service technicians, payment/accounting processors, legal/compliance advisers, auditors, hosting providers, and government authorities where required. We do not sell customer personal data.\n\n## 4. Retention\n\nFinancial, tax, contract, payment, audit, KYC, warranty, delivery, and dispute records may be retained as long as required for business, legal, accounting, compliance, or dispute purposes. Deletion requests are handled under the Data Requests and Data Retention policies.\n\n## 5. Customer rights and contact\n\nCustomers may request access, correction, update, or deletion review by contacting **subidhafurnitureofficial@gmail.com** or **+91 94764 90946**. Certain records cannot be deleted immediately where retention is legally or operationally required.\n\n## 6. Security\n\nWe use access control, role separation, audit logs, backups, and internal process controls. No system is risk-free; suspected misuse or breach should be reported immediately to **subidhafurnitureofficial@gmail.com**.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 42,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.614Z",
+    "updated_at": "2026-07-01T07:19:22.621Z",
+    "slug": "refund-cancellation",
+    "version": 1,
+    "category": "REFUND",
+    "title": "Refund and Cancellation Policy",
+    "summary": "Explains cancellation, return, refund, reversal, and adjustment rules.",
+    "content": "# Refund and Cancellation Policy\n\nRefunds, cancellations, returns, reversals, and adjustments are controlled workflows. They are not automatic and must be reviewed against invoice, receipt, contract, payment, delivery, product condition, and audit records.\n\n## 1. Direct sale cancellation\n\nBefore delivery or installation, cancellation may be considered if the product has not been specially ordered, customised, damaged, dispatched, or delivered. Any approved refund may deduct transport, handling, payment charges, packaging, customisation cost, or administrative cost.\n\n## 2. After delivery\n\nAfter delivery acknowledgement, return/replacement depends on product condition, warranty eligibility, visible damage evidence, manufacturing defect, and timely reporting. Used, damaged, customised, assembled, or customer-misused products may be rejected or charged.\n\n## 3. Lucky Plan EMI cancellation\n\nLucky Plan cancellation is subject to the approved contract/rulebook. Paid amounts, deductions, outstanding dues, delivery status, winner status, and waiver status must be checked before refund or closure.\n\n## 4. Rent/lease closure and deposit refund\n\nSecurity deposit refund requires return inspection, dues clearance, asset condition check, missing/damaged part review, and approved deduction/refund workflow.\n\n## 5. Refund method and timing\n\nApproved refunds are processed to the verified customer/payment channel within **7 to 15 working days after approval**, subject to bank/payment delay and completion of internal approval.\n\n## 6. Fraud and duplicate claims\n\nFraudulent payment proof, duplicate refund claim, chargeback abuse, or false damage claim may lead to rejection, account restriction, recovery, or legal action.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 43,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.629Z",
+    "updated_at": "2026-07-01T07:19:22.633Z",
+    "slug": "warranty",
+    "version": 1,
+    "category": "WARRANTY",
+    "title": "Warranty Policy",
+    "summary": "Explains product warranty support, exclusions, and service escalation.",
+    "content": "# Warranty Policy\n\nWarranty support depends on product type, invoice date, manufacturer warranty, shop warranty if any, usage condition, and inspection result.\n\n## 1. Warranty proof\n\nInvoice/receipt and product identity are required for warranty review. Warranty is not transferable unless approved in writing.\n\n## 2. Coverage\n\nWarranty may cover manufacturing defects, eligible hardware failure, or workmanship issues confirmed by inspection. Manufacturer warranty terms apply where the product carries manufacturer coverage.\n\n## 3. Exclusions\n\nWarranty does not cover misuse, water/fire/termite/pest damage, overloading, unauthorised repair, modification, accident, commercial misuse, normal wear and tear, colour/polish variation, fabric fading, mattress comfort preference, or damage after delivery acknowledgement.\n\n## 4. Service path\n\nWarranty claims are handled through service ticket, inspection, photo/evidence review, repair/replacement decision, and closure record.\n\n## 5. Timeline\n\nResolution depends on inspection, parts availability, supplier/manufacturer response, and workload. Estimated response time: **3 to 10 working days, depending on inspection and parts availability**.\n\n## 6. No automatic refund\n\nWarranty review does not automatically create refund, return, or replacement unless approved under business workflow and applicable law.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 44,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.644Z",
+    "updated_at": "2026-07-01T07:19:22.657Z",
+    "slug": "delivery-policy",
+    "version": 1,
+    "category": "DELIVERY",
+    "title": "Delivery Policy",
+    "summary": "Explains delivery scheduling, handover, failed delivery, customer acknowledgement, and delivery evidence.",
+    "content": "# Delivery Policy\n\nDelivery is subject to product availability, payment/contract status, address accuracy, route feasibility, staff availability, and readiness approval in the system.\n\n## 1. Delivery eligibility\n\nDelivery may be blocked if payment is unpaid/unverified, EMI/rent/lease contract is not ready, KYC is pending where required, product is unavailable, stock is on hold, address is incomplete, or customer is unreachable.\n\n## 2. Scheduling\n\nDelivery dates and time slots are estimates unless expressly confirmed. Weather, transport issue, staff shortage, supplier delay, traffic, local restrictions, or force majeure may affect delivery.\n\n## 3. Customer responsibility\n\nThe customer must provide correct address, phone, lift/stair/access details, receiver name, and availability. Extra labour, difficult access, rescheduling, or waiting may be chargeable.\n\n## 4. Handover\n\nAt handover, the customer/receiver should inspect quantity, visible condition, model, accessories, and packaging. Delivery acknowledgement may be treated as evidence that visible condition was accepted.\n\n## 5. Failed delivery\n\nWrong address, locked premises, customer absence, refusal, unpaid dues, unsafe access, or no response may be treated as failed delivery and may require rescheduling charges.\n\n## 6. Damage reporting\n\nVisible damage should be reported at delivery. Later claims require evidence and inspection under warranty/service policy.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 45,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.665Z",
+    "updated_at": "2026-07-01T07:19:22.674Z",
+    "slug": "rental-lease-policy",
+    "version": 1,
+    "category": "RENT_LEASE",
+    "title": "Rental and Lease Policy",
+    "summary": "Explains rent/lease contract onboarding, possession, monthly demand, security deposit, return, and closure rules.",
+    "content": "# Rental and Lease Policy\n\nRent and lease workflows allow customer possession/use of selected products under written contract without immediate ownership transfer.\n\n## 1. Onboarding\n\nCustomer registration, KYC, address verification, contract approval, security deposit, and payment readiness may be required before possession.\n\n## 2. Security deposit\n\nSecurity deposit may be collected as **20% to 30%, or as stated in the contract** or as stated in the contract. Deposit is not advance rent unless specifically recorded.\n\n## 3. Monthly dues\n\nMonthly rent/lease dues must be paid by due date. Late payment may lead to reminders, service hold, possession review, deduction, cancellation, recovery, or legal action.\n\n## 4. Customer use\n\nCustomer must use the asset carefully, keep it at the approved location, prevent damage, avoid unauthorised transfer/sublease, and report issues promptly.\n\n## 5. Return and closure\n\nClosure requires return inspection, dues clearance, missing/damage review, deposit deduction/refund approval, and contract closeout.\n\n## 6. Ownership\n\nOwnership remains with Subidha Furniture or lawful owner unless a separate sale document transfers title.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 46,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.682Z",
+    "updated_at": "2026-07-01T07:19:22.689Z",
+    "slug": "lucky-plan-policy",
+    "version": 1,
+    "category": "LUCKY_PLAN",
+    "title": "Lucky Plan Policy",
+    "summary": "Explains Lucky Plan EMI, Lucky IDs, winner waiver, draw rules, and customer responsibilities.",
+    "content": "# Lucky Plan Policy\n\nLucky Plan EMI is a product instalment subscription workflow operated by Subidha Furniture. It is linked to product purchase/contract records and is not a cash prize scheme.\n\n## 1. Basic structure\n\nProduct base price is treated as total contract price. Default EMI is total contract price divided by **15** months unless contract states otherwise.\n\n## 2. Lucky ID and batch\n\nEach subscription may be linked to a Lucky ID within a batch of **100** IDs. One customer may hold multiple subscriptions/Lucky IDs only where allowed by approved workflow.\n\n## 3. Draw and winner waiver\n\nA draw may be conducted as per approved rulebook. The winning Lucky ID receives waiver of future unpaid EMIs only. Already-paid EMIs are not automatically refunded unless a separate written rule applies.\n\n## 4. Payment duties\n\nCustomers must pay each EMI by due date. Late/defaulted EMI may affect draw eligibility, delivery readiness, service support, cancellation review, and settlement.\n\n## 5. Product delivery\n\nDelivery may require minimum paid EMI count, KYC, stock readiness, contract activation, and no unresolved blockers.\n\n## 6. Audit and dispute\n\nDraw records, hash/fairness proof, winner settlement, waivers, EMIs, payments, and delivery records remain auditable and cannot be manually changed for convenience.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 47,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.693Z",
+    "updated_at": "2026-07-01T07:19:22.704Z",
+    "slug": "direct-sale-policy",
+    "version": 1,
+    "category": "DIRECT_SALE",
+    "title": "Direct Sale Policy",
+    "summary": "Explains direct-sale invoice, receipt, delivery, return, cancellation, and warranty terms.",
+    "content": "# Direct Sale Policy\n\nDirect Sale means a normal retail sale outside Lucky Plan EMI, rent, or lease.\n\n## 1. Sale confirmation\n\nA sale is confirmed when invoice/receipt/order confirmation is generated or when the shop accepts the order under approved workflow.\n\n## 2. Walk-in customer\n\nWhere backend workflow allows, direct sale may be made to a walk-in customer without full EMI/rent KYC. Required billing, delivery, and warranty details must still be accurate.\n\n## 3. Product availability\n\nStock may be ready, reserved, ordered, or subject to supplier availability. Delivery/fulfilment depends on actual stock and payment status.\n\n## 4. Price and discount\n\nDiscounts are valid only when recorded in quotation/invoice. Old quotes, verbal offers, or screenshots do not bind the shop after expiry or stock/price change.\n\n## 5. Return and service\n\nReturns, warranty, and service follow the Refund/Cancellation, Warranty, Delivery, and Service policies.\n\n## 6. Separation from contract plans\n\nDirect sale does not create EMI waiver, Lucky ID, security deposit, monthly rent, or lease possession rights.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 48,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.710Z",
+    "updated_at": "2026-07-01T07:19:22.727Z",
+    "slug": "payment-policy",
+    "version": 1,
+    "category": "PAYMENT",
+    "title": "Payment Policy",
+    "summary": "Explains accepted payment modes, receipts, failed payments, outstanding dues, reconciliation, and customer payment responsibilities.",
+    "content": "# Payment Policy\n\nPayments are accepted only through approved modes and are valid only after recorded by Subidha Furniture against the correct customer, sale, invoice, EMI, rent/lease contract, deposit, advance, or service.\n\n## 1. Accepted modes\n\nApproved modes may include cash, UPI, bank transfer, card, or other shop-approved channels. Do not pay to unauthorised personal accounts.\n\n## 2. Receipt requirement\n\nThe official receipt or backend payment record is the final proof of business receipt. Screenshots, UPI success screens, or verbal confirmation are not final if the amount is not received or correctly mapped.\n\n## 3. Failed or pending payments\n\nPending, failed, reversed, duplicate, wrong-reference, wrong-account, or disputed payments may remain under review until reconciliation is complete.\n\n## 4. EMI/rent due handling\n\nPayment must be made by the due date. Late or missed payment may lead to reminder, delivery hold, service hold, default review, cancellation review, or recovery action.\n\n## 5. Correction and reversal\n\nAny correction, reversal, or void must follow approved audit-safe workflow. Customers may be asked for bank/UPI proof and identity confirmation.\n\n## 6. No unauthorised collection\n\nCustomers should report unauthorised payment demands immediately at **+91 94764 90946** or **subidhafurnitureofficial@gmail.com**.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 49,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.727Z",
+    "updated_at": "2026-07-01T07:19:22.743Z",
+    "slug": "service-policy",
+    "version": 1,
+    "category": "SERVICE",
+    "title": "Service and Repair Policy",
+    "summary": "Explains customer support, service tickets, repair inspection, chargeable service, warranty service, and closure.",
+    "content": "# Service and Repair Policy\n\nService requests are managed through approved support/service workflow so that inspection, communication, evidence, cost, and closure remain traceable.\n\n## 1. Request intake\n\nCustomers should provide invoice/contract reference, product photos, issue description, delivery date, current location, and contact details.\n\n## 2. Inspection\n\nThe shop may inspect remotely through photos/video or physically at the customer location/shop/service point. Inspection decides whether the case is warranty, chargeable repair, misuse, transport damage, or non-serviceable.\n\n## 3. Chargeable service\n\nCharges may apply for expired warranty, misuse, damage, customer relocation, spare parts, technician visit, transport, reinstallation, or non-covered repairs.\n\n## 4. Warranty service\n\nEligible warranty service may include repair, part replacement, supplier escalation, or manufacturer service. Product replacement/refund is not automatic.\n\n## 5. Closure\n\nA service case is closed when resolved, rejected with reason, customer does not respond, customer refuses charges, or issue is outside support scope.\n\n## 6. Abuse prevention\n\nRepeated false claims, abusive communication, unsafe location, or non-cooperation may lead to service refusal subject to legal rights.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 50,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.751Z",
+    "updated_at": "2026-07-01T07:19:22.756Z",
+    "slug": "grievance",
+    "version": 1,
+    "category": "GRIEVANCE",
+    "title": "Grievance Policy",
+    "summary": "Explains customer grievance submission, escalation, response, and closure process.",
+    "content": "# Grievance Policy\n\nCustomers may raise complaints about billing, payment, product, delivery, EMI, rent/lease, warranty, service, staff conduct, privacy, or website issues.\n\n## 1. How to raise\n\nSubmit complaint at **+91 94764 90946**, **subidhafurnitureofficial@gmail.com**, or shop address **South Dhadka Sukantapally, Near Rupkatha Cinema Hall, Dakhin Dhadka, Asansol, Paschim Barddhaman, West Bengal, 713302, India** with invoice/receipt/contract/subscription reference and evidence.\n\n## 2. Required evidence\n\nRelevant evidence may include photos, videos, payment proof, delivery acknowledgement, chat record, product label, service ticket, or written explanation.\n\n## 3. Review\n\nThe shop will review records, staff notes, audit trail, product condition, payment status, and policy terms. Response target is **2 to 7 working days, depending on issue type** depending on complexity.\n\n## 4. Escalation\n\nUnresolved complaints may be escalated to owner/management review. Legal remedies available under Indian law remain unaffected.\n\n## 5. Closure\n\nA grievance may be closed after resolution, refund/replacement/service decision, rejection with reason, customer non-response, or handover to legal/dispute process.\n\n## 6. Conduct\n\nAbusive, threatening, fraudulent, or unsafe communication may be restricted while preserving lawful complaint rights.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 51,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.774Z",
+    "updated_at": "2026-07-01T07:19:22.780Z",
+    "slug": "business-compliance",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Business Compliance Policy",
+    "summary": "Explains public business compliance identity and registration disclosure rules.",
+    "content": "# Business Compliance Policy\n\nThis policy explains how Subidha Furniture presents business identity, registration, tax, MSME/Udyam, and compliance information to customers.\n\n## 1. Business identity\n\nTrade name, legal name, owner/proprietor, business code, address, phone, and website are shown to help customers identify the business.\n\n## 2. GST and tax status\n\nGST status is shown as: **GST Unregistered (below threshold) -- will be updated upon registration**. GSTIN is disclosed only where legally required or approved by management.\n\n## 3. Udyam/MSME status\n\nUdyam/MSME status is shown as: **[UDYAM_STATUS_PUBLIC_TEXT]**. Private certificates and numbers are not publicly downloadable unless approved.\n\n## 4. Document privacy\n\nPAN, bank proof, ownership proof, shop licence, rental agreement, and other documents may be held internally for audit/compliance and not exposed publicly.\n\n## 5. Updates\n\nCompliance details may change due to registration, renewal, correction, or legal requirement. Public pages will be updated after verification.\n\n## 6. No false representation\n\nCustomers may report suspected incorrect compliance information at **subidhafurnitureofficial@gmail.com**.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 52,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.784Z",
+    "updated_at": "2026-07-01T07:19:22.798Z",
+    "slug": "ownership-business-proof",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Ownership and Business Proof Policy",
+    "summary": "Explains ownership and business proof disclosure rules.",
+    "content": "# Ownership and Business Proof Policy\n\nSubidha Furniture may maintain ownership, shop, address, bank, tax, MSME, and business proof records for internal audit, vendor/customer trust, and compliance readiness.\n\n## 1. Public summary only\n\nPublic pages may show a summary of verified business identity. Full private documents are not public unless legally required and approved.\n\n## 2. Private records\n\nPAN, bank proof, rental agreement, ownership documents, licences, utility bills, identity proofs, and similar records remain private operational evidence.\n\n## 3. Verification\n\nVerification means the document was reviewed internally for business use. It is not a government guarantee, legal title opinion, or public certification.\n\n## 4. Updates and expiry\n\nExpired, rejected, or superseded documents must not be treated as current. Public summaries should be updated after review.\n\n## 5. Customer reliance\n\nCustomers should rely on invoice, receipt, official communication, and verified public summary. They should not demand private documents unless legally entitled.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 53,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.807Z",
+    "updated_at": "2026-07-01T07:19:22.818Z",
+    "slug": "udyam-msme",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Udyam/MSME Policy",
+    "summary": "Explains Udyam/MSME status disclosure and verification limits.",
+    "content": "# Udyam/MSME Policy\n\nSubidha Furniture may disclose Udyam/MSME status to explain small-business identity and available public business information.\n\n## 1. Status wording\n\nCurrent public status: **[UDYAM_STATUS_PUBLIC_TEXT]**.\n\n## 2. No guarantee of benefit\n\nUdyam/MSME status does not guarantee customer discount, subsidy, government support, financing, refund, or special dispute outcome.\n\n## 3. Privacy\n\nCertificate numbers or documents may be kept private unless disclosure is legally required or approved.\n\n## 4. Updates\n\nIf Udyam/MSME status changes, public text will be updated after internal verification.\n\n## 5. Misuse\n\nNo customer, vendor, partner, or third party may misuse the business's MSME identity for unauthorised claims.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 54,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.834Z",
+    "updated_at": "2026-07-01T07:19:22.845Z",
+    "slug": "data-requests",
+    "version": 1,
+    "category": "PRIVACY",
+    "title": "Data Requests Policy",
+    "summary": "Explains customer data access, correction, retention, and deletion request handling.",
+    "content": "# Data Requests Policy\n\nCustomers may request access, correction, update, deletion review, or grievance handling for eligible personal data.\n\n## 1. How to request\n\nSend request to **subidhafurnitureofficial@gmail.com** or **+91 94764 90946** with registered phone/email and supporting identity proof if required.\n\n## 2. Verification\n\nWe may verify the requester before sharing or changing data to prevent fraud or unauthorised access.\n\n## 3. Correction\n\nIncorrect phone, address, name, email, KYC, delivery, or account details may be corrected after verification. Financial and audit records may require correction notes instead of deletion.\n\n## 4. Deletion limits\n\nInvoices, receipts, payments, tax records, contracts, audit logs, dispute records, warranty records, and legal/compliance records may be retained even if account deletion is requested.\n\n## 5. Response\n\nRequests are handled within a reasonable period depending on complexity, verification, and legal retention obligations.\n\n## 6. Abuse\n\nRepeated, fraudulent, or unauthorised requests may be refused with reason.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 55,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.852Z",
+    "updated_at": "2026-07-01T07:19:22.859Z",
+    "slug": "contact-enquiry-policy",
+    "version": 1,
+    "category": "CUSTOMER_SUPPORT",
+    "title": "Contact and Enquiry Policy",
+    "summary": "Explains safe handling of public enquiries and lead/contact submissions.",
+    "content": "# Contact and Enquiry Policy\n\nThis policy applies when a person submits enquiry forms, requests quotations, calls, WhatsApps, emails, or visits the shop for product/business information.\n\n## 1. Information collected\n\nWe may collect name, phone, location, product interest, budget, delivery preference, and message details.\n\n## 2. Follow-up\n\nWe may contact the person through call, WhatsApp, SMS, email, or in-person shop support for product guidance, quotation, delivery feasibility, EMI/rent/lease eligibility, or service response.\n\n## 3. No contract from enquiry\n\nSubmitting an enquiry does not create confirmed order, price lock, Lucky ID, EMI subscription, rent/lease contract, product reservation, or delivery promise.\n\n## 4. Lead closure\n\nEnquiries may be closed if duplicate, spam, unreachable, abusive, irrelevant, or completed.\n\n## 5. Data handling\n\nEnquiry data is handled under the Privacy Policy and Data Requests Policy.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 56,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.870Z",
+    "updated_at": "2026-07-01T07:19:22.878Z",
+    "slug": "cookie-tracking-consent",
+    "version": 1,
+    "category": "PRIVACY",
+    "title": "Cookie and Tracking Consent Policy",
+    "summary": "Cookies, analytics, sessions, and consent controls.",
+    "content": "# Cookie and Tracking Consent Policy\n\nwww.subidhafurnitureasansol.com may use cookies, local storage, session identifiers, analytics, and security logs to operate the website and improve customer support.\n\n## 1. Essential cookies\n\nEssential cookies are used for login, session security, form submission, fraud prevention, cart/quotation flow, and basic website operation.\n\n## 2. Analytics and improvement\n\nAnalytics may be used to understand page visits, product interest, enquiry performance, and technical errors. We do not use analytics to sell personal data.\n\n## 3. Communication tracking\n\nMessage, enquiry, quotation, and support interactions may be recorded to complete business follow-up.\n\n## 4. Consent and settings\n\nWhere consent controls are provided, customers may accept, reject, or manage non-essential tracking. Blocking essential cookies may break login or forms.\n\n## 5. Third-party services\n\nHosting, analytics, payment, email, WhatsApp, or security providers may process limited technical data under their own terms.\n\n## 6. Updates\n\nTracking practices may change as website features grow. Policy updates will be published through Policy Governance.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 57,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.886Z",
+    "updated_at": "2026-07-01T07:19:22.886Z",
+    "slug": "kyc-identity-verification",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "KYC and Identity Verification Policy",
+    "summary": "KYC, identity, address proof, and customer verification.",
+    "content": "# KYC and Identity Verification Policy\n\nKYC may be required for Lucky Plan EMI, rent/lease, high-value delivery, refund, dispute review, account recovery, partner onboarding, or fraud prevention.\n\n## 1. Required information\n\nKYC may include name, phone, address, identity proof, address proof, photo, signature, business proof, or other verification documents.\n\n## 2. Purpose\n\nKYC helps confirm customer identity, prevent fraud, verify delivery location, support contract enforcement, process refunds, and protect financial records.\n\n## 3. Refusal or mismatch\n\nIf KYC is missing, expired, rejected, mismatched, or suspicious, the shop may hold subscription activation, rent/lease possession, delivery, refund, or account changes.\n\n## 4. Privacy\n\nKYC documents are private and used only for legitimate business, legal, compliance, audit, dispute, and fraud-prevention purposes.\n\n## 5. Review\n\nApproval, rejection, expiry, and re-verification are controlled through backend workflow.\n\n## 6. False KYC\n\nFalse or forged KYC may lead to cancellation review, account restriction, recovery action, or legal action.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 58,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.902Z",
+    "updated_at": "2026-07-01T07:19:22.913Z",
+    "slug": "communication-consent",
+    "version": 1,
+    "category": "CUSTOMER_SUPPORT",
+    "title": "Communication Consent Policy",
+    "summary": "WhatsApp, SMS, calls, reminders, and service notices.",
+    "content": "# Communication Consent Policy\n\nBy submitting contact details or joining a business workflow, the customer permits Subidha Furniture to contact them for legitimate operational communication.\n\n## 1. Channels\n\nWe may use phone calls, SMS, WhatsApp, email, printed notice, portal notification, or in-person communication.\n\n## 2. Purpose\n\nCommunication may relate to enquiry, quotation, order, invoice, receipt, EMI reminder, overdue notice, rent/lease demand, payment confirmation, delivery, service, warranty, grievance, data request, OTP, or policy notice.\n\n## 3. Service messages\n\nOperational messages may continue even if promotional communication is refused, where needed for contract, payment, delivery, safety, legal, or support reasons.\n\n## 4. Customer duty\n\nCustomers must keep phone/email updated. Failure to receive messages due to wrong details, blocked number, spam folder, network issue, or device issue is not shop fault.\n\n## 5. Opt-out\n\nCustomers may request to stop promotional messages. Transactional and legally necessary communication may still continue.\n\n## 6. Misuse reporting\n\nReport fake payment demands or suspicious messages immediately at **+91 94764 90946**.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 59,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.918Z",
+    "updated_at": "2026-07-01T07:19:22.930Z",
+    "slug": "emi-subscription-default-policy",
+    "version": 1,
+    "category": "LUCKY_PLAN",
+    "title": "EMI Subscription Default Policy",
+    "summary": "Overdue EMI, reminders, default handling, and cancellation consequences.",
+    "content": "# EMI Subscription Default Policy\n\nThis policy applies when Lucky Plan EMI or subscription payments are late, unpaid, disputed, reversed, or under review.\n\n## 1. Due date responsibility\n\nCustomers must pay EMI by the due date stated in schedule/contract. Reminder failure does not remove payment duty.\n\n## 2. Overdue handling\n\nOverdue EMI may trigger reminders, late review, delivery hold, service hold, draw eligibility review, cancellation review, or recovery action.\n\n## 3. Part payment\n\nPart payment may be recorded but does not automatically mark EMI fully paid unless backend rules allow it.\n\n## 4. Disputed payment\n\nIf a customer claims payment but shop cannot verify receipt, the EMI may remain pending until reconciliation.\n\n## 5. Cancellation/default\n\nRepeated default, non-response, false proof, or contract breach may lead to cancellation or settlement review under contract terms.\n\n## 6. Audit\n\nEMI status, waiver status, payment status, cancellation, and settlement records remain auditable and cannot be silently changed.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 60,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.934Z",
+    "updated_at": "2026-07-01T07:19:22.945Z",
+    "slug": "lucky-draw-rules-fairness",
+    "version": 1,
+    "category": "LUCKY_PLAN",
+    "title": "Lucky Draw Rules and Fairness Policy",
+    "summary": "Draw source, last-two-digit rule, winner waiver, and dispute handling.",
+    "content": "# Lucky Draw Rules and Fairness Policy\n\nThis policy explains the fairness principles for Lucky Plan draw records.\n\n## 1. Draw source\n\nThe draw source, date, time, last-two-digit rule, hash proof, or other approved method must be recorded before/during draw as per rulebook.\n\n## 2. Eligibility\n\nEligibility depends on batch, Lucky ID assignment, subscription status, payment status, and rulebook conditions.\n\n## 3. Winner benefit\n\nThe winner receives waiver of future unpaid EMIs only. The winner does not receive a cash prize unless a separate written policy/contract states so.\n\n## 4. No manipulation\n\nAfter draw commitment/publication, source data, winner result, Lucky ID, and waiver settlement must not be changed for convenience.\n\n## 5. Dispute\n\nDraw disputes must be raised with batch ID, Lucky ID, subscription details, payment proof, and reason. Audit records will be reviewed.\n\n## 6. Transparency\n\nPublished winner records should explain enough information for customer trust without exposing private customer data.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 61,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.950Z",
+    "updated_at": "2026-07-01T07:19:22.965Z",
+    "slug": "security-deposit-policy",
+    "version": 1,
+    "category": "RENT_LEASE",
+    "title": "Security Deposit Policy",
+    "summary": "Rent/lease deposit collection, liability, deduction, and refund.",
+    "content": "# Security Deposit Policy\n\nSecurity deposit is collected for rent/lease risk protection and is separate from monthly rent unless contract states otherwise.\n\n## 1. Collection\n\nDeposit may be **20% to 30%, or as stated in the contract** or as stated in contract. Deposit receipt must identify customer, contract, amount, date, and mode.\n\n## 2. Use\n\nDeposit may secure unpaid dues, late charges, damage, missing parts, cleaning, transport, repair, replacement, contract breach, or recovery cost.\n\n## 3. Return inspection\n\nRefund review requires asset return, condition check, photos/evidence, dues clearance, and deduction approval.\n\n## 4. Deduction\n\nDeductions must be supported by reason/evidence and recorded in approved workflow.\n\n## 5. Refund\n\nApproved balance refund is processed within **7 to 15 working days after approval** after closure approval.\n\n## 6. No interest\n\nUnless contract states otherwise, security deposit is refundable without interest.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 62,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.980Z",
+    "updated_at": "2026-07-01T07:19:22.993Z",
+    "slug": "possession-handover-policy",
+    "version": 1,
+    "category": "DELIVERY",
+    "title": "Possession and Handover Policy",
+    "summary": "Possession, handover, acknowledgement, and condition evidence.",
+    "content": "# Possession and Handover Policy\n\nThis policy applies to rent/lease possession and any controlled product handover requiring condition evidence.\n\n## 1. Preconditions\n\nPossession may require approved contract, KYC, security deposit, first payment, delivery readiness, address verification, and no blockers.\n\n## 2. Handover evidence\n\nThe shop may record photos, product condition, accessories, serial/asset number, delivery person, receiver, location, and acknowledgement.\n\n## 3. Customer duty\n\nCustomer must inspect asset at handover and report visible issues immediately. Later claims may require evidence.\n\n## 4. Approved location\n\nAsset must remain at approved location unless written permission is given.\n\n## 5. Risk after handover\n\nCustomer is responsible for safe custody, reasonable use, loss, damage, missing parts, and unauthorised movement after possession.\n\n## 6. Return linkage\n\nHandover condition evidence is used during return inspection and deduction/refund review.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 63,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.997Z",
+    "updated_at": "2026-07-01T07:19:23.011Z",
+    "slug": "return-damage-inspection-policy",
+    "version": 1,
+    "category": "RENT_LEASE",
+    "title": "Return Damage Inspection Policy",
+    "summary": "Return inspection, damage evidence, deduction, and dispute handling.",
+    "content": "# Return Damage Inspection Policy\n\nThis policy applies when rent/lease assets or delivered products are returned for closure, repair, cancellation, or dispute review.\n\n## 1. Inspection basis\n\nReturn condition is compared with handover evidence, contract terms, product age, normal wear, photos, missing parts, and customer explanation.\n\n## 2. Damage categories\n\nDamage may include breakage, stains, burns, water damage, termite/pest damage, missing parts, structural damage, unauthorised repair, severe dirt, or misuse.\n\n## 3. Deduction\n\nApproved deductions may include repair, replacement, cleaning, transport, labour, missing items, depreciation, unpaid dues, and recovery cost.\n\n## 4. Customer dispute\n\nCustomer may dispute deduction by submitting evidence. The shop will review records and provide decision.\n\n## 5. Closure\n\nClosure is completed only after asset receipt, inspection, deduction/refund decision, and contract/account update.\n\n## 6. Fraud\n\nConcealed damage, swapped parts, or false claim may lead to recovery or legal action.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 64,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.015Z",
+    "updated_at": "2026-07-01T07:19:23.015Z",
+    "slug": "document-esign-consent",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Document and E-Sign Consent Policy",
+    "summary": "Digital documents, PDFs, signatures, receipts, contracts, and addendums.",
+    "content": "# Document and E-Sign Consent Policy\n\nCustomers may receive or accept documents physically or digitally, including PDFs, receipts, invoices, contracts, statements, delivery acknowledgements, and amendments.\n\n## 1. Digital documents\n\nDigital copies may be sent through portal, email, WhatsApp, download link, or other approved channel.\n\n## 2. Acceptance\n\nClick acceptance, OTP, signature, payment after document issue, delivery acknowledgement, WhatsApp confirmation, or continued use may be treated as acceptance evidence where allowed.\n\n## 3. Corrections\n\nWrong document details must be reported promptly. Corrected or revised documents may replace earlier drafts but audit trail remains.\n\n## 4. Printed and digital parity\n\nA backend-generated PDF/record may be treated as official even if printed later.\n\n## 5. Amendments\n\nContract changes require approved amendment workflow. Informal messages cannot override signed/approved contract records.\n\n## 6. Security\n\nCustomers must protect document links and report unauthorised access.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 65,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.029Z",
+    "updated_at": "2026-07-01T07:19:23.044Z",
+    "slug": "data-retention-deletion-policy",
+    "version": 1,
+    "category": "PRIVACY",
+    "title": "Data Retention and Deletion Policy",
+    "summary": "KYC, receipts, contracts, audit logs, retention, and deletion rules.",
+    "content": "# Data Retention and Deletion Policy\n\nThis policy explains why some data is retained even after a customer requests deletion or account closure.\n\n## 1. Retained records\n\nInvoices, receipts, payments, contracts, KYC, delivery records, service records, audit logs, tax/accounting records, refunds, disputes, and legal records may be retained.\n\n## 2. Retention reason\n\nRetention supports legal compliance, tax/accounting audit, fraud prevention, contract enforcement, warranty/service support, dispute resolution, and financial integrity.\n\n## 3. Deletion review\n\nEligible marketing, duplicate, obsolete, or unnecessary data may be deleted/anonymised after verification.\n\n## 4. Non-deletable records\n\nFinancial, audit, payment, waiver, stock, reconciliation, journal, contract, and dispute records must not be silently deleted or altered.\n\n## 5. Request process\n\nRequests should be sent to **subidhafurnitureofficial@gmail.com** with identity verification.\n\n## 6. Future systems\n\nRetention rules apply across current webapp, future desktop app, rental/leasing expansion, and connected operational systems.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 66,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.044Z",
+    "updated_at": "2026-07-01T07:19:23.060Z",
+    "slug": "payment-reversal-void-policy",
+    "version": 1,
+    "category": "PAYMENT",
+    "title": "Payment Reversal and Receipt Void Policy",
+    "summary": "Receipt void, payment reversal, and operational cancellation controls.",
+    "content": "# Payment Reversal and Receipt Void Policy\n\nInternal policy. Do not publish publicly.\n\n## 1. Principle\n\nPayments, receipts, EMI paid status, deposits, advances, and settlement records must not be changed for convenience. Corrections require controlled reversal/void workflow.\n\n## 2. Allowed reasons\n\nAllowed reasons include duplicate payment, wrong customer mapping, failed settlement, wrong amount, chargeback, cashier error, or verified fraud.\n\n## 3. Approval\n\nCashier may request correction. Admin/finance reviewer must approve where financial impact exists.\n\n## 4. Evidence\n\nStore original receipt, reason, payment proof, customer reference, operator, timestamp, and corrected record link.\n\n## 5. Accounting impact\n\nReversal must preserve audit trail and trigger/align accounting, reconciliation, and reporting records where applicable.\n\n## 6. Prohibited action\n\nNever delete payment rows, edit paid amount silently, or overwrite receipt numbers.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 67,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.060Z",
+    "updated_at": "2026-07-01T07:19:23.080Z",
+    "slug": "accounting-posting-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Accounting Posting Policy",
+    "summary": "Journal posting governance for EMI/direct-sale/deposit/refund/payout.",
+    "content": "# Accounting Posting Policy\n\nInternal policy. Accounting truth must be generated by backend services, not manual frontend calculations.\n\n## 1. Posting source\n\nOnly approved source events may create journal entries: payments, invoices, refunds, deposits, payouts, adjustments, direct sale finalization, and controlled reversals.\n\n## 2. COA readiness\n\nPosting requires valid chart account mapping, active period, allowed finance account, and no setup blockers.\n\n## 3. No silent mutation\n\nPosted journal lines must not be edited or deleted except through approved reversal/amendment workflow.\n\n## 4. Review\n\nUnposted bridge items must be reviewed before period close.\n\n## 5. Audit\n\nEach journal must show source model, source ID, event, amount, operator/system, and timestamp.\n\n## 6. Future compatibility\n\nRules apply to Lucky Plan, direct sale, rent, lease, manufacturing, vendor purchase, and future commerce expansion.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 68,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.091Z",
+    "updated_at": "2026-07-01T07:19:23.097Z",
+    "slug": "reconciliation-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Reconciliation Policy",
+    "summary": "Unmatched receipts, settlement matching, and reconciliation evidence.",
+    "content": "# Reconciliation Policy\n\nInternal policy for matching payment records with cash, bank, UPI, settlement, receipt, invoice, and accounting records.\n\n## 1. Daily review\n\nCashier/finance must review collections, unpaid items, duplicate references, failed payments, bank mismatch, and UPI settlement mismatch.\n\n## 2. Evidence\n\nEach exception needs amount, date, mode, reference number, customer/subscription/invoice, screenshot or bank proof where relevant.\n\n## 3. Resolution\n\nResolve only through approved actions: match, mark duplicate, reverse, reopen, correct mapping, or escalate.\n\n## 4. Period close\n\nAccounting period or day close should not be completed with material unresolved items.\n\n## 5. Segregation\n\nCashier cannot independently close major mismatch without admin/finance review.\n\n## 6. Audit retention\n\nResolved and reopened items must keep full history.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 69,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.105Z",
+    "updated_at": "2026-07-01T07:19:23.113Z",
+    "slug": "cashier-day-close-policy",
+    "version": 1,
+    "category": "PAYMENT",
+    "title": "Cashier Day Close Policy",
+    "summary": "Cash/UPI/bank day close and mismatch handling.",
+    "content": "# Cashier Day Close Policy\n\nInternal policy for daily cashier close.\n\n## 1. Close timing\n\nCashier close target: **[DAY_CLOSE_TIME]**, or before shift handover/end of business day.\n\n## 2. Required review\n\nReview cash received, UPI received, bank transfer, receipts issued, void/reversal requests, unpaid bills, advances, deposits, and exceptions.\n\n## 3. Mismatch handling\n\nAny mismatch must be recorded with reason, evidence, operator note, and admin review.\n\n## 4. Handover\n\nCash and summary should be handed to authorised owner/admin/finance person.\n\n## 5. No backdating\n\nBackdated receipt or collection is not allowed unless admin-approved and audit-marked.\n\n## 6. Accountability\n\nCashier is responsible for accurate entry, receipt issue, and timely exception reporting.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 70,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.126Z",
+    "updated_at": "2026-07-01T07:19:23.142Z",
+    "slug": "finance-account-mapping-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Finance Account Mapping Policy",
+    "summary": "Collection accounts, COA mapping, and posting blockers.",
+    "content": "# Finance Account Mapping Policy\n\nInternal policy for mapping operational collection accounts to accounting chart accounts.\n\n## 1. Mapping requirement\n\nCash, bank, UPI, customer advance, deposit, receivable, commission, payable, revenue, waiver, refund, and expense mappings must be configured before posting.\n\n## 2. Leaf posting\n\nOnly valid leaf/postable accounts should receive journal lines.\n\n## 3. Blockers\n\nMissing, inactive, control-only, duplicate, or wrong-type mappings must block accounting posting.\n\n## 4. Changes\n\nMapping changes require admin/finance approval and should not rewrite historical postings.\n\n## 5. Testing\n\nAfter setup/reset/restore, run readiness checks before live collection.\n\n## 6. Future workflows\n\nMappings must support EMI, direct sale, rent, lease, vendor purchase, manufacturing, deposits, commissions, and payouts.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 71,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.150Z",
+    "updated_at": "2026-07-01T07:19:23.156Z",
+    "slug": "commission-partner-payout-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Commission and Partner Payout Policy",
+    "summary": "Commission approval, payout batching, and partner settlement.",
+    "content": "# Commission and Partner Payout Policy\n\nInternal policy for partner/staff/vendor-linked commission and payout workflows.\n\n## 1. Eligibility\n\nCommission is earned only when backend rules confirm eligible sale/subscription/collection and no blocker exists.\n\n## 2. Approval\n\nCommission calculation, approval, hold, rejection, and payout must be audit-recorded.\n\n## 3. Payout batching\n\nPayout batches must show partner, period, amount, source records, deductions, status, approval, and payment reference.\n\n## 4. No premature payout\n\nDo not pay commission on cancelled, reversed, fraudulent, unsettled, or disputed transactions unless specifically approved.\n\n## 5. Reconciliation\n\nPayout payment must reconcile with finance account and accounting records.\n\n## 6. Partner dispute\n\nPartner dispute should reference commission ID, payout batch, source transaction, and reason.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 72,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.156Z",
+    "updated_at": "2026-07-01T07:19:23.171Z",
+    "slug": "vendor-purchase-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Vendor Purchase Policy",
+    "summary": "Vendor register, purchase bill, stock inward, and outstanding controls.",
+    "content": "# Vendor Purchase Policy\n\nInternal policy for vendor onboarding, purchase, GRN/stock inward, bills, returns, and settlement.\n\n## 1. Vendor master\n\nVendor name, phone, address, GST/PAN where applicable, bank details, and terms must be maintained before major purchase.\n\n## 2. Purchase evidence\n\nPurchase order, bill, GRN, stock inward, and payment records must link wherever applicable.\n\n## 3. Stock truth\n\nStock increases only through approved stock inward/ledger workflow, not manual UI calculation.\n\n## 4. Vendor return\n\nDamaged, wrong, short, or excess goods must be recorded with evidence and linked to bill/stock movement.\n\n## 5. Payment\n\nVendor payments require bill verification, outstanding check, approval, and finance posting where applicable.\n\n## 6. Audit\n\nNo purchase bill/payment should be deleted after posting; use reversal/adjustment.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 73,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.178Z",
+    "updated_at": "2026-07-01T07:19:23.182Z",
+    "slug": "inventory-adjustment-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Inventory Adjustment Policy",
+    "summary": "Stock correction, damage, quality hold, and write-off controls.",
+    "content": "# Inventory Adjustment Policy\n\nInternal policy for stock adjustment, hold, damage, write-off, and correction.\n\n## 1. Stock source\n\nInventory truth comes from stock ledger. Manual UI counts are not final.\n\n## 2. Allowed adjustments\n\nAllowed reasons: opening setup, physical count mismatch, damage, quality hold, service hold, return correction, purchase error, write-off, or manufacturing correction.\n\n## 3. Evidence\n\nEach adjustment requires product, location, quantity, reason, operator, approval where required, and photo/document evidence where practical.\n\n## 4. Financial impact\n\nMaterial write-off/damage may require accounting review.\n\n## 5. Separation\n\nCashier/staff should not approve own stock write-off.\n\n## 6. Future compatibility\n\nPolicy applies to sale, delivery, rent/lease possession, returns, manufacturing, and vendor workflows.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 74,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.187Z",
+    "updated_at": "2026-07-01T07:19:23.203Z",
+    "slug": "contract-amendment-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Contract Amendment Policy",
+    "summary": "Amendment request, review, approve, reject, preview, execute, and audit rules.",
+    "content": "# Contract Amendment Policy\n\nInternal policy for controlled changes to subscription, rent, lease, EMI, and customer contracts.\n\n## 1. Principle\n\nSigned/active contract data must not be edited directly. Use amendment workflow.\n\n## 2. Request reasons\n\nAllowed reasons include customer correction, tenure correction, product change, address update, payment restructuring, cancellation/closure correction, or approved settlement.\n\n## 3. Preview\n\nFinancial and operational impact must be previewed before approval/execution.\n\n## 4. Approval\n\nAdmin/owner/finance reviewer must approve material changes affecting money, EMI, deposit, waiver, delivery, or accounting.\n\n## 5. Execution\n\nExecution must create audit trail and must not corrupt old EMI/payment/draw/receipt records.\n\n## 6. Rejection\n\nRejected amendments must keep reason and requester details.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 75,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.216Z",
+    "updated_at": "2026-07-01T07:19:23.218Z",
+    "slug": "admin-access-role-control-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Admin Access and Role Control Policy",
+    "summary": "Admin/cashier/staff role separation and permission controls.",
+    "content": "# Admin Access and Role Control Policy\n\nInternal policy for user roles and access control.\n\n## 1. Role boundaries\n\nAdmin/owner controls setup, policy, accounting, reset, user management, approval, and dangerous actions. Cashier controls daily collection within limits. Customer/partner/vendor must not access admin controls.\n\n## 2. Least privilege\n\nEach user should receive minimum permissions required for their work.\n\n## 3. Internal creation\n\nAdmin/cashier/staff accounts must be created internally by authorised admin. Public self-registration should not create internal roles.\n\n## 4. Password reset\n\nPassword reset should be identity/email gated and audited.\n\n## 5. Review\n\nAccess should be reviewed after staff exit, role change, incident, or suspicious activity.\n\n## 6. Prohibited sharing\n\nShared passwords, generic admin accounts, and unauthorised access are prohibited.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 76,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.234Z",
+    "updated_at": "2026-07-01T07:19:23.243Z",
+    "slug": "audit-log-retention-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Audit Log Retention Policy",
+    "summary": "Protecting financial audit history from deletion.",
+    "content": "# Audit Log Retention Policy\n\nInternal policy for audit trail protection.\n\n## 1. Protected records\n\nPayments, EMIs, waivers, lucky draws, subscriptions, receipts, invoices, journals, stock ledger, deposits, refunds, commissions, payouts, reconciliations, and user access logs are protected.\n\n## 2. No silent deletion\n\nAudit logs and financial source records must not be deleted or overwritten to hide mistakes.\n\n## 3. Correction method\n\nUse reversal, amendment, reopen, correction note, or new version workflow.\n\n## 4. Retention\n\nAudit logs should be retained for business, tax, legal, fraud, recovery, and dispute requirements.\n\n## 5. Access\n\nOnly authorised admin/finance roles may review sensitive audit data.\n\n## 6. Incident\n\nAny attempt to tamper with audit logs must be escalated to owner/admin immediately.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 77,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.250Z",
+    "updated_at": "2026-07-01T07:19:23.260Z",
+    "slug": "backup-restore-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Backup and Restore Policy",
+    "summary": "Backup/restore governance, responsibility, and recovery.",
+    "content": "# Backup and Restore Policy\n\nInternal policy for protecting production data.\n\n## 1. Backup frequency\n\nMinimum backup target: **daily operational backup and additional backup before major resets/restores**. Additional backup is required before reset, restore, bulk import, migration, deployment, or major accounting operation.\n\n## 2. Protected data\n\nBackup must cover customer, product, subscription, EMI, payment, receipt, invoice, accounting, inventory, audit, policy, user, and configuration data.\n\n## 3. Storage\n\nProduction secrets must not be committed to Git. Backups must be stored securely with restricted access.\n\n## 4. Restore preview\n\nRestores must use preview/dry-run where available before execution.\n\n## 5. Approval\n\nProduction restore/reset requires owner/admin approval and reason.\n\n## 6. Post-restore checks\n\nRun migrations/checks, login test, dashboard check, payment/readiness check, and sample record verification after restore.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policypage",
+  "pk": 78,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.264Z",
+    "updated_at": "2026-07-01T07:19:23.270Z",
+    "slug": "incident-data-breach-policy",
+    "version": 1,
+    "category": "COMPLIANCE",
+    "title": "Incident and Data Breach Policy",
+    "summary": "Security/privacy incident response.",
+    "content": "# Incident and Data Breach Policy\n\nInternal policy for suspected security, privacy, data, payment, or operational incidents.\n\n## 1. Incidents covered\n\nUnauthorised access, leaked credentials, suspicious payment changes, data exposure, malware, wrong customer disclosure, lost device, audit tampering, or system compromise.\n\n## 2. Immediate action\n\nDisable affected access, preserve logs, stop unsafe workflow, secure backups, and inform owner/admin.\n\n## 3. Investigation\n\nRecord timeline, affected data, users, root cause, evidence, and corrective action.\n\n## 4. Customer/legal response\n\nWhere customer data or legal duties are affected, prepare appropriate notice, support response, and compliance action after review.\n\n## 5. Recovery\n\nPatch issue, rotate credentials, restore from trusted backup if required, review permissions, and test system integrity.\n\n## 6. Prevention\n\nUpdate SOPs, staff training, access rules, monitoring, and backup posture after incident.",
+    "status": "DRAFT",
+    "effective_date": null,
+    "last_reviewed_at": null,
+    "published_at": null,
+    "published_by": null,
+    "created_by": 1,
+    "updated_by": 1
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 40,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.593Z",
+    "updated_at": "2026-07-01T07:19:22.593Z",
+    "policy": 40,
+    "visibility": "PUBLIC",
+    "governance_category": "GENERAL",
+    "coverage_group": "Public Legal",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "terms"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 41,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.612Z",
+    "updated_at": "2026-07-01T07:19:22.612Z",
+    "policy": 41,
+    "visibility": "PUBLIC",
+    "governance_category": "PRIVACY",
+    "coverage_group": "Privacy / Data",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "privacy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 42,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.626Z",
+    "updated_at": "2026-07-01T07:19:22.626Z",
+    "policy": 42,
+    "visibility": "PUBLIC",
+    "governance_category": "REFUND",
+    "coverage_group": "Customer Operations",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "refund-cancellation"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 43,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.644Z",
+    "updated_at": "2026-07-01T07:19:22.644Z",
+    "policy": 43,
+    "visibility": "PUBLIC",
+    "governance_category": "WARRANTY",
+    "coverage_group": "Service / Delivery / Warranty",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "warranty"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 44,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.661Z",
+    "updated_at": "2026-07-01T07:19:22.661Z",
+    "policy": 44,
+    "visibility": "PUBLIC",
+    "governance_category": "DELIVERY",
+    "coverage_group": "Service / Delivery / Warranty",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "delivery-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 45,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.678Z",
+    "updated_at": "2026-07-01T07:19:22.678Z",
+    "policy": 45,
+    "visibility": "PUBLIC",
+    "governance_category": "RENT_LEASE",
+    "coverage_group": "Rent / Lease / Deposit",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "rental-lease-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 46,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.693Z",
+    "updated_at": "2026-07-01T07:19:22.693Z",
+    "policy": 46,
+    "visibility": "PUBLIC",
+    "governance_category": "LUCKY_PLAN",
+    "coverage_group": "Lucky Plan / EMI",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "lucky-plan-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 47,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.710Z",
+    "updated_at": "2026-07-01T07:19:22.710Z",
+    "policy": 47,
+    "visibility": "PUBLIC",
+    "governance_category": "DIRECT_SALE",
+    "coverage_group": "Customer Operations",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "direct-sale-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 48,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.727Z",
+    "updated_at": "2026-07-01T07:19:22.727Z",
+    "policy": 48,
+    "visibility": "PUBLIC",
+    "governance_category": "PAYMENT",
+    "coverage_group": "Customer Operations",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "payment-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 49,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.745Z",
+    "updated_at": "2026-07-01T07:19:22.745Z",
+    "policy": 49,
+    "visibility": "PUBLIC",
+    "governance_category": "SERVICE",
+    "coverage_group": "Service / Delivery / Warranty",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "service-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 50,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.767Z",
+    "updated_at": "2026-07-01T07:19:22.767Z",
+    "policy": 50,
+    "visibility": "PUBLIC",
+    "governance_category": "GRIEVANCE",
+    "coverage_group": "Customer Operations",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "grievance"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 51,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.784Z",
+    "updated_at": "2026-07-01T07:19:22.784Z",
+    "policy": 51,
+    "visibility": "PUBLIC",
+    "governance_category": "COMPLIANCE",
+    "coverage_group": "Public Legal",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "business-compliance"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 52,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.798Z",
+    "updated_at": "2026-07-01T07:19:22.798Z",
+    "policy": 52,
+    "visibility": "PUBLIC",
+    "governance_category": "COMPLIANCE",
+    "coverage_group": "Public Legal",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "ownership-business-proof"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 53,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.823Z",
+    "updated_at": "2026-07-01T07:19:22.825Z",
+    "policy": 53,
+    "visibility": "PUBLIC",
+    "governance_category": "COMPLIANCE",
+    "coverage_group": "Public Legal",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "udyam-msme"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 54,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.848Z",
+    "updated_at": "2026-07-01T07:19:22.849Z",
+    "policy": 54,
+    "visibility": "PUBLIC",
+    "governance_category": "PRIVACY",
+    "coverage_group": "Privacy / Data",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "data-requests"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 55,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.859Z",
+    "updated_at": "2026-07-01T07:19:22.859Z",
+    "policy": 55,
+    "visibility": "PUBLIC",
+    "governance_category": "CUSTOMER_SUPPORT",
+    "coverage_group": "Customer Operations",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "contact-enquiry-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 56,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.882Z",
+    "updated_at": "2026-07-01T07:19:22.882Z",
+    "policy": 56,
+    "visibility": "PUBLIC",
+    "governance_category": "COOKIE_CONSENT",
+    "coverage_group": "Privacy / Data",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "cookie-tracking-consent"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 57,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.886Z",
+    "updated_at": "2026-07-01T07:19:22.886Z",
+    "policy": 57,
+    "visibility": "PUBLIC",
+    "governance_category": "KYC",
+    "coverage_group": "Customer Operations",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "kyc-identity-verification"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 58,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.918Z",
+    "updated_at": "2026-07-01T07:19:22.918Z",
+    "policy": 58,
+    "visibility": "PUBLIC",
+    "governance_category": "COMMUNICATION",
+    "coverage_group": "Customer Operations",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "communication-consent"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 59,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.934Z",
+    "updated_at": "2026-07-01T07:19:22.934Z",
+    "policy": 59,
+    "visibility": "PUBLIC",
+    "governance_category": "EMI_DEFAULT",
+    "coverage_group": "Lucky Plan / EMI",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "emi-subscription-default-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 60,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.950Z",
+    "updated_at": "2026-07-01T07:19:22.950Z",
+    "policy": 60,
+    "visibility": "PUBLIC",
+    "governance_category": "LUCKY_DRAW",
+    "coverage_group": "Lucky Plan / EMI",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "lucky-draw-rules-fairness"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 61,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.974Z",
+    "updated_at": "2026-07-01T07:19:22.974Z",
+    "policy": 61,
+    "visibility": "PUBLIC",
+    "governance_category": "SECURITY_DEPOSIT",
+    "coverage_group": "Rent / Lease / Deposit",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "security-deposit-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 62,
+  "fields": {
+    "created_at": "2026-07-01T07:19:22.997Z",
+    "updated_at": "2026-07-01T07:19:22.997Z",
+    "policy": 62,
+    "visibility": "PUBLIC",
+    "governance_category": "POSSESSION",
+    "coverage_group": "Rent / Lease / Deposit",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "possession-handover-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 63,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.015Z",
+    "updated_at": "2026-07-01T07:19:23.015Z",
+    "policy": 63,
+    "visibility": "PUBLIC",
+    "governance_category": "RETURN_DAMAGE",
+    "coverage_group": "Rent / Lease / Deposit",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "return-damage-inspection-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 64,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.029Z",
+    "updated_at": "2026-07-01T07:19:23.029Z",
+    "policy": 64,
+    "visibility": "PUBLIC",
+    "governance_category": "DOCUMENT_GOVERNANCE",
+    "coverage_group": "Public Legal",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "document-esign-consent"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 65,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.044Z",
+    "updated_at": "2026-07-01T07:19:23.044Z",
+    "policy": 65,
+    "visibility": "PUBLIC",
+    "governance_category": "DATA_RETENTION",
+    "coverage_group": "Privacy / Data",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": false,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "data-retention-deletion-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 66,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.060Z",
+    "updated_at": "2026-07-01T07:19:23.060Z",
+    "policy": 66,
+    "visibility": "INTERNAL",
+    "governance_category": "PAYMENT_CONTROL",
+    "coverage_group": "Finance / Accounting Controls",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "payment-reversal-void-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 67,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.085Z",
+    "updated_at": "2026-07-01T07:19:23.085Z",
+    "policy": 67,
+    "visibility": "INTERNAL",
+    "governance_category": "ACCOUNTING",
+    "coverage_group": "Finance / Accounting Controls",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "accounting-posting-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 68,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.102Z",
+    "updated_at": "2026-07-01T07:19:23.102Z",
+    "policy": 68,
+    "visibility": "INTERNAL",
+    "governance_category": "RECONCILIATION",
+    "coverage_group": "Finance / Accounting Controls",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "reconciliation-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 69,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.113Z",
+    "updated_at": "2026-07-01T07:19:23.113Z",
+    "policy": 69,
+    "visibility": "INTERNAL",
+    "governance_category": "CASHIER_CONTROL",
+    "coverage_group": "Finance / Accounting Controls",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "cashier-day-close-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 70,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.145Z",
+    "updated_at": "2026-07-01T07:19:23.146Z",
+    "policy": 70,
+    "visibility": "INTERNAL",
+    "governance_category": "ACCOUNTING",
+    "coverage_group": "Finance / Accounting Controls",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "finance-account-mapping-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 71,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.156Z",
+    "updated_at": "2026-07-01T07:19:23.156Z",
+    "policy": 71,
+    "visibility": "INTERNAL",
+    "governance_category": "COMMISSION",
+    "coverage_group": "Inventory / Vendor / Commission",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "commission-partner-payout-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 72,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.176Z",
+    "updated_at": "2026-07-01T07:19:23.176Z",
+    "policy": 72,
+    "visibility": "INTERNAL",
+    "governance_category": "VENDOR",
+    "coverage_group": "Inventory / Vendor / Commission",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "vendor-purchase-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 73,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.187Z",
+    "updated_at": "2026-07-01T07:19:23.187Z",
+    "policy": 73,
+    "visibility": "INTERNAL",
+    "governance_category": "INVENTORY",
+    "coverage_group": "Inventory / Vendor / Commission",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "inventory-adjustment-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 74,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.209Z",
+    "updated_at": "2026-07-01T07:19:23.209Z",
+    "policy": 74,
+    "visibility": "INTERNAL",
+    "governance_category": "CONTRACT_AMENDMENT",
+    "coverage_group": "Staff / Access / Audit",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "contract-amendment-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 75,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.218Z",
+    "updated_at": "2026-07-01T07:19:23.218Z",
+    "policy": 75,
+    "visibility": "INTERNAL",
+    "governance_category": "STAFF_ACCESS",
+    "coverage_group": "Staff / Access / Audit",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "admin-access-role-control-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 76,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.247Z",
+    "updated_at": "2026-07-01T07:19:23.247Z",
+    "policy": 76,
+    "visibility": "INTERNAL",
+    "governance_category": "AUDIT_RETENTION",
+    "coverage_group": "Staff / Access / Audit",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "audit-log-retention-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 77,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.262Z",
+    "updated_at": "2026-07-01T07:19:23.262Z",
+    "policy": 77,
+    "visibility": "INTERNAL",
+    "governance_category": "BACKUP_RESTORE",
+    "coverage_group": "Backup / Incident Response",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "backup-restore-policy"
+  }
+},
+{
+  "model": "subscriptions.policygovernancemetadata",
+  "pk": 78,
+  "fields": {
+    "created_at": "2026-07-01T07:19:23.274Z",
+    "updated_at": "2026-07-01T07:19:23.274Z",
+    "policy": 78,
+    "visibility": "INTERNAL",
+    "governance_category": "INCIDENT_RESPONSE",
+    "coverage_group": "Backup / Incident Response",
+    "requires_legal_review": true,
+    "requires_admin_acceptance": true,
+    "owner": null,
+    "reviewer": null,
+    "approved_by": null,
+    "archived_by": null,
+    "internal_accepted_by": null,
+    "submitted_for_review_at": null,
+    "approved_at": null,
+    "archived_at": null,
+    "review_due_date": null,
+    "internal_acceptance_at": null,
+    "rejection_reason": "",
+    "archive_reason": "",
+    "source_template_key": "incident-data-breach-policy"
+  }
+}
+]

@@ -4,10 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import AmendmentSafetyNotice from "@/components/amendments/SafetyNotice";
+import AmendmentValueFields from "@/components/amendments/AmendmentValueFields";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ActionButton from "@/components/ui/ActionButton";
 import { DetailPanel } from "@/components/ui/operations";
+import { buildRequestedValues, validateRequestedValues } from "@/services/amendment-fields";
 import {
   AMENDMENT_TYPES,
   createAdminAmendment,
@@ -15,15 +17,6 @@ import {
   type AmendmentRequesterRole,
   type AmendmentType,
 } from "@/services/amendments";
-
-function parseJsonObject(value: string): Record<string, unknown> {
-  if (!value.trim()) return {};
-  const parsed = JSON.parse(value) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Requested values must be a JSON object.");
-  }
-  return parsed as Record<string, unknown>;
-}
 
 export default function AdminContractAmendmentCreatePage() {
   const router = useRouter();
@@ -33,7 +26,7 @@ export default function AdminContractAmendmentCreatePage() {
   const [amendmentType, setAmendmentType] = useState<AmendmentType>("ADDRESS_CHANGE");
   const [reason, setReason] = useState("");
   const [adminNote, setAdminNote] = useState("");
-  const [valuesJson, setValuesJson] = useState("{}\n");
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,12 +37,14 @@ export default function AdminContractAmendmentCreatePage() {
       const id = Number(sourceId);
       if (!Number.isFinite(id) || id <= 0) throw new Error("Enter a valid source contract/subscription ID.");
       if (!reason.trim()) throw new Error("Reason is required.");
+      const fieldError = validateRequestedValues(amendmentType, fieldValues);
+      if (fieldError) throw new Error(fieldError);
       const created = await createAdminAmendment({
         contract_type: contractType,
         subscription: contractType === "EMI_SUBSCRIPTION" ? id : null,
         rent_lease_contract: contractType === "RENT_LEASE" ? id : null,
         amendment_type: amendmentType,
-        requested_values: parseJsonObject(valuesJson),
+        requested_values: buildRequestedValues(amendmentType, fieldValues),
         reason: reason.trim(),
         requested_role: requestedRole,
         admin_note: adminNote.trim(),
@@ -123,7 +118,10 @@ export default function AdminContractAmendmentCreatePage() {
               <select
                 className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3"
                 value={amendmentType}
-                onChange={(event) => setAmendmentType(event.target.value as AmendmentType)}
+                onChange={(event) => {
+                  setAmendmentType(event.target.value as AmendmentType);
+                  setFieldValues({});
+                }}
               >
                 {AMENDMENT_TYPES.map((row) => (
                   <option key={row.value} value={row.value}>
@@ -142,14 +140,11 @@ export default function AdminContractAmendmentCreatePage() {
               />
             </label>
           </div>
-          <label className="mt-4 block text-sm font-medium">
-            Requested values JSON
-            <textarea
-              className="mt-2 min-h-40 w-full rounded-xl border border-border bg-background p-3 font-mono text-sm"
-              value={valuesJson}
-              onChange={(event) => setValuesJson(event.target.value)}
-            />
-          </label>
+          <AmendmentValueFields
+            amendmentType={amendmentType}
+            values={fieldValues}
+            onChange={(key, value) => setFieldValues((prev) => ({ ...prev, [key]: value }))}
+          />
           <label className="mt-4 block text-sm font-medium">
             Admin note
             <textarea

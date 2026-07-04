@@ -5,18 +5,35 @@ import ProductCatalogueHero from "@/components/public/ProductCatalogueHero";
 import ProductCategoryDiscovery, { type ProductCategorySummary } from "@/components/public/ProductCategoryDiscovery";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicPageShell from "@/components/public/PublicPageShell";
+import PublicSeoJsonLd from "@/components/public/PublicSeoJsonLd";
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
+import { PRODUCT_SEO_CATEGORIES } from "@/lib/product-category-seo";
 import { ROUTES } from "@/lib/routes";
 import { listPublicProducts, type PublicProduct } from "@/lib/public-api";
-import { buildPublicMetadata } from "@/lib/public-seo";
+import { buildFaqJsonLd, buildItemListJsonLd, buildPublicMetadata } from "@/lib/public-seo";
 import ProductGrid from "./ProductGrid";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Products",
-  description: "Browse furniture, electronics, and appliances from the live public catalogue.",
+  title: "Furniture Products in Asansol",
+  description: "Browse beds, sofas, wardrobes, dining tables, mattresses and appliances at Subidha Furniture, Asansol. EMI and Lucky Plan options as per approved terms.",
   path: "/products",
 });
+
+const PRODUCTS_FAQS = [
+  {
+    question: "What furniture can I buy in Asansol from Subidha Furniture?",
+    answer: "Beds, sofas, wardrobes, dining tables, mattresses and selected home appliances. Models and availability change, so visit our showroom for the current range.",
+  },
+  {
+    question: "Can I buy furniture on EMI in Asansol?",
+    answer: "EMI and Lucky Plan EMI options may be available as per approved terms. Contact us or visit the showroom to understand the plans and eligibility.",
+  },
+  {
+    question: "Do the listed products confirm stock or price?",
+    answer: "The public catalogue helps you browse. Final stock, pricing, plan type, and documents are confirmed by the branch, not from this page alone.",
+  },
+];
 
 function buildCategorySummaries(products: PublicProduct[]): ProductCategorySummary[] {
   const map = new Map<string, { count: number; mediaReadyCount: number; samples: string[] }>();
@@ -76,6 +93,32 @@ export default async function ProductsPage() {
         { label: dictionary.common.apply, href: ROUTES.public.apply, variant: "primary" },
       ]}
     >
+      <PublicSeoJsonLd
+        payload={buildItemListJsonLd(
+          PRODUCT_SEO_CATEGORIES.map((category) => ({ name: `${category.name} in Asansol`, path: `/products/${category.slug}` }))
+        )}
+      />
+      <PublicSeoJsonLd payload={buildFaqJsonLd(PRODUCTS_FAQS)} />
+
+      <section className="public-surface p-6">
+        <h2 className="text-lg font-semibold text-foreground">Shop furniture by category in Asansol</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Explore our main furniture categories. Visit the showroom for current designs, availability, and EMI or Lucky Plan options.
+        </p>
+        <ul className="mt-4 flex flex-wrap gap-3">
+          {PRODUCT_SEO_CATEGORIES.map((category) => (
+            <li key={category.slug}>
+              <Link
+                href={`/products/${category.slug}`}
+                className="inline-flex rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+              >
+                {category.name} in Asansol
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <ProductCategoryDiscovery categories={categorySummaries} />
 
       <PublicMarketingBanner

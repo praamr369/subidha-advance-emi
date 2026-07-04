@@ -1,5 +1,9 @@
 from django.urls import path
 
+from api.v1.views.catalog import (
+    VendorCatalogFacetsView,
+    VendorCatalogListView,
+)
 from api.v1.views.vendor_ops import (
     VendorSelfDashboardView,
     VendorSelfLedgerView,
@@ -41,4 +45,7 @@ urlpatterns = [
     path("kyc/documents/upload/", VendorSelfKycDocumentListUploadView.as_view()),
     path("kyc/documents/<int:doc_id>/download/", VendorSelfKycDocumentDownloadView.as_view()),
     path("kyc/audit-trail/", VendorSelfKycAuditTrailView.as_view()),
+    # Business catalog — which product categories the vendor supplies
+    path("catalog/", VendorCatalogListView.as_view()),
+    path("catalog/facets/", VendorCatalogFacetsView.as_view()),
 ]

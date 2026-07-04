@@ -466,17 +466,32 @@ class ProductCategoryMaster(TimeStampedModel):
     name = models.CharField(max_length=120, unique=True)
     description = models.TextField(blank=True, default="")
     is_active = models.BooleanField(default=True, db_index=True)
+    # --- Additive public SEO fields (SEO-3). All optional / default-safe.
+    # None of these change financial, inventory, or visibility logic for the
+    # existing catalogue; they only supply canonical public metadata.
+    slug = models.SlugField(max_length=140, blank=True, default="", db_index=True)
+    is_public = models.BooleanField(default=True, db_index=True)
+    public_title = models.CharField(max_length=160, blank=True, default="")
+    seo_title = models.CharField(max_length=200, blank=True, default="")
+    seo_description = models.CharField(max_length=320, blank=True, default="")
+    public_image = models.ImageField(upload_to="public/category/", null=True, blank=True)
+    sort_order = models.PositiveIntegerField(default=0, db_index=True)
 
     class Meta:
         db_table = "product_category_master"
-        ordering = ["name", "id"]
+        ordering = ["sort_order", "name", "id"]
         indexes = [
             models.Index(fields=["is_active", "name"]),
+            models.Index(fields=["is_public", "is_active", "sort_order"]),
         ]
 
     def save(self, *args, **kwargs):
         self.name = (self.name or "").strip()
         self.description = (self.description or "").strip()
+        if not (self.slug or "").strip():
+            self.slug = slugify(self.name)[:140]
+        else:
+            self.slug = slugify(self.slug)[:140]
         self.full_clean()
         super().save(*args, **kwargs)
 

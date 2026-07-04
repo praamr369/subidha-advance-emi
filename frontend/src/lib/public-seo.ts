@@ -150,3 +150,76 @@ export function buildBreadcrumbJsonLd(items: Array<{ name: string; path?: string
     })),
   };
 }
+
+/**
+ * FAQPage JSON-LD. Only pass FAQs that are also rendered visibly on the page —
+ * Google requires FAQ structured data to match on-page content.
+ */
+export function buildFaqJsonLd(faqs: ReadonlyArray<{ question: string; answer: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: { "@type": "Answer", text: faq.answer },
+    })),
+  };
+}
+
+/**
+ * ItemList JSON-LD for a category landing page. Pass only public-visible items;
+ * never include internal cost/stock/accounting fields.
+ */
+export function buildItemListJsonLd(items: ReadonlyArray<{ name: string; path: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      url: absolutePublicUrl(item.path),
+    })),
+  };
+}
+
+/**
+ * Product JSON-LD for a public product detail page. Uses only public-safe
+ * fields. Deliberately omits `review`, `aggregateRating`, and stock
+ * `availability` — there is no verified review system and internal stock must
+ * not be exposed. `Offer` is included only when a valid public price exists.
+ */
+export function buildProductJsonLd(input: {
+  name: string;
+  path: string;
+  description?: string | null;
+  image?: string | null;
+  category?: string | null;
+  sku?: string | null;
+  price?: string | number | null;
+}) {
+  const numericPrice = Number(input.price);
+  const hasPrice = Number.isFinite(numericPrice) && numericPrice > 0;
+  const payload: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: input.name,
+    url: absolutePublicUrl(input.path),
+    brand: { "@type": "Brand", name: defaultSiteName },
+  };
+  if (input.description) payload.description = input.description;
+  if (input.image) payload.image = [input.image];
+  if (input.category) payload.category = input.category;
+  if (input.sku) payload.sku = input.sku;
+  if (hasPrice) {
+    payload.offers = {
+      "@type": "Offer",
+      priceCurrency: "INR",
+      price: String(Math.round(numericPrice)),
+      url: absolutePublicUrl(input.path),
+      seller: { "@type": "Organization", name: defaultSiteName },
+    };
+  }
+  return payload;
+}

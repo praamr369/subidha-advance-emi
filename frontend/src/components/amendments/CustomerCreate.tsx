@@ -4,23 +4,18 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import AmendmentSafetyNotice from "@/components/amendments/SafetyNotice";
+import AmendmentValueFields from "@/components/amendments/AmendmentValueFields";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ActionButton from "@/components/ui/ActionButton";
 import { DetailPanel } from "@/components/ui/operations";
+import { buildRequestedValues, validateRequestedValues } from "@/services/amendment-fields";
 import { AMENDMENT_TYPES, createCustomerAmendment, type AmendmentContractType, type AmendmentType } from "@/services/amendments";
 import type { CustomerSubscription } from "@/services/customer";
 import { listCustomerSubscriptionsRegister } from "@/services/customer/paginated-subscriptions";
 
 type Option = { id: number; label: string; planType: string };
-
-function parseJsonObject(value: string): Record<string, unknown> {
-  if (!value.trim()) return {};
-  const parsed = JSON.parse(value) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Requested values must be a JSON object.");
-  return parsed as Record<string, unknown>;
-}
 
 function optionFromSubscription(row: CustomerSubscription): Option {
   return {
@@ -38,7 +33,7 @@ export default function CustomerAmendmentCreate() {
   const [sourceId, setSourceId] = useState("");
   const [amendmentType, setAmendmentType] = useState<AmendmentType>("ADDRESS_CHANGE");
   const [reason, setReason] = useState("");
-  const [valuesJson, setValuesJson] = useState("{}\n");
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,12 +75,14 @@ export default function CustomerAmendmentCreate() {
       const id = Number(sourceId);
       if (!Number.isFinite(id) || id <= 0) throw new Error("Select a source contract.");
       if (!reason.trim()) throw new Error("Reason is required.");
+      const fieldError = validateRequestedValues(amendmentType, fieldValues);
+      if (fieldError) throw new Error(fieldError);
       const created = await createCustomerAmendment({
         contract_type: contractType,
         subscription: contractType === "EMI_SUBSCRIPTION" ? id : null,
         rent_lease_contract: contractType === "RENT_LEASE" ? id : null,
         amendment_type: amendmentType,
-        requested_values: parseJsonObject(valuesJson),
+        requested_values: buildRequestedValues(amendmentType, fieldValues),
         reason: reason.trim(),
         metadata: { ui_phase: "PHASE_2_REQUEST_ONLY" },
       });
@@ -149,7 +146,10 @@ export default function CustomerAmendmentCreate() {
               <select
                 className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3"
                 value={amendmentType}
-                onChange={(event) => setAmendmentType(event.target.value as AmendmentType)}
+                onChange={(event) => {
+                  setAmendmentType(event.target.value as AmendmentType);
+                  setFieldValues({});
+                }}
               >
                 {AMENDMENT_TYPES.map((row) => (
                   <option key={row.value} value={row.value}>
@@ -168,14 +168,11 @@ export default function CustomerAmendmentCreate() {
               />
             </label>
           </div>
-          <label className="mt-4 block text-sm font-medium">
-            Requested values JSON
-            <textarea
-              className="mt-2 min-h-40 w-full rounded-xl border border-border bg-background p-3 font-mono text-sm"
-              value={valuesJson}
-              onChange={(event) => setValuesJson(event.target.value)}
-            />
-          </label>
+          <AmendmentValueFields
+            amendmentType={amendmentType}
+            values={fieldValues}
+            onChange={(key, value) => setFieldValues((prev) => ({ ...prev, [key]: value }))}
+          />
           <div className="mt-4 flex flex-wrap gap-3">
             <ActionButton onClick={() => void submit()} disabled={submitting}>
               {submitting ? "Submitting..." : "Submit request"}
