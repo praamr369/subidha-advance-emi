@@ -1,5 +1,9 @@
 from django.urls import path
 
+from api.v1.views.catalog import (
+    CustomerCatalogFacetsView,
+    CustomerCatalogListView,
+)
 from api.v1.views.customer import (
     CustomerDashboard,
     CustomerDeliveryDetailView,
@@ -108,4 +112,7 @@ urlpatterns = [
     path("support/tickets/<int:pk>/reopen/", CustomerSupportTicketReopenView.as_view()),
     path("support-requests/", CustomerSupportRequestListCreateView.as_view()),
     path("support-requests/<int:pk>/", CustomerSupportRequestDetailView.as_view()),
+    # Approved product catalog (browse by purpose: EMI / rent / lease / sale)
+    path("catalog/", CustomerCatalogListView.as_view()),
+    path("catalog/facets/", CustomerCatalogFacetsView.as_view()),
 ]
