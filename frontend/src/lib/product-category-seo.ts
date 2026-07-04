@@ -16,6 +16,12 @@ export type ProductSeoCategory = {
   metaDescription: string;
   intro: readonly string[];
   matchTerms: readonly string[]; // lowercase substrings matched against category/name
+  /**
+   * Canonical category-master slugs (SEO-3) that also map to this page. Used as
+   * an additional, exact match signal on top of `matchTerms`. Admins can create
+   * finer category-master rows and slug them to a SEO slug for exact mapping.
+   */
+  canonicalSlugs?: readonly string[];
   faqs: readonly { question: string; answer: string }[];
 };
 
@@ -108,6 +114,7 @@ export const PRODUCT_SEO_CATEGORIES: readonly ProductSeoCategory[] = [
       "Visit our showroom for the current appliance options and to discuss EMI or Lucky Plan EMI options as per approved terms.",
     ],
     matchTerms: ["appliance", "refrigerator", "fridge", "washing machine", "television", " tv", "cooler", "microwave"],
+    canonicalSlugs: ["home-appliances", "kitchen-appliances"],
     faqs: [
       { question: "Which appliances are available?", answer: "Selected home appliances may be available subject to stock. Visit our Asansol showroom or contact us for the current options." },
     ],
@@ -122,9 +129,17 @@ function haystackFor(product: PublicProduct): string {
   return `${product.category || ""} ${product.subcategory || ""} ${product.name || ""}`.toLowerCase();
 }
 
-/** Public products that belong to a given SEO category, by match terms. */
+/**
+ * Public products that belong to a given SEO category. A product matches when
+ * its canonical category slug is listed (exact, admin-controlled) OR any match
+ * term appears in its category/subcategory/name (heuristic fallback). The union
+ * keeps SEO-2 behavior intact while letting admins refine mapping via slugs.
+ */
 export function productsForCategory(category: ProductSeoCategory, products: readonly PublicProduct[]): PublicProduct[] {
+  const canonical = new Set((category.canonicalSlugs ?? []).map((slug) => slug.toLowerCase()));
   return products.filter((product) => {
+    const productSlug = (product.category_slug || "").toLowerCase();
+    if (productSlug && canonical.has(productSlug)) return true;
     const haystack = haystackFor(product);
     return category.matchTerms.some((term) => haystack.includes(term));
   });

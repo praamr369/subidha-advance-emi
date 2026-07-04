@@ -7,10 +7,11 @@ import ProductDetailWorkflowBoundary from "@/components/public/ProductDetailWork
 import ProductEnquiryHandoffPanel, { buildProductEnquiryHref } from "@/components/public/ProductEnquiryHandoffPanel";
 import PublicPageShell from "@/components/public/PublicPageShell";
 import PublicProductDetailMedia from "@/components/public/PublicProductDetailMedia";
+import PublicSeoJsonLd from "@/components/public/PublicSeoJsonLd";
 import { getPublicDictionary } from "@/lib/public-i18n";
 import { getPublicLocale } from "@/lib/public-i18n.server";
 import { getPublicProductDetail } from "@/lib/public-api";
-import { buildPublicMetadata } from "@/lib/public-seo";
+import { buildProductJsonLd, buildPublicMetadata } from "@/lib/public-seo";
 import { ROUTES } from "@/lib/routes";
 
 type ProductDetailPageProps = {
@@ -72,7 +73,19 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     { label: "Media state", value: mediaState },
   ];
 
+  const productJsonLd = buildProductJsonLd({
+    name: product.name,
+    path: `/products/${product.id}`,
+    description: product.description,
+    image: product.image,
+    category: product.category,
+    sku: product.product_code,
+    price: product.base_price,
+  });
+
   return (
+    <>
+    <PublicSeoJsonLd payload={productJsonLd} />
     <PublicPageShell
       title={product.name}
       subtitle={
@@ -130,5 +143,6 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
       <ProductDetailWorkflowBoundary />
     </PublicPageShell>
+    </>
   );
 }

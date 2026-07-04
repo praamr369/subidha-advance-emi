@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from core.services.operational_visibility import subscription_dashboard_visible_q
 from api.v1.serializers.media import serialize_media_url
-from api.v1.serializers.public import PublicProductSerializer
+from api.v1.serializers.public import PublicProductSerializer, PublicProductCategorySerializer
 from api.v1.views.health import PublicLivenessView, PublicReadinessView
 from api.v1.views.public_policy_site import (
     PublicBusinessComplianceSummaryView,
@@ -23,6 +23,7 @@ from subscriptions.models import (
     DrawEligibilitySnapshot,
     LuckyDraw,
     Product,
+    ProductCategoryMaster,
     PublicLeadIntent,
     Subscription,
 )
@@ -396,6 +397,22 @@ class PublicProductsView(APIView):
         return Response({"count": products.count(), "results": serializer.data})
 
 
+class PublicProductCategoriesView(APIView):
+    """Read-only public category metadata for SEO/navigation. No auth. Returns
+    only categories flagged public + active, and only public-safe fields."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        categories = (
+            ProductCategoryMaster.objects.filter(is_active=True, is_public=True)
+            .order_by("sort_order", "name", "id")
+        )
+        serializer = PublicProductCategorySerializer(categories, many=True, context={"request": request})
+        return Response({"count": categories.count(), "results": serializer.data})
+
+
 class PublicProductDetailView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -554,6 +571,7 @@ urlpatterns = [
     path("policies/<slug:slug>/", PublicPolicyPageDetailView.as_view(), name="public-policy-detail"),
     path("business-compliance/summary/", PublicBusinessComplianceSummaryView.as_view(), name="public-business-compliance-summary"),
     path("products/", PublicProductsView.as_view(), name="public-products"),
+    path("product-categories/", PublicProductCategoriesView.as_view(), name="public-product-categories"),
     path("products/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail"),
     path("leads/", PublicLeadView.as_view(), name="public-leads"),
     path("latest-winner/", LatestWinnerView.as_view(), name="latest-winner"),

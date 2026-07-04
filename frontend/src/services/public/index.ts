@@ -120,6 +120,8 @@ export type PublicProduct = {
   name: string;
   base_price: string;
   category?: string | null;
+  /** Canonical public category slug from the category master (SEO-3). */
+  category_slug?: string | null;
   subcategory?: string | null;
   image?: string | null;
   /** Optional extra gallery URLs when the API provides them (deduped with `image` on the client). */

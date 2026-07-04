@@ -1688,9 +1688,24 @@ class ProductCategoryMasterSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "is_active",
+            # Additive public SEO fields (SEO-3) — all optional for admin editing.
+            "slug",
+            "is_public",
+            "public_title",
+            "seo_title",
+            "seo_description",
+            "public_image",
+            "sort_order",
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+        extra_kwargs = {
+            "slug": {"required": False, "allow_blank": True},
+            "public_title": {"required": False, "allow_blank": True},
+            "seo_title": {"required": False, "allow_blank": True},
+            "seo_description": {"required": False, "allow_blank": True},
+            "public_image": {"required": False, "allow_null": True},
+        }
 
 
 class ProductSubcategoryMasterSerializer(serializers.ModelSerializer):

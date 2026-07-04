@@ -55,12 +55,16 @@ come from the configured business profile — nothing is hardcoded or invented.
 
 ## Needs owner / manual action
 
-- **Product category landing pages** — **RESOLVED in SEO-2.** Six static
-  category pages (`/products/beds`, `/sofas`, `/wardrobes`, `/dining-tables`,
-  `/mattresses`, `/appliances`) now exist, built on the existing public products
-  API with term-based category matching and safe empty states. No migration. See
-  `docs/seo/product-category-seo.md`. A future SEO-3 could add admin-managed
-  category slugs and public product-detail pages.
+- **Product category landing pages** — **RESOLVED in SEO-2**, hardened in SEO-3.
+  Six static category pages exist with safe empty states. SEO-3 added additive
+  category SEO fields (`slug`, `is_public`, `public_title`, `seo_*`, `sort_order`),
+  a public categories API, product `category_slug`, canonical-slug-preferred
+  matching (union with heuristics), Product JSON-LD on `/products/[id]`, and
+  dynamic product URLs in the sitemap. See `docs/seo/product-category-seo.md` and
+  `docs/seo/product-detail-seo.md`.
+- **Admin category SEO form inputs** — backend API supports the new fields;
+  the custom React admin category form still needs inputs added (documented
+  follow-up).
 - **Google Business Profile**: see `docs/seo/google-business-profile-checklist.md`.
 - **Local citations / directories**: see `docs/seo/local-citation-checklist.md`.
 - **Business profile content**: ensure the admin → Business Setup → Public Site

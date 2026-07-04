@@ -19,7 +19,7 @@ Legend: **New** = added this pass · **Existing** = already present.
 | `/products/dining-tables` | **New (SEO-2)** | Dining category | dining table shop in Asansol | Dining Tables in Asansol — Subidha Furniture | Dining Tables in Asansol \| Subidha Furniture | Breadcrumb + ItemList + FAQPage | Public product API |
 | `/products/mattresses` | **New (SEO-2)** | Mattresses category | mattress shop in Asansol | Mattresses in Asansol — Subidha Furniture | Mattresses in Asansol \| Subidha Furniture | Breadcrumb + ItemList + FAQPage | Public product API |
 | `/products/appliances` | **New (SEO-2)** | Appliances category | home appliances in Asansol | Appliances in Asansol — Subidha Furniture | Home Appliances in Asansol \| Subidha Furniture | Breadcrumb + ItemList + FAQPage | Public product API |
-| `/products/[id]` | Existing | Product detail (public, finished goods) | model-specific | product name | via helper | — | Public product API |
+| `/products/[id]` | Updated (SEO-3) | Product detail (public, finished goods) | model-specific | product name | via helper | **Product JSON-LD** (no reviews/rating) | Public product API |
 | `/lucky-plan` | Existing | Lucky Plan overview | Lucky Plan EMI | Lucky Plan | via helper | — | Static/policy |
 | `/rulebook` | Existing | Full Lucky Plan rulebook | lucky plan rules | Rulebook | via helper | — | Policy |
 | `/delivery-policy` | Existing | Delivery terms | delivery policy | Delivery Policy | via helper | — | Policy |

@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { listPublicProducts } from "@/lib/public-api";
 import { getPublicSiteUrl } from "@/lib/public-seo";
 
 const DAILY = "daily" as const;
@@ -62,14 +63,33 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: Me
   { path: "/legal/disclaimer", priority: 0.4, changeFrequency: MONTHLY },
 ];
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getPublicSiteUrl();
   const now = new Date();
 
-  return STATIC_ROUTES.map(({ path, priority, changeFrequency }) => ({
+  const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map(({ path, priority, changeFrequency }) => ({
     url: `${siteUrl}${path}`,
     lastModified: now,
     changeFrequency,
     priority,
   }));
+
+  // Public product detail pages. The public products API already returns only
+  // active, finished-goods products (no private/archived/internal items), so
+  // these URLs are safe. On any API failure we fall back to static routes only
+  // so the sitemap (and build) never breaks.
+  let productEntries: MetadataRoute.Sitemap = [];
+  try {
+    const { products } = await listPublicProducts();
+    productEntries = products.map((product) => ({
+      url: `${siteUrl}/products/${product.id}`,
+      lastModified: now,
+      changeFrequency: WEEKLY,
+      priority: 0.6,
+    }));
+  } catch {
+    productEntries = [];
+  }
+
+  return [...staticEntries, ...productEntries];
 }

@@ -183,3 +183,43 @@ export function buildItemListJsonLd(items: ReadonlyArray<{ name: string; path: s
     })),
   };
 }
+
+/**
+ * Product JSON-LD for a public product detail page. Uses only public-safe
+ * fields. Deliberately omits `review`, `aggregateRating`, and stock
+ * `availability` — there is no verified review system and internal stock must
+ * not be exposed. `Offer` is included only when a valid public price exists.
+ */
+export function buildProductJsonLd(input: {
+  name: string;
+  path: string;
+  description?: string | null;
+  image?: string | null;
+  category?: string | null;
+  sku?: string | null;
+  price?: string | number | null;
+}) {
+  const numericPrice = Number(input.price);
+  const hasPrice = Number.isFinite(numericPrice) && numericPrice > 0;
+  const payload: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: input.name,
+    url: absolutePublicUrl(input.path),
+    brand: { "@type": "Brand", name: defaultSiteName },
+  };
+  if (input.description) payload.description = input.description;
+  if (input.image) payload.image = [input.image];
+  if (input.category) payload.category = input.category;
+  if (input.sku) payload.sku = input.sku;
+  if (hasPrice) {
+    payload.offers = {
+      "@type": "Offer",
+      priceCurrency: "INR",
+      price: String(Math.round(numericPrice)),
+      url: absolutePublicUrl(input.path),
+      seller: { "@type": "Organization", name: defaultSiteName },
+    };
+  }
+  return payload;
+}

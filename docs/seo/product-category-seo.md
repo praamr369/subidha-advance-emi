@@ -74,6 +74,47 @@ Every page uses `buildPublicMetadata()` → title, description, canonical,
 OpenGraph, Twitter, robots index+follow. Titles follow "Beds in Asansol |
 Subidha Furniture" style.
 
+## SEO-3 update — canonical category slugs (additive, non-regressive)
+
+SEO-3 added public category infrastructure without changing catalogue visibility:
+
+- **Backend (additive migration `0113` + backfill `0114`):**
+  `ProductCategoryMaster` gained `slug` (auto from name, backfilled),
+  `is_public` (default **True**), `public_title`, `seo_title`, `seo_description`,
+  `public_image`, `sort_order` (default 0). No product visibility changed; no
+  financial/inventory data touched.
+- **Public API:** `GET /api/v1/public/product-categories/` — read-only, no auth,
+  returns only public+active categories with public-safe fields.
+- **Product serializer:** now also returns `category_slug` (from the product's
+  `category_master`), read-only and public-safe.
+- **Frontend matching:** `productsForCategory` now matches a product if its
+  `category_slug` is in the category's optional `canonicalSlugs` **OR** any
+  heuristic `matchTerms` hit — a union, so SEO-2 behavior is preserved and only
+  broadened. The `appliances` page maps canonical slugs `home-appliances` and
+  `kitchen-appliances`.
+
+Note: the live category masters are coarse (Furniture / Home Appliances /
+Kitchen Appliances), so the fine-grained six SEO pages still rely primarily on
+heuristic term matching. Admins can later create finer category-master rows
+(e.g. "Beds", "Sofas") and set their `slug` to the SEO slug for exact mapping.
+
+### Admin UI status
+
+The admin **API/serializer** (`ProductCategoryMasterSerializer`) now accepts all
+new fields, so they are editable via the admin API and Django admin. The custom
+React admin category form does not yet render inputs for `slug`, `is_public`,
+`public_title`, `seo_title`, `seo_description`, `public_image`, `sort_order` —
+adding those inputs is a small follow-up (labels: "Public slug", "Show on public
+website", "Public title", "SEO title", "SEO description", "Public image", "Sort
+order"). Left as documented work to avoid shipping incomplete UI.
+
+### Rollback plan
+
+Frontend-only changes revert by removing the SEO-3 commits. The backend
+migrations are additive/nullable; `0114` reverse is a no-op and `0113` can be
+reversed with `migrate subscriptions 0112` (drops the added columns) with no data
+loss to any existing field.
+
 ## SEO-3 recommendations (future, not built)
 
 - Dedicated public product **detail** pages at a slug (`/products/{category}/{slug}`)
