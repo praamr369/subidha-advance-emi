@@ -33,5 +33,7 @@ sha256sum "$DEST"/* > "$DEST/checksums.txt"
 du -sh "$DEST"
 echo "==> Backup complete: $DEST"
 
-# Retention: keep last 7 'scheduled' backups (label-specific)
-ls -1dt "$BACKUP_ROOT"/scheduled-* 2>/dev/null | tail -n +8 | xargs -r rm -rf
+# Retention: keep last 7 'scheduled' backups (label-specific).
+# Guarded with `|| true` so an empty glob under `set -o pipefail` never aborts
+# the caller (e.g. deploy.sh runs this as its first step).
+ls -1dt "$BACKUP_ROOT"/scheduled-* 2>/dev/null | tail -n +8 | xargs -r rm -rf || true
