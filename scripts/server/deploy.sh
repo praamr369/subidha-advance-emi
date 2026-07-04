@@ -35,7 +35,8 @@ fi
 echo "    $OLD_COMMIT -> $NEW_COMMIT"
 
 echo "==> [3/7] Rehearsing migrations on a copy of the live DB"
-REHEARSAL_DB="${DB_NAME}_rehearsal_$STAMP"
+# Postgres identifiers can't contain hyphens unquoted — use underscores only.
+REHEARSAL_DB="${DB_NAME}_rehearsal_${STAMP//-/_}"
 sudo -u postgres createdb "$REHEARSAL_DB"
 trap 'sudo -u postgres dropdb --if-exists "$REHEARSAL_DB"' EXIT
 sudo -u postgres pg_restore -d "$REHEARSAL_DB" "$LATEST_BACKUP/db.dump"
