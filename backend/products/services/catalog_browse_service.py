@@ -48,10 +48,17 @@ PURPOSE_BY_KEY: dict[str, PurposeSpec] = {spec.key: spec for spec in PURPOSE_SPE
 
 
 def approved_catalog_queryset() -> QuerySet[Product]:
-    """Products that admin has approved (activated) for portal visibility."""
+    """Products that admin has approved (activated) for portal visibility.
+
+    Business rule: customer/partner/vendor portals may only see sellable
+    finished goods. Products whose inventory item is a RAW_MATERIAL or
+    ACCESSORY are internal (manufacturing/BOM inputs) and stay admin-only.
+    Products without an inventory item are treated as finished goods.
+    """
     return (
         Product.objects.filter(is_active=True)
         .exclude(lifecycle_status="DISCONTINUED")
+        .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
         .select_related("category_master", "subcategory_master")
         .order_by("category", "name", "id")
     )

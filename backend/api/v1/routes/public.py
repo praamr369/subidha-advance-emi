@@ -385,7 +385,13 @@ class PublicProductsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        products = Product.objects.filter(is_active=True).order_by("name", "id")
+        # Public site shows sellable finished goods only — raw materials and
+        # accessories (manufacturing inputs) are internal, admin-only items.
+        products = (
+            Product.objects.filter(is_active=True)
+            .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
+            .order_by("name", "id")
+        )
         serializer = PublicProductSerializer(products, many=True, context={'request': request})
         return Response({"count": products.count(), "results": serializer.data})
 
@@ -396,7 +402,11 @@ class PublicProductDetailView(APIView):
 
     def get(self, request, id):
         try:
-            product = Product.objects.get(id=id, is_active=True)
+            product = (
+                Product.objects.filter(id=id, is_active=True)
+                .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"])
+                .get()
+            )
         except Product.DoesNotExist:
             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
 
