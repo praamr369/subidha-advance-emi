@@ -4,8 +4,9 @@ import { PublicMarketingShell } from "@/components/layout/page-shells";
 import CtaBanner from "@/components/public/CtaBanner";
 import FaqBlock from "@/components/public/FaqBlock";
 import HomeFeaturedProductsShowcase from "@/components/public/HomeFeaturedProductsShowcase";
-import HomeLandingHero from "@/components/public/HomeLandingHero";
 import HomePlanFlowPreview from "@/components/public/HomePlanFlowPreview";
+import CinematicStory from "@/components/public/immersive/CinematicStory";
+import ImmersiveHero from "@/components/public/immersive/ImmersiveHero";
 import PlanCategoryShowcase from "@/components/public/PlanCategoryShowcase";
 import PublicMarketingBanner from "@/components/public/PublicMarketingBanner";
 import PublicSectionShell from "@/components/public/PublicSectionShell";
@@ -45,7 +46,7 @@ export default async function PublicHome() {
     <PublicMarketingShell
       className="mx-auto w-full max-w-[1280px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10"
       hero={
-        <HomeLandingHero
+        <ImmersiveHero
           title={heroTitle}
           subtitle={heroSubtitle}
           companyName={profile.resolved_display_name}
@@ -56,6 +57,8 @@ export default async function PublicHome() {
       trust={<PublicTrustStrip />}
       sections={
         <>
+          <CinematicStory />
+
           <PublicMarketingBanner
             eyebrow="Easy monthly plan"
             title="Furniture plans that look modern outside and stay controlled inside"
