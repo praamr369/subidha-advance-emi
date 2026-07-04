@@ -37,6 +37,10 @@ python manage.py createsuperuser         # 2. MUST be the first user (pk=1) —
                                          #    the custom user model requires a phone
 python manage.py loaddata fixtures/production_bootstrap.json   # 3. 268 config objects
 python manage.py check --deploy          # 4. sanity
+# 5. REQUIRED: createsuperuser leaves role=CUSTOMER (the model default) and the
+#    frontend routes by role — without this the superuser lands on the customer
+#    portal instead of the admin dashboard:
+python manage.py shell -c "from django.contrib.auth import get_user_model; u=get_user_model().objects.get(pk=1); u.role='ADMIN'; u.save()"
 ```
 
 After loading, review in the admin: business profile details, document sequence
