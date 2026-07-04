@@ -23,12 +23,13 @@ sudo systemctl stop "$SERVICE"
 
 echo "==> [2/5] Safety: dumping CURRENT (bad) state before overwriting"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-pg_dump -Fc -U "$DB_USER" -d "$DB_NAME" -f "$BACKUP_DIR/../post-incident-$STAMP.dump" || true
+sudo -u postgres pg_dump -Fc -d "$DB_NAME" -f "/tmp/post-incident-$STAMP.dump" || true
+mv "/tmp/post-incident-$STAMP.dump" "$BACKUP_DIR/../post-incident-$STAMP.dump" 2>/dev/null || true
 
 echo "==> [3/5] Restoring database"
-dropdb -U "$DB_USER" "$DB_NAME"
-createdb -U "$DB_USER" "$DB_NAME"
-pg_restore -U "$DB_USER" -d "$DB_NAME" "$BACKUP_DIR/db.dump"
+sudo -u postgres dropdb "$DB_NAME"
+sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
+sudo -u postgres pg_restore -d "$DB_NAME" "$BACKUP_DIR/db.dump"
 
 if [ -f "$BACKUP_DIR/media.tar.gz" ]; then
   read -r -p "Also restore media files? (y/N): " MEDIA_ANS

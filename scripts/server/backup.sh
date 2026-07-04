@@ -16,7 +16,8 @@ DEST="$BACKUP_ROOT/$LABEL-$STAMP"
 mkdir -p "$DEST"
 
 echo "==> Backing up database '$DB_NAME' ..."
-pg_dump -Fc -U "$DB_USER" -d "$DB_NAME" -f "$DEST/db.dump"
+sudo -u postgres pg_dump -Fc -d "$DB_NAME" -f "/tmp/db-$STAMP.dump"
+mv "/tmp/db-$STAMP.dump" "$DEST/db.dump"
 
 echo "==> Verifying dump is restorable ..."
 pg_restore --list "$DEST/db.dump" > /dev/null
@@ -26,7 +27,7 @@ tar -czf "$DEST/media.tar.gz" -C "$MEDIA_ROOT" .
 
 echo "==> Recording deployed commit + migration state ..."
 git -C "$APP_DIR" rev-parse HEAD > "$DEST/deployed-commit.txt" 2>/dev/null || true
-(cd "$APP_DIR/backend" && python manage.py showmigrations --plan | tail -n 40 > "$DEST/migration-state.txt") 2>/dev/null || true
+(cd "$APP_DIR/backend" && set -a && . /etc/subidha/backend.env && set +a && ./.venv/bin/python manage.py showmigrations --plan | tail -n 40 > "$DEST/migration-state.txt") 2>/dev/null || true
 
 sha256sum "$DEST"/* > "$DEST/checksums.txt"
 du -sh "$DEST"
