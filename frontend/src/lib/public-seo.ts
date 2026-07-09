@@ -24,7 +24,7 @@ export function absolutePublicUrl(path = "/"): string {
 
 function defaultSocialImagePath(): string {
   const image = PUBLIC_MARKETING_ASSETS.heroShowroom;
-  return image.imageExists ? image.src : "/brand/subidha-logo.png";
+  return image.imageExists ? image.src : "/brand/logo.png";
 }
 
 export function buildPublicMetadata(input: {

@@ -23,6 +23,12 @@ try:
     notification_models = []
 
     try:
+        from system_jobs.models import Notification
+        notification_models.append(Notification)
+    except ImportError:
+        pass
+
+    try:
         from reminders.models import PaymentReminder, NotificationTemplate
         notification_models.extend([PaymentReminder, NotificationTemplate])
     except ImportError:
