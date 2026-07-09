@@ -21,10 +21,10 @@ def load_snapshot(snapshot_path: str) -> bool:
     """Load setup snapshot into database."""
 
     if not Path(snapshot_path).exists():
-        print(f"❌ Snapshot file not found: {snapshot_path}")
+        print(f"[FAIL] Snapshot file not found: {snapshot_path}")
         return False
 
-    with open(snapshot_path, 'r') as f:
+    with open(snapshot_path, 'r', encoding='utf-8') as f:
         snapshot = json.load(f)
 
     print("=" * 70)
@@ -38,11 +38,40 @@ def load_snapshot(snapshot_path: str) -> bool:
     sections = snapshot.get('sections', {})
     total_loaded = 0
 
+    # Load in dependency order (parent models first)
+    load_order = [
+        'branch_control.Branch',
+        'inventory.StockLocation',
+        'inventory.Warehouse',
+        'subscriptions.BusinessProfile',
+        'accounting.BusinessTaxProfile',
+        'accounting.ChartOfAccount',
+        'accounting.FinanceAccount',
+        'accounting.FinanceAccountCoaMapping',
+        'accounting.AccountingPostingProfile',
+        'accounting.RentLeaseAccountingAccountMapping',
+        'branch_control.CashCounter',
+        'subscriptions.ProductCategoryMaster',
+        'subscriptions.ProductSubcategoryMaster',
+        'subscriptions.ProductUnitOfMeasureMaster',
+        'accounting.ProductTaxProfile',
+        'reminders.NotificationTemplate',
+    ]
+
     try:
         with transaction.atomic():
-            for model_path, records in sections.items():
+            # Load models in dependency order
+            for model_path in load_order:
+                if model_path not in sections:
+                    continue
+
+                records = sections[model_path]
                 if not records:
-                    print(f"⊘ {model_path}: 0 records (skipped)")
+                    print(f"[SKIP] {model_path}: 0 records")
+                    continue
+
+                if not records:
+                    print(f"[SKIP] {model_path}: 0 records")
                     continue
 
                 try:
@@ -53,25 +82,39 @@ def load_snapshot(snapshot_path: str) -> bool:
                     count = 0
                     for record in records:
                         pk = record.get('pk')
-                        fields = record.get('fields', {})
+                        fields = record.get('fields', {}).copy()
 
-                        # Create or update
-                        obj, created = model_class.objects.update_or_create(
-                            pk=pk,
-                            defaults=fields
-                        )
-                        count += 1
+                        # Convert ForeignKey fields to _id format for bulk assignment
+                        # e.g., 'branch': 1 -> 'branch_id': 1
+                        meta = model_class._meta
+                        for field in meta.get_fields():
+                            if hasattr(field, 'many_to_one') and field.many_to_one:
+                                # This is a ForeignKey
+                                field_name = field.name
+                                if field_name in fields and not field_name.endswith('_id'):
+                                    # Rename to _id format
+                                    fields[f'{field_name}_id'] = fields.pop(field_name)
 
-                    print(f"✓ {model_path}: {count} records loaded")
+                        try:
+                            obj, created = model_class.objects.update_or_create(
+                                pk=pk,
+                                defaults=fields
+                            )
+                            count += 1
+                        except Exception as field_error:
+                            print(f"    [RECORD ERROR] pk={pk}: {str(field_error)}")
+                            raise
+
+                    print(f"[OK] {model_path}: {count} records loaded")
                     total_loaded += count
 
                 except Exception as e:
-                    print(f"✗ {model_path}: ERROR - {str(e)}")
+                    print(f"[ERROR] {model_path}: {str(e)}")
                     raise
 
         print()
         print("=" * 70)
-        print(f"✅ SNAPSHOT LOADED SUCCESSFULLY")
+        print("[SUCCESS] SNAPSHOT LOADED SUCCESSFULLY")
         print(f"Total records: {total_loaded}")
         print("=" * 70)
         return True
@@ -79,7 +122,7 @@ def load_snapshot(snapshot_path: str) -> bool:
     except Exception as e:
         print()
         print("=" * 70)
-        print("❌ SNAPSHOT LOAD FAILED")
+        print("[FAIL] SNAPSHOT LOAD FAILED")
         print("=" * 70)
         print(f"Error: {str(e)}")
         print()
