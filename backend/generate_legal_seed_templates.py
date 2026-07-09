@@ -1,18 +1,16 @@
 #!/usr/bin/env python
 """
-Generate 39 seed policy templates with legal compliance wording for Indian business.
+Generate seed policy templates with legal compliance wording for Indian business.
 
 Templates include:
 - Legal wording for Indian jurisdiction (WB, India)
 - Compliance with ITA 1961, GST Act, DPDP 2023, CPA 2019
 - Business-specific terms (EMI, furniture, rent-lease, subscriptions)
-- Review dates and governance metadata
 - Status: DRAFT for manual review before publishing
 """
 
 import os
 import sys
-import json
 import django
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
@@ -21,10 +19,11 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings.production')
 django.setup()
 
 from django.db import transaction
-from subscriptions.models import PolicyPage, PolicyGovernanceMetadata
+from subscriptions.models_business_setup import PolicyPage, PolicyCategory, PolicyStatus
+from subscriptions.models_policy_governance import PolicyGovernanceMetadata
 
 
-# 39 SEED TEMPLATES FOR SUBIDHA FURNITURE BUSINESS
+# SEED TEMPLATES FOR SUBIDHA FURNITURE BUSINESS
 SEED_TEMPLATES = [
     # ============ LEGAL & COMPLIANCE (8 templates) ============
     {
@@ -32,7 +31,11 @@ SEED_TEMPLATES = [
         'title': 'Terms of Service',
         'version': 1,
         'status': 'DRAFT',
-        'body': '''# TERMS OF SERVICE
+        'visibility': 'PUBLIC',
+        'governance_category': 'LEGAL_COMPLIANCE',
+        'coverage_group': 'CUSTOMER_FACING',
+        'requires_legal_review': True,
+        'content': '''# TERMS OF SERVICE
 
 Effective Date: {today}
 Last Updated: {today}
@@ -121,7 +124,7 @@ For questions: subidhafurnitureofficial@gmail.com | +919476490946
         'title': 'Privacy Policy & Data Protection',
         'version': 1,
         'status': 'DRAFT',
-        'body': '''# PRIVACY POLICY & DATA PROTECTION
+        'content': '''# PRIVACY POLICY & DATA PROTECTION
 
 **Effective Date:** {today}
 **Last Updated:** {today}
@@ -225,7 +228,7 @@ Updates will be notified by email. Continued use = acceptance of changes.
         'title': 'Data Protection & Processing Policy',
         'version': 1,
         'status': 'DRAFT',
-        'body': '''# DATA PROTECTION & PROCESSING POLICY
+        'content': '''# DATA PROTECTION & PROCESSING POLICY
 
 **Compliance Framework:** DPDP Act 2023, ITA 2000, MEITY Guidelines
 **Effective Date:** {today}
@@ -338,7 +341,7 @@ All processors (delivery, payment, analytics) have:
         'title': 'Cookie Policy & Tracking Technologies',
         'version': 1,
         'status': 'DRAFT',
-        'body': '''# COOKIE POLICY
+        'content': '''# COOKIE POLICY
 
 Effective Date: {today}
 
@@ -442,7 +445,7 @@ Changes to this policy: Notify by email + site banner
         'title': 'Website Disclaimer & Limitation of Liability',
         'version': 1,
         'status': 'DRAFT',
-        'body': '''# WEBSITE DISCLAIMER & LIABILITY LIMITATION
+        'content': '''# WEBSITE DISCLAIMER & LIABILITY LIMITATION
 
 Effective Date: {today}
 
@@ -536,7 +539,7 @@ subidhafurnitureofficial@gmail.com
         'title': 'Acceptable Use Policy',
         'version': 1,
         'status': 'DRAFT',
-        'body': '''# ACCEPTABLE USE POLICY
+        'content': '''# ACCEPTABLE USE POLICY
 
 Effective Date: {today}
 
@@ -599,7 +602,7 @@ We will investigate and respond within 48 hours.
         'title': 'Payment Terms & Conditions',
         'version': 1,
         'status': 'DRAFT',
-        'body': '''# PAYMENT TERMS & CONDITIONS
+        'content': '''# PAYMENT TERMS & CONDITIONS
 
 Effective Date: {today}
 
@@ -702,7 +705,7 @@ Billing queries: billing@subidhafurniture.com
         'title': 'Advance EMI Terms & Conditions',
         'version': 1,
         'status': 'DRAFT',
-        'body': '''# ADVANCE EMI TERMS & CONDITIONS
+        'content': '''# ADVANCE EMI TERMS & CONDITIONS
 
 **Product:** Subidha Furniture Advance EMI Scheme
 **Effective Date:** {today}
@@ -851,7 +854,7 @@ def create_seed_templates():
 
             for template in SEED_TEMPLATES:
                 # Replace placeholders
-                body = template['body'].replace('{today}', today)
+                content = template['content'].replace('{today}', today)
 
                 # Check if policy already exists
                 exists = PolicyPage.objects.filter(slug=template['slug']).exists()
@@ -867,7 +870,7 @@ def create_seed_templates():
                     title=template['title'],
                     version=template['version'],
                     status=template['status'],
-                    body=body,
+                    content=content,
                 )
 
                 # Create PolicyGovernanceMetadata
