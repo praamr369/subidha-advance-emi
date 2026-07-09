@@ -274,6 +274,17 @@ from api.v1.views.admin_disputes import (
     dispute_move_to_review_view,
     dispute_escalate_view,
 )
+from api.v1.views.admin_warranty import (
+    warranty_claims_list_view,
+    warranty_claim_detail_view,
+    warranty_claim_assess_view,
+    warranty_claim_approve_view,
+    warranty_claim_reject_view,
+    warranty_claim_resolve_view,
+    service_pricing_view,
+    extended_warranty_list_view,
+    extended_warranty_mark_paid_view,
+)
 from api.v1.views.admin_partial_payment import (
     partial_payment_preview_view,
     partial_payment_split_view,
@@ -1251,6 +1262,16 @@ urlpatterns = [
     path("crm/disputes/pending-escalation/", dispute_pending_escalation_view),
     path("crm/disputes/<int:dispute_id>/move-to-review/", dispute_move_to_review_view),
     path("crm/disputes/<int:dispute_id>/escalate/", dispute_escalate_view),
+    # Warranty & Service Management
+    path("warranty-claims/", warranty_claims_list_view),
+    path("warranty-claims/<int:claim_id>/", warranty_claim_detail_view),
+    path("warranty-claims/<int:claim_id>/assess/", warranty_claim_assess_view),
+    path("warranty-claims/<int:claim_id>/approve/", warranty_claim_approve_view),
+    path("warranty-claims/<int:claim_id>/reject/", warranty_claim_reject_view),
+    path("warranty-claims/<int:claim_id>/resolve/", warranty_claim_resolve_view),
+    path("service-pricing/<int:product_id>/", service_pricing_view),
+    path("extended-warranty/", extended_warranty_list_view),
+    path("extended-warranty/<int:plan_id>/mark-paid/", extended_warranty_mark_paid_view),
 
     # ── Partial Payment Split ─────────────────────────────────────────────────
     path("subscriptions/<int:subscription_id>/partial-payment/preview/", partial_payment_preview_view),

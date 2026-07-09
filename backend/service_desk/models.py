@@ -422,6 +422,272 @@ class ServiceDeskCaseLine(ServiceDeskTimeStampedModel):
         super().save(*args, **kwargs)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# WARRANTY & SERVICE TRACKING (Additive - Warranty & Service Policy v2.0)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class WarrantyType(models.TextChoices):
+    MANUFACTURING = "MANUFACTURING", "Manufacturing Defect (12-24 months)"
+    STRUCTURAL = "STRUCTURAL", "Structural (3 years for furniture)"
+    EXTENDED = "EXTENDED", "Extended Warranty (optional)"
+
+
+class DefectClassification(models.TextChoices):
+    MANUFACTURING_DEFECT = "MANUFACTURING_DEFECT", "Manufacturing Defect (COVERED)"
+    WEAR_TEAR = "WEAR_TEAR", "Wear & Tear (NOT COVERED)"
+    USER_DAMAGE = "USER_DAMAGE", "User Damage (NOT COVERED)"
+    ENVIRONMENTAL = "ENVIRONMENTAL", "Environmental Damage (LIMITED)"
+    UNVERIFIED = "UNVERIFIED", "Unverified (pending assessment)"
+
+
+class ServiceRemedy(models.TextChoices):
+    FREE_REPAIR = "FREE_REPAIR", "Free Repair (warranty)"
+    FREE_REPLACEMENT = "FREE_REPLACEMENT", "Free Replacement (warranty)"
+    PAID_REPAIR = "PAID_REPAIR", "Paid Repair (out-of-warranty)"
+    PAID_REPLACEMENT = "PAID_REPLACEMENT", "Paid Replacement (out-of-warranty)"
+    EXTENDED_WARRANTY = "EXTENDED_WARRANTY", "Extended Warranty Enrollment"
+    DECLINED = "DECLINED", "Claim Declined"
+
+
+class WarrantyClaim(ServiceDeskTimeStampedModel):
+    """Warranty claim tracking for manufacturing defects and coverage"""
+
+    # Link to service case
+    service_case = models.OneToOneField(
+        ServiceDeskCase,
+        on_delete=models.PROTECT,
+        related_name="warranty_claim",
+    )
+
+    # Product & subscription info
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="warranty_claims",
+    )
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="warranty_claims",
+    )
+
+    # Warranty details
+    warranty_type = models.CharField(
+        max_length=20,
+        choices=WarrantyType.choices,
+        default=WarrantyType.MANUFACTURING,
+    )
+    warranty_start_date = models.DateField()
+    warranty_end_date = models.DateField()
+    is_in_warranty = models.BooleanField(default=True, db_index=True)
+
+    # Defect information
+    defect_description = models.TextField()
+    defect_date_discovered = models.DateField()
+    defect_classification = models.CharField(
+        max_length=30,
+        choices=DefectClassification.choices,
+        default=DefectClassification.UNVERIFIED,
+        db_index=True,
+    )
+
+    # Claim process
+    claim_submitted_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    claim_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('SUBMITTED', 'Submitted'),
+            ('UNDER_ASSESSMENT', 'Under Assessment'),
+            ('APPROVED', 'Approved'),
+            ('REJECTED', 'Rejected'),
+            ('RESOLVED', 'Resolved'),
+        ],
+        default='SUBMITTED',
+        db_index=True,
+    )
+
+    # Assessment & verification
+    assessment_notes = models.TextField(blank=True, default="")
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_warranty_claims",
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    # Remedy & resolution
+    recommended_remedy = models.CharField(
+        max_length=30,
+        choices=ServiceRemedy.choices,
+        default=ServiceRemedy.FREE_REPAIR,
+    )
+    remedy_cost_labor = models.DecimalField(
+        max_digits=10, decimal_places=2, default=MONEY_ZERO
+    )
+    remedy_cost_parts = models.DecimalField(
+        max_digits=10, decimal_places=2, default=MONEY_ZERO
+    )
+    remedy_cost_travel = models.DecimalField(
+        max_digits=10, decimal_places=2, default=MONEY_ZERO
+    )
+    total_cost = models.DecimalField(
+        max_digits=10, decimal_places=2, default=MONEY_ZERO
+    )
+
+    # Service center details
+    authorized_service_center = models.CharField(max_length=160, blank=True, default="")
+    service_center_contact = models.CharField(max_length=20, blank=True, default="")
+
+    # Timeline
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_warranty_claims",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "warranty_claims"
+        ordering = ["-claim_submitted_at"]
+        indexes = [
+            models.Index(fields=["product", "is_in_warranty"]),
+            models.Index(fields=["claim_status", "claim_submitted_at"]),
+            models.Index(fields=["defect_classification"]),
+        ]
+
+    def __str__(self):
+        return f"WarrantyClaim {self.id} - {self.product.name} ({self.claim_status})"
+
+    @property
+    def days_to_report_deadline(self) -> int:
+        """Days remaining to report defect (30-day window from discovery)"""
+        from datetime import timedelta
+        deadline = self.defect_date_discovered + timedelta(days=30)
+        remaining = (deadline - timezone.localdate()).days
+        return max(0, remaining)
+
+    @property
+    def is_claim_eligible(self) -> bool:
+        """Check if claim is eligible (within 30-day reporting window)"""
+        return self.days_to_report_deadline > 0 and self.is_in_warranty
+
+    def approve_claim(self, approved_by, remedy, cost_labor, cost_parts, cost_travel=0):
+        """Approve warranty claim"""
+        self.claim_status = 'APPROVED'
+        self.recommended_remedy = remedy
+        self.remedy_cost_labor = cost_labor
+        self.remedy_cost_parts = cost_parts
+        self.remedy_cost_travel = cost_travel
+        self.total_cost = cost_labor + cost_parts + cost_travel
+        self.approved_at = timezone.now()
+        self.approved_by = approved_by
+        self.save()
+
+
+class ServicePricing(ServiceDeskTimeStampedModel):
+    """Service pricing configuration by product category & service type"""
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="service_pricing",
+    )
+
+    # Labor costs
+    warranty_labor_cost = models.DecimalField(
+        max_digits=10, decimal_places=2, default=MONEY_ZERO,
+        help_text="Free for warranty; applies to extended warranty"
+    )
+    out_of_warranty_labor_cost = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("1000"),
+        help_text="₹500-2,000 range"
+    )
+
+    # Service call charges
+    home_service_charge = models.DecimalField(
+        max_digits=10, decimal_places=2, default=MONEY_ZERO,
+        help_text="Free within 5km, ₹500 beyond for warranty"
+    )
+    travel_charge_beyond_5km = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("500")
+    )
+
+    # Service SLA
+    home_visit_days = models.PositiveIntegerField(
+        default=3,
+        help_text="Days for technician home visit (warranty period)"
+    )
+    service_completion_days = models.PositiveIntegerField(
+        default=14,
+        help_text="Days to complete repair/replacement"
+    )
+
+    class Meta:
+        db_table = "service_pricing"
+        unique_together = ("product",)
+
+    def __str__(self):
+        return f"ServicePricing for {self.product.name}"
+
+
+class WarrantyExtendedPlan(ServiceDeskTimeStampedModel):
+    """Extended warranty plan purchase & enrollment"""
+
+    subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.PROTECT,
+        related_name="warranty_extended_plans",
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="extended_warranty_plans",
+    )
+
+    # Plan details
+    plan_duration_months = models.PositiveIntegerField(
+        default=12,
+        help_text="Additional months (typically 12, renewable)"
+    )
+    plan_cost = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        help_text="5-10% of product price"
+    )
+    plan_cost_percentage = models.DecimalField(
+        max_digits=4, decimal_places=2,
+        help_text="5.00 to 10.00 percent"
+    )
+
+    # Enrollment dates
+    enrollment_date = models.DateField()
+    coverage_start_date = models.DateField()
+    coverage_end_date = models.DateField()
+
+    # Payment & status
+    payment_status = models.CharField(
+        max_length=20,
+        choices=[('PENDING', 'Pending'), ('PAID', 'Paid'), ('CANCELLED', 'Cancelled')],
+        default='PENDING',
+    )
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "warranty_extended_plans"
+        ordering = ["-enrollment_date"]
+
+    def __str__(self):
+        return f"ExtendedPlan {self.product.name} ({self.coverage_start_date})"
+
+
 from service_desk.support_ticket_models import (  # noqa: E402,F401
     SupportTicket,
     SupportTicketAttachment,
