@@ -5653,6 +5653,27 @@ class RecoveryCase(TimeStampedModel):
         default="",
     )
     settled_at = models.DateTimeField(null=True, blank=True)
+
+    # Settlement approval workflow
+    settlement_requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requested_settlements",
+    )
+    settlement_requested_at = models.DateTimeField(null=True, blank=True)
+    settlement_approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_settlements",
+    )
+    settlement_approved_at = models.DateTimeField(null=True, blank=True)
+    settlement_notes = models.TextField(blank=True, default="")
+    settlement_approval_notes = models.TextField(blank=True, default="")
+
     notes = models.TextField(blank=True, default="")
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
     last_contact_at = models.DateTimeField(null=True, blank=True)
@@ -5686,6 +5707,15 @@ class RecoveryCase(TimeStampedModel):
         if days <= 120:
             return "91-120"
         return "120+"
+
+    def is_settlement_requested(self) -> bool:
+        return self.settlement_requested_at is not None
+
+    def is_settlement_approved(self) -> bool:
+        return self.settlement_approved_at is not None
+
+    def can_request_settlement(self) -> bool:
+        return self.stage in [RecoveryStage.IDENTIFIED, RecoveryStage.NOTICE_SENT]
 
 
 # ---------------------------------------------------------------------------
@@ -5983,8 +6013,26 @@ class CustomerDispute(TimeStampedModel):
         blank=True,
         related_name="created_disputes",
     )
-    resolution_notes = models.TextField(blank=True, default="")
+
+    # SLA Timeline
+    open_due_at = models.DateTimeField(null=True, blank=True)  # Deadline for OPEN stage
+    review_due_at = models.DateTimeField(null=True, blank=True)  # Deadline for UNDER_REVIEW stage
+    resolve_due_at = models.DateTimeField(null=True, blank=True)  # Deadline for RESOLVED/REJECTED stage
+
+    # Stage transitions
+    review_started_at = models.DateTimeField(null=True, blank=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
+
+    resolution_notes = models.TextField(blank=True, default="")
+    resolution_decision = models.TextField(blank=True, default="")  # Why it was resolved/rejected
+
+    def save(self, *args, **kwargs):
+        # Auto-set SLA deadlines on creation
+        if not self.pk and not self.open_due_at:
+            self.open_due_at = timezone.now() + timezone.timedelta(days=7)
+            self.review_due_at = timezone.now() + timezone.timedelta(days=14)
+            self.resolve_due_at = timezone.now() + timezone.timedelta(days=21)
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = "subscriptions_customer_disputes"
@@ -5992,3 +6040,28 @@ class CustomerDispute(TimeStampedModel):
 
     def __str__(self):
         return f"Dispute {self.dispute_ref} [{self.stage}] — {self.customer_id}"
+
+    @property
+    def is_sla_compliant(self) -> bool:
+        """Check if dispute is on track with SLA."""
+        now = timezone.now()
+        if self.stage == DisputeStage.OPEN:
+            return self.open_due_at is None or now <= self.open_due_at
+        if self.stage == DisputeStage.UNDER_REVIEW:
+            return self.review_due_at is None or now <= self.review_due_at
+        return True  # RESOLVED, REJECTED, ESCALATED don't have active SLA
+
+    @property
+    def is_sla_breached(self) -> bool:
+        """Check if SLA deadline has been missed."""
+        now = timezone.now()
+        if self.stage == DisputeStage.OPEN:
+            return self.open_due_at is not None and now > self.open_due_at
+        if self.stage == DisputeStage.UNDER_REVIEW:
+            return self.review_due_at is not None and now > self.review_due_at
+        return False
+
+    @property
+    def days_since_creation(self) -> int:
+        """Days elapsed since dispute was created."""
+        return (timezone.now() - self.created_at).days if self.created_at else 0

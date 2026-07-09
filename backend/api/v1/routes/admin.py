@@ -237,6 +237,7 @@ from api.v1.views.admin_recovery import (
     AdminRecoveryCaseListView,
     AdminRecoveryCaseSendLegalNoticeView,
     AdminRecoveryCaseSendSettlementOfferView,
+    AdminRecoveryCaseSettlementView,
     AdminSchemeDetailView,
     AdminSchemeListView,
     AdminStaffTargetListView,
@@ -267,6 +268,11 @@ from api.v1.views.admin_disputes import (
     dispute_list_create_view,
     dispute_detail_view,
     dispute_notify_customer_view,
+    dispute_sla_status_view,
+    dispute_sla_breached_view,
+    dispute_pending_escalation_view,
+    dispute_move_to_review_view,
+    dispute_escalate_view,
 )
 from api.v1.views.admin_partial_payment import (
     partial_payment_preview_view,
@@ -1185,6 +1191,7 @@ urlpatterns = [
     path("recovery-cases/<int:pk>/", AdminRecoveryCaseDetailView.as_view()),
     path("recovery-cases/<int:pk>/send-legal-notice/", AdminRecoveryCaseSendLegalNoticeView.as_view()),
     path("recovery-cases/<int:pk>/send-settlement-offer/", AdminRecoveryCaseSendSettlementOfferView.as_view()),
+    path("recovery-cases/<int:case_id>/settlement/", AdminRecoveryCaseSettlementView.as_view()),
 
     # ── AML / KYC re-verification ──────────────────────────────────────────
     path("aml/screenings/", AdminAMLScreeningListView.as_view()),
@@ -1239,6 +1246,11 @@ urlpatterns = [
     path("crm/disputes/", dispute_list_create_view),
     path("crm/disputes/<int:dispute_id>/", dispute_detail_view),
     path("crm/disputes/<int:dispute_id>/notify/", dispute_notify_customer_view),
+    path("crm/disputes/<int:dispute_id>/sla-status/", dispute_sla_status_view),
+    path("crm/disputes/sla-breached/", dispute_sla_breached_view),
+    path("crm/disputes/pending-escalation/", dispute_pending_escalation_view),
+    path("crm/disputes/<int:dispute_id>/move-to-review/", dispute_move_to_review_view),
+    path("crm/disputes/<int:dispute_id>/escalate/", dispute_escalate_view),
 
     # ── Partial Payment Split ─────────────────────────────────────────────────
     path("subscriptions/<int:subscription_id>/partial-payment/preview/", partial_payment_preview_view),

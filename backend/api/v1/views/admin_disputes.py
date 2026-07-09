@@ -32,10 +32,19 @@ def _row(d: CustomerDispute) -> dict:
         "stage": d.stage,
         "priority": d.priority,
         "assigned_to_id": d.assigned_to_id,
+        "assigned_to_name": d.assigned_to.get_full_name() if d.assigned_to_id else None,
         "resolution_notes": d.resolution_notes,
+        "resolution_decision": d.resolution_decision,
         "resolved_at": d.resolved_at.isoformat() if d.resolved_at else None,
         "created_at": d.created_at.isoformat(),
         "updated_at": d.updated_at.isoformat(),
+        # SLA fields
+        "is_sla_compliant": d.is_sla_compliant,
+        "is_sla_breached": d.is_sla_breached,
+        "days_since_creation": d.days_since_creation,
+        "open_due_at": d.open_due_at.isoformat() if d.open_due_at else None,
+        "review_due_at": d.review_due_at.isoformat() if d.review_due_at else None,
+        "resolve_due_at": d.resolve_due_at.isoformat() if d.resolve_due_at else None,
     }
 
 
@@ -151,3 +160,104 @@ def dispute_notify_customer_view(request, dispute_id):
     )
 
     return Response({"message": "Notification sent.", "email": email, "dispute_ref": d.dispute_ref})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdmin])
+def dispute_sla_status_view(request, dispute_id):
+    """Get SLA compliance status for a dispute."""
+    try:
+        d = CustomerDispute.objects.get(pk=dispute_id)
+    except CustomerDispute.DoesNotExist:
+        return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        "dispute_ref": d.dispute_ref,
+        "stage": d.stage,
+        "is_sla_compliant": d.is_sla_compliant,
+        "is_sla_breached": d.is_sla_breached,
+        "days_since_creation": d.days_since_creation,
+        "open_due_at": d.open_due_at.isoformat() if d.open_due_at else None,
+        "review_due_at": d.review_due_at.isoformat() if d.review_due_at else None,
+        "resolve_due_at": d.resolve_due_at.isoformat() if d.resolve_due_at else None,
+        "review_started_at": d.review_started_at.isoformat() if d.review_started_at else None,
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdmin])
+def dispute_sla_breached_view(request):
+    """List all disputes with breached SLA."""
+    disputes = CustomerDispute.objects.filter(
+        stage__in=["OPEN", "UNDER_REVIEW"]
+    ).select_related("customer__user", "assigned_to")
+
+    breached = [d for d in disputes if d.is_sla_breached]
+    rows = [_row(d) for d in breached]
+
+    return Response({
+        "count": len(rows),
+        "results": rows,
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdmin])
+def dispute_pending_escalation_view(request):
+    """List disputes that need escalation (SLA compliance about to breach)."""
+    disputes = CustomerDispute.objects.filter(
+        stage__in=["OPEN", "UNDER_REVIEW"]
+    ).select_related("customer__user", "assigned_to")
+
+    # Disputes that are compliant but need escalation (5+ days old)
+    pending = [d for d in disputes if not d.is_sla_breached and d.is_sla_compliant and d.days_since_creation >= 5]
+    rows = [_row(d) for d in pending]
+
+    return Response({
+        "count": len(rows),
+        "results": rows,
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsAdmin])
+def dispute_move_to_review_view(request, dispute_id):
+    """Move dispute from OPEN to UNDER_REVIEW."""
+    try:
+        d = CustomerDispute.objects.get(pk=dispute_id)
+    except CustomerDispute.DoesNotExist:
+        return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if d.stage != "OPEN":
+        return Response(
+            {"error": f"Can only move OPEN disputes to review. Current stage: {d.stage}"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    d.stage = "UNDER_REVIEW"
+    d.review_started_at = timezone.now()
+    d.assigned_to_id = request.data.get("assigned_to_id") or request.user.id
+    d.save(update_fields=["stage", "review_started_at", "assigned_to_id"])
+
+    return Response(_row(d))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsAdmin])
+def dispute_escalate_view(request, dispute_id):
+    """Escalate a dispute when SLA is about to breach."""
+    try:
+        d = CustomerDispute.objects.get(pk=dispute_id)
+    except CustomerDispute.DoesNotExist:
+        return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if d.stage not in ["OPEN", "UNDER_REVIEW"]:
+        return Response(
+            {"error": f"Can only escalate OPEN or UNDER_REVIEW disputes. Current stage: {d.stage}"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    d.stage = "ESCALATED"
+    d.save(update_fields=["stage"])
+
+    return Response(_row(d))

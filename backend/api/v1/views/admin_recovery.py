@@ -850,3 +850,102 @@ class AdminRecoveryCaseBulkEscalateView(APIView):
             "escalated_count": len(escalated),
             "escalated": escalated,
         })
+
+
+# ---------------------------------------------------------------------------
+# Settlement Management
+# ---------------------------------------------------------------------------
+
+class AdminRecoveryCaseSettlementView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id=None):
+        """Request or approve settlement for a recovery case."""
+        from subscriptions.models import RecoveryCase
+        from api.v1.services.recovery_service import request_settlement, approve_settlement
+
+        try:
+            case = RecoveryCase.objects.get(pk=case_id)
+        except RecoveryCase.DoesNotExist:
+            return Response({"error": "Recovery case not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        action = request.data.get("action")
+
+        if action == "request":
+            # Request settlement (field staff initiates)
+            settlement_notes = request.data.get("settlement_notes", "")
+            case = request_settlement(case, request.user, settlement_notes)
+            return Response({
+                "id": case.id,
+                "status": "settlement_requested",
+                "settlement_requested_at": case.settlement_requested_at.isoformat() if case.settlement_requested_at else None,
+                "settlement_requested_by": case.settlement_requested_by.get_full_name() if case.settlement_requested_by else None,
+            })
+
+        elif action == "approve":
+            # Approve settlement (manager approves)
+            if not case.settlement_requested_at:
+                return Response(
+                    {"error": "Settlement not yet requested."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            settlement_type = request.data.get("settlement_type")  # "FULL" or "PARTIAL"
+            settled_amount = Decimal(str(request.data.get("settled_amount", 0)))
+            approval_notes = request.data.get("approval_notes", "")
+
+            if not settlement_type or settlement_type not in ["FULL", "PARTIAL"]:
+                return Response(
+                    {"error": "settlement_type must be FULL or PARTIAL."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            case = approve_settlement(case, request.user, settlement_type, settled_amount, approval_notes)
+
+            return Response({
+                "id": case.id,
+                "status": "settlement_approved",
+                "settlement_type": case.settlement_type,
+                "settled_amount": str(case.settled_amount),
+                "settled_at": case.settled_at.isoformat() if case.settled_at else None,
+                "settlement_approved_by": case.settlement_approved_by.get_full_name() if case.settlement_approved_by else None,
+            })
+
+        return Response(
+            {"error": "action must be 'request' or 'approve'."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def get(self, request, case_id=None):
+        """Get settlement details for a recovery case."""
+        from subscriptions.models import RecoveryCase
+
+        try:
+            case = RecoveryCase.objects.select_related(
+                "subscription__customer",
+                "settlement_requested_by",
+                "settlement_approved_by",
+            ).get(pk=case_id)
+        except RecoveryCase.DoesNotExist:
+            return Response({"error": "Recovery case not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            "id": case.id,
+            "subscription_id": case.subscription_id,
+            "customer_name": case.subscription.customer.name,
+            "overdue_amount": str(case.overdue_amount),
+            "overdue_emis": case.overdue_emis,
+            "stage": case.stage,
+            # Settlement details
+            "settlement_requested": case.settlement_requested_at is not None,
+            "settlement_requested_at": case.settlement_requested_at.isoformat() if case.settlement_requested_at else None,
+            "settlement_requested_by": case.settlement_requested_by.get_full_name() if case.settlement_requested_by else None,
+            "settlement_notes": case.settlement_notes,
+            "settlement_approved": case.settlement_approved_at is not None,
+            "settlement_approved_at": case.settlement_approved_at.isoformat() if case.settlement_approved_at else None,
+            "settlement_approved_by": case.settlement_approved_by.get_full_name() if case.settlement_approved_by else None,
+            "settlement_type": case.settlement_type,
+            "settled_amount": str(case.settled_amount),
+            "settlement_approval_notes": case.settlement_approval_notes,
+            "settled_at": case.settled_at.isoformat() if case.settled_at else None,
+        })
