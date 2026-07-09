@@ -14,6 +14,15 @@ import {
   DISPUTE_STAGES,
   DisputeStage,
 } from "@/services/disputes";
+import {
+  getDisputeSLAStatus,
+  getBreachedSLADisputes,
+  getPendingEscalationDisputes,
+  moveDisputeToReview,
+  escalateDispute,
+  formatSLAStatus,
+  DisputeSLAStatus,
+} from "@/services/dispute-sla";
 
 const STAGE_COLORS: Record<string, string> = {
   OPEN: "bg-yellow-50 text-yellow-700 border-yellow-200",
@@ -57,6 +66,7 @@ export default function DisputesPage() {
   const [formErr, setFormErr] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<CustomerDispute | null>(null);
+  const [selectedSLA, setSelectedSLA] = useState<DisputeSLAStatus | null>(null);
   const [patchStage, setPatchStage] = useState<DisputeStage | "">("");
   const [patchNotes, setPatchNotes] = useState("");
   const [patchBusy, setPatchBusy] = useState(false);
@@ -65,6 +75,9 @@ export default function DisputesPage() {
   const [notifyMsg, setNotifyMsg] = useState("");
   const [notifyBusy, setNotifyBusy] = useState(false);
   const [notifyResult, setNotifyResult] = useState<string | null>(null);
+
+  const [slaAction, setSLAAction] = useState<"move-review" | "escalate" | null>(null);
+  const [slaActionBusy, setSLAActionBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -142,6 +155,46 @@ export default function DisputesPage() {
     }
   };
 
+  const handleManageDispute = async (dispute: CustomerDispute) => {
+    setSelected(dispute);
+    setPatchStage("");
+    setPatchNotes(dispute.resolution_notes || "");
+    setPatchMsg(null);
+    setNotifyResult(null);
+    setNotifyMsg("");
+    setSLAAction(null);
+    setSLAActionBusy(false);
+
+    // Load SLA status
+    try {
+      const sla = await getDisputeSLAStatus(dispute.id);
+      setSelectedSLA(sla);
+    } catch (err) {
+      console.error("Failed to load SLA status:", err);
+    }
+  };
+
+  const handleSLAAction = async (action: "move-review" | "escalate") => {
+    if (!selected) return;
+    setSLAActionBusy(true);
+    try {
+      if (action === "move-review") {
+        await moveDisputeToReview(selected.id);
+        setPatchMsg("Moved to review.");
+      } else if (action === "escalate") {
+        await escalateDispute(selected.id);
+        setPatchMsg("Escalated.");
+      }
+      void load();
+      setTimeout(() => handleManageDispute(selected), 500);
+    } catch (err) {
+      setPatchMsg("Action failed.");
+      console.error(err);
+    } finally {
+      setSLAActionBusy(false);
+    }
+  };
+
   return (
     <ERPPageShell
       eyebrow="CRM"
@@ -202,34 +255,49 @@ export default function DisputesPage() {
                 <th className="px-4 py-3 text-left">Subject</th>
                 <th className="px-4 py-3 text-left">Priority</th>
                 <th className="px-4 py-3 text-left">Stage</th>
-                <th className="px-4 py-3 text-left">Created</th>
+                <th className="px-4 py-3 text-left">SLA Status</th>
+                <th className="px-4 py-3 text-left">Age (days)</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => (
-                <tr key={r.id} className="border-t border-border hover:bg-muted/20">
-                  <td className="px-4 py-3 font-mono text-xs">{r.dispute_ref}</td>
-                  <td className="px-4 py-3">{r.customer_name}</td>
-                  <td className="px-4 py-3 text-xs">{r.dispute_type.replace("_", " ")}</td>
-                  <td className="px-4 py-3 max-w-[200px] truncate">{r.subject}</td>
-                  <td className={`px-4 py-3 text-xs ${PRIORITY_COLORS[r.priority] || ""}`}>{r.priority}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full border text-xs ${STAGE_COLORS[r.stage] || ""}`}>
-                      {r.stage.replace("_", " ")}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{r.created_at.slice(0, 10)}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => { setSelected(r); setPatchStage(""); setPatchNotes(r.resolution_notes || ""); setPatchMsg(null); setNotifyResult(null); setNotifyMsg(""); }}
-                      className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-muted"
-                    >
-                      Manage
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map(r => {
+                const slaStatus = (r as any).is_sla_breached ? "breached" : (r as any).is_sla_compliant ? "compliant" : "at-risk";
+                const daysOld = (r as any).days_since_creation || Math.floor((Date.now() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24));
+                const slaColors = {
+                  breached: "bg-red-100 text-red-700",
+                  "at-risk": "bg-yellow-100 text-yellow-700",
+                  compliant: "bg-green-100 text-green-700",
+                };
+                return (
+                  <tr key={r.id} className="border-t border-border hover:bg-muted/20">
+                    <td className="px-4 py-3 font-mono text-xs">{r.dispute_ref}</td>
+                    <td className="px-4 py-3">{r.customer_name}</td>
+                    <td className="px-4 py-3 text-xs">{r.dispute_type.replace("_", " ")}</td>
+                    <td className="px-4 py-3 max-w-[200px] truncate">{r.subject}</td>
+                    <td className={`px-4 py-3 text-xs ${PRIORITY_COLORS[r.priority] || ""}`}>{r.priority}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full border text-xs ${STAGE_COLORS[r.stage] || ""}`}>
+                        {r.stage.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${slaColors[slaStatus as keyof typeof slaColors] || ""}`}>
+                        {slaStatus === "breached" ? "⚠️ Breached" : slaStatus === "at-risk" ? "⏱️ At Risk" : "✓ On Track"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{daysOld} days</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => void handleManageDispute(r)}
+                        className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-muted"
+                      >
+                        Manage
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -280,12 +348,34 @@ export default function DisputesPage() {
 
             <div className="text-sm text-foreground mb-4 bg-muted/30 rounded-xl p-3">{selected.description}</div>
 
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className={`px-2 py-0.5 rounded-full border text-xs ${STAGE_COLORS[selected.stage] || ""}`}>
                 {selected.stage.replace("_", " ")}
               </span>
               <span className={`text-xs ${PRIORITY_COLORS[selected.priority] || ""}`}>{selected.priority}</span>
+              {selectedSLA && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${selectedSLA.is_sla_breached ? "bg-red-100 text-red-700" : selectedSLA.is_sla_compliant ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                  {selectedSLA.is_sla_breached ? "⚠️ SLA Breached" : selectedSLA.is_sla_compliant ? "✓ On Track" : "⏱️ At Risk"}
+                </span>
+              )}
             </div>
+
+            {/* SLA Timeline */}
+            {selectedSLA && (
+              <div className="bg-muted/40 rounded-xl p-3 mb-4 text-xs">
+                <div className="font-semibold mb-2">SLA Timeline</div>
+                <div className="space-y-1 text-muted-foreground">
+                  <div>Created: {new Date(selected.created_at).toLocaleDateString()}</div>
+                  <div>Age: {selectedSLA.days_since_creation} days</div>
+                  {selectedSLA.stage === "OPEN" && selectedSLA.open_due_at && (
+                    <div>Due: {new Date(selectedSLA.open_due_at).toLocaleDateString()} (7 days)</div>
+                  )}
+                  {selectedSLA.stage === "UNDER_REVIEW" && selectedSLA.review_due_at && (
+                    <div>Due: {new Date(selectedSLA.review_due_at).toLocaleDateString()} (14 days)</div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Stage transition */}
             {STAGE_TRANSITIONS[selected.stage] && (
@@ -316,6 +406,33 @@ export default function DisputesPage() {
             <button onClick={() => void submitPatch()} disabled={patchBusy || (!patchStage && !patchNotes)} className="w-full h-9 rounded-xl bg-primary text-primary-foreground text-sm font-semibold mb-4 disabled:opacity-50">
               {patchBusy ? "Saving…" : "Save Changes"}
             </button>
+
+            {/* SLA Actions */}
+            {selectedSLA && selected.stage === "OPEN" && (
+              <div className="border-t border-border pt-4 pb-4 mb-4">
+                <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">SLA Actions</div>
+                <button
+                  onClick={() => void handleSLAAction("move-review")}
+                  disabled={slaActionBusy}
+                  className="w-full h-9 rounded-xl border border-blue-300 text-blue-700 text-sm font-medium mb-2 hover:bg-blue-50 disabled:opacity-50"
+                >
+                  {slaActionBusy ? "Processing…" : "Move to Review"}
+                </button>
+              </div>
+            )}
+
+            {selectedSLA && (selectedSLA.stage === "OPEN" || selectedSLA.stage === "UNDER_REVIEW") && selectedSLA.is_sla_breached && (
+              <div className="border-t border-border pt-4 pb-4 mb-4">
+                <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">Escalation</div>
+                <button
+                  onClick={() => void handleSLAAction("escalate")}
+                  disabled={slaActionBusy}
+                  className="w-full h-9 rounded-xl border border-red-300 text-red-700 text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+                >
+                  {slaActionBusy ? "Processing…" : "Escalate Dispute"}
+                </button>
+              </div>
+            )}
 
             {/* Notify customer */}
             <div className="border-t border-border pt-4">
