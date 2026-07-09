@@ -22,6 +22,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -33,6 +34,7 @@ class CustomerDashboardApiTests(APITestCase):
             username="customer_dashboard_admin",
             phone="9322000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.customer_user = create_customer_user(
             username="customer_dashboard_user",
             phone="7322000001",

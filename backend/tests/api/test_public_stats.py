@@ -21,6 +21,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -31,6 +32,7 @@ class PublicStatsApiTests(APITestCase):
             username="public_stats_admin",
             phone="9317000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.finance_account = create_payment_collection_finance_account(
             code="TEST-PUBLIC-STATS-001",
             name="Public Stats Collection Cash",

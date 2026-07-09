@@ -31,6 +31,7 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -43,6 +44,7 @@ class DashboardEndpointsParityApiTests(APITestCase):
             username="dashboard_parity_admin",
             phone="9330000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.cashier = create_cashier_user(
             username="dashboard_parity_cashier",
             phone="9330000002",

@@ -16,6 +16,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 from subscriptions.models import Subscription, Emi
 
@@ -24,6 +25,7 @@ class CustomerOperationalSummaryApiTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="ops_summary_admin", phone="9381110001")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.cashier = create_cashier_user(
             username="ops_summary_cashier", phone="9381110002"
         )

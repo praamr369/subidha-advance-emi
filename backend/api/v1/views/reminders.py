@@ -79,6 +79,8 @@ class PaymentReminderViewSet(viewsets.ModelViewSet):
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         payload = PaymentReminderSerializer(reminder, context=self.get_serializer_context())
+        if reminder.status == "FAILED":
+            raise ValidationError({"detail": reminder.last_error or f"{reminder.channel} delivery failed."})
         return Response({"updated": updated, "reminder": payload.data})
 
     @action(detail=True, methods=["post"], url_path="send")

@@ -17,6 +17,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -26,6 +27,7 @@ class DashboardSurfacePaginationOrderingApiTests(APITestCase):
         super().setUp()
         self.today = timezone.localdate()
         self.admin = create_admin_user(username="dash_paging_admin", phone="9363100001")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.customer_user = create_customer_user(
             username="dash_paging_customer",
             phone="7363100001",

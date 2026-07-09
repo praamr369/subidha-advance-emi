@@ -16,6 +16,7 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -25,6 +26,7 @@ class AdminPayoutBatchActionTests(APITestCase):
             username="admin_payout_action_test",
             phone="9107000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
 
         self.partner = create_partner_user(
             username="partner_payout_action_test",

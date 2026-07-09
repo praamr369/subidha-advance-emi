@@ -30,6 +30,8 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -39,6 +41,7 @@ class CommissionPayoutBatchDomainTests(TestCase):
             username="payout_batch_admin",
             phone="9110000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.partner = create_partner_user(
             username="payout_batch_partner",
             phone="9110000002",
@@ -72,6 +75,7 @@ class CommissionPayoutBatchDomainTests(TestCase):
             code="TEST-PAYOUT-001",
             name="Payout Batch Cash",
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.finance_account)
 
     def _create_commission(
         self,

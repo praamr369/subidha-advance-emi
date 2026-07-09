@@ -24,6 +24,7 @@ const links = [
   { href: ROUTES.admin.settingsBusinessSetupDocumentNumbering, label: "Document Numbering" },
   { href: ROUTES.admin.brandData, label: "Brand Data Center" },
   { href: ROUTES.admin.settingsBusinessSetupOpeningBalances, label: "Opening Balances" },
+  { href: ROUTES.admin.settingsBusinessSetupMigration, label: "Migration Center" },
   { href: ROUTES.admin.settingsBusinessSetupReset, label: "Dry Runs & Reset" },
 ];
 

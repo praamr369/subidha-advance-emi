@@ -18,6 +18,7 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -27,6 +28,7 @@ class AdminCommissionReconciliationTests(APITestCase):
             username="admin_comm_recon",
             phone="9112000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.partner = create_partner_user(
             username="partner_comm_recon",
             phone="9112000002",

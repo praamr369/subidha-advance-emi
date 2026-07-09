@@ -6,7 +6,7 @@ from django.utils import timezone
 from accounting.models import TaxDocumentStatus, TaxInvoice
 from accounting.services.gst_document_posting_service import approve_tax_invoice, ensure_document_sequence, post_tax_invoice
 from accounting.services.gst_lifecycle_service import cancel_tax_invoice
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_gst_registered_tax_profile
 from tests.accounting.helpers import seed_bridge_ready_environment
 
 
@@ -14,6 +14,7 @@ class GstCancelReversalTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="gst_cancel_admin", phone="9363400001")
+        ensure_gst_registered_tax_profile()
         seed_bridge_ready_environment(timezone.localdate(), performed_by=self.admin)
         self.invoice = TaxInvoice.objects.create(
             invoice_date=timezone.localdate(),

@@ -18,6 +18,8 @@ from tests.helpers import (
     create_product,
     create_subscription,
     create_user,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -25,6 +27,7 @@ class CashierApiTests(APITestCase):
     def setUp(self):
         today = timezone.localdate()
         self.admin = create_admin_user(username="cash_admin", phone="9000000101")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.cashier = create_user(
             username="cashier_test",
             password="CashierPass123!",
@@ -80,6 +83,7 @@ class CashierApiTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_finance)
 
     def test_cashier_dashboard_allowed_for_admin(self):
         self.client.force_authenticate(user=self.admin)

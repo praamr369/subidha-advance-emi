@@ -23,6 +23,7 @@ from tests.helpers import (
     create_product,
     create_subscription,
     create_user,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -33,6 +34,7 @@ class CrmApiTests(APITestCase):
             username="crm_admin",
             phone="9388000901",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.client.force_authenticate(user=self.admin)
         self.customer = create_customer_profile(
             name="CRM Customer",

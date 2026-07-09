@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from rest_framework import status
@@ -5,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind, MoneyMovement
 from tests.accounting.helpers import seed_bridge_ready_environment
-from tests.helpers import create_admin_user, create_cashier_user
+from tests.helpers import create_admin_user, create_cashier_user, ensure_test_collection_purpose_mapping
 
 
 class AdminFinanceTransferApiTests(APITestCase):
@@ -26,8 +27,10 @@ class AdminFinanceTransferApiTests(APITestCase):
             opening_balance=Decimal("0.00"),
             bank_last4="7788",
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash)
+        ensure_test_collection_purpose_mapping(finance_account=self.bank)
         self.payload = {
-            "movement_date": "2026-06-29",
+            "movement_date": str(date.today()),
             "from_finance_account_id": self.cash.id,
             "to_finance_account_id": self.bank.id,
             "amount": "500.00",

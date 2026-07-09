@@ -18,6 +18,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -28,6 +29,7 @@ class AdminReportsAnalyticsSummaryApiTests(APITestCase):
             username="admin_reports_analytics",
             phone="9355000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.customer = create_customer_profile(
             name="Analytics Customer",
             phone="7355000001",

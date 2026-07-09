@@ -6,8 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting.models import BusinessTaxProfile, BusinessTaxRegistrationMode
-from accounting.models import DocumentSequence
-from accounting.services.gst_document_posting_service import financial_year_for
+from accounting.services.document_sequence_service import DocumentType
 from billing.models import BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument
 from billing.models import DirectSaleStatus
 from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
@@ -22,6 +21,8 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -38,6 +39,8 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
         )
         self.admin = create_admin_user(username="direct_sale_workspace_admin", phone="9377000011")
         self.client.force_authenticate(self.admin)
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
+        ensure_document_numbering_profile_for_date(DocumentType.DIRECT_SALE, date.today(), performed_by=self.admin)
         self.customer = create_customer_profile(
             name="Direct Sale Workspace Customer",
             phone="7377000011",
@@ -63,15 +66,6 @@ class DirectSaleBillingWorkspaceTests(APITestCase):
             default_stock_location=self.location,
             opening_stock_qty=Decimal("0.000"),
             reorder_level_qty=Decimal("1.000"),
-        )
-        fy = financial_year_for(date.today())
-        DocumentSequence.objects.create(
-            series_code="DIRECT_SALE_INVOICE",
-            financial_year=fy,
-            prefix=f"DSI-{fy}",
-            next_number=1,
-            padding=5,
-            is_active=True,
         )
 
     def _payload(self, **line_overrides):

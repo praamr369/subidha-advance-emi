@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 
 from django.conf import settings
@@ -31,8 +32,9 @@ def _default_branch():
 
 
 def _generate_reference(prefix: str) -> str:
-    timestamp = timezone.now().strftime("%Y%m%d%H%M%S%f")
-    return f"{prefix}-{timestamp}"
+    timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
+    suffix = uuid.uuid4().hex[:6].upper()
+    return f"{prefix}-{timestamp}-{suffix}"
 
 
 def generate_chart_code() -> str:
@@ -640,6 +642,8 @@ class FinancialYear(AccountingTimeStampedModel):
         self.notes = (self.notes or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
+        from accounting.services.period_service import invalidate_period_memo
+        invalidate_period_memo()
 
     def __str__(self):
         return f"{self.code} ({self.start_date} - {self.end_date})"
@@ -722,6 +726,8 @@ class AccountingPeriod(AccountingTimeStampedModel):
         self.lock_reason = (self.lock_reason or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
+        from accounting.services.period_service import invalidate_period_memo
+        invalidate_period_memo()
 
     def __str__(self):
         return f"{self.code} ({self.start_date} - {self.end_date})"

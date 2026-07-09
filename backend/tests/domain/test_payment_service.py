@@ -28,12 +28,15 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
 class PaymentServiceTests(TestCase):
     def setUp(self):
         self.admin = create_admin_user()
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.partner = create_partner_user()
         self.customer = create_customer_profile(name="Amrita", phone="7407533262")
         self.product = create_product(base_price=Decimal("15000.00"))
@@ -57,11 +60,13 @@ class PaymentServiceTests(TestCase):
             code="TEST-PAY-SVC-001",
             name="Payment Service Cash",
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.finance_account)
         self.bank_finance_account = create_finance_account(
             code="TEST-PAY-SVC-002",
             name="Payment Service Bank",
             kind=FinanceAccountKind.BANK,
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.bank_finance_account)
 
     def test_record_emi_payment_success(self):
         result = record_emi_payment(

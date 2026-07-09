@@ -16,13 +16,14 @@ from accounting.services.document_sequence_service import (
 from accounting.services.gst_document_posting_service import approve_tax_invoice, ensure_document_sequence
 from accounting.services.setup_defaults_service import apply_accounting_setup_defaults
 from billing.models import DirectSale
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_gst_registered_tax_profile
 
 
 class DocumentNumberingFinancialYearTests(TestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="doc_numbering_fy_admin", phone="9381200099")
+        ensure_gst_registered_tax_profile()
 
     def _activate_fy(self, *, code="FY2026-27", start=date(2026, 4, 1), end=date(2027, 3, 31)):
         return FinancialYear.objects.create(

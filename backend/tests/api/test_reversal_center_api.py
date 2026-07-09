@@ -10,12 +10,17 @@ from billing.services.billing_service import approve_billing_invoice, create_dir
 from billing.services.reversal_service import create_direct_sale_exchange, create_direct_sale_return, post_direct_sale_return
 from inventory.models import InventoryItem, StockLocation, StockMovementType
 from tests.helpers import create_admin_user, create_cashier_user, create_customer_profile, create_product
+from tests.helpers import (
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
+)
 
 
 class ReversalCenterApiTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="rev_api_admin", phone="9386222221")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.cashier = create_cashier_user(username="rev_api_cashier", phone="9386222222")
         self.customer = create_customer_profile(name="Rev API Customer", phone="7386222221")
         self.product = create_product(name="Rev API Product", product_code="REV-API-001", base_price=Decimal("1000.00"))
@@ -24,6 +29,7 @@ class ReversalCenterApiTests(APITestCase):
         self.inventory_item = InventoryItem.objects.create(product=self.product, sku="REV-API-SKU-001", default_stock_location=self.sellable_location, opening_stock_qty=Decimal("10.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("700.00"))
         cash_chart = ChartOfAccount.objects.create(code="REV-API-CASH-001", name="Rev API Cash", account_type=ChartOfAccountType.ASSET)
         self.cash_account = FinanceAccount.objects.create(name="Rev API Counter", kind=FinanceAccountKind.CASH, chart_account=cash_chart, opening_balance=Decimal("0.00"))
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account)
 
     def _create_sale(self):
         return create_direct_sale(

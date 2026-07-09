@@ -929,7 +929,7 @@ class PurchaseBill(InventoryTimeStampedModel):
                 (PurchaseBillStatus.APPROVED, PurchaseBillStatus.CANCELLED),
             },
         )
-        self.bill_no = (self.bill_no or "").strip().upper()
+        self.bill_no = ((self.bill_no or "").strip() or _generate_inventory_reference("PBILL")).upper()
         self.notes = (self.notes or "").strip()
         if self.branch_id is None:
             self.branch = (
@@ -1061,7 +1061,7 @@ class PurchaseOrder(InventoryTimeStampedModel):
             existing = PurchaseOrder.objects.filter(pk=self.pk).only("status").first()
             if existing and existing.status == PurchaseOrderStatus.CANCELLED and self.status != PurchaseOrderStatus.CANCELLED:
                 raise ValidationError({"status": "Cancelled purchase orders cannot be changed."})
-        self.po_no = (self.po_no or "").strip().upper()
+        self.po_no = ((self.po_no or "").strip() or _generate_inventory_reference("PO")).upper()
         self.notes = (self.notes or "").strip()
         if self.branch_id is None:
             self.branch = getattr(self.stock_location, "branch", None) or _default_branch()
@@ -1105,7 +1105,7 @@ class GoodsReceipt(InventoryTimeStampedModel):
         ordering = ["-receipt_date", "-created_at", "-id"]
 
     def save(self, *args, **kwargs):
-        self.receipt_no = (self.receipt_no or "").strip().upper()
+        self.receipt_no = ((self.receipt_no or "").strip() or _generate_inventory_reference("GR")).upper()
         self.notes = (self.notes or "").strip()
         self.over_receive_reason = (self.over_receive_reason or "").strip()
         if self.branch_id is None:
@@ -1279,7 +1279,7 @@ class PurchaseRequest(InventoryTimeStampedModel):
         ordering = ["-request_date", "-created_at", "-id"]
 
     def save(self, *args, **kwargs):
-        self.request_no = (self.request_no or "").strip().upper()
+        self.request_no = ((self.request_no or "").strip() or _generate_inventory_reference("PR")).upper()
         self.notes = (self.notes or "").strip()
         if self.branch_id is None:
             self.branch = getattr(self.stock_location, "branch", None) or _default_branch()

@@ -29,6 +29,8 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -39,6 +41,7 @@ class CashierBranchScopeTests(APITestCase):
             username="branch_scope_admin",
             phone="9389200001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.cashier = create_cashier_user(
             username="branch_scope_cashier",
             phone="9389200002",
@@ -69,6 +72,7 @@ class CashierBranchScopeTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account_one)
         self.cash_account_two = FinanceAccount.objects.create(
             name="Branch Two Cash",
             branch=self.branch_two,
@@ -80,6 +84,7 @@ class CashierBranchScopeTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account_two)
         self.counter_one = CashCounter.objects.create(
             code="CTR-BR1-01",
             name="Branch One Desk",

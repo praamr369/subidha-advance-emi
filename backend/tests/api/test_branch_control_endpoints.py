@@ -22,6 +22,8 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -33,6 +35,7 @@ class BranchControlApiTests(APITestCase):
             phone="9389100001",
         )
         self.client.force_authenticate(user=self.admin)
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.primary_branch = Branch.objects.filter(is_primary=True).get()
         self.primary_branch.code = "BR-MAIN"
         self.primary_branch.name = "Main Branch"
@@ -50,6 +53,7 @@ class BranchControlApiTests(APITestCase):
             chart_account=cash_chart,
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account)
 
     def test_admin_can_create_counter_and_reporting_overview_reflects_branch_collections(self):
         counter_response = self.client.post(

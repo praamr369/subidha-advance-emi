@@ -21,6 +21,7 @@ from tests.helpers import (
     create_payment_collection_finance_account,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 User = get_user_model()
@@ -34,6 +35,7 @@ class UsernameChangeApiTests(APITestCase):
             phone="9800000001",
             email="username-admin@example.com",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.cashier = create_cashier_user(
             username="username_cashier",
             phone="9800000002",

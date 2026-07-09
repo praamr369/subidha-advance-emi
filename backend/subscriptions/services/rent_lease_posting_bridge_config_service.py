@@ -53,7 +53,7 @@ def get_rent_lease_posting_bridge_state(*, readiness: dict[str, Any] | None = No
     readiness = readiness or {}
     mapping_ready = bool(readiness.get("mapping_ready") or readiness.get("status") == "READY")
     period_controls_ready = bool(readiness.get("posting_controls_ready", False))
-    bridge_setup_ready = bool(mapping_ready)
+    bridge_setup_ready = bool(config.is_enabled and mapping_ready)
     return {
         "config": _auto_ready_config_payload(config, mapping_ready=mapping_ready),
         "is_enabled": bridge_setup_ready,

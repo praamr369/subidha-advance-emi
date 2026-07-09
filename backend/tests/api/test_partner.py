@@ -23,12 +23,14 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
 class PartnerApiTests(APITestCase):
     def setUp(self):
         self.admin = create_admin_user(username="partner_admin", phone="9000000301")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
 
         self.partner = create_partner_user(
             username="partner_primary",
@@ -429,11 +431,13 @@ from tests.helpers import (
     create_admin_user,
     create_partner_user,
     create_customer_profile,
+    create_payment_collection_finance_account,
     create_product,
     create_batch,
     create_lucky_id,
     create_subscription,
     create_emi,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -442,6 +446,7 @@ class PartnerCommissionApiTests(TestCase):
         self.client = APIClient()
 
         self.admin = create_admin_user(username="admin1", phone="9000000001")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
 
         self.partner = create_partner_user(
             username="partner1",

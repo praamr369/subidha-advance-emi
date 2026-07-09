@@ -18,6 +18,7 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -27,6 +28,7 @@ class CommissionStatementExportTests(APITestCase):
             username="admin_statement_export",
             phone="9113000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.partner = create_partner_user(
             username="partner_statement_export",
             phone="9113000002",

@@ -134,7 +134,7 @@ def send_payment_reminder(
                     "channel": reminder.channel,
                 },
             )
-            raise ValueError(f"{reminder.channel} delivery failed: {exc}") from exc
+            return reminder, False  # FAILED status committed; view returns 400 based on status
         if not gateway_result.get("accepted"):
             raise ValueError(f"{reminder.channel} gateway did not accept the message.")
         if notes:

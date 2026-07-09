@@ -14,6 +14,7 @@ from tests.helpers import (
     create_product,
     ensure_document_numbering_profile_for_date,
     ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -23,6 +24,7 @@ class BooksDailyCashbookTests(TestCase):
         self.admin = create_admin_user(username="books_admin", phone="9381400001")
         ensure_test_accounting_posting_prerequisites(date(2026, 4, 22), performed_by=self.admin)
         ensure_document_numbering_profile_for_date("DIRECT_SALE_RECEIPT", date(2026, 4, 22), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date("TAX_INVOICE", date(2026, 4, 22), performed_by=self.admin)
         self.customer = create_customer_profile(name="Books Customer", phone="7381400001")
         product = create_product(name="Books Product", product_code="BOOK-001", base_price=Decimal("1500.00"))
         inventory_item = InventoryItem.objects.create(
@@ -43,6 +45,7 @@ class BooksDailyCashbookTests(TestCase):
             chart_account=chart_account,
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.finance_account)
         sequence = DocumentSequence.objects.create(
             series_code="BILL_INV",
             financial_year="2026-27",

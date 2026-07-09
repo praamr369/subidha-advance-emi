@@ -4,13 +4,14 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from inventory.models import InventoryItem, StockLocation
-from tests.helpers import create_admin_user, create_product
+from tests.helpers import create_admin_user, create_product, ensure_test_accounting_posting_prerequisites
 
 
 class ManufacturingApiTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="mfg_api_admin", phone="9387700102")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.client.force_authenticate(user=self.admin)
         self.location = StockLocation.objects.create(code="MFG-API", name="Manufacturing API Floor")
         self.raw_product = create_product(

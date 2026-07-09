@@ -12,7 +12,7 @@ from accounting.services.gst_document_posting_service import (
     post_credit_note,
     post_debit_note,
 )
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_gst_registered_tax_profile
 from tests.accounting.helpers import seed_bridge_ready_environment
 
 
@@ -23,6 +23,7 @@ class GstCreditDebitNotePostingTests(TestCase):
             username="gst_notes_admin",
             phone="9364000006",
         )
+        ensure_gst_registered_tax_profile()
         seed_bridge_ready_environment(timezone.localdate(), performed_by=self.admin)
         invoice_series = ensure_document_sequence(
             series_code="GST_INV",

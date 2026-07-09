@@ -4,13 +4,20 @@ from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import ChartOfAccount, ChartOfAccountType, DocumentSequence, FinanceAccount, FinanceAccountKind
+from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
+from accounting.services.document_sequence_service import DocumentType
 from billing.models import ReceiptDocument
 from inventory.models import InventoryItem, PurchaseNeed, PurchaseNeedStatus
-from accounting.services.gst_document_posting_service import financial_year_for
 from subscriptions.services.product_possession_service import record_handover
 from subscriptions.services.rent_lease_contract_service import create_rent_contract
-from tests.helpers import create_admin_user, create_customer_profile, create_product
+from tests.helpers import (
+    create_admin_user,
+    create_customer_profile,
+    create_product,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
+)
 
 
 class DirectSaleApiTests(APITestCase):
@@ -21,6 +28,10 @@ class DirectSaleApiTests(APITestCase):
             phone="9388000011",
         )
         self.client.force_authenticate(user=self.admin)
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
+        ensure_test_accounting_posting_prerequisites(date(2026, 4, 1), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date(DocumentType.DIRECT_SALE, date.today(), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date(DocumentType.TAX_INVOICE, date.today(), performed_by=self.admin)
         self.customer = create_customer_profile(
             name="Direct Sale API Customer",
             phone="7388000011",
@@ -48,15 +59,7 @@ class DirectSaleApiTests(APITestCase):
             chart_account=cash_chart,
             opening_balance=Decimal("0.00"),
         )
-        fy = financial_year_for(date.today())
-        DocumentSequence.objects.create(
-            series_code="DIRECT_SALE_INVOICE",
-            financial_year=fy,
-            prefix=f"DSI-{fy}",
-            next_number=1,
-            padding=5,
-            is_active=True,
-        )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account)
 
     def test_admin_can_create_confirm_and_filter_direct_sale_documents(self):
         response = self.client.post(

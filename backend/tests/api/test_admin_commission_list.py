@@ -19,6 +19,7 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -28,6 +29,7 @@ class AdminCommissionListTests(APITestCase):
             username="admin_list_test",
             phone="9103000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
 
         self.partner = create_partner_user(
             username="partner_list_test",

@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 from accounting.models import ChartOfAccount, ChartOfAccountType, FinanceAccount, FinanceAccountKind
 from accounting.services.accounting_setup_service import LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME
 from branch_control.models import Branch, BranchStatus
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_test_collection_purpose_mapping
 
 
 class AdminCounterCollectionBookApiTests(APITestCase):
@@ -41,6 +41,7 @@ class AdminCounterCollectionBookApiTests(APITestCase):
             is_active=True,
             is_real_settlement_account=True,
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_fa)
         self.ledger_fa = FinanceAccount.objects.create(
             name=LEDGER_POSTING_PROFILES_FINANCE_ACCOUNT_NAME,
             branch=self.branch,

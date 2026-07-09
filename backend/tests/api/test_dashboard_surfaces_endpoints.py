@@ -16,6 +16,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -28,6 +29,7 @@ class DashboardSurfacesEndpointsApiTests(APITestCase):
             username="dashboard_surface_admin",
             phone="9363000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.customer_user = create_customer_user(
             username="dashboard_surface_customer",
             phone="7363000001",

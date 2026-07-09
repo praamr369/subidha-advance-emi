@@ -18,6 +18,7 @@ from tests.helpers import (
     create_subscription,
     ensure_document_numbering_profile_for_date,
     ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -77,6 +78,7 @@ class AdminPaymentApiTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_finance)
         self.bank_finance = FinanceAccount.objects.create(
             name="Admin Bank Settlement",
             kind=FinanceAccountKind.BANK,
@@ -87,6 +89,7 @@ class AdminPaymentApiTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.bank_finance)
 
     def test_admin_payment_collect_success(self):
         response = self.client.post(

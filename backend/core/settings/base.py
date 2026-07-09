@@ -432,6 +432,7 @@ INSTALLED_APPS = [
     "reconciliation",
     "settlements",
     "smart_fields",
+    "migration_center",
     "django_extensions",
 ]
 

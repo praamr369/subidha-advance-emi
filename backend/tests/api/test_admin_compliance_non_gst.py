@@ -43,6 +43,9 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -50,6 +53,7 @@ class NonGstComplianceApiTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="non_gst_admin", phone="9100000001")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.partner = create_partner_user(username="non_gst_partner", phone="9100000002")
         self.cashier = create_cashier_user(username="non_gst_cashier", phone="9100000003")
         self.customer_user = create_customer_user(username="non_gst_customer", phone="9100000004")
@@ -106,21 +110,17 @@ class NonGstComplianceApiTests(APITestCase):
             chart_account=cash_chart,
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account)
         self.bank_account = FinanceAccount.objects.create(
             name="Non GST Purchase Bank",
             kind=FinanceAccountKind.BANK,
             chart_account=bank_chart,
             opening_balance=Decimal("0.00"),
         )
-        fy = financial_year_for(date.today())
-        DocumentSequence.objects.create(
-            series_code="DIRECT_SALE_INVOICE",
-            financial_year=fy,
-            prefix=f"DSI-{fy}",
-            next_number=1,
-            padding=5,
-            is_active=True,
-        )
+        ensure_test_collection_purpose_mapping(finance_account=self.bank_account)
+        ensure_document_numbering_profile_for_date("DIRECT_SALE", date(2026, 5, 2), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date("TAX_INVOICE", date(2026, 5, 2), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date("DIRECT_SALE_RECEIPT", date(2026, 5, 2), performed_by=self.admin)
 
     def _direct_sale_payload(self, *, tax_mode: str, tax_amount: str = "0.00") -> dict:
         taxable_total = Decimal("12000.00")
@@ -465,15 +465,9 @@ class NonGstBackfillCommandTests(APITestCase):
             chart_account=chart,
             opening_balance=Decimal("0.00"),
         )
-        fy = financial_year_for(date.today())
-        DocumentSequence.objects.create(
-            series_code="DIRECT_SALE_INVOICE",
-            financial_year=fy,
-            prefix=f"DSI-{fy}",
-            next_number=1,
-            padding=5,
-            is_active=True,
-        )
+        ensure_test_accounting_posting_prerequisites(date(2026, 5, 4), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date("DIRECT_SALE", date(2026, 5, 4), performed_by=self.admin)
+        ensure_document_numbering_profile_for_date("TAX_INVOICE", date(2026, 5, 4), performed_by=self.admin)
 
         response = self.client.post(
             "/api/v1/billing/direct-sales/",

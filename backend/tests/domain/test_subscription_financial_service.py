@@ -25,6 +25,7 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -34,6 +35,7 @@ class SubscriptionFinancialServiceTests(TestCase):
             username="subscription_finance_admin",
             phone="9302000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.partner = create_partner_user(
             username="subscription_finance_partner",
             phone="9302000002",

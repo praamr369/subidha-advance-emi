@@ -23,6 +23,8 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -32,6 +34,7 @@ class AdminReconciliationApiTests(APITestCase):
             username="admin_reconciliation_ops",
             phone="9315000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.customer_user = create_customer_user(
             username="reconciliation_customer_user",
             phone="7315000001",
@@ -99,6 +102,7 @@ class AdminReconciliationApiTests(APITestCase):
             code="TEST-ADMIN-RECON-001",
             name="Admin Reconciliation Cash",
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.finance_account)
 
         self.payment_primary = record_emi_payment(
             emi_id=self.emi_primary.id,

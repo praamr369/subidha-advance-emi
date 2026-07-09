@@ -4,12 +4,18 @@ from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounting.models import BusinessTaxProfile, BusinessTaxRegistrationMode, DocumentSequence
-from accounting.services.gst_document_posting_service import financial_year_for
+from accounting.models import BusinessTaxProfile, BusinessTaxRegistrationMode
+from accounting.services.document_sequence_service import DocumentType
 from billing.models import DirectSale
 from inventory.models import InventoryItem, StockLocation, Warehouse
 from service_desk.models import ServiceDeskCase, ServiceDeskCaseStatus, ServiceDeskCaseType
-from tests.helpers import create_admin_user, create_customer_profile, create_product
+from tests.helpers import (
+    create_admin_user,
+    create_customer_profile,
+    create_product,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
+)
 
 
 class DirectSaleDeliveryOutstandingReleaseTests(APITestCase):
@@ -25,6 +31,8 @@ class DirectSaleDeliveryOutstandingReleaseTests(APITestCase):
         )
         self.admin = create_admin_user(username="ds_release_admin", phone="9377000091")
         self.client.force_authenticate(self.admin)
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
+        ensure_document_numbering_profile_for_date(DocumentType.DIRECT_SALE, date.today(), performed_by=self.admin)
         self.customer = create_customer_profile(
             name="Outstanding Release Customer",
             phone="7377000091",
@@ -50,15 +58,6 @@ class DirectSaleDeliveryOutstandingReleaseTests(APITestCase):
             default_stock_location=self.location,
             opening_stock_qty=Decimal("50.000"),
             reorder_level_qty=Decimal("1.000"),
-        )
-        fy = financial_year_for(date.today())
-        DocumentSequence.objects.create(
-            series_code="DIRECT_SALE_INVOICE",
-            financial_year=fy,
-            prefix=f"DSI-{fy}",
-            next_number=1,
-            padding=5,
-            is_active=True,
         )
 
     def _payload(self):

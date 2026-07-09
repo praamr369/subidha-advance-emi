@@ -18,12 +18,14 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
 class AuditLogTests(TestCase):
     def setUp(self):
         self.admin = create_admin_user(username="audit_admin", phone="9000000501")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.partner = create_partner_user(username="audit_partner", phone="9000000502")
 
         self.customer = create_customer_profile(

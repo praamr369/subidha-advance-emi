@@ -39,6 +39,7 @@ from tests.accounting.helpers import (
     seed_bridge_ready_environment,
 )
 from tests.helpers import create_admin_user, create_customer_profile, create_product
+from accounting.services.period_service import invalidate_period_memo
 
 
 def _rent_product(code="RENT-DMG-1"):
@@ -61,6 +62,7 @@ def _enable_bridge():
 class DamageDeductionBridgeTests(TestCase):
     def setUp(self):
         super().setUp()
+        invalidate_period_memo()
         self.today = timezone.localdate()
         self.admin = create_admin_user(username="dmg_admin", phone="9910000001")
         self.env = seed_bridge_ready_environment(self.today, performed_by=self.admin)
@@ -236,6 +238,7 @@ class DamageDeductionBridgeTests(TestCase):
 class ReconcileCommandTests(TestCase):
     def setUp(self):
         super().setUp()
+        invalidate_period_memo()
         self.today = timezone.localdate()
         self.admin = create_admin_user(username="dmg_cmd_admin", phone="9920000001")
         self.env = seed_bridge_ready_environment(self.today, performed_by=self.admin)

@@ -20,12 +20,14 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
 class CommissionServiceTests(TestCase):
     def setUp(self):
         self.admin = create_admin_user(username="commission_admin", phone="9100000001")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
 
         self.partner = create_partner_user(
             username="commission_partner",

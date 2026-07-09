@@ -20,12 +20,14 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
 class CustomerSupportApiTests(APITestCase):
     def setUp(self):
         self.admin = create_admin_user(username="support_admin", phone="9000000901")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.cashier = create_cashier_user(
             username="support_cashier",
             phone="9000000904",

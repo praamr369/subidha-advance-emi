@@ -6,6 +6,8 @@ from decimal import Decimal
 from accounting.models import (
     AccountingPeriod,
     AccountingPeriodStatus,
+    BusinessTaxProfile,
+    BusinessTaxRegistrationMode,
     ChartOfAccount,
     ChartOfAccountType,
     FinanceAccount,
@@ -14,7 +16,7 @@ from accounting.models import (
     FinanceAccountMappingPurpose,
     FinancialYear,
 )
-from accounting.services.period_service import financial_year_bounds, financial_year_code
+from accounting.services.period_service import financial_year_bounds, financial_year_code, invalidate_period_memo
 from accounting.services.document_sequence_service import DocumentType, upsert_numbering_profile
 from accounts.models import User, UserRole
 from subscriptions.models import (
@@ -112,6 +114,7 @@ def ensure_test_financial_year(reference_date: date | None = None, *, performed_
 
 
 def ensure_test_open_accounting_period(reference_date: date | None = None, *, performed_by=None):
+    invalidate_period_memo()
     reference_date = reference_date or date.today()
     financial_year = ensure_test_financial_year(reference_date, performed_by=performed_by)
     fy_code = financial_year.code
@@ -173,6 +176,7 @@ def ensure_test_journal_numbering_profile(reference_date: date | None = None, *,
 
 
 def ensure_test_accounting_posting_prerequisites(reference_date: date | None = None, *, posting_date: date | None = None, performed_by=None):
+    invalidate_period_memo()
     posting_date = posting_date or reference_date or date.today()
     financial_year, period = ensure_test_open_accounting_period(posting_date, performed_by=performed_by)
     numbering_profile = ensure_test_journal_numbering_profile(posting_date, performed_by=performed_by)
@@ -429,15 +433,17 @@ def create_payment_collection_finance_account(
     """
     Shared test helper for a normal operational collection account.
 
-    Keeps finance hardening expectations explicit by always creating an active
-    finance account backed by an active posting-capable chart account.
+    Always wires up the collection-purpose COA mapping so the account passes
+    the FinanceAccountPostingReadinessError guard in payment/collection services.
     """
-    return create_finance_account(
+    account = create_finance_account(
         code=code,
         name=name,
         kind=kind,
         opening_balance=opening_balance,
     )
+    ensure_test_collection_purpose_mapping(finance_account=account)
+    return account
 
 
 def ensure_test_collection_purpose_mapping(*, finance_account, purpose: str | None = None, is_default: bool = False):
@@ -564,6 +570,20 @@ def ensure_default_payment_collection_accounts():
         ensure_test_collection_purpose_mapping(finance_account=finance_account, purpose=purpose)
         accounts[kind] = finance_account
     return accounts
+
+
+def ensure_gst_registered_tax_profile(*, effective_from: date | None = None, gstin: str = "27AAPFU0939F1ZV") -> BusinessTaxProfile:
+    """Ensure an active GST_REGULAR tax profile exists for tests that exercise GST invoice flows."""
+    from django.utils import timezone as _tz
+    ref_date = effective_from or _tz.localdate()
+    BusinessTaxProfile.objects.filter(is_active=True).update(is_active=False)
+    return BusinessTaxProfile.objects.create(
+        mode=BusinessTaxRegistrationMode.GST_REGULAR,
+        legal_name="Subidha Furniture",
+        gstin=gstin,
+        effective_from=ref_date,
+        is_active=True,
+    )
 
 
 @contextmanager

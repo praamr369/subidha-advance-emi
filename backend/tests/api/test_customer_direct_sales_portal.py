@@ -7,13 +7,15 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounting.models import DocumentSequence
-from accounting.services.gst_document_posting_service import financial_year_for
+from accounting.services.document_sequence_service import DocumentType
 from billing.models import BillingInvoice, DirectSale, DirectSaleLine, ReceiptDocument, ReceiptType
 from tests.helpers import (
     create_admin_user,
     create_customer_profile,
     create_customer_user,
     create_product,
+    ensure_document_numbering_profile_for_date,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -21,6 +23,7 @@ class CustomerDirectSalesPortalApiTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="cust_ds_admin", phone="9333000001")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.customer_user = create_customer_user(
             username="cust_ds_user",
             phone="9333000002",
@@ -46,23 +49,11 @@ class CustomerDirectSalesPortalApiTests(APITestCase):
             product_code="CUST-DS-001",
             base_price=Decimal("5000.00"),
         )
-        fy = financial_year_for(date(2026, 5, 1))
-        self.ds_series = DocumentSequence.objects.create(
-            series_code="DIRECT_SALE_INVOICE",
-            financial_year=fy,
-            prefix=f"DSI-{fy}",
-            next_number=100,
-            padding=5,
-            is_active=True,
+        fy = "2026-27"
+        self.ds_series = ensure_document_numbering_profile_for_date(
+            DocumentType.DIRECT_SALE, date(2026, 5, 1), performed_by=self.admin
         )
-        self.inv_series = DocumentSequence.objects.create(
-            series_code="BILL_INV",
-            financial_year=fy,
-            prefix=f"INV-{fy}",
-            next_number=100,
-            padding=5,
-            is_active=True,
-        )
+        self.inv_series = self.ds_series
 
         self.own_sale = self._create_direct_sale(
             customer=self.customer,

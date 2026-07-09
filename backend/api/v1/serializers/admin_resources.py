@@ -1065,8 +1065,9 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
         if not latest:
             audit = self._latest_release_audit(obj)
             old_subscription_id = None
-            if audit and isinstance(audit.metadata, dict):
-                old_subscription_id = audit.metadata.get("old_subscription_id")
+            audit_metadata = (audit or {}).get("metadata") or {}
+            if isinstance(audit_metadata, dict):
+                old_subscription_id = audit_metadata.get("old_subscription_id")
             return f"SUB-{old_subscription_id}" if old_subscription_id else None
         return (
             getattr(latest, "subscription_number", None)
@@ -1104,7 +1105,7 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
         cache = getattr(self, "_release_audit_map_cache", None)
         if cache is not None:
             return cache
-        mapping: dict[int, int] = {}
+        mapping: dict[int, dict] = {}
         rows = (
             AuditLog.objects.filter(
                 model_name="Subscription",
@@ -1116,12 +1117,12 @@ class LuckyIdAdminSerializer(serializers.ModelSerializer):
         for row in rows:
             lucky_pk = (row.get("metadata") or {}).get("lucky_id")
             if lucky_pk is not None and lucky_pk not in mapping:
-                mapping[lucky_pk] = row["id"]  # first seen = latest (ordered)
+                mapping[lucky_pk] = row  # first seen = latest (ordered)
         self._release_audit_map_cache = mapping
         return mapping
 
     def _latest_release_audit(self, obj):
-        # Returns a truthy audit id (or None); callers only test truthiness.
+        # Returns the audit row dict (with "id" and "metadata"), or None.
         return self._release_audit_map().get(obj.pk)
 
     def get_assignable(self, obj):

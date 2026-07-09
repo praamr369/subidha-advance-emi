@@ -21,6 +21,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 from subscriptions.services.payment_service import record_emi_payment
 from subscriptions.models import SubscriptionStatus
@@ -33,6 +34,7 @@ class AdminDashboardApiTests(APITestCase):
             username="admin_dashboard_ops",
             phone="9304000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.client.force_authenticate(user=self.admin)
 
         customer = create_customer_profile(

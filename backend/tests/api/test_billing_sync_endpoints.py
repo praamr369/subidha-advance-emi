@@ -15,6 +15,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -25,6 +26,7 @@ class BillingSyncEndpointTests(APITestCase):
             username="billing_sync_api_admin",
             phone="9387000020",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.client.force_authenticate(user=self.admin)
         self.customer = create_customer_profile(
             name="Billing Sync API Customer",

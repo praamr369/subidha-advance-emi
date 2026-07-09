@@ -41,7 +41,7 @@ from accounting.services.hr_workspace_service import (
     reject_leave_request_action,
     _write_audit,
 )
-from accounting.services.workforce_service import leave_balance_rows, upsert_leave_request_draft
+from accounting.services.workforce_service import leave_balance_rows, upsert_employee_expense_claim_draft, upsert_leave_request_draft
 from api.v1.permissions import IsAdmin
 from api.v1.serializers.accounting import (
     EmployeeAttendanceSerializer,
@@ -690,7 +690,7 @@ class AdminHrAttendanceListCreateView(_AdminBase):
         employee = get_object_or_404(EmployeeProfile, pk=serializer.validated_data["employee"])
         attendance_date = serializer.validated_data.get("attendance_date") or timezone.localdate()
         attendance = mark_attendance(performed_by=request.user, employee=employee, attendance_date=attendance_date, status=serializer.validated_data["status"], notes=serializer.validated_data.get("notes") or "", worked_hours=serializer.validated_data.get("worked_hours"), overtime_hours=serializer.validated_data.get("overtime_hours"))
-        return Response(EmployeeAttendanceSerializer(attendance, context={"request": request}).data)
+        return Response(EmployeeAttendanceSerializer(attendance, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
 class HrLeavePatchSerializer(serializers.Serializer):
@@ -784,7 +784,10 @@ class AdminHrExpenseClaimsListCreateView(_AdminBase):
         return Response({"count": qs.count(), "results": EmployeeExpenseClaimSerializer(results, many=True, context={"request": request}).data})
 
     def post(self, request):
-        raise serializers.ValidationError({"detail": "Create expense claims via the expense claim module."})
+        serializer = EmployeeExpenseClaimSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        claim = serializer.save()
+        return Response(EmployeeExpenseClaimSerializer(claim, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
 class AdminHrExpenseClaimPatchView(_AdminBase):

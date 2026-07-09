@@ -16,7 +16,12 @@ from accounting.services.purchase_bill_posting_service import approve_purchase_b
 from accounting.services.vendor_settlement_service import post_vendor_settlement
 from inventory.models import InventoryItem, InventoryItemType
 from inventory.services.stock_service import upsert_purchase_bill_draft
-from tests.helpers import create_admin_user, create_product
+from tests.helpers import (
+    create_admin_user,
+    create_product,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
+)
 
 
 class VendorOperationalSummaryApiTests(APITestCase):
@@ -26,6 +31,7 @@ class VendorOperationalSummaryApiTests(APITestCase):
             username="vendor_ops_admin",
             phone="9389400001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.client.force_authenticate(user=self.admin)
 
         product = create_product(
@@ -52,6 +58,7 @@ class VendorOperationalSummaryApiTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account)
 
         purchase_bill = upsert_purchase_bill_draft(
             bill_no="VENDOR-OPS-202604-001",

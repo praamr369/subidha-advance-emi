@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from rest_framework import status
@@ -17,6 +18,7 @@ from tests.helpers import (
     create_customer_profile,
     create_customer_user,
     create_partner_user,
+    ensure_test_accounting_posting_prerequisites,
 )
 from accounting.models import EmployeeProfile
 
@@ -28,6 +30,8 @@ class AccountingWorkforceEndpointsTests(APITestCase):
             username="accounting_workforce_admin",
             phone="9357000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
+        ensure_test_accounting_posting_prerequisites(date(2026, 4, 20), performed_by=self.admin)
         self.partner = create_partner_user(
             username="accounting_workforce_partner",
             phone="9357000002",
@@ -48,9 +52,9 @@ class AccountingWorkforceEndpointsTests(APITestCase):
 
     def test_non_admin_roles_cannot_access_workforce_accounting_endpoints(self):
         endpoints = [
-            "/api/v1/accounting/attendance/",
-            "/api/v1/accounting/leave-requests/",
-            "/api/v1/accounting/expense-claims/",
+            "/api/v1/admin/hr/attendance/",
+            "/api/v1/admin/hr/leave-requests/",
+            "/api/v1/admin/hr/expense-claims/",
             "/api/v1/accounting/salary-payments/",
             "/api/v1/accounting/reports/staff-ledger/",
         ]
@@ -96,7 +100,7 @@ class AccountingWorkforceEndpointsTests(APITestCase):
         )
 
         attendance_response = self.client.post(
-            "/api/v1/accounting/attendance/",
+            "/api/v1/admin/hr/attendance/",
             {
                 "employee": employee.id,
                 "attendance_date": "2026-04-09",
@@ -154,7 +158,7 @@ class AccountingWorkforceEndpointsTests(APITestCase):
         )
 
         leave_request_response = self.client.post(
-            "/api/v1/accounting/leave-requests/",
+            "/api/v1/admin/hr/leave-requests/",
             {
                 "employee": employee.id,
                 "leave_type": leave_type.id,
@@ -172,7 +176,7 @@ class AccountingWorkforceEndpointsTests(APITestCase):
         )
 
         approve_response = self.client.post(
-            f"/api/v1/accounting/leave-requests/{leave_request_response.data['id']}/approve/",
+            f"/api/v1/admin/hr/leave-requests/{leave_request_response.data['id']}/approve/",
             {},
             format="json",
         )
@@ -191,7 +195,7 @@ class AccountingWorkforceEndpointsTests(APITestCase):
         self.assertEqual(calendar_response.data["summary"]["leave_count"], 1)
 
         claim_response = self.client.post(
-            "/api/v1/accounting/expense-claims/",
+            "/api/v1/admin/hr/expense-claims/",
             {
                 "employee": employee.id,
                 "claim_date": "2026-04-20",
@@ -207,7 +211,7 @@ class AccountingWorkforceEndpointsTests(APITestCase):
         self.assertEqual(claim_response.status_code, status.HTTP_201_CREATED, claim_response.data)
 
         claim_approve_response = self.client.post(
-            f"/api/v1/accounting/expense-claims/{claim_response.data['id']}/approve/",
+            f"/api/v1/admin/hr/expense-claims/{claim_response.data['id']}/approve/",
             {"approved_amount": "300.00"},
             format="json",
         )
@@ -222,7 +226,7 @@ class AccountingWorkforceEndpointsTests(APITestCase):
         )
 
         claim_post_response = self.client.post(
-            f"/api/v1/accounting/expense-claims/{claim_response.data['id']}/post/",
+            f"/api/v1/admin/hr/expense-claims/{claim_response.data['id']}/post/",
             {},
             format="json",
         )
@@ -237,7 +241,7 @@ class AccountingWorkforceEndpointsTests(APITestCase):
         )
 
         claim_payment_response = self.client.post(
-            "/api/v1/accounting/expense-claim-payments/",
+            "/api/v1/admin/hr/payroll-payments/",
             {
                 "expense_claim": claim_response.data["id"],
                 "payment_date": "2026-04-21",

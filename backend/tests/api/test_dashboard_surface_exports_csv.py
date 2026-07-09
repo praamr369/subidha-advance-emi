@@ -18,6 +18,7 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -27,6 +28,7 @@ class DashboardSurfaceCsvExportApiTests(APITestCase):
         super().setUp()
         today = timezone.localdate()
         self.admin = create_admin_user(username="dash_csv_admin", phone="9363200001")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         customer_user = create_customer_user(username="dash_csv_customer", phone="7363200001")
         customer = create_customer_profile(user=customer_user, name="Dash CSV Customer", phone="7363200001")
         product = create_product(name="Dash CSV Product", product_code="DCSV-001", base_price=Decimal("2000.00"))

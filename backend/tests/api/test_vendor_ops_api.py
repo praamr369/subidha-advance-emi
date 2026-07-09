@@ -408,8 +408,8 @@ class VendorOpsApiTests(APITestCase):
         )
         response = self.client.get(f"/api/v1/admin/vendors/{self.vendor.id}/outstanding/")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(response.data["purchase_bills"], "1200")
-        self.assertEqual(response.data["purchase_returns"], "200")
+        self.assertEqual(response.data["purchase_bills"], "1200.00")
+        self.assertEqual(response.data["purchase_returns"], "200.00")
         self.assertEqual(response.data["outstanding"], "1000.00")
 
     def test_purchase_return_vendor_side_does_not_affect_customer_credit(self):

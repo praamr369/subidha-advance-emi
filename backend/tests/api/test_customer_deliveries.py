@@ -21,6 +21,7 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -30,6 +31,7 @@ class CustomerDeliveryApiTests(APITestCase):
             username="customer_delivery_admin",
             phone="9331000000",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.partner = create_partner_user(
             username="customer_delivery_partner",
             phone="9331000001",

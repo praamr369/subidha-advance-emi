@@ -27,6 +27,8 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -38,6 +40,7 @@ class FinancePaymentOperationsApiTests(APITestCase):
             phone="9390000001",
         )
         self.client.force_authenticate(user=self.admin)
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
 
         self.customer = create_customer_profile(name="Finance Ops Customer", phone="7390000001")
         self.product = create_product(
@@ -73,6 +76,7 @@ class FinancePaymentOperationsApiTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_finance)
         self.upi_finance = FinanceAccount.objects.create(
             name="Finance UPI Clearing",
             kind=FinanceAccountKind.UPI,
@@ -83,6 +87,7 @@ class FinancePaymentOperationsApiTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.upi_finance)
         self.bank_finance = FinanceAccount.objects.create(
             name="Finance Main Bank",
             kind=FinanceAccountKind.BANK,
@@ -93,6 +98,7 @@ class FinancePaymentOperationsApiTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.bank_finance)
         self.inactive_finance = FinanceAccount.objects.create(
             name="Inactive Counter",
             kind=FinanceAccountKind.CASH,

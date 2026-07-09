@@ -12,6 +12,7 @@ from reconciliation.models import ReconciliationItem, ReconciliationItemStatus, 
 from reconciliation.services.accounting_bridge_reconciliation import run_accounting_bridge_checks
 from reconciliation.services.run_numbering import next_reconciliation_run_no
 from subscriptions.models import Payment, PaymentMethod
+from accounting.services.period_service import invalidate_period_memo
 from tests.helpers import (
     create_admin_user,
     create_cashier_user,
@@ -164,17 +165,22 @@ class AccountingBridgeCandidatePostingPhaseFTests(APITestCase):
         preview = self.client.get(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/{self.candidate_id}/preview/").data
 
         self.prereqs["accounting_period"].status = AccountingPeriodStatus.LOCKED
-        self.prereqs["accounting_period"].save(update_fields=["status", "updated_at"])
+        self.prereqs["accounting_period"].is_locked = True
+        self.prereqs["accounting_period"].save(update_fields=["status", "is_locked", "updated_at"])
+        invalidate_period_memo()
         locked = self.client.post(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/{self.candidate_id}/post/", {"idempotency_key": preview["idempotency_key"], "confirm": True}, format="json")
         self.assertEqual(locked.status_code, status.HTTP_400_BAD_REQUEST)
 
         self.prereqs["accounting_period"].status = AccountingPeriodStatus.CLOSED
         self.prereqs["accounting_period"].save(update_fields=["status", "updated_at"])
+        invalidate_period_memo()
         closed = self.client.post(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/{self.candidate_id}/post/", {"idempotency_key": preview["idempotency_key"], "confirm": True}, format="json")
         self.assertEqual(closed.status_code, status.HTTP_400_BAD_REQUEST)
 
         self.prereqs["accounting_period"].status = AccountingPeriodStatus.OPEN
-        self.prereqs["accounting_period"].save(update_fields=["status", "updated_at"])
+        self.prereqs["accounting_period"].is_locked = False
+        self.prereqs["accounting_period"].save(update_fields=["status", "is_locked", "updated_at"])
+        invalidate_period_memo()
         DocumentSequence.objects.filter(document_type=DocumentType.JOURNAL_ENTRY).update(is_active=False)
         missing_numbering = self.client.post(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/{self.candidate_id}/post/", {"idempotency_key": preview["idempotency_key"], "confirm": True}, format="json")
         self.assertEqual(missing_numbering.status_code, status.HTTP_400_BAD_REQUEST)
@@ -190,6 +196,7 @@ class AccountingBridgeCandidatePostingPhaseFTests(APITestCase):
     def test_post_rejects_missing_accounting_period(self):
         preview = self.client.get(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/{self.candidate_id}/preview/").data
         self.prereqs["accounting_period"].delete()
+        invalidate_period_memo()
         response = self.client.post(f"/api/v1/admin/accounting/bridge-reconciliation/candidates/{self.candidate_id}/post/", {"idempotency_key": preview["idempotency_key"], "confirm": True}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(JournalEntry.objects.filter(source_model="Payment", source_id=str(self.payment.id), voucher_type="PAYMENT_COLLECTION").count(), 0)

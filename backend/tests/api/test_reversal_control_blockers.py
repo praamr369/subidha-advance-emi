@@ -10,6 +10,10 @@ from billing.services.billing_service import approve_billing_invoice, create_dir
 from subscriptions.models import Emi, LuckyDraw, OperationalCancellation, Payment
 from inventory.models import InventoryItem
 from tests.helpers import create_admin_user, create_customer_profile, create_product
+from tests.helpers import (
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
+)
 from tests.helpers import create_customer_user
 
 
@@ -17,12 +21,14 @@ class ReversalControlBlockerTests(APITestCase):
     def setUp(self):
         super().setUp()
         self.admin = create_admin_user(username="rev_case_admin", phone="9386333001")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.client.force_authenticate(user=self.admin)
         self.customer = create_customer_profile(name="Reversal Blocker Customer", phone="7386333001")
         self.product = create_product(name="Reversal Blocker Product", product_code="REV-BLOCK-001", base_price=Decimal("1000.00"))
         self.inventory_item = InventoryItem.objects.create(product=self.product, sku="REV-BLOCK-SKU-001", opening_stock_qty=Decimal("5.000"), reorder_level_qty=Decimal("1.000"), standard_unit_cost=Decimal("700.00"))
         cash_chart = ChartOfAccount.objects.create(code="REV-BLOCK-CASH-001", name="Reversal Block Cash", account_type=ChartOfAccountType.ASSET)
         self.cash_account = FinanceAccount.objects.create(name="Reversal Block Cash Counter", kind=FinanceAccountKind.CASH, chart_account=cash_chart, opening_balance=Decimal("0.00"))
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account)
 
     def _create_sale(self, *, received_total: Decimal = Decimal("0.00")):
         return create_direct_sale(

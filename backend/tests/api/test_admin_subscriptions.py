@@ -18,6 +18,7 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -27,6 +28,7 @@ class AdminSubscriptionDetailApiTests(APITestCase):
             username="admin_subscription_detail",
             phone="9303000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.client.force_authenticate(user=self.admin)
 
         self.partner = create_partner_user(

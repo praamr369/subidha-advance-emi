@@ -28,6 +28,7 @@ from accounting.services.document_sequence_service import (
     DocumentType,
     get_or_create_sequence_for_document_type,
 )
+from accounting.services.period_service import invalidate_period_memo
 from accounting.services.system_accounts_service import ensure_system_account
 
 MAIN_CASH_FINANCE_ACCOUNT_NAME = "Main Cash Desk"
@@ -539,10 +540,11 @@ def _upsert_default_mapping(
 
 
 def _ensure_journal_entry_numbering_profile() -> dict[str, Any]:
+    invalidate_period_memo()
     try:
         before = DocumentSequence.objects.count()
         sequence = get_or_create_sequence_for_document_type(DocumentType.JOURNAL_ENTRY, timezone.localdate())
-    except DocumentNumberingSetupError as exc:
+    except Exception as exc:
         return {"created": False, "blocked": True, "detail": str(exc)}
     return {
         "created": DocumentSequence.objects.count() > before,

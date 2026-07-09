@@ -19,12 +19,15 @@ from tests.helpers import (
     create_partner_user,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
 class ReconciliationTests(TestCase):
     def setUp(self):
         self.admin = create_admin_user(username="recon_admin", phone="9000000401")
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.partner = create_partner_user(username="recon_partner", phone="9000000402")
 
         self.customer = create_customer_profile(
@@ -78,6 +81,7 @@ class ReconciliationTests(TestCase):
             code="TEST-RECON-001",
             name="Reconciliation Cash",
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.finance_account)
 
     def _sum_ledger_amount(self, *, emi, entry_type):
         return (

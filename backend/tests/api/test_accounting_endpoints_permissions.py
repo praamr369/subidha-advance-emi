@@ -10,6 +10,7 @@ from tests.helpers import (
     create_customer_profile,
     create_customer_user,
     create_partner_user,
+    ensure_test_accounting_posting_prerequisites,
 )
 
 
@@ -20,6 +21,7 @@ class AccountingEndpointsPermissionsTests(APITestCase):
             username="accounting_api_admin",
             phone="9350000001",
         )
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
         self.partner = create_partner_user(
             username="accounting_api_partner",
             phone="9350000002",

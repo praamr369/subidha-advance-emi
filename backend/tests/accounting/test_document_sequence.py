@@ -8,7 +8,7 @@ from accounting.services.gst_document_posting_service import (
     approve_tax_invoice,
     ensure_document_sequence,
 )
-from tests.helpers import create_admin_user
+from tests.helpers import create_admin_user, ensure_gst_registered_tax_profile
 
 
 class DocumentSequenceTests(TestCase):
@@ -18,6 +18,7 @@ class DocumentSequenceTests(TestCase):
             username="document_sequence_admin",
             phone="9364000004",
         )
+        ensure_gst_registered_tax_profile()
 
     def _create_invoice(self):
         return TaxInvoice.objects.create(

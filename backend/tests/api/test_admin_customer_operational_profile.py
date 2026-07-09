@@ -24,6 +24,8 @@ from tests.helpers import (
     create_lucky_id,
     create_product,
     create_subscription,
+    ensure_test_accounting_posting_prerequisites,
+    ensure_test_collection_purpose_mapping,
 )
 
 
@@ -35,6 +37,7 @@ class AdminCustomerOperationalProfileApiTests(APITestCase):
             phone="9389300001",
         )
         self.client.force_authenticate(user=self.admin)
+        ensure_test_accounting_posting_prerequisites(performed_by=self.admin)
 
         self.customer = create_customer_profile(
             name="Operational Profile Customer",
@@ -62,6 +65,7 @@ class AdminCustomerOperationalProfileApiTests(APITestCase):
             ),
             opening_balance=Decimal("0.00"),
         )
+        ensure_test_collection_purpose_mapping(finance_account=self.cash_account)
 
         batch = create_batch(
             batch_code="CUSTOPS0426",
