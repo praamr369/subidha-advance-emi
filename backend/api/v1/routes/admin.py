@@ -285,6 +285,13 @@ from api.v1.views.admin_warranty import (
     extended_warranty_list_view,
     extended_warranty_mark_paid_view,
 )
+from api.v1.views.admin_warranty_coverage import (
+    product_warranty_coverage_view,
+    warranty_service_records_view,
+    warranty_service_record_detail_view,
+    warranty_invoice_check_view,
+    warranty_dashboard_summary_view,
+)
 from api.v1.views.admin_partial_payment import (
     partial_payment_preview_view,
     partial_payment_split_view,
@@ -1272,6 +1279,12 @@ urlpatterns = [
     path("service-pricing/<int:product_id>/", service_pricing_view),
     path("extended-warranty/", extended_warranty_list_view),
     path("extended-warranty/<int:plan_id>/mark-paid/", extended_warranty_mark_paid_view),
+    # Warranty Coverage Management
+    path("products/<int:product_id>/warranty-coverage/", product_warranty_coverage_view),
+    path("warranty-service-records/", warranty_service_records_view),
+    path("warranty-service-records/<int:record_id>/", warranty_service_record_detail_view),
+    path("warranty-invoice-check/<int:invoice_id>/", warranty_invoice_check_view),
+    path("warranty-dashboard-summary/", warranty_dashboard_summary_view),
 
     # ── Partial Payment Split ─────────────────────────────────────────────────
     path("subscriptions/<int:subscription_id>/partial-payment/preview/", partial_payment_preview_view),

@@ -688,6 +688,168 @@ class WarrantyExtendedPlan(ServiceDeskTimeStampedModel):
         return f"ExtendedPlan {self.product.name} ({self.coverage_start_date})"
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# WARRANTY SERVICE RECORDS (Warranty tracking per Invoice/Delivery)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class WarrantyServiceRecord(ServiceDeskTimeStampedModel):
+    """Track warranty status and service history per invoice/delivery"""
+
+    from billing.models import BillingInvoice
+    from subscriptions.models import SubscriptionDelivery
+
+    # Link to sale/invoice
+    invoice = models.OneToOneField(
+        BillingInvoice,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="warranty_record",
+    )
+    delivery = models.OneToOneField(
+        SubscriptionDelivery,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="warranty_record",
+    )
+
+    # Product warranty details
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="warranty_service_records",
+    )
+
+    # Warranty period (from delivery date)
+    delivery_date = models.DateField(db_index=True)
+    warranty_manufacturing_end = models.DateField(db_index=True)
+    warranty_structural_end = models.DateField(null=True, blank=True)
+
+    # Warranty status
+    is_in_manufacturing_warranty = models.BooleanField(default=True, db_index=True)
+    is_in_structural_warranty = models.BooleanField(default=True, db_index=True)
+    has_extended_warranty = models.BooleanField(default=False, db_index=True)
+
+    # Service history
+    total_service_calls = models.PositiveIntegerField(default=0)
+    total_warranty_claims = models.PositiveIntegerField(default=0)
+    last_service_date = models.DateField(null=True, blank=True)
+
+    # Notes
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "warranty_service_records"
+        ordering = ["-delivery_date"]
+        indexes = [
+            models.Index(fields=["product", "is_in_manufacturing_warranty"]),
+            models.Index(fields=["delivery_date"]),
+            models.Index(fields=["warranty_manufacturing_end"]),
+        ]
+
+    def __str__(self):
+        return f"WarrantyRecord {self.product.name} (Delivery: {self.delivery_date})"
+
+    @property
+    def days_until_manufacturing_warranty_expires(self) -> int:
+        """Days remaining in manufacturing warranty"""
+        remaining = (self.warranty_manufacturing_end - timezone.localdate()).days
+        return max(0, remaining)
+
+    @property
+    def days_until_structural_warranty_expires(self) -> int:
+        """Days remaining in structural warranty"""
+        if not self.warranty_structural_end:
+            return 0
+        remaining = (self.warranty_structural_end - timezone.localdate()).days
+        return max(0, remaining)
+
+    @property
+    def warranty_status_display(self) -> str:
+        """Human-readable warranty status"""
+        if self.is_in_manufacturing_warranty:
+            return f"Manufacturing: {self.days_until_manufacturing_warranty_expires} days"
+        if self.is_in_structural_warranty:
+            return f"Structural: {self.days_until_structural_warranty_expires} days"
+        if self.has_extended_warranty:
+            return "Extended warranty active"
+        return "Out of warranty"
+
+    def update_warranty_status(self):
+        """Update warranty status based on current date"""
+        today = timezone.localdate()
+        self.is_in_manufacturing_warranty = today <= self.warranty_manufacturing_end
+        if self.warranty_structural_end:
+            self.is_in_structural_warranty = today <= self.warranty_structural_end
+        self.save()
+
+
+class WarrantyServiceCall(ServiceDeskTimeStampedModel):
+    """Track individual service calls against warranty records"""
+
+    warranty_record = models.ForeignKey(
+        WarrantyServiceRecord,
+        on_delete=models.PROTECT,
+        related_name="service_calls",
+    )
+    service_case = models.ForeignKey(
+        ServiceDeskCase,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="warranty_service_calls",
+    )
+
+    # Service details
+    service_call_date = models.DateField(db_index=True)
+    service_type = models.CharField(
+        max_length=30,
+        choices=[
+            ('REPAIR', 'Repair'),
+            ('REPLACEMENT', 'Replacement'),
+            ('MAINTENANCE', 'Maintenance'),
+            ('INSPECTION', 'Inspection'),
+        ],
+        default='REPAIR',
+    )
+
+    # Warranty coverage
+    is_warranty_covered = models.BooleanField(default=True, db_index=True)
+    coverage_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('MANUFACTURING', 'Manufacturing Warranty'),
+            ('STRUCTURAL', 'Structural Warranty'),
+            ('EXTENDED', 'Extended Warranty'),
+            ('PAID', 'Paid Service'),
+        ],
+        blank=True,
+        default='',
+    )
+
+    # Cost
+    service_cost = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        default=MONEY_ZERO,
+        help_text="Total service cost (0 if warranty covered)"
+    )
+
+    # Notes
+    technician_notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "warranty_service_calls"
+        ordering = ["-service_call_date"]
+        indexes = [
+            models.Index(fields=["warranty_record", "service_call_date"]),
+            models.Index(fields=["is_warranty_covered"]),
+        ]
+
+    def __str__(self):
+        return f"ServiceCall {self.warranty_record.product.name} ({self.service_call_date})"
+
+
 from service_desk.support_ticket_models import (  # noqa: E402,F401
     SupportTicket,
     SupportTicketAttachment,

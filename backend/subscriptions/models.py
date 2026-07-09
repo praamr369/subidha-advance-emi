@@ -624,6 +624,31 @@ class Product(TimeStampedModel):
         db_index=True,
     )
 
+    # WARRANTY COVERAGE (Additive - v2.0)
+    warranty_enabled = models.BooleanField(
+        default=True,
+        help_text="Enable warranty coverage for this product",
+        db_index=True,
+    )
+    warranty_months_manufacturing = models.PositiveIntegerField(
+        default=12,
+        help_text="Manufacturing defect warranty (months)",
+    )
+    warranty_months_structural = models.PositiveIntegerField(
+        default=36,
+        help_text="Structural warranty for furniture (months, 0 = none)",
+    )
+    warranty_months_extended_max = models.PositiveIntegerField(
+        default=12,
+        help_text="Max months for extended warranty plan",
+    )
+    extended_warranty_cost_percentage = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal('7.5'),
+        help_text="Extended warranty cost as % of product price",
+    )
+
     class Meta:
         db_table = "products"
         ordering = ["name", "id"]
