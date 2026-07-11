@@ -1,19 +1,23 @@
-import os
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status, serializers
+from rest_framework import status
 
 from api.v1.permissions import IsAdmin
 from reviews.models import InternalReview
-from reviews.services import get_combined_reviews, fetch_google_reviews, fetch_facebook_reviews
+from reviews.services import (
+    get_combined_reviews,
+    fetch_google_reviews,
+    fetch_facebook_reviews,
+    fetch_youtube_comments,
+    get_review_links,
+)
 
 
 # ── Public ────────────────────────────────────────────────────────────────────
 
 class PublicReviewsView(APIView):
-    """Public: returns all approved reviews + Google/Facebook data (cached)."""
     authentication_classes = []
     permission_classes = [AllowAny]
 
@@ -22,7 +26,6 @@ class PublicReviewsView(APIView):
 
 
 class PublicReviewSubmitView(APIView):
-    """Anyone can submit a review; goes into pending queue."""
     authentication_classes = []
     permission_classes = [AllowAny]
 
@@ -45,7 +48,6 @@ class PublicReviewSubmitView(APIView):
             return Response({"error": "Rating must be 1–5."}, status=status.HTTP_400_BAD_REQUEST)
 
         customer = request.user if request.user.is_authenticated else None
-
         InternalReview.objects.create(
             reviewer_name=name,
             reviewer_phone=phone,
@@ -57,17 +59,14 @@ class PublicReviewSubmitView(APIView):
         return Response({"message": "Thank you! Your review is pending approval."}, status=status.HTTP_201_CREATED)
 
 
-# ── Customer (authenticated) ──────────────────────────────────────────────────
+# ── Customer ──────────────────────────────────────────────────────────────────
 
 class CustomerReviewListView(APIView):
-    """Logged-in customer: list their own submitted reviews."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         qs = InternalReview.objects.filter(customer=request.user)
-        return Response({
-            "results": [_serialize_review(r, include_status=True) for r in qs]
-        })
+        return Response({"results": [_serialize_review(r, include_status=True) for r in qs]})
 
 
 # ── Admin ─────────────────────────────────────────────────────────────────────
@@ -87,6 +86,7 @@ class AdminReviewListView(APIView):
                 "approved": InternalReview.objects.filter(status="approved").count(),
                 "rejected": InternalReview.objects.filter(status="rejected").count(),
             },
+            "links": get_review_links(),
         })
 
 
@@ -116,17 +116,16 @@ class AdminReviewDetailView(APIView):
 
 
 class AdminReviewRefreshCacheView(APIView):
-    """Force-refresh cached Google/Facebook reviews."""
     permission_classes = [IsAdmin]
 
     def post(self, request):
         g = fetch_google_reviews(force_refresh=True)
         f = fetch_facebook_reviews(force_refresh=True)
+        y = fetch_youtube_comments(force_refresh=True)
         return Response({
-            "google_fetched": len(g.get("reviews", [])),
-            "facebook_fetched": len(f.get("reviews", [])),
-            "google_error": g.get("error"),
-            "facebook_error": f.get("error"),
+            "google": {"fetched": len(g.get("reviews", [])), "error": g.get("error")},
+            "facebook": {"fetched": len(f.get("reviews", [])), "error": f.get("error")},
+            "youtube": {"fetched": len(y.get("reviews", [])), "error": y.get("error")},
         })
 
 
