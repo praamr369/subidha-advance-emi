@@ -10,10 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import {
-  AlertTriangle,
   ArrowRight,
   BadgeCheck,
-  Banknote,
   BarChart3,
   Building2,
   CalendarClock,
@@ -26,7 +24,6 @@ import {
   RefreshCw,
   ShoppingCart,
   ShieldAlert,
-  Siren,
   Truck,
   Users,
   Wallet,
@@ -45,21 +42,18 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ADMIN_ENTERPRISE_MODULES } from "@/config/admin-enterprise";
 import {
-  buildReconciliationPosture,
   buildSettlementPosture,
   buildWinnerPosture,
   formatDate,
   money,
 } from "@/lib/dashboard-summary";
 import {
-  buildAdminCollectionsRoute,
   buildAdminDeliveriesRoute,
   buildAdminLeadsRoute,
   buildAdminPaymentRoute,
   buildAdminReconciliationRoute,
   buildAdminSubscriptionRequestsRoute,
   buildAdminSubscriptionRoute,
-  buildAdminSupportRequestsRoute,
 } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -429,66 +423,6 @@ function AttentionRow({
   );
 }
 
-function ActionBucketCard({
-  eyebrow,
-  title,
-  value,
-  detail,
-  primaryHref,
-  primaryLabel,
-  secondaryHref,
-  secondaryLabel,
-  tone = "default",
-}: {
-  eyebrow: string;
-  title: string;
-  value: string;
-  detail: string;
-  primaryHref: string;
-  primaryLabel: string;
-  secondaryHref?: string;
-  secondaryLabel?: string;
-  tone?: "default" | "warning" | "success" | "info";
-}) {
-  const toneClassName =
-    tone === "warning"
-      ? "border-amber-200 bg-amber-50/88"
-      : tone === "success"
-      ? "border-emerald-200 bg-emerald-50/88"
-      : tone === "info"
-      ? "border-sky-200 bg-sky-50/88"
-      : "border-border bg-card";
-
-  return (
-    <article
-      className={`rounded-[1.5rem] border p-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.44)] ${toneClassName}`}
-    >
-      <div className="enterprise-eyebrow">
-        {eyebrow}
-      </div>
-      <h3 className="mt-2 text-base font-semibold text-foreground">{title}</h3>
-      <div className="enterprise-metric mt-3 text-foreground">
-        {value}
-      </div>
-      <p className="mt-3 text-sm leading-6 text-slate-700">{detail}</p>
-      <div className="mt-5 flex flex-wrap gap-2">
-        <ActionButton href={primaryHref} variant="primary" className="h-9 px-3 text-xs">
-          {primaryLabel}
-        </ActionButton>
-        {secondaryHref && secondaryLabel ? (
-          <ActionButton
-            href={secondaryHref}
-            variant="secondary"
-            className="h-9 px-3 text-xs"
-          >
-            {secondaryLabel}
-          </ActionButton>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
 export default function AdminDashboardPage() {
   const [legacy, setLegacy] = useState<LegacyDashboardPayload | null>(null);
   const [canonical, setCanonical] = useState<CanonicalDashboardPayload | null>(null);
@@ -807,17 +741,12 @@ export default function AdminDashboardPage() {
     canonical?.reconciliation ?? legacy?.reconciliation;
   const settlementPosture = summary ? buildSettlementPosture(summary) : null;
   const winnerPosture = buildWinnerPosture(winnerSurface, summary);
-  const reconciliationPosture = buildReconciliationPosture(
-    reconciliationSurface
-  );
   const overdueFollowUpHref = ROUTES.admin.emisOverdue;
   const flaggedPaymentQueueHref = buildAdminReconciliationRoute({
     view: "payments",
     flagged: true,
   });
-  const dueCollectionWorkspaceHref = buildAdminCollectionsRoute();
   const deliveryQueueHref = buildAdminDeliveriesRoute({ bucket: "PENDING" });
-  const supportQueueHref = buildAdminSupportRequestsRoute({ status: "SUBMITTED" });
   const onboardingRequestsHref = buildAdminSubscriptionRequestsRoute({
     status: "SUBMITTED",
   });
@@ -857,18 +786,6 @@ export default function AdminDashboardPage() {
   const upiTotal = toNumber(
     branchOverview?.collections.upi_net_total ?? branchOverview?.collections.upi_total
   );
-  const todayCashTotal = toNumber(
-    todayBranchOverview?.collections.cash_net_total ??
-      todayBranchOverview?.collections.cash_total
-  );
-  const todayBankTotal = toNumber(
-    todayBranchOverview?.collections.bank_net_total ??
-      todayBranchOverview?.collections.bank_total
-  );
-  const todayUpiTotal = toNumber(
-    todayBranchOverview?.collections.upi_net_total ??
-      todayBranchOverview?.collections.upi_total
-  );
   const todayNetCollections =
     todayBranchOverview?.collections.net_amount ??
     legacy?.collections?.today_net_amount ??
@@ -889,19 +806,6 @@ export default function AdminDashboardPage() {
   const reminderActionCount =
     (pendingReminderQueue?.count ?? 0) + (failedReminderQueue?.count ?? 0);
   const customerIssueActionCount = serviceDeskActionCount + supportActionCount;
-  const attentionQueueCount =
-    (summary?.overdue_emis ?? 0) +
-    (reconciliationSurface?.flagged_count ?? 0) +
-    deliveryActionCount +
-    customerIssueActionCount +
-    purchaseActionCount +
-    payrollActionCount +
-    reminderActionCount +
-    onboardingActionCount;
-  const activeContracts =
-    branchOverview?.subscriptions.active_contracts ??
-    summary?.active_subscriptions ??
-    0;
   const portfolioMix = legacy?.portfolio_mix ?? null;
   const portfolioTotal = Math.max(
     (portfolioMix?.emi ?? 0) + (portfolioMix?.rent ?? 0) + (portfolioMix?.lease ?? 0),
@@ -1235,41 +1139,6 @@ export default function AdminDashboardPage() {
               </WorkspaceSection>
             ) : null}
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <DashboardKpiCard
-                label="Collections (Window scope)"
-                value={money(windowNetCollections)}
-                detail={`${branchOverview?.collections.active_count ?? branchOverview?.collections.count ?? 0} active · ${branchOverview?.collections.reversed_count ?? 0} reversed · ${branchWindow.label} · ${selectedBranchLabel}`}
-                href={ROUTES.admin.branchReporting}
-                tone="success"
-                icon={<Banknote className="h-5 w-5 text-emerald-700" />}
-              />
-              <DashboardKpiCard
-                label="Active contracts"
-                value={String(activeContracts)}
-                detail={`Portfolio includes EMI / RENT / LEASE. ${overdueEmiCount} overdue EMI rows in the same branch posture.`}
-                href={ROUTES.admin.subscriptions}
-                tone={overdueEmiCount > 0 ? "warning" : "info"}
-                icon={<Users className="h-5 w-5 text-sky-700" />}
-              />
-              <DashboardKpiCard
-                label="Immediate Action Queue"
-                value={String(attentionQueueCount)}
-                detail="Overdue EMI, finance flags, reminders, service, procurement, payroll, and onboarding exceptions"
-                href={overdueFollowUpHref}
-                tone={attentionQueueCount > 0 ? "warning" : "success"}
-                icon={<Siren className="h-5 w-5 text-amber-700" />}
-              />
-              <DashboardKpiCard
-                label="Stock alert queue"
-                value={String(lowStockRows.length)}
-                detail={`${rawMaterialLowRows.length} raw-material alert(s) from real inventory summary`}
-                href={ROUTES.admin.inventoryStockOnHand}
-                tone={lowStockRows.length > 0 ? "warning" : "success"}
-                icon={<PackageSearch className="h-5 w-5 text-slate-700" />}
-              />
-            </div>
-
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
               <CockpitPanel
                 title="Needs Immediate Action"
@@ -1356,20 +1225,6 @@ export default function AdminDashboardPage() {
                       <PaymentModeSplit cash={cashTotal} bank={bankTotal} upi={upiTotal} />
                     </div>
 
-                    <div className="mt-6 rounded-xl border border-border bg-card p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Today (net)
-                      </div>
-                      <div className="mt-2 text-xl font-semibold text-slate-950">
-                        {money(todayCashTotal + todayBankTotal + todayUpiTotal)}
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Snapshot for {formatLocalDate(new Date())} in the same branch scope.
-                      </p>
-                      <div className="mt-4">
-                        <PaymentModeSplit cash={todayCashTotal} bank={todayBankTotal} upi={todayUpiTotal} />
-                      </div>
-                    </div>
                   </div>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between gap-3">
@@ -1767,87 +1622,6 @@ export default function AdminDashboardPage() {
               </div>
             </CockpitPanel>
 
-            <WorkspaceSection
-              title="Daily action buckets"
-              description="Each bucket opens the existing canonical operational workspace with live filters applied, so admin can move directly from summary posture into the real queue."
-              contentClassName="grid gap-4 lg:grid-cols-2 xl:grid-cols-3"
-            >
-              <ActionBucketCard
-                eyebrow="Collections & EMI"
-                title="Overdue EMI follow-up"
-                value={String(summary.overdue_emis ?? 0)}
-                detail={`${money(summary.overdue_amount)} is currently overdue in canonical scope. Open the overdue lane or jump to the collections workspace.`}
-                primaryHref={overdueFollowUpHref}
-                primaryLabel="Open overdue queue"
-                secondaryHref={dueCollectionWorkspaceHref}
-                secondaryLabel="Open collections"
-                tone={(summary.overdue_emis ?? 0) > 0 ? "warning" : "success"}
-              />
-              <ActionBucketCard
-                eyebrow="Collections & EMI"
-                title="Flagged payment reconciliation"
-                value={String(reconciliationSurface?.flagged_count ?? 0)}
-                detail={`${reconciliationSurface?.checked_count ?? 0} rows were checked in the current scope. Open the flagged payment queue for controlled follow-up.`}
-                primaryHref={flaggedPaymentQueueHref}
-                primaryLabel="Open payment queue"
-                secondaryHref={buildAdminReconciliationRoute({ flagged: true })}
-                secondaryLabel="Subscription attention"
-                tone={
-                  (reconciliationSurface?.flagged_count ?? 0) > 0
-                    ? "warning"
-                    : "success"
-                }
-              />
-              <ActionBucketCard
-                eyebrow="Fulfillment"
-                title="Pending delivery actions"
-                value={String(deliveryActionCount)}
-                detail={`${deliverySummary?.pending ?? 0} pending, ${deliverySummary?.scheduled ?? 0} scheduled, and ${deliverySummary?.in_transit ?? 0} in transit. Open the canonical delivery register.`}
-                primaryHref={deliveryQueueHref}
-                primaryLabel="Open delivery queue"
-                secondaryHref={ROUTES.admin.deliveries}
-                secondaryLabel="All deliveries"
-                tone={deliveryActionCount > 0 ? "warning" : "success"}
-              />
-              <ActionBucketCard
-                eyebrow="Control Center"
-                title="Pending support issues"
-                value={String(supportActionCount)}
-                detail={`${supportQueue?.summary.unassigned ?? 0} are currently unassigned in the submitted support queue. Open the live admin support workspace.`}
-                primaryHref={supportQueueHref}
-                primaryLabel="Open support queue"
-                secondaryHref={ROUTES.admin.supportRequests}
-                secondaryLabel="All support"
-                tone={supportActionCount > 0 ? "warning" : "success"}
-              />
-              <ActionBucketCard
-                eyebrow="Partner Finance"
-                title="Commission and payout actions"
-                value={String(legacy.commission_summary?.pending_count ?? 0)}
-                detail={`${money(legacy.commission_summary?.pending_commission)} is waiting settlement. Open commission finance or the payout queue without leaving the canonical routes.`}
-                primaryHref={ROUTES.admin.financeCommissions}
-                primaryLabel="Open commissions"
-                secondaryHref={ROUTES.admin.financeSettledCommissions}
-                secondaryLabel="Open payout queue"
-                tone={
-                  (legacy.commission_summary?.pending_count ?? 0) > 0
-                    ? "warning"
-                    : "info"
-                }
-              />
-              <ActionBucketCard
-                eyebrow="Sales & Onboarding"
-                title="Onboarding handoff"
-                value={String(onboardingActionCount)}
-                detail={`${requestQueue?.count ?? 0} submitted subscription request(s) and ${leadActionCount} open lead(s) still need operator handoff into real customer or contract records.`}
-                primaryHref={onboardingRequestsHref}
-                primaryLabel="Open request queue"
-                secondaryHref={newLeadQueueHref}
-                secondaryLabel="Open new leads"
-                tone={onboardingActionCount > 0 ? "info" : "success"}
-              />
-            </WorkspaceSection>
-
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Paid"
@@ -1868,11 +1642,15 @@ export default function AdminDashboardPage() {
                 icon={<CreditCard className="h-5 w-5" />}
               />
               <StatCard
-                label="Overdue EMI"
-                value={String(summary.overdue_emis ?? 0)}
-                subtext={`${money(summary.overdue_amount)} currently overdue in canonical scope`}
-                tone={(summary.overdue_emis ?? 0) > 0 ? "warning" : "default"}
-                icon={<AlertTriangle className="h-5 w-5" />}
+                label="Collection progress"
+                value={`${asPercent(
+                  toNumber(summary.total_paid_amount),
+                  toNumber(summary.total_paid_amount) +
+                    toNumber(summary.total_pending_amount)
+                ).toFixed(1)}%`}
+                subtext={`${summary.paid_emis} of ${summary.paid_emis + (summary.pending_emis ?? 0)} EMI rows settled`}
+                tone="info"
+                icon={<Percent className="h-5 w-5" />}
               />
               <StatCard
                 label="Upcoming EMI"
@@ -1931,13 +1709,13 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="rounded-[1.3rem] border border-border bg-card p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Collections today
+                      Today&apos;s transactions
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-950">
-                      {money(legacy.collections?.today_net_amount)}
+                      {legacy.collections?.today_transaction_count ?? 0} posted
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {legacy.collections?.today_transaction_count ?? 0} transactions
+                      {legacy.collections?.today_reversed_payments ?? 0} reversed row(s) excluded from net
                     </div>
                   </div>
                   <div className="rounded-[1.3rem] border border-border bg-card p-4">
@@ -2030,57 +1808,13 @@ export default function AdminDashboardPage() {
                   ) : null}
                 </WorkspaceSection>
 
-                <WorkspaceSection
-                  title={reconciliationPosture.title}
-                  description={reconciliationPosture.description}
-                  className={reconciliationPosture.tone}
-                  action={
-                    <>
-                      <ActionButton
-                        href={buildAdminReconciliationRoute({ flagged: true })}
-                        variant="secondary"
-                        className="h-9 px-3 text-xs"
-                      >
-                        Open reconciliation
-                      </ActionButton>
-                      <DashboardSurfaceExportActions
-                        query={dashboardQuery}
-                        actions={[
-                          {
-                            surface: "reconciliation-exceptions",
-                            label: "Export CSV",
-                          },
-                        ]}
-                      />
-                    </>
-                  }
-                >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <StatCard
-                      label="Checked"
-                      value={String(reconciliationSurface?.checked_count ?? 0)}
-                      subtext="Subscriptions checked in admin scope"
-                      tone="default"
-                    />
-                    <StatCard
-                      label="Flagged"
-                      value={String(reconciliationSurface?.flagged_count ?? 0)}
-                      subtext="Rows needing controlled finance review"
-                      tone={
-                        (reconciliationSurface?.flagged_count ?? 0) > 0
-                          ? "warning"
-                          : "success"
-                      }
-                    />
-                  </div>
-                </WorkspaceSection>
               </div>
             </div>
 
             <div className="grid gap-4 xl:grid-cols-2">
               <WorkspaceSection
-                title="Collections and commissions"
-                description="Operational collection throughput stays separate from partner commission settlement, but all shared finance posture now comes from the same canonical summary-v2 flow."
+                title="Gross throughput and portfolio risk"
+                description="Gross (pre-reversal) collection throughput and portfolio default posture. Net collections live in the page header; commission settlement lives in the Commissions module card."
                 actionHref={ROUTES.admin.financeCommissions}
                 actionLabel="Open commission finance"
               >
@@ -2088,28 +1822,14 @@ export default function AdminDashboardPage() {
                   <StatCard
                     label="Gross Today"
                     value={money(legacy.collections?.today_gross_amount)}
-                    subtext={`${legacy.collections?.today_active_payments ?? 0} active payment rows`}
+                    subtext={`${legacy.collections?.today_active_payments ?? 0} active payment rows before reversals`}
                     tone="default"
                     icon={<Wallet className="h-5 w-5" />}
                   />
                   <StatCard
-                    label="Net Today"
-                    value={money(legacy.collections?.today_net_amount)}
-                    subtext={`${legacy.collections?.today_reversed_payments ?? 0} reversed rows excluded`}
-                    tone="success"
-                    icon={<CircleDollarSign className="h-5 w-5" />}
-                  />
-                  <StatCard
-                    label="Pending Commission"
-                    value={money(legacy.commission_summary?.pending_commission)}
-                    subtext={`${legacy.commission_summary?.pending_count ?? 0} rows waiting settlement`}
-                    tone="warning"
-                    icon={<Percent className="h-5 w-5" />}
-                  />
-                  <StatCard
                     label="Defaulted"
                     value={String(legacy.risk.defaulted)}
-                    subtext={`${legacy.risk.default_rate.toFixed(2)}% default rate`}
+                    subtext={`${legacy.risk.default_rate.toFixed(2)}% default rate across the portfolio`}
                     tone={legacy.risk.defaulted > 0 ? "warning" : "success"}
                     icon={<ShieldAlert className="h-5 w-5" />}
                   />
@@ -2319,9 +2039,27 @@ export default function AdminDashboardPage() {
 
               <WorkspaceSection
                 title="Reconciliation attention"
-                description="Top flagged subscriptions surfaced from the canonical reconciliation lane for the selected drilldown window."
-                actionHref={buildAdminReconciliationRoute({ flagged: true })}
-                actionLabel="Open flagged rows"
+                description={`${reconciliationSurface?.checked_count ?? 0} subscription(s) checked, ${reconciliationSurface?.flagged_count ?? 0} flagged in the canonical reconciliation lane for the selected drilldown window.`}
+                action={
+                  <>
+                    <ActionButton
+                      href={buildAdminReconciliationRoute({ flagged: true })}
+                      variant="secondary"
+                      className="h-9 px-3 text-xs"
+                    >
+                      Open flagged rows
+                    </ActionButton>
+                    <DashboardSurfaceExportActions
+                      query={dashboardQuery}
+                      actions={[
+                        {
+                          surface: "reconciliation-exceptions",
+                          label: "Export CSV",
+                        },
+                      ]}
+                    />
+                  </>
+                }
               >
                 {flaggedRows.length > 0 ? (
                   <div className="grid gap-3">
