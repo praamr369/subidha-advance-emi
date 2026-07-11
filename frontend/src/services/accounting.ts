@@ -2510,3 +2510,39 @@ export async function downloadAccountingExportCsv(
     `${reportKey}-${period}.csv`
   );
 }
+
+
+// ── Fixed assets ──────────────────────────────────────────────────────────────
+
+export type FixedAsset = {
+  id: number
+  name: string
+  asset_code?: string | null
+  asset_class?: string | null
+  purchase_date?: string | null
+  purchase_cost?: string | number | null
+  accumulated_depreciation?: string | number | null
+  book_value?: string | number | null
+  status?: string | null
+  notes?: string | null
+}
+
+export async function listFixedAssets(params?: {
+  page?: number
+  page_size?: number
+  search?: string
+}): Promise<AccountingPaginatedResponse<FixedAsset>> {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.page_size) qs.set('page_size', String(params.page_size))
+  if (params?.search) qs.set('search', params.search)
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  return apiFetch<AccountingPaginatedResponse<FixedAsset>>(`/admin/accounting/assets/${suffix}`)
+}
+
+export async function createFixedAsset(payload: Partial<FixedAsset>): Promise<FixedAsset> {
+  return apiFetch<FixedAsset>('/admin/accounting/assets/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}

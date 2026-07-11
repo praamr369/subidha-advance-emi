@@ -316,6 +316,16 @@ export default function AdminFinanceDepositsPage() {
         <Link href={ROUTES.admin.rentLease} className="rounded-xl border px-3 py-2 text-sm font-semibold">Rent/Lease Workspace</Link>
         <Link href={`${ROUTES.admin.financeCollect}?workflow=unified`} className="rounded-xl border px-3 py-2 text-sm font-semibold">Unified Collection</Link>
         <Link href={ROUTES.admin.accountingSetup} className="rounded-xl border px-3 py-2 text-sm font-semibold">Accounting Setup</Link>
+        <Link href={ROUTES.admin.accountingBridgeReconciliation} className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+          Bridge Reconciliation →
+        </Link>
+      </div>
+
+      <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
+        <span className="font-semibold">Accounting bridge: </span>
+        Deposit deduction and refund transactions create source records. Journal entries (DR/CR ledger postings) are audit-deferred and must be posted manually via{" "}
+        <Link href={ROUTES.admin.accountingBridgeReconciliation} className="underline font-medium">Bridge Reconciliation</Link>.
+        Rows marked <span className="font-semibold">Bridge: Deferred</span> below have no journal entry yet.
       </div>
 
       <WorkspaceSection title="Deposit Register" description="Live rent/lease security deposit ledger with latest concrete source evidence.">
@@ -333,10 +343,13 @@ export default function AdminFinanceDepositsPage() {
                     <th className="px-3 py-2 text-right">Refundable</th>
                     <th className="px-3 py-2 text-right">Deducted</th>
                     <th className="px-3 py-2">Posture</th>
+                    <th className="px-3 py-2">Bridge</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {rows.map((row) => {
+                    const hasTx = Boolean(row.latest_transaction?.transaction_id);
+                    return (
                     <tr
                       key={row.demand_id}
                       tabIndex={0}
@@ -370,8 +383,18 @@ export default function AdminFinanceDepositsPage() {
                         <StatusBadge status={posture(row)} />
                         {row.disabled_reason ? <div className="mt-1 max-w-[12rem] text-xs text-muted-foreground">{row.disabled_reason}</div> : null}
                       </td>
+                      <td className="px-3 py-2">
+                        {hasTx ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                            Deferred
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </MobileSafeTable>

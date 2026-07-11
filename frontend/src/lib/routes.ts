@@ -214,7 +214,7 @@ export const ROUTES = {
     payments: "/admin/payments",
     paymentsCreate: "/admin/payments/create",
     paymentsHistory: "/admin/payments/history",
-    paymentReconciliation: "/admin/payments/reconciliation",
+    paymentReconciliation: "/admin/payments/reconciliation", // redirects to /admin/accounting/bridge-reconciliation?view=payments
     emis: "/admin/emis",
     emisPending: "/admin/emis/pending",
     emisOverdue: "/admin/emis/overdue",

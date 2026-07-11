@@ -256,86 +256,87 @@ export default function AdminFinancePage() {
         setRefreshing(true);
       }
 
-      try {
-        const [
-          summaryPayload,
-          batchesPayload,
-          analyticsPayload,
-          chartPayload,
-          financeAccountPayload,
-          draftPurchasePayload,
-          approvedPurchasePayload,
-          directSalesPayload,
-          paymentRegisterPayload,
-          vendorsPayload,
-          financeOperationalPayload,
-          reconciliationPayload,
-          financeTransferPayload,
-        ] = await Promise.all([
-          apiFetch<AdminCommissionSummaryResponse>("/admin/commissions/summary/"),
-          apiFetch<unknown>("/admin/commission-payout-batches/list/"),
-          getAdminAnalyticsSummary(analyticsQuery),
-          listChartOfAccounts(),
-          listFinanceAccounts(),
-          listPurchaseBills({ status: "DRAFT", page_size: 1 }),
-          listPurchaseBills({ status: "APPROVED", page_size: 1 }),
-          listDirectSales({ outstanding_only: "true", page_size: 6 }),
-          getAdminPaymentRegister(),
-          listVendors({ page_size: 6 }),
-          getFinanceOperationalSummary(),
-          getReconciliationOverview(),
-          listFinanceTransfers(),
-        ]);
+      // Use allSettled so one failing endpoint never blanks the whole page.
+      const [
+        summaryResult,
+        batchesResult,
+        analyticsResult,
+        chartResult,
+        financeAccountResult,
+        draftPurchaseResult,
+        approvedPurchaseResult,
+        directSalesResult,
+        paymentRegisterResult,
+        vendorsResult,
+        financeOperationalResult,
+        reconciliationResult,
+        financeTransferResult,
+      ] = await Promise.allSettled([
+        apiFetch<AdminCommissionSummaryResponse>("/admin/commissions/summary/"),
+        apiFetch<unknown>("/admin/commission-payout-batches/list/"),
+        getAdminAnalyticsSummary(analyticsQuery),
+        listChartOfAccounts(),
+        listFinanceAccounts(),
+        listPurchaseBills({ status: "DRAFT", page_size: 1 }),
+        listPurchaseBills({ status: "APPROVED", page_size: 1 }),
+        listDirectSales({ outstanding_only: "true", page_size: 6 }),
+        getAdminPaymentRegister(),
+        listVendors({ page_size: 6 }),
+        getFinanceOperationalSummary(),
+        getReconciliationOverview(),
+        listFinanceTransfers(),
+      ]);
 
-        const vendorDetails = await Promise.all(
-          vendorsPayload.results.map((vendor) => getVendorOperationalSummary(vendor.id))
-        );
+      function ok<T>(result: PromiseSettledResult<T>): T | null {
+        return result.status === "fulfilled" ? result.value : null;
+      }
 
-        setSummary(summaryPayload);
-        setBatches(
-          toArray<Record<string, unknown>>(batchesPayload).map(normalizePayoutBatch)
-        );
-        setAnalytics(analyticsPayload);
-        setChartAccounts(chartPayload);
-        setFinanceAccounts(financeAccountPayload);
-        setDraftPurchaseBills(draftPurchasePayload);
-        setApprovedPurchaseBills(approvedPurchasePayload);
-        setDirectSales(directSalesPayload.results);
-        setRecentCollections(paymentRegisterPayload.results.slice(0, 8));
-        setFinanceOperationalSummary(financeOperationalPayload);
-        setReconciliationOverview(reconciliationPayload);
-        setFinanceTransfers(financeTransferPayload);
-        setVendorSummaries(
-          vendorDetails.sort(
-            (left, right) =>
-              toNumber(right.summary.outstanding_payable_total) -
-              toNumber(left.summary.outstanding_payable_total)
-          )
-        );
-        setError(null);
-      } catch (err) {
-        setError(toErrorMessage(err));
-        if (mode === "initial") {
-          setSummary(null);
-          setBatches([]);
-          setAnalytics(null);
-          setChartAccounts(null);
-          setFinanceAccounts(null);
-          setDraftPurchaseBills(null);
-          setApprovedPurchaseBills(null);
-          setDirectSales([]);
-          setRecentCollections([]);
-          setFinanceOperationalSummary(null);
-          setReconciliationOverview(null);
-          setFinanceTransfers(null);
-          setVendorSummaries([]);
-        }
-      } finally {
-        if (mode === "initial") {
-          setLoading(false);
-        } else {
-          setRefreshing(false);
-        }
+      const vendorsPayload = ok(vendorsResult);
+      const vendorDetails =
+        vendorsPayload && vendorsPayload.results.length > 0
+          ? await Promise.allSettled(
+              vendorsPayload.results.map((vendor) => getVendorOperationalSummary(vendor.id))
+            ).then((results) =>
+              results
+                .filter((r): r is PromiseFulfilledResult<VendorOperationalSummary> => r.status === "fulfilled")
+                .map((r) => r.value)
+            )
+          : [];
+
+      const failedSections = [
+        summaryResult, batchesResult, analyticsResult, financeOperationalResult,
+        reconciliationResult,
+      ].filter((r) => r.status === "rejected").length;
+
+      setSummary(ok(summaryResult));
+      setBatches(toArray<Record<string, unknown>>(ok(batchesResult)).map(normalizePayoutBatch));
+      setAnalytics(ok(analyticsResult));
+      setChartAccounts(ok(chartResult));
+      setFinanceAccounts(ok(financeAccountResult));
+      setDraftPurchaseBills(ok(draftPurchaseResult));
+      setApprovedPurchaseBills(ok(approvedPurchaseResult));
+      setDirectSales(ok(directSalesResult)?.results ?? []);
+      setRecentCollections((ok(paymentRegisterResult)?.results ?? []).slice(0, 8));
+      setFinanceOperationalSummary(ok(financeOperationalResult));
+      setReconciliationOverview(ok(reconciliationResult));
+      setFinanceTransfers(ok(financeTransferResult));
+      setVendorSummaries(
+        vendorDetails.sort(
+          (left, right) =>
+            toNumber(right.summary.outstanding_payable_total) -
+            toNumber(left.summary.outstanding_payable_total)
+        )
+      );
+      setError(
+        failedSections > 0
+          ? `${failedSections} finance section(s) failed to load — data shown may be partial. Refresh to retry.`
+          : null
+      );
+
+      if (mode === "initial") {
+        setLoading(false);
+      } else {
+        setRefreshing(false);
       }
     },
     [analyticsQuery]
@@ -572,14 +573,22 @@ export default function AdminFinancePage() {
         {loading ? <LoadingBlock label="Loading finance control center..." /> : null}
 
         {!loading && error ? (
-          <ErrorState
-            title="Unable to load finance control center"
-            description={error}
-            onRetry={() => void loadPage("initial")}
-          />
+          <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 px-4 py-3 flex items-start gap-3 text-sm text-amber-800 dark:text-amber-300">
+            <span className="text-base shrink-0">⚠</span>
+            <span>
+              {error}{" "}
+              <button
+                type="button"
+                onClick={() => void loadPage("refresh")}
+                className="underline font-medium"
+              >
+                Retry
+              </button>
+            </span>
+          </div>
         ) : null}
 
-        {!loading && !error ? (
+        {!loading ? (
           <>
             <ControlLaneGrid
               title="Finance source workflow lanes"
